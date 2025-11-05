@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -6,6 +5,8 @@ import 'package:share_plus/share_plus.dart';
 import '../../services/csv_import_service.dart';
 import '../../core/theme/app_colors.dart';
 import 'package:path_provider/path_provider.dart';
+// Conditional import - use dart:io on mobile, stub on web
+import 'dart:io' if (dart.library.html) '../../utils/io_stub.dart';
 
 class CSVImportDialog extends StatefulWidget {
   final String schoolId;

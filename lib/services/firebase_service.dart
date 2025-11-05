@@ -5,6 +5,8 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 
+import '../firebase_options.dart';
+
 class FirebaseService {
   static FirebaseService? _instance;
   static FirebaseService get instance => _instance ??= FirebaseService._();
@@ -15,13 +17,13 @@ class FirebaseService {
   late final FirebaseAuth _auth;
   late final FirebaseFirestore _firestore;
   late final FirebaseStorage _storage;
-  late final FirebaseMessaging _messaging;
+  late final FirebaseMessaging? _messaging;
 
   // Getters
   FirebaseAuth get auth => _auth;
   FirebaseFirestore get firestore => _firestore;
   FirebaseStorage get storage => _storage;
-  FirebaseMessaging get messaging => _messaging;
+  FirebaseMessaging? get messaging => _messaging;
 
   // Current user stream
   Stream<User?> get authStateChanges => _auth.authStateChanges();
@@ -34,7 +36,11 @@ class FirebaseService {
       _auth = FirebaseAuth.instance;
       _firestore = FirebaseFirestore.instance;
       _storage = FirebaseStorage.instance;
-      _messaging = FirebaseMessaging.instance;
+
+      // Firebase Messaging is not fully supported on web
+      if (!kIsWeb) {
+        _messaging = FirebaseMessaging.instance;
+      }
 
       // Configure Firestore settings
       _firestore.settings = const Settings(
@@ -42,11 +48,11 @@ class FirebaseService {
         cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
       );
 
-      // Request notification permissions
-      await _requestNotificationPermissions();
-
-      // Setup message handlers
-      await _setupMessageHandlers();
+      // Request notification permissions (mobile only)
+      if (!kIsWeb) {
+        await _requestNotificationPermissions();
+        await _setupMessageHandlers();
+      }
 
       debugPrint('Firebase services initialized successfully');
     } catch (e) {
@@ -57,8 +63,10 @@ class FirebaseService {
 
   // Request notification permissions
   Future<void> _requestNotificationPermissions() async {
+    if (_messaging == null) return;
+
     try {
-      final settings = await _messaging.requestPermission(
+      final settings = await _messaging!.requestPermission(
         alert: true,
         announcement: false,
         badge: true,
@@ -73,7 +81,7 @@ class FirebaseService {
 
         // Get FCM token (skip on iOS Simulator as APNS is not available)
         try {
-          final token = await _messaging.getToken();
+          final token = await _messaging!.getToken();
           if (token != null) {
             debugPrint('FCM Token: $token');
             // Save token to user profile
@@ -81,7 +89,7 @@ class FirebaseService {
           }
 
           // Listen to token refresh
-          _messaging.onTokenRefresh.listen(_saveFCMToken);
+          _messaging!.onTokenRefresh.listen(_saveFCMToken);
         } catch (tokenError) {
           // APNS token not available on iOS Simulator - this is expected
           if (tokenError.toString().contains('apns-token-not-set')) {
@@ -102,6 +110,8 @@ class FirebaseService {
 
   // Setup message handlers
   Future<void> _setupMessageHandlers() async {
+    if (_messaging == null) return;
+
     // Handle background messages
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
@@ -125,7 +135,7 @@ class FirebaseService {
     });
 
     // Check if app was opened from a notification
-    final initialMessage = await _messaging.getInitialMessage();
+    final initialMessage = await _messaging!.getInitialMessage();
     if (initialMessage != null) {
       debugPrint('App opened from notification');
       _handleNotificationTap(initialMessage);
@@ -196,7 +206,9 @@ class FirebaseService {
 // Background message handler (must be top-level function)
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   debugPrint('Handling a background message: ${message.messageId}');
   // Handle background message
 }
