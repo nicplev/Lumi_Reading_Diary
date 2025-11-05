@@ -9,6 +9,7 @@ import '../../services/firebase_service.dart';
 import '../parent/parent_home_screen.dart';
 import '../teacher/teacher_home_screen.dart';
 import '../admin/admin_home_screen.dart';
+import '../marketing/landing_screen.dart';
 import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -128,7 +129,7 @@ class _SplashScreenState extends State<SplashScreen> {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => const LoginScreen(),
+        builder: (context) => const LandingScreen(),
       ),
     );
   }
