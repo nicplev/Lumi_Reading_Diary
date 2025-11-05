@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "432054475733",
+    "project_id": "lumi-kakakids",
+    "storage_bucket": "lumi-kakakids.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:432054475733:android:eecbe226fd3f62ed963b5c",
+        "android_client_info": {
+          "package_name": "com.lumi.lumi_reading_tracker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB6jyxGJQcnZIama91DdvsryN2l7qt1vTo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,34 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "lumi-kakakids",
+          "appId": "1:432054475733:android:eecbe226fd3f62ed963b5c",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "lumi-kakakids",
+          "appId": "1:432054475733:ios:3e84170b90653be9963b5c",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "lumi-kakakids",
+          "configurations": {
+            "android": "1:432054475733:android:eecbe226fd3f62ed963b5c",
+            "ios": "1:432054475733:ios:3e84170b90653be9963b5c"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,183 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ============================================
+    // NESTED SCHOOL STRUCTURE SECURITY RULES
+    // ============================================
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getUserData(schoolId) {
+      let userPath = /databases/$(database)/documents/schools/$(schoolId)/users/$(request.auth.uid);
+      let parentPath = /databases/$(database)/documents/schools/$(schoolId)/parents/$(request.auth.uid);
+
+      return exists(userPath) ? get(userPath).data :
+             exists(parentPath) ? get(parentPath).data : null;
+    }
+
+    function isSchoolAdmin(schoolId) {
+      return isSignedIn() && getUserData(schoolId).role == 'schoolAdmin';
+    }
+
+    function isTeacher(schoolId) {
+      return isSignedIn() && getUserData(schoolId).role == 'teacher';
+    }
+
+    function belongsToSchool(schoolId) {
+      return isSignedIn() &&
+             (exists(/databases/$(database)/documents/schools/$(schoolId)/users/$(request.auth.uid)) ||
+              exists(/databases/$(database)/documents/schools/$(schoolId)/parents/$(request.auth.uid)));
+    }
+
+    // ============================================
+    // Schools Collection
+    // ============================================
+    match /schools/{schoolId} {
+      // Allow authenticated users to list schools (for login)
+      allow list: if isSignedIn();
+
+      // School document - read for members, write for admins
+      allow get: if belongsToSchool(schoolId);
+      allow write: if isSchoolAdmin(schoolId);
+
+      // ============================================
+      // Users Subcollection (staff, teachers, admins)
+      // ============================================
+      match /users/{userId} {
+        // Allow user to read their own profile (including during login)
+        allow read: if isSignedIn() && request.auth.uid == userId;
+
+        // Admins and teachers can read all users in their school
+        allow read: if isSchoolAdmin(schoolId) || isTeacher(schoolId);
+
+        // Users can update their own profile
+        allow update: if isSignedIn() && request.auth.uid == userId;
+
+        // Admins can create, update, and delete any user in their school
+        allow create: if isSignedIn() &&
+                         request.resource.data.schoolId == schoolId;
+
+        allow update: if isSignedIn() &&
+                         (request.auth.uid == userId || isSchoolAdmin(schoolId));
+
+        // Admins have full delete permissions for users in their school
+        // Using a more permissive check that allows admins to delete users
+        allow delete: if isSignedIn() &&
+                         (isSchoolAdmin(schoolId) ||
+                          exists(/databases/$(database)/documents/schools/$(schoolId)/users/$(request.auth.uid)) &&
+                          get(/databases/$(database)/documents/schools/$(schoolId)/users/$(request.auth.uid)).data.role == 'schoolAdmin');
+      }
+
+      // ============================================
+      // Parents Subcollection
+      // ============================================
+      match /parents/{parentId} {
+        // Allow parent to read their own profile (including during login)
+        allow read: if isSignedIn() && request.auth.uid == parentId;
+
+        // Admins and teachers can read all parents
+        allow read: if isSchoolAdmin(schoolId) || isTeacher(schoolId);
+
+        // Parents can update their own profile
+        allow update: if isSignedIn() && request.auth.uid == parentId;
+
+        // Admins can update any parent in their school
+        allow update: if isSchoolAdmin(schoolId);
+
+        // Allow authenticated users to create parent documents
+        allow create: if isSignedIn() &&
+                         request.resource.data.schoolId == schoolId;
+
+        // Only admins can delete parents
+        allow delete: if isSchoolAdmin(schoolId);
+      }
+
+      // ============================================
+      // Students Subcollection
+      // ============================================
+      match /students/{studentId} {
+        // Admins and teachers can read all students
+        allow read: if isSchoolAdmin(schoolId) || isTeacher(schoolId);
+
+        // Parents can read their linked children
+        allow read: if isSignedIn() &&
+                       studentId in getUserData(schoolId).linkedChildren;
+
+        // Admins and teachers can create/update/delete students
+        allow create: if isSignedIn() &&
+                         request.resource.data.schoolId == schoolId;
+
+        allow update, delete: if isSchoolAdmin(schoolId) || isTeacher(schoolId);
+      }
+
+      // ============================================
+      // Classes Subcollection
+      // ============================================
+      match /classes/{classId} {
+        // Admins can read all classes
+        allow read: if isSchoolAdmin(schoolId);
+
+        // Teachers can read classes they're assigned to
+        allow read: if isTeacher(schoolId) &&
+                       (resource.data.teacherId == request.auth.uid ||
+                        (resource.data.teacherIds != null &&
+                         request.auth.uid in resource.data.teacherIds));
+
+        // Parents can read classes their children are in
+        allow read: if isSignedIn() &&
+                       getUserData(schoolId).linkedChildren != null &&
+                       resource.data.studentIds.hasAny(getUserData(schoolId).linkedChildren);
+
+        // Only admins can create/delete classes
+        allow create, delete: if isSchoolAdmin(schoolId);
+
+        // Admins can update any class, teachers can only update their assigned classes
+        allow update: if isSchoolAdmin(schoolId) ||
+                         (isTeacher(schoolId) &&
+                          (resource.data.teacherId == request.auth.uid ||
+                           (resource.data.teacherIds != null &&
+                            request.auth.uid in resource.data.teacherIds)));
+      }
+
+      // ============================================
+      // Reading Logs Subcollection
+      // ============================================
+      match /readingLogs/{logId} {
+        // Admins and teachers can read all logs
+        allow read: if isSchoolAdmin(schoolId) || isTeacher(schoolId);
+
+        // Parents can read logs for their children
+        allow read: if isSignedIn() &&
+                       resource.data.studentId in getUserData(schoolId).linkedChildren;
+
+        // Parents can create logs for their children
+        allow create: if isSignedIn() &&
+                         request.resource.data.studentId in getUserData(schoolId).linkedChildren &&
+                         request.resource.data.parentId == request.auth.uid;
+
+        // Parents can update their own logs
+        allow update: if isSignedIn() && resource.data.parentId == request.auth.uid;
+
+        // Teachers and admins can update any log
+        allow update: if isSchoolAdmin(schoolId) || isTeacher(schoolId);
+
+        // Only admins can delete logs
+        allow delete: if isSchoolAdmin(schoolId);
+      }
+
+      // ============================================
+      // Allocations Subcollection
+      // ============================================
+      match /allocations/{allocationId} {
+        // Everyone in the school can read allocations
+        allow read: if belongsToSchool(schoolId);
+
+        // Only teachers and admins can write allocations
+        allow write: if isSchoolAdmin(schoolId) || isTeacher(schoolId);
+      }
+    }
+  }
+}

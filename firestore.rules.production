@@ -1,0 +1,75 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSchoolAdmin() {
+      return request.auth != null &&
+        request.auth.token.role == 'schoolAdmin';
+    }
+
+    function isTeacher() {
+      return request.auth != null &&
+        request.auth.token.role == 'teacher';
+    }
+
+    function belongsToSchool(schoolId) {
+      return request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.schoolId == schoolId;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow write: if isSignedIn() &&
+        (request.auth.uid == userId || isSchoolAdmin());
+    }
+
+    // Schools collection
+    match /schools/{schoolId} {
+      allow read: if belongsToSchool(schoolId);
+      allow write: if isSchoolAdmin() && belongsToSchool(schoolId);
+    }
+
+    // Classes collection
+    match /classes/{classId} {
+      allow read: if isSignedIn() &&
+        (isTeacher() || isSchoolAdmin() ||
+         get(/databases/$(database)/documents/classes/$(classId)).data.studentIds.hasAny(
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.linkedChildren
+         ));
+      allow write: if (isTeacher() || isSchoolAdmin()) &&
+        belongsToSchool(resource.data.schoolId);
+    }
+
+    // Students collection
+    match /students/{studentId} {
+      allow read: if isSignedIn() &&
+        (isTeacher() || isSchoolAdmin() ||
+         studentId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.linkedChildren);
+      allow write: if (isTeacher() || isSchoolAdmin()) &&
+        belongsToSchool(resource.data.schoolId);
+    }
+
+    // Reading logs collection
+    match /readingLogs/{logId} {
+      allow read: if isSignedIn() &&
+        (request.auth.uid == resource.data.parentId ||
+         isTeacher() || isSchoolAdmin());
+      allow create: if isSignedIn() &&
+        request.auth.uid == request.resource.data.parentId;
+      allow update: if isSignedIn() &&
+        (request.auth.uid == resource.data.parentId || isTeacher());
+      allow delete: if isSchoolAdmin();
+    }
+
+    // Allocations collection
+    match /allocations/{allocationId} {
+      allow read: if isSignedIn();
+      allow write: if isTeacher() || isSchoolAdmin();
+    }
+  }
+}

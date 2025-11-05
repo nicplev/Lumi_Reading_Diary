@@ -1,0 +1,13 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ⚠️ TESTING RULES - VERY PERMISSIVE ⚠️
+    // Temporarily allowing ALL access for testing setup
+
+    match /{document=**} {
+      // TEMPORARY: Allow all read/write access for testing
+      // This is ONLY for initial setup - DO NOT use in production!
+      allow read, write: if true;
+    }
+  }
+}
