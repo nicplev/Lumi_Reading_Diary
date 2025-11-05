@@ -14,6 +14,8 @@ import '../teacher/teacher_home_screen.dart';
 import '../admin/admin_home_screen.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
+import 'parent_registration_screen.dart';
+import '../onboarding/school_demo_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -377,15 +379,35 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 16),
 
-              // Invite code option
+              // Invite code option for parents
               TextButton.icon(
                 onPressed: () {
-                  // Navigate to invite code screen
-                  // This will be implemented later
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ParentRegistrationScreen(),
+                    ),
+                  );
                 },
                 icon: const Icon(Icons.qr_code),
-                label: const Text('Have an invite code?'),
+                label: const Text('Parent? Register with Student Code'),
               ).animate().fadeIn(delay: 900.ms, duration: 500.ms),
+
+              const SizedBox(height: 8),
+
+              // School registration option
+              TextButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SchoolDemoScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.school),
+                label: const Text('School? Request a Demo'),
+              ).animate().fadeIn(delay: 1000.ms, duration: 500.ms),
             ],
           ),
         ),
