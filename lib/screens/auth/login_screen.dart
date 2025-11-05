@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -13,6 +14,7 @@ import '../parent/parent_home_screen.dart';
 import '../teacher/teacher_home_screen.dart';
 import '../admin/admin_home_screen.dart';
 import 'register_screen.dart';
+import 'web_not_available_screen.dart';
 import 'forgot_password_screen.dart';
 import 'parent_registration_screen.dart';
 import '../onboarding/school_demo_screen.dart';
@@ -148,6 +150,16 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _navigateToHome(UserModel user) {
+    // Check if parent is trying to access web version
+    if (kIsWeb && user.role == UserRole.parent) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const WebNotAvailableScreen()),
+        (route) => false,
+      );
+      return;
+    }
+
     Widget homeScreen;
 
     switch (user.role) {

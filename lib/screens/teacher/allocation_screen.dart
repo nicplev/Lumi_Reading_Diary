@@ -148,6 +148,8 @@ class _AllocationScreenState extends State<AllocationScreen>
       );
 
       await _firebaseService.firestore
+          .collection('schools')
+          .doc(widget.teacher.schoolId!)
           .collection('allocations')
           .doc(allocation.id)
           .set(allocation.toFirestore());
@@ -254,7 +256,7 @@ class _AllocationScreenState extends State<AllocationScreen>
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppColors.info.withOpacity(0.1),
+                      color: AppColors.info.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -761,20 +763,42 @@ class _AllocationScreenState extends State<AllocationScreen>
 
     return StreamBuilder<QuerySnapshot>(
       stream: _firebaseService.firestore
+          .collection('schools')
+          .doc(widget.teacher.schoolId!)
           .collection('allocations')
           .where('classId', isEqualTo: widget.selectedClass!.id)
           .where('isActive', isEqualTo: true)
-          .where('endDate', isGreaterThanOrEqualTo: Timestamp.now())
-          .orderBy('endDate')
           .orderBy('createdAt', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 64, color: AppColors.error),
+                const SizedBox(height: 16),
+                Text('Error loading allocations', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Text(
+                  snapshot.error.toString(),
+                  style: Theme.of(context).textTheme.bodySmall,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          );
+        }
+
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
 
+        // Filter allocations in code to avoid composite index requirement
+        final now = DateTime.now();
         final allocations = snapshot.data!.docs
             .map((doc) => AllocationModel.fromFirestore(doc))
+            .where((allocation) => allocation.endDate.isAfter(now))
             .toList();
 
         if (allocations.isEmpty) {
@@ -785,7 +809,7 @@ class _AllocationScreenState extends State<AllocationScreen>
                 Icon(
                   Icons.assignment_outlined,
                   size: 64,
-                  color: AppColors.gray.withOpacity(0.5),
+                  color: AppColors.gray.withValues(alpha: 0.5),
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -839,6 +863,8 @@ class _AllocationScreenState extends State<AllocationScreen>
 
                 if (confirm == true) {
                   await _firebaseService.firestore
+                      .collection('schools')
+                      .doc(widget.teacher.schoolId!)
                       .collection('allocations')
                       .doc(allocation.id)
                       .update({'isActive': false});
@@ -959,8 +985,8 @@ class _AllocationCard extends StatelessWidget {
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: isExpiring
-                    ? AppColors.warning.withOpacity(0.1)
-                    : AppColors.lightGray.withOpacity(0.5),
+                    ? AppColors.warning.withValues(alpha: 0.1)
+                    : AppColors.lightGray.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(

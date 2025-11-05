@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -64,5 +61,14 @@ class DefaultFirebaseOptions {
     projectId: 'lumi-kakakids',
     storageBucket: 'lumi-kakakids.firebasestorage.app',
     iosBundleId: 'com.lumi.lumiReadingTracker',
+  );
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyD40vt-hzfS8E2EIy_OlkKOMGBwlrXTyJs',
+    appId: '1:432054475733:web:503da019d86e3de8963b5c',
+    messagingSenderId: '432054475733',
+    projectId: 'lumi-kakakids',
+    authDomain: 'lumi-kakakids.firebaseapp.com',
+    storageBucket: 'lumi-kakakids.firebasestorage.app',
   );
 }

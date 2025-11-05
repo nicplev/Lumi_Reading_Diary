@@ -48,32 +48,17 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
       final List<ClassModel> classes = [];
 
       // Using nested structure - query classes within the teacher's school
+      // Query using teacherIds array to find all classes where this teacher is assigned
       final classQuery = await _firebaseService.firestore
           .collection('schools')
           .doc(widget.user.schoolId)
           .collection('classes')
-          .where('teacherId', isEqualTo: widget.user.id)
+          .where('teacherIds', arrayContains: widget.user.id)
           .where('isActive', isEqualTo: true)
           .get();
 
       for (var doc in classQuery.docs) {
         classes.add(ClassModel.fromFirestore(doc));
-      }
-
-      // Also load classes where user is assistant teacher
-      final assistantQuery = await _firebaseService.firestore
-          .collection('schools')
-          .doc(widget.user.schoolId)
-          .collection('classes')
-          .where('assistantTeacherId', isEqualTo: widget.user.id)
-          .where('isActive', isEqualTo: true)
-          .get();
-
-      for (var doc in assistantQuery.docs) {
-        final classModel = ClassModel.fromFirestore(doc);
-        if (!classes.any((c) => c.id == classModel.id)) {
-          classes.add(classModel);
-        }
       }
 
       setState(() {

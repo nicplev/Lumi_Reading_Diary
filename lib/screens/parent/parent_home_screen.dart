@@ -232,6 +232,8 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
 
                     return StreamBuilder<QuerySnapshot>(
                       stream: _firebaseService.firestore
+                          .collection('schools')
+                          .doc(widget.user.schoolId!)
                           .collection('allocations')
                           .where('studentIds', arrayContains: selectedChild.id)
                           .where('startDate',
@@ -350,6 +352,8 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
 
   Stream<StudentStats?> _getStudentStats(String studentId) {
     return _firebaseService.firestore
+        .collection('schools')
+        .doc(widget.user.schoolId!)
         .collection('students')
         .doc(studentId)
         .snapshots()
