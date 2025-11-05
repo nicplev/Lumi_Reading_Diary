@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../services/onboarding_service.dart';
 import '../../data/models/school_model.dart';
-import '../../data/models/school_onboarding_model.dart';
-import '../admin/admin_home_screen.dart';
+import '../auth/login_screen.dart';
 
 class SchoolRegistrationWizard extends StatefulWidget {
   final String onboardingId;
@@ -38,7 +36,6 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
   // Data collection
   Map<String, dynamic> _schoolData = {};
   Map<String, dynamic> _adminData = {};
-  Map<String, dynamic> _readingData = {};
 
   final List<String> _steps = [
     'School Info',
@@ -79,7 +76,6 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
       case 2:
         isValid = _readingLevelsFormKey.currentState?.saveAndValidate() ?? false;
         if (isValid) {
-          _readingData = _readingLevelsFormKey.currentState!.value;
           await _completeOnboarding();
           return; // _completeOnboarding handles navigation
         }
@@ -235,7 +231,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
                         height: 4,
                         decoration: BoxDecoration(
                           color: isCompleted || isCurrent
-                              ? AppColors.primary
+                              ? AppColors.primaryBlue
                               : AppColors.lightGray,
                           borderRadius: BorderRadius.circular(2),
                         ),
@@ -256,7 +252,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
                 child: Text(
                   _steps[index],
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isCurrent ? AppColors.primary : AppColors.gray,
+                        color: isCurrent ? AppColors.primaryBlue : AppColors.gray,
                         fontWeight:
                             isCurrent ? FontWeight.bold : FontWeight.normal,
                       ),
@@ -356,7 +352,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
         children: [
           const Center(
             child: LumiMascot(
-              mood: LumiMood.excited,
+              mood: LumiMood.happy,
               size: 80,
             ),
           ),
@@ -383,7 +379,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
               padding: const EdgeInsets.all(12),
               margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
-                color: AppColors.error.withOpacity(0.1),
+                color: AppColors.error.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.error),
               ),
@@ -544,7 +540,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
               'Welcome to Lumi!',
               style: Theme.of(context).textTheme.displaySmall?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
+                    color: AppColors.primaryBlue,
                   ),
               textAlign: TextAlign.center,
             ),
@@ -559,13 +555,11 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
             const SizedBox(height: 48),
             ElevatedButton(
               onPressed: () {
-                // Navigate to admin dashboard
+                // Navigate to login screen
                 Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const AdminHomeScreen(
-                      user: null, // Will be loaded from auth
-                    ),
+                    builder: (context) => const LoginScreen(),
                   ),
                   (route) => false,
                 );
@@ -573,7 +567,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(56),
               ),
-              child: const Text('Go to Dashboard'),
+              child: const Text('Continue to Login'),
             ),
           ],
         ),

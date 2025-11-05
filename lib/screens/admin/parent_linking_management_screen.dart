@@ -30,7 +30,6 @@ class _ParentLinkingManagementScreenState
   Map<String, StudentLinkCodeModel?> _studentCodes = {};
   bool _isLoading = false;
   bool _isGeneratingAll = false;
-  String? _selectedClassId;
 
   @override
   void initState() {
@@ -188,7 +187,8 @@ class _ParentLinkingManagementScreenState
       return '${student.fullName},${code?.code ?? "No code"}';
     }).join('\n');
 
-    await Clipboard.setData(ClipboardData(text: 'Student Name,Link Code\n$codesText'));
+    await Clipboard.setData(
+        ClipboardData(text: 'Student Name,Link Code\n$codesText'));
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -230,7 +230,7 @@ class _ParentLinkingManagementScreenState
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 10,
                         offset: const Offset(0, 2),
                       ),
@@ -245,7 +245,7 @@ class _ParentLinkingManagementScreenState
                               'Total Students',
                               _students.length.toString(),
                               Icons.people,
-                              AppColors.primary,
+                              AppColors.primaryBlue,
                             ),
                           ),
                           Container(
@@ -291,8 +291,8 @@ class _ParentLinkingManagementScreenState
                                 height: 16,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor:
-                                      AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white),
                                 ),
                               )
                             : const Icon(Icons.auto_awesome),
@@ -318,11 +318,12 @@ class _ParentLinkingManagementScreenState
                         margin: const EdgeInsets.only(bottom: 12),
                         child: ExpansionTile(
                           leading: CircleAvatar(
-                            backgroundColor: AppColors.primary.withOpacity(0.1),
+                            backgroundColor:
+                                AppColors.primaryBlue.withValues(alpha: 0.1),
                             child: Text(
                               student.firstName[0].toUpperCase(),
                               style: const TextStyle(
-                                color: AppColors.primary,
+                                color: AppColors.primaryBlue,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -364,13 +365,12 @@ class _ParentLinkingManagementScreenState
                                     Container(
                                       padding: const EdgeInsets.all(16),
                                       decoration: BoxDecoration(
-                                        color: AppColors.primary
-                                            .withOpacity(0.1),
-                                        borderRadius:
-                                            BorderRadius.circular(12),
+                                        color: AppColors.primaryBlue
+                                            .withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
-                                          color: AppColors.primary
-                                              .withOpacity(0.3),
+                                          color: AppColors.primaryBlue
+                                              .withValues(alpha: 0.3),
                                         ),
                                       ),
                                       child: Column(
@@ -382,7 +382,7 @@ class _ParentLinkingManagementScreenState
                                                 .displaySmall
                                                 ?.copyWith(
                                                   fontWeight: FontWeight.bold,
-                                                  color: AppColors.primary,
+                                                  color: AppColors.primaryBlue,
                                                   letterSpacing: 4,
                                                 ),
                                           ),
@@ -407,7 +407,10 @@ class _ParentLinkingManagementScreenState
                                         Expanded(
                                           child: _buildInfoChip(
                                             'Status',
-                                            code.status.toString().split('.').last,
+                                            code.status
+                                                .toString()
+                                                .split('.')
+                                                .last,
                                             code.status == LinkCodeStatus.active
                                                 ? AppColors.success
                                                 : AppColors.gray,
@@ -469,7 +472,8 @@ class _ParentLinkingManagementScreenState
     );
   }
 
-  Widget _buildStatItem(String label, String value, IconData icon, Color color) {
+  Widget _buildStatItem(
+      String label, String value, IconData icon, Color color) {
     return Column(
       children: [
         Icon(icon, color: color, size: 24),
@@ -498,9 +502,9 @@ class _ParentLinkingManagementScreenState
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -125,7 +125,7 @@ class _DemoRequestScreenState extends State<DemoRequestScreen> {
                     FadeEffect(duration: Duration(milliseconds: 500)),
                   ],
                   child: const LumiMascot(
-                    mood: LumiMood.excited,
+                    mood: LumiMood.happy,
                     size: 100,
                     message: 'Let\'s get started!',
                   ),
@@ -162,7 +162,7 @@ class _DemoRequestScreenState extends State<DemoRequestScreen> {
                   padding: const EdgeInsets.all(12),
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: AppColors.error.withOpacity(0.1),
+                    color: AppColors.error.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: AppColors.error, width: 1),
                   ),
@@ -317,10 +317,10 @@ class _DemoRequestScreenState extends State<DemoRequestScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.info.withOpacity(0.1),
+                  color: AppColors.info.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: AppColors.info.withOpacity(0.3),
+                    color: AppColors.info.withValues(alpha: 0.3),
                     width: 1,
                   ),
                 ),

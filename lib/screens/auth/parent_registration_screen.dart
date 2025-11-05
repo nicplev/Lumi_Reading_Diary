@@ -203,7 +203,7 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
                   height: 4,
                   decoration: BoxDecoration(
                     color: isCompleted || isCurrent
-                        ? AppColors.primary
+                        ? AppColors.primaryBlue
                         : AppColors.lightGray,
                     borderRadius: BorderRadius.circular(2),
                   ),
@@ -258,7 +258,7 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
             padding: const EdgeInsets.all(12),
             margin: const EdgeInsets.only(bottom: 16),
             decoration: BoxDecoration(
-              color: AppColors.error.withOpacity(0.1),
+              color: AppColors.error.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: AppColors.error),
             ),
@@ -295,7 +295,7 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
                     errorText: 'Please enter the code',
                   ),
                   FormBuilderValidators.match(
-                    r'^[A-Z0-9]{8}$',
+                    RegExp(r'^[A-Z0-9]{8}$'),
                     errorText: 'Code must be 8 characters (letters and numbers)',
                   ),
                 ]),
@@ -330,10 +330,10 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.info.withOpacity(0.1),
+            color: AppColors.info.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: AppColors.info.withOpacity(0.3),
+              color: AppColors.info.withValues(alpha: 0.3),
             ),
           ),
           child: Row(
@@ -361,7 +361,7 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
       children: [
         const Center(
           child: LumiMascot(
-            mood: LumiMood.excited,
+            mood: LumiMood.happy,
             size: 100,
           ),
         ),
@@ -382,7 +382,7 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
         Text(
           'You\'re registering for: ${_studentInfo?['firstName']} ${_studentInfo?['lastName']}',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.primary,
+                color: AppColors.primaryBlue,
                 fontWeight: FontWeight.w600,
               ),
           textAlign: TextAlign.center,
@@ -396,7 +396,7 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
             padding: const EdgeInsets.all(12),
             margin: const EdgeInsets.only(bottom: 16),
             decoration: BoxDecoration(
-              color: AppColors.error.withOpacity(0.1),
+              color: AppColors.error.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: AppColors.error),
             ),
@@ -531,17 +531,30 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
         const SizedBox(height: 48),
 
         ElevatedButton(
-          onPressed: () {
-            // Navigate to parent home screen
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const ParentHomeScreen(
-                  user: null, // Will be loaded from auth
-                ),
-              ),
-              (route) => false,
-            );
+          onPressed: () async {
+            // Fetch the user data before navigating
+            final userId = _auth.currentUser?.uid;
+            if (userId != null) {
+              final parentDoc = await _firestore
+                  .collection('schools')
+                  .doc(_verifiedCode!.schoolId)
+                  .collection('parents')
+                  .doc(userId)
+                  .get();
+
+              if (parentDoc.exists && mounted) {
+                final parentUser = UserModel.fromFirestore(parentDoc);
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ParentHomeScreen(
+                      user: parentUser,
+                    ),
+                  ),
+                  (route) => false,
+                );
+              }
+            }
           },
           style: ElevatedButton.styleFrom(
             minimumSize: const Size.fromHeight(56),
@@ -554,10 +567,10 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.success.withOpacity(0.1),
+            color: AppColors.success.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: AppColors.success.withOpacity(0.3),
+              color: AppColors.success.withValues(alpha: 0.3),
             ),
           ),
           child: Column(

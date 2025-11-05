@@ -22,7 +22,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
       description:
           'Lumi helps schools, teachers, and parents work together to nurture a love of reading in every child.',
       icon: Icons.auto_stories,
-      color: AppColors.primary,
+      color: AppColors.primaryBlue,
     ),
     _DemoSlide(
       title: 'For Teachers',
@@ -52,7 +52,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
         'Daily reminders',
       ],
       icon: Icons.family_restroom,
-      color: AppColors.accent,
+      color: AppColors.secondaryPurple,
     ),
     _DemoSlide(
       title: 'For Schools',
@@ -97,7 +97,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
         '💬 Excellent support',
       ],
       icon: Icons.star,
-      color: AppColors.primary,
+      color: AppColors.primaryBlue,
     ),
   ];
 
@@ -146,7 +146,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
               child: Row(
                 children: [
                   const LumiMascot(
-                    mood: LumiMood.excited,
+                    mood: LumiMood.happy,
                     size: 40,
                   ),
                   const SizedBox(width: 12),
@@ -154,7 +154,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
                     'Lumi Reading Diary',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
+                          color: AppColors.primaryBlue,
                         ),
                   ),
                   const Spacer(),
@@ -202,7 +202,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
                     height: 8,
                     decoration: BoxDecoration(
                       color: _currentPage == index
-                          ? AppColors.primary
+                          ? AppColors.primaryBlue
                           : AppColors.lightGray,
                       borderRadius: BorderRadius.circular(4),
                     ),
@@ -262,7 +262,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
             width: 120,
             height: 120,
             decoration: BoxDecoration(
-              color: slide.color.withOpacity(0.1),
+              color: slide.color.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -324,7 +324,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 10,
                       offset: const Offset(0, 2),
                     ),
@@ -336,7 +336,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: slide.color.withOpacity(0.1),
+                        color: slide.color.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
