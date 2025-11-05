@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:csv/csv.dart';
-import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+// Conditional import - use dart:io on mobile, stub on web
+import 'dart:io' if (dart.library.html) '../../utils/io_stub.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../data/models/user_model.dart';

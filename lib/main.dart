@@ -8,6 +8,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 import 'core/theme/app_theme.dart';
 import 'services/firebase_service.dart';
+import 'firebase_options.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
@@ -27,8 +28,10 @@ void main() async {
   // Initialize Hive for local storage
   await Hive.initFlutter();
 
-  // Initialize Firebase
-  await Firebase.initializeApp();
+  // Initialize Firebase with platform-specific options
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   // Initialize Firebase services
   await FirebaseService.instance.initialize();
