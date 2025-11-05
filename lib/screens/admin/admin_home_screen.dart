@@ -11,6 +11,7 @@ import '../auth/login_screen.dart';
 import 'user_management_screen.dart';
 import 'class_management_screen.dart';
 import 'database_migration_screen.dart';
+import 'parent_linking_management_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   final UserModel user;
@@ -428,13 +429,16 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           ),
                           _buildQuickAction(
                             icon: Icons.qr_code,
-                            label: 'Invites',
+                            label: 'Parent Links',
                             color: MinimalTheme.orange,
                             onTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content:
-                                      Text('Invitation system coming soon'),
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      ParentLinkingManagementScreen(
+                                    user: widget.user,
+                                  ),
                                 ),
                               );
                             },

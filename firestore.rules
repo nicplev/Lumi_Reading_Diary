@@ -179,5 +179,69 @@ service cloud.firestore {
         allow write: if isSchoolAdmin(schoolId) || isTeacher(schoolId);
       }
     }
+
+    // ============================================
+    // School Onboarding Collection (top-level)
+    // ============================================
+    match /schoolOnboarding/{onboardingId} {
+      // Anyone can create a demo request (unauthenticated)
+      allow create: if true;
+
+      // Owner can read their onboarding
+      allow read: if isSignedIn() &&
+                     (resource.data.contactEmail == request.auth.token.email ||
+                      resource.data.adminUserId == request.auth.uid);
+
+      // Owner can update their onboarding
+      allow update: if isSignedIn() &&
+                       (resource.data.contactEmail == request.auth.token.email ||
+                        resource.data.adminUserId == request.auth.uid);
+    }
+
+    // ============================================
+    // Student Link Codes Collection (top-level)
+    // ============================================
+    match /studentLinkCodes/{codeId} {
+      // Anyone can read to verify codes (for parent registration)
+      allow read: if true;
+
+      // School admins and teachers can create codes
+      allow create: if isSignedIn() &&
+                       (isSchoolAdmin(resource.data.schoolId) ||
+                        isTeacher(resource.data.schoolId));
+
+      // School admins and teachers can update codes (e.g., marking as used)
+      // Parents can also update when using the code
+      allow update: if isSignedIn() &&
+                       (isSchoolAdmin(resource.data.schoolId) ||
+                        isTeacher(resource.data.schoolId) ||
+                        request.auth.uid == request.resource.data.usedBy);
+
+      // Only school admins can delete codes
+      allow delete: if isSignedIn() && isSchoolAdmin(resource.data.schoolId);
+    }
+
+    // ============================================
+    // Notifications Collection (top-level)
+    // ============================================
+    match /notifications/{notificationId} {
+      // Users can read their own notifications
+      allow read: if isSignedIn() &&
+                     (resource.data.userId == request.auth.uid ||
+                      resource.data.parentUserId == request.auth.uid);
+
+      // System can create notifications
+      allow create: if isSignedIn();
+
+      // Users can update their own notifications (e.g., mark as read)
+      allow update: if isSignedIn() &&
+                       (resource.data.userId == request.auth.uid ||
+                        resource.data.parentUserId == request.auth.uid);
+
+      // Only admins can delete notifications
+      allow delete: if isSignedIn() &&
+                       exists(/databases/$(database)/documents/schools/$(resource.data.schoolId)/users/$(request.auth.uid)) &&
+                       get(/databases/$(database)/documents/schools/$(resource.data.schoolId)/users/$(request.auth.uid)).data.role == 'schoolAdmin';
+    }
   }
 }
