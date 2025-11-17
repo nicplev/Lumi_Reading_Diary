@@ -268,24 +268,42 @@ class OfflineService {
   ) async {
     final log = ReadingLogModel.fromLocal(pendingSync.data);
 
+    // Get the school ID from the log data
+    final schoolId = pendingSync.data['schoolId'] as String?;
+    if (schoolId == null) {
+      throw Exception('Missing schoolId for reading log sync');
+    }
+
+    final logRef = firebaseService.firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('readingLogs')
+        .doc(log.id);
+
     switch (pendingSync.action) {
       case SyncAction.create:
-        await firebaseService.firestore
-            .collection('readingLogs')
-            .doc(log.id)
-            .set(log.toFirestore());
+        // Check for conflicts before creating
+        final existingDoc = await logRef.get();
+        if (existingDoc.exists) {
+          // Conflict: document already exists
+          debugPrint('Conflict detected for reading log ${log.id}');
+          await _resolveReadingLogConflict(log, existingDoc, logRef);
+        } else {
+          await logRef.set(log.toFirestore());
+        }
         break;
       case SyncAction.update:
-        await firebaseService.firestore
-            .collection('readingLogs')
-            .doc(log.id)
-            .update(log.toFirestore());
+        // For updates, use server timestamp to detect conflicts
+        final existingDoc = await logRef.get();
+        if (existingDoc.exists) {
+          await _resolveReadingLogConflict(log, existingDoc, logRef);
+        } else {
+          // Document was deleted remotely, treat as create
+          await logRef.set(log.toFirestore());
+        }
         break;
       case SyncAction.delete:
-        await firebaseService.firestore
-            .collection('readingLogs')
-            .doc(log.id)
-            .delete();
+        await logRef.delete();
         break;
     }
 
@@ -297,20 +315,100 @@ class OfflineService {
     await _readingLogsBox.put(log.id, syncedLog.toLocal());
   }
 
+  /// Resolve conflicts when syncing reading logs
+  Future<void> _resolveReadingLogConflict(
+    ReadingLogModel localLog,
+    dynamic remoteDoc,
+    dynamic logRef,
+  ) async {
+    final remoteData = remoteDoc.data() as Map<String, dynamic>?;
+    if (remoteData == null) {
+      // Remote was deleted, use local
+      await logRef.set(localLog.toFirestore());
+      return;
+    }
+
+    // Simple conflict resolution: Last write wins based on timestamp
+    final localTimestamp = localLog.syncedAt?.millisecondsSinceEpoch ?? 0;
+    final remoteTimestamp =
+        (remoteData['syncedAt'] as dynamic)?.millisecondsSinceEpoch ?? 0;
+
+    if (localTimestamp > remoteTimestamp) {
+      // Local is newer, use local
+      debugPrint('Local version is newer, updating remote');
+      await logRef.update(localLog.toFirestore());
+    } else {
+      // Remote is newer, keep remote and update local
+      debugPrint('Remote version is newer, updating local');
+      final remoteLog = ReadingLogModel.fromFirestore(remoteDoc);
+      await _readingLogsBox.put(localLog.id, remoteLog.toLocal());
+    }
+  }
+
   Future<void> _syncStudent(
     PendingSync pendingSync,
     FirebaseService firebaseService,
   ) async {
-    // Implement student sync
-    // Similar to reading log sync
+    final studentData = Map<String, dynamic>.from(pendingSync.data);
+    final studentId = pendingSync.id;
+    final schoolId = studentData['schoolId'] as String?;
+
+    if (schoolId == null) {
+      throw Exception('Missing schoolId for student sync');
+    }
+
+    final studentRef = firebaseService.firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('students')
+        .doc(studentId);
+
+    switch (pendingSync.action) {
+      case SyncAction.create:
+        await studentRef.set(studentData);
+        break;
+      case SyncAction.update:
+        await studentRef.update(studentData);
+        break;
+      case SyncAction.delete:
+        await studentRef.delete();
+        break;
+    }
+
+    debugPrint('Student synced: $studentId');
   }
 
   Future<void> _syncAllocation(
     PendingSync pendingSync,
     FirebaseService firebaseService,
   ) async {
-    // Implement allocation sync
-    // Similar to reading log sync
+    final allocationData = Map<String, dynamic>.from(pendingSync.data);
+    final allocationId = pendingSync.id;
+    final schoolId = allocationData['schoolId'] as String?;
+
+    if (schoolId == null) {
+      throw Exception('Missing schoolId for allocation sync');
+    }
+
+    final allocationRef = firebaseService.firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('allocations')
+        .doc(allocationId);
+
+    switch (pendingSync.action) {
+      case SyncAction.create:
+        await allocationRef.set(allocationData);
+        break;
+      case SyncAction.update:
+        await allocationRef.update(allocationData);
+        break;
+      case SyncAction.delete:
+        await allocationRef.delete();
+        break;
+    }
+
+    debugPrint('Allocation synced: $allocationId');
   }
 
   // Clear all local data
