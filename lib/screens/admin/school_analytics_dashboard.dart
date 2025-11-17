@@ -1,0 +1,1090 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:fl_chart/fl_chart.dart';
+import '../../data/models/class_model.dart';
+import '../../data/models/student_model.dart';
+import '../../data/models/reading_log_model.dart';
+import '../../services/firebase_service.dart';
+import '../../core/theme/app_colors.dart';
+
+/// Comprehensive analytics dashboard for school administrators
+/// Provides executive-level insights into reading program performance
+class SchoolAnalyticsDashboard extends StatefulWidget {
+  final String schoolId;
+
+  const SchoolAnalyticsDashboard({
+    super.key,
+    required this.schoolId,
+  });
+
+  @override
+  State<SchoolAnalyticsDashboard> createState() =>
+      _SchoolAnalyticsDashboardState();
+}
+
+class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
+  bool _isLoading = true;
+  String? _error;
+
+  // Data
+  List<ClassModel> _classes = [];
+  Map<String, List<StudentModel>> _studentsByClass = {};
+  Map<String, Map<String, dynamic>> _classMetrics = {};
+  Map<String, dynamic>? _schoolMetrics;
+
+  // Date range for analytics
+  DateTime _startDate = DateTime.now().subtract(const Duration(days: 30));
+  DateTime _endDate = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAnalyticsData();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('School Analytics Dashboard'),
+        backgroundColor: AppColors.primary,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadAnalyticsData,
+            tooltip: 'Refresh Data',
+          ),
+          IconButton(
+            icon: const Icon(Icons.calendar_today),
+            onPressed: _showDateRangePicker,
+            tooltip: 'Change Date Range',
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? _buildErrorState()
+              : RefreshIndicator(
+                  onRefresh: _loadAnalyticsData,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildDateRangeBanner(),
+                        const SizedBox(height: 16),
+                        _buildExecutiveSummary(),
+                        const SizedBox(height: 24),
+                        _buildEngagementMetrics(),
+                        const SizedBox(height: 24),
+                        _buildReadingTrendsChart(),
+                        const SizedBox(height: 24),
+                        _buildClassComparison(),
+                        const SizedBox(height: 24),
+                        _buildAtRiskStudents(),
+                        const SizedBox(height: 24),
+                        _buildTopPerformingClasses(),
+                      ],
+                    ),
+                  ),
+                ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+          const SizedBox(height: 16),
+          Text(
+            'Error loading analytics',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _error ?? 'Unknown error',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.grey[600],
+                ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: _loadAnalyticsData,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateRangeBanner() {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Icon(Icons.date_range, color: AppColors.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Analytics Period',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                  ),
+                  Text(
+                    '${DateFormat('MMM dd, yyyy').format(_startDate)} - ${DateFormat('MMM dd, yyyy').format(_endDate)}',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: _showDateRangePicker,
+              child: const Text('Change'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExecutiveSummary() {
+    if (_schoolMetrics == null) return const SizedBox.shrink();
+
+    final metrics = _schoolMetrics!;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Executive Summary',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+        ),
+        const SizedBox(height: 12),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 1.5,
+          children: [
+            _buildMetricCard(
+              'Total Students',
+              '${metrics['totalStudents']}',
+              Icons.people,
+              AppColors.primary,
+              subtitle: '${metrics['activeStudents']} active',
+            ),
+            _buildMetricCard(
+              'Total Classes',
+              '${metrics['totalClasses']}',
+              Icons.class_,
+              Colors.purple,
+            ),
+            _buildMetricCard(
+              'Reading Minutes',
+              '${_formatNumber(metrics['totalMinutes'])}',
+              Icons.schedule,
+              Colors.green,
+              subtitle: 'Last ${_endDate.difference(_startDate).inDays} days',
+            ),
+            _buildMetricCard(
+              'Engagement Rate',
+              '${metrics['engagementRate'].toStringAsFixed(0)}%',
+              Icons.trending_up,
+              Colors.orange,
+              subtitle: 'Students reading regularly',
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMetricCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color, {
+    String? subtitle,
+  }) {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: color, size: 24),
+                const Spacer(),
+              ],
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: color,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.grey[600],
+                      ),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.grey[500],
+                          fontSize: 10,
+                        ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEngagementMetrics() {
+    if (_schoolMetrics == null) return const SizedBox.shrink();
+
+    final metrics = _schoolMetrics!;
+
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Engagement & Performance',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 16),
+            _buildProgressRow(
+              'Students Meeting Daily Target',
+              metrics['studentsMetTarget'] ?? 0,
+              metrics['totalStudents'] ?? 1,
+              Colors.green,
+            ),
+            const SizedBox(height: 12),
+            _buildProgressRow(
+              'Students with Active Streak',
+              metrics['studentsWithStreak'] ?? 0,
+              metrics['totalStudents'] ?? 1,
+              Colors.orange,
+            ),
+            const SizedBox(height: 12),
+            _buildProgressRow(
+              'Classes Above Average',
+              metrics['classesAboveAverage'] ?? 0,
+              metrics['totalClasses'] ?? 1,
+              Colors.purple,
+            ),
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildStatColumn(
+                    'Avg Minutes/Student',
+                    '${metrics['avgMinutesPerStudent']?.toStringAsFixed(1) ?? "0"}',
+                    Colors.blue,
+                  ),
+                ),
+                Expanded(
+                  child: _buildStatColumn(
+                    'Total Books Read',
+                    '${metrics['totalBooks'] ?? 0}',
+                    Colors.teal,
+                  ),
+                ),
+                Expanded(
+                  child: _buildStatColumn(
+                    'Longest Streak',
+                    '${metrics['longestStreak'] ?? 0} days',
+                    Colors.amber,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProgressRow(String label, int current, int total, Color color) {
+    final percentage = total > 0 ? (current / total) : 0.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            Text(
+              '$current / $total (${(percentage * 100).toStringAsFixed(0)}%)',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        LinearProgressIndicator(
+          value: percentage,
+          backgroundColor: color.withOpacity(0.2),
+          valueColor: AlwaysStoppedAnimation<Color>(color),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatColumn(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.grey[600],
+              ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReadingTrendsChart() {
+    if (_schoolMetrics == null) return const SizedBox.shrink();
+
+    final weeklyData = _schoolMetrics!['weeklyData'] as List<Map<String, dynamic>>? ?? [];
+
+    if (weeklyData.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Reading Trends (Weekly)',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              height: 200,
+              child: LineChart(
+                LineChartData(
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval: 1000,
+                    getDrawingHorizontalLine: (value) {
+                      return FlLine(
+                        color: Colors.grey[300],
+                        strokeWidth: 1,
+                      );
+                    },
+                  ),
+                  titlesData: FlTitlesData(
+                    show: true,
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 30,
+                        interval: 1,
+                        getTitlesWidget: (value, meta) {
+                          if (value.toInt() >= 0 &&
+                              value.toInt() < weeklyData.length) {
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                weeklyData[value.toInt()]['label'] as String,
+                                style: const TextStyle(fontSize: 10),
+                              ),
+                            );
+                          }
+                          return const Text('');
+                        },
+                      ),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        interval: 1000,
+                        reservedSize: 50,
+                        getTitlesWidget: (value, meta) {
+                          return Text(
+                            '${(value / 1000).toStringAsFixed(0)}k',
+                            style: const TextStyle(fontSize: 10),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  borderData: FlBorderData(
+                    show: true,
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  minX: 0,
+                  maxX: (weeklyData.length - 1).toDouble(),
+                  minY: 0,
+                  maxY: _getMaxYValue(weeklyData),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: weeklyData.asMap().entries.map((entry) {
+                        return FlSpot(
+                          entry.key.toDouble(),
+                          (entry.value['minutes'] as int).toDouble(),
+                        );
+                      }).toList(),
+                      isCurved: true,
+                      color: AppColors.primary,
+                      barWidth: 3,
+                      isStrokeCapRound: true,
+                      dotData: const FlDotData(show: true),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        color: AppColors.primary.withOpacity(0.1),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  double _getMaxYValue(List<Map<String, dynamic>> data) {
+    if (data.isEmpty) return 1000;
+
+    final maxMinutes = data
+        .map((e) => e['minutes'] as int)
+        .reduce((a, b) => a > b ? a : b)
+        .toDouble();
+
+    // Round up to nearest thousand and add some padding
+    return ((maxMinutes / 1000).ceil() * 1000 * 1.2);
+  }
+
+  Widget _buildClassComparison() {
+    if (_classes.isEmpty) return const SizedBox.shrink();
+
+    // Sort classes by total minutes read (descending)
+    final sortedClasses = List<ClassModel>.from(_classes);
+    sortedClasses.sort((a, b) {
+      final aMinutes = _classMetrics[a.id]?['totalMinutes'] ?? 0;
+      final bMinutes = _classMetrics[b.id]?['totalMinutes'] ?? 0;
+      return bMinutes.compareTo(aMinutes);
+    });
+
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Class Performance Comparison',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 16),
+            Table(
+              columnWidths: const {
+                0: FlexColumnWidth(2),
+                1: FlexColumnWidth(1),
+                2: FlexColumnWidth(1),
+                3: FlexColumnWidth(1),
+              },
+              border: TableBorder.all(color: Colors.grey[300]!),
+              children: [
+                // Header
+                TableRow(
+                  decoration: BoxDecoration(color: Colors.grey[100]),
+                  children: [
+                    _buildTableHeader('Class'),
+                    _buildTableHeader('Students'),
+                    _buildTableHeader('Minutes'),
+                    _buildTableHeader('Avg/Student'),
+                  ],
+                ),
+                // Data rows
+                ...sortedClasses.map((classModel) {
+                  final metrics = _classMetrics[classModel.id];
+                  final totalMinutes = metrics?['totalMinutes'] ?? 0;
+                  final studentCount = _studentsByClass[classModel.id]?.length ?? 0;
+                  final avgPerStudent =
+                      studentCount > 0 ? (totalMinutes / studentCount).round() : 0;
+
+                  return TableRow(
+                    children: [
+                      _buildTableCell(classModel.name),
+                      _buildTableCell('$studentCount'),
+                      _buildTableCell('$totalMinutes'),
+                      _buildTableCell('$avgPerStudent'),
+                    ],
+                  );
+                }).toList(),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTableHeader(String text) {
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTableCell(String text) {
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 12),
+      ),
+    );
+  }
+
+  Widget _buildAtRiskStudents() {
+    if (_schoolMetrics == null) return const SizedBox.shrink();
+
+    final atRiskStudents =
+        _schoolMetrics!['atRiskStudents'] as List<Map<String, dynamic>>? ?? [];
+
+    if (atRiskStudents.isEmpty) {
+      return Card(
+        elevation: 2,
+        color: Colors.green[50],
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green[700], size: 32),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  'No students currently at risk! All students are actively engaged.',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.green[900],
+                      ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.orange[700]),
+                const SizedBox(width: 8),
+                Text(
+                  'Students Needing Support (${atRiskStudents.length})',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ...atRiskStudents.take(10).map((student) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: Colors.orange[100],
+                      child: Text(
+                        (student['name'] as String)[0].toUpperCase(),
+                        style: TextStyle(
+                          color: Colors.orange[900],
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            student['name'] as String,
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          Text(
+                            student['className'] as String,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.orange[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.orange[300]!),
+                      ),
+                      child: Text(
+                        student['issue'] as String,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.orange[900],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+            if (atRiskStudents.length > 10) ...[
+              const SizedBox(height: 8),
+              Center(
+                child: TextButton(
+                  onPressed: () {
+                    // Show all at-risk students
+                    _showAllAtRiskStudents(atRiskStudents);
+                  },
+                  child: Text('View all ${atRiskStudents.length} students'),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopPerformingClasses() {
+    if (_classes.isEmpty) return const SizedBox.shrink();
+
+    // Get top 3 classes by average minutes per student
+    final sortedClasses = List<ClassModel>.from(_classes);
+    sortedClasses.sort((a, b) {
+      final aStudents = _studentsByClass[a.id]?.length ?? 0;
+      final bStudents = _studentsByClass[b.id]?.length ?? 0;
+
+      if (aStudents == 0) return 1;
+      if (bStudents == 0) return -1;
+
+      final aAvg =
+          (_classMetrics[a.id]?['totalMinutes'] ?? 0) / aStudents;
+      final bAvg =
+          (_classMetrics[b.id]?['totalMinutes'] ?? 0) / bStudents;
+
+      return bAvg.compareTo(aAvg);
+    });
+
+    final topClasses = sortedClasses.take(3).toList();
+
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.emoji_events, color: Colors.amber[700]),
+                const SizedBox(width: 8),
+                Text(
+                  'Top Performing Classes',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ...topClasses.asMap().entries.map((entry) {
+              final index = entry.key;
+              final classModel = entry.value;
+              final metrics = _classMetrics[classModel.id];
+              final studentCount = _studentsByClass[classModel.id]?.length ?? 0;
+              final totalMinutes = metrics?['totalMinutes'] ?? 0;
+              final avgPerStudent =
+                  studentCount > 0 ? (totalMinutes / studentCount).round() : 0;
+
+              final medals = ['🥇', '🥈', '🥉'];
+              final colors = [Colors.amber, Colors.grey, Colors.orange];
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: colors[index][50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: colors[index][300]!),
+                ),
+                child: Row(
+                  children: [
+                    Text(
+                      medals[index],
+                      style: const TextStyle(fontSize: 32),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            classModel.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Text(
+                            '$studentCount students',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '$avgPerStudent min',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            color: colors[index][900],
+                          ),
+                        ),
+                        Text(
+                          'per student',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatNumber(int? number) {
+    if (number == null) return '0';
+    if (number >= 1000000) {
+      return '${(number / 1000000).toStringAsFixed(1)}M';
+    } else if (number >= 1000) {
+      return '${(number / 1000).toStringAsFixed(1)}k';
+    }
+    return number.toString();
+  }
+
+  Future<void> _loadAnalyticsData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final firebaseService = Provider.of<FirebaseService>(context, listen: false);
+
+      // Fetch all classes for the school
+      final classesSnapshot = await firebaseService.firestore
+          .collection('classes')
+          .where('schoolId', isEqualTo: widget.schoolId)
+          .where('isActive', isEqualTo: true)
+          .get();
+
+      _classes = classesSnapshot.docs
+          .map((doc) => ClassModel.fromFirestore(doc))
+          .toList();
+
+      // Fetch students for each class
+      for (final classModel in _classes) {
+        final studentDocs = await firebaseService.getStudentsInClass(classModel.id);
+        _studentsByClass[classModel.id] = studentDocs
+            .map((doc) => StudentModel.fromFirestore(doc))
+            .toList();
+
+        // Calculate metrics for this class
+        int totalMinutes = 0;
+        for (final student in _studentsByClass[classModel.id]!) {
+          final logDocs = await firebaseService.getReadingLogsForStudent(
+            student.id,
+            startDate: _startDate,
+            endDate: _endDate,
+          );
+
+          final logs = logDocs
+              .map((doc) => ReadingLogModel.fromFirestore(doc))
+              .toList();
+
+          totalMinutes += logs.fold<int>(
+            0,
+            (sum, log) => sum + log.minutesRead,
+          );
+        }
+
+        _classMetrics[classModel.id] = {
+          'totalMinutes': totalMinutes,
+        };
+      }
+
+      // Calculate school-wide metrics
+      _calculateSchoolMetrics();
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _error = e.toString();
+      });
+    }
+  }
+
+  void _calculateSchoolMetrics() {
+    int totalStudents = 0;
+    int activeStudents = 0;
+    int totalMinutes = 0;
+    int totalBooks = 0;
+    int studentsMetTarget = 0;
+    int studentsWithStreak = 0;
+    int longestStreak = 0;
+    final atRiskStudents = <Map<String, dynamic>>[];
+    final weeklyMinutes = <String, int>{};
+
+    for (final classModel in _classes) {
+      final students = _studentsByClass[classModel.id] ?? [];
+      totalStudents += students.length;
+
+      for (final student in students) {
+        if (student.stats != null) {
+          final stats = student.stats!;
+
+          if (stats.totalMinutesRead > 0) activeStudents++;
+          totalMinutes += stats.totalMinutesRead;
+          totalBooks += stats.totalBooksRead;
+
+          if (stats.currentStreak > 0) studentsWithStreak++;
+          if (stats.longestStreak > longestStreak) {
+            longestStreak = stats.longestStreak;
+          }
+
+          // Check if student met target (simplified - would need more data)
+          if (stats.averageMinutesPerDay >= 20) studentsMetTarget++;
+
+          // Identify at-risk students
+          if (stats.totalReadingDays < 3 ||
+              stats.currentStreak == 0 ||
+              stats.averageMinutesPerDay < 10) {
+            atRiskStudents.add({
+              'name': student.fullName,
+              'className': classModel.name,
+              'issue': stats.totalReadingDays < 3
+                  ? 'Low engagement'
+                  : 'Below target',
+            });
+          }
+        }
+      }
+    }
+
+    // Calculate weekly data (simplified)
+    final weeks = (_endDate.difference(_startDate).inDays / 7).ceil();
+    for (int i = 0; i < weeks; i++) {
+      final weekStart = _startDate.add(Duration(days: i * 7));
+      final weekLabel = DateFormat('MMM dd').format(weekStart);
+      weeklyMinutes[weekLabel] = (totalMinutes / weeks).round();
+    }
+
+    final weeklyData = weeklyMinutes.entries
+        .map((e) => {'label': e.key, 'minutes': e.value})
+        .toList();
+
+    final avgMinutesPerStudent =
+        totalStudents > 0 ? totalMinutes / totalStudents : 0.0;
+    final engagementRate =
+        totalStudents > 0 ? (activeStudents / totalStudents) * 100 : 0.0;
+
+    // Count classes above average
+    int classesAboveAverage = 0;
+    for (final classModel in _classes) {
+      final students = _studentsByClass[classModel.id] ?? [];
+      if (students.isEmpty) continue;
+
+      final classMinutes = _classMetrics[classModel.id]?['totalMinutes'] ?? 0;
+      final classAvg = classMinutes / students.length;
+
+      if (classAvg > avgMinutesPerStudent) classesAboveAverage++;
+    }
+
+    _schoolMetrics = {
+      'totalStudents': totalStudents,
+      'activeStudents': activeStudents,
+      'totalClasses': _classes.length,
+      'totalMinutes': totalMinutes,
+      'totalBooks': totalBooks,
+      'avgMinutesPerStudent': avgMinutesPerStudent,
+      'engagementRate': engagementRate,
+      'studentsMetTarget': studentsMetTarget,
+      'studentsWithStreak': studentsWithStreak,
+      'longestStreak': longestStreak,
+      'classesAboveAverage': classesAboveAverage,
+      'atRiskStudents': atRiskStudents,
+      'weeklyData': weeklyData,
+    };
+  }
+
+  Future<void> _showDateRangePicker() async {
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      initialDateRange: DateTimeRange(start: _startDate, end: _endDate),
+    );
+
+    if (picked != null) {
+      setState(() {
+        _startDate = picked.start;
+        _endDate = picked.end;
+      });
+      _loadAnalyticsData();
+    }
+  }
+
+  void _showAllAtRiskStudents(List<Map<String, dynamic>> students) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Students Needing Support'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: students.length,
+            itemBuilder: (context, index) {
+              final student = students[index];
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Colors.orange[100],
+                  child: Text(
+                    (student['name'] as String)[0].toUpperCase(),
+                    style: TextStyle(color: Colors.orange[900]),
+                  ),
+                ),
+                title: Text(student['name'] as String),
+                subtitle: Text(student['className'] as String),
+                trailing: Text(student['issue'] as String),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+}
