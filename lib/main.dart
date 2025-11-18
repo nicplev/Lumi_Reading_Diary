@@ -8,6 +8,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 import 'core/theme/app_theme.dart';
 import 'services/firebase_service.dart';
+import 'services/crash_reporting_service.dart';
 import 'firebase_options.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
@@ -33,16 +34,28 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  // Initialize crash reporting (must be after Firebase init)
+  await CrashReportingService.instance.initialize();
+
   // Initialize Firebase services
   await FirebaseService.instance.initialize();
 
   // Configure Flutter Animate
   Animate.restartOnHotReload = true;
 
-  runApp(
-    const ProviderScope(
-      child: LumiApp(),
-    ),
+  // Run app with error handling zone
+  await CrashReportingService.runZonedGuarded(
+    () async {
+      runApp(
+        const ProviderScope(
+          child: LumiApp(),
+        ),
+      );
+    },
+    onError: (error, stack) {
+      debugPrint('Uncaught error: $error');
+      debugPrint('Stack trace: $stack');
+    },
   );
 }
 
