@@ -175,6 +175,52 @@ class FirebaseService {
     // Add more navigation logic as needed
   }
 
+  // Get reading logs for a student within a date range
+  Future<List<dynamic>> getReadingLogsForStudent(
+    String studentId, {
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    try {
+      Query query = _firestore
+          .collection('readingLogs')
+          .where('studentId', isEqualTo: studentId);
+
+      if (startDate != null) {
+        query = query.where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
+      }
+
+      if (endDate != null) {
+        query = query.where('date', isLessThanOrEqualTo: Timestamp.fromDate(endDate));
+      }
+
+      final snapshot = await query.orderBy('date', descending: true).get();
+
+      // Return documents as dynamic to allow conversion in calling code
+      return snapshot.docs;
+    } catch (e) {
+      debugPrint('Error fetching reading logs for student: $e');
+      rethrow;
+    }
+  }
+
+  // Get all students in a class
+  Future<List<dynamic>> getStudentsInClass(String classId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('students')
+          .where('classId', isEqualTo: classId)
+          .where('isActive', isEqualTo: true)
+          .get();
+
+      // Return documents as dynamic to allow conversion in calling code
+      return snapshot.docs;
+    } catch (e) {
+      debugPrint('Error fetching students in class: $e');
+      rethrow;
+    }
+  }
+
   // Sign out
   Future<void> signOut() async {
     try {
