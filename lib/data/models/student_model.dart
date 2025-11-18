@@ -55,7 +55,9 @@ class StudentModel {
           : null,
       profileImageUrl: data['profileImageUrl'],
       isActive: data['isActive'] ?? true,
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
+      createdAt: data['createdAt'] != null
+          ? (data['createdAt'] as Timestamp).toDate()
+          : DateTime.now(),
       enrolledAt: data['enrolledAt'] != null
           ? (data['enrolledAt'] as Timestamp).toDate()
           : null,

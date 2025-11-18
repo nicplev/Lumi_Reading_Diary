@@ -7,6 +7,7 @@ import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/student_link_code_model.dart';
 import '../../services/parent_linking_service.dart';
+import '../../utils/firestore_debug.dart';
 
 class ParentLinkingManagementScreen extends StatefulWidget {
   final UserModel user;
@@ -25,6 +26,7 @@ class _ParentLinkingManagementScreenState
     extends State<ParentLinkingManagementScreen> {
   final ParentLinkingService _linkingService = ParentLinkingService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirestoreDebug _firestoreDebug = FirestoreDebug();
 
   List<StudentModel> _students = [];
   Map<String, StudentLinkCodeModel?> _studentCodes = {};
@@ -43,26 +45,59 @@ class _ParentLinkingManagementScreenState
     });
 
     try {
+      debugPrint('🔍 Loading students for school: ${widget.user.schoolId}');
+
       final studentsSnapshot = await _firestore
           .collection('schools')
           .doc(widget.user.schoolId)
           .collection('students')
-          .where('isActive', isEqualTo: true)
           .get();
 
-      final students = studentsSnapshot.docs
-          .map((doc) => StudentModel.fromFirestore(doc))
-          .toList();
+      debugPrint('📊 Found ${studentsSnapshot.docs.length} student documents');
 
-      // Load codes for each student
-      final codes = await _linkingService.getCodesForStudents(
-        students.map((s) => s.id).toList(),
-      );
+      final students = <StudentModel>[];
+      for (final doc in studentsSnapshot.docs) {
+        try {
+          final student = StudentModel.fromFirestore(doc);
+          students.add(student);
+          debugPrint('   ✓ Parsed student: ${student.firstName} ${student.lastName} (${doc.id})');
+        } catch (e, stackTrace) {
+          debugPrint('   ❌ Failed to parse student ${doc.id}: $e');
+          debugPrint('   Document data: ${doc.data()}');
+          debugPrint('   Stack trace: $stackTrace');
+        }
+      }
 
+      debugPrint('✅ Successfully parsed ${students.length} out of ${studentsSnapshot.docs.length} students');
+
+      // Set students first, even if loading codes fails
       setState(() {
         _students = students;
-        _studentCodes = codes;
       });
+
+      debugPrint('📈 Students set in state: ${_students.length} students');
+
+      // Try to load codes for each student
+      try {
+        final codes = await _linkingService.getCodesForStudents(
+          students.map((s) => s.id).toList(),
+        );
+
+        debugPrint('🔗 Loaded ${codes.length} link codes');
+
+        setState(() {
+          _studentCodes = codes;
+        });
+      } catch (codeError, codeStackTrace) {
+        debugPrint('⚠️ Failed to load link codes (students still displayed): $codeError');
+        debugPrint('Stack trace: $codeStackTrace');
+        // Students are already set, so they'll display without codes
+      }
+
+      debugPrint('📈 Final state: ${_students.length} students loaded');
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error loading students: $e');
+      debugPrint('Stack trace: $stackTrace');
     } finally {
       setState(() {
         _isLoading = false;
@@ -181,6 +216,427 @@ class _ParentLinkingManagementScreenState
     }
   }
 
+  Future<void> _runDiagnostic() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Running diagnostic...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final result = await _firestoreDebug.runFullDiagnostic(widget.user.schoolId!);
+
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+
+        // Show results
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Firestore Diagnostic Results'),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildDiagnosticSection(
+                    'Students in Database',
+                    result['students']['count'].toString(),
+                    result['students']['success'] ? AppColors.success : AppColors.error,
+                  ),
+                  if (result['students']['students'] != null && (result['students']['students'] as List).isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Student List:',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    ...(result['students']['students'] as List).map((s) => Padding(
+                      padding: const EdgeInsets.only(left: 16.0, bottom: 4),
+                      child: Text(
+                        '• ${s['firstName']} ${s['lastName']} (${s['studentId']})',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    )),
+                  ],
+                  const Divider(height: 24),
+                  _buildDiagnosticSection(
+                    'Classes in Database',
+                    result['classes']['count'].toString(),
+                    result['classes']['success'] ? AppColors.success : AppColors.error,
+                  ),
+                  if (result['classes']['classes'] != null && (result['classes']['classes'] as List).isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Class List:',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    ...(result['classes']['classes'] as List).map((c) => Padding(
+                      padding: const EdgeInsets.only(left: 16.0, bottom: 4),
+                      child: Text(
+                        '• ${c['name']} - ${c['studentCount']} students',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    )),
+                  ],
+                  const Divider(height: 24),
+                  _buildDiagnosticSection(
+                    'Student References in Classes',
+                    result['verification']['totalReferences'].toString(),
+                    AppColors.info,
+                  ),
+                  _buildDiagnosticSection(
+                    'Existing Student Documents',
+                    result['verification']['existingCount'].toString(),
+                    AppColors.success,
+                  ),
+                  _buildDiagnosticSection(
+                    'Missing Student Documents',
+                    result['verification']['missingCount'].toString(),
+                    result['verification']['missingCount'] > 0 ? AppColors.error : AppColors.success,
+                  ),
+                  if (result['verification']['missingCount'] > 0) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            '⚠️ Data Integrity Issue',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.error,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Some class arrays reference student IDs that don\'t have corresponding documents.',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+              if (result['students']['count'] > 0)
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _fixStudentData();
+                  },
+                  icon: const Icon(Icons.build),
+                  label: const Text('Fix Student Data'),
+                ),
+              if (result['classes']['count'] > result['students']['count'])
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _cleanupClasses();
+                  },
+                  icon: const Icon(Icons.cleaning_services),
+                  label: const Text('Clean Up Classes'),
+                ),
+              if (result['students']['count'] == 0)
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _createTestStudent();
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text('Create Test Student'),
+                ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Diagnostic failed: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildDiagnosticSection(String label, String value, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.gray,
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _createTestStudent() async {
+    // First, get a class ID
+    final classesSnapshot = await _firestore
+        .collection('schools')
+        .doc(widget.user.schoolId)
+        .collection('classes')
+        .limit(1)
+        .get();
+
+    if (classesSnapshot.docs.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No classes found. Please create a class first.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return;
+    }
+
+    final classId = classesSnapshot.docs.first.id;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Creating test student...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final result = await _firestoreDebug.createTestStudent(
+        widget.user.schoolId!,
+        classId,
+      );
+
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+
+        if (result['success']) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Test student created successfully'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          // Reload students
+          _loadStudents();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to create test student: ${result['error']}'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _fixStudentData() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Fixing student data...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final result = await _firestoreDebug.fixStudentActiveStatus(
+        widget.user.schoolId!,
+      );
+
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+
+        if (result['success']) {
+          final fixedCount = result['fixedCount'];
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                fixedCount > 0
+                    ? 'Fixed $fixedCount student(s) - set isActive to true'
+                    : 'All students already have correct isActive status',
+              ),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          // Reload students to reflect changes
+          _loadStudents();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to fix student data: ${result['error']}'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _cleanupClasses() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Cleaning up classes...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final result = await _firestoreDebug.cleanupNullClasses(
+        widget.user.schoolId!,
+      );
+
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+
+        if (result['success']) {
+          final deletedCount = result['deletedCount'];
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                deletedCount > 0
+                    ? 'Deleted $deletedCount empty class(es) with null names'
+                    : 'No empty null-named classes to clean up',
+              ),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to clean up classes: ${result['error']}'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _exportAllCodes() async {
     final codesText = _students.map((student) {
       final code = _studentCodes[student.id];
@@ -209,6 +665,11 @@ class _ParentLinkingManagementScreenState
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.bug_report),
+            tooltip: 'Run Diagnostic',
+            onPressed: _runDiagnostic,
+          ),
           if (_students.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.download),
@@ -221,6 +682,60 @@ class _ParentLinkingManagementScreenState
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
+                // Debug info banner (only show if no students)
+                if (_students.isEmpty)
+                  Container(
+                    margin: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.warning.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              color: AppColors.warning,
+                              size: 24,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'No students found in database',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.warning,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Run the diagnostic to check your Firestore data structure, or import students via CSV.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: _runDiagnostic,
+                                icon: const Icon(Icons.bug_report),
+                                label: const Text('Run Diagnostic'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ).animate().fadeIn(duration: 500.ms),
+
                 // Stats card
                 Container(
                   margin: const EdgeInsets.all(16),

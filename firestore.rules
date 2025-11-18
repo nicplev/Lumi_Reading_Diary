@@ -207,8 +207,8 @@ service cloud.firestore {
 
       // School admins and teachers can create codes
       allow create: if isSignedIn() &&
-                       (isSchoolAdmin(resource.data.schoolId) ||
-                        isTeacher(resource.data.schoolId));
+                       (isSchoolAdmin(request.resource.data.schoolId) ||
+                        isTeacher(request.resource.data.schoolId));
 
       // School admins and teachers can update codes (e.g., marking as used)
       // Parents can also update when using the code

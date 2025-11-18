@@ -160,10 +160,15 @@ class _AllocationScreenState extends State<AllocationScreen>
         );
         _resetForm();
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('Error saving allocation: $e');
+      debugPrint('Stack trace: $stackTrace');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to save allocation')),
+          SnackBar(
+            content: Text('Failed to save allocation: ${e.toString()}'),
+            duration: const Duration(seconds: 5),
+          ),
         );
       }
     } finally {
@@ -772,6 +777,8 @@ class _AllocationScreenState extends State<AllocationScreen>
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
+          debugPrint('Error loading allocations: ${snapshot.error}');
+          debugPrint('Error stack trace: ${snapshot.stackTrace}');
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -780,10 +787,13 @@ class _AllocationScreenState extends State<AllocationScreen>
                 const SizedBox(height: 16),
                 Text('Error loading allocations', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
-                Text(
-                  snapshot.error.toString(),
-                  style: Theme.of(context).textTheme.bodySmall,
-                  textAlign: TextAlign.center,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Text(
+                    snapshot.error.toString(),
+                    style: Theme.of(context).textTheme.bodySmall,
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ],
             ),

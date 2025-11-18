@@ -36,6 +36,25 @@ class ParentLinkingService {
       isUnique = existing.docs.isEmpty;
     } while (!isUnique);
 
+    // Fetch student info to store in metadata
+    // This allows parents to see student name without needing read access to students collection
+    final studentDoc = await _firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('students')
+        .doc(studentId)
+        .get();
+
+    Map<String, dynamic>? metadata;
+    if (studentDoc.exists) {
+      final studentData = studentDoc.data()!;
+      metadata = {
+        'studentFirstName': studentData['firstName'],
+        'studentLastName': studentData['lastName'],
+        'studentFullName': '${studentData['firstName']} ${studentData['lastName']}',
+      };
+    }
+
     final linkCode = StudentLinkCodeModel(
       id: '',
       studentId: studentId,
@@ -45,6 +64,7 @@ class ParentLinkingService {
       createdAt: DateTime.now(),
       expiresAt: DateTime.now().add(Duration(days: validityDays)),
       createdBy: createdBy,
+      metadata: metadata,
     );
 
     final docRef = await _firestore

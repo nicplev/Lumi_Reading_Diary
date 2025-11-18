@@ -43,10 +43,19 @@ class FirebaseService {
       }
 
       // Configure Firestore settings
-      _firestore.settings = const Settings(
-        persistenceEnabled: true,
-        cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-      );
+      // Note: cacheSizeBytes is not supported on web and can cause write failures
+      if (kIsWeb) {
+        // Web uses default settings (persistence enabled by default via IndexedDB)
+        _firestore.settings = const Settings(
+          persistenceEnabled: true,
+        );
+      } else {
+        // Mobile supports full persistence configuration
+        _firestore.settings = const Settings(
+          persistenceEnabled: true,
+          cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+        );
+      }
 
       // Request notification permissions (mobile only)
       if (!kIsWeb) {

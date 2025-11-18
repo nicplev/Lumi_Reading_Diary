@@ -42,6 +42,7 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
       final code = _codeFormKey.currentState!.value['code'] as String;
 
       try {
+        // Verify the code (no authentication needed - Firestore rules allow unauthenticated reads)
         final linkCode = await _linkingService.verifyCode(code);
 
         if (linkCode == null) {
@@ -49,21 +50,16 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
               'Invalid or expired code. Please check with your school.');
         }
 
-        // Fetch student information
-        final studentDoc = await _firestore
-            .collection('schools')
-            .doc(linkCode.schoolId)
-            .collection('students')
-            .doc(linkCode.studentId)
-            .get();
-
-        if (!studentDoc.exists) {
-          throw Exception('Student information not found.');
+        // Use student info from link code metadata
+        // This avoids needing read permissions on students collection
+        final studentInfo = linkCode.metadata ?? {};
+        if (studentInfo.isEmpty) {
+          throw Exception('Student information not found in code.');
         }
 
         setState(() {
           _verifiedCode = linkCode;
-          _studentInfo = studentDoc.data();
+          _studentInfo = studentInfo;
           _currentStep = 1;
         });
       } catch (e) {
@@ -380,7 +376,7 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
         const SizedBox(height: 8),
 
         Text(
-          'You\'re registering for: ${_studentInfo?['firstName']} ${_studentInfo?['lastName']}',
+          'You\'re registering for: ${_studentInfo?['studentFullName']}',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: AppColors.primaryBlue,
                 fontWeight: FontWeight.w600,
@@ -521,7 +517,7 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
         const SizedBox(height: 16),
 
         Text(
-          'Your account has been created and linked to ${_studentInfo?['firstName']} ${_studentInfo?['lastName']}.',
+          'Your account has been created and linked to ${_studentInfo?['studentFullName']}.',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                 color: AppColors.gray,
               ),

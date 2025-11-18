@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -126,10 +127,12 @@ class _SplashScreenState extends State<SplashScreen> {
   void _navigateToLogin() {
     if (!mounted) return;
 
+    // Web users see the marketing landing page
+    // Mobile users (iOS/Android) go directly to login
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => const LandingScreen(),
+        builder: (context) => kIsWeb ? const LandingScreen() : const LoginScreen(),
       ),
     );
   }

@@ -37,16 +37,23 @@ class _LandingScreenState extends State<LandingScreen> {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    const Color(0xFF6B8EF9).withOpacity(0.2),
-                    const Color(0xFF6B8EF9).withOpacity(0.0),
+                    const Color(0xFF6B8EF9).withValues(alpha: 0.2),
+                    const Color(0xFF6B8EF9).withValues(alpha: 0.0),
                   ],
                 ),
               ),
-            ).animate(onPlay: (controller) => controller.repeat())
+            )
+                .animate(onPlay: (controller) => controller.repeat())
                 .fadeIn(duration: 2.seconds)
-                .scale(begin: const Offset(0.8, 0.8), end: const Offset(1.2, 1.2), duration: 4.seconds)
+                .scale(
+                    begin: const Offset(0.8, 0.8),
+                    end: const Offset(1.2, 1.2),
+                    duration: 4.seconds)
                 .then()
-                .scale(begin: const Offset(1.2, 1.2), end: const Offset(0.8, 0.8), duration: 4.seconds),
+                .scale(
+                    begin: const Offset(1.2, 1.2),
+                    end: const Offset(0.8, 0.8),
+                    duration: 4.seconds),
           ),
           Positioned(
             bottom: -150,
@@ -58,16 +65,23 @@ class _LandingScreenState extends State<LandingScreen> {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    const Color(0xFFFF8C42).withOpacity(0.15),
-                    const Color(0xFFFF8C42).withOpacity(0.0),
+                    const Color(0xFFFF8C42).withValues(alpha: 0.15),
+                    const Color(0xFFFF8C42).withValues(alpha: 0.0),
                   ],
                 ),
               ),
-            ).animate(onPlay: (controller) => controller.repeat())
+            )
+                .animate(onPlay: (controller) => controller.repeat())
                 .fadeIn(duration: 2.seconds, delay: 1.seconds)
-                .scale(begin: const Offset(1.0, 1.0), end: const Offset(1.3, 1.3), duration: 5.seconds)
+                .scale(
+                    begin: const Offset(1.0, 1.0),
+                    end: const Offset(1.3, 1.3),
+                    duration: 5.seconds)
                 .then()
-                .scale(begin: const Offset(1.3, 1.3), end: const Offset(1.0, 1.0), duration: 5.seconds),
+                .scale(
+                    begin: const Offset(1.3, 1.3),
+                    end: const Offset(1.0, 1.0),
+                    duration: 5.seconds),
           ),
 
           // Main content
@@ -111,7 +125,7 @@ class _LandingScreenState extends State<LandingScreen> {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF6B8EF9).withOpacity(0.3),
+                      color: const Color(0xFF6B8EF9).withValues(alpha: 0.3),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -136,7 +150,8 @@ class _LandingScreenState extends State<LandingScreen> {
                 ),
               ),
             ],
-          ).animate()
+          )
+              .animate()
               .fadeIn(duration: 600.ms)
               .slideX(begin: -0.2, end: 0, curve: Curves.easeOut),
 
@@ -147,7 +162,8 @@ class _LandingScreenState extends State<LandingScreen> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const LoginScreen()),
+                    MaterialPageRoute(
+                        builder: (context) => const LoginScreen()),
                   );
                 },
                 child: Text(
@@ -164,13 +180,15 @@ class _LandingScreenState extends State<LandingScreen> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const DemoRequestScreen()),
+                    MaterialPageRoute(
+                        builder: (context) => const DemoRequestScreen()),
                   );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF6B8EF9),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -185,7 +203,8 @@ class _LandingScreenState extends State<LandingScreen> {
                 ),
               ),
             ],
-          ).animate()
+          )
+              .animate()
               .fadeIn(duration: 600.ms, delay: 200.ms)
               .slideX(begin: 0.2, end: 0, curve: Curves.easeOut),
         ],
@@ -209,7 +228,8 @@ class _LandingScreenState extends State<LandingScreen> {
               height: 1.2,
               color: const Color(0xFF1E1E3F),
             ),
-          ).animate()
+          )
+              .animate()
               .fadeIn(duration: 800.ms, delay: 300.ms)
               .slideY(begin: 0.3, end: 0, curve: Curves.easeOut),
 
@@ -224,7 +244,8 @@ class _LandingScreenState extends State<LandingScreen> {
               color: const Color(0xFF6E6E8F),
               height: 1.6,
             ),
-          ).animate()
+          )
+              .animate()
               .fadeIn(duration: 800.ms, delay: 500.ms)
               .slideY(begin: 0.3, end: 0, curve: Curves.easeOut),
 
@@ -238,18 +259,20 @@ class _LandingScreenState extends State<LandingScreen> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const DemoRequestScreen()),
+                    MaterialPageRoute(
+                        builder: (context) => const DemoRequestScreen()),
                   );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF6B8EF9),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
                   elevation: 8,
-                  shadowColor: const Color(0xFF6B8EF9).withOpacity(0.4),
+                  shadowColor: const Color(0xFF6B8EF9).withValues(alpha: 0.4),
                 ),
                 child: Row(
                   children: [
@@ -277,7 +300,8 @@ class _LandingScreenState extends State<LandingScreen> {
                 },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF6B8EF9),
-                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
                   side: const BorderSide(color: Color(0xFF6B8EF9), width: 2),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -298,7 +322,8 @@ class _LandingScreenState extends State<LandingScreen> {
                 ),
               ),
             ],
-          ).animate()
+          )
+              .animate()
               .fadeIn(duration: 800.ms, delay: 700.ms)
               .slideY(begin: 0.3, end: 0, curve: Curves.easeOut),
 
@@ -311,7 +336,7 @@ class _LandingScreenState extends State<LandingScreen> {
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF6B8EF9).withOpacity(0.2),
+                  color: const Color(0xFF6B8EF9).withValues(alpha: 0.2),
                   blurRadius: 60,
                   offset: const Offset(0, 20),
                 ),
@@ -326,9 +351,9 @@ class _LandingScreenState extends State<LandingScreen> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      const Color(0xFF6B8EF9).withOpacity(0.1),
-                      const Color(0xFF9B7EF8).withOpacity(0.1),
-                      const Color(0xFFFF8C42).withOpacity(0.1),
+                      const Color(0xFF6B8EF9).withValues(alpha: 0.1),
+                      const Color(0xFF9B7EF8).withValues(alpha: 0.1),
+                      const Color(0xFFFF8C42).withValues(alpha: 0.1),
                     ],
                   ),
                 ),
@@ -342,7 +367,8 @@ class _LandingScreenState extends State<LandingScreen> {
                           Icon(
                             Icons.auto_stories_rounded,
                             size: 120,
-                            color: const Color(0xFF6B8EF9).withOpacity(0.6),
+                            color:
+                                const Color(0xFF6B8EF9).withValues(alpha: 0.6),
                           ),
                           const SizedBox(height: 24),
                           Text(
@@ -364,7 +390,8 @@ class _LandingScreenState extends State<LandingScreen> {
                         '🎯',
                         'Track Progress',
                         const Color(0xFF6B8EF9),
-                      ).animate(onPlay: (controller) => controller.repeat())
+                      )
+                          .animate(onPlay: (controller) => controller.repeat())
                           .moveY(begin: 0, end: -10, duration: 2.seconds)
                           .then()
                           .moveY(begin: -10, end: 0, duration: 2.seconds),
@@ -376,8 +403,13 @@ class _LandingScreenState extends State<LandingScreen> {
                         '⭐',
                         '20 mins read',
                         const Color(0xFFFF8C42),
-                      ).animate(onPlay: (controller) => controller.repeat())
-                          .moveY(begin: 0, end: -15, duration: 2.5.seconds, delay: 500.ms)
+                      )
+                          .animate(onPlay: (controller) => controller.repeat())
+                          .moveY(
+                              begin: 0,
+                              end: -15,
+                              duration: 2.5.seconds,
+                              delay: 500.ms)
                           .then()
                           .moveY(begin: -15, end: 0, duration: 2.5.seconds),
                     ),
@@ -388,8 +420,13 @@ class _LandingScreenState extends State<LandingScreen> {
                         '📖',
                         'New Book',
                         const Color(0xFF9B7EF8),
-                      ).animate(onPlay: (controller) => controller.repeat())
-                          .moveY(begin: 0, end: -12, duration: 2.2.seconds, delay: 1.seconds)
+                      )
+                          .animate(onPlay: (controller) => controller.repeat())
+                          .moveY(
+                              begin: 0,
+                              end: -12,
+                              duration: 2.2.seconds,
+                              delay: 1.seconds)
                           .then()
                           .moveY(begin: -12, end: 0, duration: 2.2.seconds),
                     ),
@@ -397,10 +434,12 @@ class _LandingScreenState extends State<LandingScreen> {
                 ),
               ),
             ),
-          ).animate()
+          )
+              .animate()
               .fadeIn(duration: 1000.ms, delay: 900.ms)
               .slideY(begin: 0.2, end: 0, curve: Curves.easeOut)
-              .scale(begin: const Offset(0.9, 0.9), end: const Offset(1.0, 1.0)),
+              .scale(
+                  begin: const Offset(0.9, 0.9), end: const Offset(1.0, 1.0)),
         ],
       ),
     );
@@ -414,7 +453,7 @@ class _LandingScreenState extends State<LandingScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.2),
+            color: color.withValues(alpha: 0.2),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -473,7 +512,8 @@ class _LandingScreenState extends State<LandingScreen> {
                   colors: [Color(0xFF6B8EF9), Color(0xFF9B7EF8)],
                 ),
                 title: 'Teacher Dashboard',
-                description: 'Real-time insights into student reading progress with beautiful visualizations and analytics',
+                description:
+                    'Real-time insights into student reading progress with beautiful visualizations and analytics',
               ),
               _buildFeatureCard(
                 icon: Icons.family_restroom_rounded,
@@ -481,7 +521,8 @@ class _LandingScreenState extends State<LandingScreen> {
                   colors: [Color(0xFFFF8C42), Color(0xFFFFB366)],
                 ),
                 title: 'Parent App',
-                description: 'Simple one-tap logging, streak tracking, and progress history for busy families',
+                description:
+                    'Simple one-tap logging, streak tracking, and progress history for busy families',
               ),
               _buildFeatureCard(
                 icon: Icons.school_rounded,
@@ -489,7 +530,8 @@ class _LandingScreenState extends State<LandingScreen> {
                   colors: [Color(0xFF9B7EF8), Color(0xFFB89EF8)],
                 ),
                 title: 'Admin Control',
-                description: 'Manage your entire school with user management, class setup, and custom reading levels',
+                description:
+                    'Manage your entire school with user management, class setup, and custom reading levels',
               ),
               _buildFeatureCard(
                 icon: Icons.assignment_rounded,
@@ -497,7 +539,8 @@ class _LandingScreenState extends State<LandingScreen> {
                   colors: [Color(0xFF4ECDC4), Color(0xFF6FE7DB)],
                 ),
                 title: 'Smart Allocations',
-                description: 'Assign reading by level, title, or free choice with flexible schedules that work for you',
+                description:
+                    'Assign reading by level, title, or free choice with flexible schedules that work for you',
               ),
               _buildFeatureCard(
                 icon: Icons.cloud_sync_rounded,
@@ -505,7 +548,8 @@ class _LandingScreenState extends State<LandingScreen> {
                   colors: [Color(0xFFFF6B9D), Color(0xFFFF8BB5)],
                 ),
                 title: 'Offline Support',
-                description: 'Log readings without internet and auto-sync when connected for uninterrupted tracking',
+                description:
+                    'Log readings without internet and auto-sync when connected for uninterrupted tracking',
               ),
               _buildFeatureCard(
                 icon: Icons.notifications_active_rounded,
@@ -513,7 +557,8 @@ class _LandingScreenState extends State<LandingScreen> {
                   colors: [Color(0xFFFFC837), Color(0xFFFFD666)],
                 ),
                 title: 'Smart Reminders',
-                description: 'Gentle push notifications to keep reading streaks alive without overwhelming families',
+                description:
+                    'Gentle push notifications to keep reading streaks alive without overwhelming families',
               ),
             ],
           ),
@@ -550,7 +595,7 @@ class _LandingScreenState extends State<LandingScreen> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: gradient.colors.first.withOpacity(0.3),
+                  color: gradient.colors.first.withValues(alpha: 0.3),
                   blurRadius: 16,
                   offset: const Offset(0, 8),
                 ),
@@ -578,9 +623,7 @@ class _LandingScreenState extends State<LandingScreen> {
           ),
         ],
       ),
-    ).animate()
-        .fadeIn(duration: 600.ms)
-        .slideY(begin: 0.2, end: 0);
+    ).animate().fadeIn(duration: 600.ms).slideY(begin: 0.2, end: 0);
   }
 
   Widget _buildHowItWorksSection(BuildContext context) {
@@ -611,7 +654,8 @@ class _LandingScreenState extends State<LandingScreen> {
           _buildHowItWorksStep(
             number: '1',
             title: 'Schools Set Up',
-            description: 'Admins create classes, add teachers, and configure reading levels in minutes',
+            description:
+                'Admins create classes, add teachers, and configure reading levels in minutes',
             emoji: '🏫',
             color: const Color(0xFF6B8EF9),
           ),
@@ -619,7 +663,8 @@ class _LandingScreenState extends State<LandingScreen> {
           _buildHowItWorksStep(
             number: '2',
             title: 'Teachers Assign',
-            description: 'Teachers create smart reading allocations tailored to each student's level',
+            description:
+                'Teachers create smart reading allocations tailored to each student\'s level',
             emoji: '📚',
             color: const Color(0xFF9B7EF8),
           ),
@@ -627,7 +672,8 @@ class _LandingScreenState extends State<LandingScreen> {
           _buildHowItWorksStep(
             number: '3',
             title: 'Parents Track',
-            description: 'Parents log daily reading with one tap and watch their child's progress soar',
+            description:
+                'Parents log daily reading with one tap and watch their child\'s progress soar',
             emoji: '⭐',
             color: const Color(0xFFFF8C42),
           ),
@@ -649,12 +695,12 @@ class _LandingScreenState extends State<LandingScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: color.withOpacity(0.2),
+          color: color.withValues(alpha: 0.2),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             blurRadius: 24,
             offset: const Offset(0, 8),
           ),
@@ -667,7 +713,7 @@ class _LandingScreenState extends State<LandingScreen> {
             height: 80,
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [color, color.withOpacity(0.7)],
+                colors: [color, color.withValues(alpha: 0.7)],
               ),
               shape: BoxShape.circle,
             ),
@@ -718,9 +764,7 @@ class _LandingScreenState extends State<LandingScreen> {
           ),
         ],
       ),
-    ).animate()
-        .fadeIn(duration: 600.ms)
-        .slideX(begin: -0.1, end: 0);
+    ).animate().fadeIn(duration: 600.ms).slideX(begin: -0.1, end: 0);
   }
 
   Widget _buildBenefitsSection(BuildContext context) {
@@ -747,32 +791,38 @@ class _LandingScreenState extends State<LandingScreen> {
               _buildBenefitItem(
                 emoji: '⚡',
                 title: 'Save Time',
-                description: 'Reduce admin work by 80% with automated tracking and parent linking',
+                description:
+                    'Reduce admin work by 80% with automated tracking and parent linking',
               ),
               _buildBenefitItem(
                 emoji: '📈',
                 title: 'Boost Engagement',
-                description: 'Students read 3x more with gamification and family involvement',
+                description:
+                    'Students read 3x more with gamification and family involvement',
               ),
               _buildBenefitItem(
                 emoji: '💡',
                 title: 'Data-Driven',
-                description: 'Make informed decisions with real-time analytics and insights',
+                description:
+                    'Make informed decisions with real-time analytics and insights',
               ),
               _buildBenefitItem(
                 emoji: '🔒',
                 title: 'Secure & Private',
-                description: 'Bank-level encryption with GDPR and COPPA compliance',
+                description:
+                    'Bank-level encryption with GDPR and COPPA compliance',
               ),
               _buildBenefitItem(
                 emoji: '🌟',
                 title: 'Easy Setup',
-                description: 'Get started in under 10 minutes with our guided onboarding',
+                description:
+                    'Get started in under 10 minutes with our guided onboarding',
               ),
               _buildBenefitItem(
                 emoji: '💚',
                 title: 'Family Friendly',
-                description: 'Parents love the simple interface and instant progress updates',
+                description:
+                    'Parents love the simple interface and instant progress updates',
               ),
             ],
           ),
@@ -816,7 +866,8 @@ class _LandingScreenState extends State<LandingScreen> {
           ),
         ],
       ),
-    ).animate()
+    )
+        .animate()
         .fadeIn(duration: 600.ms)
         .scale(begin: const Offset(0.8, 0.8), end: const Offset(1.0, 1.0));
   }
@@ -838,7 +889,7 @@ class _LandingScreenState extends State<LandingScreen> {
         borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6B8EF9).withOpacity(0.4),
+            color: const Color(0xFF6B8EF9).withValues(alpha: 0.4),
             blurRadius: 40,
             offset: const Offset(0, 20),
           ),
@@ -862,7 +913,7 @@ class _LandingScreenState extends State<LandingScreen> {
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
               fontSize: 20,
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
               height: 1.6,
             ),
           ),
@@ -874,13 +925,15 @@ class _LandingScreenState extends State<LandingScreen> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const DemoRequestScreen()),
+                    MaterialPageRoute(
+                        builder: (context) => const DemoRequestScreen()),
                   );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: const Color(0xFF6B8EF9),
-                  padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 28),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 48, vertical: 28),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
@@ -905,12 +958,14 @@ class _LandingScreenState extends State<LandingScreen> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const LoginScreen()),
+                    MaterialPageRoute(
+                        builder: (context) => const LoginScreen()),
                   );
                 },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 28),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 48, vertical: 28),
                   side: const BorderSide(color: Colors.white, width: 2),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -930,18 +985,18 @@ class _LandingScreenState extends State<LandingScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildTrustBadge(Icons.check_circle_rounded, 'No credit card required'),
+              _buildTrustBadge(
+                  Icons.check_circle_rounded, 'No credit card required'),
               const SizedBox(width: 32),
               _buildTrustBadge(Icons.timer_rounded, 'Setup in 10 minutes'),
               const SizedBox(width: 32),
-              _buildTrustBadge(Icons.support_agent_rounded, 'Free onboarding support'),
+              _buildTrustBadge(
+                  Icons.support_agent_rounded, 'Free onboarding support'),
             ],
           ),
         ],
       ),
-    ).animate()
-        .fadeIn(duration: 800.ms)
-        .slideY(begin: 0.2, end: 0);
+    ).animate().fadeIn(duration: 800.ms).slideY(begin: 0.2, end: 0);
   }
 
   Widget _buildTrustBadge(IconData icon, String text) {
@@ -953,7 +1008,7 @@ class _LandingScreenState extends State<LandingScreen> {
           text,
           style: GoogleFonts.inter(
             fontSize: 16,
-            color: Colors.white.withOpacity(0.9),
+            color: Colors.white.withValues(alpha: 0.9),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -1008,7 +1063,7 @@ class _LandingScreenState extends State<LandingScreen> {
                     'Making reading magical for every child',
                     style: GoogleFonts.inter(
                       fontSize: 16,
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withValues(alpha: 0.7),
                     ),
                   ),
                 ],
@@ -1030,13 +1085,15 @@ class _LandingScreenState extends State<LandingScreen> {
                   _buildFooterLink('Request Demo', () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const DemoRequestScreen()),
+                      MaterialPageRoute(
+                          builder: (context) => const DemoRequestScreen()),
                     );
                   }),
                   _buildFooterLink('Login', () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const LoginScreen()),
+                      MaterialPageRoute(
+                          builder: (context) => const LoginScreen()),
                     );
                   }),
                 ],
@@ -1044,14 +1101,14 @@ class _LandingScreenState extends State<LandingScreen> {
             ],
           ),
           const SizedBox(height: 48),
-          Divider(color: Colors.white.withOpacity(0.1)),
+          Divider(color: Colors.white.withValues(alpha: 0.1)),
           const SizedBox(height: 24),
           Text(
             '© 2025 Lumi Reading Diary. All rights reserved.',
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
               fontSize: 14,
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
             ),
           ),
         ],
@@ -1068,7 +1125,7 @@ class _LandingScreenState extends State<LandingScreen> {
           text,
           style: GoogleFonts.inter(
             fontSize: 16,
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.white.withValues(alpha: 0.8),
             decoration: TextDecoration.none,
           ),
         ),
