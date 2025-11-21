@@ -5,19 +5,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/lumi_mascot.dart';
+import '../../core/routing/app_router.dart';
 import '../../data/models/user_model.dart';
 import '../../services/firebase_service.dart';
-import '../parent/parent_home_screen.dart';
-import '../teacher/teacher_home_screen.dart';
-import '../admin/admin_home_screen.dart';
-import 'register_screen.dart';
-import 'web_not_available_screen.dart';
-import 'forgot_password_screen.dart';
-import 'parent_registration_screen.dart';
-import '../onboarding/school_demo_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -151,34 +145,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _navigateToHome(UserModel user) {
     // Check if parent is trying to access web version
-    if (kIsWeb && user.role == UserRole.parent) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const WebNotAvailableScreen()),
-        (route) => false,
-      );
+    final redirectRoute = AppRouter.checkParentWebAccess(user.role);
+    if (redirectRoute != null) {
+      context.go(redirectRoute);
       return;
     }
 
-    Widget homeScreen;
-
-    switch (user.role) {
-      case UserRole.parent:
-        homeScreen = ParentHomeScreen(user: user);
-        break;
-      case UserRole.teacher:
-        homeScreen = TeacherHomeScreen(user: user);
-        break;
-      case UserRole.schoolAdmin:
-        homeScreen = AdminHomeScreen(user: user);
-        break;
-    }
-
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => homeScreen),
-      (route) => false,
-    );
+    // Navigate to role-based home screen
+    final homeRoute = AppRouter.getHomeRouteForRole(user.role);
+    context.go(homeRoute, extra: user);
   }
 
   @override
@@ -326,14 +301,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ForgotPasswordScreen(),
-                      ),
-                    );
-                  },
+                  onPressed: () => context.push('/auth/forgot-password'),
                   child: const Text('Forgot Password?'),
                 ).animate().fadeIn(delay: 600.ms, duration: 500.ms),
               ),
@@ -373,14 +341,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                   ),
                   TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const RegisterScreen(),
-                        ),
-                      );
-                    },
+                    onPressed: () => context.push('/auth/register'),
                     style: TextButton.styleFrom(
                       padding: EdgeInsets.zero,
                     ),
@@ -393,14 +354,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
               // Invite code option for parents
               TextButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ParentRegistrationScreen(),
-                    ),
-                  );
-                },
+                onPressed: () => context.push('/auth/parent-register'),
                 icon: const Icon(Icons.qr_code),
                 label: const Text('Parent? Register with Student Code'),
               ).animate().fadeIn(delay: 900.ms, duration: 500.ms),
@@ -409,14 +363,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
               // School registration option
               TextButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const SchoolDemoScreen(),
-                    ),
-                  );
-                },
+                onPressed: () => context.push('/onboarding/demo'),
                 icon: const Icon(Icons.school),
                 label: const Text('School? Request a Demo'),
               ).animate().fadeIn(delay: 1000.ms, duration: 500.ms),

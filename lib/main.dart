@@ -7,12 +7,10 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import 'core/theme/app_theme.dart';
+import 'core/routing/app_router.dart';
 import 'services/firebase_service.dart';
 import 'services/crash_reporting_service.dart';
 import 'firebase_options.dart';
-import 'screens/auth/splash_screen.dart';
-import 'screens/auth/login_screen.dart';
-import 'screens/auth/register_screen.dart';
 
 void main() async {
   // Ensure Flutter binding is initialized
@@ -64,17 +62,13 @@ class LumiApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'Lumi Reading Diary',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme(),
       darkTheme: AppTheme.darkTheme(),
       themeMode: ThemeMode.light,
-      home: const SplashScreen(),
-      routes: {
-        '/login': (context) => const LoginScreen(),
-        '/register': (context) => const RegisterScreen(),
-      },
+      routerConfig: AppRouter.router,
     );
   }
 }

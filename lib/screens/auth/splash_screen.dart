@@ -2,16 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/lumi_mascot.dart';
+import '../../core/routing/app_router.dart';
 import '../../data/models/user_model.dart';
 import '../../services/firebase_service.dart';
-import '../parent/parent_home_screen.dart';
-import '../teacher/teacher_home_screen.dart';
-import '../admin/admin_home_screen.dart';
-import '../marketing/landing_screen.dart';
-import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -81,35 +78,16 @@ class _SplashScreenState extends State<SplashScreen> {
           // Assign to non-nullable variable for type promotion
           final currentUser = user;
 
-          // Navigate based on role
-          switch (currentUser.role) {
-            case UserRole.parent:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ParentHomeScreen(user: currentUser),
-                ),
-              );
-              break;
-
-            case UserRole.teacher:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => TeacherHomeScreen(user: currentUser),
-                ),
-              );
-              break;
-
-            case UserRole.schoolAdmin:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => AdminHomeScreen(user: currentUser),
-                ),
-              );
-              break;
+          // Check if parent is trying to access web
+          final redirectRoute = AppRouter.checkParentWebAccess(currentUser.role);
+          if (redirectRoute != null) {
+            context.go(redirectRoute);
+            return;
           }
+
+          // Navigate based on role
+          final homeRoute = AppRouter.getHomeRouteForRole(currentUser.role);
+          context.go(homeRoute, extra: currentUser);
         } else {
           // User document doesn't exist, go to login
           _navigateToLogin();
@@ -129,12 +107,8 @@ class _SplashScreenState extends State<SplashScreen> {
 
     // Web users see the marketing landing page
     // Mobile users (iOS/Android) go directly to login
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => kIsWeb ? const LandingScreen() : const LoginScreen(),
-      ),
-    );
+    final route = kIsWeb ? '/landing' : '/auth/login';
+    context.go(route);
   }
 
   @override
