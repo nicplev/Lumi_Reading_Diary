@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
 import '../../services/firebase_service.dart';
-import '../auth/login_screen.dart';
 
 class ParentProfileScreen extends StatefulWidget {
   final UserModel user;
@@ -132,11 +132,7 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
     if (confirm == true) {
       await _firebaseService.signOut();
       if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-          (route) => false,
-        );
+        context.go('/auth/login');
       }
     }
   }

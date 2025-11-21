@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/class_model.dart';
 import '../../services/firebase_service.dart';
 import 'csv_import_dialog.dart';
-import 'student_management_screen.dart';
 
 class ClassManagementScreen extends StatefulWidget {
   final UserModel adminUser;
@@ -578,15 +578,7 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
         await _showAssignTeacherDialog(classModel);
         break;
       case 'manage_students':
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => StudentManagementScreen(
-              classModel: classModel,
-              adminUser: widget.adminUser,
-            ),
-          ),
-        );
+        context.push('/admin/student-management', extra: widget.adminUser);
         break;
       case 'delete':
         await _deleteClass(classModel);

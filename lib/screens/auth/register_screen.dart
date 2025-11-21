@@ -4,12 +4,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/lumi_mascot.dart';
+import '../../core/routing/app_router.dart';
 import '../../data/models/user_model.dart';
 import '../../services/firebase_service.dart';
-import '../parent/parent_home_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   final String? inviteCode;
@@ -86,13 +87,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
           // Navigate to appropriate home screen
           if (_selectedRole == UserRole.parent) {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ParentHomeScreen(user: user),
-              ),
-              (route) => false,
-            );
+            final homeRoute = AppRouter.getHomeRouteForRole(user.role);
+            context.go(homeRoute, extra: user);
           } else {
             // For teacher or admin, show pending approval screen
             _showPendingApprovalDialog();
@@ -172,13 +168,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                '/login',
-                (route) => false,
-              );
-            },
+            onPressed: () => context.go('/auth/login'),
             child: const Text('OK'),
           ),
         ],

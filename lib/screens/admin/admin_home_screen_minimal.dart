@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/minimal_theme.dart';
 import '../../core/widgets/minimal/minimal_widgets.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/school_model.dart';
 import '../../services/firebase_service.dart';
-import '../auth/login_screen.dart';
 import 'user_management_screen.dart';
 import 'class_management_screen.dart';
 import 'database_migration_screen.dart';
@@ -132,11 +132,7 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
     if (confirm == true) {
       await _firebaseService.signOut();
       if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-          (route) => false,
-        );
+        context.go('/auth/login');
       }
     }
   }
@@ -827,14 +823,7 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
                       ),
                     ),
                     onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => DatabaseMigrationScreen(
-                            adminUser: widget.user,
-                          ),
-                        ),
-                      );
+                      context.push('/admin/database-migration', extra: widget.user);
                     },
                   ),
                   const Divider(height: 1),

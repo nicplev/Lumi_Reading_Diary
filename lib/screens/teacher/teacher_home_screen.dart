@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/liquid_glass_theme.dart';
@@ -12,10 +13,8 @@ import '../../data/models/class_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../services/firebase_service.dart';
-import 'class_detail_screen.dart';
 import 'allocation_screen.dart';
 import 'teacher_profile_screen.dart';
-import '../auth/login_screen.dart';
 
 class TeacherHomeScreen extends StatefulWidget {
   final UserModel user;
@@ -296,14 +295,12 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                 return _ClassCard(
                   classModel: classModel,
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ClassDetailScreen(
-                          classModel: classModel,
-                          teacher: widget.user,
-                        ),
-                      ),
+                    context.push(
+                      '/teacher/class-detail/${classModel.id}',
+                      extra: {
+                        'user': widget.user,
+                        'classData': classModel,
+                      },
                     );
                   },
                 );
@@ -337,11 +334,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
     if (confirm == true) {
       await _firebaseService.signOut();
       if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-          (route) => false,
-        );
+        context.go('/auth/login');
       }
     }
   }
