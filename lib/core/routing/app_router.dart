@@ -41,6 +41,7 @@ import '../../screens/onboarding/school_registration_wizard.dart';
 import '../../screens/onboarding/school_demo_screen.dart';
 import '../../screens/onboarding/demo_request_screen.dart';
 import '../../screens/marketing/landing_screen.dart';
+import '../../screens/design_system_demo_screen.dart';
 
 /// Global navigation key for GoRouter
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -454,6 +455,15 @@ class AppRouter {
           final user = state.extra as UserModel?;
           return DatabaseMigrationScreen(user: user!);
         },
+      ),
+
+      // ============================================
+      // DEVELOPMENT & DEMO
+      // ============================================
+      GoRoute(
+        path: '/design-system-demo',
+        name: 'design-system-demo',
+        builder: (context, state) => const DesignSystemDemoScreen(),
       ),
     ],
 
