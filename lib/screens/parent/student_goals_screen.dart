@@ -6,6 +6,11 @@ import '../../data/models/student_model.dart';
 import '../../data/models/reading_goal_model.dart';
 import '../../services/firebase_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/lumi_card.dart';
 
 /// Screen for viewing and managing student reading goals
 /// Allows students and parents to set targets and track progress
@@ -45,18 +50,26 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Reading Goals'),
-        backgroundColor: AppColors.primaryBlue,
+        title: Text('Reading Goals', style: LumiTextStyles.h3()),
+        backgroundColor: AppColors.white,
+        elevation: 0,
         bottom: TabBar(
           controller: _tabController,
+          labelColor: AppColors.rosePink,
+          unselectedLabelColor: AppColors.charcoal.withValues(alpha: 0.6),
+          labelStyle: LumiTextStyles.bodyMedium(),
+          indicatorColor: AppColors.rosePink,
           tabs: const [
             Tab(text: 'Active'),
             Tab(text: 'Completed'),
           ],
         ),
       ),
+      backgroundColor: AppColors.offWhite,
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.rosePink),
+            ))
           : TabBarView(
               controller: _tabController,
               children: [
@@ -64,11 +77,11 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
                 _buildCompletedGoalsTab(),
               ],
             ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: LumiFab(
         onPressed: _showCreateGoalDialog,
-        backgroundColor: AppColors.primaryBlue,
-        icon: const Icon(Icons.flag),
-        label: const Text('New Goal'),
+        icon: Icons.flag,
+        label: 'New Goal',
+        isExtended: true,
       ),
     );
   }
@@ -87,13 +100,14 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
 
     return RefreshIndicator(
       onRefresh: _loadGoals,
+      color: AppColors.rosePink,
       child: ListView.builder(
-        padding: const EdgeInsets.all(16),
+        padding: LumiPadding.allS,
         itemCount: _activeGoals.length + 1,
         itemBuilder: (context, index) {
           if (index == 0) {
             return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
+              padding: EdgeInsets.only(bottom: LumiSpacing.s),
               child: _buildGoalsSummaryCard(),
             );
           }
@@ -116,8 +130,9 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
 
     return RefreshIndicator(
       onRefresh: _loadGoals,
+      color: AppColors.rosePink,
       child: ListView.builder(
-        padding: const EdgeInsets.all(16),
+        padding: LumiPadding.allS,
         itemCount: _completedGoals.length,
         itemBuilder: (context, index) {
           return _buildGoalCard(_completedGoals[index], isCompleted: true);
@@ -132,45 +147,36 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
         _activeGoals.where((g) => g.progressPercentage >= 0.5).length;
     final achievedGoals = _activeGoals.where((g) => g.isAchieved).length;
 
-    return Card(
-      elevation: 2,
-      color: AppColors.primaryBlue.withOpacity(0.1),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.trending_up, color: AppColors.primaryBlue),
-                const SizedBox(width: 8),
-                Text(
-                  'Goal Summary',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildSummaryItem('Total Goals', '$totalGoals',
-                      Icons.flag, Colors.blue),
-                ),
-                Expanded(
-                  child: _buildSummaryItem('On Track', '$onTrackGoals',
-                      Icons.timeline, Colors.orange),
-                ),
-                Expanded(
-                  child: _buildSummaryItem('Achieved', '$achievedGoals',
-                      Icons.check_circle, Colors.green),
-                ),
-              ],
-            ),
-          ],
-        ),
+    return LumiCard(
+      isHighlighted: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.trending_up, color: AppColors.rosePink),
+              LumiGap.horizontalXS,
+              Text('Goal Summary', style: LumiTextStyles.h3()),
+            ],
+          ),
+          LumiGap.s,
+          Row(
+            children: [
+              Expanded(
+                child: _buildSummaryItem(
+                    'Total Goals', '$totalGoals', Icons.flag, AppColors.rosePink),
+              ),
+              Expanded(
+                child: _buildSummaryItem('On Track', '$onTrackGoals',
+                    Icons.timeline, AppColors.warmOrange),
+              ),
+              Expanded(
+                child: _buildSummaryItem('Achieved', '$achievedGoals',
+                    Icons.check_circle, AppColors.mintGreen),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -180,19 +186,16 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
     return Column(
       children: [
         Icon(icon, color: color, size: 32),
-        const SizedBox(height: 8),
+        LumiGap.xs,
         Text(
           value,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
+          style: LumiTextStyles.h2(color: color),
         ),
         Text(
           label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.grey[600],
-              ),
+          style: LumiTextStyles.bodySmall(
+            color: AppColors.charcoal.withValues(alpha: 0.7),
+          ),
           textAlign: TextAlign.center,
         ),
       ],
@@ -201,22 +204,19 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
 
   Widget _buildGoalCard(ReadingGoalModel goal, {bool isCompleted = false}) {
     final color = isCompleted
-        ? Colors.green
+        ? AppColors.mintGreen
         : goal.isAchieved
-            ? Colors.green
+            ? AppColors.mintGreen
             : goal.isExpired
-                ? Colors.red
-                : AppColors.primaryBlue;
+                ? AppColors.error
+                : AppColors.rosePink;
 
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
+    return Padding(
+      padding: EdgeInsets.only(bottom: LumiSpacing.listItemSpacing),
+      child: LumiCard(
+        padding: LumiPadding.allS,
         onTap: () => _showGoalDetails(goal),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
+        child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
@@ -227,21 +227,15 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
                       children: [
                         Text(
                           goal.title,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                          style: LumiTextStyles.h3(),
                         ),
                         if (goal.description != null) ...[
-                          const SizedBox(height: 4),
+                          LumiGap.xxs,
                           Text(
                             goal.description!,
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Colors.grey[600],
-                                    ),
+                            style: LumiTextStyles.bodySmall(
+                              color: AppColors.charcoal.withValues(alpha: 0.7),
+                            ),
                           ),
                         ],
                       ],
@@ -250,34 +244,30 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
                   if (goal.isAchieved)
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
+                        horizontal: LumiSpacing.inputPaddingVertical,
+                        vertical: LumiSpacing.elementSpacing - 2,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.green[50],
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.green),
+                        color: AppColors.mintGreen.withValues(alpha: 0.1),
+                        borderRadius: LumiBorders.medium,
+                        border: Border.all(color: AppColors.mintGreen, width: 2),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(Icons.check_circle,
-                              size: 16, color: Colors.green[700]),
-                          const SizedBox(width: 4),
+                              size: 16, color: AppColors.mintGreen),
+                          LumiGap.horizontalXXS,
                           Text(
                             'Achieved!',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green[700],
-                            ),
+                            style: LumiTextStyles.label(color: AppColors.mintGreen),
                           ),
                         ],
                       ),
                     ),
                 ],
               ),
-              const SizedBox(height: 16),
+              LumiGap.s,
               Row(
                 children: [
                   Expanded(
@@ -289,73 +279,61 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
                           children: [
                             Text(
                               '${goal.currentValue} / ${goal.targetValue} ${goal.valueUnit}',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                              style: LumiTextStyles.bodyMedium(),
                             ),
                             Text(
                               '${(goal.progressPercentage * 100).toStringAsFixed(0)}%',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: color,
-                                  ),
+                              style: LumiTextStyles.bodyMedium(color: color),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        LumiGap.xs,
                         LinearProgressIndicator(
                           value: goal.progressPercentage,
-                          backgroundColor: color.withOpacity(0.2),
+                          backgroundColor: color.withValues(alpha: 0.2),
                           valueColor: AlwaysStoppedAnimation<Color>(color),
+                          borderRadius: LumiBorders.small,
                         ),
                       ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              LumiGap.xs,
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
                     children: [
                       Icon(Icons.calendar_today,
-                          size: 14, color: Colors.grey[600]),
-                      const SizedBox(width: 4),
+                          size: 14, color: AppColors.charcoal.withValues(alpha: 0.6)),
+                      LumiGap.horizontalXXS,
                       Text(
                         'Ends ${DateFormat('MMM dd').format(goal.endDate)}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.grey[600],
-                            ),
+                        style: LumiTextStyles.bodySmall(
+                          color: AppColors.charcoal.withValues(alpha: 0.7),
+                        ),
                       ),
                     ],
                   ),
                   if (!isCompleted && !goal.isAchieved)
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
+                        horizontal: LumiSpacing.xs,
+                        vertical: LumiSpacing.xxs,
                       ),
                       decoration: BoxDecoration(
                         color: goal.daysRemaining <= 3
-                            ? Colors.orange[50]
-                            : Colors.blue[50],
-                        borderRadius: BorderRadius.circular(12),
+                            ? AppColors.warmOrange.withValues(alpha: 0.1)
+                            : AppColors.rosePink.withValues(alpha: 0.1),
+                        borderRadius: LumiBorders.medium,
                       ),
                       child: Text(
                         '${goal.daysRemaining} days left',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
+                        style: LumiTextStyles.caption(
                           color: goal.daysRemaining <= 3
-                              ? Colors.orange[700]
-                              : Colors.blue[700],
+                              ? AppColors.warmOrange
+                              : AppColors.rosePink,
                         ),
                       ),
                     ),
@@ -364,7 +342,6 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
             ],
           ),
         ),
-      ),
     );
   }
 
@@ -377,39 +354,32 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
   }) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: LumiPadding.allL,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 80, color: Colors.grey[400]),
-            const SizedBox(height: 24),
+            Icon(icon, size: 80, color: AppColors.charcoal.withValues(alpha: 0.3)),
+            LumiGap.m,
             Text(
               title,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: Colors.grey[700],
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: LumiTextStyles.h2(
+                color: AppColors.charcoal.withValues(alpha: 0.7),
+              ),
             ),
-            const SizedBox(height: 12),
+            LumiGap.xs,
             Text(
               message,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey[600],
-                  ),
+              style: LumiTextStyles.body(
+                color: AppColors.charcoal.withValues(alpha: 0.6),
+              ),
               textAlign: TextAlign.center,
             ),
             if (actionLabel != null && onAction != null) ...[
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
+              LumiGap.m,
+              LumiPrimaryButton(
                 onPressed: onAction,
-                icon: const Icon(Icons.add),
-                label: Text(actionLabel),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
-                  ),
-                ),
+                icon: Icons.add,
+                text: actionLabel,
               ),
             ],
           ],
@@ -455,7 +425,7 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error loading goals: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
         ),
       );
     }
@@ -493,8 +463,8 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
+                      color: AppColors.charcoal.withValues(alpha: 0.2),
+                      borderRadius: LumiBorders.custom(2),
                     ),
                   ),
                 ),
@@ -503,19 +473,14 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
                   children: [
                     if (goal.isAchieved)
                       Icon(Icons.emoji_events,
-                          size: 32, color: Colors.amber[700])
+                          size: 32, color: AppColors.softYellow)
                     else
-                      Icon(Icons.flag, size: 32, color: AppColors.primaryBlue),
+                      Icon(Icons.flag, size: 32, color: AppColors.rosePink),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         goal.title,
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineSmall
-                            ?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                        style: LumiTextStyles.h2(),
                       ),
                     ),
                   ],
@@ -524,9 +489,9 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
                   const SizedBox(height: 8),
                   Text(
                     goal.description!,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: Colors.grey[700],
-                        ),
+                    style: LumiTextStyles.bodyLarge(
+                      color: AppColors.charcoal.withValues(alpha: 0.7),
+                    ),
                   ),
                 ],
                 const SizedBox(height: 24),
@@ -576,25 +541,23 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
                 if (goal.isAchieved && goal.rewardMessage != null) ...[
                   const SizedBox(height: 24),
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: LumiPadding.allS,
                     decoration: BoxDecoration(
-                      color: Colors.green[50],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.green),
+                      color: AppColors.mintGreen.withValues(alpha: 0.1),
+                      borderRadius: LumiBorders.medium,
+                      border: Border.all(color: AppColors.mintGreen, width: 2),
                     ),
                     child: Row(
                       children: [
                         Icon(Icons.celebration,
-                            color: Colors.green[700], size: 32),
-                        const SizedBox(width: 12),
+                            color: AppColors.mintGreen, size: 32),
+                        LumiGap.horizontalXS,
                         Expanded(
                           child: Text(
                             goal.rewardMessage!,
-                            style:
-                                Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                      color: Colors.green[900],
-                                      fontWeight: FontWeight.w500,
-                                    ),
+                            style: LumiTextStyles.bodyLarge(
+                              color: AppColors.success,
+                            ),
                           ),
                         ),
                       ],
@@ -603,19 +566,14 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
                 ],
                 const SizedBox(height: 24),
                 if (!goal.isAchieved && goal.status == GoalStatus.active)
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        _markGoalComplete(goal);
-                      },
-                      icon: const Icon(Icons.check),
-                      label: const Text('Mark as Complete'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.all(16),
-                      ),
-                    ),
+                  LumiSecondaryButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _markGoalComplete(goal);
+                    },
+                    icon: Icons.check,
+                    text: 'Mark as Complete',
+                    isFullWidth: true,
                   ),
               ],
             ),
@@ -627,26 +585,24 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
 
   Widget _buildDetailRow(String label, String value, IconData icon) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.only(bottom: LumiSpacing.inputPaddingVertical),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: Colors.grey[600]),
-          const SizedBox(width: 12),
+          Icon(icon, size: 20, color: AppColors.charcoal.withValues(alpha: 0.6)),
+          LumiGap.horizontalXS,
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.grey[600],
-                      ),
+                  style: LumiTextStyles.bodySmall(
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
+                  ),
                 ),
                 Text(
                   value,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: LumiTextStyles.bodyLarge(),
                 ),
               ],
             ),
@@ -674,7 +630,7 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('🎉 Congratulations! Goal marked as complete!'),
-          backgroundColor: Colors.green,
+          backgroundColor: AppColors.mintGreen,
         ),
       );
 
@@ -685,7 +641,7 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error completing goal: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
         ),
       );
     }
@@ -720,46 +676,43 @@ class _CreateGoalDialogState extends State<_CreateGoalDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
+      shape: LumiBorders.shapeLarge,
       child: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: LumiPadding.allM,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
                 children: [
-                  Icon(Icons.flag, color: AppColors.primaryBlue),
-                  const SizedBox(width: 8),
+                  Icon(Icons.flag, color: AppColors.rosePink),
+                  LumiGap.horizontalXS,
                   Expanded(
                     child: Text(
                       'Create Reading Goal',
-                      style:
-                          Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                      style: LumiTextStyles.h2(),
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
+                  LumiIconButton(
+                    icon: Icons.close,
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              LumiGap.m,
               Text(
                 'Choose a goal template:',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: LumiTextStyles.h3(),
               ),
-              const SizedBox(height: 12),
+              LumiGap.xs,
               ...GoalTemplate.templates.map((template) {
                 return RadioListTile<GoalTemplate>(
-                  title: Text(template.title),
-                  subtitle: Text(template.description),
+                  title: Text(template.title, style: LumiTextStyles.bodyMedium()),
+                  subtitle: Text(template.description, style: LumiTextStyles.bodySmall()),
                   value: template,
                   groupValue: _selectedTemplate,
+                  activeColor: AppColors.rosePink,
                   onChanged: (value) {
                     setState(() {
                       _selectedTemplate = value;
@@ -769,17 +722,12 @@ class _CreateGoalDialogState extends State<_CreateGoalDialog> {
                     });
                   },
                 );
-              }).toList(),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _selectedTemplate != null ? _createGoal : null,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.all(16),
-                  ),
-                  child: const Text('Create Goal'),
-                ),
+              }),
+              LumiGap.m,
+              LumiPrimaryButton(
+                onPressed: _selectedTemplate != null ? _createGoal : null,
+                text: 'Create Goal',
+                isFullWidth: true,
               ),
             ],
           ),
@@ -824,7 +772,7 @@ class _CreateGoalDialogState extends State<_CreateGoalDialog> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Goal created successfully!'),
-          backgroundColor: Colors.green,
+          backgroundColor: AppColors.mintGreen,
         ),
       );
     } catch (e) {
@@ -833,7 +781,7 @@ class _CreateGoalDialogState extends State<_CreateGoalDialog> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error creating goal: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
         ),
       );
     }
