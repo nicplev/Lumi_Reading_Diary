@@ -4,6 +4,11 @@ import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/lumi_card.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../services/firebase_service.dart';
 
@@ -45,28 +50,25 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundPrimary,
+      backgroundColor: AppColors.offWhite,
       appBar: AppBar(
-        title: const Text('Reading History'),
+        title: Text('Reading History', style: LumiTextStyles.h3()),
         backgroundColor: AppColors.white,
         elevation: 0,
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'This Week'),
-            Tab(text: 'This Month'),
-            Tab(text: 'All Time'),
+          tabs: [
+            Tab(child: Text('This Week', style: LumiTextStyles.label())),
+            Tab(child: Text('This Month', style: LumiTextStyles.label())),
+            Tab(child: Text('All Time', style: LumiTextStyles.label())),
           ],
-          labelColor: AppColors.primaryBlue,
-          unselectedLabelColor: AppColors.gray,
-          indicatorColor: AppColors.primaryBlue,
+          labelColor: AppColors.rosePink,
+          unselectedLabelColor: AppColors.charcoal.withValues(alpha: 0.7),
+          indicatorColor: AppColors.rosePink,
         ),
         actions: [
-          IconButton(
-            icon: Icon(
-              _selectedView == 'list' ? Icons.bar_chart : Icons.list,
-              color: AppColors.darkGray,
-            ),
+          LumiIconButton(
+            icon: _selectedView == 'list' ? Icons.bar_chart : Icons.list,
             onPressed: () {
               setState(() {
                 _selectedView = _selectedView == 'list' ? 'chart' : 'list';
@@ -130,12 +132,12 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
         // Month selector
         Container(
           color: AppColors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: EdgeInsets.symmetric(horizontal: LumiSpacing.s, vertical: LumiSpacing.xs),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              IconButton(
-                icon: const Icon(Icons.chevron_left),
+              LumiIconButton(
+                icon: Icons.chevron_left,
                 onPressed: () {
                   setState(() {
                     _selectedMonth = DateTime(
@@ -147,12 +149,10 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
               ),
               Text(
                 DateFormat('MMMM yyyy').format(_selectedMonth),
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: LumiTextStyles.h3(),
               ),
-              IconButton(
-                icon: const Icon(Icons.chevron_right),
+              LumiIconButton(
+                icon: Icons.chevron_right,
                 onPressed: _selectedMonth.month == DateTime.now().month &&
                         _selectedMonth.year == DateTime.now().year
                     ? null
@@ -233,8 +233,8 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
         return Column(
           children: [
             // Statistics cards
-            Container(
-              padding: const EdgeInsets.all(16),
+            Padding(
+              padding: LumiPadding.allS,
               child: Row(
                 children: [
                   Expanded(
@@ -242,10 +242,10 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                       title: 'Total Time',
                       value: '${totalMinutes ~/ 60}h ${totalMinutes % 60}m',
                       icon: Icons.timer,
-                      color: AppColors.primaryBlue,
+                      color: AppColors.rosePink,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  LumiGap.horizontalS,
                   Expanded(
                     child: _StatCard(
                       title: 'Books Read',
@@ -254,13 +254,13 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                       color: AppColors.secondaryPurple,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  LumiGap.horizontalS,
                   Expanded(
                     child: _StatCard(
                       title: 'Avg/Day',
                       value: '${averageMinutes}m',
                       icon: Icons.trending_up,
-                      color: AppColors.secondaryGreen,
+                      color: AppColors.mintGreen,
                     ),
                   ),
                 ],
@@ -288,7 +288,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: LumiPadding.allS,
       itemCount: logs.length,
       itemBuilder: (context, index) {
         final log = logs[index];
@@ -311,7 +311,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
     }
 
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: LumiPadding.allS,
       child: Column(
         children: [
           Expanded(
@@ -323,7 +323,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                     barRods: [
                       BarChartRodData(
                         toY: (minutesByDay[index] ?? 0).toDouble(),
-                        color: AppColors.primaryBlue,
+                        color: AppColors.rosePink,
                         width: 30,
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(8),
@@ -340,7 +340,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                         final date = startOfWeek.add(Duration(days: value.toInt()));
                         return Text(
                           DateFormat('E').format(date).substring(0, 1),
-                          style: const TextStyle(fontSize: 12),
+                          style: LumiTextStyles.bodySmall(),
                         );
                       },
                     ),
@@ -352,7 +352,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                       getTitlesWidget: (value, meta) {
                         return Text(
                           '${value.toInt()}m',
-                          style: const TextStyle(fontSize: 10),
+                          style: LumiTextStyles.bodySmall().copyWith(fontSize: 10),
                         );
                       },
                     ),
@@ -369,12 +369,10 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          LumiGap.s,
           Text(
             'Total: ${minutesByDay.values.fold(0, (a, b) => a + b)} minutes',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            style: LumiTextStyles.h3(),
           ),
         ],
       ),
@@ -396,28 +394,28 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
     }
 
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: LumiPadding.allS,
       child: LineChart(
         LineChartData(
           lineBarsData: [
             LineChartBarData(
               spots: spots,
               isCurved: true,
-              color: AppColors.primaryBlue,
+              color: AppColors.rosePink,
               barWidth: 3,
               dotData: FlDotData(
                 show: true,
                 getDotPainter: (spot, percent, barData, index) {
                   return FlDotCirclePainter(
                     radius: spot.y > 0 ? 4 : 0,
-                    color: AppColors.primaryBlue,
+                    color: AppColors.rosePink,
                     strokeWidth: 0,
                   );
                 },
               ),
               belowBarData: BarAreaData(
                 show: true,
-                color: AppColors.primaryBlue.withOpacity(0.1),
+                color: AppColors.rosePink.withValues(alpha: 0.1),
               ),
             ),
           ],
@@ -429,7 +427,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                 getTitlesWidget: (value, meta) {
                   return Text(
                     value.toInt().toString(),
-                    style: const TextStyle(fontSize: 10),
+                    style: LumiTextStyles.bodySmall().copyWith(fontSize: 10),
                   );
                 },
               ),
@@ -441,7 +439,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                 getTitlesWidget: (value, meta) {
                   return Text(
                     '${value.toInt()}m',
-                    style: const TextStyle(fontSize: 10),
+                    style: LumiTextStyles.bodySmall().copyWith(fontSize: 10),
                   );
                 },
               ),
@@ -475,7 +473,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
     final currentMonth = DateTime.now().month;
 
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: LumiPadding.allS,
       child: BarChart(
         BarChartData(
           barGroups: List.generate(currentMonth, (index) {
@@ -485,7 +483,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
               barRods: [
                 BarChartRodData(
                   toY: (minutesByMonth[month] ?? 0).toDouble(),
-                  color: AppColors.primaryBlue,
+                  color: AppColors.rosePink,
                   width: 20,
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(8),
@@ -502,7 +500,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                   if (value.toInt() < currentMonth) {
                     return Text(
                       months[value.toInt()],
-                      style: const TextStyle(fontSize: 10),
+                      style: LumiTextStyles.bodySmall().copyWith(fontSize: 10),
                     );
                   }
                   return const SizedBox();
@@ -516,7 +514,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                 getTitlesWidget: (value, meta) {
                   return Text(
                     '${(value / 60).toStringAsFixed(0)}h',
-                    style: const TextStyle(fontSize: 10),
+                    style: LumiTextStyles.bodySmall().copyWith(fontSize: 10),
                   );
                 },
               ),
@@ -543,14 +541,14 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
           Icon(
             Icons.book_outlined,
             size: 64,
-            color: AppColors.gray.withOpacity(0.5),
+            color: AppColors.charcoal.withValues(alpha: 0.5),
           ),
-          const SizedBox(height: 16),
+          LumiGap.s,
           Text(
             message,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppColors.gray,
-                ),
+            style: LumiTextStyles.h3().copyWith(
+              color: AppColors.charcoal.withValues(alpha: 0.7),
+            ),
           ),
         ],
       ),
@@ -565,132 +563,134 @@ class _LogCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: AppColors.primaryBlue.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                DateFormat('dd').format(log.date),
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primaryBlue,
-                    ),
-              ),
-              Text(
-                DateFormat('MMM').format(log.date),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.primaryBlue,
-                    ),
-              ),
-            ],
-          ),
-        ),
-        title: Text(
-          log.bookTitles.join(', '),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Row(
+    return Padding(
+      padding: EdgeInsets.only(bottom: LumiSpacing.xs),
+      child: LumiCard(
+        padding: EdgeInsets.zero,
+        child: ListTile(
+          leading: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.rosePink.withValues(alpha: 0.1),
+              borderRadius: LumiBorders.medium,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.timer,
-                  size: 16,
-                  color: log.hasMetTarget
-                      ? AppColors.secondaryGreen
-                      : AppColors.gray,
-                ),
-                const SizedBox(width: 4),
                 Text(
-                  '${log.minutesRead} minutes',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: log.hasMetTarget
-                            ? AppColors.secondaryGreen
-                            : AppColors.gray,
-                      ),
-                ),
-                if (log.hasMetTarget) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.secondaryGreen.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'Goal Met',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: AppColors.secondaryGreen,
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
+                  DateFormat('dd').format(log.date),
+                  style: LumiTextStyles.h3().copyWith(
+                    color: AppColors.rosePink,
                   ),
-                ],
+                ),
+                Text(
+                  DateFormat('MMM').format(log.date),
+                  style: LumiTextStyles.bodySmall().copyWith(
+                    color: AppColors.rosePink,
+                  ),
+                ),
               ],
             ),
-            if (log.notes != null && log.notes!.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                log.notes!,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.gray,
+          ),
+          title: Text(
+            log.bookTitles.join(', '),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: LumiTextStyles.h3(),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              LumiGap.xxs,
+              Row(
+                children: [
+                  Icon(
+                    Icons.timer,
+                    size: 16,
+                    color: log.hasMetTarget
+                        ? AppColors.mintGreen
+                        : AppColors.charcoal.withValues(alpha: 0.7),
+                  ),
+                  LumiGap.horizontalXXS,
+                  Text(
+                    '${log.minutesRead} minutes',
+                    style: LumiTextStyles.bodySmall().copyWith(
+                      color: log.hasMetTarget
+                          ? AppColors.mintGreen
+                          : AppColors.charcoal.withValues(alpha: 0.7),
                     ),
-              ),
-            ],
-            if (log.teacherComment != null) ...[
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.info.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.comment,
-                      size: 16,
-                      color: AppColors.info,
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
+                  ),
+                  if (log.hasMetTarget) ...[
+                    LumiGap.horizontalXS,
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: LumiSpacing.xxs, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.mintGreen.withValues(alpha: 0.1),
+                        borderRadius: LumiBorders.circular,
+                      ),
                       child: Text(
-                        'Teacher: ${log.teacherComment}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.info,
-                            ),
+                        'Goal Met',
+                        style: LumiTextStyles.label().copyWith(
+                          color: AppColors.mintGreen,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
+                ],
+              ),
+              if (log.notes != null && log.notes!.isNotEmpty) ...[
+                LumiGap.xxs,
+                Text(
+                  log.notes!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: LumiTextStyles.bodySmall().copyWith(
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
+                  ),
                 ),
-              ),
+              ],
+              if (log.teacherComment != null) ...[
+                LumiGap.xxs,
+                Container(
+                  padding: LumiPadding.allXS,
+                  decoration: BoxDecoration(
+                    color: AppColors.info.withValues(alpha: 0.1),
+                    borderRadius: LumiBorders.small,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.comment,
+                        size: 16,
+                        color: AppColors.info,
+                      ),
+                      LumiGap.horizontalXXS,
+                      Expanded(
+                        child: Text(
+                          'Teacher: ${log.teacherComment}',
+                          style: LumiTextStyles.bodySmall().copyWith(
+                            color: AppColors.info,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
+          trailing: log.isCompleted
+              ? const Icon(
+                  Icons.check_circle,
+                  color: AppColors.mintGreen,
+                )
+              : Icon(
+                  Icons.circle_outlined,
+                  color: AppColors.charcoal.withValues(alpha: 0.7),
+                ),
         ),
-        trailing: log.isCompleted
-            ? const Icon(
-                Icons.check_circle,
-                color: AppColors.secondaryGreen,
-              )
-            : const Icon(
-                Icons.circle_outlined,
-                color: AppColors.gray,
-              ),
       ),
     );
   }
@@ -711,28 +711,25 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.darkGray,
-                  ),
+    return LumiCard(
+      padding: LumiPadding.allS,
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 24),
+          LumiGap.xs,
+          Text(
+            value,
+            style: LumiTextStyles.h2().copyWith(
+              color: AppColors.charcoal,
             ),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.gray,
-                  ),
+          ),
+          Text(
+            title,
+            style: LumiTextStyles.bodySmall().copyWith(
+              color: AppColors.charcoal.withValues(alpha: 0.7),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
