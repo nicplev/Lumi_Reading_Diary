@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -8,6 +7,10 @@ import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../core/routing/app_router.dart';
 import '../../data/models/user_model.dart';
@@ -40,8 +43,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
       try {
         // Sign in with email and password
-        final UserCredential userCredential = await _firebaseService.auth
-            .signInWithEmailAndPassword(
+        final UserCredential userCredential =
+            await _firebaseService.auth.signInWithEmailAndPassword(
           email: email,
           password: password,
         );
@@ -49,9 +52,8 @@ class _LoginScreenState extends State<LoginScreen> {
         if (userCredential.user != null) {
           // NEW: Find user in nested structure
           // First, get all schools and search for the user
-          final schoolsSnapshot = await _firebaseService.firestore
-              .collection('schools')
-              .get();
+          final schoolsSnapshot =
+              await _firebaseService.firestore.collection('schools').get();
 
           UserModel? user;
           String? userSchoolId;
@@ -159,14 +161,14 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundPrimary,
+      backgroundColor: AppColors.offWhite,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: LumiPadding.allM,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 32),
+              LumiGap.l,
 
               // Lumi Mascot
               Center(
@@ -182,38 +184,37 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
-              const SizedBox(height: 32),
+              LumiGap.l,
 
               // Title
               Text(
                 'Log In',
-                style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.darkGray,
+                style: LumiTextStyles.display().copyWith(
+                      color: AppColors.charcoal,
                     ),
                 textAlign: TextAlign.center,
               ).animate().fadeIn(delay: 200.ms, duration: 500.ms),
 
-              const SizedBox(height: 8),
+              LumiGap.xs,
 
               // Subtitle
               Text(
                 'Enter your credentials to continue',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.gray,
+                style: LumiTextStyles.body().copyWith(
+                      color: AppColors.charcoal.withValues(alpha: 0.7),
                     ),
                 textAlign: TextAlign.center,
               ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
 
-              const SizedBox(height: 32),
+              LumiGap.l,
 
               // Error message
               if (_errorMessage != null)
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: LumiPadding.allS,
                   decoration: BoxDecoration(
-                    color: AppColors.error.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    color: AppColors.error.withValues(alpha: 0.1),
+                    borderRadius: LumiBorders.small,
                     border: Border.all(color: AppColors.error, width: 1),
                   ),
                   child: Row(
@@ -223,20 +224,20 @@ class _LoginScreenState extends State<LoginScreen> {
                         color: AppColors.error,
                         size: 20,
                       ),
-                      const SizedBox(width: 8),
+                      LumiGap.horizontalXS,
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppColors.error,
-                              ),
+                          style: LumiTextStyles.bodySmall().copyWith(
+                                    color: AppColors.error,
+                                  ),
                         ),
                       ),
                     ],
                   ),
                 ).animate().fadeIn().shake(),
 
-              const SizedBox(height: 16),
+              LumiGap.s,
 
               // Login Form
               FormBuilder(
@@ -262,7 +263,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ]),
                     ).animate().fadeIn(delay: 400.ms, duration: 500.ms),
 
-                    const SizedBox(height: 16),
+                    LumiGap.s,
 
                     // Password field
                     FormBuilderTextField(
@@ -275,7 +276,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             _obscurePassword
                                 ? Icons.visibility_off
                                 : Icons.visibility,
-                            color: AppColors.gray,
+                            color: AppColors.charcoal.withValues(alpha: 0.7),
                           ),
                           onPressed: () {
                             setState(() {
@@ -295,40 +296,27 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
-              const SizedBox(height: 12),
+              LumiGap.s,
 
               // Forgot password link
               Align(
                 alignment: Alignment.centerRight,
-                child: TextButton(
+                child: LumiTextButton(
                   onPressed: () => context.push('/auth/forgot-password'),
-                  child: const Text('Forgot Password?'),
+                  text: 'Forgot Password?',
                 ).animate().fadeIn(delay: 600.ms, duration: 500.ms),
               ),
 
-              const SizedBox(height: 24),
+              LumiGap.m,
 
               // Login button
-              ElevatedButton(
+              LumiPrimaryButton(
                 onPressed: _isLoading ? null : _handleLogin,
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(56),
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppColors.white,
-                          ),
-                        ),
-                      )
-                    : const Text('Log In'),
+                text: 'Log In',
+                isLoading: _isLoading,
               ).animate().fadeIn(delay: 700.ms, duration: 500.ms),
 
-              const SizedBox(height: 24),
+              LumiGap.m,
 
               // Register link
               Row(
@@ -336,36 +324,33 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   Text(
                     "Don't have an account? ",
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.gray,
+                    style: LumiTextStyles.body().copyWith(
+                          color: AppColors.charcoal.withValues(alpha: 0.7),
                         ),
                   ),
-                  TextButton(
+                  LumiTextButton(
                     onPressed: () => context.push('/auth/register'),
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                    ),
-                    child: const Text('Sign Up'),
+                    text: 'Sign Up',
                   ),
                 ],
               ).animate().fadeIn(delay: 800.ms, duration: 500.ms),
 
-              const SizedBox(height: 16),
+              LumiGap.s,
 
               // Invite code option for parents
-              TextButton.icon(
+              LumiTextButton(
                 onPressed: () => context.push('/auth/parent-register'),
-                icon: const Icon(Icons.qr_code),
-                label: const Text('Parent? Register with Student Code'),
+                text: 'Parent? Register with Student Code',
+                icon: Icons.qr_code,
               ).animate().fadeIn(delay: 900.ms, duration: 500.ms),
 
-              const SizedBox(height: 8),
+              LumiGap.xs,
 
               // School registration option
-              TextButton.icon(
+              LumiTextButton(
                 onPressed: () => context.push('/onboarding/demo'),
-                icon: const Icon(Icons.school),
-                label: const Text('School? Request a Demo'),
+                text: 'School? Request a Demo',
+                icon: Icons.school,
               ).animate().fadeIn(delay: 1000.ms, duration: 500.ms),
             ],
           ),
