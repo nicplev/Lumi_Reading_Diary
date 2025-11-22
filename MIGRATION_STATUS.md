@@ -1,7 +1,7 @@
 # Lumi Design System Migration - Status & Guide
 
 **Last Updated:** 2025-11-22
-**Progress:** 3/10 Parent Screens Completed (30%)
+**Progress:** 4/10 Parent Screens Completed (40%)
 
 ## 🎯 Mission
 
@@ -46,12 +46,27 @@ Systematically migrate all Parent screens in the Lumi Reading Diary app to use t
   - Updated success dialog with Lumi components
   - Migrated form inputs with time selector, book list, notes, and photo attachment
 
+### 4. parent_home_screen.dart ✓
+- **Commit:** `1979a05` - "refactor: Migrate parent_home_screen to Lumi Design System"
+- **Changes:**
+  - Replaced LiquidGlassTheme gradient backgrounds with solid AppColors.offWhite
+  - Replaced all GlassCard/AnimatedGlassCard → LumiCard
+  - Replaced GlassButton → LumiPrimaryButton
+  - Updated all Theme.of(context).textTheme → LumiTextStyles
+  - Replaced all deprecated colors (primaryBlue → rosePink, secondaryGreen → mintGreen, secondaryOrange → warmOrange, gray/darkGray → charcoal, lightGray → skyBlue)
+  - Applied LumiPadding/LumiGap/LumiSpacing throughout
+  - Replaced IconButton → LumiIconButton
+  - Applied LumiBorders for all border radius
+  - Created custom _buildMiniStat helper to replace GlassMiniStat component
+  - Replaced .withOpacity() → .withValues(alpha:)
+  - Updated BottomNavigationBar with Lumi colors
+  - Migrated loading states, empty states, and all three navigation tabs
+
 ---
 
-## 📋 REMAINING SCREENS (7/10)
+## 📋 REMAINING SCREENS (6/10)
 
 ### High Priority / High Complexity
-4. **parent_home_screen.dart** - Dashboard with GlassCards and stats
 5. **reading_history_screen.dart** - Charts and data visualization
 6. **book_browser_screen.dart** - Complex search/browse UI with tabs
 
@@ -60,6 +75,25 @@ Systematically migrate all Parent screens in the Lumi Reading Diary app to use t
 8. **offline_management_screen.dart** - Settings and switches
 9. **reminder_settings_screen.dart** - Heavy gradients, needs simplification
 10. **student_report_screen.dart** - Reporting interface
+
+---
+
+## ✅ ADMIN SCREENS COMPLETED (1)
+
+### 1. user_management_screen.dart ✓
+- **Commit:** `21eadbc` - "refactor: Migrate user_management_screen to Lumi Design System"
+- **Changes:**
+  - Replaced all deprecated colors (primaryBlue → rosePink, gray → charcoal)
+  - Updated all typography to LumiTextStyles (AppBar, cards, badges)
+  - Replaced FloatingActionButton.extended → LumiFab(isExtended: true)
+  - Converted TextButton → LumiTextButton
+  - Replaced ElevatedButton → LumiPrimaryButton
+  - Converted all Card → LumiCard (with padding: EdgeInsets.zero for ListTile)
+  - Applied LumiPadding/LumiGap/LumiSpacing throughout
+  - Applied LumiBorders for all border radius
+  - Replaced .withOpacity() → .withValues(alpha:)
+  - Updated role badges and status tags with Lumi text styles
+  - Maintained error-colored delete buttons with proper Lumi styling
 
 ---
 
