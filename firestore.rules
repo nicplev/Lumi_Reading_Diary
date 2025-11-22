@@ -202,20 +202,39 @@ service cloud.firestore {
     // Student Link Codes Collection (top-level)
     // ============================================
     match /studentLinkCodes/{codeId} {
-      // Anyone can read to verify codes (for parent registration)
-      allow read: if true;
+      // Allow list queries for code verification (parent registration flow)
+      // Restrict to single document queries with limit to prevent enumeration
+      // Note: This still allows unauthenticated verification but limits abuse
+      // Consider implementing rate limiting at app/Cloud Functions level for production
+      allow list: if request.query.limit == 1 &&
+                     resource.data.status == 'active' &&
+                     resource.data.expiresAt.toMillis() > request.time.toMillis();
+
+      // Allow direct document get for authenticated users only
+      allow get: if isSignedIn();
+
+      // School admins and teachers can read all codes for their school
+      allow list: if isSignedIn() &&
+                     (isSchoolAdmin(resource.data.schoolId) ||
+                      isTeacher(resource.data.schoolId));
+
+      // Parents can read codes they've used
+      allow get: if isSignedIn() &&
+                    resource.data.usedBy == request.auth.uid;
 
       // School admins and teachers can create codes
       allow create: if isSignedIn() &&
                        (isSchoolAdmin(request.resource.data.schoolId) ||
                         isTeacher(request.resource.data.schoolId));
 
-      // School admins and teachers can update codes (e.g., marking as used)
-      // Parents can also update when using the code
+      // School admins and teachers can update codes
+      // Parents can update codes when linking (within transaction)
       allow update: if isSignedIn() &&
                        (isSchoolAdmin(resource.data.schoolId) ||
                         isTeacher(resource.data.schoolId) ||
-                        request.auth.uid == request.resource.data.usedBy);
+                        (request.auth.uid == request.resource.data.usedBy &&
+                         resource.data.status == 'active' &&
+                         request.resource.data.status == 'used'));
 
       // Only school admins can delete codes
       allow delete: if isSignedIn() && isSchoolAdmin(resource.data.schoolId);

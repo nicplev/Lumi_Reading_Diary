@@ -11,6 +11,7 @@ import '../../core/routing/app_router.dart';
 import '../../services/parent_linking_service.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_link_code_model.dart';
+import '../../core/exceptions/linking_exceptions.dart';
 
 class ParentRegistrationScreen extends StatefulWidget {
   const ParentRegistrationScreen({super.key});
@@ -43,13 +44,8 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
       final code = _codeFormKey.currentState!.value['code'] as String;
 
       try {
-        // Verify the code (no authentication needed - Firestore rules allow unauthenticated reads)
+        // Verify the code - this now throws custom exceptions
         final linkCode = await _linkingService.verifyCode(code);
-
-        if (linkCode == null) {
-          throw Exception(
-              'Invalid or expired code. Please check with your school.');
-        }
 
         // Use student info from link code metadata
         // This avoids needing read permissions on students collection
@@ -62,6 +58,11 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
           _verifiedCode = linkCode;
           _studentInfo = studentInfo;
           _currentStep = 1;
+        });
+      } on LinkingException catch (e) {
+        // Use the user-friendly message from custom exceptions
+        setState(() {
+          _errorMessage = e.userMessage;
         });
       } catch (e) {
         setState(() {
@@ -88,52 +89,127 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
       final fullName = values['fullName'] as String;
 
       try {
-        // 1. Create Firebase Auth user
-        final userCredential = await _auth.createUserWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
+        String userId;
+        bool isNewAccount = false;
 
-        final userId = userCredential.user!.uid;
+        // 1. Try to create Firebase Auth user (with idempotency support)
+        try {
+          final userCredential = await _auth.createUserWithEmailAndPassword(
+            email: email,
+            password: password,
+          );
+          userId = userCredential.user!.uid;
+          isNewAccount = true;
+        } on FirebaseAuthException catch (e) {
+          if (e.code == 'email-already-in-use') {
+            // Account exists - try to sign in and resume linking
+            try {
+              final userCredential = await _auth.signInWithEmailAndPassword(
+                email: email,
+                password: password,
+              );
+              userId = userCredential.user!.uid;
 
-        // 2. Create parent user document
-        final parentUser = UserModel(
-          id: userId,
-          email: email,
-          fullName: fullName,
-          role: UserRole.parent,
-          schoolId: _verifiedCode!.schoolId,
-          linkedChildren: [_verifiedCode!.studentId],
-          createdAt: DateTime.now(),
-          isActive: true,
-        );
+              // Check if this user is already fully registered
+              final existingParent = await _firestore
+                  .collection('schools')
+                  .doc(_verifiedCode!.schoolId)
+                  .collection('parents')
+                  .doc(userId)
+                  .get();
 
-        await _firestore
+              if (existingParent.exists) {
+                final parentData = existingParent.data()!;
+                final linkedChildren =
+                    List<String>.from(parentData['linkedChildren'] ?? []);
+
+                if (linkedChildren.contains(_verifiedCode!.studentId)) {
+                  // Already fully registered and linked
+                  setState(() {
+                    _errorMessage =
+                        'You are already registered and linked to this student. Please use the login page.';
+                  });
+                  await _auth.signOut();
+                  return;
+                }
+                // Parent exists but not linked to this student - continue with linking
+              }
+            } on FirebaseAuthException catch (signInError) {
+              if (signInError.code == 'wrong-password') {
+                setState(() {
+                  _errorMessage =
+                      'This email is already registered with a different password. If this is your account, please login instead.';
+                });
+                return;
+              }
+              throw signInError;
+            }
+          } else {
+            throw e;
+          }
+        }
+
+        // 2. Create or update parent user document
+        final parentRef = _firestore
             .collection('schools')
             .doc(_verifiedCode!.schoolId)
             .collection('parents')
-            .doc(userId)
-            .set(parentUser.toFirestore());
+            .doc(userId);
 
-        // 3. Link parent to student
-        await _linkingService.linkParentToStudent(
-          code: _verifiedCode!.code,
-          parentUserId: userId,
-          parentEmail: email,
-        );
+        final existingDoc = await parentRef.get();
+
+        if (!existingDoc.exists || isNewAccount) {
+          // Create new parent document
+          final parentUser = UserModel(
+            id: userId,
+            email: email,
+            fullName: fullName,
+            role: UserRole.parent,
+            schoolId: _verifiedCode!.schoolId,
+            linkedChildren: [_verifiedCode!.studentId],
+            createdAt: DateTime.now(),
+            isActive: true,
+          );
+
+          await parentRef.set(parentUser.toFirestore());
+        }
+
+        // 3. Link parent to student (uses atomic transaction)
+        try {
+          await _linkingService.linkParentToStudent(
+            code: _verifiedCode!.code,
+            parentUserId: userId,
+            parentEmail: email,
+          );
+        } on AlreadyLinkedException {
+          // This is actually success - user is already linked
+          // Proceed to success screen
+        }
 
         // 4. Move to success step
         setState(() {
           _currentStep = 2;
         });
+      } on LinkingException catch (e) {
+        // Use user-friendly messages from custom exceptions
+        setState(() {
+          _errorMessage = e.userMessage;
+        });
+        // Sign out if there was an error
+        await _auth.signOut();
       } on FirebaseAuthException catch (e) {
         setState(() {
           _errorMessage = _getAuthErrorMessage(e.code);
         });
+        // Sign out if there was an error
+        await _auth.signOut();
       } catch (e) {
         setState(() {
-          _errorMessage = 'Failed to complete registration: ${e.toString()}';
+          _errorMessage =
+              'An unexpected error occurred. Please try again or contact support.';
         });
+        // Sign out if there was an error
+        await _auth.signOut();
       } finally {
         setState(() {
           _isLoading = false;
