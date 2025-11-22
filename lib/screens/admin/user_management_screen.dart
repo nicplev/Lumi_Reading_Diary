@@ -3,6 +3,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/lumi_card.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../data/models/user_model.dart';
 import '../../services/firebase_service.dart';
@@ -67,16 +72,16 @@ class _UserManagementScreenState extends State<UserManagementScreen>
       appBar: AppBar(
         backgroundColor: AppColors.white,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'User Management',
-          style: TextStyle(color: AppColors.darkGray),
+          style: LumiTextStyles.h3(color: AppColors.charcoal),
         ),
-        iconTheme: const IconThemeData(color: AppColors.darkGray),
+        iconTheme: const IconThemeData(color: AppColors.charcoal),
         bottom: TabBar(
           controller: _tabController,
-          labelColor: AppColors.primaryBlue,
-          unselectedLabelColor: AppColors.gray,
-          indicatorColor: AppColors.primaryBlue,
+          labelColor: AppColors.rosePink,
+          unselectedLabelColor: AppColors.charcoal.withValues(alpha: 0.7),
+          indicatorColor: AppColors.rosePink,
           tabs: const [
             Tab(text: 'All'),
             Tab(text: 'Teachers'),
@@ -85,8 +90,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'user_management_fab',
+      floatingActionButton: LumiFab(
         onPressed: () {
           if (_tabController.index == 3) {
             _showAddStudentDialog();
@@ -94,9 +98,9 @@ class _UserManagementScreenState extends State<UserManagementScreen>
             _showAddUserDialog();
           }
         },
-        backgroundColor: AppColors.primaryBlue,
-        icon: const Icon(Icons.add),
-        label: Text(_tabController.index == 3 ? 'Add Student' : 'Add User'),
+        isExtended: true,
+        icon: Icons.add,
+        label: _tabController.index == 3 ? 'Add Student' : 'Add User',
       ),
       body: Column(
         children: [
@@ -140,17 +144,17 @@ class _UserManagementScreenState extends State<UserManagementScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const CircularProgressIndicator(
-                  color: AppColors.primaryBlue,
+                  color: AppColors.rosePink,
                 ),
-                const SizedBox(height: 16),
-                const Text(
+                LumiGap.s,
+                Text(
                   'Loading users...',
-                  style: TextStyle(color: AppColors.gray),
+                  style: LumiTextStyles.body(color: AppColors.charcoal.withValues(alpha: 0.7)),
                 ),
-                const SizedBox(height: 8),
-                TextButton(
+                LumiGap.xs,
+                LumiTextButton(
                   onPressed: () => setState(() {}),
-                  child: const Text('Retry'),
+                  text: 'Retry',
                 ),
               ],
             ),
@@ -178,7 +182,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.all(16),
+          padding: LumiPadding.allS,
           itemCount: filteredDocs.length,
           itemBuilder: (context, index) {
             final user = UserModel.fromFirestore(filteredDocs[index]);
@@ -202,17 +206,17 @@ class _UserManagementScreenState extends State<UserManagementScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const CircularProgressIndicator(
-                  color: AppColors.primaryBlue,
+                  color: AppColors.rosePink,
                 ),
-                const SizedBox(height: 16),
-                const Text(
+                LumiGap.s,
+                Text(
                   'Loading users...',
-                  style: TextStyle(color: AppColors.gray),
+                  style: LumiTextStyles.body(color: AppColors.charcoal.withValues(alpha: 0.7)),
                 ),
-                const SizedBox(height: 8),
-                TextButton(
+                LumiGap.xs,
+                LumiTextButton(
                   onPressed: () => setState(() {}),
-                  child: const Text('Retry'),
+                  text: 'Retry',
                 ),
               ],
             ),
@@ -244,7 +248,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.all(16),
+          padding: LumiPadding.allS,
           itemCount: filteredDocs.length,
           itemBuilder: (context, index) {
             final doc = filteredDocs[index];
@@ -261,43 +265,43 @@ class _UserManagementScreenState extends State<UserManagementScreen>
     final roleColor = _getRoleColor(roleString);
     final roleIcon = _getRoleIcon(roleString);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
+    return Padding(
+      padding: EdgeInsets.only(bottom: LumiSpacing.listItemSpacing),
+      child: LumiCard(
+        padding: EdgeInsets.zero,
+        child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: roleColor.withOpacity(0.2),
+          backgroundColor: roleColor.withValues(alpha: 0.2),
           child: Icon(roleIcon, color: roleColor),
         ),
         title: Text(
           user.fullName,
-          style: const TextStyle(fontWeight: FontWeight.w600),
+          style: LumiTextStyles.bodyLarge().copyWith(fontWeight: FontWeight.w600),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(user.email),
-            const SizedBox(height: 4),
+            LumiGap.xxs,
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: LumiSpacing.xs,
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: roleColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    color: roleColor.withValues(alpha: 0.1),
+                    borderRadius: LumiBorders.medium,
                   ),
                   child: Text(
                     roleString.toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 10,
+                    style: LumiTextStyles.caption(color: roleColor).copyWith(
                       fontWeight: FontWeight.bold,
-                      color: roleColor,
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                LumiGap.horizontalXS,
                 if (!user.isActive)
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -305,15 +309,13 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.error.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      color: AppColors.error.withValues(alpha: 0.1),
+                      borderRadius: LumiBorders.medium,
                     ),
-                    child: const Text(
+                    child: Text(
                       'INACTIVE',
-                      style: TextStyle(
-                        fontSize: 10,
+                      style: LumiTextStyles.caption(color: AppColors.error).copyWith(
                         fontWeight: FontWeight.bold,
-                        color: AppColors.error,
                       ),
                     ),
                   ),
@@ -329,7 +331,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
               child: Row(
                 children: [
                   Icon(Icons.edit, size: 20),
-                  SizedBox(width: 8),
+                  LumiGap.horizontalXS,
                   Text('Edit'),
                 ],
               ),
@@ -342,7 +344,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                     user.isActive ? Icons.block : Icons.check_circle,
                     size: 20,
                   ),
-                  const SizedBox(width: 8),
+                  LumiGap.horizontalXS,
                   Text(user.isActive ? 'Deactivate' : 'Activate'),
                 ],
               ),
@@ -352,22 +354,23 @@ class _UserManagementScreenState extends State<UserManagementScreen>
               child: Row(
                 children: [
                   Icon(Icons.lock_reset, size: 20),
-                  SizedBox(width: 8),
+                  LumiGap.horizontalXS,
                   Text('Reset Password'),
                 ],
               ),
             ),
-            const PopupMenuItem(
+            PopupMenuItem(
               value: 'delete',
               child: Row(
                 children: [
                   Icon(Icons.delete, size: 20, color: AppColors.error),
-                  SizedBox(width: 8),
-                  Text('Delete', style: TextStyle(color: AppColors.error)),
+                  LumiGap.horizontalXS,
+                  Text('Delete', style: LumiTextStyles.body(color: AppColors.error)),
                 ],
               ),
             ),
           ],
+        ),
         ),
       ),
     );
@@ -380,28 +383,29 @@ class _UserManagementScreenState extends State<UserManagementScreen>
     final className = data['className'] ?? '';
     final isActive = data['isActive'] ?? true;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
+    return Padding(
+      padding: EdgeInsets.only(bottom: LumiSpacing.listItemSpacing),
+      child: LumiCard(
+        padding: EdgeInsets.zero,
+        child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: AppColors.primaryBlue.withOpacity(0.2),
+          backgroundColor: AppColors.rosePink.withValues(alpha: 0.2),
           child: Text(
             firstName.isNotEmpty ? firstName[0].toUpperCase() : '?',
-            style: const TextStyle(
-              color: AppColors.primaryBlue,
+            style: LumiTextStyles.body(color: AppColors.rosePink).copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
         ),
         title: Text(
           '$firstName $lastName',
-          style: const TextStyle(fontWeight: FontWeight.w600),
+          style: LumiTextStyles.bodyLarge().copyWith(fontWeight: FontWeight.w600),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Student ID: ${data['studentId'] ?? studentId}'),
-            const SizedBox(height: 4),
+            LumiGap.xxs,
             Row(
               children: [
                 if (yearLevel.isNotEmpty)
@@ -411,56 +415,50 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.secondaryPurple.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      color: AppColors.secondaryPurple.withValues(alpha: 0.1),
+                      borderRadius: LumiBorders.medium,
                     ),
                     child: Text(
                       yearLevel,
-                      style: const TextStyle(
-                        fontSize: 10,
+                      style: LumiTextStyles.caption(color: AppColors.secondaryPurple).copyWith(
                         fontWeight: FontWeight.bold,
-                        color: AppColors.secondaryPurple,
                       ),
                     ),
                   ),
                 if (className.isNotEmpty) ...[
-                  const SizedBox(width: 8),
+                  LumiGap.horizontalXS,
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.teacherColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      color: AppColors.teacherColor.withValues(alpha: 0.1),
+                      borderRadius: LumiBorders.medium,
                     ),
                     child: Text(
                       className,
-                      style: const TextStyle(
-                        fontSize: 10,
+                      style: LumiTextStyles.caption(color: AppColors.teacherColor).copyWith(
                         fontWeight: FontWeight.bold,
-                        color: AppColors.teacherColor,
                       ),
                     ),
                   ),
                 ],
                 if (!isActive) ...[
-                  const SizedBox(width: 8),
+                  LumiGap.horizontalXS,
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.error.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      color: AppColors.error.withValues(alpha: 0.1),
+                      borderRadius: LumiBorders.medium,
                     ),
-                    child: const Text(
+                    child: Text(
                       'INACTIVE',
-                      style: TextStyle(
-                        fontSize: 10,
+                      style: LumiTextStyles.caption(color: AppColors.error).copyWith(
                         fontWeight: FontWeight.bold,
-                        color: AppColors.error,
                       ),
                     ),
                   ),
@@ -477,7 +475,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
               child: Row(
                 children: [
                   Icon(Icons.edit, size: 20),
-                  SizedBox(width: 8),
+                  LumiGap.horizontalXS,
                   Text('Edit'),
                 ],
               ),
@@ -490,22 +488,23 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                     isActive ? Icons.block : Icons.check_circle,
                     size: 20,
                   ),
-                  const SizedBox(width: 8),
+                  LumiGap.horizontalXS,
                   Text(isActive ? 'Deactivate' : 'Activate'),
                 ],
               ),
             ),
-            const PopupMenuItem(
+            PopupMenuItem(
               value: 'delete',
               child: Row(
                 children: [
                   Icon(Icons.delete, size: 20, color: AppColors.error),
-                  SizedBox(width: 8),
-                  Text('Delete', style: TextStyle(color: AppColors.error)),
+                  LumiGap.horizontalXS,
+                  Text('Delete', style: LumiTextStyles.body(color: AppColors.error)),
                 ],
               ),
             ),
           ],
+        ),
         ),
       ),
     );
@@ -516,11 +515,11 @@ class _UserManagementScreenState extends State<UserManagementScreen>
       case 'teacher':
         return AppColors.teacherColor;
       case 'parent':
-        return AppColors.primaryBlue;
+        return AppColors.rosePink;
       case 'schoolAdmin':
         return AppColors.adminColor;
       default:
-        return AppColors.gray;
+        return AppColors.charcoal.withValues(alpha: 0.7);
     }
   }
 
@@ -652,14 +651,19 @@ class _UserManagementScreenState extends State<UserManagementScreen>
         title: const Text('Delete User'),
         content: Text('Are you sure you want to delete ${user.fullName}? This action cannot be undone.'),
         actions: [
-          TextButton(
+          LumiTextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            text: 'Cancel',
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Delete'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.error,
+              shape: RoundedRectangleBorder(
+                borderRadius: LumiBorders.small,
+              ),
+            ),
+            child: Text('Delete', style: LumiTextStyles.button(color: AppColors.error)),
           ),
         ],
       ),
@@ -692,14 +696,19 @@ class _UserManagementScreenState extends State<UserManagementScreen>
         title: const Text('Delete Student'),
         content: const Text('Are you sure you want to delete this student? This action cannot be undone.'),
         actions: [
-          TextButton(
+          LumiTextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            text: 'Cancel',
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Delete'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.error,
+              shape: RoundedRectangleBorder(
+                borderRadius: LumiBorders.small,
+              ),
+            ),
+            child: Text('Delete', style: LumiTextStyles.button(color: AppColors.error)),
           ),
         ],
       ),
@@ -771,7 +780,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       });
                     },
                   ),
-                  const SizedBox(height: 16),
+                  LumiGap.s,
                   // First Name
                   TextFormField(
                     controller: firstNameController,
@@ -786,7 +795,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       return null;
                     },
                   ),
-                  const SizedBox(height: 16),
+                  LumiGap.s,
                   // Last Name
                   TextFormField(
                     controller: lastNameController,
@@ -801,7 +810,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       return null;
                     },
                   ),
-                  const SizedBox(height: 16),
+                  LumiGap.s,
                   // Email
                   TextFormField(
                     controller: emailController,
@@ -820,7 +829,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       return null;
                     },
                   ),
-                  const SizedBox(height: 16),
+                  LumiGap.s,
                   // Password
                   TextFormField(
                     controller: passwordController,
@@ -845,20 +854,17 @@ class _UserManagementScreenState extends State<UserManagementScreen>
             ),
           ),
           actions: [
-            TextButton(
+            LumiTextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+              text: 'Cancel',
             ),
-            ElevatedButton(
+            LumiPrimaryButton(
               onPressed: () {
                 if (formKey.currentState!.validate()) {
                   Navigator.pop(context, true);
                 }
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryBlue,
-              ),
-              child: const Text('Add User'),
+              text: 'Add User',
             ),
           ],
         ),
@@ -947,7 +953,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
               'User $firstName $lastName has been created.\n\nPlease sign in again to continue.',
             ),
             actions: [
-              ElevatedButton(
+              LumiPrimaryButton(
                 onPressed: () {
                   Navigator.of(context).pop();
                   // Navigate to login screen
@@ -956,10 +962,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                     (route) => false,
                   );
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryBlue,
-                ),
-                child: const Text('Go to Login'),
+                text: 'Go to Login',
               ),
             ],
           ),
@@ -1055,20 +1058,17 @@ class _UserManagementScreenState extends State<UserManagementScreen>
           ),
         ),
         actions: [
-          TextButton(
+          LumiTextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            text: 'Cancel',
           ),
-          ElevatedButton(
+          LumiPrimaryButton(
             onPressed: () {
               if (formKey.currentState!.validate()) {
                 Navigator.pop(context, true);
               }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryBlue,
-            ),
-            child: const Text('Add Student'),
+            text: 'Add Student',
           ),
         ],
       ),
@@ -1171,7 +1171,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       });
                     },
                   ),
-                  const SizedBox(height: 16),
+                  LumiGap.s,
                   // First Name
                   TextFormField(
                     controller: firstNameController,
@@ -1186,7 +1186,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       return null;
                     },
                   ),
-                  const SizedBox(height: 16),
+                  LumiGap.s,
                   // Last Name
                   TextFormField(
                     controller: lastNameController,
@@ -1201,7 +1201,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       return null;
                     },
                   ),
-                  const SizedBox(height: 16),
+                  LumiGap.s,
                   // Email (read-only)
                   TextFormField(
                     controller: emailController,
@@ -1217,20 +1217,17 @@ class _UserManagementScreenState extends State<UserManagementScreen>
             ),
           ),
           actions: [
-            TextButton(
+            LumiTextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+              text: 'Cancel',
             ),
-            ElevatedButton(
+            LumiPrimaryButton(
               onPressed: () {
                 if (formKey.currentState!.validate()) {
                   Navigator.pop(context, true);
                 }
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryBlue,
-              ),
-              child: const Text('Update User'),
+              text: 'Update User',
             ),
           ],
         ),
@@ -1363,20 +1360,17 @@ class _UserManagementScreenState extends State<UserManagementScreen>
           ),
         ),
         actions: [
-          TextButton(
+          LumiTextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            text: 'Cancel',
           ),
-          ElevatedButton(
+          LumiPrimaryButton(
             onPressed: () {
               if (formKey.currentState!.validate()) {
                 Navigator.pop(context, true);
               }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryBlue,
-            ),
-            child: const Text('Update Student'),
+            text: 'Update Student',
           ),
         ],
       ),
