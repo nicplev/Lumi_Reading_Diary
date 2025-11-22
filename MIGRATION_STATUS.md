@@ -1,7 +1,7 @@
 # Lumi Design System Migration - Status & Guide
 
 **Last Updated:** 2025-11-22
-**Progress:** 4/10 Parent Screens Completed (40%)
+**Progress:** 5/10 Parent Screens Completed (50%)
 
 ## 🎯 Mission
 
@@ -9,7 +9,7 @@ Systematically migrate all Parent screens in the Lumi Reading Diary app to use t
 
 ---
 
-## ✅ COMPLETED SCREENS (4/10)
+## ✅ COMPLETED SCREENS (5/10)
 
 ### 1. parent_profile_screen.dart ✓
 - **Commit:** `52c6910` - "refactor: Migrate parent_profile_screen to Lumi Design System"
@@ -62,12 +62,29 @@ Systematically migrate all Parent screens in the Lumi Reading Diary app to use t
   - Updated BottomNavigationBar with Lumi colors
   - Migrated loading states, empty states, and all three navigation tabs
 
+### 5. reading_history_screen.dart ✓
+- **Commit:** `55af348` - "refactor: Migrate reading_history_screen to Lumi Design System"
+- **Changes:**
+  - Replaced AppColors.backgroundPrimary → AppColors.offWhite
+  - Replaced AppColors.primaryBlue → AppColors.rosePink
+  - Replaced AppColors.secondaryGreen → AppColors.mintGreen
+  - Replaced AppColors.gray → AppColors.charcoal.withValues(alpha: 0.7)
+  - Replaced AppColors.darkGray → AppColors.charcoal
+  - Updated all Theme.of(context).textTheme → LumiTextStyles
+  - Replaced all Card → LumiCard (including stat cards and log cards)
+  - Replaced all IconButton → LumiIconButton
+  - Applied LumiPadding/LumiGap/LumiSpacing throughout (including chart padding)
+  - Applied LumiBorders for all border radius
+  - Replaced .withOpacity() → .withValues(alpha:)
+  - Updated fl_chart components with Lumi colors (bar charts, line charts)
+  - Migrated TabBar, month selector, and all three tabs (Week, Month, All Time)
+  - Updated empty states with Lumi typography and colors
+
 ---
 
-## 📋 REMAINING SCREENS (6/10)
+## 📋 REMAINING SCREENS (5/10)
 
 ### High Priority / High Complexity
-5. **reading_history_screen.dart** - Charts and data visualization
 6. **book_browser_screen.dart** - Complex search/browse UI with tabs
 
 ### Medium Priority / Medium Complexity
