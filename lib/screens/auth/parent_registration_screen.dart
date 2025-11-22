@@ -4,12 +4,13 @@ import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/lumi_mascot.dart';
+import '../../core/routing/app_router.dart';
 import '../../services/parent_linking_service.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_link_code_model.dart';
-import '../parent/parent_home_screen.dart';
 
 class ParentRegistrationScreen extends StatefulWidget {
   const ParentRegistrationScreen({super.key});
@@ -540,15 +541,8 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
 
               if (parentDoc.exists && mounted) {
                 final parentUser = UserModel.fromFirestore(parentDoc);
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ParentHomeScreen(
-                      user: parentUser,
-                    ),
-                  ),
-                  (route) => false,
-                );
+                final homeRoute = AppRouter.getHomeRouteForRole(parentUser.role);
+                context.go(homeRoute, extra: parentUser);
               }
             }
           },

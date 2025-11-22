@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../services/onboarding_service.dart';
 import '../../data/models/school_model.dart';
-import '../auth/login_screen.dart';
 
 class SchoolRegistrationWizard extends StatefulWidget {
   final String onboardingId;
@@ -554,16 +554,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
             ),
             const SizedBox(height: 48),
             ElevatedButton(
-              onPressed: () {
-                // Navigate to login screen
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const LoginScreen(),
-                  ),
-                  (route) => false,
-                );
-              },
+              onPressed: () => context.go('/auth/login'),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(56),
               ),

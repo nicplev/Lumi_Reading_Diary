@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/minimal_theme.dart';
 import '../../core/widgets/minimal/minimal_widgets.dart';
@@ -9,7 +10,6 @@ import '../../data/models/class_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../services/firebase_service.dart';
-import 'class_detail_screen.dart';
 import 'allocation_screen.dart';
 import 'teacher_profile_screen.dart';
 
@@ -804,14 +804,12 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
   Widget _buildClassCard(ClassModel classModel) {
     return AnimatedRoundedCard(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ClassDetailScreen(
-              classModel: classModel,
-              teacher: widget.user,
-            ),
-          ),
+        context.push(
+          '/teacher/class-detail/${classModel.id}',
+          extra: {
+            'user': widget.user,
+            'classData': classModel,
+          },
         );
       },
       child: Row(

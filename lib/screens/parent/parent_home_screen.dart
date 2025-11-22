@@ -258,15 +258,13 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
                           onTap: hasLoggedToday
                               ? null
                               : () async {
-                                  final result = await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => LogReadingScreen(
-                                        student: selectedChild,
-                                        parent: widget.user,
-                                        allocation: allocation,
-                                      ),
-                                    ),
+                                  final result = await context.push(
+                                    '/parent/log-reading',
+                                    extra: {
+                                      'user': widget.user,
+                                      'student': selectedChild,
+                                      'allocation': allocation,
+                                    },
                                   );
                                   if (result == true) {
                                     // Refresh after logging
