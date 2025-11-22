@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/reading_goal_model.dart';
 import '../../services/firebase_service.dart';
@@ -45,7 +46,7 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Reading Goals'),
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.primaryBlue,
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -65,7 +66,7 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
             ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showCreateGoalDialog,
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.primaryBlue,
         icon: const Icon(Icons.flag),
         label: const Text('New Goal'),
       ),
@@ -133,7 +134,7 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
 
     return Card(
       elevation: 2,
-      color: AppColors.primary.withOpacity(0.1),
+      color: AppColors.primaryBlue.withOpacity(0.1),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -141,7 +142,7 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
           children: [
             Row(
               children: [
-                Icon(Icons.trending_up, color: AppColors.primary),
+                Icon(Icons.trending_up, color: AppColors.primaryBlue),
                 const SizedBox(width: 8),
                 Text(
                   'Goal Summary',
@@ -205,7 +206,7 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
             ? Colors.green
             : goal.isExpired
                 ? Colors.red
-                : AppColors.primary;
+                : AppColors.primaryBlue;
 
     return Card(
       elevation: 2,
@@ -474,7 +475,7 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
   void _showGoalDetails(ReadingGoalModel goal) {
     showModalBottomSheet(
       context: context,
-      isScrollControlledBottom: true,
+      isScrollControlled: true,
       builder: (context) => DraggableScrollableSheet(
         initialChildSize: 0.6,
         minChildSize: 0.4,
@@ -504,7 +505,7 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
                       Icon(Icons.emoji_events,
                           size: 32, color: Colors.amber[700])
                     else
-                      Icon(Icons.flag, size: 32, color: AppColors.primary),
+                      Icon(Icons.flag, size: 32, color: AppColors.primaryBlue),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -728,7 +729,7 @@ class _CreateGoalDialogState extends State<_CreateGoalDialog> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.flag, color: AppColors.primary),
+                  Icon(Icons.flag, color: AppColors.primaryBlue),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(

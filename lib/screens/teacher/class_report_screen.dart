@@ -35,7 +35,7 @@ class _ClassReportScreenState extends State<ClassReportScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Class Report'),
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.primaryBlue,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -80,13 +80,13 @@ class _ClassReportScreenState extends State<ClassReportScreen> {
                   width: 60,
                   height: 60,
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primaryBlue.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     Icons.class_,
                     size: 32,
-                    color: AppColors.primary,
+                    color: AppColors.primaryBlue,
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -185,7 +185,7 @@ class _ClassReportScreenState extends State<ClassReportScreen> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          border: Border.all(color: AppColors.primary),
+          border: Border.all(color: AppColors.primaryBlue),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Column(
@@ -238,7 +238,7 @@ class _ClassReportScreenState extends State<ClassReportScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.preview, color: AppColors.primary),
+                Icon(Icons.preview, color: AppColors.primaryBlue),
                 const SizedBox(width: 8),
                 Text(
                   'Report Preview',
@@ -333,7 +333,7 @@ class _ClassReportScreenState extends State<ClassReportScreen> {
               : const Icon(Icons.picture_as_pdf),
           label: Text(_isGenerating ? 'Generating...' : 'Generate Class Report'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
+            backgroundColor: AppColors.primaryBlue,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.all(16),
           ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/reading_group_model.dart';
@@ -37,7 +38,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Reading Groups'),
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.primaryBlue,
         actions: [
           IconButton(
             icon: const Icon(Icons.help_outline),
@@ -68,7 +69,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
             ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _createNewGroup,
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.primaryBlue,
         icon: const Icon(Icons.add),
         label: const Text('New Group'),
       ),

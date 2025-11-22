@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets' as pw;
+import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
@@ -820,7 +820,7 @@ class PdfReportService {
                 ],
               ),
               // Data rows
-              ...topPerformers.take(10).asMap().entries.map((entry) {
+              ...topPerformers.take(10).toList().asMap().entries.map((entry) {
                 final index = entry.key;
                 final student = entry.value;
                 return pw.TableRow(
@@ -1086,8 +1086,7 @@ class PdfReportService {
     final weeklyData = _calculateWeeklyData(sortedLogs, startDate, endDate);
 
     // Average minutes per reading day (not per calendar day)
-    final avgMinutesPerDay =
-        readingDays > 0 ? totalMinutes / readingDays : 0.0;
+    final avgMinutesPerDay = readingDays > 0 ? totalMinutes / readingDays : 0.0;
 
     return {
       'totalMinutes': totalMinutes,
@@ -1179,7 +1178,8 @@ class PdfReportService {
     }
 
     // Sort top performers by minutes
-    topPerformers.sort((a, b) => (b['minutes'] as int).compareTo(a['minutes'] as int));
+    topPerformers
+        .sort((a, b) => (b['minutes'] as int).compareTo(a['minutes'] as int));
 
     // Find most popular reading level
     String? popularLevel;
@@ -1195,7 +1195,8 @@ class PdfReportService {
         students.isNotEmpty ? (activeReaders / students.length) * 100 : 0.0;
     final avgMinutesPerStudent =
         students.isNotEmpty ? totalMinutes / students.length : 0.0;
-    final avgDailyMinutes = activeReaders > 0 ? totalMinutes / activeReaders : 0.0;
+    final avgDailyMinutes =
+        activeReaders > 0 ? totalMinutes / activeReaders : 0.0;
     final targetMetPercentage =
         students.isNotEmpty ? (studentsMetTarget / students.length) * 100 : 0.0;
 
@@ -1266,7 +1267,8 @@ class PdfReportService {
     for (final log in sortedLogs) {
       final weekStart = _getWeekStart(log.date);
       final weekLabel = DateFormat('MMM dd').format(weekStart);
-      weeklyMinutes[weekLabel] = (weeklyMinutes[weekLabel] ?? 0) + log.minutesRead;
+      weeklyMinutes[weekLabel] =
+          (weeklyMinutes[weekLabel] ?? 0) + log.minutesRead;
     }
 
     // Convert to list format for chart

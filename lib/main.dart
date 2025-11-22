@@ -13,37 +13,38 @@ import 'services/crash_reporting_service.dart';
 import 'firebase_options.dart';
 
 void main() async {
-  // Ensure Flutter binding is initialized
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Set preferred orientations (mobile only)
-  if (!kIsWeb) {
-    await SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
-  }
-
-  // Initialize Hive for local storage
-  await Hive.initFlutter();
-
-  // Initialize Firebase with platform-specific options
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  // Initialize crash reporting (must be after Firebase init)
-  await CrashReportingService.instance.initialize();
-
-  // Initialize Firebase services
-  await FirebaseService.instance.initialize();
-
-  // Configure Flutter Animate
-  Animate.restartOnHotReload = true;
-
-  // Run app with error handling zone
-  await CrashReportingService.runZonedGuarded(
+  // Run app with error handling zone - all initialization must happen inside
+  await CrashReportingService.runAppWithZoneGuard(
     () async {
+      // Ensure Flutter binding is initialized
+      WidgetsFlutterBinding.ensureInitialized();
+
+      // Set preferred orientations (mobile only)
+      if (!kIsWeb) {
+        await SystemChrome.setPreferredOrientations([
+          DeviceOrientation.portraitUp,
+          DeviceOrientation.portraitDown,
+        ]);
+      }
+
+      // Initialize Hive for local storage
+      await Hive.initFlutter();
+
+      // Initialize Firebase with platform-specific options
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+
+      // Initialize crash reporting (must be after Firebase init)
+      await CrashReportingService.instance.initialize();
+
+      // Initialize Firebase services
+      await FirebaseService.instance.initialize();
+
+      // Configure Flutter Animate
+      Animate.restartOnHotReload = true;
+
+      // Run app
       runApp(
         const ProviderScope(
           child: LumiApp(),
