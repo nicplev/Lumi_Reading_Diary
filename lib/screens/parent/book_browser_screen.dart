@@ -3,6 +3,11 @@ import '../../data/models/student_model.dart';
 import '../../data/models/book_model.dart';
 import '../../services/book_recommendation_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/lumi_card.dart';
 
 /// Screen for browsing and discovering books
 /// Shows personalized recommendations and popular books
@@ -46,19 +51,23 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.offWhite,
       appBar: AppBar(
-        title: const Text('Discover Books'),
-        backgroundColor: AppColors.primaryBlue,
+        title: Text('Discover Books', style: LumiTextStyles.h3()),
+        backgroundColor: AppColors.white,
+        elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
+          LumiIconButton(
+            icon: Icons.search,
             onPressed: _showSearch,
-            tooltip: 'Search Books',
           ),
         ],
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
+          labelColor: AppColors.rosePink,
+          unselectedLabelColor: AppColors.charcoal.withValues(alpha: 0.6),
+          indicatorColor: AppColors.rosePink,
           tabs: const [
             Tab(text: 'For You'),
             Tab(text: 'Reading'),
@@ -85,24 +94,24 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
     return RefreshIndicator(
       onRefresh: _loadData,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: LumiPadding.allS,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildWelcomeCard(),
-            const SizedBox(height: 24),
+            LumiGap.m,
             if (_recommendations.isNotEmpty) ...[
               _buildSectionHeader(
                 'Recommended for ${widget.student.firstName}',
                 'Based on reading level and interests',
               ),
-              const SizedBox(height: 12),
+              LumiGap.s,
               _buildBookGrid(_recommendations),
-              const SizedBox(height: 24),
+              LumiGap.m,
             ],
             if (_genres.isNotEmpty) ...[
               _buildSectionHeader('Browse by Genre', 'Explore different categories'),
-              const SizedBox(height: 12),
+              LumiGap.s,
               _buildGenreChips(),
             ],
           ],
@@ -125,7 +134,7 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
     return RefreshIndicator(
       onRefresh: _loadData,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: LumiPadding.allS,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -133,7 +142,7 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
               'Currently Reading (${_currentlyReading.length})',
               'Keep up the great work!',
             ),
-            const SizedBox(height: 12),
+            LumiGap.s,
             _buildBookGrid(_currentlyReading),
           ],
         ),
@@ -155,7 +164,7 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
     return RefreshIndicator(
       onRefresh: _loadData,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: LumiPadding.allS,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -163,7 +172,7 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
               'Completed Books (${_completed.length})',
               'Great job finishing these books!',
             ),
-            const SizedBox(height: 12),
+            LumiGap.s,
             _buildBookGrid(_completed),
           ],
         ),
@@ -175,7 +184,7 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
     return RefreshIndicator(
       onRefresh: _loadData,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: LumiPadding.allS,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -185,7 +194,7 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
                   ? 'Level ${widget.student.currentReadingLevel}'
                   : 'All levels',
             ),
-            const SizedBox(height: 12),
+            LumiGap.s,
             _buildBookGrid(_popular),
           ],
         ),
@@ -194,37 +203,31 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
   }
 
   Widget _buildWelcomeCard() {
-    return Card(
-      elevation: 2,
-      color: AppColors.primaryBlue.withOpacity(0.1),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Icon(Icons.auto_stories, size: 48, color: AppColors.primaryBlue),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Find Your Next Book!',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+    return LumiCard(
+      isHighlighted: true,
+      child: Row(
+        children: [
+          Icon(Icons.auto_stories, size: 48, color: AppColors.rosePink),
+          LumiGap.horizontalS,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Find Your Next Book!',
+                  style: LumiTextStyles.h3(),
+                ),
+                LumiGap.xxs,
+                Text(
+                  'Discover books perfect for your reading level',
+                  style: LumiTextStyles.bodySmall(
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Discover books perfect for your reading level',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey[700],
-                        ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -235,16 +238,14 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
       children: [
         Text(
           title,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+          style: LumiTextStyles.h2(),
         ),
-        const SizedBox(height: 4),
+        LumiGap.xxs,
         Text(
           subtitle,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.grey[600],
-              ),
+          style: LumiTextStyles.bodySmall(
+            color: AppColors.charcoal.withValues(alpha: 0.6),
+          ),
         ),
       ],
     );
@@ -252,10 +253,15 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
 
   Widget _buildBookGrid(List<BookModel> books) {
     if (books.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(32),
-          child: Text('No books found'),
+          padding: LumiPadding.allL,
+          child: Text(
+            'No books found',
+            style: LumiTextStyles.body(
+              color: AppColors.charcoal.withValues(alpha: 0.6),
+            ),
+          ),
         ),
       );
     }
@@ -263,11 +269,11 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         childAspectRatio: 0.65,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+        crossAxisSpacing: LumiSpacing.listItemSpacing,
+        mainAxisSpacing: LumiSpacing.listItemSpacing,
       ),
       itemCount: books.length,
       itemBuilder: (context, index) {
@@ -277,68 +283,78 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
   }
 
   Widget _buildBookCard(BookModel book) {
-    return Card(
-      elevation: 2,
-      clipBehavior: Clip.antiAlias,
+    return LumiCard(
+      padding: EdgeInsets.zero,
       child: InkWell(
         onTap: () => _showBookDetails(book),
+        borderRadius: LumiBorders.medium,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: Container(
                 width: double.infinity,
-                color: Colors.grey[200],
+                decoration: BoxDecoration(
+                  color: AppColors.skyBlue.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.only(
+                    topLeft: LumiBorders.medium.topLeft,
+                    topRight: LumiBorders.medium.topRight,
+                  ),
+                ),
                 child: book.coverImageUrl != null
-                    ? Image.network(
-                        book.coverImageUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return _buildBookPlaceholder(book);
-                        },
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.only(
+                          topLeft: LumiBorders.medium.topLeft,
+                          topRight: LumiBorders.medium.topRight,
+                        ),
+                        child: Image.network(
+                          book.coverImageUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return _buildBookPlaceholder(book);
+                          },
+                        ),
                       )
                     : _buildBookPlaceholder(book),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(8),
+              padding: LumiPadding.allXS,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     book.title,
-                    style: const TextStyle(
+                    style: LumiTextStyles.label().copyWith(
                       fontWeight: FontWeight.bold,
-                      fontSize: 13,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                   if (book.author != null) ...[
-                    const SizedBox(height: 4),
+                    LumiGap.xxs,
                     Text(
                       book.author!,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey[600],
+                      style: LumiTextStyles.caption(
+                        color: AppColors.charcoal.withValues(alpha: 0.6),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
                   if (book.averageRating != null) ...[
-                    const SizedBox(height: 4),
+                    LumiGap.xxs,
                     Row(
                       children: [
                         Icon(
                           Icons.star,
                           size: 14,
-                          color: Colors.amber[700],
+                          color: AppColors.warmOrange,
                         ),
-                        const SizedBox(width: 4),
+                        LumiGap.horizontalXXS,
                         Text(
                           book.averageRating!.toStringAsFixed(1),
-                          style: const TextStyle(fontSize: 11),
+                          style: LumiTextStyles.caption(),
                         ),
                       ],
                     ),
@@ -354,25 +370,25 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
 
   Widget _buildBookPlaceholder(BookModel book) {
     return Container(
-      color: AppColors.primaryBlue.withOpacity(0.1),
+      color: AppColors.rosePink.withValues(alpha: 0.1),
       child: Center(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: LumiPadding.allS,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 Icons.menu_book,
                 size: 48,
-                color: AppColors.primaryBlue.withOpacity(0.5),
+                color: AppColors.rosePink.withValues(alpha: 0.5),
               ),
-              const SizedBox(height: 8),
+              LumiGap.xs,
               Text(
                 book.title,
-                style: TextStyle(
-                  fontSize: 12,
+                style: LumiTextStyles.bodySmall(
+                  color: AppColors.rosePink,
+                ).copyWith(
                   fontWeight: FontWeight.bold,
-                  color: AppColors.primaryBlue,
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 3,
@@ -387,14 +403,15 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
 
   Widget _buildGenreChips() {
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: LumiSpacing.xs,
+      runSpacing: LumiSpacing.xs,
       children: _genres.map((genre) {
         return ActionChip(
-          label: Text(genre),
+          label: Text(genre, style: LumiTextStyles.label()),
           onPressed: () => _browseGenre(genre),
-          backgroundColor: AppColors.primaryBlue.withOpacity(0.1),
-          side: BorderSide(color: AppColors.primaryBlue.withOpacity(0.3)),
+          backgroundColor: AppColors.rosePink.withValues(alpha: 0.1),
+          side: BorderSide(color: AppColors.rosePink.withValues(alpha: 0.3)),
+          shape: RoundedRectangleBorder(borderRadius: LumiBorders.medium),
         );
       }).toList(),
     );
@@ -409,31 +426,35 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
   }) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: LumiPadding.allL,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
+            Icon(
+              icon,
+              size: 64,
+              color: AppColors.charcoal.withValues(alpha: 0.4),
+            ),
+            LumiGap.s,
             Text(
               title,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: Colors.grey[700],
-                  ),
+              style: LumiTextStyles.h2(
+                color: AppColors.charcoal.withValues(alpha: 0.7),
+              ),
             ),
-            const SizedBox(height: 8),
+            LumiGap.xs,
             Text(
               message,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey[600],
-                  ),
+              style: LumiTextStyles.body(
+                color: AppColors.charcoal.withValues(alpha: 0.6),
+              ),
               textAlign: TextAlign.center,
             ),
             if (actionLabel != null && onAction != null) ...[
-              const SizedBox(height: 24),
-              ElevatedButton(
+              LumiGap.m,
+              LumiPrimaryButton(
                 onPressed: onAction,
-                child: Text(actionLabel),
+                text: actionLabel,
               ),
             ],
           ],
@@ -472,7 +493,7 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error loading books: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
         ),
       );
     }
@@ -490,7 +511,7 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
         builder: (context, scrollController) {
           return SingleChildScrollView(
             controller: scrollController,
-            padding: const EdgeInsets.all(24),
+            padding: LumiPadding.allM,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -499,102 +520,109 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
+                      color: AppColors.charcoal.withValues(alpha: 0.3),
+                      borderRadius: LumiBorders.small,
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                LumiGap.m,
                 Text(
                   book.title,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                  style: LumiTextStyles.h2(),
                 ),
                 if (book.author != null) ...[
-                  const SizedBox(height: 8),
+                  LumiGap.xs,
                   Text(
                     'by ${book.author}',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: Colors.grey[600],
-                        ),
+                    style: LumiTextStyles.h3(
+                      color: AppColors.charcoal.withValues(alpha: 0.6),
+                    ),
                   ),
                 ],
-                const SizedBox(height: 16),
+                LumiGap.s,
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: LumiSpacing.xs,
+                  runSpacing: LumiSpacing.xs,
                   children: [
                     if (book.readingLevel != null)
                       Chip(
-                        label: Text('Level ${book.readingLevel}'),
+                        label: Text(
+                          'Level ${book.readingLevel}',
+                          style: LumiTextStyles.label(),
+                        ),
                         avatar: const Icon(Icons.school, size: 16),
+                        backgroundColor: AppColors.skyBlue.withValues(alpha: 0.3),
+                        shape: RoundedRectangleBorder(borderRadius: LumiBorders.medium),
                       ),
                     if (book.averageRating != null)
                       Chip(
-                        label: Text('${book.averageRating!.toStringAsFixed(1)} ⭐'),
+                        label: Text(
+                          '${book.averageRating!.toStringAsFixed(1)} ⭐',
+                          style: LumiTextStyles.label(),
+                        ),
                         avatar: const Icon(Icons.star, size: 16),
+                        backgroundColor: AppColors.skyBlue.withValues(alpha: 0.3),
+                        shape: RoundedRectangleBorder(borderRadius: LumiBorders.medium),
                       ),
                     if (book.pageCount != null)
                       Chip(
-                        label: Text('${book.pageCount} pages'),
+                        label: Text(
+                          '${book.pageCount} pages',
+                          style: LumiTextStyles.label(),
+                        ),
                         avatar: const Icon(Icons.chrome_reader_mode, size: 16),
+                        backgroundColor: AppColors.skyBlue.withValues(alpha: 0.3),
+                        shape: RoundedRectangleBorder(borderRadius: LumiBorders.medium),
                       ),
                   ],
                 ),
                 if (book.description != null) ...[
-                  const SizedBox(height: 16),
+                  LumiGap.s,
                   Text(
                     'About this book',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                    style: LumiTextStyles.h3(),
                   ),
-                  const SizedBox(height: 8),
+                  LumiGap.xs,
                   Text(
                     book.description!,
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    style: LumiTextStyles.body(),
                   ),
                 ],
                 if (book.genres.isNotEmpty) ...[
-                  const SizedBox(height: 16),
+                  LumiGap.s,
                   Text(
                     'Genres',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                    style: LumiTextStyles.h3(),
                   ),
-                  const SizedBox(height: 8),
+                  LumiGap.xs,
                   Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                    spacing: LumiSpacing.xs,
+                    runSpacing: LumiSpacing.xs,
                     children: book.genres.map((genre) {
-                      return Chip(label: Text(genre));
+                      return Chip(
+                        label: Text(genre, style: LumiTextStyles.label()),
+                        backgroundColor: AppColors.skyBlue.withValues(alpha: 0.3),
+                        shape: RoundedRectangleBorder(borderRadius: LumiBorders.medium),
+                      );
                     }).toList(),
                   ),
                 ],
-                const SizedBox(height: 24),
+                LumiGap.m,
                 SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton.icon(
+                  child: LumiPrimaryButton(
                     onPressed: () => Navigator.of(context).pop('start'),
-                    icon: const Icon(Icons.play_arrow),
-                    label: const Text('Start Reading'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.all(16),
-                    ),
+                    text: 'Start Reading',
+                    icon: Icons.play_arrow,
                   ),
                 ),
-                const SizedBox(height: 12),
+                LumiGap.s,
                 SizedBox(
                   width: double.infinity,
-                  child: OutlinedButton.icon(
+                  child: LumiSecondaryButton(
                     onPressed: () => Navigator.of(context).pop('similar'),
-                    icon: const Icon(Icons.more_horiz),
-                    label: const Text('Find Similar Books'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.all(16),
-                    ),
+                    text: 'Find Similar Books',
+                    icon: Icons.more_horiz,
                   ),
                 ),
               ],
@@ -620,7 +648,7 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Started reading "${book.title}"!'),
-          backgroundColor: Colors.green,
+          backgroundColor: AppColors.success,
         ),
       );
 
@@ -631,7 +659,7 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error starting book: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
         ),
       );
     }
@@ -647,7 +675,11 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text('Books similar to ${book.title}'),
+          shape: LumiBorders.shapeLarge,
+          title: Text(
+            'Books similar to ${book.title}',
+            style: LumiTextStyles.h3(),
+          ),
           content: SizedBox(
             width: double.maxFinite,
             child: ListView.builder(
@@ -656,8 +688,16 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
               itemBuilder: (context, index) {
                 final similarBook = similar[index];
                 return ListTile(
-                  title: Text(similarBook.title),
-                  subtitle: Text(similarBook.author ?? 'Unknown'),
+                  title: Text(
+                    similarBook.title,
+                    style: LumiTextStyles.body(),
+                  ),
+                  subtitle: Text(
+                    similarBook.author ?? 'Unknown',
+                    style: LumiTextStyles.bodySmall(
+                      color: AppColors.charcoal.withValues(alpha: 0.6),
+                    ),
+                  ),
                   onTap: () {
                     Navigator.of(context).pop();
                     _showBookDetails(similarBook);
@@ -667,9 +707,9 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
             ),
           ),
           actions: [
-            TextButton(
+            LumiTextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
+              text: 'Close',
             ),
           ],
         ),
@@ -680,7 +720,7 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error loading similar books: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
         ),
       );
     }
@@ -708,19 +748,36 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text('$genre Books'),
+          shape: LumiBorders.shapeLarge,
+          title: Text(
+            '$genre Books',
+            style: LumiTextStyles.h3(),
+          ),
           content: SizedBox(
             width: double.maxFinite,
             child: books.isEmpty
-                ? const Text('No books found in this genre')
+                ? Text(
+                    'No books found in this genre',
+                    style: LumiTextStyles.body(
+                      color: AppColors.charcoal.withValues(alpha: 0.6),
+                    ),
+                  )
                 : ListView.builder(
                     shrinkWrap: true,
                     itemCount: books.length,
                     itemBuilder: (context, index) {
                       final book = books[index];
                       return ListTile(
-                        title: Text(book.title),
-                        subtitle: Text(book.author ?? 'Unknown'),
+                        title: Text(
+                          book.title,
+                          style: LumiTextStyles.body(),
+                        ),
+                        subtitle: Text(
+                          book.author ?? 'Unknown',
+                          style: LumiTextStyles.bodySmall(
+                            color: AppColors.charcoal.withValues(alpha: 0.6),
+                          ),
+                        ),
                         onTap: () {
                           Navigator.of(context).pop();
                           _showBookDetails(book);
@@ -730,9 +787,9 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
                   ),
           ),
           actions: [
-            TextButton(
+            LumiTextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
+              text: 'Close',
             ),
           ],
         ),
@@ -743,7 +800,7 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error loading books: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
         ),
       );
     }
