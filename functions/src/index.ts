@@ -467,6 +467,471 @@ export const cleanupExpiredLinkCodes = functions.pubsub
   });
 
 /**
+ * SERVER-SIDE CODE VERIFICATION
+ * Provides secure, rate-limited verification of parent link codes
+ * This eliminates the need for unauthenticated Firestore reads
+ *
+ * Security features:
+ * - Rate limiting by IP address
+ * - Audit logging of all attempts
+ * - No direct Firestore access from client
+ * - Centralized validation logic
+ */
+export const verifyParentLinkCode = functions.https.onCall(async (data, context) => {
+  const code = data.code?.toString().toUpperCase();
+
+  // Input validation
+  if (!code || !/^[A-Z0-9]{8}$/.test(code)) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Invalid code format. Code must be 8 alphanumeric characters."
+    );
+  }
+
+  // Get client IP for rate limiting
+  const clientIP = context.rawRequest.ip || "unknown";
+  const rateLimitKey = `verify_attempt_${clientIP}`;
+
+  try {
+    // Check rate limit (max 10 attempts per IP per minute)
+    const rateLimitRef = db.doc(`rateLimits/${rateLimitKey}`);
+    const rateLimitDoc = await rateLimitRef.get();
+
+    if (rateLimitDoc.exists) {
+      const data = rateLimitDoc.data()!;
+      const attempts = data.attempts || 0;
+      const lastAttempt = data.lastAttempt?.toDate() || new Date(0);
+      const oneMinuteAgo = new Date(Date.now() - 60000);
+
+      if (lastAttempt > oneMinuteAgo && attempts >= 10) {
+        functions.logger.warn("Rate limit exceeded for code verification", {
+          ip: clientIP,
+          code: code,
+        });
+
+        throw new functions.https.HttpsError(
+          "resource-exhausted",
+          "Too many attempts. Please wait a minute and try again."
+        );
+      }
+
+      // Reset counter if last attempt was over a minute ago
+      if (lastAttempt <= oneMinuteAgo) {
+        await rateLimitRef.set({
+          attempts: 1,
+          lastAttempt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } else {
+        await rateLimitRef.update({
+          attempts: admin.firestore.FieldValue.increment(1),
+          lastAttempt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+    } else {
+      // First attempt from this IP
+      await rateLimitRef.set({
+        attempts: 1,
+        lastAttempt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    // Query the link code
+    const linkCodeQuery = await db
+      .collection("studentLinkCodes")
+      .where("code", "==", code)
+      .limit(1)
+      .get();
+
+    if (linkCodeQuery.empty) {
+      // Log failed attempt
+      await db.collection("auditLogs").add({
+        type: "code_verification_failed",
+        code: code,
+        reason: "code_not_found",
+        ip: clientIP,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      throw new functions.https.HttpsError(
+        "not-found",
+        "Invalid or expired code. Please check with your school."
+      );
+    }
+
+    const linkCodeDoc = linkCodeQuery.docs[0];
+    const linkCodeData = linkCodeDoc.data();
+
+    // Validate code status
+    if (linkCodeData.status !== "active") {
+      let reason = "code_not_active";
+      let message = "This code is no longer valid.";
+
+      if (linkCodeData.status === "used") {
+        reason = "code_already_used";
+        message = "This code has already been used by another parent.";
+      } else if (linkCodeData.status === "expired") {
+        reason = "code_expired";
+        message = "This code has expired. Please request a new code.";
+      } else if (linkCodeData.status === "revoked") {
+        reason = "code_revoked";
+        message = linkCodeData.revokeReason || "This code has been revoked.";
+      }
+
+      // Log failed attempt
+      await db.collection("auditLogs").add({
+        type: "code_verification_failed",
+        code: code,
+        reason: reason,
+        ip: clientIP,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      throw new functions.https.HttpsError("failed-precondition", message);
+    }
+
+    // Check expiration
+    const expiresAt = linkCodeData.expiresAt?.toDate();
+    if (expiresAt && expiresAt < new Date()) {
+      // Log failed attempt
+      await db.collection("auditLogs").add({
+        type: "code_verification_failed",
+        code: code,
+        reason: "code_expired",
+        ip: clientIP,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "This code has expired. Please request a new code."
+      );
+    }
+
+    // Log successful verification
+    await db.collection("auditLogs").add({
+      type: "code_verification_success",
+      code: code,
+      codeId: linkCodeDoc.id,
+      studentId: linkCodeData.studentId,
+      schoolId: linkCodeData.schoolId,
+      ip: clientIP,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Return sanitized code data (excluding sensitive fields)
+    return {
+      success: true,
+      codeData: {
+        id: linkCodeDoc.id,
+        code: linkCodeData.code,
+        studentId: linkCodeData.studentId,
+        schoolId: linkCodeData.schoolId,
+        status: linkCodeData.status,
+        expiresAt: linkCodeData.expiresAt,
+        metadata: linkCodeData.metadata || {},
+      },
+    };
+  } catch (error) {
+    // Re-throw HttpsErrors
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+
+    // Log unexpected errors
+    functions.logger.error("Unexpected error in verifyParentLinkCode", {
+      error: error instanceof Error ? error.message : String(error),
+      code: code,
+      ip: clientIP,
+    });
+
+    throw new functions.https.HttpsError(
+      "internal",
+      "An error occurred while verifying the code. Please try again."
+    );
+  }
+});
+
+/**
+ * BULK LINK CODES FOR SIBLINGS
+ * Allows parents to link multiple children using a single bulk code
+ * Useful for families with multiple children in the same school
+ */
+export const createBulkLinkCode = functions.https.onCall(async (data, context) => {
+  // Require authentication
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "You must be logged in to create bulk link codes."
+    );
+  }
+
+  const { studentIds, schoolId, validityDays = 365 } = data;
+
+  // Validate inputs
+  if (!Array.isArray(studentIds) || studentIds.length === 0) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "You must provide at least one student ID."
+    );
+  }
+
+  if (studentIds.length > 10) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Maximum 10 students can be linked with a single code."
+    );
+  }
+
+  if (!schoolId) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "School ID is required."
+    );
+  }
+
+  try {
+    // Verify user has permission (admin or teacher)
+    const userDoc = await db
+      .doc(`schools/${schoolId}/users/${context.auth.uid}`)
+      .get();
+
+    if (!userDoc.exists) {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "You do not have permission to create link codes for this school."
+      );
+    }
+
+    const userData = userDoc.data()!;
+    if (!["schoolAdmin", "teacher"].includes(userData.role)) {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "Only administrators and teachers can create bulk link codes."
+      );
+    }
+
+    // Fetch student information for all students
+    const studentPromises = studentIds.map((studentId: string) =>
+      db.doc(`schools/${schoolId}/students/${studentId}`).get()
+    );
+    const studentDocs = await Promise.all(studentPromises);
+
+    // Validate all students exist
+    const invalidStudents = studentDocs.filter((doc) => !doc.exists);
+    if (invalidStudents.length > 0) {
+      throw new functions.https.HttpsError(
+        "not-found",
+        `${invalidStudents.length} student(s) not found.`
+      );
+    }
+
+    // Build metadata with all student names
+    const studentsMetadata = studentDocs.map((doc) => {
+      const data = doc.data()!;
+      return {
+        studentId: doc.id,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        fullName: `${data.firstName} ${data.lastName}`,
+      };
+    });
+
+    // Generate unique code
+    let code: string;
+    let isUnique = false;
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+    do {
+      code = Array.from({ length: 8 }, () =>
+        chars.charAt(Math.floor(Math.random() * chars.length))
+      ).join("");
+
+      const existing = await db
+        .collection("studentLinkCodes")
+        .where("code", "==", code)
+        .where("status", "==", "active")
+        .get();
+
+      isUnique = existing.empty;
+    } while (!isUnique);
+
+    // Create the bulk link code
+    const bulkCodeData = {
+      code: code,
+      type: "bulk", // New field to differentiate bulk codes
+      studentIds: studentIds,
+      schoolId: schoolId,
+      status: "active",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: admin.firestore.Timestamp.fromDate(
+        new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000)
+      ),
+      createdBy: context.auth.uid,
+      metadata: {
+        students: studentsMetadata,
+        studentCount: studentIds.length,
+      },
+    };
+
+    const docRef = await db.collection("studentLinkCodes").add(bulkCodeData);
+
+    functions.logger.info("Bulk link code created", {
+      codeId: docRef.id,
+      code: code,
+      studentCount: studentIds.length,
+      schoolId: schoolId,
+      createdBy: context.auth.uid,
+    });
+
+    return {
+      success: true,
+      codeId: docRef.id,
+      code: code,
+      studentCount: studentIds.length,
+      students: studentsMetadata,
+      expiresAt: bulkCodeData.expiresAt,
+    };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+
+    functions.logger.error("Error creating bulk link code", {
+      error: error instanceof Error ? error.message : String(error),
+      studentIds: studentIds,
+      schoolId: schoolId,
+    });
+
+    throw new functions.https.HttpsError(
+      "internal",
+      "An error occurred while creating the bulk link code."
+    );
+  }
+});
+
+/**
+ * PARENT SELF-UNLINKING
+ * Allows parents to unlink themselves from a student
+ * Useful when parent accounts are linked incorrectly or need to be removed
+ */
+export const unlinkParentFromStudent = functions.https.onCall(async (data, context) => {
+  // Require authentication
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "You must be logged in to unlink from a student."
+    );
+  }
+
+  const { studentId, schoolId } = data;
+
+  // Validate inputs
+  if (!studentId || !schoolId) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Student ID and School ID are required."
+    );
+  }
+
+  const parentUserId = context.auth.uid;
+
+  try {
+    // Run in transaction to ensure atomicity
+    await db.runTransaction(async (transaction) => {
+      // Get parent document
+      const parentRef = db.doc(`schools/${schoolId}/parents/${parentUserId}`);
+      const parentDoc = await transaction.get(parentRef);
+
+      if (!parentDoc.exists) {
+        throw new functions.https.HttpsError(
+          "not-found",
+          "Parent account not found."
+        );
+      }
+
+      const parentData = parentDoc.data()!;
+
+      // Check if parent is linked to this student
+      const linkedChildren = parentData.linkedChildren || [];
+      if (!linkedChildren.includes(studentId)) {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "You are not linked to this student."
+        );
+      }
+
+      // Get student document
+      const studentRef = db.doc(`schools/${schoolId}/students/${studentId}`);
+      const studentDoc = await transaction.get(studentRef);
+
+      if (!studentDoc.exists) {
+        throw new functions.https.HttpsError(
+          "not-found",
+          "Student not found."
+        );
+      }
+
+      const studentData = studentDoc.data()!;
+
+      // Remove parent from student's parentIds
+      const updatedParentIds = (studentData.parentIds || []).filter(
+        (id: string) => id !== parentUserId
+      );
+
+      // Remove student from parent's linkedChildren
+      const updatedLinkedChildren = linkedChildren.filter(
+        (id: string) => id !== studentId
+      );
+
+      // Update both documents atomically
+      transaction.update(studentRef, {
+        parentIds: updatedParentIds,
+      });
+
+      transaction.update(parentRef, {
+        linkedChildren: updatedLinkedChildren,
+      });
+
+      // Create audit log
+      transaction.set(db.collection("auditLogs").doc(), {
+        type: "parent_self_unlink",
+        parentUserId: parentUserId,
+        studentId: studentId,
+        schoolId: schoolId,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+
+    functions.logger.info("Parent successfully unlinked from student", {
+      parentUserId: parentUserId,
+      studentId: studentId,
+      schoolId: schoolId,
+    });
+
+    return {
+      success: true,
+      message: "Successfully unlinked from student.",
+    };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+
+    functions.logger.error("Error unlinking parent from student", {
+      error: error instanceof Error ? error.message : String(error),
+      parentUserId: parentUserId,
+      studentId: studentId,
+      schoolId: schoolId,
+    });
+
+    throw new functions.https.HttpsError(
+      "internal",
+      "An error occurred while unlinking. Please try again."
+    );
+  }
+});
+
+/**
  * Update class statistics when allocations or logs change
  */
 export const updateClassStats = functions.firestore

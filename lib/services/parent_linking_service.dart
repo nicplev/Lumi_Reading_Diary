@@ -134,6 +134,7 @@ class ParentLinkingService {
 
   // Link parent to student using code
   // Uses Firestore transaction to ensure atomicity and prevent race conditions
+  // Supports both single and bulk (sibling) link codes
   Future<bool> linkParentToStudent({
     required String code,
     required String parentUserId,
@@ -153,6 +154,14 @@ class ParentLinkingService {
         }
 
         final codeDoc = codeQuery.docs.first;
+        final linkCodeData = codeDoc.data();
+
+        // Check if this is a bulk code (for siblings)
+        final isBulkCode = linkCodeData['type'] == 'bulk';
+        final studentIds = isBulkCode
+            ? List<String>.from(linkCodeData['studentIds'] ?? [])
+            : [linkCodeData['studentId'] as String];
+
         final linkCode = StudentLinkCodeModel.fromFirestore(codeDoc);
 
         // Check if code is usable (active and not expired)
@@ -173,40 +182,57 @@ class ParentLinkingService {
           throw InvalidCodeException();
         }
 
-        // 2. Get student document reference and read within transaction
-        final studentRef = _firestore
-            .collection('schools')
-            .doc(linkCode.schoolId)
-            .collection('students')
-            .doc(linkCode.studentId);
-
-        final studentSnapshot = await transaction.get(studentRef);
-
-        if (!studentSnapshot.exists) {
-          throw StudentNotFoundException();
-        }
-
-        final student = StudentModel.fromFirestore(studentSnapshot);
-
-        // 3. Check if parent already linked
-        if (student.parentIds.contains(parentUserId)) {
-          throw AlreadyLinkedException();
-        }
-
-        // 4. Get parent document reference
+        // 2. Process each student (for bulk codes, this will be multiple students)
+        final schoolId = linkCodeData['schoolId'] as String;
         final parentRef = _firestore
             .collection('schools')
-            .doc(linkCode.schoolId)
+            .doc(schoolId)
             .collection('parents')
             .doc(parentUserId);
 
-        // 5. Get code document reference
+        final List<String> linkedStudentIds = [];
+
+        for (final studentId in studentIds) {
+          // Get student document reference and read within transaction
+          final studentRef = _firestore
+              .collection('schools')
+              .doc(schoolId)
+              .collection('students')
+              .doc(studentId);
+
+          final studentSnapshot = await transaction.get(studentRef);
+
+          if (!studentSnapshot.exists) {
+            print('Warning: Student $studentId not found, skipping');
+            continue;
+          }
+
+          final student = StudentModel.fromFirestore(studentSnapshot);
+
+          // Skip if parent already linked to this student
+          if (student.parentIds.contains(parentUserId)) {
+            print('Info: Parent already linked to student $studentId, skipping');
+            continue;
+          }
+
+          // Update student with parent ID
+          transaction.update(studentRef, {
+            'parentIds': FieldValue.arrayUnion([parentUserId]),
+          });
+
+          linkedStudentIds.add(studentId);
+        }
+
+        if (linkedStudentIds.isEmpty) {
+          throw AlreadyLinkedException();
+        }
+
+        // 3. Get code document reference
         final linkCodeRef = _firestore
             .collection('studentLinkCodes')
             .doc(linkCode.id);
 
         // Re-check code status within transaction to prevent race condition
-        // This ensures another parent hasn't used the code between our initial check and now
         final freshCodeSnapshot = await transaction.get(linkCodeRef);
         if (!freshCodeSnapshot.exists) {
           throw InvalidCodeException();
@@ -218,17 +244,12 @@ class ParentLinkingService {
           throw CodeAlreadyUsedException();
         }
 
-        // 6. ATOMIC UPDATES - All operations succeed or all fail
+        // 4. ATOMIC UPDATES - All operations succeed or all fail
 
-        // Update student with parent ID
-        transaction.update(studentRef, {
-          'parentIds': FieldValue.arrayUnion([parentUserId]),
-        });
-
-        // Update parent with linked child
+        // Update parent with all linked children
         transaction.update(parentRef, {
-          'linkedChildren': FieldValue.arrayUnion([linkCode.studentId]),
-          'schoolId': linkCode.schoolId,
+          'linkedChildren': FieldValue.arrayUnion(linkedStudentIds),
+          'schoolId': schoolId,
         });
 
         // Mark code as used
@@ -238,19 +259,28 @@ class ParentLinkingService {
           'usedAt': FieldValue.serverTimestamp(),
         });
 
-        // 7. Create notification for teacher (outside transaction)
-        // Notifications are non-critical and can be done after transaction commits
-        // Using Future.delayed to ensure it runs after transaction completes
+        // 5. Create notifications for teacher (outside transaction)
+        // For bulk codes, create one notification for all students
         Future.delayed(Duration.zero, () {
-          _createLinkNotification(
-            schoolId: linkCode.schoolId,
-            studentId: linkCode.studentId,
-            parentUserId: parentUserId,
-            parentEmail: parentEmail,
-          ).catchError((error) {
-            // Log error but don't fail the linking operation
-            print('Warning: Failed to create link notification: $error');
-          });
+          if (isBulkCode) {
+            _createBulkLinkNotification(
+              schoolId: schoolId,
+              studentIds: linkedStudentIds,
+              parentUserId: parentUserId,
+              parentEmail: parentEmail,
+            ).catchError((error) {
+              print('Warning: Failed to create bulk link notification: $error');
+            });
+          } else {
+            _createLinkNotification(
+              schoolId: schoolId,
+              studentId: linkedStudentIds.first,
+              parentUserId: parentUserId,
+              parentEmail: parentEmail,
+            ).catchError((error) {
+              print('Warning: Failed to create link notification: $error');
+            });
+          }
         });
 
         return true;
@@ -278,6 +308,27 @@ class ParentLinkingService {
       'parentUserId': parentUserId,
       'parentEmail': parentEmail,
       'message': 'A parent has linked to a student',
+      'createdAt': FieldValue.serverTimestamp(),
+      'read': false,
+    };
+
+    await _firestore.collection('notifications').add(notification);
+  }
+
+  // Create notification for teacher when parent links to multiple students (bulk)
+  Future<void> _createBulkLinkNotification({
+    required String schoolId,
+    required List<String> studentIds,
+    required String parentUserId,
+    required String parentEmail,
+  }) async {
+    final notification = {
+      'type': 'parent_bulk_linked',
+      'schoolId': schoolId,
+      'studentIds': studentIds,
+      'parentUserId': parentUserId,
+      'parentEmail': parentEmail,
+      'message': 'A parent has linked to ${studentIds.length} students',
       'createdAt': FieldValue.serverTimestamp(),
       'read': false,
     };
