@@ -437,7 +437,7 @@ export const cleanupExpiredLinkCodes = functions.pubsub
     try {
       const expiredCodesSnapshot = await db
         .collection("studentLinkCodes")
-        .where("expiryDate", "<", now)
+        .where("expiresAt", "<", now)
         .where("status", "==", "active")
         .get();
 
