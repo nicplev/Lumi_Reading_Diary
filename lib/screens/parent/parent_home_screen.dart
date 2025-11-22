@@ -2,17 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/liquid_glass_theme.dart';
-import '../../core/widgets/glass/glass_widgets.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/lumi_card.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../data/models/allocation_model.dart';
 import '../../services/firebase_service.dart';
-import 'log_reading_screen.dart';
 import 'reading_history_screen.dart';
 import 'parent_profile_screen.dart';
 
@@ -82,13 +85,11 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
-        body: Container(
-          decoration: const BoxDecoration(
-            gradient: LiquidGlassTheme.backgroundGradient,
-          ),
-          child: const Center(
-            child: CircularProgressIndicator(),
+      return const Scaffold(
+        backgroundColor: AppColors.offWhite,
+        body: Center(
+          child: CircularProgressIndicator(
+            color: AppColors.rosePink,
           ),
         ),
       );
@@ -96,36 +97,31 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
 
     if (_children.isEmpty) {
       return Scaffold(
-        body: Container(
-          decoration: const BoxDecoration(
-            gradient: LiquidGlassTheme.backgroundGradient,
-          ),
-          child: _buildNoChildrenView(),
-        ),
+        backgroundColor: AppColors.offWhite,
+        body: _buildNoChildrenView(),
       );
     }
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LiquidGlassTheme.backgroundGradient,
-        ),
-        child: IndexedStack(
-          index: _selectedIndex,
-          children: [
-            _buildHomeView(),
-            ReadingHistoryScreen(
-              studentId: _selectedChildId!,
-              parentId: widget.user.id,
-              schoolId: widget.user.schoolId!,
-            ),
-            ParentProfileScreen(user: widget.user),
-          ],
-        ),
+      backgroundColor: AppColors.offWhite,
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: [
+          _buildHomeView(),
+          ReadingHistoryScreen(
+            studentId: _selectedChildId!,
+            parentId: widget.user.id,
+            schoolId: widget.user.schoolId!,
+          ),
+          ParentProfileScreen(user: widget.user),
+        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) => setState(() => _selectedIndex = index),
+        backgroundColor: AppColors.white,
+        selectedItemColor: AppColors.rosePink,
+        unselectedItemColor: AppColors.charcoal.withValues(alpha: 0.6),
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
@@ -163,9 +159,9 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
               children: [
                 Text(
                   'Hello, ${widget.user.fullName.isNotEmpty ? widget.user.fullName.split(' ').first : 'Parent'}!',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppColors.gray,
-                      ),
+                  style: LumiTextStyles.h3(
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
+                  ),
                 ),
                 if (_children.length > 1)
                   DropdownButton<String>(
@@ -182,25 +178,18 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
                       });
                     },
                     underline: const SizedBox(),
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: AppColors.darkGray,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    style: LumiTextStyles.h2(color: AppColors.charcoal),
                   )
                 else
                   Text(
                     selectedChild.firstName,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: AppColors.darkGray,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    style: LumiTextStyles.h2(color: AppColors.charcoal),
                   ),
               ],
             ),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.notifications_outlined),
-                color: AppColors.darkGray,
+              LumiIconButton(
+                icon: Icons.notifications_outlined,
                 onPressed: () {
                   // Navigate to notifications
                 },
@@ -210,7 +199,7 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
 
           // Content
           SliverPadding(
-            padding: const EdgeInsets.all(16),
+            padding: LumiPadding.allS,
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 // Today's Reading Card
@@ -277,7 +266,7 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
                   },
                 ),
 
-                const SizedBox(height: 20),
+                LumiGap.m,
 
                 // Weekly Progress
                 _WeeklyProgressCard(
@@ -285,7 +274,7 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
                   schoolId: widget.user.schoolId!,
                 ).animate().fadeIn(delay: 200.ms),
 
-                const SizedBox(height: 20),
+                LumiGap.m,
 
                 // Reading Streak
                 StreamBuilder<StudentStats?>(
@@ -310,7 +299,7 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
   Widget _buildNoChildrenView() {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: LumiPadding.allM,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -318,29 +307,26 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
               mood: LumiMood.thinking,
               size: 150,
             ),
-            const SizedBox(height: 24),
+            LumiGap.m,
             Text(
               'No Children Linked',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.darkGray,
-                  ),
+              style: LumiTextStyles.h2(color: AppColors.charcoal),
             ),
-            const SizedBox(height: 12),
+            LumiGap.xs,
             Text(
               'Please ask your teacher for an invite code to link your children.',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: AppColors.gray,
-                  ),
+              style: LumiTextStyles.bodyLarge(
+                color: AppColors.charcoal.withValues(alpha: 0.7),
+              ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 32),
-            ElevatedButton.icon(
+            LumiGap.l,
+            LumiPrimaryButton(
               onPressed: () {
                 // Navigate to enter invite code screen
               },
-              icon: const Icon(Icons.qr_code),
-              label: const Text('Enter Invite Code'),
+              text: 'Enter Invite Code',
+              icon: Icons.qr_code,
             ),
           ],
         ),
@@ -380,111 +366,96 @@ class _TodayCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedGlassCard(
+    return GestureDetector(
       onTap: onTap,
-      padding: const EdgeInsets.all(LiquidGlassTheme.spacingLg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  gradient: hasLoggedToday
-                      ? LiquidGlassTheme.successGradient
-                      : LiquidGlassTheme.coolGradient,
-                  borderRadius: BorderRadius.circular(LiquidGlassTheme.radiusCapsule),
-                  boxShadow: hasLoggedToday
-                      ? LiquidGlassTheme.glowShadow(color: AppColors.secondaryGreen)
-                      : LiquidGlassTheme.glowShadow(color: AppColors.primaryBlue),
-                ),
-                child: Text(
-                  DateFormat('EEEE, MMM d').format(DateTime.now()),
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: AppColors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-              ),
-              const Spacer(),
-              if (hasLoggedToday)
+      child: LumiCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
                 Container(
-                  padding: const EdgeInsets.all(4),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: LumiSpacing.xs,
+                    vertical: LumiSpacing.xxs,
+                  ),
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: LiquidGlassTheme.glowShadow(
-                      color: AppColors.secondaryGreen,
+                    color: hasLoggedToday
+                        ? AppColors.mintGreen
+                        : AppColors.rosePink,
+                    borderRadius: LumiBorders.circular,
+                  ),
+                  child: Text(
+                    DateFormat('EEEE, MMM d').format(DateTime.now()),
+                    style: LumiTextStyles.label(
+                      color: AppColors.white,
                     ),
                   ),
-                  child: const Icon(
+                ),
+                const Spacer(),
+                if (hasLoggedToday)
+                  const Icon(
                     Icons.check_circle,
-                    color: AppColors.secondaryGreen,
+                    color: AppColors.mintGreen,
                     size: 32,
                   ),
-                ),
-            ],
-          ),
-          const SizedBox(height: LiquidGlassTheme.spacingMd),
-          Text(
-            hasLoggedToday ? 'Reading Complete!' : "Today's Reading",
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.darkGray,
-                ),
-          ),
-          const SizedBox(height: LiquidGlassTheme.spacingSm),
-          if (allocation != null) ...[
-            _buildRequirement(
-              context,
-              Icons.timer_outlined,
-              '${allocation!.targetMinutes} minutes',
+              ],
             ),
-            const SizedBox(height: 8),
-            if (allocation!.type == AllocationType.byLevel)
+            LumiGap.m,
+            Text(
+              hasLoggedToday ? 'Reading Complete!' : "Today's Reading",
+              style: LumiTextStyles.h2(color: AppColors.charcoal),
+            ),
+            LumiGap.s,
+            if (allocation != null) ...[
+              _buildRequirement(
+                context,
+                Icons.timer_outlined,
+                '${allocation!.targetMinutes} minutes',
+              ),
+              LumiGap.xs,
+              if (allocation!.type == AllocationType.byLevel)
+                _buildRequirement(
+                  context,
+                  Icons.book_outlined,
+                  'Level ${allocation!.levelStart}${allocation!.levelEnd != null ? ' - ${allocation!.levelEnd}' : ''} books',
+                ),
+              if (allocation!.type == AllocationType.byTitle &&
+                  allocation!.bookTitles != null)
+                ...allocation!.bookTitles!.map((title) => Padding(
+                      padding: EdgeInsets.only(bottom: LumiSpacing.xxs),
+                      child: _buildRequirement(
+                        context,
+                        Icons.book_outlined,
+                        title,
+                      ),
+                    )),
+            ] else ...[
+              _buildRequirement(
+                context,
+                Icons.timer_outlined,
+                '20 minutes',
+              ),
+              LumiGap.xs,
               _buildRequirement(
                 context,
                 Icons.book_outlined,
-                'Level ${allocation!.levelStart}${allocation!.levelEnd != null ? ' - ${allocation!.levelEnd}' : ''} books',
+                'Any reading material',
               ),
-            if (allocation!.type == AllocationType.byTitle &&
-                allocation!.bookTitles != null)
-              ...allocation!.bookTitles!.map((title) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: _buildRequirement(
-                      context,
-                      Icons.book_outlined,
-                      title,
-                    ),
-                  )),
-          ] else ...[
-            _buildRequirement(
-              context,
-              Icons.timer_outlined,
-              '20 minutes',
-            ),
-            const SizedBox(height: 8),
-            _buildRequirement(
-              context,
-              Icons.book_outlined,
-              'Any reading material',
-            ),
+            ],
+            if (!hasLoggedToday) ...[
+              LumiGap.m,
+              SizedBox(
+                width: double.infinity,
+                child: LumiPrimaryButton(
+                  onPressed: onTap,
+                  text: 'Tap to Mark as Done',
+                  icon: Icons.check_circle_outline,
+                ),
+              ),
+            ],
           ],
-          if (!hasLoggedToday) ...[
-            const SizedBox(height: LiquidGlassTheme.spacingLg),
-            GlassButton(
-              text: 'Tap to Mark as Done',
-              onPressed: onTap,
-              isPrimary: true,
-              icon: Icons.check_circle_outline,
-              gradient: LiquidGlassTheme.parentGradient,
-              width: double.infinity,
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
@@ -495,15 +466,13 @@ class _TodayCard extends StatelessWidget {
         Icon(
           icon,
           size: 20,
-          color: AppColors.gray,
+          color: AppColors.charcoal.withValues(alpha: 0.7),
         ),
-        const SizedBox(width: 8),
+        LumiGap.horizontalXS,
         Expanded(
           child: Text(
             text,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: AppColors.darkGray,
-                ),
+            style: LumiTextStyles.bodyLarge(color: AppColors.charcoal),
           ),
         ),
       ],
@@ -526,19 +495,15 @@ class _WeeklyProgressCard extends StatelessWidget {
       Duration(days: DateTime.now().weekday - 1),
     );
 
-    return GlassCard(
-      padding: const EdgeInsets.all(LiquidGlassTheme.spacingLg),
+    return LumiCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'This Week',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.darkGray,
-                ),
+            style: LumiTextStyles.h2(color: AppColors.charcoal),
           ),
-          const SizedBox(height: LiquidGlassTheme.spacingMd),
+          LumiGap.m,
           StreamBuilder<QuerySnapshot>(
             stream: FirebaseService.instance.firestore
                 .collection('schools')
@@ -552,8 +517,8 @@ class _WeeklyProgressCard extends StatelessWidget {
               final logs = <ReadingLogModel>[];
               if (snapshot.hasData) {
                 logs.addAll(
-                  snapshot.data!.docs.map((doc) =>
-                      ReadingLogModel.fromFirestore(doc)),
+                  snapshot.data!.docs
+                      .map((doc) => ReadingLogModel.fromFirestore(doc)),
                 );
               }
 
@@ -599,31 +564,24 @@ class _DayIndicator extends StatelessWidget {
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        gradient: isCompleted ? LiquidGlassTheme.successGradient : null,
-        color: !isCompleted
-            ? (isToday
-                ? AppColors.primaryBlue.withValues(alpha: 0.2)
-                : AppColors.lightGray)
-            : null,
+        color: isCompleted
+            ? AppColors.mintGreen
+            : (isToday
+                ? AppColors.rosePink.withValues(alpha: 0.2)
+                : AppColors.skyBlue),
         shape: BoxShape.circle,
         border: isToday
-            ? Border.all(color: AppColors.primaryBlue, width: 2)
-            : null,
-        boxShadow: isCompleted
-            ? LiquidGlassTheme.glowShadow(
-                color: AppColors.secondaryGreen,
-                blurRadius: 8,
-                spreadRadius: 0,
-              )
+            ? Border.all(color: AppColors.rosePink, width: 2)
             : null,
       ),
       child: Center(
         child: Text(
           day,
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: isCompleted ? AppColors.white : AppColors.darkGray,
-                fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-              ),
+          style: LumiTextStyles.label(
+            color: isCompleted ? AppColors.white : AppColors.charcoal,
+          ).copyWith(
+            fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+          ),
         ),
       ),
     );
@@ -643,14 +601,13 @@ class _StreakCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
-      padding: const EdgeInsets.all(LiquidGlassTheme.spacingLg),
+    return LumiCard(
       child: Row(
         children: [
           Expanded(
-            child: GlassMiniStat(
+            child: _buildMiniStat(
               icon: Icons.local_fire_department,
-              color: AppColors.secondaryOrange,
+              color: AppColors.warmOrange,
               value: currentStreak.toString(),
               label: 'Current Streak',
             ),
@@ -658,20 +615,10 @@ class _StreakCard extends StatelessWidget {
           Container(
             width: 1,
             height: 50,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  AppColors.lightGray.withValues(alpha: 0.2),
-                  AppColors.lightGray,
-                  AppColors.lightGray.withValues(alpha: 0.2),
-                ],
-              ),
-            ),
+            color: AppColors.skyBlue,
           ),
           Expanded(
-            child: GlassMiniStat(
+            child: _buildMiniStat(
               icon: Icons.emoji_events,
               color: AppColors.gold,
               value: longestStreak.toString(),
@@ -681,28 +628,48 @@ class _StreakCard extends StatelessWidget {
           Container(
             width: 1,
             height: 50,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  AppColors.lightGray.withValues(alpha: 0.2),
-                  AppColors.lightGray,
-                  AppColors.lightGray.withValues(alpha: 0.2),
-                ],
-              ),
-            ),
+            color: AppColors.skyBlue,
           ),
           Expanded(
-            child: GlassMiniStat(
+            child: _buildMiniStat(
               icon: Icons.timer,
-              color: AppColors.primaryBlue,
+              color: AppColors.rosePink,
               value: '${totalMinutes ~/ 60}h',
               label: 'Total Time',
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMiniStat({
+    required IconData icon,
+    required Color color,
+    required String value,
+    required String label,
+  }) {
+    return Column(
+      children: [
+        Icon(
+          icon,
+          color: color,
+          size: 32,
+        ),
+        LumiGap.xs,
+        Text(
+          value,
+          style: LumiTextStyles.h2(color: AppColors.charcoal),
+        ),
+        LumiGap.xxs,
+        Text(
+          label,
+          style: LumiTextStyles.bodySmall(
+            color: AppColors.charcoal.withValues(alpha: 0.7),
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 }
