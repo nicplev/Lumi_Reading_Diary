@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../data/models/student_link_code_model.dart';
 import '../data/models/student_model.dart';
 import '../data/models/user_model.dart';
+import '../core/exceptions/linking_exceptions.dart';
 
 class ParentLinkingService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -97,7 +98,7 @@ class ParentLinkingService {
   }
 
   // Verify and retrieve link code
-  Future<StudentLinkCodeModel?> verifyCode(String code) async {
+  Future<StudentLinkCodeModel> verifyCode(String code) async {
     final query = await _firestore
         .collection('studentLinkCodes')
         .where('code', isEqualTo: code.toUpperCase())
@@ -105,94 +106,162 @@ class ParentLinkingService {
         .get();
 
     if (query.docs.isEmpty) {
-      return null;
+      throw InvalidCodeException();
     }
 
     final linkCode = StudentLinkCodeModel.fromFirestore(query.docs.first);
 
-    // Check if code is usable
+    // Check if code is usable and throw specific exceptions
+    if (linkCode.status == LinkCodeStatus.used) {
+      throw CodeAlreadyUsedException();
+    }
+
+    if (linkCode.status == LinkCodeStatus.revoked) {
+      throw CodeRevokedException(reason: linkCode.revokeReason);
+    }
+
+    if (linkCode.status == LinkCodeStatus.expired ||
+        DateTime.now().isAfter(linkCode.expiresAt)) {
+      throw CodeExpiredException();
+    }
+
     if (!linkCode.isUsable) {
-      return null;
+      throw InvalidCodeException();
     }
 
     return linkCode;
   }
 
   // Link parent to student using code
+  // Uses Firestore transaction to ensure atomicity and prevent race conditions
   Future<bool> linkParentToStudent({
     required String code,
     required String parentUserId,
     required String parentEmail,
   }) async {
-    try {
-      // 1. Verify code
-      final linkCode = await verifyCode(code);
-      if (linkCode == null) {
-        throw Exception('Invalid or expired code');
+    return await _firestore.runTransaction<bool>((transaction) async {
+      try {
+        // 1. Verify code and get link code document
+        final codeQuery = await _firestore
+            .collection('studentLinkCodes')
+            .where('code', isEqualTo: code.toUpperCase())
+            .limit(1)
+            .get();
+
+        if (codeQuery.docs.isEmpty) {
+          throw InvalidCodeException();
+        }
+
+        final codeDoc = codeQuery.docs.first;
+        final linkCode = StudentLinkCodeModel.fromFirestore(codeDoc);
+
+        // Check if code is usable (active and not expired)
+        if (linkCode.status == LinkCodeStatus.used) {
+          throw CodeAlreadyUsedException();
+        }
+
+        if (linkCode.status == LinkCodeStatus.revoked) {
+          throw CodeRevokedException(reason: linkCode.revokeReason);
+        }
+
+        if (linkCode.status == LinkCodeStatus.expired ||
+            DateTime.now().isAfter(linkCode.expiresAt)) {
+          throw CodeExpiredException();
+        }
+
+        if (!linkCode.isUsable) {
+          throw InvalidCodeException();
+        }
+
+        // 2. Get student document reference and read within transaction
+        final studentRef = _firestore
+            .collection('schools')
+            .doc(linkCode.schoolId)
+            .collection('students')
+            .doc(linkCode.studentId);
+
+        final studentSnapshot = await transaction.get(studentRef);
+
+        if (!studentSnapshot.exists) {
+          throw StudentNotFoundException();
+        }
+
+        final student = StudentModel.fromFirestore(studentSnapshot);
+
+        // 3. Check if parent already linked
+        if (student.parentIds.contains(parentUserId)) {
+          throw AlreadyLinkedException();
+        }
+
+        // 4. Get parent document reference
+        final parentRef = _firestore
+            .collection('schools')
+            .doc(linkCode.schoolId)
+            .collection('parents')
+            .doc(parentUserId);
+
+        // 5. Get code document reference
+        final linkCodeRef = _firestore
+            .collection('studentLinkCodes')
+            .doc(linkCode.id);
+
+        // Re-check code status within transaction to prevent race condition
+        // This ensures another parent hasn't used the code between our initial check and now
+        final freshCodeSnapshot = await transaction.get(linkCodeRef);
+        if (!freshCodeSnapshot.exists) {
+          throw InvalidCodeException();
+        }
+
+        final freshCodeData = freshCodeSnapshot.data()!;
+
+        if (freshCodeData['status'] != 'active') {
+          throw CodeAlreadyUsedException();
+        }
+
+        // 6. ATOMIC UPDATES - All operations succeed or all fail
+
+        // Update student with parent ID
+        transaction.update(studentRef, {
+          'parentIds': FieldValue.arrayUnion([parentUserId]),
+        });
+
+        // Update parent with linked child
+        transaction.update(parentRef, {
+          'linkedChildren': FieldValue.arrayUnion([linkCode.studentId]),
+          'schoolId': linkCode.schoolId,
+        });
+
+        // Mark code as used
+        transaction.update(linkCodeRef, {
+          'status': LinkCodeStatus.used.toString().split('.').last,
+          'usedBy': parentUserId,
+          'usedAt': FieldValue.serverTimestamp(),
+        });
+
+        // 7. Create notification for teacher (outside transaction)
+        // Notifications are non-critical and can be done after transaction commits
+        // Using Future.delayed to ensure it runs after transaction completes
+        Future.delayed(Duration.zero, () {
+          _createLinkNotification(
+            schoolId: linkCode.schoolId,
+            studentId: linkCode.studentId,
+            parentUserId: parentUserId,
+            parentEmail: parentEmail,
+          ).catchError((error) {
+            // Log error but don't fail the linking operation
+            print('Warning: Failed to create link notification: $error');
+          });
+        });
+
+        return true;
+      } on LinkingException {
+        // Re-throw custom linking exceptions
+        rethrow;
+      } catch (e) {
+        // Wrap any other errors in a TransactionFailedException
+        throw TransactionFailedException(e.toString());
       }
-
-      // 2. Get student
-      final studentDoc = await _firestore
-          .collection('schools')
-          .doc(linkCode.schoolId)
-          .collection('students')
-          .doc(linkCode.studentId)
-          .get();
-
-      if (!studentDoc.exists) {
-        throw Exception('Student not found');
-      }
-
-      final student = StudentModel.fromFirestore(studentDoc);
-
-      // 3. Check if parent already linked
-      if (student.parentIds.contains(parentUserId)) {
-        throw Exception('Parent already linked to this student');
-      }
-
-      // 4. Update student with parent ID
-      await _firestore
-          .collection('schools')
-          .doc(linkCode.schoolId)
-          .collection('students')
-          .doc(linkCode.studentId)
-          .update({
-        'parentIds': FieldValue.arrayUnion([parentUserId]),
-      });
-
-      // 5. Update parent user with linked child
-      await _firestore
-          .collection('schools')
-          .doc(linkCode.schoolId)
-          .collection('parents')
-          .doc(parentUserId)
-          .update({
-        'linkedChildren': FieldValue.arrayUnion([linkCode.studentId]),
-        'schoolId': linkCode.schoolId,
-      });
-
-      // 6. Mark code as used
-      await _firestore
-          .collection('studentLinkCodes')
-          .doc(linkCode.id)
-          .update({
-        'status': LinkCodeStatus.used.toString().split('.').last,
-        'usedBy': parentUserId,
-        'usedAt': FieldValue.serverTimestamp(),
-      });
-
-      // 7. Create notification for teacher
-      await _createLinkNotification(
-        schoolId: linkCode.schoolId,
-        studentId: linkCode.studentId,
-        parentUserId: parentUserId,
-        parentEmail: parentEmail,
-      );
-
-      return true;
-    } catch (e) {
-      throw Exception('Failed to link parent: $e');
-    }
+    });
   }
 
   // Create notification for teacher when parent links
