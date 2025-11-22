@@ -1,7 +1,7 @@
 # Lumi Design System Migration - Status & Guide
 
 **Last Updated:** 2025-11-22
-**Progress:** 2/10 Parent Screens Completed (20%)
+**Progress:** 3/10 Parent Screens Completed (30%)
 
 ## 🎯 Mission
 
@@ -9,7 +9,7 @@ Systematically migrate all Parent screens in the Lumi Reading Diary app to use t
 
 ---
 
-## ✅ COMPLETED SCREENS (2/10)
+## ✅ COMPLETED SCREENS (3/10)
 
 ### 1. parent_profile_screen.dart ✓
 - **Commit:** `52c6910` - "refactor: Migrate parent_profile_screen to Lumi Design System"
@@ -32,12 +32,25 @@ Systematically migrate all Parent screens in the Lumi Reading Diary app to use t
   - Updated dialogs, bottom sheets, and snackbars
   - Fixed all color references (green → mintGreen, orange → warmOrange)
 
+### 3. log_reading_screen.dart ✓
+- **Commit:** `28c1913` - "refactor: Migrate log_reading_screen to Lumi Design System"
+- **Changes:**
+  - Replaced all deprecated colors (backgroundPrimary → offWhite, primaryBlue → rosePink)
+  - Updated all Theme.of(context).textTheme → LumiTextStyles
+  - Converted all Card → LumiCard
+  - Replaced ElevatedButton → LumiPrimaryButton (with isLoading support)
+  - Replaced TextButton → LumiTextButton
+  - Applied LumiPadding/LumiGap/LumiSpacing throughout (including Wrap spacing)
+  - Applied LumiBorders for all border radius
+  - Replaced .withOpacity() → .withValues(alpha:)
+  - Updated success dialog with Lumi components
+  - Migrated form inputs with time selector, book list, notes, and photo attachment
+
 ---
 
-## 📋 REMAINING SCREENS (8/10)
+## 📋 REMAINING SCREENS (7/10)
 
 ### High Priority / High Complexity
-3. **log_reading_screen.dart** - Main user action, forms, time selection
 4. **parent_home_screen.dart** - Dashboard with GlassCards and stats
 5. **reading_history_screen.dart** - Charts and data visualization
 6. **book_browser_screen.dart** - Complex search/browse UI with tabs
@@ -317,8 +330,8 @@ Column(
 
 ## 🎯 NEXT STEPS
 
-1. **Start with:** `log_reading_screen.dart` (high priority, frequently used)
-2. **Then:** `parent_home_screen.dart` (main dashboard)
+1. **Start with:** `parent_home_screen.dart` (main dashboard with GlassCards and stats)
+2. **Then:** `reading_history_screen.dart` (charts and data visualization)
 3. **Continue with:** remaining screens in priority order
 
 ### Recommended Approach
