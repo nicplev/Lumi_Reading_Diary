@@ -3,6 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
@@ -114,16 +118,20 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Sign Out'),
-        content: const Text('Are you sure you want to sign out?'),
+        shape: LumiBorders.shapeLarge,
+        title: Text('Sign Out', style: LumiTextStyles.h3()),
+        content: Text(
+          'Are you sure you want to sign out?',
+          style: LumiTextStyles.body(),
+        ),
         actions: [
-          TextButton(
+          LumiTextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            text: 'Cancel',
           ),
-          TextButton(
+          LumiTextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Sign Out'),
+            text: 'Sign Out',
           ),
         ],
       ),
@@ -140,9 +148,9 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundPrimary,
+      backgroundColor: AppColors.offWhite,
       appBar: AppBar(
-        title: const Text('Profile'),
+        title: Text('Profile', style: LumiTextStyles.h3()),
         backgroundColor: AppColors.white,
         elevation: 0,
       ),
@@ -152,60 +160,51 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
             // Profile header
             Container(
               color: AppColors.white,
-              padding: const EdgeInsets.all(24),
+              padding: LumiPadding.allM,
               child: Column(
                 children: [
                   CircleAvatar(
                     radius: 50,
-                    backgroundColor: AppColors.primaryBlue,
+                    backgroundColor: AppColors.rosePink,
                     child: Text(
                       widget.user.fullName.isNotEmpty
                           ? widget.user.fullName[0].toUpperCase()
                           : '?',
-                      style: const TextStyle(
-                        fontSize: 36,
-                        color: AppColors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: LumiTextStyles.display(color: AppColors.white),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  LumiGap.s,
                   Text(
                     widget.user.fullName,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                    style: LumiTextStyles.h2(),
                   ),
-                  const SizedBox(height: 4),
+                  LumiGap.xxs,
                   Text(
                     widget.user.email,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.gray,
-                        ),
+                    style: LumiTextStyles.bodySmall(
+                      color: AppColors.charcoal.withOpacity(0.7),
+                    ),
                   ),
-                  const SizedBox(height: 8),
+                  LumiGap.xs,
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
+                      horizontal: LumiSpacing.inputPaddingVertical,
+                      vertical: LumiSpacing.elementSpacing - 2,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.parentColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
+                      color: AppColors.rosePink.withOpacity(0.1),
+                      borderRadius: LumiBorders.circular,
                     ),
                     child: Text(
                       'Parent',
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            color: AppColors.parentColor,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      style: LumiTextStyles.label(color: AppColors.rosePink),
                     ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 16),
+            LumiGap.s,
 
             // Linked Children Section
             _buildSectionTitle(
@@ -214,44 +213,41 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
               color: AppColors.white,
               child: _linkedChildren.isEmpty
                   ? ListTile(
-                      leading:
-                          const Icon(Icons.info_outline, color: AppColors.gray),
+                      leading: Icon(Icons.info_outline,
+                          color: AppColors.charcoal.withOpacity(0.5)),
                       title: Text(
                         'No children linked',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.gray,
-                            ),
+                        style: LumiTextStyles.body(
+                          color: AppColors.charcoal.withOpacity(0.7),
+                        ),
                       ),
-                      trailing: TextButton(
+                      trailing: LumiTextButton(
                         onPressed: () {
                           // Navigate to add child
                         },
-                        child: const Text('Add Child'),
+                        text: 'Add Child',
                       ),
                     )
                   : Column(
                       children: _linkedChildren.map((child) {
                         return ListTile(
                           leading: CircleAvatar(
-                            backgroundColor:
-                                AppColors.primaryBlue.withOpacity(0.1),
+                            backgroundColor: AppColors.rosePink.withOpacity(0.1),
                             child: Text(
                               child.firstName.isNotEmpty
                                   ? child.firstName[0].toUpperCase()
                                   : '?',
-                              style: TextStyle(
-                                color: AppColors.primaryBlue,
-                                fontWeight: FontWeight.bold,
+                              style: LumiTextStyles.bodyMedium(
+                                color: AppColors.rosePink,
                               ),
                             ),
                           ),
-                          title: Text(child.fullName),
+                          title: Text(child.fullName, style: LumiTextStyles.bodyMedium()),
                           subtitle: Text(
                             'Level: ${child.currentReadingLevel ?? "Not set"}',
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: AppColors.gray,
-                                    ),
+                            style: LumiTextStyles.bodySmall(
+                              color: AppColors.charcoal.withOpacity(0.7),
+                            ),
                           ),
                           trailing: StreamBuilder<DocumentSnapshot>(
                             stream: _firebaseService.firestore
@@ -269,13 +265,12 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                               final streak = stats?['currentStreak'] ?? 0;
                               return Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
+                                  horizontal: LumiSpacing.xs,
+                                  vertical: LumiSpacing.xxs,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: AppColors.secondaryOrange
-                                      .withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(12),
+                                  color: AppColors.warmOrange.withOpacity(0.1),
+                                  borderRadius: LumiBorders.medium,
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -283,14 +278,13 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                                     const Icon(
                                       Icons.local_fire_department,
                                       size: 16,
-                                      color: AppColors.secondaryOrange,
+                                      color: AppColors.warmOrange,
                                     ),
-                                    const SizedBox(width: 4),
+                                    LumiGap.horizontalXXS,
                                     Text(
                                       '$streak',
-                                      style: TextStyle(
-                                        color: AppColors.secondaryOrange,
-                                        fontWeight: FontWeight.bold,
+                                      style: LumiTextStyles.label(
+                                        color: AppColors.warmOrange,
                                       ),
                                     ),
                                   ],
@@ -303,7 +297,7 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                     ),
             ),
 
-            const SizedBox(height: 16),
+            LumiGap.s,
 
             // Notification Settings
             _buildSectionTitle(
@@ -313,8 +307,8 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
               child: Column(
                 children: [
                   SwitchListTile(
-                    title: const Text('Daily Reminders'),
-                    subtitle: const Text('Get reminded to log daily reading'),
+                    title: Text('Daily Reminders', style: LumiTextStyles.bodyMedium()),
+                    subtitle: Text('Get reminded to log daily reading', style: LumiTextStyles.bodySmall()),
                     value: _notificationsEnabled,
                     onChanged: (value) {
                       setState(() {
@@ -322,17 +316,15 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                       });
                       _updatePreferences();
                     },
-                    activeThumbColor: AppColors.primaryBlue,
+                    activeColor: AppColors.rosePink,
                   ),
                   if (_notificationsEnabled) ...[
                     const Divider(height: 1),
                     ListTile(
-                      title: const Text('Reminder Time'),
+                      title: Text('Reminder Time', style: LumiTextStyles.bodyMedium()),
                       subtitle: Text(
                         _reminderTime.format(context),
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.primaryBlue,
-                            ),
+                        style: LumiTextStyles.bodySmall(color: AppColors.rosePink),
                       ),
                       trailing: const Icon(Icons.access_time),
                       onTap: () async {
@@ -353,7 +345,7 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
               ),
             ),
 
-            const SizedBox(height: 16),
+            LumiGap.s,
 
             // App Settings
             _buildSectionTitle(context, 'Settings', Icons.settings_outlined),
@@ -363,8 +355,8 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                 children: [
                   ListTile(
                     leading: const Icon(Icons.language),
-                    title: const Text('Language'),
-                    subtitle: const Text('English'),
+                    title: Text('Language', style: LumiTextStyles.bodyMedium()),
+                    subtitle: Text('English', style: LumiTextStyles.bodySmall()),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       // Navigate to language settings
@@ -373,7 +365,7 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.help_outline),
-                    title: const Text('Help & Support'),
+                    title: Text('Help & Support', style: LumiTextStyles.bodyMedium()),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       // Navigate to help
@@ -382,7 +374,7 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.privacy_tip_outlined),
-                    title: const Text('Privacy Policy'),
+                    title: Text('Privacy Policy', style: LumiTextStyles.bodyMedium()),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       // Navigate to privacy policy
@@ -391,7 +383,7 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.info_outline),
-                    title: const Text('About Lumi'),
+                    title: Text('About Lumi', style: LumiTextStyles.bodyMedium()),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       _showAboutDialog();
@@ -401,7 +393,7 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
               ),
             ),
 
-            const SizedBox(height: 16),
+            LumiGap.s,
 
             // Actions
             Container(
@@ -410,13 +402,13 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                 children: [
                   ListTile(
                     leading: const Icon(Icons.qr_code_scanner,
-                        color: AppColors.primaryBlue),
+                        color: AppColors.rosePink),
                     title: Text(
                       'Enter Invite Code',
-                      style: TextStyle(color: AppColors.primaryBlue),
+                      style: LumiTextStyles.bodyMedium(color: AppColors.rosePink),
                     ),
                     trailing: const Icon(Icons.chevron_right,
-                        color: AppColors.primaryBlue),
+                        color: AppColors.rosePink),
                     onTap: () {
                       // Navigate to enter invite code
                     },
@@ -426,7 +418,7 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                     leading: const Icon(Icons.logout, color: AppColors.error),
                     title: Text(
                       'Sign Out',
-                      style: TextStyle(color: AppColors.error),
+                      style: LumiTextStyles.bodyMedium(color: AppColors.error),
                     ),
                     onTap: _handleSignOut,
                   ),
@@ -434,17 +426,15 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
               ),
             ),
 
-            const SizedBox(height: 32),
+            LumiGap.l,
 
             // Version info
             Text(
               'Version 1.0.0',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.gray,
-                  ),
+              style: LumiTextStyles.caption(),
             ),
 
-            const SizedBox(height: 16),
+            LumiGap.s,
           ],
         ),
       ),
@@ -453,17 +443,19 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
 
   Widget _buildSectionTitle(BuildContext context, String title, IconData icon) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: EdgeInsets.fromLTRB(
+        LumiSpacing.s,
+        LumiSpacing.s,
+        LumiSpacing.s,
+        LumiSpacing.xs,
+      ),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: AppColors.gray),
-          const SizedBox(width: 8),
+          Icon(icon, size: 20, color: AppColors.charcoal.withOpacity(0.7)),
+          LumiGap.horizontalXS,
           Text(
             title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.darkGray,
-                ),
+            style: LumiTextStyles.h3(),
           ),
         ],
       ),
@@ -474,11 +466,9 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: LumiBorders.shapeLarge,
         child: Container(
-          padding: const EdgeInsets.all(24),
+          padding: LumiPadding.allM,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -486,30 +476,28 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                 mood: LumiMood.happy,
                 size: 100,
               ),
-              const SizedBox(height: 16),
+              LumiGap.s,
               Text(
                 'Lumi Reading Diary',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: LumiTextStyles.h2(),
               ),
-              const SizedBox(height: 8),
+              LumiGap.xs,
               Text(
                 'Version 1.0.0',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.gray,
-                    ),
+                style: LumiTextStyles.bodySmall(
+                  color: AppColors.charcoal.withOpacity(0.7),
+                ),
               ),
-              const SizedBox(height: 16),
+              LumiGap.s,
               Text(
                 'Making reading fun and trackable for every child. Lumi helps families build consistent reading habits together.',
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium,
+                style: LumiTextStyles.body(),
               ),
-              const SizedBox(height: 24),
-              TextButton(
+              LumiGap.m,
+              LumiTextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
+                text: 'Close',
               ),
             ],
           ),

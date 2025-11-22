@@ -48,7 +48,7 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('School Analytics Dashboard'),
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.primaryBlue,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -130,7 +130,7 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            Icon(Icons.date_range, color: AppColors.primary),
+            Icon(Icons.date_range, color: AppColors.primaryBlue),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -188,7 +188,7 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
               'Total Students',
               '${metrics['totalStudents']}',
               Icons.people,
-              AppColors.primary,
+              AppColors.primaryBlue,
               subtitle: '${metrics['activeStudents']} active',
             ),
             _buildMetricCard(
@@ -497,13 +497,13 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
                         );
                       }).toList(),
                       isCurved: true,
-                      color: AppColors.primary,
+                      color: AppColors.primaryBlue,
                       barWidth: 3,
                       isStrokeCapRound: true,
                       dotData: const FlDotData(show: true),
                       belowBarData: BarAreaData(
                         show: true,
-                        color: AppColors.primary.withOpacity(0.1),
+                        color: AppColors.primaryBlue.withOpacity(0.1),
                       ),
                     ),
                   ],

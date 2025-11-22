@@ -139,7 +139,7 @@ class CrashReportingService {
     if (!_initialized) return false;
 
     try {
-      return await _crashlytics.isCrashlyticsCollectionEnabled();
+      return _crashlytics.isCrashlyticsCollectionEnabled;
     } catch (e) {
       debugPrint('Error checking crashlytics status: $e');
       return false;
@@ -195,7 +195,7 @@ class CrashReportingService {
   }
 
   /// Wrapper for running app with zone error handling
-  static Future<void> runZonedGuarded(
+  static Future<void> runAppWithZoneGuard(
     Future<void> Function() body, {
     void Function(Object error, StackTrace stack)? onError,
   }) async {

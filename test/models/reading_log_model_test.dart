@@ -6,75 +6,66 @@ import '../helpers/test_helpers.dart';
 void main() {
   group('ReadingLogModel', () {
     late Map<String, dynamic> testData;
-    late Timestamp testTimestamp;
+    late DateTime testDateTime;
 
     setUp(() {
-      testTimestamp = Timestamp.now();
+      testDateTime = DateTime.now();
       testData = TestHelpers.sampleReadingLogData();
     });
 
     group('fromFirestore', () {
-      test('creates model from Firestore document correctly', () {
+      test('creates model from Firestore document correctly', () async {
         final firestore = TestHelpers.createFakeFirestore();
 
         // Add document to fake Firestore
-        firestore.collection('readingLogs').doc('test-log-123').set(testData);
+        await firestore.collection('readingLogs').doc('test-log-123').set(testData);
 
         // Get document
-        final docFuture = firestore.collection('readingLogs').doc('test-log-123').get();
+        final doc = await firestore.collection('readingLogs').doc('test-log-123').get();
+        final log = ReadingLogModel.fromFirestore(doc);
 
-        docFuture.then((doc) {
-          final log = ReadingLogModel.fromFirestore(doc);
-
-          expect(log.id, equals('test-log-123'));
-          expect(log.studentId, equals('test-student-123'));
-          expect(log.parentId, equals('parent-123'));
-          expect(log.minutesRead, equals(25));
-          expect(log.targetMinutes, equals(20));
-          expect(log.bookTitles, contains('Harry Potter'));
-          expect(log.bookTitles, contains('The Hobbit'));
-          expect(log.notes, equals('Great reading session!'));
-          expect(log.status, equals(ReadingStatus.completed));
-          expect(log.isOfflineCreated, equals(false));
-        });
+        expect(log.id, equals('test-log-123'));
+        expect(log.studentId, equals('test-student-123'));
+        expect(log.parentId, equals('parent-123'));
+        expect(log.minutesRead, equals(25));
+        expect(log.targetMinutes, equals(20));
+        expect(log.bookTitles, contains('Harry Potter'));
+        expect(log.bookTitles, contains('The Hobbit'));
+        expect(log.notes, equals('Great reading session!'));
+        expect(log.status, equals(LogStatus.completed));
+        expect(log.isOfflineCreated, equals(false));
       });
 
-      test('handles null optional fields', () {
+      test('handles null optional fields', () async {
         final dataWithNulls = {
           ...testData,
           'notes': null,
-          'photoUrl': null,
+          'photoUrls': null,
           'syncedAt': null,
         };
 
         final firestore = TestHelpers.createFakeFirestore();
-        firestore.collection('readingLogs').doc('test-log-456').set(dataWithNulls);
+        await firestore.collection('readingLogs').doc('test-log-456').set(dataWithNulls);
 
-        final docFuture = firestore.collection('readingLogs').doc('test-log-456').get();
+        final doc = await firestore.collection('readingLogs').doc('test-log-456').get();
+        final log = ReadingLogModel.fromFirestore(doc);
 
-        docFuture.then((doc) {
-          final log = ReadingLogModel.fromFirestore(doc);
-
-          expect(log.notes, isNull);
-          expect(log.photoUrl, isNull);
-          expect(log.syncedAt, isNull);
-        });
+        expect(log.notes, isNull);
+        expect(log.photoUrls, isNull);
+        expect(log.syncedAt, isNull);
       });
 
-      test('correctly parses status enum', () {
+      test('correctly parses status enum', () async {
         final statuses = ['completed', 'partial', 'skipped', 'pending'];
 
         for (final status in statuses) {
           final data = {...testData, 'status': status};
           final firestore = TestHelpers.createFakeFirestore();
-          firestore.collection('readingLogs').doc('log-$status').set(data);
+          await firestore.collection('readingLogs').doc('log-$status').set(data);
 
-          final docFuture = firestore.collection('readingLogs').doc('log-$status').get();
-
-          docFuture.then((doc) {
-            final log = ReadingLogModel.fromFirestore(doc);
-            expect(log.status.toString(), contains(status));
-          });
+          final doc = await firestore.collection('readingLogs').doc('log-$status').get();
+          final log = ReadingLogModel.fromFirestore(doc);
+          expect(log.status.toString(), contains(status));
         }
       });
     });
@@ -86,25 +77,25 @@ void main() {
           studentId: 'student-789',
           parentId: 'parent-789',
           schoolId: 'school-789',
-          date: testTimestamp,
+          classId: 'class-789',
+          date: testDateTime,
           minutesRead: 30,
           targetMinutes: 25,
           bookTitles: ['Book One', 'Book Two'],
           notes: 'Test notes',
-          status: ReadingStatus.completed,
-          photoUrl: 'https://example.com/photo.jpg',
+          status: LogStatus.completed,
+          photoUrls: ['https://example.com/photo.jpg'],
           isOfflineCreated: false,
-          syncedAt: testTimestamp,
-          createdAt: testTimestamp,
-          updatedAt: testTimestamp,
+          syncedAt: testDateTime,
+          createdAt: testDateTime,
         );
 
         final map = log.toFirestore();
 
-        expect(map['id'], equals('test-log-789'));
         expect(map['studentId'], equals('student-789'));
         expect(map['parentId'], equals('parent-789'));
         expect(map['schoolId'], equals('school-789'));
+        expect(map['classId'], equals('class-789'));
         expect(map['minutesRead'], equals(30));
         expect(map['targetMinutes'], equals(25));
         expect(map['bookTitles'], equals(['Book One', 'Book Two']));
@@ -119,23 +110,23 @@ void main() {
           studentId: 'student-123',
           parentId: 'parent-123',
           schoolId: 'school-123',
-          date: testTimestamp,
+          classId: 'class-123',
+          date: testDateTime,
           minutesRead: 20,
           targetMinutes: 20,
           bookTitles: [],
           notes: null,
-          status: ReadingStatus.pending,
-          photoUrl: null,
+          status: LogStatus.pending,
+          photoUrls: null,
           isOfflineCreated: true,
           syncedAt: null,
-          createdAt: testTimestamp,
-          updatedAt: testTimestamp,
+          createdAt: testDateTime,
         );
 
         final map = log.toFirestore();
 
         expect(map['notes'], isNull);
-        expect(map['photoUrl'], isNull);
+        expect(map['photoUrls'], isNull);
         expect(map['syncedAt'], isNull);
       });
     });
@@ -147,17 +138,17 @@ void main() {
           studentId: 'student-123',
           parentId: 'parent-123',
           schoolId: 'school-123',
-          date: testTimestamp,
+          classId: 'class-123',
+          date: testDateTime,
           minutesRead: 20,
           targetMinutes: 20,
           bookTitles: ['Local Book'],
           notes: 'Local notes',
-          status: ReadingStatus.completed,
-          photoUrl: null,
+          status: LogStatus.completed,
+          photoUrls: null,
           isOfflineCreated: true,
           syncedAt: null,
-          createdAt: testTimestamp,
-          updatedAt: testTimestamp,
+          createdAt: testDateTime,
         );
 
         final localMap = log.toLocal();
@@ -173,24 +164,24 @@ void main() {
           'studentId': 'student-456',
           'parentId': 'parent-456',
           'schoolId': 'school-456',
+          'classId': 'class-456',
           'date': DateTime.now().toIso8601String(),
           'minutesRead': 15,
           'targetMinutes': 20,
           'bookTitles': ['Book A', 'Book B'],
           'notes': 'From local',
           'status': 'partial',
-          'photoUrl': null,
+          'photoUrls': null,
           'isOfflineCreated': true,
           'syncedAt': null,
           'createdAt': DateTime.now().toIso8601String(),
-          'updatedAt': DateTime.now().toIso8601String(),
         };
 
         final log = ReadingLogModel.fromLocal(localData);
 
         expect(log.id, equals('local-log-456'));
         expect(log.minutesRead, equals(15));
-        expect(log.status, equals(ReadingStatus.partial));
+        expect(log.status, equals(LogStatus.partial));
         expect(log.isOfflineCreated, equals(true));
       });
 
@@ -200,17 +191,17 @@ void main() {
           studentId: 'student-rt',
           parentId: 'parent-rt',
           schoolId: 'school-rt',
-          date: testTimestamp,
+          classId: 'class-rt',
+          date: testDateTime,
           minutesRead: 25,
           targetMinutes: 20,
           bookTitles: ['Book X', 'Book Y', 'Book Z'],
           notes: 'Roundtrip test',
-          status: ReadingStatus.completed,
-          photoUrl: 'https://example.com/photo.jpg',
+          status: LogStatus.completed,
+          photoUrls: ['https://example.com/photo.jpg'],
           isOfflineCreated: false,
-          syncedAt: testTimestamp,
-          createdAt: testTimestamp,
-          updatedAt: testTimestamp,
+          syncedAt: testDateTime,
+          createdAt: testDateTime,
         );
 
         final localMap = original.toLocal();
@@ -232,32 +223,32 @@ void main() {
           studentId: 'student-copy',
           parentId: 'parent-copy',
           schoolId: 'school-copy',
-          date: testTimestamp,
+          classId: 'class-copy',
+          date: testDateTime,
           minutesRead: 20,
           targetMinutes: 20,
           bookTitles: ['Original Book'],
           notes: 'Original notes',
-          status: ReadingStatus.pending,
-          photoUrl: null,
+          status: LogStatus.pending,
+          photoUrls: null,
           isOfflineCreated: true,
           syncedAt: null,
-          createdAt: testTimestamp,
-          updatedAt: testTimestamp,
+          createdAt: testDateTime,
         );
 
         final updated = original.copyWith(
           minutesRead: 30,
-          status: ReadingStatus.completed,
+          status: LogStatus.completed,
           isOfflineCreated: false,
-          syncedAt: testTimestamp,
+          syncedAt: testDateTime,
         );
 
         expect(updated.id, equals(original.id));
         expect(updated.studentId, equals(original.studentId));
         expect(updated.minutesRead, equals(30)); // Changed
-        expect(updated.status, equals(ReadingStatus.completed)); // Changed
+        expect(updated.status, equals(LogStatus.completed)); // Changed
         expect(updated.isOfflineCreated, equals(false)); // Changed
-        expect(updated.syncedAt, equals(testTimestamp)); // Changed
+        expect(updated.syncedAt, equals(testDateTime)); // Changed
         expect(updated.notes, equals(original.notes)); // Unchanged
       });
 
@@ -267,17 +258,17 @@ void main() {
           studentId: 'student-keep',
           parentId: 'parent-keep',
           schoolId: 'school-keep',
-          date: testTimestamp,
+          classId: 'class-keep',
+          date: testDateTime,
           minutesRead: 20,
           targetMinutes: 20,
           bookTitles: ['Keep Book'],
           notes: 'Keep notes',
-          status: ReadingStatus.completed,
-          photoUrl: null,
+          status: LogStatus.completed,
+          photoUrls: null,
           isOfflineCreated: false,
-          syncedAt: testTimestamp,
-          createdAt: testTimestamp,
-          updatedAt: testTimestamp,
+          syncedAt: testDateTime,
+          createdAt: testDateTime,
         );
 
         final copy = original.copyWith();
@@ -296,17 +287,17 @@ void main() {
           studentId: 'student-123',
           parentId: 'parent-123',
           schoolId: 'school-123',
-          date: testTimestamp,
+          classId: 'class-123',
+          date: testDateTime,
           minutesRead: 25,
           targetMinutes: 20,
           bookTitles: [],
           notes: null,
-          status: ReadingStatus.completed,
-          photoUrl: null,
+          status: LogStatus.completed,
+          photoUrls: null,
           isOfflineCreated: false,
           syncedAt: null,
-          createdAt: testTimestamp,
-          updatedAt: testTimestamp,
+          createdAt: testDateTime,
         );
 
         expect(log.minutesRead, greaterThan(0));
@@ -319,20 +310,20 @@ void main() {
           studentId: 'student-123',
           parentId: 'parent-123',
           schoolId: 'school-123',
-          date: testTimestamp,
+          classId: 'class-123',
+          date: testDateTime,
           minutesRead: 25,
           targetMinutes: 20,
           bookTitles: ['Book'],
           notes: null,
-          status: ReadingStatus.completed,
-          photoUrl: null,
+          status: LogStatus.completed,
+          photoUrls: null,
           isOfflineCreated: false,
           syncedAt: null,
-          createdAt: testTimestamp,
-          updatedAt: testTimestamp,
+          createdAt: testDateTime,
         );
 
-        expect(log.status, equals(ReadingStatus.completed));
+        expect(log.status, equals(LogStatus.completed));
         expect(log.minutesRead, greaterThan(0));
       });
     });
@@ -344,17 +335,17 @@ void main() {
           studentId: 'student-123',
           parentId: 'parent-123',
           schoolId: 'school-123',
-          date: testTimestamp,
+          classId: 'class-123',
+          date: testDateTime,
           minutesRead: 20,
           targetMinutes: 20,
           bookTitles: [],
           notes: null,
-          status: ReadingStatus.completed,
-          photoUrl: null,
+          status: LogStatus.completed,
+          photoUrls: null,
           isOfflineCreated: false,
           syncedAt: null,
-          createdAt: testTimestamp,
-          updatedAt: testTimestamp,
+          createdAt: testDateTime,
         );
 
         expect(log.bookTitles, isEmpty);
@@ -369,17 +360,17 @@ void main() {
           studentId: 'student-123',
           parentId: 'parent-123',
           schoolId: 'school-123',
-          date: testTimestamp,
+          classId: 'class-123',
+          date: testDateTime,
           minutesRead: 20,
           targetMinutes: 20,
           bookTitles: [],
           notes: longNotes,
-          status: ReadingStatus.completed,
-          photoUrl: null,
+          status: LogStatus.completed,
+          photoUrls: null,
           isOfflineCreated: false,
           syncedAt: null,
-          createdAt: testTimestamp,
-          updatedAt: testTimestamp,
+          createdAt: testDateTime,
         );
 
         expect(log.notes, equals(longNotes));
@@ -393,17 +384,17 @@ void main() {
           studentId: 'student-123',
           parentId: 'parent-123',
           schoolId: 'school-123',
-          date: testTimestamp,
+          classId: 'class-123',
+          date: testDateTime,
           minutesRead: 60,
           targetMinutes: 20,
           bookTitles: manyBooks,
           notes: null,
-          status: ReadingStatus.completed,
-          photoUrl: null,
+          status: LogStatus.completed,
+          photoUrls: null,
           isOfflineCreated: false,
           syncedAt: null,
-          createdAt: testTimestamp,
-          updatedAt: testTimestamp,
+          createdAt: testDateTime,
         );
 
         expect(log.bookTitles.length, equals(20));

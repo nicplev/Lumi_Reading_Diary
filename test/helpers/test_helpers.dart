@@ -22,15 +22,15 @@ class TestHelpers {
   }
 
   /// Create a mock DocumentSnapshot
-  static DocumentSnapshot<Map<String, dynamic>> createMockDocument({
+  static Future<DocumentSnapshot<Map<String, dynamic>>> createMockDocument({
     required String id,
     required Map<String, dynamic> data,
     required String collection,
     FakeFirebaseFirestore? firestore,
-  }) {
+  }) async {
     final fakeFirestore = firestore ?? createFakeFirestore();
-    fakeFirestore.collection(collection).doc(id).set(data);
-    return fakeFirestore.collection(collection).doc(id).get() as Future<DocumentSnapshot<Map<String, dynamic>>>;
+    await fakeFirestore.collection(collection).doc(id).set(data);
+    return await fakeFirestore.collection(collection).doc(id).get();
   }
 
   /// Sample test data
@@ -82,15 +82,14 @@ class TestHelpers {
         'totalReadingDays': 18,
         'lastReadingDate': Timestamp.now(),
       },
-      'readingLevelHistory': [
+      'levelHistory': [
         {
           'level': 'Level 10',
-          'date': Timestamp.now(),
-          'setBy': 'teacher-123',
+          'changedAt': Timestamp.now(),
+          'changedBy': 'teacher-123',
         }
       ],
       'createdAt': Timestamp.now(),
-      'updatedAt': Timestamp.now(),
     };
   }
 
@@ -99,23 +98,24 @@ class TestHelpers {
     String? studentId,
     String? parentId,
     String? schoolId,
+    String? classId,
   }) {
     return {
       'id': logId ?? 'test-log-123',
       'studentId': studentId ?? 'test-student-123',
       'parentId': parentId ?? 'parent-123',
       'schoolId': schoolId ?? 'test-school-123',
+      'classId': classId ?? 'test-class-123',
       'date': Timestamp.now(),
       'minutesRead': 25,
       'targetMinutes': 20,
       'bookTitles': ['Harry Potter', 'The Hobbit'],
       'notes': 'Great reading session!',
       'status': 'completed',
-      'photoUrl': null,
+      'photoUrls': null,
       'isOfflineCreated': false,
       'syncedAt': Timestamp.now(),
       'createdAt': Timestamp.now(),
-      'updatedAt': Timestamp.now(),
     };
   }
 

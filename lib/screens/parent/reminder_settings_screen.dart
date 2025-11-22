@@ -28,7 +28,7 @@ class _ReminderSettingsScreenState extends State<ReminderSettingsScreen> {
     {'time': const TimeOfDay(hour: 7, minute: 0), 'label': '🌅 Morning', 'emoji': '☕'},
     {'time': const TimeOfDay(hour: 15, minute: 0), 'label': '📚 After School', 'emoji': '🎒'},
     {'time': const TimeOfDay(hour: 18, minute: 0), 'label': '🌆 Evening', 'emoji': '🍽️'},
-    {'time': const TimeOfDay(hour': 20, minute: 0), 'label': '🌙 Bedtime', 'emoji': '🛏️'},
+    {'time': const TimeOfDay(hour: 20, minute: 0), 'label': '🌙 Bedtime', 'emoji': '🛏️'},
   ];
 
   @override

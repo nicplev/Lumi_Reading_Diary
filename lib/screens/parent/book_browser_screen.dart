@@ -48,7 +48,7 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Discover Books'),
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.primaryBlue,
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
@@ -196,12 +196,12 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
   Widget _buildWelcomeCard() {
     return Card(
       elevation: 2,
-      color: AppColors.primary.withOpacity(0.1),
+      color: AppColors.primaryBlue.withOpacity(0.1),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            Icon(Icons.auto_stories, size: 48, color: AppColors.primary),
+            Icon(Icons.auto_stories, size: 48, color: AppColors.primaryBlue),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -354,7 +354,7 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
 
   Widget _buildBookPlaceholder(BookModel book) {
     return Container(
-      color: AppColors.primary.withOpacity(0.1),
+      color: AppColors.primaryBlue.withOpacity(0.1),
       child: Center(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -364,7 +364,7 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
               Icon(
                 Icons.menu_book,
                 size: 48,
-                color: AppColors.primary.withOpacity(0.5),
+                color: AppColors.primaryBlue.withOpacity(0.5),
               ),
               const SizedBox(height: 8),
               Text(
@@ -372,7 +372,7 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
+                  color: AppColors.primaryBlue,
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 3,
@@ -393,8 +393,8 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
         return ActionChip(
           label: Text(genre),
           onPressed: () => _browseGenre(genre),
-          backgroundColor: AppColors.primary.withOpacity(0.1),
-          side: BorderSide(color: AppColors.primary.withOpacity(0.3)),
+          backgroundColor: AppColors.primaryBlue.withOpacity(0.1),
+          side: BorderSide(color: AppColors.primaryBlue.withOpacity(0.3)),
         );
       }).toList(),
     );
@@ -481,7 +481,7 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
   Future<void> _showBookDetails(BookModel book) async {
     final action = await showModalBottomSheet<String>(
       context: context,
-      isScrollControlledBottom: true,
+      isScrollControlled: true,
       builder: (context) => DraggableScrollableSheet(
         initialChildSize: 0.6,
         minChildSize: 0.4,

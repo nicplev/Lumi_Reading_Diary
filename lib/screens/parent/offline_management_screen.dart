@@ -30,7 +30,7 @@ class _OfflineManagementScreenState extends State<OfflineManagementScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Offline & Sync'),
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.primaryBlue,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -160,7 +160,7 @@ class _OfflineManagementScreenState extends State<OfflineManagementScreen> {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.pending_actions, color: AppColors.primary),
+                    Icon(Icons.pending_actions, color: AppColors.primaryBlue),
                     const SizedBox(width: 8),
                     Text(
                       'Pending Changes',
@@ -213,12 +213,12 @@ class _OfflineManagementScreenState extends State<OfflineManagementScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              '${sync.operation} ${sync.type}',
+                              '${sync.action} ${sync.type}',
                               style: const TextStyle(fontSize: 13),
                             ),
                           ),
                           Text(
-                            _formatTimestamp(sync.timestamp),
+                            _formatTimestamp(sync.createdAt),
                             style: TextStyle(
                               fontSize: 11,
                               color: Colors.grey[600],
@@ -277,7 +277,7 @@ class _OfflineManagementScreenState extends State<OfflineManagementScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.settings_sync, color: AppColors.primary),
+                Icon(Icons.sync, color: AppColors.primaryBlue),
                 const SizedBox(width: 8),
                 Text(
                   'Sync Settings',
@@ -324,7 +324,7 @@ class _OfflineManagementScreenState extends State<OfflineManagementScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.storage, color: AppColors.primary),
+                Icon(Icons.storage, color: AppColors.primaryBlue),
                 const SizedBox(width: 8),
                 Text(
                   'Cache Management',
@@ -380,7 +380,7 @@ class _OfflineManagementScreenState extends State<OfflineManagementScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.network_check, color: AppColors.primary),
+                Icon(Icons.network_check, color: AppColors.primaryBlue),
                 const SizedBox(width: 8),
                 Text(
                   'Bandwidth Usage',

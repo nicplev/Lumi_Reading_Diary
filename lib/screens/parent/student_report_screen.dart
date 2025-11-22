@@ -35,7 +35,7 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Generate Report'),
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.primaryBlue,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -78,13 +78,13 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
               children: [
                 CircleAvatar(
                   radius: 30,
-                  backgroundColor: AppColors.primary.withOpacity(0.1),
+                  backgroundColor: AppColors.primaryBlue.withOpacity(0.1),
                   child: Text(
                     widget.student.firstName[0].toUpperCase(),
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
+                      color: AppColors.primaryBlue,
                     ),
                   ),
                 ),
@@ -177,7 +177,7 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          border: Border.all(color: AppColors.primary),
+          border: Border.all(color: AppColors.primaryBlue),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Column(
@@ -230,7 +230,7 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.preview, color: AppColors.primary),
+                Icon(Icons.preview, color: AppColors.primaryBlue),
                 const SizedBox(width: 8),
                 Text(
                   'Report Preview',
@@ -324,7 +324,7 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
               : const Icon(Icons.picture_as_pdf),
           label: Text(_isGenerating ? 'Generating...' : 'Generate Report'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
+            backgroundColor: AppColors.primaryBlue,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.all(16),
           ),

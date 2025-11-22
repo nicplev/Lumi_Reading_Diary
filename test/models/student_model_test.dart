@@ -6,9 +6,11 @@ import '../helpers/test_helpers.dart';
 void main() {
   group('StudentModel', () {
     late Map<String, dynamic> testData;
+    late DateTime testDateTime;
 
     setUp(() {
       testData = TestHelpers.sampleStudentData();
+      testDateTime = DateTime.now();
     });
 
     group('fromFirestore', () {
@@ -53,16 +55,16 @@ void main() {
         final doc = await firestore.collection('students').doc('student-history').get();
         final student = StudentModel.fromFirestore(doc);
 
-        expect(student.readingLevelHistory, isNotEmpty);
-        expect(student.readingLevelHistory.first.level, equals('Level 10'));
-        expect(student.readingLevelHistory.first.setBy, equals('teacher-123'));
+        expect(student.levelHistory, isNotEmpty);
+        expect(student.levelHistory.first.level, equals('Level 10'));
+        expect(student.levelHistory.first.changedBy, equals('teacher-123'));
       });
 
       test('handles null optional fields', () async {
         final dataWithNulls = {
           ...testData,
           'stats': null,
-          'readingLevelHistory': null,
+          'levelHistory': null,
         };
 
         final firestore = TestHelpers.createFakeFirestore();
@@ -72,7 +74,7 @@ void main() {
         final student = StudentModel.fromFirestore(doc);
 
         expect(student.stats, isNull);
-        expect(student.readingLevelHistory, isEmpty);
+        expect(student.levelHistory, isEmpty);
       });
     });
 
@@ -94,22 +96,20 @@ void main() {
             longestStreak: 5,
             averageMinutesPerDay: 20.0,
             totalReadingDays: 5,
-            lastReadingDate: Timestamp.now(),
+            lastReadingDate: testDateTime,
           ),
-          readingLevelHistory: [
+          levelHistory: [
             ReadingLevelHistory(
               level: 'Level 5',
-              date: Timestamp.now(),
-              setBy: 'teacher-999',
+              changedAt: testDateTime,
+              changedBy:'teacher-999',
             ),
           ],
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
+          createdAt: testDateTime,
         );
 
         final map = student.toFirestore();
 
-        expect(map['id'], equals('student-convert'));
         expect(map['firstName'], equals('John'));
         expect(map['lastName'], equals('Doe'));
         expect(map['studentId'], equals('STU999'));
@@ -130,9 +130,8 @@ void main() {
           currentReadingLevel: 'Level 1',
           parentIds: [],
           stats: null,
-          readingLevelHistory: [],
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
+          levelHistory: [],
+          createdAt: testDateTime,
         );
 
         final map = student.toFirestore();
@@ -159,11 +158,10 @@ void main() {
             longestStreak: 8,
             averageMinutesPerDay: 25.0,
             totalReadingDays: 8,
-            lastReadingDate: Timestamp.now(),
+            lastReadingDate: testDateTime,
           ),
-          readingLevelHistory: [],
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
+          levelHistory: [],
+          createdAt: testDateTime,
         );
 
         final updated = original.copyWith(
@@ -188,7 +186,7 @@ void main() {
           longestStreak: 15,
           averageMinutesPerDay: 25.0,
           totalReadingDays: 20,
-          lastReadingDate: Timestamp.now(),
+          lastReadingDate: testDateTime,
         );
 
         expect(stats.averageMinutesPerDay, equals(25.0));
@@ -219,7 +217,7 @@ void main() {
           longestStreak: 10,
           averageMinutesPerDay: 20.0,
           totalReadingDays: 15,
-          lastReadingDate: Timestamp.now(),
+          lastReadingDate: testDateTime,
         );
 
         expect(stats.currentStreak, lessThanOrEqualTo(stats.longestStreak));
@@ -232,18 +230,18 @@ void main() {
         final history = [
           ReadingLevelHistory(
             level: 'Level 5',
-            date: Timestamp.fromDate(DateTime(2024, 1, 1)),
-            setBy: 'teacher-123',
+            changedAt: DateTime(2024, 1, 1),
+            changedBy:'teacher-123',
           ),
           ReadingLevelHistory(
             level: 'Level 6',
-            date: Timestamp.fromDate(DateTime(2024, 2, 1)),
-            setBy: 'teacher-123',
+            changedAt: DateTime(2024, 2, 1),
+            changedBy:'teacher-123',
           ),
           ReadingLevelHistory(
             level: 'Level 7',
-            date: Timestamp.fromDate(DateTime(2024, 3, 1)),
-            setBy: 'teacher-123',
+            changedAt: DateTime(2024, 3, 1),
+            changedBy:'teacher-123',
           ),
         ];
 
@@ -253,18 +251,18 @@ void main() {
         expect(history[2].level, equals('Level 7'));
 
         // Check chronological order
-        expect(history[0].date.toDate().isBefore(history[1].date.toDate()), isTrue);
-        expect(history[1].date.toDate().isBefore(history[2].date.toDate()), isTrue);
+        expect(history[0].changedAt.isBefore(history[1].changedAt), isTrue);
+        expect(history[1].changedAt.isBefore(history[2].changedAt), isTrue);
       });
 
       test('records who set the level', () {
         final history = ReadingLevelHistory(
           level: 'Level 10',
-          date: Timestamp.now(),
-          setBy: 'teacher-456',
+          changedAt: testDateTime,
+          changedBy:'teacher-456',
         );
 
-        expect(history.setBy, equals('teacher-456'));
+        expect(history.changedBy, equals('teacher-456'));
       });
     });
 
@@ -280,9 +278,8 @@ void main() {
           currentReadingLevel: 'Level 1',
           parentIds: [],
           stats: null,
-          readingLevelHistory: [],
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
+          levelHistory: [],
+          createdAt: testDateTime,
         );
 
         expect(student.id, isNotEmpty);
@@ -305,9 +302,8 @@ void main() {
           currentReadingLevel: 'Level 1',
           parentIds: [],
           stats: null,
-          readingLevelHistory: [],
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
+          levelHistory: [],
+          createdAt: testDateTime,
         );
 
         expect(student.parentIds, isEmpty);
@@ -324,9 +320,8 @@ void main() {
           currentReadingLevel: 'Level 5',
           parentIds: ['parent-1', 'parent-2', 'parent-3'],
           stats: null,
-          readingLevelHistory: [],
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
+          levelHistory: [],
+          createdAt: testDateTime,
         );
 
         expect(student.parentIds.length, equals(3));
@@ -345,9 +340,8 @@ void main() {
           currentReadingLevel: 'Level 1',
           parentIds: [],
           stats: null,
-          readingLevelHistory: [],
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
+          levelHistory: [],
+          createdAt: testDateTime,
         );
 
         expect(student.firstName.length, equals(100));
@@ -365,9 +359,8 @@ void main() {
           currentReadingLevel: 'Level 1',
           parentIds: [],
           stats: null,
-          readingLevelHistory: [],
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
+          levelHistory: [],
+          createdAt: testDateTime,
         );
 
         expect(student.firstName, equals("O'Connor"));
@@ -379,8 +372,8 @@ void main() {
           50,
           (i) => ReadingLevelHistory(
             level: 'Level ${i + 1}',
-            date: Timestamp.fromDate(DateTime(2024, 1, 1).add(Duration(days: i * 7))),
-            setBy: 'teacher-123',
+            changedAt: DateTime(2024, 1, 1).add(Duration(days: i * 7)),
+            changedBy:'teacher-123',
           ),
         );
 
@@ -394,14 +387,13 @@ void main() {
           currentReadingLevel: 'Level 50',
           parentIds: [],
           stats: null,
-          readingLevelHistory: manyHistoryEntries,
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
+          levelHistory: manyHistoryEntries,
+          createdAt: testDateTime,
         );
 
-        expect(student.readingLevelHistory.length, equals(50));
-        expect(student.readingLevelHistory.first.level, equals('Level 1'));
-        expect(student.readingLevelHistory.last.level, equals('Level 50'));
+        expect(student.levelHistory.length, equals(50));
+        expect(student.levelHistory.first.level, equals('Level 1'));
+        expect(student.levelHistory.last.level, equals('Level 50'));
       });
 
       test('handles extreme stats values', () {
@@ -412,7 +404,7 @@ void main() {
           longestStreak: 500,
           averageMinutesPerDay: 274.0, // ~4.5 hours
           totalReadingDays: 365,
-          lastReadingDate: Timestamp.now(),
+          lastReadingDate: testDateTime,
         );
 
         expect(stats.totalMinutesRead, equals(100000));

@@ -1,21 +1,28 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lumi_reading_tracker/services/offline_service.dart';
 import 'package:lumi_reading_tracker/data/models/reading_log_model.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'dart:io';
 import '../helpers/test_helpers.dart';
 
 void main() {
+  // Initialize Flutter bindings for tests
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('OfflineService', () {
     late OfflineService offlineService;
+    late Directory testDirectory;
 
     setUpAll(() async {
-      // Initialize Hive for testing
-      await Hive.initFlutter();
+      // Create a temporary directory for Hive
+      testDirectory = await Directory.systemTemp.createTemp('hive_test_');
+      // Initialize Hive with test directory
+      Hive.init(testDirectory.path);
     });
 
-    setUp(() {
+    setUp(() async {
       offlineService = OfflineService.instance;
+      await offlineService.initialize();
     });
 
     group('saveReadingLogLocally', () {
@@ -25,17 +32,17 @@ void main() {
           studentId: 'student-123',
           parentId: 'parent-123',
           schoolId: 'school-123',
-          date: Timestamp.now(),
+          classId: 'class-123',
+          date: DateTime.now(),
           minutesRead: 20,
           targetMinutes: 20,
           bookTitles: ['Test Book'],
           notes: 'Test notes',
-          status: ReadingStatus.completed,
-          photoUrl: null,
+          status: LogStatus.completed,
+          photoUrls: null,
           isOfflineCreated: true,
           syncedAt: null,
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
+          createdAt: DateTime.now(),
         );
 
         await offlineService.saveReadingLogLocally(log);
@@ -52,17 +59,17 @@ void main() {
           studentId: 'student-456',
           parentId: 'parent-456',
           schoolId: 'school-456',
-          date: Timestamp.now(),
+          classId: 'class-456',
+          date: DateTime.now(),
           minutesRead: 25,
           targetMinutes: 20,
           bookTitles: [],
           notes: null,
-          status: ReadingStatus.completed,
-          photoUrl: null,
+          status: LogStatus.completed,
+          photoUrls: null,
           isOfflineCreated: true,
           syncedAt: null,
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
+          createdAt: DateTime.now(),
         );
 
         // Simulate offline state
@@ -81,17 +88,17 @@ void main() {
           studentId: 'student-target',
           parentId: 'parent-123',
           schoolId: 'school-123',
-          date: Timestamp.now(),
+          classId: 'class-123',
+          date: DateTime.now(),
           minutesRead: 20,
           targetMinutes: 20,
           bookTitles: [],
           notes: null,
-          status: ReadingStatus.completed,
-          photoUrl: null,
+          status: LogStatus.completed,
+          photoUrls: null,
           isOfflineCreated: false,
-          syncedAt: Timestamp.now(),
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
+          syncedAt: DateTime.now(),
+          createdAt: DateTime.now(),
         );
 
         final log2 = ReadingLogModel(
@@ -99,17 +106,17 @@ void main() {
           studentId: 'student-other',
           parentId: 'parent-123',
           schoolId: 'school-123',
-          date: Timestamp.now(),
+          classId: 'class-123',
+          date: DateTime.now(),
           minutesRead: 15,
           targetMinutes: 20,
           bookTitles: [],
           notes: null,
-          status: ReadingStatus.completed,
-          photoUrl: null,
+          status: LogStatus.completed,
+          photoUrls: null,
           isOfflineCreated: false,
-          syncedAt: Timestamp.now(),
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
+          syncedAt: DateTime.now(),
+          createdAt: DateTime.now(),
         );
 
         await offlineService.saveReadingLogLocally(log1);
@@ -127,17 +134,17 @@ void main() {
           studentId: 'student-sort',
           parentId: 'parent-123',
           schoolId: 'school-123',
-          date: Timestamp.fromDate(DateTime(2024, 1, 1)),
+          classId: 'class-123',
+          date: DateTime(2024, 1, 1),
           minutesRead: 20,
           targetMinutes: 20,
           bookTitles: [],
           notes: null,
-          status: ReadingStatus.completed,
-          photoUrl: null,
+          status: LogStatus.completed,
+          photoUrls: null,
           isOfflineCreated: false,
-          syncedAt: Timestamp.now(),
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
+          syncedAt: DateTime.now(),
+          createdAt: DateTime.now(),
         );
 
         final newLog = ReadingLogModel(
@@ -145,17 +152,17 @@ void main() {
           studentId: 'student-sort',
           parentId: 'parent-123',
           schoolId: 'school-123',
-          date: Timestamp.fromDate(DateTime(2024, 3, 1)),
+          classId: 'class-123',
+          date: DateTime(2024, 3, 1),
           minutesRead: 25,
           targetMinutes: 20,
           bookTitles: [],
           notes: null,
-          status: ReadingStatus.completed,
-          photoUrl: null,
+          status: LogStatus.completed,
+          photoUrls: null,
           isOfflineCreated: false,
-          syncedAt: Timestamp.now(),
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
+          syncedAt: DateTime.now(),
+          createdAt: DateTime.now(),
         );
 
         await offlineService.saveReadingLogLocally(oldLog);
@@ -261,17 +268,17 @@ void main() {
           studentId: 'student-cleanup',
           parentId: 'parent-123',
           schoolId: 'school-123',
-          date: Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 60))),
+          classId: 'class-123',
+          date: DateTime.now().subtract(const Duration(days: 60)),
           minutesRead: 20,
           targetMinutes: 20,
           bookTitles: [],
           notes: null,
-          status: ReadingStatus.completed,
-          photoUrl: null,
+          status: LogStatus.completed,
+          photoUrls: null,
           isOfflineCreated: false,
-          syncedAt: Timestamp.now(),
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
+          syncedAt: DateTime.now(),
+          createdAt: DateTime.now(),
         );
 
         final recentLog = ReadingLogModel(
@@ -279,17 +286,17 @@ void main() {
           studentId: 'student-cleanup',
           parentId: 'parent-123',
           schoolId: 'school-123',
-          date: Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 5))),
+          classId: 'class-123',
+          date: DateTime.now().subtract(const Duration(days: 5)),
           minutesRead: 25,
           targetMinutes: 20,
           bookTitles: [],
           notes: null,
-          status: ReadingStatus.completed,
-          photoUrl: null,
+          status: LogStatus.completed,
+          photoUrls: null,
           isOfflineCreated: false,
-          syncedAt: Timestamp.now(),
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
+          syncedAt: DateTime.now(),
+          createdAt: DateTime.now(),
         );
 
         await offlineService.saveReadingLogLocally(oldLog);
@@ -313,17 +320,17 @@ void main() {
           studentId: 'student-integration',
           parentId: 'parent-integration',
           schoolId: 'school-integration',
-          date: Timestamp.now(),
+          classId: 'class-integration',
+          date: DateTime.now(),
           minutesRead: 30,
           targetMinutes: 20,
           bookTitles: ['Integration Test Book'],
           notes: 'Created offline',
-          status: ReadingStatus.completed,
-          photoUrl: null,
+          status: LogStatus.completed,
+          photoUrls: null,
           isOfflineCreated: true,
           syncedAt: null,
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
+          createdAt: DateTime.now(),
         );
 
         // Save locally
@@ -337,7 +344,7 @@ void main() {
         // After sync (simulated), it would have syncedAt set
         final syncedLog = log.copyWith(
           isOfflineCreated: false,
-          syncedAt: Timestamp.now(),
+          syncedAt: DateTime.now(),
         );
 
         await offlineService.saveReadingLogLocally(syncedLog);
@@ -356,6 +363,10 @@ void main() {
     tearDownAll(() async {
       // Close Hive
       await Hive.close();
+      // Clean up test directory
+      if (await testDirectory.exists()) {
+        await testDirectory.delete(recursive: true);
+      }
     });
   });
 }
