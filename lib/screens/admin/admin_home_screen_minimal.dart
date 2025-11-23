@@ -3,14 +3,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/minimal_theme.dart';
-import '../../core/widgets/minimal/minimal_widgets.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_card.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/school_model.dart';
 import '../../services/firebase_service.dart';
 import 'user_management_screen.dart';
 import 'class_management_screen.dart';
-import 'database_migration_screen.dart';
 
 class AdminHomeScreenMinimal extends StatefulWidget {
   final UserModel user;
@@ -114,16 +115,16 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Sign Out'),
-        content: const Text('Are you sure you want to sign out?'),
+        title: Text('Sign Out'),
+        content: Text('Are you sure you want to sign out?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text('Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Sign Out'),
+            child: Text('Sign Out'),
           ),
         ],
       ),
@@ -141,10 +142,10 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: MinimalTheme.cream,
+        backgroundColor: AppColors.offWhite,
         body: const Center(
           child: CircularProgressIndicator(
-            color: MinimalTheme.primaryPurple,
+            color: AppColors.rosePink,
           ),
         ),
       );
@@ -152,13 +153,13 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
 
     if (_school == null) {
       return Scaffold(
-        backgroundColor: MinimalTheme.cream,
+        backgroundColor: AppColors.offWhite,
         body: _buildNoSchoolView(),
       );
     }
 
     return Scaffold(
-      backgroundColor: MinimalTheme.cream,
+      backgroundColor: AppColors.offWhite,
       body: IndexedStack(
         index: _selectedIndex,
         children: [
@@ -171,7 +172,7 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: MinimalTheme.white,
+          color: AppColors.white,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.05),
@@ -183,8 +184,8 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(
-              horizontal: MinimalTheme.spaceM,
-              vertical: MinimalTheme.spaceS,
+              horizontal: LumiSpacing.m,
+              vertical: LumiSpacing.s,
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -206,7 +207,7 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
     final isSelected = _selectedIndex == index;
     return InkWell(
       onTap: () => setState(() => _selectedIndex = index),
-      borderRadius: BorderRadius.circular(MinimalTheme.radiusMedium),
+      borderRadius: BorderRadius.circular(LumiBorders.radiusMedium),
       child: Container(
         padding: const EdgeInsets.symmetric(
           horizontal: 12,
@@ -214,9 +215,9 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
         ),
         decoration: BoxDecoration(
           color: isSelected
-              ? MinimalTheme.lightPurple.withValues(alpha: 0.5)
+              ? AppColors.rosePink.withValues(alpha: 0.1)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(MinimalTheme.radiusMedium),
+          borderRadius: BorderRadius.circular(LumiBorders.radiusMedium),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -224,8 +225,8 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
             Icon(
               icon,
               color: isSelected
-                  ? MinimalTheme.primaryPurple
-                  : MinimalTheme.textSecondary,
+                  ? AppColors.rosePink
+                  : AppColors.charcoal.withValues(alpha: 0.7),
               size: 24,
             ),
             const SizedBox(height: 4),
@@ -234,10 +235,9 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
               style: TextStyle(
                 fontSize: 11,
                 color: isSelected
-                    ? MinimalTheme.primaryPurple
-                    : MinimalTheme.textSecondary,
-                fontWeight:
-                    isSelected ? FontWeight.w600 : FontWeight.normal,
+                    ? AppColors.rosePink
+                    : AppColors.charcoal.withValues(alpha: 0.7),
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
           ],
@@ -254,13 +254,13 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
           SliverToBoxAdapter(
             child: Container(
               decoration: BoxDecoration(
-                gradient: MinimalTheme.purpleGradient,
+                color: AppColors.rosePink,
                 borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(MinimalTheme.radiusLarge),
-                  bottomRight: Radius.circular(MinimalTheme.radiusLarge),
+                  bottomLeft: Radius.circular(LumiBorders.radiusLarge),
+                  bottomRight: Radius.circular(LumiBorders.radiusLarge),
                 ),
               ),
-              padding: const EdgeInsets.all(MinimalTheme.spaceL),
+              padding: const EdgeInsets.all(LumiSpacing.l),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -270,17 +270,17 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
                         width: 60,
                         height: 60,
                         decoration: BoxDecoration(
-                          color: MinimalTheme.white.withValues(alpha: 0.2),
+                          color: AppColors.white.withValues(alpha: 0.2),
                           borderRadius:
-                              BorderRadius.circular(MinimalTheme.radiusMedium),
+                              BorderRadius.circular(LumiBorders.radiusMedium),
                         ),
                         child: const Icon(
                           Icons.school,
-                          color: MinimalTheme.white,
+                          color: AppColors.white,
                           size: 32,
                         ),
                       ),
-                      const SizedBox(width: MinimalTheme.spaceM),
+                      const SizedBox(width: LumiSpacing.m),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -290,15 +290,15 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
                               style: const TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
-                                color: MinimalTheme.white,
+                                color: AppColors.white,
                               ),
                             ),
                             const SizedBox(height: 4),
-                            const Text(
+                            Text(
                               'School Admin Dashboard',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: MinimalTheme.white,
+                                color: AppColors.white,
                               ),
                             ),
                           ],
@@ -307,7 +307,7 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
                       IconButton(
                         icon: const Icon(
                           Icons.notifications_outlined,
-                          color: MinimalTheme.white,
+                          color: AppColors.white,
                         ),
                         onPressed: () {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -326,94 +326,226 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
 
           // Content
           SliverPadding(
-            padding: const EdgeInsets.all(MinimalTheme.spaceL),
+            padding: const EdgeInsets.all(LumiSpacing.l),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 // Statistics Grid
                 Row(
                   children: [
                     Expanded(
-                      child: StatCard(
-                        label: 'Total Students',
-                        value: _totalStudents.toString(),
-                        icon: Icons.school,
-                        iconColor: MinimalTheme.primaryPurple,
+                      child: LumiCard(
+                        child: Padding(
+                          padding: const EdgeInsets.all(LumiSpacing.m),
+                          child: Column(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: AppColors.rosePink.withValues(alpha: 0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.school,
+                                  color: AppColors.rosePink,
+                                  size: 28,
+                                ),
+                              ),
+                              const SizedBox(height: LumiSpacing.m),
+                              Text(
+                                _totalStudents.toString(),
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.charcoal,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Total Students',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.charcoal.withValues(alpha: 0.7),
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: MinimalTheme.spaceM),
+                    const SizedBox(width: LumiSpacing.m),
                     Expanded(
-                      child: StatCard(
-                        label: 'Total Teachers',
-                        value: _totalTeachers.toString(),
-                        icon: Icons.person,
-                        iconColor: MinimalTheme.blue,
+                      child: LumiCard(
+                        child: Padding(
+                          padding: const EdgeInsets.all(LumiSpacing.m),
+                          child: Column(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: AppColors.skyBlue.withValues(alpha: 0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.person,
+                                  color: AppColors.skyBlue,
+                                  size: 28,
+                                ),
+                              ),
+                              const SizedBox(height: LumiSpacing.m),
+                              Text(
+                                _totalTeachers.toString(),
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.charcoal,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Total Teachers',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.charcoal.withValues(alpha: 0.7),
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: MinimalTheme.spaceM),
+                const SizedBox(height: LumiSpacing.m),
                 Row(
                   children: [
                     Expanded(
-                      child: StatCard(
-                        label: 'Active Classes',
-                        value: _totalClasses.toString(),
-                        icon: Icons.groups,
-                        iconColor: MinimalTheme.darkPurple,
+                      child: LumiCard(
+                        child: Padding(
+                          padding: const EdgeInsets.all(LumiSpacing.m),
+                          child: Column(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: AppColors.warmOrange.withValues(alpha: 0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.groups,
+                                  color: AppColors.warmOrange,
+                                  size: 28,
+                                ),
+                              ),
+                              const SizedBox(height: LumiSpacing.m),
+                              Text(
+                                _totalClasses.toString(),
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.charcoal,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Active Classes',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.charcoal.withValues(alpha: 0.7),
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: MinimalTheme.spaceM),
+                    const SizedBox(width: LumiSpacing.m),
                     Expanded(
-                      child: StatCard(
-                        label: 'Active Users',
-                        value: _activeUsers.toString(),
-                        icon: Icons.people,
-                        iconColor: MinimalTheme.green,
+                      child: LumiCard(
+                        child: Padding(
+                          padding: const EdgeInsets.all(LumiSpacing.m),
+                          child: Column(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: AppColors.mintGreen.withValues(alpha: 0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.people,
+                                  color: AppColors.mintGreen,
+                                  size: 28,
+                                ),
+                              ),
+                              const SizedBox(height: LumiSpacing.m),
+                              Text(
+                                _activeUsers.toString(),
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.charcoal,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Active Users',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.charcoal.withValues(alpha: 0.7),
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
 
-                const SizedBox(height: MinimalTheme.spaceL),
+                const SizedBox(height: LumiSpacing.l),
 
                 // Weekly Engagement Chart
                 _buildEngagementChart(),
 
-                const SizedBox(height: MinimalTheme.spaceL),
+                const SizedBox(height: LumiSpacing.l),
 
                 // Quick Actions
-                RoundedCard(
+                LumiCard(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Quick Actions',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: MinimalTheme.textPrimary,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Quick Actions',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.charcoal,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: MinimalTheme.spaceM),
+                      const SizedBox(height: LumiSpacing.m),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
                           _buildQuickAction(
                             icon: Icons.person_add,
                             label: 'Add User',
-                            color: MinimalTheme.primaryPurple,
+                            color: AppColors.rosePink,
                             onTap: () => setState(() => _selectedIndex = 1),
                           ),
                           _buildQuickAction(
                             icon: Icons.group_add,
                             label: 'Add Class',
-                            color: MinimalTheme.darkPurple,
+                            color: AppColors.warmOrange,
                             onTap: () => setState(() => _selectedIndex = 2),
                           ),
                           _buildQuickAction(
                             icon: Icons.download,
                             label: 'Reports',
-                            color: MinimalTheme.green,
+                            color: AppColors.mintGreen,
                             onTap: () {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
@@ -425,7 +557,7 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
                           _buildQuickAction(
                             icon: Icons.qr_code,
                             label: 'Invites',
-                            color: MinimalTheme.orange,
+                            color: AppColors.warmOrange,
                             onTap: () {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
@@ -441,22 +573,22 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
                   ),
                 ),
 
-                const SizedBox(height: MinimalTheme.spaceL),
+                const SizedBox(height: LumiSpacing.l),
 
                 // Recent Activity
-                RoundedCard(
+                LumiCard(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
+                          Text(
                             'Recent Activity',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: MinimalTheme.textPrimary,
+                              color: AppColors.charcoal,
                             ),
                           ),
                           TextButton(
@@ -467,16 +599,16 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
                                 ),
                               );
                             },
-                            child: const Text(
+                            child: Text(
                               'View All',
                               style: TextStyle(
-                                color: MinimalTheme.primaryPurple,
+                                color: AppColors.rosePink,
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: MinimalTheme.spaceM),
+                      const SizedBox(height: LumiSpacing.m),
                       _buildRecentActivity(),
                     ],
                   ),
@@ -490,19 +622,19 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
   }
 
   Widget _buildEngagementChart() {
-    return RoundedCard(
+    return LumiCard(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+          Text(
             'Weekly Engagement',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: MinimalTheme.textPrimary,
+              color: AppColors.charcoal,
             ),
           ),
-          const SizedBox(height: MinimalTheme.spaceM),
+          const SizedBox(height: LumiSpacing.m),
           StreamBuilder<QuerySnapshot>(
             stream: _firebaseService.firestore
                 .collection('schools')
@@ -531,8 +663,9 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
                 }
               }
 
-              final maxValue =
-                  logsByDay.values.isEmpty ? 0 : logsByDay.values.reduce((a, b) => a > b ? a : b);
+              final maxValue = logsByDay.values.isEmpty
+                  ? 0
+                  : logsByDay.values.reduce((a, b) => a > b ? a : b);
 
               return SizedBox(
                 height: 180,
@@ -544,19 +677,20 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
                     final height = maxValue == 0
                         ? 20.0
                         : (value / maxValue * 140).clamp(20.0, 140.0);
-                    final date = DateTime.now()
-                        .subtract(Duration(days: 6 - index));
-                    final dayLabel = DateFormat('E').format(date).substring(0, 1);
+                    final date =
+                        DateTime.now().subtract(Duration(days: 6 - index));
+                    final dayLabel =
+                        DateFormat('E').format(date).substring(0, 1);
 
                     return Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         Text(
                           value.toString(),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: MinimalTheme.textSecondary,
+                            color: AppColors.charcoal.withValues(alpha: 0.7),
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -564,7 +698,7 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
                           width: 32,
                           height: height,
                           decoration: BoxDecoration(
-                            gradient: MinimalTheme.purpleGradient,
+                            color: AppColors.rosePink,
                             borderRadius: const BorderRadius.vertical(
                               top: Radius.circular(8),
                             ),
@@ -573,9 +707,9 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
                         const SizedBox(height: 8),
                         Text(
                           dayLabel,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: MinimalTheme.textSecondary,
+                            color: AppColors.charcoal.withValues(alpha: 0.7),
                           ),
                         ),
                       ],
@@ -598,7 +732,7 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(MinimalTheme.radiusMedium),
+      borderRadius: BorderRadius.circular(LumiBorders.radiusMedium),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -607,7 +741,7 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
             height: 56,
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(MinimalTheme.radiusMedium),
+              borderRadius: BorderRadius.circular(LumiBorders.radiusMedium),
             ),
             child: Icon(
               icon,
@@ -615,12 +749,12 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
               size: 28,
             ),
           ),
-          const SizedBox(height: MinimalTheme.spaceS),
+          const SizedBox(height: LumiSpacing.s),
           Text(
             label,
             style: const TextStyle(
               fontSize: 12,
-              color: MinimalTheme.textPrimary,
+              color: AppColors.charcoal,
             ),
           ),
         ],
@@ -641,7 +775,7 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
         if (!snapshot.hasData) {
           return const Center(
             child: CircularProgressIndicator(
-              color: MinimalTheme.primaryPurple,
+              color: AppColors.rosePink,
             ),
           );
         }
@@ -649,10 +783,33 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
         final logs = snapshot.data!.docs;
 
         if (logs.isEmpty) {
-          return const EmptyState(
-            icon: Icons.history,
-            title: 'No Activity',
-            message: 'No recent activity',
+          return Center(
+            child: Column(
+              children: [
+                Icon(
+                  Icons.history,
+                  size: 48,
+                  color: AppColors.charcoal.withValues(alpha: 0.3),
+                ),
+                const SizedBox(height: LumiSpacing.m),
+                Text(
+                  'No Activity',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.charcoal,
+                  ),
+                ),
+                const SizedBox(height: LumiSpacing.s),
+                Text(
+                  'No recent activity',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
           );
         }
 
@@ -661,43 +818,42 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
             final data = doc.data() as Map<String, dynamic>;
             final date = (data['createdAt'] as Timestamp).toDate();
             return Padding(
-              padding: const EdgeInsets.only(bottom: MinimalTheme.spaceM),
+              padding: const EdgeInsets.only(bottom: LumiSpacing.m),
               child: Row(
                 children: [
                   Container(
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color:
-                          MinimalTheme.lightPurple.withValues(alpha: 0.5),
+                      color: AppColors.rosePink.withValues(alpha: 0.1),
                       borderRadius:
-                          BorderRadius.circular(MinimalTheme.radiusMedium),
+                          BorderRadius.circular(LumiBorders.radiusMedium),
                     ),
                     child: const Icon(
                       Icons.book,
-                      color: MinimalTheme.primaryPurple,
+                      color: AppColors.rosePink,
                       size: 20,
                     ),
                   ),
-                  const SizedBox(width: MinimalTheme.spaceM),
+                  const SizedBox(width: LumiSpacing.m),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'New reading log',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: MinimalTheme.textPrimary,
+                            color: AppColors.charcoal,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           DateFormat('MMM dd, hh:mm a').format(date),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: MinimalTheme.textSecondary,
+                            color: AppColors.charcoal.withValues(alpha: 0.7),
                           ),
                         ),
                       ],
@@ -723,37 +879,37 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
   Widget _buildSettingsView() {
     return SafeArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(MinimalTheme.spaceL),
+        padding: const EdgeInsets.all(LumiSpacing.l),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Settings',
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
-                color: MinimalTheme.textPrimary,
+                color: AppColors.charcoal,
               ),
             ),
-            const SizedBox(height: MinimalTheme.spaceL),
+            const SizedBox(height: LumiSpacing.l),
 
             // School Settings Section
-            const Text(
+            Text(
               'School Settings',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: MinimalTheme.textSecondary,
+                color: AppColors.charcoal.withValues(alpha: 0.7),
                 letterSpacing: 1.2,
               ),
             ),
-            const SizedBox(height: MinimalTheme.spaceM),
-            RoundedCard(
+            const SizedBox(height: LumiSpacing.m),
+            LumiCard(
               child: Column(
                 children: [
                   _buildSettingsTile(
                     icon: Icons.school,
-                    iconColor: MinimalTheme.primaryPurple,
+                    iconColor: AppColors.rosePink,
                     title: 'School Information',
                     subtitle: 'View and edit school details',
                     onTap: () {
@@ -767,7 +923,7 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
                   const Divider(height: 1),
                   _buildSettingsTile(
                     icon: Icons.notifications,
-                    iconColor: MinimalTheme.orange,
+                    iconColor: AppColors.warmOrange,
                     title: 'Notifications',
                     subtitle: 'Configure notification settings',
                     onTap: () {
@@ -782,25 +938,25 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
               ),
             ),
 
-            const SizedBox(height: MinimalTheme.spaceL),
+            const SizedBox(height: LumiSpacing.l),
 
             // Database Section
-            const Text(
+            Text(
               'Database',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: MinimalTheme.textSecondary,
+                color: AppColors.charcoal.withValues(alpha: 0.7),
                 letterSpacing: 1.2,
               ),
             ),
-            const SizedBox(height: MinimalTheme.spaceM),
-            RoundedCard(
+            const SizedBox(height: LumiSpacing.m),
+            LumiCard(
               child: Column(
                 children: [
                   _buildSettingsTile(
                     icon: Icons.cloud_sync,
-                    iconColor: MinimalTheme.darkPurple,
+                    iconColor: AppColors.warmOrange,
                     title: 'Database Migration',
                     subtitle: 'Migrate to optimised structure',
                     trailing: Container(
@@ -809,27 +965,28 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: MinimalTheme.blue.withValues(alpha: 0.15),
+                        color: AppColors.skyBlue.withValues(alpha: 0.15),
                         borderRadius:
-                            BorderRadius.circular(MinimalTheme.radiusPill),
+                            BorderRadius.circular(100),
                       ),
-                      child: const Text(
+                      child: Text(
                         'RECOMMENDED',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: MinimalTheme.blue,
+                          color: AppColors.skyBlue,
                         ),
                       ),
                     ),
                     onTap: () {
-                      context.push('/admin/database-migration', extra: widget.user);
+                      context.push('/admin/database-migration',
+                          extra: widget.user);
                     },
                   ),
                   const Divider(height: 1),
                   _buildSettingsTile(
                     icon: Icons.backup,
-                    iconColor: MinimalTheme.green,
+                    iconColor: AppColors.mintGreen,
                     title: 'Backup & Export',
                     subtitle: 'Export school data',
                     onTap: () {
@@ -844,25 +1001,25 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
               ),
             ),
 
-            const SizedBox(height: MinimalTheme.spaceL),
+            const SizedBox(height: LumiSpacing.l),
 
             // App Settings Section
-            const Text(
+            Text(
               'App Settings',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: MinimalTheme.textSecondary,
+                color: AppColors.charcoal.withValues(alpha: 0.7),
                 letterSpacing: 1.2,
               ),
             ),
-            const SizedBox(height: MinimalTheme.spaceM),
-            RoundedCard(
+            const SizedBox(height: LumiSpacing.m),
+            LumiCard(
               child: Column(
                 children: [
                   _buildSettingsTile(
                     icon: Icons.help_outline,
-                    iconColor: MinimalTheme.blue,
+                    iconColor: AppColors.skyBlue,
                     title: 'Help & Support',
                     subtitle: null,
                     onTap: () {
@@ -876,7 +1033,7 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
                   const Divider(height: 1),
                   _buildSettingsTile(
                     icon: Icons.info_outline,
-                    iconColor: MinimalTheme.textSecondary,
+                    iconColor: AppColors.charcoal.withValues(alpha: 0.7),
                     title: 'About',
                     subtitle: 'Version 1.0.0',
                     onTap: () {
@@ -907,7 +1064,7 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.all(MinimalTheme.spaceM),
+        padding: const EdgeInsets.all(LumiSpacing.m),
         child: Row(
           children: [
             Container(
@@ -915,7 +1072,7 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
               height: 40,
               decoration: BoxDecoration(
                 color: iconColor.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(MinimalTheme.radiusMedium),
+                borderRadius: BorderRadius.circular(LumiBorders.radiusMedium),
               ),
               child: Icon(
                 icon,
@@ -923,7 +1080,7 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
                 size: 20,
               ),
             ),
-            const SizedBox(width: MinimalTheme.spaceM),
+            const SizedBox(width: LumiSpacing.m),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -933,16 +1090,16 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: MinimalTheme.textPrimary,
+                      color: AppColors.charcoal,
                     ),
                   ),
                   if (subtitle != null) ...[
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: MinimalTheme.textSecondary,
+                        color: AppColors.charcoal.withValues(alpha: 0.7),
                       ),
                     ),
                   ],
@@ -950,9 +1107,9 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
               ),
             ),
             trailing ??
-                const Icon(
+                Icon(
                   Icons.chevron_right,
-                  color: MinimalTheme.textSecondary,
+                  color: AppColors.charcoal.withValues(alpha: 0.7),
                 ),
           ],
         ),
@@ -965,19 +1122,19 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
       child: SingleChildScrollView(
         child: Column(
           children: [
-            const SizedBox(height: MinimalTheme.spaceL),
+            const SizedBox(height: LumiSpacing.l),
 
             // Profile Card
             Padding(
-              padding: const EdgeInsets.all(MinimalTheme.spaceL),
-              child: RoundedCard(
+              padding: const EdgeInsets.all(LumiSpacing.l),
+              child: LumiCard(
                 child: Column(
                   children: [
                     Container(
                       width: 100,
                       height: 100,
                       decoration: BoxDecoration(
-                        gradient: MinimalTheme.purpleGradient,
+                        color: AppColors.rosePink,
                         shape: BoxShape.circle,
                       ),
                       child: Center(
@@ -987,45 +1144,45 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
                               : '?',
                           style: const TextStyle(
                             fontSize: 48,
-                            color: MinimalTheme.white,
+                            color: AppColors.white,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: MinimalTheme.spaceM),
+                    const SizedBox(height: LumiSpacing.m),
                     Text(
                       widget.user.fullName,
                       style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
-                        color: MinimalTheme.textPrimary,
+                        color: AppColors.charcoal,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       widget.user.email,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        color: MinimalTheme.textSecondary,
+                        color: AppColors.charcoal.withValues(alpha: 0.7),
                       ),
                     ),
-                    const SizedBox(height: MinimalTheme.spaceM),
+                    const SizedBox(height: LumiSpacing.m),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: MinimalTheme.lightPurple.withValues(alpha: 0.5),
+                        color: AppColors.rosePink.withValues(alpha: 0.1),
                         borderRadius:
-                            BorderRadius.circular(MinimalTheme.radiusPill),
+                            BorderRadius.circular(100),
                       ),
-                      child: const Text(
+                      child: Text(
                         'School Administrator',
                         style: TextStyle(
                           fontSize: 14,
-                          color: MinimalTheme.primaryPurple,
+                          color: AppColors.rosePink,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -1038,28 +1195,28 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
             // School Info Card
             Padding(
               padding: const EdgeInsets.symmetric(
-                horizontal: MinimalTheme.spaceL,
+                horizontal: LumiSpacing.l,
               ),
-              child: RoundedCard(
+              child: LumiCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'School Information',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: MinimalTheme.textPrimary,
+                        color: AppColors.charcoal,
                       ),
                     ),
-                    const SizedBox(height: MinimalTheme.spaceM),
+                    const SizedBox(height: LumiSpacing.m),
                     _buildInfoRow(Icons.school, _school?.name ?? 'N/A'),
-                    const SizedBox(height: MinimalTheme.spaceS),
+                    const SizedBox(height: LumiSpacing.s),
                     _buildInfoRow(
                       Icons.people,
                       '$_totalStudents students',
                     ),
-                    const SizedBox(height: MinimalTheme.spaceS),
+                    const SizedBox(height: LumiSpacing.s),
                     _buildInfoRow(
                       Icons.groups,
                       '$_totalClasses classes',
@@ -1069,32 +1226,49 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
               ),
             ),
 
-            const SizedBox(height: MinimalTheme.spaceL),
+            const SizedBox(height: LumiSpacing.l),
 
             // Sign out button
             Padding(
               padding: const EdgeInsets.symmetric(
-                horizontal: MinimalTheme.spaceL,
+                horizontal: LumiSpacing.l,
               ),
-              child: PillButton(
-                text: 'Sign Out',
-                onPressed: _handleSignOut,
-                backgroundColor: MinimalTheme.orange,
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _handleSignOut,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.warmOrange,
+                    foregroundColor: AppColors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                  ),
+                  child: Text(
+                    'Sign Out',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ),
             ),
 
-            const SizedBox(height: MinimalTheme.spaceL),
+            const SizedBox(height: LumiSpacing.l),
 
             // Version info
-            const Text(
+            Text(
               'Version 1.0.0',
               style: TextStyle(
                 fontSize: 12,
-                color: MinimalTheme.textSecondary,
+                color: AppColors.charcoal.withValues(alpha: 0.7),
               ),
             ),
 
-            const SizedBox(height: MinimalTheme.spaceL),
+            const SizedBox(height: LumiSpacing.l),
           ],
         ),
       ),
@@ -1107,14 +1281,14 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
         Icon(
           icon,
           size: 18,
-          color: MinimalTheme.primaryPurple,
+          color: AppColors.rosePink,
         ),
-        const SizedBox(width: MinimalTheme.spaceS),
+        const SizedBox(width: LumiSpacing.s),
         Text(
           text,
           style: const TextStyle(
             fontSize: 14,
-            color: MinimalTheme.textPrimary,
+            color: AppColors.charcoal,
           ),
         ),
       ],
@@ -1124,7 +1298,7 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
   Widget _buildNoSchoolView() {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(MinimalTheme.spaceL),
+        padding: const EdgeInsets.all(LumiSpacing.l),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -1132,31 +1306,31 @@ class _AdminHomeScreenMinimalState extends State<AdminHomeScreenMinimal> {
               width: 150,
               height: 150,
               decoration: BoxDecoration(
-                gradient: MinimalTheme.purpleGradient,
+                color: AppColors.rosePink,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.school,
                 size: 80,
-                color: MinimalTheme.white,
+                color: AppColors.white,
               ),
             ),
-            const SizedBox(height: MinimalTheme.spaceL),
-            const Text(
+            const SizedBox(height: LumiSpacing.l),
+            Text(
               'No School Configured',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: MinimalTheme.textPrimary,
+                color: AppColors.charcoal,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: MinimalTheme.spaceM),
-            const Text(
+            const SizedBox(height: LumiSpacing.m),
+            Text(
               'Please contact support to set up your school.',
               style: TextStyle(
                 fontSize: 16,
-                color: MinimalTheme.textSecondary,
+                color: AppColors.charcoal.withValues(alpha: 0.7),
               ),
               textAlign: TextAlign.center,
             ),
