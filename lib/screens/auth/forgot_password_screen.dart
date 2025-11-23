@@ -5,6 +5,10 @@ import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../services/firebase_service.dart';
 
@@ -72,18 +76,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundPrimary,
+      backgroundColor: AppColors.offWhite,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.darkGray),
+          icon: const Icon(Icons.arrow_back, color: AppColors.charcoal),
           onPressed: () => Navigator.pop(context),
         ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: LumiPadding.allM,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -101,38 +105,35 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 ),
               ),
 
-              const SizedBox(height: 32),
+              LumiGap.l,
 
               // Title
               Text(
                 _emailSent ? 'Email Sent!' : 'Reset Password',
-                style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.darkGray,
-                    ),
+                style: LumiTextStyles.h1(color: AppColors.charcoal),
                 textAlign: TextAlign.center,
               ).animate().fadeIn(delay: 200.ms, duration: 500.ms),
 
-              const SizedBox(height: 16),
+              LumiGap.s,
 
               // Description
               if (!_emailSent)
                 Text(
                   "Enter your email address and we'll send you instructions to reset your password.",
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.gray,
-                      ),
+                  style: LumiTextStyles.body(
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
+                  ),
                   textAlign: TextAlign.center,
                 ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
 
               if (_emailSent) ...[
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: LumiPadding.allS,
                   decoration: BoxDecoration(
-                    color: AppColors.secondaryGreen.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    color: AppColors.success.withValues(alpha: 0.1),
+                    borderRadius: LumiBorders.medium,
                     border: Border.all(
-                      color: AppColors.secondaryGreen,
+                      color: AppColors.success,
                       width: 1,
                     ),
                   ),
@@ -140,73 +141,65 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     children: [
                       const Icon(
                         Icons.mark_email_read_outlined,
-                        color: AppColors.secondaryGreen,
+                        color: AppColors.success,
                         size: 48,
                       ),
-                      const SizedBox(height: 16),
+                      LumiGap.s,
                       Text(
                         'Password reset email sent to:',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.darkGray,
-                            ),
+                        style: LumiTextStyles.bodyMedium(color: AppColors.charcoal),
                       ),
-                      const SizedBox(height: 4),
+                      LumiGap.xxs,
                       Text(
                         _successEmail ?? '',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: AppColors.primaryBlue,
-                              fontWeight: FontWeight.bold,
-                            ),
+                        style: LumiTextStyles.h3(color: AppColors.rosePink),
                       ),
-                      const SizedBox(height: 16),
+                      LumiGap.s,
                       Text(
                         'Please check your inbox (and spam folder) for instructions on how to reset your password.',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.gray,
-                            ),
+                        style: LumiTextStyles.bodySmall(
+                          color: AppColors.charcoal.withValues(alpha: 0.7),
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     ],
                   ),
                 ).animate().fadeIn(delay: 300.ms, duration: 500.ms).scale(),
 
-                const SizedBox(height: 24),
+                LumiGap.m,
 
                 // Return to login button
-                ElevatedButton(
+                LumiPrimaryButton(
                   onPressed: () {
                     Navigator.pop(context);
                   },
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(56),
-                  ),
-                  child: const Text('Back to Login'),
+                  text: 'Back to Login',
                 ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
 
-                const SizedBox(height: 16),
+                LumiGap.s,
 
                 // Resend email button
-                TextButton(
+                LumiTextButton(
                   onPressed: () {
                     setState(() {
                       _emailSent = false;
                       _successEmail = null;
                     });
                   },
-                  child: const Text("Didn't receive the email? Try again"),
+                  text: "Didn't receive the email? Try again",
                 ).animate().fadeIn(delay: 600.ms, duration: 500.ms),
               ],
 
               if (!_emailSent) ...[
-                const SizedBox(height: 32),
+                LumiGap.l,
 
                 // Error message
                 if (_errorMessage != null)
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: LumiPadding.allXS,
                     decoration: BoxDecoration(
-                      color: AppColors.error.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
+                      color: AppColors.error.withValues(alpha: 0.1),
+                      borderRadius: LumiBorders.small,
                       border: Border.all(color: AppColors.error, width: 1),
                     ),
                     child: Row(
@@ -216,30 +209,42 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           color: AppColors.error,
                           size: 20,
                         ),
-                        const SizedBox(width: 8),
+                        LumiGap.xs,
                         Expanded(
                           child: Text(
                             _errorMessage!,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: AppColors.error,
-                                ),
+                            style: LumiTextStyles.bodySmall(color: AppColors.error),
                           ),
                         ),
                       ],
                     ),
                   ).animate().fadeIn().shake(),
 
-                const SizedBox(height: 16),
+                LumiGap.s,
 
                 // Email form
                 FormBuilder(
                   key: _formKey,
                   child: FormBuilderTextField(
                     name: 'email',
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Email Address',
-                      prefixIcon: Icon(Icons.email_outlined),
+                      labelStyle: LumiTextStyles.body(
+                        color: AppColors.charcoal.withValues(alpha: 0.7),
+                      ),
+                      prefixIcon: const Icon(Icons.email_outlined),
                       hintText: 'Enter your registered email',
+                      border: OutlineInputBorder(
+                        borderRadius: LumiBorders.medium,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: LumiBorders.medium,
+                        borderSide: const BorderSide(
+                          color: AppColors.rosePink,
+                          width: 2,
+                        ),
+                      ),
+                      errorStyle: LumiTextStyles.bodySmall(color: AppColors.error),
                     ),
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.done,
@@ -255,36 +260,23 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ).animate().fadeIn(delay: 400.ms, duration: 500.ms),
                 ),
 
-                const SizedBox(height: 32),
+                LumiGap.l,
 
                 // Submit button
-                ElevatedButton(
+                LumiPrimaryButton(
                   onPressed: _isLoading ? null : _handlePasswordReset,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(56),
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              AppColors.white,
-                            ),
-                          ),
-                        )
-                      : const Text('Send Reset Email'),
+                  text: 'Send Reset Email',
+                  isLoading: _isLoading,
                 ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
 
-                const SizedBox(height: 24),
+                LumiGap.m,
 
                 // Additional help
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: LumiPadding.allS,
                   decoration: BoxDecoration(
-                    color: AppColors.info.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    color: AppColors.info.withValues(alpha: 0.1),
+                    borderRadius: LumiBorders.medium,
                   ),
                   child: Row(
                     children: [
@@ -293,23 +285,19 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         color: AppColors.info,
                         size: 20,
                       ),
-                      const SizedBox(width: 12),
+                      LumiGap.xs,
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Need help?',
-                              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                    color: AppColors.info,
-                                  ),
+                              style: LumiTextStyles.label(color: AppColors.info),
                             ),
-                            const SizedBox(height: 4),
+                            LumiGap.xxs,
                             Text(
                               'If you continue to have trouble, please contact your school administrator.',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppColors.darkGray,
-                                  ),
+                              style: LumiTextStyles.bodySmall(color: AppColors.charcoal),
                             ),
                           ],
                         ),
