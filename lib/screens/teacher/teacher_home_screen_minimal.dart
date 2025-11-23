@@ -265,9 +265,7 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
-                        children: _classes.asMap().entries.map((entry) {
-                          final index = entry.key;
-                          final classModel = entry.value;
+                        children: _classes.map((classModel) {
                           final isSelected = classModel.id == _selectedClass!.id;
                           return Padding(
                             padding: const EdgeInsets.only(right: LumiSpacing.s),
