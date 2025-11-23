@@ -4,6 +4,10 @@ import 'package:lumi_reading_tracker/data/models/achievement_model.dart';
 import 'package:lumi_reading_tracker/data/models/student_model.dart';
 import 'package:lumi_reading_tracker/core/widgets/glass/glass_achievement_card.dart';
 import 'package:lumi_reading_tracker/core/theme/app_colors.dart';
+import 'package:lumi_reading_tracker/core/theme/lumi_text_styles.dart';
+import 'package:lumi_reading_tracker/core/theme/lumi_spacing.dart';
+import 'package:lumi_reading_tracker/core/theme/lumi_borders.dart';
+import 'package:lumi_reading_tracker/core/widgets/lumi/lumi_buttons.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 /// Achievements screen showing earned and locked achievements
@@ -41,41 +45,30 @@ class _AchievementsScreenState extends State<AchievementsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              AppColors.primaryBlue.withOpacity(0.1),
-              AppColors.secondaryOrange.withOpacity(0.1),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // App bar
-              _buildAppBar(),
+      backgroundColor: AppColors.offWhite,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // App bar
+            _buildAppBar(),
 
-              // Category filter
-              _buildCategoryFilter(),
+            // Category filter
+            _buildCategoryFilter(),
 
-              // Tabs (Earned / All)
-              _buildTabs(),
+            // Tabs (Earned / All)
+            _buildTabs(),
 
-              // Achievement list
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildEarnedAchievements(),
-                    _buildAllAchievements(),
-                  ],
-                ),
+            // Achievement list
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildEarnedAchievements(),
+                  _buildAllAchievements(),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -83,21 +76,17 @@ class _AchievementsScreenState extends State<AchievementsScreen>
 
   Widget _buildAppBar() {
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: LumiPadding.allS,
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
+          LumiIconButton(
+            icon: Icons.arrow_back,
             onPressed: () => Navigator.pop(context),
           ),
-          const SizedBox(width: 8),
-          const Text(
+          LumiGap.horizontalXS,
+          Text(
             '🏆 Achievements',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
+            style: LumiTextStyles.h2(),
           ),
         ],
       ),
@@ -107,7 +96,7 @@ class _AchievementsScreenState extends State<AchievementsScreen>
   Widget _buildCategoryFilter() {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: LumiPadding.horizontalS,
       child: Row(
         children: [
           _buildCategoryChip(
@@ -115,10 +104,10 @@ class _AchievementsScreenState extends State<AchievementsScreen>
             null,
             _selectedCategory == null,
           ),
-          const SizedBox(width: 8),
+          LumiGap.horizontalXS,
           ...AchievementCategory.values.map((category) {
             return Padding(
-              padding: const EdgeInsets.only(right: 8),
+              padding: EdgeInsets.only(right: LumiSpacing.xs),
               child: _buildCategoryChip(
                 category.displayName,
                 category,
@@ -140,39 +129,41 @@ class _AchievementsScreenState extends State<AchievementsScreen>
           _selectedCategory = selected ? null : category;
         });
       },
-      backgroundColor: Colors.white.withOpacity(0.1),
-      selectedColor: AppColors.primaryBlue.withOpacity(0.3),
-      checkmarkColor: Colors.white,
-      labelStyle: TextStyle(
-        color: Colors.white,
+      backgroundColor: AppColors.white,
+      selectedColor: AppColors.skyBlue,
+      checkmarkColor: AppColors.rosePink,
+      labelStyle: LumiTextStyles.label(
+        color: selected ? AppColors.rosePink : AppColors.charcoal,
+      ).copyWith(
         fontWeight: selected ? FontWeight.bold : FontWeight.normal,
       ),
       side: BorderSide(
         color: selected
-            ? AppColors.primaryBlue.withOpacity(0.5)
-            : Colors.white.withOpacity(0.3),
+            ? AppColors.rosePink
+            : AppColors.charcoal.withValues(alpha: 0.3),
       ),
     );
   }
 
   Widget _buildTabs() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      margin: LumiPadding.allS,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
+        color: AppColors.white,
+        borderRadius: LumiBorders.large,
         border: Border.all(
-          color: Colors.white.withOpacity(0.2),
+          color: AppColors.charcoal.withValues(alpha: 0.2),
         ),
       ),
       child: TabBar(
         controller: _tabController,
         indicator: BoxDecoration(
-          color: AppColors.primaryBlue.withOpacity(0.3),
-          borderRadius: BorderRadius.circular(16),
+          color: AppColors.skyBlue,
+          borderRadius: LumiBorders.large,
         ),
-        labelColor: Colors.white,
-        unselectedLabelColor: Colors.white.withOpacity(0.6),
+        labelColor: AppColors.rosePink,
+        labelStyle: LumiTextStyles.label(),
+        unselectedLabelColor: AppColors.charcoal.withValues(alpha: 0.6),
         tabs: const [
           Tab(text: 'Earned'),
           Tab(text: 'All Achievements'),
@@ -230,7 +221,7 @@ class _AchievementsScreenState extends State<AchievementsScreen>
         filteredAchievements.sort((a, b) => b.earnedAt.compareTo(a.earnedAt));
 
         return ListView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: EdgeInsets.symmetric(vertical: LumiSpacing.xs),
           itemCount: filteredAchievements.length,
           itemBuilder: (context, index) {
             return GlassAchievementCard(
@@ -279,11 +270,11 @@ class _AchievementsScreenState extends State<AchievementsScreen>
         }
 
         return GridView.builder(
-          padding: const EdgeInsets.all(16),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          padding: LumiPadding.allS,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 3,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
+            crossAxisSpacing: LumiSpacing.listItemSpacing,
+            mainAxisSpacing: LumiSpacing.listItemSpacing,
             childAspectRatio: 0.8,
           ),
           itemCount: allTemplates.length,
@@ -334,14 +325,13 @@ class _AchievementsScreenState extends State<AchievementsScreen>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           CircularProgressIndicator(
-            color: AppColors.primaryBlue,
+            color: AppColors.rosePink,
           ),
-          const SizedBox(height: 16),
+          LumiGap.s,
           Text(
             'Loading achievements...',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
-              fontSize: 16,
+            style: LumiTextStyles.body(
+              color: AppColors.charcoal.withValues(alpha: 0.8),
             ),
           ),
         ],
@@ -357,23 +347,20 @@ class _AchievementsScreenState extends State<AchievementsScreen>
           const Icon(
             Icons.error_outline,
             size: 64,
-            color: Colors.red,
+            color: AppColors.error,
           ),
-          const SizedBox(height: 16),
+          LumiGap.s,
           Text(
             'Error loading achievements',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+            style: LumiTextStyles.h3(
+              color: AppColors.charcoal,
             ),
           ),
-          const SizedBox(height: 8),
+          LumiGap.xs,
           Text(
             error,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
-              fontSize: 14,
+            style: LumiTextStyles.bodySmall(
+              color: AppColors.charcoal.withValues(alpha: 0.7),
             ),
             textAlign: TextAlign.center,
           ),
@@ -394,13 +381,11 @@ class _AchievementsScreenState extends State<AchievementsScreen>
               .animate(onPlay: (controller) => controller.repeat())
               .shimmer(duration: 2000.ms)
               .shake(hz: 2, rotation: 0.05),
-          const SizedBox(height: 16),
+          LumiGap.s,
           Text(
             message,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+            style: LumiTextStyles.h3(
+              color: AppColors.charcoal,
             ),
             textAlign: TextAlign.center,
           ),
@@ -456,14 +441,15 @@ class _AchievementsScreenState extends State<AchievementsScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: LumiBorders.shapeLarge,
         title: Row(
           children: [
             Text(achievement.icon),
-            const SizedBox(width: 8),
+            LumiGap.horizontalXS,
             Expanded(
               child: Text(
                 achievement.name,
-                style: const TextStyle(fontSize: 18),
+                style: LumiTextStyles.h3(),
               ),
             ),
           ],
@@ -472,26 +458,27 @@ class _AchievementsScreenState extends State<AchievementsScreen>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(achievement.description),
-            const SizedBox(height: 16),
+            Text(
+              achievement.description,
+              style: LumiTextStyles.body(),
+            ),
+            LumiGap.s,
             LinearProgressIndicator(
               value: progress,
-              backgroundColor: Colors.grey.withOpacity(0.3),
+              backgroundColor: AppColors.charcoal.withValues(alpha: 0.3),
               color: Color(achievement.rarity.color),
             ),
-            const SizedBox(height: 8),
+            LumiGap.xs,
             Text(
               '$currentValue / ${achievement.requiredValue} $unit',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-              ),
+              style: LumiTextStyles.bodyLarge(),
             ),
           ],
         ),
         actions: [
-          TextButton(
+          LumiTextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            text: 'Close',
           ),
         ],
       ),
