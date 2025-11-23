@@ -8,8 +8,6 @@ import '../../data/models/reading_log_model.dart';
 import '../../services/firebase_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/lumi_text_styles.dart';
-import '../../core/theme/lumi_spacing.dart';
-import '../../core/theme/lumi_borders.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_card.dart';
 
@@ -130,7 +128,6 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
 
   Widget _buildDateRangeBanner() {
     return LumiCard(
-      elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
@@ -230,7 +227,6 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
     String? subtitle,
   }) {
     return LumiCard(
-      elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -284,7 +280,6 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
     final metrics = _schoolMetrics!;
 
     return LumiCard(
-      elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -376,7 +371,7 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
         const SizedBox(height: 8),
         LinearProgressIndicator(
           value: percentage,
-          backgroundColor: color.withValues(alpha:0.2),
+          backgroundColor: color.withValues(alpha: 0.2),
           valueColor: AlwaysStoppedAnimation<Color>(color),
         ),
       ],
@@ -416,7 +411,6 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
     }
 
     return LumiCard(
-      elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -439,7 +433,7 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
                     horizontalInterval: 1000,
                     getDrawingHorizontalLine: (value) {
                       return FlLine(
-                        color: AppColors.charcoal.withValues(alpha: 0.2),
+                        color: AppColors.charcoal.withValues(alpha: 0.1),
                         strokeWidth: 1,
                       );
                     },
@@ -488,7 +482,7 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
                   ),
                   borderData: FlBorderData(
                     show: true,
-                    border: Border.all(color: AppColors.charcoal.withValues(alpha: 0.2)!),
+                    border: Border.all(color: AppColors.charcoal.withValues(alpha: 0.1)),
                   ),
                   minX: 0,
                   maxX: (weeklyData.length - 1).toDouble(),
@@ -509,7 +503,7 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
                       dotData: const FlDotData(show: true),
                       belowBarData: BarAreaData(
                         show: true,
-                        color: AppColors.rosePink.withValues(alpha:0.1),
+                        color: AppColors.rosePink.withValues(alpha: 0.1),
                       ),
                     ),
                   ],
@@ -546,7 +540,6 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
     });
 
     return LumiCard(
-      elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -566,11 +559,11 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
                 2: FlexColumnWidth(1),
                 3: FlexColumnWidth(1),
               },
-              border: TableBorder.all(color: AppColors.charcoal.withValues(alpha: 0.2)!),
+              border: TableBorder.all(color: AppColors.charcoal.withValues(alpha: 0.1)),
               children: [
                 // Header
                 TableRow(
-                  decoration: BoxDecoration(color: AppColors.charcoal.withValues(alpha: 0.05)),
+                  decoration: BoxDecoration(color: AppColors.charcoal.withValues(alpha: 0.03)),
                   children: [
                     _buildTableHeader('Class'),
                     _buildTableHeader('Students'),
@@ -610,7 +603,7 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
       padding: const EdgeInsets.all(12),
       child: Text(
         text,
-        style: LumiTextStyles.body(
+        style: LumiTextStyles.body().copyWith(
           fontWeight: FontWeight.bold,
           fontSize: 12,
         ),
@@ -635,9 +628,12 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
         _schoolMetrics!['atRiskStudents'] as List<Map<String, dynamic>>? ?? [];
 
     if (atRiskStudents.isEmpty) {
-      return LumiCard(
-        elevation: 2,
-        color: AppColors.mintGreen.withValues(alpha: 0.1),
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.mintGreen.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(16),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -659,7 +655,6 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
     }
 
     return LumiCard(
-      elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -688,9 +683,7 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
                       backgroundColor: AppColors.warmOrange.withValues(alpha: 0.2),
                       child: Text(
                         (student['name'] as String)[0].toUpperCase(),
-                        style: LumiTextStyles.h3(
-                          color: AppColors.warmOrange,
-                        ),
+                        style: LumiTextStyles.h3(color: AppColors.warmOrange),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -700,7 +693,7 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
                         children: [
                           Text(
                             student['name'] as String,
-                            style: LumiTextStyles.body(fontWeight: FontWeight.w500),
+                            style: LumiTextStyles.body().copyWith(fontWeight: FontWeight.w500),
                           ),
                           Text(
                             student['className'] as String,
@@ -719,7 +712,7 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
                       decoration: BoxDecoration(
                         color: AppColors.warmOrange.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.warmOrange.withValues(alpha: 0.4)!),
+                        border: Border.all(color: AppColors.warmOrange.withValues(alpha: 0.3)),
                       ),
                       child: Text(
                         student['issue'] as String,
@@ -771,7 +764,6 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
     final topClasses = sortedClasses.take(3).toList();
 
     return LumiCard(
-      elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -800,21 +792,30 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
                   studentCount > 0 ? (totalMinutes / studentCount).round() : 0;
 
               final medals = ['🥇', '🥈', '🥉'];
-              final colors = [AppColors.softYellow, Colors.grey, AppColors.warmOrange];
+              final bgColors = [
+                AppColors.softYellow.withValues(alpha: 0.1),
+                AppColors.charcoal.withValues(alpha: 0.05),
+                AppColors.warmOrange.withValues(alpha: 0.1),
+              ];
+              final borderColors = [
+                AppColors.softYellow.withValues(alpha: 0.3),
+                AppColors.charcoal.withValues(alpha: 0.2),
+                AppColors.warmOrange.withValues(alpha: 0.3),
+              ];
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: colors[index][50],
+                  color: bgColors[index],
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: colors[index][300]!),
+                  border: Border.all(color: borderColors[index]),
                 ),
                 child: Row(
                   children: [
                     Text(
                       medals[index],
-                      style: LumiTextStyles.body(fontSize: 32),
+                      style: LumiTextStyles.body().copyWith(fontSize: 32),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -823,7 +824,7 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
                         children: [
                           Text(
                             classModel.name,
-                            style: LumiTextStyles.body(
+                            style: LumiTextStyles.body().copyWith(
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
                             ),
