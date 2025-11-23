@@ -3,6 +3,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/lumi_card.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/class_model.dart';
@@ -81,22 +86,17 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
         elevation: 0,
         title: Text(
           '${widget.classModel.name} - Students',
-          style: const TextStyle(
-            color: AppColors.darkGray,
-            fontWeight: FontWeight.bold,
-          ),
+          style: LumiTextStyles.h3(color: AppColors.charcoal),
         ),
-        iconTheme: const IconThemeData(color: AppColors.darkGray),
+        iconTheme: const IconThemeData(color: AppColors.charcoal),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.upload_file),
+          LumiIconButton(
+            icon: Icons.upload_file,
             onPressed: _showCSVImportDialog,
-            tooltip: 'Import CSV',
           ),
-          IconButton(
-            icon: const Icon(Icons.person_add),
+          LumiIconButton(
+            icon: Icons.person_add,
             onPressed: _showAddStudentDialog,
-            tooltip: 'Add Student',
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.sort),
@@ -152,7 +152,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
           // Search Bar
           Container(
             color: AppColors.white,
-            padding: const EdgeInsets.all(16),
+            padding: LumiPadding.allS,
             child: CommonWidgets.buildSearchBar(
               hintText: 'Search by name or student ID...',
               onChanged: (value) {
@@ -176,22 +176,24 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                           size: 64,
                           color: AppColors.error,
                         ),
-                        const SizedBox(height: 16),
+                        LumiGap.s,
                         Text(
                           'Error loading students',
-                          style: Theme.of(context).textTheme.titleLarge,
+                          style: LumiTextStyles.h3(),
                         ),
-                        const SizedBox(height: 8),
+                        LumiGap.xs,
                         Text(
                           snapshot.error.toString(),
-                          style: const TextStyle(color: AppColors.gray),
+                          style: LumiTextStyles.body(
+                            color: AppColors.charcoal.withValues(alpha: 0.6),
+                          ),
                           textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
+                        LumiGap.s,
+                        LumiPrimaryButton(
                           onPressed: () => setState(() {}),
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Retry'),
+                          text: 'Retry',
+                          icon: Icons.refresh,
                         ),
                       ],
                     ),
@@ -222,18 +224,10 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                     icon: Icons.school_outlined,
                     title: 'No students yet',
                     subtitle: 'Add students to ${widget.classModel.name} to get started',
-                    action: ElevatedButton.icon(
+                    action: LumiPrimaryButton(
                       onPressed: _showAddStudentDialog,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryBlue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 16,
-                        ),
-                      ),
-                      icon: const Icon(Icons.person_add),
-                      label: const Text('Add Student'),
+                      text: 'Add Student',
+                      icon: Icons.person_add,
                     ),
                   );
                 }
@@ -242,23 +236,19 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                   children: [
                     // Student Count Header
                     Container(
-                      padding: const EdgeInsets.all(16),
+                      padding: LumiPadding.allS,
                       color: AppColors.white,
                       child: Row(
                         children: [
                           const Icon(
                             Icons.people,
-                            color: AppColors.primaryBlue,
+                            color: AppColors.rosePink,
                             size: 20,
                           ),
-                          const SizedBox(width: 8),
+                          LumiGap.xs,
                           Text(
                             '${students.length} ${students.length == 1 ? 'Student' : 'Students'}',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.darkGray,
-                            ),
+                            style: LumiTextStyles.bodyLarge(color: AppColors.charcoal),
                           ),
                         ],
                       ),
@@ -267,7 +257,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                     // Student List
                     Expanded(
                       child: ListView.builder(
-                        padding: const EdgeInsets.all(16),
+                        padding: LumiPadding.allS,
                         itemCount: students.length,
                         itemBuilder: (context, index) {
                           return _buildStudentCard(students[index]);
@@ -281,32 +271,29 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: LumiFab(
         onPressed: _showAddStudentDialog,
-        backgroundColor: AppColors.primaryBlue,
-        icon: const Icon(Icons.person_add),
-        label: const Text('Add Student'),
+        icon: Icons.person_add,
+        label: 'Add Student',
+        isExtended: true,
       ),
     );
   }
 
   Widget _buildStudentCard(StudentModel student) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: LumiSpacing.xs),
+      child: LumiCard(
         child: Row(
           children: [
             // Avatar
             CommonWidgets.buildAvatar(
               name: student.fullName,
               size: 50,
-              backgroundColor: AppColors.primaryBlue.withValues(alpha: 0.1),
-              textColor: AppColors.primaryBlue,
+              backgroundColor: AppColors.rosePink.withValues(alpha: 0.1),
+              textColor: AppColors.rosePink,
             ),
-            const SizedBox(width: 16),
+            LumiGap.s,
 
             // Student Info
             Expanded(
@@ -315,36 +302,31 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                 children: [
                   Text(
                     student.fullName,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.darkGray,
-                    ),
+                    style: LumiTextStyles.bodyLarge(),
                   ),
-                  const SizedBox(height: 4),
+                  LumiGap.xxs,
                   if (student.studentId != null && student.studentId!.isNotEmpty)
                     Text(
                       'ID: ${student.studentId}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.gray,
+                      style: LumiTextStyles.body(
+                        color: AppColors.charcoal.withValues(alpha: 0.6),
                       ),
                     ),
-                  const SizedBox(height: 8),
+                  LumiGap.xs,
                   Row(
                     children: [
                       if (student.currentReadingLevel != null &&
                           student.currentReadingLevel!.isNotEmpty)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
+                            horizontal: LumiSpacing.xs,
+                            vertical: LumiSpacing.xxs,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.secondaryPurple.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(4),
+                            color: AppColors.skyBlue.withValues(alpha: 0.2),
+                            borderRadius: LumiBorders.small,
                             border: Border.all(
-                              color: AppColors.secondaryPurple.withValues(alpha: 0.3),
+                              color: AppColors.skyBlue.withValues(alpha: 0.5),
                             ),
                           ),
                           child: Row(
@@ -353,27 +335,24 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                               const Icon(
                                 Icons.book,
                                 size: 14,
-                                color: AppColors.secondaryPurple,
+                                color: AppColors.skyBlue,
                               ),
-                              const SizedBox(width: 4),
+                              const SizedBox(width: LumiSpacing.xxs),
                               Text(
                                 student.currentReadingLevel!,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.secondaryPurple,
+                                style: LumiTextStyles.bodySmall(
+                                  color: AppColors.skyBlue,
                                 ),
                               ),
                             ],
                           ),
                         ),
                       if (student.dateOfBirth != null) ...[
-                        const SizedBox(width: 8),
+                        LumiGap.xs,
                         Text(
                           'Age: ${_calculateAge(student.dateOfBirth!)}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.gray,
+                          style: LumiTextStyles.bodySmall(
+                            color: AppColors.charcoal.withValues(alpha: 0.6),
                           ),
                         ),
                       ],
@@ -385,7 +364,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
 
             // Actions Menu
             PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, color: AppColors.gray),
+              icon: Icon(Icons.more_vert, color: AppColors.charcoal.withValues(alpha: 0.6)),
               onSelected: (value) async {
                 switch (value) {
                   case 'edit':
@@ -420,13 +399,16 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                     ],
                   ),
                 ),
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'remove',
                   child: Row(
                     children: [
-                      Icon(Icons.remove_circle_outline, size: 20, color: AppColors.error),
-                      SizedBox(width: 8),
-                      Text('Remove from Class', style: TextStyle(color: AppColors.error)),
+                      const Icon(Icons.remove_circle_outline, size: 20, color: AppColors.error),
+                      const SizedBox(width: LumiSpacing.xs),
+                      Text(
+                        'Remove from Class',
+                        style: LumiTextStyles.body(color: AppColors.error),
+                      ),
                     ],
                   ),
                 ),
@@ -534,10 +516,10 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                         selectedDate != null
                             ? DateFormat('yyyy-MM-dd').format(selectedDate!)
                             : 'Select date...',
-                        style: TextStyle(
+                        style: LumiTextStyles.body(
                           color: selectedDate != null
-                              ? AppColors.darkGray
-                              : AppColors.gray,
+                              ? AppColors.charcoal
+                              : AppColors.charcoal.withValues(alpha: 0.4),
                         ),
                       ),
                     ),
@@ -574,7 +556,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                 Navigator.pop(context, true);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryBlue,
+                backgroundColor: AppColors.rosePink,
                 foregroundColor: Colors.white,
               ),
               child: const Text('Add Student'),
@@ -747,10 +729,10 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                         selectedDate != null
                             ? DateFormat('yyyy-MM-dd').format(selectedDate!)
                             : 'Select date...',
-                        style: TextStyle(
+                        style: LumiTextStyles.body(
                           color: selectedDate != null
-                              ? AppColors.darkGray
-                              : AppColors.gray,
+                              ? AppColors.charcoal
+                              : AppColors.charcoal.withValues(alpha: 0.4),
                         ),
                       ),
                     ),
@@ -786,7 +768,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                 Navigator.pop(context, true);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryBlue,
+                backgroundColor: AppColors.rosePink,
                 foregroundColor: Colors.white,
               ),
               child: const Text('Save Changes'),
@@ -921,7 +903,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
               Navigator.pop(context, true);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryBlue,
+              backgroundColor: AppColors.rosePink,
               foregroundColor: Colors.white,
             ),
             child: const Text('Update Level'),
