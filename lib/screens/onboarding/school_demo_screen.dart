@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import 'demo_request_screen.dart';
 
@@ -22,7 +26,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
       description:
           'Lumi helps schools, teachers, and parents work together to nurture a love of reading in every child.',
       icon: Icons.auto_stories,
-      color: AppColors.primaryBlue,
+      color: AppColors.rosePink,
     ),
     _DemoSlide(
       title: 'For Teachers',
@@ -37,7 +41,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
         'Parent communication',
       ],
       icon: Icons.school,
-      color: AppColors.success,
+      color: AppColors.mintGreen,
     ),
     _DemoSlide(
       title: 'For Parents',
@@ -52,7 +56,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
         'Daily reminders',
       ],
       icon: Icons.family_restroom,
-      color: AppColors.secondaryPurple,
+      color: AppColors.skyBlue,
     ),
     _DemoSlide(
       title: 'For Schools',
@@ -67,7 +71,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
         'Data export & reports',
       ],
       icon: Icons.business,
-      color: AppColors.warning,
+      color: AppColors.warmOrange,
     ),
     _DemoSlide(
       title: 'Seamless Parent Linking',
@@ -82,7 +86,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
         'Easy unlinking options',
       ],
       icon: Icons.link,
-      color: AppColors.info,
+      color: AppColors.softYellow,
     ),
     _DemoSlide(
       title: 'Key Benefits',
@@ -97,7 +101,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
         '💬 Excellent support',
       ],
       icon: Icons.star,
-      color: AppColors.primaryBlue,
+      color: AppColors.rosePink,
     ),
   ];
 
@@ -136,29 +140,26 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundPrimary,
+      backgroundColor: AppColors.offWhite,
       body: SafeArea(
         child: Column(
           children: [
             // Header
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: LumiPadding.allS,
               child: Row(
                 children: [
                   const LumiMascot(
                     mood: LumiMood.happy,
                     size: 40,
                   ),
-                  const SizedBox(width: 12),
+                  LumiGap.horizontalXS,
                   Text(
                     'Lumi Reading Diary',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primaryBlue,
-                        ),
+                    style: LumiTextStyles.h2(color: AppColors.rosePink),
                   ),
                   const Spacer(),
-                  TextButton(
+                  LumiTextButton(
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -167,7 +168,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
                         ),
                       );
                     },
-                    child: const Text('Skip to Registration'),
+                    text: 'Skip to Registration',
                   ),
                 ],
               ),
@@ -191,20 +192,20 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
 
             // Page indicators
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: LumiPadding.verticalS,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(
                   _slides.length,
                   (index) => Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    margin: EdgeInsets.symmetric(horizontal: LumiSpacing.xxs),
                     width: _currentPage == index ? 24 : 8,
                     height: 8,
                     decoration: BoxDecoration(
                       color: _currentPage == index
-                          ? AppColors.primaryBlue
-                          : AppColors.lightGray,
-                      borderRadius: BorderRadius.circular(4),
+                          ? AppColors.rosePink
+                          : AppColors.charcoal.withValues(alpha: 0.2),
+                      borderRadius: LumiBorders.small,
                     ),
                   ).animate().scale(
                         duration: 200.ms,
@@ -215,32 +216,26 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
 
             // Navigation buttons
             Padding(
-              padding: const EdgeInsets.all(24),
+              padding: LumiPadding.allM,
               child: Row(
                 children: [
                   if (_currentPage > 0)
                     Expanded(
-                      child: OutlinedButton(
+                      child: LumiSecondaryButton(
                         onPressed: _previousPage,
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(56),
-                        ),
-                        child: const Text('Previous'),
+                        text: 'Previous',
+                        isFullWidth: true,
                       ),
                     ),
-                  if (_currentPage > 0) const SizedBox(width: 16),
+                  if (_currentPage > 0) LumiGap.horizontalS,
                   Expanded(
                     flex: 2,
-                    child: ElevatedButton(
+                    child: LumiPrimaryButton(
                       onPressed: _nextPage,
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(56),
-                      ),
-                      child: Text(
-                        _currentPage == _slides.length - 1
-                            ? 'Get Started'
-                            : 'Next',
-                      ),
+                      text: _currentPage == _slides.length - 1
+                          ? 'Get Started'
+                          : 'Next',
+                      isFullWidth: true,
                     ),
                   ),
                 ],
@@ -254,7 +249,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
 
   Widget _buildSlide(_DemoSlide slide) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: LumiPadding.allM,
       child: Column(
         children: [
           // Icon
@@ -272,44 +267,37 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
             ),
           ).animate().scale(delay: 200.ms, duration: 500.ms),
 
-          const SizedBox(height: 32),
+          LumiGap.l,
 
           // Title
           Text(
             slide.title,
-            style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.darkGray,
-                ),
+            style: LumiTextStyles.displayMedium(color: AppColors.charcoal),
             textAlign: TextAlign.center,
           ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
 
-          const SizedBox(height: 12),
+          LumiGap.xs,
 
           // Subtitle
           Text(
             slide.subtitle,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: slide.color,
-                  fontWeight: FontWeight.w600,
-                ),
+            style: LumiTextStyles.h3(color: slide.color),
             textAlign: TextAlign.center,
           ).animate().fadeIn(delay: 400.ms, duration: 500.ms),
 
-          const SizedBox(height: 24),
+          LumiGap.m,
 
           // Description
           if (slide.description.isNotEmpty)
             Text(
               slide.description,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: AppColors.gray,
-                    height: 1.5,
-                  ),
+              style: LumiTextStyles.bodyLarge(
+                color: AppColors.charcoal.withValues(alpha: 0.7),
+              ),
               textAlign: TextAlign.center,
             ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
 
-          const SizedBox(height: 32),
+          LumiGap.l,
 
           // Features
           if (slide.features != null)
@@ -317,14 +305,14 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
               final index = entry.key;
               final feature = entry.value;
               return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(16),
+                margin: EdgeInsets.only(bottom: LumiSpacing.xs),
+                padding: LumiPadding.allS,
                 decoration: BoxDecoration(
                   color: AppColors.white,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: LumiBorders.medium,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
+                      color: AppColors.charcoal.withValues(alpha: 0.05),
                       blurRadius: 10,
                       offset: const Offset(0, 2),
                     ),
@@ -345,15 +333,11 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
                         size: 20,
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    LumiGap.horizontalS,
                     Expanded(
                       child: Text(
                         feature,
-                        style:
-                            Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: AppColors.darkGray,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                        style: LumiTextStyles.bodyMedium(color: AppColors.charcoal),
                       ),
                     ),
                   ],
