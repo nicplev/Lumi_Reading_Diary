@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/class_model.dart';
 import '../../services/firebase_service.dart';
@@ -79,16 +83,20 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Sign Out'),
-        content: const Text('Are you sure you want to sign out?'),
+        shape: LumiBorders.shapeLarge,
+        title: Text('Sign Out', style: LumiTextStyles.h2()),
+        content: Text(
+          'Are you sure you want to sign out?',
+          style: LumiTextStyles.body(),
+        ),
         actions: [
-          TextButton(
+          LumiTextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            text: 'Cancel',
           ),
-          TextButton(
+          LumiTextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Sign Out'),
+            text: 'Sign Out',
           ),
         ],
       ),
@@ -109,9 +117,9 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundPrimary,
+      backgroundColor: AppColors.offWhite,
       appBar: AppBar(
-        title: const Text('Profile'),
+        title: Text('Profile', style: LumiTextStyles.h2()),
         backgroundColor: AppColors.white,
         elevation: 0,
       ),
@@ -121,7 +129,7 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
             // Profile header
             Container(
               color: AppColors.white,
-              padding: const EdgeInsets.all(24),
+              padding: LumiPadding.allM,
               child: Column(
                 children: [
                   CircleAvatar(
@@ -131,50 +139,41 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                       widget.user.fullName.isNotEmpty
                           ? widget.user.fullName[0].toUpperCase()
                           : '?',
-                      style: const TextStyle(
-                        fontSize: 36,
-                        color: AppColors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: LumiTextStyles.display(color: AppColors.white),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  LumiGap.s,
                   Text(
                     widget.user.fullName,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                    style: LumiTextStyles.h1(),
                   ),
-                  const SizedBox(height: 4),
+                  LumiGap.xxs,
                   Text(
                     widget.user.email,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.gray,
-                        ),
+                    style: LumiTextStyles.bodyMedium(
+                      color: AppColors.charcoal.withValues(alpha: 0.7),
+                    ),
                   ),
-                  const SizedBox(height: 8),
+                  LumiGap.xs,
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.teacherColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
+                      color: AppColors.teacherColor.withValues(alpha: 0.1),
+                      borderRadius: LumiBorders.circular,
                     ),
                     child: Text(
                       'Teacher',
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            color: AppColors.teacherColor,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      style: LumiTextStyles.label(color: AppColors.teacherColor),
                     ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 16),
+            LumiGap.s,
 
             // Classes Section
             _buildSectionTitle(context, 'My Classes', Icons.groups),
@@ -189,12 +188,15 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                     )
                   : _classes.isEmpty
                       ? ListTile(
-                          leading: const Icon(Icons.info_outline, color: AppColors.gray),
+                          leading: Icon(
+                            Icons.info_outline,
+                            color: AppColors.charcoal.withValues(alpha: 0.7),
+                          ),
                           title: Text(
                             'No classes assigned',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: AppColors.gray,
-                                ),
+                            style: LumiTextStyles.bodyMedium(
+                              color: AppColors.charcoal.withValues(alpha: 0.7),
+                            ),
                           ),
                         )
                       : Column(
@@ -202,18 +204,21 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                             final isMainTeacher = classModel.teacherId == widget.user.id;
                             return ListTile(
                               leading: CircleAvatar(
-                                backgroundColor: AppColors.teacherColor.withOpacity(0.1),
+                                backgroundColor: AppColors.teacherColor.withValues(alpha: 0.1),
                                 child: const Icon(
                                   Icons.groups,
                                   color: AppColors.teacherColor,
                                 ),
                               ),
-                              title: Text(classModel.name),
+                              title: Text(
+                                classModel.name,
+                                style: LumiTextStyles.bodyMedium(),
+                              ),
                               subtitle: Text(
                                 '${classModel.studentIds.length} students • ${classModel.yearLevel != null ? 'Year ${classModel.yearLevel}' : ''}',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: AppColors.gray,
-                                    ),
+                                style: LumiTextStyles.bodySmall(
+                                  color: AppColors.charcoal.withValues(alpha: 0.7),
+                                ),
                               ),
                               trailing: isMainTeacher
                                   ? null
@@ -223,14 +228,12 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                                         vertical: 4,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: AppColors.info.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(12),
+                                        color: AppColors.info.withValues(alpha: 0.1),
+                                        borderRadius: LumiBorders.medium,
                                       ),
                                       child: Text(
                                         'Assistant',
-                                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                              color: AppColors.info,
-                                            ),
+                                        style: LumiTextStyles.label(color: AppColors.info),
                                       ),
                                     ),
                             );
@@ -238,7 +241,7 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                         ),
             ),
 
-            const SizedBox(height: 16),
+            LumiGap.s,
 
             // School Info
             StreamBuilder<DocumentSnapshot>(
@@ -261,14 +264,14 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                     Container(
                       color: AppColors.white,
                       child: ListTile(
-                        leading: const Icon(Icons.school, color: AppColors.primaryBlue),
-                        title: Text(schoolName),
+                        leading: const Icon(Icons.school, color: AppColors.rosePink),
+                        title: Text(schoolName, style: LumiTextStyles.bodyMedium()),
                         subtitle: widget.user.schoolId != null
                             ? Text(
                                 'School ID: ${widget.user.schoolId!.substring(0, 8)}...',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: AppColors.gray,
-                                    ),
+                                style: LumiTextStyles.bodySmall(
+                                  color: AppColors.charcoal.withValues(alpha: 0.7),
+                                ),
                               )
                             : null,
                       ),
@@ -278,7 +281,7 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
               },
             ),
 
-            const SizedBox(height: 16),
+            LumiGap.s,
 
             // Settings
             _buildSectionTitle(context, 'Settings', Icons.settings_outlined),
@@ -288,7 +291,10 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                 children: [
                   ListTile(
                     leading: const Icon(Icons.notifications_outlined),
-                    title: const Text('Notification Settings'),
+                    title: Text(
+                      'Notification Settings',
+                      style: LumiTextStyles.bodyMedium(),
+                    ),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       // Navigate to notification settings
@@ -297,7 +303,10 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.help_outline),
-                    title: const Text('Help & Support'),
+                    title: Text(
+                      'Help & Support',
+                      style: LumiTextStyles.bodyMedium(),
+                    ),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       // Navigate to help
@@ -306,7 +315,10 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.privacy_tip_outlined),
-                    title: const Text('Privacy Policy'),
+                    title: Text(
+                      'Privacy Policy',
+                      style: LumiTextStyles.bodyMedium(),
+                    ),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       // Navigate to privacy policy
@@ -316,7 +328,7 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
               ),
             ),
 
-            const SizedBox(height: 16),
+            LumiGap.s,
 
             // Actions
             Container(
@@ -325,23 +337,23 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                 leading: const Icon(Icons.logout, color: AppColors.error),
                 title: Text(
                   'Sign Out',
-                  style: TextStyle(color: AppColors.error),
+                  style: LumiTextStyles.bodyMedium(color: AppColors.error),
                 ),
                 onTap: _handleSignOut,
               ),
             ),
 
-            const SizedBox(height: 32),
+            LumiGap.l,
 
             // Version info
             Text(
               'Version 1.0.0',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.gray,
-                  ),
+              style: LumiTextStyles.bodySmall(
+                color: AppColors.charcoal.withValues(alpha: 0.7),
+              ),
             ),
 
-            const SizedBox(height: 16),
+            LumiGap.s,
           ],
         ),
       ),
@@ -350,17 +362,23 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
 
   Widget _buildSectionTitle(BuildContext context, String title, IconData icon) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: const EdgeInsets.fromLTRB(
+        LumiSpacing.s,
+        LumiSpacing.s,
+        LumiSpacing.s,
+        LumiSpacing.xs,
+      ),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: AppColors.gray),
-          const SizedBox(width: 8),
+          Icon(
+            icon,
+            size: 20,
+            color: AppColors.charcoal.withValues(alpha: 0.7),
+          ),
+          LumiGap.xs,
           Text(
             title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.darkGray,
-                ),
+            style: LumiTextStyles.h3(color: AppColors.charcoal),
           ),
         ],
       ),
