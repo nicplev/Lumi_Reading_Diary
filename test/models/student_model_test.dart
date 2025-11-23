@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lumi_reading_tracker/data/models/student_model.dart';
 import '../helpers/test_helpers.dart';
@@ -16,9 +15,15 @@ void main() {
     group('fromFirestore', () {
       test('creates student model from Firestore document', () async {
         final firestore = TestHelpers.createFakeFirestore();
-        await firestore.collection('students').doc('test-student-123').set(testData);
+        await firestore
+            .collection('students')
+            .doc('test-student-123')
+            .set(testData);
 
-        final doc = await firestore.collection('students').doc('test-student-123').get();
+        final doc = await firestore
+            .collection('students')
+            .doc('test-student-123')
+            .get();
         final student = StudentModel.fromFirestore(doc);
 
         expect(student.id, equals('test-student-123'));
@@ -34,9 +39,13 @@ void main() {
 
       test('correctly parses stats object', () async {
         final firestore = TestHelpers.createFakeFirestore();
-        await firestore.collection('students').doc('student-stats').set(testData);
+        await firestore
+            .collection('students')
+            .doc('student-stats')
+            .set(testData);
 
-        final doc = await firestore.collection('students').doc('student-stats').get();
+        final doc =
+            await firestore.collection('students').doc('student-stats').get();
         final student = StudentModel.fromFirestore(doc);
 
         expect(student.stats, isNotNull);
@@ -50,9 +59,13 @@ void main() {
 
       test('correctly parses reading level history', () async {
         final firestore = TestHelpers.createFakeFirestore();
-        await firestore.collection('students').doc('student-history').set(testData);
+        await firestore
+            .collection('students')
+            .doc('student-history')
+            .set(testData);
 
-        final doc = await firestore.collection('students').doc('student-history').get();
+        final doc =
+            await firestore.collection('students').doc('student-history').get();
         final student = StudentModel.fromFirestore(doc);
 
         expect(student.levelHistory, isNotEmpty);
@@ -68,9 +81,13 @@ void main() {
         };
 
         final firestore = TestHelpers.createFakeFirestore();
-        await firestore.collection('students').doc('student-nulls').set(dataWithNulls);
+        await firestore
+            .collection('students')
+            .doc('student-nulls')
+            .set(dataWithNulls);
 
-        final doc = await firestore.collection('students').doc('student-nulls').get();
+        final doc =
+            await firestore.collection('students').doc('student-nulls').get();
         final student = StudentModel.fromFirestore(doc);
 
         expect(student.stats, isNull);
@@ -102,7 +119,7 @@ void main() {
             ReadingLevelHistory(
               level: 'Level 5',
               changedAt: testDateTime,
-              changedBy:'teacher-999',
+              changedBy: 'teacher-999',
             ),
           ],
           createdAt: testDateTime,
@@ -231,17 +248,17 @@ void main() {
           ReadingLevelHistory(
             level: 'Level 5',
             changedAt: DateTime(2024, 1, 1),
-            changedBy:'teacher-123',
+            changedBy: 'teacher-123',
           ),
           ReadingLevelHistory(
             level: 'Level 6',
             changedAt: DateTime(2024, 2, 1),
-            changedBy:'teacher-123',
+            changedBy: 'teacher-123',
           ),
           ReadingLevelHistory(
             level: 'Level 7',
             changedAt: DateTime(2024, 3, 1),
-            changedBy:'teacher-123',
+            changedBy: 'teacher-123',
           ),
         ];
 
@@ -259,7 +276,7 @@ void main() {
         final history = ReadingLevelHistory(
           level: 'Level 10',
           changedAt: testDateTime,
-          changedBy:'teacher-456',
+          changedBy: 'teacher-456',
         );
 
         expect(history.changedBy, equals('teacher-456'));
@@ -373,7 +390,7 @@ void main() {
           (i) => ReadingLevelHistory(
             level: 'Level ${i + 1}',
             changedAt: DateTime(2024, 1, 1).add(Duration(days: i * 7)),
-            changedBy:'teacher-123',
+            changedBy: 'teacher-123',
           ),
         );
 

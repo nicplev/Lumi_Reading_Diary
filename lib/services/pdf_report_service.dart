@@ -565,7 +565,7 @@ class PdfReportService {
                 ],
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );
@@ -832,7 +832,7 @@ class PdfReportService {
                     _buildTableCell('${student['streak']}'),
                   ],
                 );
-              }).toList(),
+              }),
             ],
           ),
         ],
@@ -909,7 +909,7 @@ class PdfReportService {
                     _buildTableCell(student['issue'] as String),
                   ],
                 );
-              }).toList(),
+              }),
             ],
           ),
         ],
@@ -1295,7 +1295,7 @@ class PdfReportService {
     // Celebrate successes
     if (currentStreak >= 7) {
       recommendations.add(
-        '🎉 Excellent work! ${student.firstName} has maintained a ${currentStreak}-day reading streak. Keep up the amazing consistency!',
+        '🎉 Excellent work! ${student.firstName} has maintained a $currentStreak-day reading streak. Keep up the amazing consistency!',
       );
     }
 

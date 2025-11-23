@@ -3,7 +3,6 @@ import 'package:lumi_reading_tracker/services/offline_service.dart';
 import 'package:lumi_reading_tracker/data/models/reading_log_model.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'dart:io';
-import '../helpers/test_helpers.dart';
 
 void main() {
   // Initialize Flutter bindings for tests
@@ -48,7 +47,8 @@ void main() {
         await offlineService.saveReadingLogLocally(log);
 
         // Verify log was saved
-        final savedLogs = await offlineService.getLocalReadingLogs('student-123');
+        final savedLogs =
+            await offlineService.getLocalReadingLogs('student-123');
         expect(savedLogs, isNotEmpty);
         expect(savedLogs.first.id, equals('test-log-local'));
       });
@@ -175,7 +175,8 @@ void main() {
       });
 
       test('returns empty list for student with no logs', () async {
-        final logs = await offlineService.getLocalReadingLogs('student-nonexistent');
+        final logs =
+            await offlineService.getLocalReadingLogs('student-nonexistent');
         expect(logs, isEmpty);
       });
     });
@@ -305,7 +306,8 @@ void main() {
         // Clear data older than 30 days
         await offlineService.clearOldData(daysToKeep: 30);
 
-        final logs = await offlineService.getLocalReadingLogs('student-cleanup');
+        final logs =
+            await offlineService.getLocalReadingLogs('student-cleanup');
 
         // Recent log should remain
         expect(logs.any((log) => log.id == 'log-recent'), isTrue);
@@ -337,7 +339,8 @@ void main() {
         await offlineService.saveReadingLogLocally(log);
 
         // Verify it's marked as offline created
-        final savedLogs = await offlineService.getLocalReadingLogs('student-integration');
+        final savedLogs =
+            await offlineService.getLocalReadingLogs('student-integration');
         expect(savedLogs.first.isOfflineCreated, isTrue);
         expect(savedLogs.first.syncedAt, isNull);
 
@@ -349,7 +352,8 @@ void main() {
 
         await offlineService.saveReadingLogLocally(syncedLog);
 
-        final updatedLogs = await offlineService.getLocalReadingLogs('student-integration');
+        final updatedLogs =
+            await offlineService.getLocalReadingLogs('student-integration');
         expect(updatedLogs.first.isOfflineCreated, isFalse);
         expect(updatedLogs.first.syncedAt, isNotNull);
       });

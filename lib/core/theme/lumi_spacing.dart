@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 /// Lumi Design System - Spacing
 ///
 /// All spacing values follow an 8pt grid system for visual consistency

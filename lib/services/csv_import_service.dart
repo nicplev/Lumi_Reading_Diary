@@ -272,6 +272,15 @@ class CSVImportService {
               'studentIds': FieldValue.arrayUnion([studentRef.id]),
             });
 
+            // Increment school studentCount
+            final schoolRef = _firebaseService.firestore
+                .collection('schools')
+                .doc(schoolId);
+
+            batch.update(schoolRef, {
+              'studentCount': FieldValue.increment(1),
+            });
+
             // Create student model for result
             final student = StudentModel(
               id: studentRef.id,

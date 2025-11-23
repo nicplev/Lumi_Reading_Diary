@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lumi_reading_tracker/data/models/reading_log_model.dart';
 import '../helpers/test_helpers.dart';
@@ -18,10 +17,14 @@ void main() {
         final firestore = TestHelpers.createFakeFirestore();
 
         // Add document to fake Firestore
-        await firestore.collection('readingLogs').doc('test-log-123').set(testData);
+        await firestore
+            .collection('readingLogs')
+            .doc('test-log-123')
+            .set(testData);
 
         // Get document
-        final doc = await firestore.collection('readingLogs').doc('test-log-123').get();
+        final doc =
+            await firestore.collection('readingLogs').doc('test-log-123').get();
         final log = ReadingLogModel.fromFirestore(doc);
 
         expect(log.id, equals('test-log-123'));
@@ -45,9 +48,13 @@ void main() {
         };
 
         final firestore = TestHelpers.createFakeFirestore();
-        await firestore.collection('readingLogs').doc('test-log-456').set(dataWithNulls);
+        await firestore
+            .collection('readingLogs')
+            .doc('test-log-456')
+            .set(dataWithNulls);
 
-        final doc = await firestore.collection('readingLogs').doc('test-log-456').get();
+        final doc =
+            await firestore.collection('readingLogs').doc('test-log-456').get();
         final log = ReadingLogModel.fromFirestore(doc);
 
         expect(log.notes, isNull);
@@ -61,9 +68,15 @@ void main() {
         for (final status in statuses) {
           final data = {...testData, 'status': status};
           final firestore = TestHelpers.createFakeFirestore();
-          await firestore.collection('readingLogs').doc('log-$status').set(data);
+          await firestore
+              .collection('readingLogs')
+              .doc('log-$status')
+              .set(data);
 
-          final doc = await firestore.collection('readingLogs').doc('log-$status').get();
+          final doc = await firestore
+              .collection('readingLogs')
+              .doc('log-$status')
+              .get();
           final log = ReadingLogModel.fromFirestore(doc);
           expect(log.status.toString(), contains(status));
         }

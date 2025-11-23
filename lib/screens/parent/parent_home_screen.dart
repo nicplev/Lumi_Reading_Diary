@@ -11,6 +11,7 @@ import '../../core/theme/lumi_borders.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_card.dart';
 import '../../core/widgets/lumi_mascot.dart';
+import '../../core/services/navigation_state_service.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/reading_log_model.dart';
@@ -247,14 +248,15 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
                           onTap: hasLoggedToday
                               ? null
                               : () async {
-                                  final result = await context.push(
-                                    '/parent/log-reading',
-                                    extra: {
-                                      'user': widget.user,
-                                      'student': selectedChild,
-                                      'allocation': allocation,
-                                    },
-                                  );
+                                  // Store data in navigation service
+                                  NavigationStateService().setTempData({
+                                    'parent': widget.user,
+                                    'student': selectedChild,
+                                    'allocation': allocation,
+                                  });
+                                  debugPrint('DEBUG: Setting temp data - parent: ${widget.user.id}, student: ${selectedChild.id}');
+
+                                  final result = await context.push('/parent/log-reading');
                                   if (result == true) {
                                     // Refresh after logging
                                     setState(() {});

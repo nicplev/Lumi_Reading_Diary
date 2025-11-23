@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/minimal_theme.dart';
 import '../../core/widgets/minimal/minimal_widgets.dart';
+import '../../core/services/navigation_state_service.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../data/models/allocation_model.dart';
 import '../../services/firebase_service.dart';
-import 'log_reading_screen.dart';
 import 'reading_history_screen.dart';
 import 'parent_profile_screen.dart';
 
@@ -334,16 +335,15 @@ class _ParentHomeScreenMinimalState extends State<ParentHomeScreenMinimal> {
               onTap: hasLoggedToday
                   ? null
                   : () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => LogReadingScreen(
-                            student: student,
-                            parent: widget.user,
-                            allocation: allocation,
-                          ),
-                        ),
-                      );
+                      // Store data in navigation service
+                      final data = {
+                        'parent': widget.user,
+                        'student': student,
+                        'allocation': allocation,
+                      };
+                      debugPrint('DEBUG: Setting temp data - parent: ${widget.user.id}, student: ${student.id}');
+                      NavigationStateService().setTempData(data);
+                      context.push('/parent/log-reading');
                     },
               padding: const EdgeInsets.all(MinimalTheme.spaceL),
               child: Column(
@@ -415,16 +415,15 @@ class _ParentHomeScreenMinimalState extends State<ParentHomeScreenMinimal> {
                     PillButton(
                       text: 'Tap to Mark as Done',
                       onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => LogReadingScreen(
-                              student: student,
-                              parent: widget.user,
-                              allocation: allocation,
-                            ),
-                          ),
-                        );
+                        // Store data in navigation service
+                        final data = {
+                          'parent': widget.user,
+                          'student': student,
+                          'allocation': allocation,
+                        };
+                        debugPrint('DEBUG: Setting temp data - parent: ${widget.user.id}, student: ${student.id}');
+                        NavigationStateService().setTempData(data);
+                        context.push('/parent/log-reading');
                       },
                       icon: Icons.check_circle_outline,
                       backgroundColor: MinimalTheme.primaryPurple,

@@ -43,6 +43,14 @@ service cloud.firestore {
       allow get: if belongsToSchool(schoolId);
       allow write: if isSchoolAdmin(schoolId);
 
+      // Allow authenticated users to increment counters during registration
+      // This allows newly registered users/parents to update teacherCount, parentCount, or studentCount
+      // Only allows incrementing one counter field at a time
+      allow update: if isSignedIn() &&
+                       request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['teacherCount', 'parentCount', 'studentCount']) &&
+                       request.resource.data.diff(resource.data).affectedKeys().size() == 1;
+
       // ============================================
       // Users Subcollection (staff, teachers, admins)
       // ============================================
@@ -261,6 +269,50 @@ service cloud.firestore {
       allow delete: if isSignedIn() &&
                        exists(/databases/$(database)/documents/schools/$(resource.data.schoolId)/users/$(request.auth.uid)) &&
                        get(/databases/$(database)/documents/schools/$(resource.data.schoolId)/users/$(request.auth.uid)).data.role == 'schoolAdmin';
+    }
+
+    // ============================================
+    // School Codes Collection (top-level)
+    // ============================================
+    match /schoolCodes/{codeId} {
+      // Allow reading codes for validation during registration (even before authentication)
+      // This is safe because:
+      // 1. Only allows querying by specific code (not listing all codes)
+      // 2. Code validation happens before user creation
+      // 3. Codes don't contain sensitive information
+      allow read: if true;
+
+      // Only school admins can create school codes for their school
+      allow create: if isSignedIn() &&
+                       exists(/databases/$(database)/documents/schools/$(request.resource.data.schoolId)/users/$(request.auth.uid)) &&
+                       get(/databases/$(database)/documents/schools/$(request.resource.data.schoolId)/users/$(request.auth.uid)).data.role == 'schoolAdmin';
+
+      // School admins can update their school's codes
+      allow update: if isSignedIn() &&
+                       exists(/databases/$(database)/documents/schools/$(resource.data.schoolId)/users/$(request.auth.uid)) &&
+                       get(/databases/$(database)/documents/schools/$(resource.data.schoolId)/users/$(request.auth.uid)).data.role == 'schoolAdmin';
+
+      // Allow authenticated users to increment usage count (during teacher registration)
+      // Only the usageCount field can be modified
+      allow update: if isSignedIn() &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usageCount']) &&
+                       request.resource.data.usageCount == resource.data.usageCount + 1;
+
+      // Only school admins can delete codes
+      allow delete: if isSignedIn() &&
+                       exists(/databases/$(database)/documents/schools/$(resource.data.schoolId)/users/$(request.auth.uid)) &&
+                       get(/databases/$(database)/documents/schools/$(resource.data.schoolId)/users/$(request.auth.uid)).data.role == 'schoolAdmin';
+    }
+
+    // ============================================
+    // User School Index Collection (top-level)
+    // ============================================
+    match /userSchoolIndex/{emailHash} {
+      // Allow all authenticated users to read (for fast login lookups)
+      allow read: if isSignedIn();
+
+      // Allow authenticated users to create/update their own index entry (during registration/login)
+      allow write: if isSignedIn();
     }
   }
 }

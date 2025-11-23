@@ -15,6 +15,7 @@ import '../../core/widgets/lumi_mascot.dart';
 import '../../core/routing/app_router.dart';
 import '../../data/models/user_model.dart';
 import '../../services/firebase_service.dart';
+import '../../core/services/user_school_index_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -26,6 +27,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormBuilderState>();
   final FirebaseService _firebaseService = FirebaseService.instance;
+  final UserSchoolIndexService _indexService = UserSchoolIndexService();
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _errorMessage;
@@ -50,43 +52,82 @@ class _LoginScreenState extends State<LoginScreen> {
         );
 
         if (userCredential.user != null) {
-          // NEW: Find user in nested structure
-          // First, get all schools and search for the user
-          final schoolsSnapshot =
-              await _firebaseService.firestore.collection('schools').get();
-
+          // OPTIMIZED: Use email-to-school index for O(1) lookup
           UserModel? user;
           String? userSchoolId;
 
-          for (final schoolDoc in schoolsSnapshot.docs) {
-            final schoolId = schoolDoc.id;
+          // Try fast lookup using index first
+          final indexResult = await _indexService.lookupSchoolByEmail(email);
 
-            // Try to find user in this school's users collection
+          if (indexResult != null) {
+            // Found in index - direct lookup (2-3 reads total)
+            final schoolId = indexResult['schoolId'] as String;
+            final userType = indexResult['userType'] as String;
+            final collectionName = userType == 'parent' ? 'parents' : 'users';
+
             final userDoc = await _firebaseService.firestore
                 .collection('schools')
                 .doc(schoolId)
-                .collection('users')
+                .collection(collectionName)
                 .doc(userCredential.user!.uid)
                 .get();
 
             if (userDoc.exists) {
               user = UserModel.fromFirestore(userDoc);
               userSchoolId = schoolId;
-              break;
             }
+          } else {
+            // Fallback: Index not found (existing users before optimization)
+            // Iterate through schools (legacy behavior for backward compatibility)
+            final schoolsSnapshot =
+                await _firebaseService.firestore.collection('schools').get();
 
-            // Also check parents collection
-            final parentDoc = await _firebaseService.firestore
-                .collection('schools')
-                .doc(schoolId)
-                .collection('parents')
-                .doc(userCredential.user!.uid)
-                .get();
+            for (final schoolDoc in schoolsSnapshot.docs) {
+              final schoolId = schoolDoc.id;
 
-            if (parentDoc.exists) {
-              user = UserModel.fromFirestore(parentDoc);
-              userSchoolId = schoolId;
-              break;
+              // Try to find user in this school's users collection
+              final userDoc = await _firebaseService.firestore
+                  .collection('schools')
+                  .doc(schoolId)
+                  .collection('users')
+                  .doc(userCredential.user!.uid)
+                  .get();
+
+              if (userDoc.exists) {
+                user = UserModel.fromFirestore(userDoc);
+                userSchoolId = schoolId;
+
+                // Backfill the index for this user for future logins
+                await _indexService.createOrUpdateIndex(
+                  email: email,
+                  schoolId: schoolId,
+                  userType: 'user',
+                  userId: userCredential.user!.uid,
+                );
+                break;
+              }
+
+              // Also check parents collection
+              final parentDoc = await _firebaseService.firestore
+                  .collection('schools')
+                  .doc(schoolId)
+                  .collection('parents')
+                  .doc(userCredential.user!.uid)
+                  .get();
+
+              if (parentDoc.exists) {
+                user = UserModel.fromFirestore(parentDoc);
+                userSchoolId = schoolId;
+
+                // Backfill the index for this user for future logins
+                await _indexService.createOrUpdateIndex(
+                  email: email,
+                  schoolId: schoolId,
+                  userType: 'parent',
+                  userId: userCredential.user!.uid,
+                );
+                break;
+              }
             }
           }
 
@@ -155,6 +196,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     // Navigate to role-based home screen
     final homeRoute = AppRouter.getHomeRouteForRole(user.role);
+    // ignore: invalid_use_of_internal_member
     context.go(homeRoute, extra: user);
   }
 

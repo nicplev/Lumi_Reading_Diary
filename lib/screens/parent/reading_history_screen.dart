@@ -570,7 +570,7 @@ class _LogCard extends StatelessWidget {
         child: ListTile(
           leading: Container(
             width: 48,
-            height: 48,
+            height: 50,
             decoration: BoxDecoration(
               color: AppColors.rosePink.withValues(alpha: 0.1),
               borderRadius: LumiBorders.medium,

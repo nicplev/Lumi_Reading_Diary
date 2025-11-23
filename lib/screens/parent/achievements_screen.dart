@@ -376,7 +376,7 @@ class _AchievementsScreenState extends State<AchievementsScreen>
         children: [
           Text(
             '🏆',
-            style: const TextStyle(fontSize: 64),
+            style: LumiTextStyles.display().copyWith(fontSize: 64),
           )
               .animate(onPlay: (controller) => controller.repeat())
               .shimmer(duration: 2000.ms)

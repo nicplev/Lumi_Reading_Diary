@@ -350,24 +350,64 @@ class ParentLinkingService {
     required String studentId,
     required String parentUserId,
   }) async {
-    // Remove from student's parentIds
-    await _firestore
-        .collection('schools')
-        .doc(schoolId)
-        .collection('students')
-        .doc(studentId)
-        .update({
-      'parentIds': FieldValue.arrayRemove([parentUserId]),
-    });
+    // Use transaction to ensure atomic updates (both succeed or both fail)
+    await _firestore.runTransaction((transaction) async {
+      final studentRef = _firestore
+          .collection('schools')
+          .doc(schoolId)
+          .collection('students')
+          .doc(studentId);
 
-    // Remove from parent's linkedChildren
-    await _firestore
-        .collection('schools')
-        .doc(schoolId)
-        .collection('parents')
-        .doc(parentUserId)
-        .update({
-      'linkedChildren': FieldValue.arrayRemove([studentId]),
+      final parentRef = _firestore
+          .collection('schools')
+          .doc(schoolId)
+          .collection('parents')
+          .doc(parentUserId);
+
+      // Read student and parent documents to verify they exist
+      final studentSnapshot = await transaction.get(studentRef);
+      final parentSnapshot = await transaction.get(parentRef);
+
+      if (!studentSnapshot.exists) {
+        throw Exception('Student not found');
+      }
+
+      if (!parentSnapshot.exists) {
+        throw Exception('Parent not found');
+      }
+
+      // Verify the link exists before unlinking
+      final studentData = studentSnapshot.data()!;
+      final parentIds = List<String>.from(studentData['parentIds'] ?? []);
+
+      if (!parentIds.contains(parentUserId)) {
+        throw Exception('Parent is not linked to this student');
+      }
+
+      // Atomic updates: Remove from both sides
+      transaction.update(studentRef, {
+        'parentIds': FieldValue.arrayRemove([parentUserId]),
+      });
+
+      transaction.update(parentRef, {
+        'linkedChildren': FieldValue.arrayRemove([studentId]),
+      });
+
+      // Find and revoke any active link codes for this student
+      final linkCodesSnapshot = await _firestore
+          .collection('studentLinkCodes')
+          .where('studentId', isEqualTo: studentId)
+          .where('status', isEqualTo: 'active')
+          .get();
+
+      for (final codeDoc in linkCodesSnapshot.docs) {
+        transaction.update(codeDoc.reference, {
+          'status': 'revoked',
+          'revokedBy': parentUserId,
+          'revokedAt': FieldValue.serverTimestamp(),
+          'revokeReason': 'Parent unlinked from student',
+        });
+      }
     });
   }
 

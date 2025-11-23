@@ -1,10 +1,13 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../data/models/user_model.dart';
+import '../../data/models/student_model.dart';
+import '../../data/models/class_model.dart';
+import '../../data/models/allocation_model.dart';
 import '../../services/firebase_service.dart';
+import '../services/navigation_state_service.dart';
 import '../../screens/auth/splash_screen.dart';
 import '../../screens/auth/login_screen.dart';
 import '../../screens/auth/register_screen.dart';
@@ -12,7 +15,6 @@ import '../../screens/auth/forgot_password_screen.dart';
 import '../../screens/auth/parent_registration_screen.dart';
 import '../../screens/auth/web_not_available_screen.dart';
 import '../../screens/parent/parent_home_screen.dart';
-import '../../screens/parent/parent_home_screen_minimal.dart';
 import '../../screens/parent/log_reading_screen.dart';
 import '../../screens/parent/reading_history_screen.dart';
 import '../../screens/parent/student_goals_screen.dart';
@@ -23,14 +25,12 @@ import '../../screens/parent/student_report_screen.dart';
 import '../../screens/parent/parent_profile_screen.dart';
 import '../../screens/parent/book_browser_screen.dart';
 import '../../screens/teacher/teacher_home_screen.dart';
-import '../../screens/teacher/teacher_home_screen_minimal.dart';
 import '../../screens/teacher/allocation_screen.dart';
 import '../../screens/teacher/class_detail_screen.dart';
 import '../../screens/teacher/reading_groups_screen.dart';
 import '../../screens/teacher/class_report_screen.dart';
 import '../../screens/teacher/teacher_profile_screen.dart';
 import '../../screens/admin/admin_home_screen.dart';
-import '../../screens/admin/admin_home_screen_minimal.dart';
 import '../../screens/admin/user_management_screen.dart';
 import '../../screens/admin/student_management_screen.dart';
 import '../../screens/admin/class_management_screen.dart';
@@ -60,7 +60,7 @@ class AppRouter {
     redirect: (context, state) async {
       final isLoggedIn = _firebaseService.auth.currentUser != null;
       final isAuthRoute = state.matchedLocation.startsWith('/auth') ||
-                          state.matchedLocation == '/splash';
+          state.matchedLocation == '/splash';
 
       // Allow splash and auth routes
       if (state.matchedLocation == '/splash' || isAuthRoute) {
@@ -130,7 +130,10 @@ class AppRouter {
       GoRoute(
         path: '/onboarding/school-registration',
         name: 'school-registration',
-        builder: (context, state) => const SchoolRegistrationWizard(),
+        builder: (context, state) {
+          final onboardingId = state.uri.queryParameters['onboardingId'] ?? 'default';
+          return SchoolRegistrationWizard(onboardingId: onboardingId);
+        },
       ),
 
       GoRoute(
@@ -166,25 +169,30 @@ class AppRouter {
       ),
 
       GoRoute(
-        path: '/parent/home-minimal',
-        name: 'parent-home-minimal',
-        redirect: (context, state) => _requireRole(UserRole.parent),
-        builder: (context, state) {
-          final user = state.extra as UserModel?;
-          if (user == null) return const LoginScreen();
-          return ParentHomeScreenMinimal(user: user);
-        },
-      ),
-
-      GoRoute(
         path: '/parent/log-reading',
         name: 'log-reading',
         redirect: (context, state) => _requireRole(UserRole.parent),
         builder: (context, state) {
-          final params = state.extra as Map<String, dynamic>?;
+          // Try to get data from navigation service first
+          final tempData = NavigationStateService().getTempData();
+
+          debugPrint('DEBUG: log-reading route - tempData: $tempData');
+
+          final parent = tempData?['parent'] as UserModel?;
+          final student = tempData?['student'] as StudentModel?;
+          final allocation = tempData?['allocation'] as AllocationModel?;
+
+          debugPrint('DEBUG: parent: ${parent?.id}, student: ${student?.id}, allocation: ${allocation?.id}');
+
+          if (parent == null || student == null) {
+            debugPrint('DEBUG: parent or student is null, redirecting to login');
+            return const LoginScreen();
+          }
+
           return LogReadingScreen(
-            user: params?['user'] as UserModel,
-            student: params?['student'],
+            parent: parent,
+            student: student,
+            allocation: allocation,
           );
         },
       ),
@@ -195,9 +203,12 @@ class AppRouter {
         redirect: (context, state) => _requireRole(UserRole.parent),
         builder: (context, state) {
           final params = state.extra as Map<String, dynamic>?;
+          final student = params?['student'] as StudentModel?;
+          if (student == null) return const LoginScreen();
           return ReadingHistoryScreen(
-            user: params?['user'] as UserModel,
-            student: params?['student'],
+            studentId: student.id,
+            parentId: student.parentIds.isNotEmpty ? student.parentIds.first : '',
+            schoolId: student.schoolId,
           );
         },
       ),
@@ -208,9 +219,10 @@ class AppRouter {
         redirect: (context, state) => _requireRole(UserRole.parent),
         builder: (context, state) {
           final params = state.extra as Map<String, dynamic>?;
+          final student = params?['student'] as StudentModel?;
+          if (student == null) return const LoginScreen();
           return StudentGoalsScreen(
-            user: params?['user'] as UserModel,
-            student: params?['student'],
+            student: student,
           );
         },
       ),
@@ -221,9 +233,11 @@ class AppRouter {
         redirect: (context, state) => _requireRole(UserRole.parent),
         builder: (context, state) {
           final params = state.extra as Map<String, dynamic>?;
+          final student = params?['student'] as StudentModel?;
+          if (student == null) return const LoginScreen();
           return AchievementsScreen(
-            user: params?['user'] as UserModel,
-            student: params?['student'],
+            studentId: student.id,
+            schoolId: student.schoolId,
           );
         },
       ),
@@ -233,8 +247,9 @@ class AppRouter {
         name: 'reminder-settings',
         redirect: (context, state) => _requireRole(UserRole.parent),
         builder: (context, state) {
-          final user = state.extra as UserModel?;
-          return ReminderSettingsScreen(user: user!);
+          final params = state.extra as Map<String, dynamic>?;
+          final studentName = params?['studentName'] as String? ?? 'Student';
+          return ReminderSettingsScreen(studentName: studentName);
         },
       ),
 
@@ -243,8 +258,7 @@ class AppRouter {
         name: 'offline-management',
         redirect: (context, state) => _requireRole(UserRole.parent),
         builder: (context, state) {
-          final user = state.extra as UserModel?;
-          return OfflineManagementScreen(user: user!);
+          return const OfflineManagementScreen();
         },
       ),
 
@@ -254,9 +268,10 @@ class AppRouter {
         redirect: (context, state) => _requireRole(UserRole.parent),
         builder: (context, state) {
           final params = state.extra as Map<String, dynamic>?;
+          final student = params?['student'] as StudentModel?;
+          if (student == null) return const LoginScreen();
           return StudentReportScreen(
-            user: params?['user'] as UserModel,
-            student: params?['student'],
+            student: student,
           );
         },
       ),
@@ -277,9 +292,10 @@ class AppRouter {
         redirect: (context, state) => _requireRole(UserRole.parent),
         builder: (context, state) {
           final params = state.extra as Map<String, dynamic>?;
+          final student = params?['student'] as StudentModel?;
+          if (student == null) return const LoginScreen();
           return BookBrowserScreen(
-            user: params?['user'] as UserModel,
-            onBookSelected: params?['onBookSelected'],
+            student: student,
           );
         },
       ),
@@ -299,25 +315,16 @@ class AppRouter {
       ),
 
       GoRoute(
-        path: '/teacher/home-minimal',
-        name: 'teacher-home-minimal',
-        redirect: (context, state) => _requireRole(UserRole.teacher),
-        builder: (context, state) {
-          final user = state.extra as UserModel?;
-          if (user == null) return const LoginScreen();
-          return TeacherHomeScreenMinimal(user: user);
-        },
-      ),
-
-      GoRoute(
         path: '/teacher/allocation',
         name: 'allocation',
         redirect: (context, state) => _requireRole(UserRole.teacher),
         builder: (context, state) {
           final params = state.extra as Map<String, dynamic>?;
+          final teacher = params?['teacher'] as UserModel?;
+          if (teacher == null) return const LoginScreen();
           return AllocationScreen(
-            user: params?['user'] as UserModel,
-            classData: params?['classData'],
+            teacher: teacher,
+            selectedClass: params?['selectedClass'] as ClassModel?,
           );
         },
       ),
@@ -327,11 +334,13 @@ class AppRouter {
         name: 'class-detail',
         redirect: (context, state) => _requireRole(UserRole.teacher),
         builder: (context, state) {
-          final classId = state.pathParameters['classId']!;
           final params = state.extra as Map<String, dynamic>?;
+          final teacher = params?['teacher'] as UserModel?;
+          final classModel = params?['classModel'] as ClassModel?;
+          if (teacher == null || classModel == null) return const LoginScreen();
           return ClassDetailScreen(
-            user: params?['user'] as UserModel,
-            classId: classId,
+            teacher: teacher,
+            classModel: classModel,
           );
         },
       ),
@@ -342,9 +351,10 @@ class AppRouter {
         redirect: (context, state) => _requireRole(UserRole.teacher),
         builder: (context, state) {
           final params = state.extra as Map<String, dynamic>?;
+          final classModel = params?['classModel'] as ClassModel?;
+          if (classModel == null) return const LoginScreen();
           return ReadingGroupsScreen(
-            user: params?['user'] as UserModel,
-            classData: params?['classData'],
+            classModel: classModel,
           );
         },
       ),
@@ -355,9 +365,10 @@ class AppRouter {
         redirect: (context, state) => _requireRole(UserRole.teacher),
         builder: (context, state) {
           final params = state.extra as Map<String, dynamic>?;
+          final classModel = params?['classModel'] as ClassModel?;
+          if (classModel == null) return const LoginScreen();
           return ClassReportScreen(
-            user: params?['user'] as UserModel,
-            classData: params?['classData'],
+            classModel: classModel,
           );
         },
       ),
@@ -387,23 +398,13 @@ class AppRouter {
       ),
 
       GoRoute(
-        path: '/admin/home-minimal',
-        name: 'admin-home-minimal',
-        redirect: (context, state) => _requireRole(UserRole.schoolAdmin),
-        builder: (context, state) {
-          final user = state.extra as UserModel?;
-          if (user == null) return const LoginScreen();
-          return AdminHomeScreenMinimal(user: user);
-        },
-      ),
-
-      GoRoute(
         path: '/admin/user-management',
         name: 'user-management',
         redirect: (context, state) => _requireRole(UserRole.schoolAdmin),
         builder: (context, state) {
           final user = state.extra as UserModel?;
-          return UserManagementScreen(user: user!);
+          if (user == null) return const LoginScreen();
+          return UserManagementScreen(adminUser: user);
         },
       ),
 
@@ -412,8 +413,14 @@ class AppRouter {
         name: 'student-management',
         redirect: (context, state) => _requireRole(UserRole.schoolAdmin),
         builder: (context, state) {
-          final user = state.extra as UserModel?;
-          return StudentManagementScreen(user: user!);
+          final params = state.extra as Map<String, dynamic>?;
+          final adminUser = params?['adminUser'] as UserModel?;
+          final classModel = params?['classModel'] as ClassModel?;
+          if (adminUser == null || classModel == null) return const LoginScreen();
+          return StudentManagementScreen(
+            adminUser: adminUser,
+            classModel: classModel,
+          );
         },
       ),
 
@@ -423,7 +430,8 @@ class AppRouter {
         redirect: (context, state) => _requireRole(UserRole.schoolAdmin),
         builder: (context, state) {
           final user = state.extra as UserModel?;
-          return ClassManagementScreen(user: user!);
+          if (user == null) return const LoginScreen();
+          return ClassManagementScreen(adminUser: user);
         },
       ),
 
@@ -433,7 +441,8 @@ class AppRouter {
         redirect: (context, state) => _requireRole(UserRole.schoolAdmin),
         builder: (context, state) {
           final user = state.extra as UserModel?;
-          return SchoolAnalyticsDashboard(user: user!);
+          if (user == null || user.schoolId == null) return const LoginScreen();
+          return SchoolAnalyticsDashboard(schoolId: user.schoolId!);
         },
       ),
 
@@ -453,7 +462,8 @@ class AppRouter {
         redirect: (context, state) => _requireRole(UserRole.schoolAdmin),
         builder: (context, state) {
           final user = state.extra as UserModel?;
-          return DatabaseMigrationScreen(user: user!);
+          if (user == null) return const LoginScreen();
+          return DatabaseMigrationScreen(adminUser: user);
         },
       ),
 

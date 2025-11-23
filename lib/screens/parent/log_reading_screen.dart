@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:io';
 
 import '../../core/theme/app_colors.dart';
@@ -173,6 +174,8 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
   Future<void> _updateStudentStats() async {
     try {
       final studentRef = _firebaseService.firestore
+          .collection('schools')
+          .doc(widget.parent.schoolId)
           .collection('students')
           .doc(widget.student.id);
 
@@ -261,8 +264,8 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
                 LumiGap.m,
                 LumiPrimaryButton(
                   onPressed: () {
-                    Navigator.pop(context); // Close dialog
-                    Navigator.pop(context, true); // Return to home with success
+                    context.pop(); // Close dialog
+                    context.pop(true); // Return to home with success
                   },
                   text: 'Continue',
                   isFullWidth: true,

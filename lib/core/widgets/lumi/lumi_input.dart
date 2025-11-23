@@ -457,7 +457,7 @@ class LumiDropdown<T> extends StatelessWidget {
           const SizedBox(height: LumiSpacing.elementSpacing),
         ],
         DropdownButtonFormField<T>(
-          value: value,
+          initialValue: value,
           onChanged: enabled ? onChanged : null,
           items: items.map((item) {
             return DropdownMenuItem<T>(
