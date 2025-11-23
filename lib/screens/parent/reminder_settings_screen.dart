@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:lumi_reading_tracker/services/notification_service.dart';
 import 'package:lumi_reading_tracker/core/theme/app_colors.dart';
+import 'package:lumi_reading_tracker/core/theme/lumi_text_styles.dart';
+import 'package:lumi_reading_tracker/core/theme/lumi_spacing.dart';
+import 'package:lumi_reading_tracker/core/theme/lumi_borders.dart';
+import 'package:lumi_reading_tracker/core/widgets/lumi/lumi_buttons.dart';
+import 'package:lumi_reading_tracker/core/widgets/lumi/lumi_card.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 /// Reminder settings screen for configuring daily reading reminders
@@ -25,10 +30,26 @@ class _ReminderSettingsScreenState extends State<ReminderSettingsScreen> {
 
   // Smart reminder suggestions
   final List<Map<String, dynamic>> _suggestions = [
-    {'time': const TimeOfDay(hour: 7, minute: 0), 'label': '🌅 Morning', 'emoji': '☕'},
-    {'time': const TimeOfDay(hour: 15, minute: 0), 'label': '📚 After School', 'emoji': '🎒'},
-    {'time': const TimeOfDay(hour: 18, minute: 0), 'label': '🌆 Evening', 'emoji': '🍽️'},
-    {'time': const TimeOfDay(hour: 20, minute: 0), 'label': '🌙 Bedtime', 'emoji': '🛏️'},
+    {
+      'time': const TimeOfDay(hour: 7, minute: 0),
+      'label': '🌅 Morning',
+      'emoji': '☕'
+    },
+    {
+      'time': const TimeOfDay(hour: 15, minute: 0),
+      'label': '📚 After School',
+      'emoji': '🎒'
+    },
+    {
+      'time': const TimeOfDay(hour: 18, minute: 0),
+      'label': '🌆 Evening',
+      'emoji': '🍽️'
+    },
+    {
+      'time': const TimeOfDay(hour: 20, minute: 0),
+      'label': '🌙 Bedtime',
+      'emoji': '🛏️'
+    },
   ];
 
   @override
@@ -60,9 +81,9 @@ class _ReminderSettingsScreenState extends State<ReminderSettingsScreen> {
       if (!hasPermission) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Notification permissions required for reminders'),
-              backgroundColor: Colors.red,
+            SnackBar(
+              content: const Text('Notification permissions required for reminders'),
+              backgroundColor: AppColors.error,
             ),
           );
         }
@@ -82,7 +103,7 @@ class _ReminderSettingsScreenState extends State<ReminderSettingsScreen> {
             content: Text(
               'Daily reminder set for ${_formatTime(_reminderTime)} 🔔',
             ),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
           ),
         );
       }
@@ -110,11 +131,11 @@ class _ReminderSettingsScreenState extends State<ReminderSettingsScreen> {
         return Theme(
           data: Theme.of(context).copyWith(
             timePickerTheme: TimePickerThemeData(
-              backgroundColor: AppColors.primaryBlue.withOpacity(0.1),
-              hourMinuteTextColor: Colors.white,
-              dayPeriodTextColor: Colors.white,
-              dialHandColor: AppColors.secondaryOrange,
-              dialBackgroundColor: AppColors.primaryBlue.withOpacity(0.2),
+              backgroundColor: AppColors.white,
+              hourMinuteTextColor: AppColors.rosePink,
+              dayPeriodTextColor: AppColors.rosePink,
+              dialHandColor: AppColors.rosePink,
+              dialBackgroundColor: AppColors.skyBlue,
             ),
           ),
           child: child!,
@@ -139,7 +160,7 @@ class _ReminderSettingsScreenState extends State<ReminderSettingsScreen> {
               content: Text(
                 'Reminder time updated to ${_formatTime(_reminderTime)} 🔔',
               ),
-              backgroundColor: Colors.green,
+              backgroundColor: AppColors.success,
             ),
           );
         }
@@ -182,91 +203,64 @@ class _ReminderSettingsScreenState extends State<ReminderSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              AppColors.primaryBlue.withOpacity(0.1),
-              AppColors.secondaryOrange.withOpacity(0.1),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: SafeArea(
-          child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Header
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.arrow_back, color: Colors.white),
-                            onPressed: () => Navigator.pop(context),
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            '🔔 Reminders',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Enable/Disable toggle
-                      _buildToggleCard(),
-                      const SizedBox(height: 24),
-
-                      if (_remindersEnabled) ...[
-                        // Time picker
-                        _buildTimePickerCard(),
-                        const SizedBox(height: 24),
-
-                        // Smart suggestions
-                        _buildSuggestionsCard(),
-                        const SizedBox(height: 24),
-
-                        // Info card
-                        _buildInfoCard(),
-                        const SizedBox(height: 16),
-
-                        // Test notification button
-                        _buildTestButton(),
-                      ],
-                    ],
-                  ),
+      backgroundColor: AppColors.offWhite,
+      body: SafeArea(
+        child: _loading
+            ? Center(
+                child: CircularProgressIndicator(
+                  color: AppColors.rosePink,
                 ),
-        ),
+              )
+            : SingleChildScrollView(
+                padding: LumiPadding.allS,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Row(
+                      children: [
+                        LumiIconButton(
+                          icon: Icons.arrow_back,
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                        LumiGap.horizontalXS,
+                        Text(
+                          '🔔 Reminders',
+                          style: LumiTextStyles.h2(),
+                        ),
+                      ],
+                    ),
+                    LumiGap.m,
+
+                    // Enable/Disable toggle
+                    _buildToggleCard(),
+                    LumiGap.m,
+
+                    if (_remindersEnabled) ...[
+                      // Time picker
+                      _buildTimePickerCard(),
+                      LumiGap.m,
+
+                      // Smart suggestions
+                      _buildSuggestionsCard(),
+                      LumiGap.m,
+
+                      // Info card
+                      _buildInfoCard(),
+                      LumiGap.s,
+
+                      // Test notification button
+                      _buildTestButton(),
+                    ],
+                  ],
+                ),
+              ),
       ),
     );
   }
 
   Widget _buildToggleCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.white.withOpacity(0.2),
-            Colors.white.withOpacity(0.1),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.3),
-          width: 1,
-        ),
-      ),
+    return LumiCard(
       child: Row(
         children: [
           Container(
@@ -274,36 +268,26 @@ class _ReminderSettingsScreenState extends State<ReminderSettingsScreen> {
             height: 60,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  AppColors.secondaryOrange.withOpacity(0.3),
-                  AppColors.secondaryOrange.withOpacity(0.1),
-                ],
-              ),
+              color: AppColors.warmOrange.withValues(alpha: 0.2),
             ),
             child: const Center(
               child: Text('🔔', style: TextStyle(fontSize: 32)),
             ),
           ),
-          const SizedBox(width: 16),
+          LumiGap.horizontalS,
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Daily Reminders',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white.withOpacity(0.9),
-                  ),
+                  style: LumiTextStyles.h3(),
                 ),
-                const SizedBox(height: 4),
+                LumiGap.xxs,
                 Text(
                   'Get reminded to log reading',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.white.withOpacity(0.7),
+                  style: LumiTextStyles.body(
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
                   ),
                 ),
               ],
@@ -312,7 +296,8 @@ class _ReminderSettingsScreenState extends State<ReminderSettingsScreen> {
           Switch(
             value: _remindersEnabled,
             onChanged: _toggleReminders,
-            activeColor: AppColors.secondaryOrange,
+            activeTrackColor: AppColors.warmOrange.withValues(alpha: 0.5),
+            activeThumbColor: AppColors.warmOrange,
           ),
         ],
       ),
@@ -320,81 +305,63 @@ class _ReminderSettingsScreenState extends State<ReminderSettingsScreen> {
   }
 
   Widget _buildTimePickerCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.white.withOpacity(0.2),
-            Colors.white.withOpacity(0.1),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.3),
-          width: 1,
-        ),
-      ),
+    return LumiCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Reminder Time',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.white.withOpacity(0.9),
-            ),
+            style: LumiTextStyles.h3(),
           ),
-          const SizedBox(height: 16),
+          LumiGap.s,
           GestureDetector(
             onTap: _pickTime,
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+              padding: EdgeInsets.symmetric(
+                vertical: LumiSpacing.m,
+                horizontal: LumiSpacing.m,
+              ),
               decoration: BoxDecoration(
-                color: AppColors.primaryBlue.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(16),
+                color: AppColors.rosePink.withValues(alpha: 0.1),
+                borderRadius: LumiBorders.large,
                 border: Border.all(
-                  color: AppColors.primaryBlue.withOpacity(0.5),
+                  color: AppColors.rosePink,
                   width: 2,
                 ),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.access_time,
-                    color: Colors.white,
+                    color: AppColors.rosePink,
                     size: 32,
                   ),
-                  const SizedBox(width: 16),
+                  LumiGap.horizontalS,
                   Text(
                     _formatTime(_reminderTime),
-                    style: const TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                    style: LumiTextStyles.display(
+                      color: AppColors.rosePink,
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          LumiGap.xs,
           Text(
             'Tap to change time',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.white.withOpacity(0.6),
-              fontStyle: FontStyle.italic,
-            ),
+            style: LumiTextStyles.bodySmall(
+              color: AppColors.charcoal.withValues(alpha: 0.6),
+            ).copyWith(fontStyle: FontStyle.italic),
             textAlign: TextAlign.center,
           ),
         ],
       ),
-    ).animate().fadeIn(duration: 300.ms, delay: 100.ms).slideY(begin: 0.2, end: 0);
+    )
+        .animate()
+        .fadeIn(duration: 300.ms, delay: 100.ms)
+        .slideY(begin: 0.2, end: 0);
   }
 
   Widget _buildSuggestionsCard() {
@@ -402,20 +369,16 @@ class _ReminderSettingsScreenState extends State<ReminderSettingsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: EdgeInsets.symmetric(horizontal: LumiSpacing.xxs),
           child: Text(
             'Quick Set',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.white.withOpacity(0.9),
-            ),
+            style: LumiTextStyles.h3(),
           ),
         ),
-        const SizedBox(height: 12),
+        LumiGap.xs,
         Wrap(
-          spacing: 12,
-          runSpacing: 12,
+          spacing: LumiSpacing.listItemSpacing,
+          runSpacing: LumiSpacing.listItemSpacing,
           children: _suggestions.map((suggestion) {
             final time = suggestion['time'] as TimeOfDay;
             final isSelected = time.hour == _reminderTime.hour &&
@@ -424,29 +387,19 @@ class _ReminderSettingsScreenState extends State<ReminderSettingsScreen> {
             return GestureDetector(
               onTap: () => _setSuggestionTime(time),
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
+                padding: EdgeInsets.symmetric(
+                  horizontal: LumiSpacing.s,
+                  vertical: LumiSpacing.xs,
                 ),
                 decoration: BoxDecoration(
-                  gradient: isSelected
-                      ? LinearGradient(
-                          colors: [
-                            AppColors.secondaryOrange.withOpacity(0.3),
-                            AppColors.secondaryOrange.withOpacity(0.2),
-                          ],
-                        )
-                      : LinearGradient(
-                          colors: [
-                            Colors.white.withOpacity(0.2),
-                            Colors.white.withOpacity(0.1),
-                          ],
-                        ),
-                  borderRadius: BorderRadius.circular(12),
+                  color: isSelected
+                      ? AppColors.skyBlue
+                      : AppColors.white,
+                  borderRadius: LumiBorders.medium,
                   border: Border.all(
                     color: isSelected
-                        ? AppColors.secondaryOrange.withOpacity(0.5)
-                        : Colors.white.withOpacity(0.3),
+                        ? AppColors.rosePink
+                        : AppColors.charcoal.withValues(alpha: 0.3),
                     width: isSelected ? 2 : 1,
                   ),
                 ),
@@ -457,13 +410,16 @@ class _ReminderSettingsScreenState extends State<ReminderSettingsScreen> {
                       suggestion['emoji'],
                       style: const TextStyle(fontSize: 20),
                     ),
-                    const SizedBox(width: 8),
+                    LumiGap.horizontalXS,
                     Text(
                       suggestion['label'],
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        color: Colors.white,
+                      style: LumiTextStyles.body(
+                        color: isSelected
+                            ? AppColors.rosePink
+                            : AppColors.charcoal,
+                      ).copyWith(
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.normal,
                       ),
                     ),
                   ],
@@ -473,33 +429,35 @@ class _ReminderSettingsScreenState extends State<ReminderSettingsScreen> {
           }).toList(),
         ),
       ],
-    ).animate().fadeIn(duration: 300.ms, delay: 200.ms).slideY(begin: 0.2, end: 0);
+    )
+        .animate()
+        .fadeIn(duration: 300.ms, delay: 200.ms)
+        .slideY(begin: 0.2, end: 0);
   }
 
   Widget _buildInfoCard() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: LumiPadding.allS,
       decoration: BoxDecoration(
-        color: AppColors.primaryBlue.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(16),
+        color: AppColors.skyBlue,
+        borderRadius: LumiBorders.large,
         border: Border.all(
-          color: AppColors.primaryBlue.withOpacity(0.3),
+          color: AppColors.rosePink.withValues(alpha: 0.3),
         ),
       ),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.info_outline,
-            color: Colors.white,
+            color: AppColors.rosePink,
             size: 24,
           ),
-          const SizedBox(width: 12),
+          LumiGap.horizontalXS,
           Expanded(
             child: Text(
               'Reminders help build consistent reading habits. You\'ll get a friendly notification at ${_formatTime(_reminderTime)} every day.',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.white.withOpacity(0.9),
+              style: LumiTextStyles.body(
+                color: AppColors.charcoal,
               ),
             ),
           ),
@@ -510,18 +468,10 @@ class _ReminderSettingsScreenState extends State<ReminderSettingsScreen> {
 
   Widget _buildTestButton() {
     return Center(
-      child: ElevatedButton.icon(
+      child: LumiSecondaryButton(
         onPressed: _testNotification,
-        icon: const Icon(Icons.notification_add),
-        label: const Text('Test Notification'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white.withOpacity(0.2),
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
+        text: 'Test Notification',
+        icon: Icons.notification_add,
       ),
     ).animate().fadeIn(duration: 300.ms, delay: 400.ms);
   }
