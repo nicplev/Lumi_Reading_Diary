@@ -8,6 +8,11 @@ import 'package:share_plus/share_plus.dart';
 import 'dart:io' if (dart.library.html) '../../utils/io_stub.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/lumi_card.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/student_model.dart';
@@ -210,26 +215,38 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: AppColors.backgroundPrimary,
+        backgroundColor: AppColors.offWhite,
         appBar: AppBar(
-          title: Text(widget.classModel.name),
+          title: Text(
+            widget.classModel.name,
+            style: LumiTextStyles.h3(color: AppColors.white),
+          ),
+          backgroundColor: AppColors.rosePink,
+          iconTheme: const IconThemeData(color: AppColors.white),
         ),
         body: const Center(
-          child: CircularProgressIndicator(),
+          child: CircularProgressIndicator(
+            color: AppColors.rosePink,
+          ),
         ),
       );
     }
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundPrimary,
+      backgroundColor: AppColors.offWhite,
       appBar: AppBar(
-        title: Text(widget.classModel.name),
-        backgroundColor: AppColors.white,
+        title: Text(
+          widget.classModel.name,
+          style: LumiTextStyles.h3(color: AppColors.white),
+        ),
+        backgroundColor: AppColors.rosePink,
+        iconTheme: const IconThemeData(color: AppColors.white),
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.download),
+          LumiIconButton(
+            icon: Icons.download,
             onPressed: _exportToCSV,
+            iconColor: AppColors.white,
           ),
         ],
       ),
@@ -238,7 +255,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
           // Class info header
           Container(
             color: AppColors.white,
-            padding: const EdgeInsets.all(16),
+            padding: LumiPadding.allS,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -251,17 +268,15 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                         if (widget.classModel.yearLevel != null)
                           Text(
                             'Year ${widget.classModel.yearLevel}',
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: AppColors.gray,
-                                    ),
+                            style: LumiTextStyles.bodySmall(
+                              color: AppColors.charcoal.withValues(alpha: 0.7),
+                            ),
                           ),
                         Text(
                           '${_students.length} Students',
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                          style: LumiTextStyles.bodyMedium(
+                            color: AppColors.charcoal,
+                          ),
                         ),
                       ],
                     ),
@@ -272,12 +287,14 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.lightGray,
-                          borderRadius: BorderRadius.circular(20),
+                          color: AppColors.skyBlue.withValues(alpha: 0.3),
+                          borderRadius: LumiBorders.circular,
                         ),
                         child: Text(
                           'Room ${widget.classModel.room}',
-                          style: Theme.of(context).textTheme.labelMedium,
+                          style: LumiTextStyles.label(
+                            color: AppColors.charcoal,
+                          ),
                         ),
                       ),
                   ],
@@ -290,19 +307,32 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
           Container(
             color: AppColors.white,
             margin: const EdgeInsets.only(top: 1),
-            padding: const EdgeInsets.all(16),
+            padding: LumiPadding.allS,
             child: Row(
               children: [
                 Expanded(
                   child: SegmentedButton<String>(
-                    segments: const [
+                    style: SegmentedButton.styleFrom(
+                      selectedBackgroundColor: AppColors.rosePink,
+                      selectedForegroundColor: AppColors.white,
+                      backgroundColor: AppColors.white,
+                      foregroundColor: AppColors.charcoal,
+                      side: const BorderSide(color: AppColors.rosePink),
+                    ),
+                    segments: [
                       ButtonSegment(
                         value: 'week',
-                        label: Text('This Week'),
+                        label: Text(
+                          'This Week',
+                          style: LumiTextStyles.label(),
+                        ),
                       ),
                       ButtonSegment(
                         value: 'month',
-                        label: Text('This Month'),
+                        label: Text(
+                          'This Month',
+                          style: LumiTextStyles.label(),
+                        ),
                       ),
                     ],
                     selected: {_periodType},
@@ -313,21 +343,31 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                     },
                   ),
                 ),
-                const SizedBox(width: 16),
+                LumiGap.horizontalS,
                 DropdownButton<String>(
                   value: _sortBy,
-                  items: const [
+                  style: LumiTextStyles.body(color: AppColors.charcoal),
+                  items: [
                     DropdownMenuItem(
                       value: 'name',
-                      child: Text('Sort by Name'),
+                      child: Text(
+                        'Sort by Name',
+                        style: LumiTextStyles.body(),
+                      ),
                     ),
                     DropdownMenuItem(
                       value: 'level',
-                      child: Text('Sort by Level'),
+                      child: Text(
+                        'Sort by Level',
+                        style: LumiTextStyles.body(),
+                      ),
                     ),
                     DropdownMenuItem(
                       value: 'streak',
-                      child: Text('Sort by Streak'),
+                      child: Text(
+                        'Sort by Streak',
+                        style: LumiTextStyles.body(),
+                      ),
                     ),
                   ],
                   onChanged: (value) {
@@ -345,7 +385,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
           // Student list
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: LumiPadding.allS,
               itemCount: _students.length,
               itemBuilder: (context, index) {
                 final student = _students[index];
@@ -379,161 +419,143 @@ class _StudentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 25,
-                  backgroundColor: AppColors.primaryBlue.withOpacity(0.1),
-                  child: Text(
-                    student.firstName[0].toUpperCase(),
-                    style: TextStyle(
-                      color: AppColors.primaryBlue,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
+    return LumiCard(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 25,
+                backgroundColor: AppColors.rosePink.withValues(alpha: 0.1),
+                child: Text(
+                  student.firstName[0].toUpperCase(),
+                  style: LumiTextStyles.h3(color: AppColors.rosePink),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        student.fullName,
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+              ),
+              LumiGap.horizontalS,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      student.fullName,
+                      style: LumiTextStyles.bodyMedium(
+                        color: AppColors.charcoal,
                       ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
+                    ),
+                    LumiGap.xxs,
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.skyBlue.withValues(alpha: 0.3),
+                            borderRadius: LumiBorders.circular,
+                          ),
+                          child: Text(
+                            'Level: ${student.currentReadingLevel ?? "Not set"}',
+                            style: LumiTextStyles.caption(
+                              color: AppColors.charcoal,
+                            ),
+                          ),
+                        ),
+                        LumiGap.horizontalXS,
+                        if ((student.stats?.currentStreak ?? 0) > 0)
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.secondaryPurple.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
+                              color: AppColors.warmOrange.withValues(alpha: 0.2),
+                              borderRadius: LumiBorders.circular,
                             ),
-                            child: Text(
-                              'Level: ${student.currentReadingLevel ?? "Not set"}',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelSmall
-                                  ?.copyWith(
-                                    color: AppColors.secondaryPurple,
-                                    fontWeight: FontWeight.bold,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.local_fire_department,
+                                  size: 12,
+                                  color: AppColors.warmOrange,
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '${student.stats?.currentStreak}',
+                                  style: LumiTextStyles.caption(
+                                    color: AppColors.warmOrange,
                                   ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          if ((student.stats?.currentStreak ?? 0) > 0)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color:
-                                    AppColors.secondaryOrange.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.local_fire_department,
-                                    size: 12,
-                                    color: AppColors.secondaryOrange,
-                                  ),
-                                  const SizedBox(width: 2),
-                                  Text(
-                                    '${student.stats?.currentStreak}',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelSmall
-                                        ?.copyWith(
-                                          color: AppColors.secondaryOrange,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.message_outlined),
-                  onPressed: () {
-                    // Send message to parents
-                  },
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 12),
-
-            // Period stats
-            StreamBuilder<QuerySnapshot>(
-              stream: FirebaseService.instance.firestore
-                  .collection('readingLogs')
-                  .where('studentId', isEqualTo: student.id)
-                  .where('date',
-                      isGreaterThanOrEqualTo: Timestamp.fromDate(periodStart))
-                  .where('date',
-                      isLessThanOrEqualTo: Timestamp.fromDate(periodEnd))
-                  .snapshots(),
-              builder: (context, snapshot) {
-                final logs = snapshot.data?.docs
-                        .map((doc) => ReadingLogModel.fromFirestore(doc))
-                        .toList() ??
-                    [];
-
-                final daysCompleted = logs.length;
-                final totalMinutes =
-                    logs.fold<int>(0, (sum, log) => sum + log.minutesRead);
-                final averageMinutes =
-                    logs.isEmpty ? 0 : totalMinutes ~/ logs.length;
-
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _StatItem(
-                      label: 'Days',
-                      value: '$daysCompleted',
-                      icon: Icons.calendar_today,
-                      color: AppColors.primaryBlue,
-                    ),
-                    _StatItem(
-                      label: 'Total Min',
-                      value: '$totalMinutes',
-                      icon: Icons.timer,
-                      color: AppColors.secondaryGreen,
-                    ),
-                    _StatItem(
-                      label: 'Avg Min',
-                      value: '$averageMinutes',
-                      icon: Icons.trending_up,
-                      color: AppColors.secondaryOrange,
+                      ],
                     ),
                   ],
-                );
-              },
-            ),
-          ],
-        ),
+                ),
+              ),
+              LumiIconButton(
+                icon: Icons.message_outlined,
+                onPressed: () {
+                  // Send message to parents
+                },
+              ),
+            ],
+          ),
+
+          LumiGap.s,
+          // Period stats
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseService.instance.firestore
+                .collection('readingLogs')
+                .where('studentId', isEqualTo: student.id)
+                .where('date',
+                    isGreaterThanOrEqualTo: Timestamp.fromDate(periodStart))
+                .where('date',
+                    isLessThanOrEqualTo: Timestamp.fromDate(periodEnd))
+                .snapshots(),
+            builder: (context, snapshot) {
+              final logs = snapshot.data?.docs
+                      .map((doc) => ReadingLogModel.fromFirestore(doc))
+                      .toList() ??
+                  [];
+
+              final daysCompleted = logs.length;
+              final totalMinutes =
+                  logs.fold<int>(0, (sum, log) => sum + log.minutesRead);
+              final averageMinutes =
+                  logs.isEmpty ? 0 : totalMinutes ~/ logs.length;
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _StatItem(
+                    label: 'Days',
+                    value: '$daysCompleted',
+                    icon: Icons.calendar_today,
+                    color: AppColors.rosePink,
+                  ),
+                  _StatItem(
+                    label: 'Total Min',
+                    value: '$totalMinutes',
+                    icon: Icons.timer,
+                    color: AppColors.mintGreen,
+                  ),
+                  _StatItem(
+                    label: 'Avg Min',
+                    value: '$averageMinutes',
+                    icon: Icons.trending_up,
+                    color: AppColors.warmOrange,
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -557,18 +579,16 @@ class _StatItem extends StatelessWidget {
     return Column(
       children: [
         Icon(icon, size: 20, color: color),
-        const SizedBox(height: 4),
+        LumiGap.xxs,
         Text(
           value,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+          style: LumiTextStyles.bodyMedium(color: AppColors.charcoal),
         ),
         Text(
           label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.gray,
-              ),
+          style: LumiTextStyles.bodySmall(
+            color: AppColors.charcoal.withValues(alpha: 0.7),
+          ),
         ),
       ],
     );
