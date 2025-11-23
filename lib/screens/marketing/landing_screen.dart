@@ -58,15 +58,15 @@ class _LandingScreenState extends State<LandingScreen> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF6B8EF9), Color(0xFF9B7EF8)],
+                  gradient: LinearGradient(
+                    colors: [AppColors.skyBlue, AppColors.rosePink],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF6B8EF9).withValues(alpha: 0.3),
+                      color: AppColors.skyBlue.withValues(alpha: 0.3),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -85,8 +85,8 @@ class _LandingScreenState extends State<LandingScreen> {
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
                   foreground: Paint()
-                    ..shader = const LinearGradient(
-                      colors: [Color(0xFF6B8EF9), Color(0xFF9B7EF8)],
+                    ..shader = LinearGradient(
+                      colors: [AppColors.skyBlue, AppColors.rosePink],
                     ).createShader(const Rect.fromLTWH(0, 0, 200, 70)),
                 ),
               ),
@@ -212,7 +212,7 @@ class _LandingScreenState extends State<LandingScreen> {
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF6B8EF9).withValues(alpha: 0.2),
+                  color: AppColors.skyBlue.withValues(alpha: 0.2),
                   blurRadius: 60,
                   offset: const Offset(0, 20),
                 ),
@@ -227,9 +227,9 @@ class _LandingScreenState extends State<LandingScreen> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      const Color(0xFF6B8EF9).withValues(alpha: 0.1),
-                      const Color(0xFF9B7EF8).withValues(alpha: 0.1),
-                      const Color(0xFFFF8C42).withValues(alpha: 0.1),
+                      AppColors.skyBlue.withValues(alpha: 0.1),
+                      AppColors.rosePink.withValues(alpha: 0.1),
+                      AppColors.warmOrange.withValues(alpha: 0.1),
                     ],
                   ),
                 ),
@@ -244,7 +244,7 @@ class _LandingScreenState extends State<LandingScreen> {
                             Icons.auto_stories_rounded,
                             size: 120,
                             color:
-                                const Color(0xFF6B8EF9).withValues(alpha: 0.6),
+                                AppColors.skyBlue.withValues(alpha: 0.6),
                           ),
                           const SizedBox(height: 24),
                           Text(
@@ -252,7 +252,7 @@ class _LandingScreenState extends State<LandingScreen> {
                             style: GoogleFonts.poppins(
                               fontSize: 32,
                               fontWeight: FontWeight.w600,
-                              color: const Color(0xFF6B8EF9),
+                              color: AppColors.skyBlue,
                             ),
                           ),
                         ],
@@ -265,7 +265,7 @@ class _LandingScreenState extends State<LandingScreen> {
                       child: _buildFloatingCard(
                         '🎯',
                         'Track Progress',
-                        const Color(0xFF6B8EF9),
+                        AppColors.skyBlue,
                       )
                           .animate(onPlay: (controller) => controller.repeat())
                           .moveY(begin: 0, end: -10, duration: 2.seconds)
@@ -278,7 +278,7 @@ class _LandingScreenState extends State<LandingScreen> {
                       child: _buildFloatingCard(
                         '⭐',
                         '20 mins read',
-                        const Color(0xFFFF8C42),
+                        AppColors.warmOrange,
                       )
                           .animate(onPlay: (controller) => controller.repeat())
                           .moveY(
@@ -295,7 +295,7 @@ class _LandingScreenState extends State<LandingScreen> {
                       child: _buildFloatingCard(
                         '📖',
                         'New Book',
-                        const Color(0xFF9B7EF8),
+                        AppColors.rosePink,
                       )
                           .animate(onPlay: (controller) => controller.repeat())
                           .moveY(
@@ -385,7 +385,7 @@ class _LandingScreenState extends State<LandingScreen> {
               _buildFeatureCard(
                 icon: Icons.dashboard_rounded,
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF6B8EF9), Color(0xFF9B7EF8)],
+                  colors: [AppColors.skyBlue, AppColors.rosePink],
                 ),
                 title: 'Teacher Dashboard',
                 description:
@@ -393,8 +393,8 @@ class _LandingScreenState extends State<LandingScreen> {
               ),
               _buildFeatureCard(
                 icon: Icons.family_restroom_rounded,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFF8C42), Color(0xFFFFB366)],
+                gradient: LinearGradient(
+                  colors: [AppColors.warmOrange, AppColors.warmOrange.withValues(alpha: 0.7)],
                 ),
                 title: 'Parent App',
                 description:
@@ -402,8 +402,8 @@ class _LandingScreenState extends State<LandingScreen> {
               ),
               _buildFeatureCard(
                 icon: Icons.school_rounded,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF9B7EF8), Color(0xFFB89EF8)],
+                gradient: LinearGradient(
+                  colors: [AppColors.rosePink, AppColors.rosePink.withValues(alpha: 0.7)],
                 ),
                 title: 'Admin Control',
                 description:
@@ -411,8 +411,8 @@ class _LandingScreenState extends State<LandingScreen> {
               ),
               _buildFeatureCard(
                 icon: Icons.assignment_rounded,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF4ECDC4), Color(0xFF6FE7DB)],
+                gradient: LinearGradient(
+                  colors: [AppColors.mintGreen, AppColors.mintGreen.withValues(alpha: 0.7)],
                 ),
                 title: 'Smart Allocations',
                 description:
@@ -420,8 +420,8 @@ class _LandingScreenState extends State<LandingScreen> {
               ),
               _buildFeatureCard(
                 icon: Icons.cloud_sync_rounded,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFF6B9D), Color(0xFFFF8BB5)],
+                gradient: LinearGradient(
+                  colors: [AppColors.rosePink, AppColors.rosePink.withValues(alpha: 0.8)],
                 ),
                 title: 'Offline Support',
                 description:
@@ -429,8 +429,8 @@ class _LandingScreenState extends State<LandingScreen> {
               ),
               _buildFeatureCard(
                 icon: Icons.notifications_active_rounded,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFFC837), Color(0xFFFFD666)],
+                gradient: LinearGradient(
+                  colors: [AppColors.softYellow, AppColors.softYellow.withValues(alpha: 0.7)],
                 ),
                 title: 'Smart Reminders',
                 description:
@@ -529,7 +529,7 @@ class _LandingScreenState extends State<LandingScreen> {
             description:
                 'Admins create classes, add teachers, and configure reading levels in minutes',
             emoji: '🏫',
-            color: const Color(0xFF6B8EF9),
+            color: AppColors.skyBlue,
           ),
           const SizedBox(height: 32),
           _buildHowItWorksStep(
@@ -538,7 +538,7 @@ class _LandingScreenState extends State<LandingScreen> {
             description:
                 'Teachers create smart reading allocations tailored to each student\'s level',
             emoji: '📚',
-            color: const Color(0xFF9B7EF8),
+            color: AppColors.rosePink,
           ),
           const SizedBox(height: 32),
           _buildHowItWorksStep(
@@ -547,7 +547,7 @@ class _LandingScreenState extends State<LandingScreen> {
             description:
                 'Parents log daily reading with one tap and watch their child\'s progress soar',
             emoji: '⭐',
-            color: const Color(0xFFFF8C42),
+            color: AppColors.warmOrange,
           ),
         ],
       ),
@@ -736,19 +736,19 @@ class _LandingScreenState extends State<LandingScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 80),
       padding: const EdgeInsets.symmetric(horizontal: 64, vertical: 80),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF6B8EF9),
-            Color(0xFF9B7EF8),
-            Color(0xFFFF8C42),
+            AppColors.skyBlue,
+            AppColors.rosePink,
+            AppColors.warmOrange,
           ],
         ),
         borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6B8EF9).withValues(alpha: 0.4),
+            color: AppColors.skyBlue.withValues(alpha: 0.4),
             blurRadius: 40,
             offset: const Offset(0, 20),
           ),
@@ -860,7 +860,7 @@ class _LandingScreenState extends State<LandingScreen> {
                         height: 40,
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF6B8EF9), Color(0xFF9B7EF8)],
+                            colors: [AppColors.skyBlue, AppColors.rosePink],
                           ),
                           borderRadius: BorderRadius.circular(10),
                         ),

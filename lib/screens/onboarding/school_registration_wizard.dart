@@ -183,7 +183,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundPrimary,
+      backgroundColor: AppColors.offWhite,
       appBar: AppBar(
         title: const Text('School Registration'),
         backgroundColor: Colors.transparent,
