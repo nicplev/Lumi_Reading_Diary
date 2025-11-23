@@ -5,8 +5,11 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/liquid_glass_theme.dart';
-import '../../core/widgets/glass/glass_widgets.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/lumi_card.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/class_model.dart';
@@ -78,13 +81,11 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
-        body: Container(
-          decoration: const BoxDecoration(
-            gradient: LiquidGlassTheme.backgroundGradient,
-          ),
-          child: const Center(
-            child: CircularProgressIndicator(),
+      return const Scaffold(
+        backgroundColor: AppColors.offWhite,
+        body: Center(
+          child: CircularProgressIndicator(
+            color: AppColors.rosePink,
           ),
         ),
       );
@@ -92,37 +93,32 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
 
     if (_classes.isEmpty) {
       return Scaffold(
-        body: Container(
-          decoration: const BoxDecoration(
-            gradient: LiquidGlassTheme.backgroundGradient,
-          ),
-          child: _buildNoClassesView(),
-        ),
+        backgroundColor: AppColors.offWhite,
+        body: _buildNoClassesView(),
       );
     }
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LiquidGlassTheme.backgroundGradient,
-        ),
-        child: IndexedStack(
-          index: _selectedIndex,
-          children: [
-            _buildDashboardView(),
-            _buildClassesView(),
-            AllocationScreen(
-              teacher: widget.user,
-              selectedClass: _selectedClass,
-            ),
-            TeacherProfileScreen(user: widget.user),
-          ],
-        ),
+      backgroundColor: AppColors.offWhite,
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: [
+          _buildDashboardView(),
+          _buildClassesView(),
+          AllocationScreen(
+            teacher: widget.user,
+            selectedClass: _selectedClass,
+          ),
+          TeacherProfileScreen(user: widget.user),
+        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) => setState(() => _selectedIndex = index),
         type: BottomNavigationBarType.fixed,
+        backgroundColor: AppColors.white,
+        selectedItemColor: AppColors.rosePink,
+        unselectedItemColor: AppColors.charcoal.withValues(alpha: 0.6),
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.dashboard),
@@ -163,9 +159,9 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
               children: [
                 Text(
                   'Hello, ${widget.user.fullName.isNotEmpty ? widget.user.fullName.split(' ').first : 'Teacher'}!',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: AppColors.gray,
-                      ),
+                  style: LumiTextStyles.h3(
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
+                  ),
                 ),
                 if (_classes.length > 1)
                   DropdownButton<ClassModel>(
@@ -182,25 +178,18 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                       });
                     },
                     underline: const SizedBox(),
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: AppColors.darkGray,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    style: LumiTextStyles.h2(color: AppColors.charcoal),
                   )
                 else
                   Text(
                     _selectedClass!.name,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: AppColors.darkGray,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    style: LumiTextStyles.h2(color: AppColors.charcoal),
                   ),
               ],
             ),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.notifications_outlined),
-                color: AppColors.darkGray,
+              LumiIconButton(
+                icon: Icons.notifications_outlined,
                 onPressed: () {
                   // Navigate to notifications
                 },
@@ -210,7 +199,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
 
           // Content
           SliverPadding(
-            padding: const EdgeInsets.all(16),
+            padding: LumiPadding.allS,
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 // Today's Overview Card
@@ -225,7 +214,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                   },
                 ),
 
-                const SizedBox(height: 16),
+                LumiGap.s,
 
                 // Class Progress Chart
                 _ClassProgressChart(
@@ -233,7 +222,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                   schoolId: widget.user.schoolId!,
                 ),
 
-                const SizedBox(height: 16),
+                LumiGap.s,
 
                 // Students Grid
                 _StudentsGrid(
@@ -242,7 +231,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                   schoolId: widget.user.schoolId!,
                 ),
 
-                const SizedBox(height: 16),
+                LumiGap.s,
 
                 // Quick Actions
                 _QuickActionsCard(
@@ -265,30 +254,27 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.all(LiquidGlassTheme.spacingMd),
+            padding: LumiPadding.allM,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'My Classes',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.darkGray,
-                      ),
+                  style: LumiTextStyles.h1(color: AppColors.charcoal),
                 ),
-                const SizedBox(height: 4),
+                LumiGap.xxs,
                 Text(
                   '${_classes.length} active ${_classes.length == 1 ? 'class' : 'classes'}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.gray,
-                      ),
+                  style: LumiTextStyles.body(
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
+                  ),
                 ),
               ],
             ),
           ),
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: LumiPadding.allS,
               itemCount: _classes.length,
               itemBuilder: (context, index) {
                 final classModel = _classes[index];
@@ -347,18 +333,14 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
           Positioned(
             top: 8,
             left: 8,
-            child: IconButton(
-              icon: const Icon(
-                Icons.arrow_back,
-                color: AppColors.darkGray,
-              ),
+            child: LumiIconButton(
+              icon: Icons.arrow_back,
               onPressed: _handleSignOut,
-              tooltip: 'Sign Out',
             ),
           ),
           // Main content
           Padding(
-            padding: const EdgeInsets.all(24),
+            padding: LumiPadding.allL,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -366,20 +348,17 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                   mood: LumiMood.thinking,
                   size: 150,
                 ),
-                const SizedBox(height: 24),
+                LumiGap.m,
                 Text(
                   'No Classes Assigned',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.darkGray,
-                      ),
+                  style: LumiTextStyles.h1(color: AppColors.charcoal),
                 ),
-                const SizedBox(height: 12),
+                LumiGap.xs,
                 Text(
                   'Please contact your school administrator to be assigned to a class.',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: AppColors.gray,
-                      ),
+                  style: LumiTextStyles.bodyLarge(
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
+                  ),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -425,8 +404,8 @@ class _TodayOverviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
-      padding: const EdgeInsets.all(LiquidGlassTheme.spacingLg),
+    return LumiCard(
+      padding: LumiPadding.allM,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -435,11 +414,11 @@ class _TodayOverviewCard extends StatelessWidget {
             children: [
               Text(
                 'Today\'s Progress',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: LumiTextStyles.h2(color: AppColors.charcoal),
               ),
-              TextButton.icon(
+              LumiTextButton(
+                text: DateFormat('MMM dd').format(selectedDate),
+                icon: Icons.calendar_today,
                 onPressed: () async {
                   final picked = await showDatePicker(
                     context: context,
@@ -451,14 +430,10 @@ class _TodayOverviewCard extends StatelessWidget {
                     onDateChanged(picked);
                   }
                 },
-                icon: const Icon(Icons.calendar_today, size: 16),
-                label: Text(
-                  DateFormat('MMM dd').format(selectedDate),
-                ),
               ),
             ],
           ),
-          const SizedBox(height: LiquidGlassTheme.spacingMd),
+          LumiGap.s,
           StreamBuilder<QuerySnapshot>(
             stream: FirebaseService.instance.firestore
                 .collection('schools')
@@ -501,12 +476,12 @@ class _TodayOverviewCard extends StatelessWidget {
                           child: CircularProgressIndicator(
                             value: completionRate / 100,
                             strokeWidth: 12,
-                            backgroundColor: AppColors.lightGray,
+                            backgroundColor: AppColors.charcoal.withValues(alpha: 0.1),
                             valueColor: AlwaysStoppedAnimation<Color>(
                               completionRate >= 80
-                                  ? AppColors.secondaryGreen
+                                  ? AppColors.mintGreen
                                   : completionRate >= 50
-                                      ? AppColors.secondaryYellow
+                                      ? AppColors.softYellow
                                       : AppColors.error,
                             ),
                           ),
@@ -516,23 +491,20 @@ class _TodayOverviewCard extends StatelessWidget {
                           children: [
                             Text(
                               '${completionRate.toStringAsFixed(0)}%',
-                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.darkGray,
-                                  ),
+                              style: LumiTextStyles.h1(color: AppColors.charcoal),
                             ),
                             Text(
                               'Complete',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppColors.gray,
-                                  ),
+                              style: LumiTextStyles.bodySmall(
+                                color: AppColors.charcoal.withValues(alpha: 0.7),
+                              ),
                             ),
                           ],
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  LumiGap.s,
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
@@ -540,19 +512,19 @@ class _TodayOverviewCard extends StatelessWidget {
                         icon: Icons.groups,
                         value: '${logs.length}/${classModel.studentIds.length}',
                         label: 'Students',
-                        color: AppColors.primaryBlue,
+                        color: AppColors.rosePink,
                       ),
                       _StatItem(
                         icon: Icons.timer,
                         value: '$averageMinutes',
                         label: 'Avg Minutes',
-                        color: AppColors.secondaryOrange,
+                        color: AppColors.warmOrange,
                       ),
                       _StatItem(
                         icon: Icons.book,
                         value: '${logs.fold<int>(0, (sum, log) => sum + log.bookTitles.length)}',
                         label: 'Books',
-                        color: AppColors.secondaryPurple,
+                        color: AppColors.skyBlue,
                       ),
                     ],
                   ),
@@ -581,18 +553,16 @@ class _ClassProgressChart extends StatelessWidget {
       Duration(days: DateTime.now().weekday - 1),
     );
 
-    return GlassCard(
-      padding: const EdgeInsets.all(LiquidGlassTheme.spacingLg),
+    return LumiCard(
+      padding: LumiPadding.allM,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Weekly Trend',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            style: LumiTextStyles.h2(color: AppColors.charcoal),
           ),
-          const SizedBox(height: LiquidGlassTheme.spacingMd),
+          LumiGap.s,
           StreamBuilder<QuerySnapshot>(
             stream: FirebaseService.instance.firestore
                 .collection('schools')
@@ -629,7 +599,7 @@ class _ClassProgressChart extends StatelessWidget {
                         barRods: [
                           BarChartRodData(
                             toY: completionByDay[index]?.toDouble() ?? 0,
-                            color: AppColors.primaryBlue,
+                            color: AppColors.rosePink,
                             width: 30,
                             borderRadius: const BorderRadius.vertical(
                               top: Radius.circular(8),
@@ -647,7 +617,7 @@ class _ClassProgressChart extends StatelessWidget {
                             final days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
                             return Text(
                               days[value.toInt()],
-                              style: const TextStyle(fontSize: 12),
+                              style: LumiTextStyles.label(color: AppColors.charcoal),
                             );
                           },
                         ),
@@ -659,7 +629,7 @@ class _ClassProgressChart extends StatelessWidget {
                           getTitlesWidget: (value, meta) {
                             return Text(
                               '${value.toInt()}',
-                              style: const TextStyle(fontSize: 10),
+                              style: LumiTextStyles.bodySmall(color: AppColors.charcoal),
                             );
                           },
                         ),
@@ -697,8 +667,8 @@ class _StudentsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
-      padding: const EdgeInsets.all(LiquidGlassTheme.spacingLg),
+    return LumiCard(
+      padding: LumiPadding.allM,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -707,19 +677,17 @@ class _StudentsGrid extends StatelessWidget {
             children: [
               Text(
                 'Students',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: LumiTextStyles.h2(color: AppColors.charcoal),
               ),
-              TextButton(
+              LumiTextButton(
+                text: 'See All',
                 onPressed: () {
                   // Navigate to student list
                 },
-                child: const Text('See All'),
               ),
             ],
           ),
-          const SizedBox(height: LiquidGlassTheme.spacingSm),
+          LumiGap.xs,
           StreamBuilder<QuerySnapshot>(
             stream: FirebaseService.instance.firestore
                 .collection('schools')
@@ -803,13 +771,12 @@ class _StudentAvatar extends StatelessWidget {
                 CircleAvatar(
                   radius: 25,
                   backgroundColor: hasLogged
-                      ? AppColors.secondaryGreen.withValues(alpha: 0.2)
-                      : AppColors.lightGray,
+                      ? AppColors.mintGreen.withValues(alpha: 0.2)
+                      : AppColors.charcoal.withValues(alpha: 0.1),
                   child: Text(
                     student.firstName[0].toUpperCase(),
-                    style: TextStyle(
-                      color: hasLogged ? AppColors.secondaryGreen : AppColors.gray,
-                      fontWeight: FontWeight.bold,
+                    style: LumiTextStyles.body(
+                      color: hasLogged ? AppColors.mintGreen : AppColors.charcoal.withValues(alpha: 0.7),
                     ),
                   ),
                 ),
@@ -821,7 +788,7 @@ class _StudentAvatar extends StatelessWidget {
                       width: 16,
                       height: 16,
                       decoration: const BoxDecoration(
-                        color: AppColors.secondaryGreen,
+                        color: AppColors.mintGreen,
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -833,10 +800,10 @@ class _StudentAvatar extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 4),
+            LumiGap.xxs,
             Text(
               student.firstName,
-              style: Theme.of(context).textTheme.bodySmall,
+              style: LumiTextStyles.bodySmall(color: AppColors.charcoal),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -858,43 +825,41 @@ class _QuickActionsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
-      padding: const EdgeInsets.all(LiquidGlassTheme.spacingLg),
+    return LumiCard(
+      padding: LumiPadding.allM,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Quick Actions',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            style: LumiTextStyles.h2(color: AppColors.charcoal),
           ),
-          const SizedBox(height: LiquidGlassTheme.spacingMd),
+          LumiGap.s,
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _ActionButton(
                 icon: Icons.assignment,
                 label: 'Allocate',
-                color: AppColors.primaryBlue,
+                color: AppColors.rosePink,
                 onTap: () => onAction('allocate'),
               ),
               _ActionButton(
                 icon: Icons.message,
                 label: 'Message',
-                color: AppColors.secondaryPurple,
+                color: AppColors.skyBlue,
                 onTap: () => onAction('message'),
               ),
               _ActionButton(
                 icon: Icons.download,
                 label: 'Export',
-                color: AppColors.secondaryGreen,
+                color: AppColors.mintGreen,
                 onTap: () => onAction('export'),
               ),
               _ActionButton(
                 icon: Icons.notifications_active,
                 label: 'Nudge',
-                color: AppColors.secondaryOrange,
+                color: AppColors.warmOrange,
                 onTap: () => onAction('nudge'),
               ),
               ],
@@ -922,17 +887,16 @@ class _ActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(LiquidGlassTheme.spacingSm),
+      child: Padding(
+        padding: const EdgeInsets.all(LumiSpacing.xs),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(LiquidGlassTheme.spacingSm),
+              padding: const EdgeInsets.all(LumiSpacing.xs),
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
-                boxShadow: LiquidGlassTheme.softShadow(),
               ),
               child: Icon(
                 icon,
@@ -940,10 +904,10 @@ class _ActionButton extends StatelessWidget {
                 size: 24,
               ),
             ),
-            const SizedBox(height: LiquidGlassTheme.spacingXs),
+            LumiGap.xxs,
             Text(
               label,
-              style: Theme.of(context).textTheme.bodySmall,
+              style: LumiTextStyles.bodySmall(color: AppColors.charcoal),
             ),
           ],
         ),
@@ -964,65 +928,58 @@ class _ClassCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: AnimatedGlassCard(
+      padding: const EdgeInsets.only(bottom: LumiSpacing.xs),
+      child: LumiCard(
         onTap: onTap,
-        padding: const EdgeInsets.all(LiquidGlassTheme.spacingLg),
+        padding: LumiPadding.allM,
         child: Row(
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              gradient: LiquidGlassTheme.teacherGradient,
-              borderRadius: BorderRadius.circular(LiquidGlassTheme.radiusMd),
-              boxShadow: LiquidGlassTheme.glowShadow(
-                color: AppColors.teacherColor,
-                blurRadius: 8,
-                spreadRadius: 0,
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: AppColors.rosePink,
+                borderRadius: LumiBorders.medium,
+              ),
+              child: const Icon(
+                Icons.groups,
+                color: AppColors.white,
+                size: 32,
               ),
             ),
-            child: const Icon(
-              Icons.groups,
-              color: AppColors.white,
-              size: 32,
-            ),
-          ),
-          const SizedBox(width: LiquidGlassTheme.spacingMd),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  classModel.name,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${classModel.studentIds.length} students',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.gray,
-                      ),
-                ),
-                if (classModel.yearLevel != null) ...[
-                  const SizedBox(height: 2),
+            LumiGap.s,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    'Year ${classModel.yearLevel}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.gray,
-                        ),
+                    classModel.name,
+                    style: LumiTextStyles.h3(color: AppColors.charcoal),
                   ),
+                  LumiGap.xxs,
+                  Text(
+                    '${classModel.studentIds.length} students',
+                    style: LumiTextStyles.bodySmall(
+                      color: AppColors.charcoal.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  if (classModel.yearLevel != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'Year ${classModel.yearLevel}',
+                      style: LumiTextStyles.bodySmall(
+                        color: AppColors.charcoal.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          const Icon(
-            Icons.chevron_right,
-            color: AppColors.gray,
-          ),
-        ],
+            Icon(
+              Icons.chevron_right,
+              color: AppColors.charcoal.withValues(alpha: 0.4),
+            ),
+          ],
         ),
       ),
     );
@@ -1047,18 +1004,16 @@ class _StatItem extends StatelessWidget {
     return Column(
       children: [
         Icon(icon, color: color, size: 20),
-        const SizedBox(height: 4),
+        LumiGap.xxs,
         Text(
           value,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+          style: LumiTextStyles.h3(color: AppColors.charcoal),
         ),
         Text(
           label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.gray,
-              ),
+          style: LumiTextStyles.bodySmall(
+            color: AppColors.charcoal.withValues(alpha: 0.7),
+          ),
         ),
       ],
     );
