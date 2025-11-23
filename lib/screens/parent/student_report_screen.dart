@@ -2,12 +2,16 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../services/pdf_report_service.dart';
 import '../../services/firebase_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/lumi_card.dart';
 
 /// Screen for generating and sharing student progress reports
 /// Used by both parents and teachers
@@ -33,24 +37,26 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.offWhite,
       appBar: AppBar(
-        title: const Text('Generate Report'),
-        backgroundColor: AppColors.primaryBlue,
+        title: Text('Generate Report', style: LumiTextStyles.h3()),
+        backgroundColor: AppColors.white,
+        elevation: 0,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: LumiPadding.allS,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildStudentCard(),
-            const SizedBox(height: 24),
+            LumiGap.m,
             _buildDateRangeSelector(),
-            const SizedBox(height: 24),
+            LumiGap.m,
             _buildReportPreview(),
-            const SizedBox(height: 24),
+            LumiGap.m,
             _buildActionButtons(),
             if (_generatedReport != null) ...[
-              const SizedBox(height: 24),
+              LumiGap.m,
               _buildGeneratedReportCard(),
             ],
           ],
@@ -60,108 +66,94 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
   }
 
   Widget _buildStudentCard() {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Student Information',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+    return LumiCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Student Information',
+            style: LumiTextStyles.h3(),
+          ),
+          LumiGap.xs,
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 30,
+                backgroundColor: AppColors.rosePink.withValues(alpha: 0.1),
+                child: Text(
+                  widget.student.firstName[0].toUpperCase(),
+                  style: LumiTextStyles.h2(
+                    color: AppColors.rosePink,
                   ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: AppColors.primaryBlue.withOpacity(0.1),
-                  child: Text(
-                    widget.student.firstName[0].toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primaryBlue,
+                ),
+              ),
+              LumiGap.horizontalS,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.student.fullName,
+                      style: LumiTextStyles.h2(),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.student.fullName,
-                        style: Theme.of(context).textTheme.titleLarge,
+                    LumiGap.xxs,
+                    Text(
+                      'Reading Level: ${widget.student.currentReadingLevel ?? "Not set"}',
+                      style: LumiTextStyles.body(
+                        color: AppColors.charcoal.withValues(alpha: 0.6),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Reading Level: ${widget.student.currentReadingLevel ?? "Not set"}',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.grey[600],
-                            ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildDateRangeSelector() {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Report Period',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildDateButton(
-                    label: 'Start Date',
-                    date: _startDate,
-                    onTap: () => _selectDate(context, isStartDate: true),
-                  ),
+    return LumiCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Report Period',
+            style: LumiTextStyles.h3(),
+          ),
+          LumiGap.s,
+          Row(
+            children: [
+              Expanded(
+                child: _buildDateButton(
+                  label: 'Start Date',
+                  date: _startDate,
+                  onTap: () => _selectDate(context, isStartDate: true),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildDateButton(
-                    label: 'End Date',
-                    date: _endDate,
-                    onTap: () => _selectDate(context, isStartDate: false),
-                  ),
+              ),
+              LumiGap.horizontalS,
+              Expanded(
+                child: _buildDateButton(
+                  label: 'End Date',
+                  date: _endDate,
+                  onTap: () => _selectDate(context, isStartDate: false),
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _buildQuickRangeChip('Last 7 Days', 7),
-                _buildQuickRangeChip('Last 30 Days', 30),
-                _buildQuickRangeChip('Last 90 Days', 90),
-                _buildQuickRangeChip('This Year', null),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+          LumiGap.s,
+          Wrap(
+            spacing: LumiSpacing.xs,
+            runSpacing: LumiSpacing.xs,
+            children: [
+              _buildQuickRangeChip('Last 7 Days', 7),
+              _buildQuickRangeChip('Last 30 Days', 30),
+              _buildQuickRangeChip('Last 90 Days', 90),
+              _buildQuickRangeChip('This Year', null),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -173,28 +165,26 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: LumiBorders.small,
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: LumiPadding.allXS,
         decoration: BoxDecoration(
-          border: Border.all(color: AppColors.primaryBlue),
-          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.rosePink),
+          borderRadius: LumiBorders.small,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey[600],
-                  ),
+              style: LumiTextStyles.bodySmall(
+                color: AppColors.charcoal.withValues(alpha: 0.6),
+              ),
             ),
-            const SizedBox(height: 4),
+            LumiGap.xxs,
             Text(
               DateFormat('MMM dd, yyyy').format(date),
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: LumiTextStyles.bodyLarge(),
             ),
           ],
         ),
@@ -205,6 +195,11 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
   Widget _buildQuickRangeChip(String label, int? days) {
     return ActionChip(
       label: Text(label),
+      backgroundColor: AppColors.white,
+      side: BorderSide(
+        color: AppColors.charcoal.withValues(alpha: 0.3),
+      ),
+      labelStyle: LumiTextStyles.label(),
       onPressed: () {
         setState(() {
           if (days != null) {
@@ -221,52 +216,46 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
   }
 
   Widget _buildReportPreview() {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.preview, color: AppColors.primaryBlue),
-                const SizedBox(width: 8),
-                Text(
-                  'Report Preview',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _buildPreviewItem(
-              icon: Icons.calendar_today,
-              label: 'Period',
-              value:
-                  '${DateFormat('MMM dd').format(_startDate)} - ${DateFormat('MMM dd, yyyy').format(_endDate)}',
-            ),
-            const Divider(),
-            _buildPreviewItem(
-              icon: Icons.access_time,
-              label: 'Duration',
-              value: '${_endDate.difference(_startDate).inDays} days',
-            ),
-            const Divider(),
-            _buildPreviewItem(
-              icon: Icons.description,
-              label: 'Includes',
-              value: 'Reading stats, trends, books, achievements',
-            ),
-            const Divider(),
-            _buildPreviewItem(
-              icon: Icons.format_size,
-              label: 'Format',
-              value: 'PDF (A4)',
-            ),
-          ],
-        ),
+    return LumiCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.preview, color: AppColors.rosePink),
+              LumiGap.horizontalXS,
+              Text(
+                'Report Preview',
+                style: LumiTextStyles.h3(),
+              ),
+            ],
+          ),
+          LumiGap.s,
+          _buildPreviewItem(
+            icon: Icons.calendar_today,
+            label: 'Period',
+            value:
+                '${DateFormat('MMM dd').format(_startDate)} - ${DateFormat('MMM dd, yyyy').format(_endDate)}',
+          ),
+          const Divider(),
+          _buildPreviewItem(
+            icon: Icons.access_time,
+            label: 'Duration',
+            value: '${_endDate.difference(_startDate).inDays} days',
+          ),
+          const Divider(),
+          _buildPreviewItem(
+            icon: Icons.description,
+            label: 'Includes',
+            value: 'Reading stats, trends, books, achievements',
+          ),
+          const Divider(),
+          _buildPreviewItem(
+            icon: Icons.format_size,
+            label: 'Format',
+            value: 'PDF (A4)',
+          ),
+        ],
       ),
     );
   }
@@ -277,26 +266,28 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
     required String value,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: EdgeInsets.symmetric(vertical: LumiSpacing.xs),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: Colors.grey[600]),
-          const SizedBox(width: 12),
+          Icon(
+            icon,
+            size: 20,
+            color: AppColors.charcoal.withValues(alpha: 0.6),
+          ),
+          LumiGap.horizontalXS,
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.grey[600],
-                      ),
+                  style: LumiTextStyles.bodySmall(
+                    color: AppColors.charcoal.withValues(alpha: 0.6),
+                  ),
                 ),
                 Text(
                   value,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
+                  style: LumiTextStyles.body(),
                 ),
               ],
             ),
@@ -310,43 +301,52 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ElevatedButton.icon(
-          onPressed: _isGenerating ? null : _generateReport,
-          icon: _isGenerating
-              ? const SizedBox(
+        if (_isGenerating)
+          Container(
+            padding: LumiPadding.allM,
+            decoration: BoxDecoration(
+              color: AppColors.rosePink.withValues(alpha: 0.1),
+              borderRadius: LumiBorders.large,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    color: AppColors.rosePink,
                   ),
-                )
-              : const Icon(Icons.picture_as_pdf),
-          label: Text(_isGenerating ? 'Generating...' : 'Generate Report'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primaryBlue,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.all(16),
+                ),
+                LumiGap.horizontalS,
+                Text(
+                  'Generating...',
+                  style: LumiTextStyles.bodyLarge(
+                    color: AppColors.rosePink,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          LumiPrimaryButton(
+            onPressed: _generateReport,
+            text: 'Generate Report',
+            icon: Icons.picture_as_pdf,
           ),
-        ),
         if (_generatedReport != null) ...[
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
+          LumiGap.s,
+          LumiSecondaryButton(
             onPressed: _shareReport,
-            icon: const Icon(Icons.share),
-            label: const Text('Share Report'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.all(16),
-            ),
+            text: 'Share Report',
+            icon: Icons.share,
           ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
+          LumiGap.xs,
+          LumiSecondaryButton(
             onPressed: _printReport,
-            icon: const Icon(Icons.print),
-            label: const Text('Print Report'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.all(16),
-            ),
+            text: 'Print Report',
+            icon: Icons.print,
           ),
         ],
       ],
@@ -354,37 +354,41 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
   }
 
   Widget _buildGeneratedReportCard() {
-    return Card(
-      elevation: 2,
-      color: Colors.green[50],
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.green[700], size: 32),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Report Generated Successfully!',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green[900],
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Saved to: ${_generatedReport!.path.split('/').last}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.green[700],
-                        ),
-                  ),
-                ],
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.success.withValues(alpha: 0.1),
+        borderRadius: LumiBorders.large,
+      ),
+      child: LumiCard(
+        padding: EdgeInsets.zero,
+        child: Padding(
+          padding: LumiPadding.allS,
+          child: Row(
+            children: [
+              Icon(Icons.check_circle, color: AppColors.success, size: 32),
+              LumiGap.horizontalS,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Report Generated Successfully!',
+                      style: LumiTextStyles.h3(
+                        color: AppColors.success,
+                      ),
+                    ),
+                    LumiGap.xxs,
+                    Text(
+                      'Saved to: ${_generatedReport!.path.split('/').last}',
+                      style: LumiTextStyles.bodySmall(
+                        color: AppColors.success.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -430,7 +434,8 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
 
     try {
       // Fetch reading logs for the date range
-      final firebaseService = Provider.of<FirebaseService>(context, listen: false);
+      final firebaseService =
+          Provider.of<FirebaseService>(context, listen: false);
       final docs = await firebaseService.getReadingLogsForStudent(
         widget.student.id,
         startDate: _startDate,
@@ -438,9 +443,8 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
       );
 
       // Convert documents to ReadingLogModel objects
-      final readingLogs = docs
-          .map((doc) => ReadingLogModel.fromFirestore(doc))
-          .toList();
+      final readingLogs =
+          docs.map((doc) => ReadingLogModel.fromFirestore(doc)).toList();
 
       // Optionally fetch class average for comparison
       // This would require additional Firebase query
@@ -462,10 +466,10 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Report generated successfully!'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: const Text('Report generated successfully!'),
+          backgroundColor: AppColors.success,
+          duration: const Duration(seconds: 2),
         ),
       );
     } catch (e) {
@@ -478,7 +482,7 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error generating report: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
           duration: const Duration(seconds: 3),
         ),
       );
@@ -496,7 +500,7 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error sharing report: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
         ),
       );
     }
@@ -513,7 +517,7 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error printing report: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
         ),
       );
     }
