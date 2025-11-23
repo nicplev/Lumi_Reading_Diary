@@ -1,7 +1,7 @@
 # Lumi Design System Migration - Status & Guide
 
-**Last Updated:** 2025-11-22
-**Progress:** 6/10 Parent Screens Completed (60%)
+**Last Updated:** 2025-11-23
+**Progress:** 7/10 Parent Screens Completed (70%)
 
 ## 🎯 Mission
 
@@ -9,7 +9,7 @@ Systematically migrate all Parent screens in the Lumi Reading Diary app to use t
 
 ---
 
-## ✅ COMPLETED SCREENS (6/10)
+## ✅ COMPLETED SCREENS (7/10)
 
 ### 1. parent_profile_screen.dart ✓
 - **Commit:** `52c6910` - "refactor: Migrate parent_profile_screen to Lumi Design System"
@@ -107,12 +107,31 @@ Systematically migrate all Parent screens in the Lumi Reading Diary app to use t
   - Updated Colors.green → AppColors.success
   - Updated Colors.red → AppColors.error
 
+### 7. achievements_screen.dart ✓
+- **Commit:** `58219f3` - "refactor: Migrate achievements_screen to Lumi Design System"
+- **Changes:**
+  - Replaced gradient background with solid AppColors.offWhite
+  - Replaced AppColors.primaryBlue → AppColors.rosePink
+  - Replaced AppColors.secondaryOrange → AppColors.warmOrange
+  - Replaced all hardcoded TextStyle with LumiTextStyles
+  - Replaced all hardcoded spacing with LumiSpacing/LumiGap/LumiPadding
+  - Replaced IconButton → LumiIconButton
+  - Replaced TextButton → LumiTextButton
+  - Applied LumiBorders for all border radius
+  - Replaced .withOpacity() → .withValues(alpha:)
+  - Replaced Colors.red → AppColors.error
+  - Replaced Colors.grey → AppColors.charcoal
+  - Updated TabBar styling with Lumi design tokens
+  - Updated FilterChip with Lumi colors (skyBlue selected, rosePink accents)
+  - Updated all state widgets (loading, error, empty) with Lumi styling
+  - Updated AlertDialog with LumiBorders.shapeLarge
+  - Kept GlassAchievementCard component for specialized badge styling
+
 ---
 
-## 📋 REMAINING SCREENS (4/10)
+## 📋 REMAINING SCREENS (3/10)
 
 ### Medium Priority / Medium Complexity
-7. **achievements_screen.dart** - Badge system and gamification
 8. **offline_management_screen.dart** - Settings and switches
 9. **reminder_settings_screen.dart** - Heavy gradients, needs simplification
 10. **student_report_screen.dart** - Reporting interface
