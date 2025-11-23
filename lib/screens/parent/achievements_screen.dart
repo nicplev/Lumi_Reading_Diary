@@ -302,10 +302,10 @@ class _AchievementsScreenState extends State<AchievementsScreen>
               earnedAt: DateTime.now(), // Placeholder
             );
 
-            return GlassAchievementBadge(
-              achievement: achievement,
-              locked: !isEarned,
-              onTap: () => _showAchievementProgress(
+            return _buildAchievementBadge(
+              achievement,
+              isEarned,
+              () => _showAchievementProgress(
                 achievement,
                 student,
                 isEarned,
@@ -480,6 +480,84 @@ class _AchievementsScreenState extends State<AchievementsScreen>
         FadeEffect(duration: 300.ms, delay: (50 * (achievement.id.hashCode % 5)).ms),
         SlideEffect(begin: const Offset(0, 0.1), end: Offset.zero, duration: 300.ms),
       ] : [],
+    );
+  }
+
+  Widget _buildAchievementBadge(
+    AchievementModel achievement,
+    bool isEarned,
+    VoidCallback onTap,
+  ) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: isEarned ? AppColors.white : AppColors.charcoal.withValues(alpha: 0.05),
+          borderRadius: LumiBorders.large,
+          border: Border.all(
+            color: isEarned
+                ? AppColors.rosePink
+                : AppColors.charcoal.withValues(alpha: 0.2),
+            width: isEarned ? 2 : 1,
+          ),
+          boxShadow: isEarned
+              ? [
+                  BoxShadow(
+                    color: AppColors.rosePink.withValues(alpha: 0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Icon with optional grayscale filter for locked
+            Opacity(
+              opacity: isEarned ? 1.0 : 0.3,
+              child: Text(
+                achievement.icon,
+                style: const TextStyle(fontSize: 48),
+              ),
+            ),
+            LumiGap.xs,
+            // Achievement name
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: LumiSpacing.xs),
+              child: Text(
+                achievement.name,
+                style: LumiTextStyles.bodySmall(
+                  color: isEarned
+                      ? AppColors.charcoal
+                      : AppColors.charcoal.withValues(alpha: 0.5),
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            // Lock icon if not earned
+            if (!isEarned) ...[
+              LumiGap.xxs,
+              Icon(
+                Icons.lock,
+                size: 16,
+                color: AppColors.charcoal.withValues(alpha: 0.4),
+              ),
+            ],
+            // Check icon if earned
+            if (isEarned) ...[
+              LumiGap.xxs,
+              const Icon(
+                Icons.check_circle,
+                size: 16,
+                color: AppColors.rosePink,
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
