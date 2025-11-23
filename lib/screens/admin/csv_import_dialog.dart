@@ -4,6 +4,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../services/csv_import_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
 import 'package:path_provider/path_provider.dart';
 // Conditional import - use dart:io on mobile, stub on web
 import 'dart:io' if (dart.library.html) '../../utils/io_stub.dart';
@@ -44,7 +48,7 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: LumiBorders.large),
       child: Container(
         width: 800,
         constraints: const BoxConstraints(maxHeight: 700),
@@ -58,12 +62,12 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryBlue.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    color: AppColors.rosePink.withValues(alpha: 0.1),
+                    borderRadius: LumiBorders.large,
                   ),
                   child: const Icon(
                     Icons.upload_file,
-                    color: AppColors.primaryBlue,
+                    color: AppColors.rosePink,
                     size: 24,
                   ),
                 ),
@@ -74,23 +78,19 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
                     children: [
                       Text(
                         'Import Students from CSV',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.black,
-                        ),
+                        style: LumiTextStyles.h2(color: AppColors.charcoal)
+                            .copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Upload a CSV file to bulk import students',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.gray,
-                        ),
+                        style: LumiTextStyles.body(color: AppColors.charcoal.withValues(alpha: 0.6)),
                       ),
                     ],
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: AppColors.gray),
+                  icon: const Icon(Icons.close, color: AppColors.charcoal.withValues(alpha: 0.6)),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -141,7 +141,7 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: AppColors.info.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: LumiBorders.large,
               border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
             ),
             child: Column(
@@ -153,10 +153,8 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
                     const SizedBox(width: 8),
                     Text(
                       'CSV Format Requirements',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.info,
-                      ),
+                      style: LumiTextStyles.body(color: AppColors.info)
+                          .copyWith(fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -178,16 +176,16 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
               onPressed: _downloadTemplate,
               icon: Icon(
                 _isMobilePlatform() ? Icons.share : Icons.download,
-                color: AppColors.primaryBlue,
+                color: AppColors.rosePink,
               ),
               label: Text(
                 _isMobilePlatform() ? 'Share CSV Template' : 'Download CSV Template',
-                style: const TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.bold),
+                style: const TextStyle(color: AppColors.rosePink, fontWeight: FontWeight.bold),
               ),
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppColors.primaryBlue),
+                side: const BorderSide(color: AppColors.rosePink),
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(borderRadius: LumiBorders.large),
               ),
             ),
           ),
@@ -202,18 +200,16 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.lightGray),
+                  borderRadius: LumiBorders.large,
+                  border: Border.all(color: AppColors.charcoal.withValues(alpha: 0.2)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Paste CSV Content',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.black,
-                      ),
+                      style: LumiTextStyles.body(color: AppColors.charcoal)
+                          .copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -222,7 +218,7 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
                       decoration: InputDecoration(
                         hintText: 'Student ID,First Name,Last Name,Class Name...\nS001,John,Doe,3A...',
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: LumiBorders.medium,
                         ),
                         filled: true,
                         fillColor: AppColors.offWhite,
@@ -248,7 +244,7 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
                           child: ElevatedButton(
                             onPressed: _isParsing ? null : _parseTextInput,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primaryBlue,
+                              backgroundColor: AppColors.rosePink,
                               foregroundColor: Colors.white,
                             ),
                             child: _isParsing
@@ -273,15 +269,15 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
                     _showTextInput = true;
                   });
                 },
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: LumiBorders.large,
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(48),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryBlue.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(16),
+                    color: AppColors.rosePink.withValues(alpha: 0.05),
+                    borderRadius: LumiBorders.large,
                     border: Border.all(
-                      color: AppColors.primaryBlue.withValues(alpha: 0.3),
+                      color: AppColors.rosePink.withValues(alpha: 0.3),
                       width: 2,
                       style: BorderStyle.solid,
                     ),
@@ -291,22 +287,18 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
                       Icon(
                         Icons.content_paste,
                         size: 64,
-                        color: AppColors.primaryBlue.withValues(alpha: 0.5),
+                        color: AppColors.rosePink.withValues(alpha: 0.5),
                       ),
                       const SizedBox(height: 16),
                       Text(
                         'Tap to paste CSV content',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: AppColors.primaryBlue,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: LumiTextStyles.h3(color: AppColors.rosePink)
+                            .copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'Copy your CSV data and paste it here',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.gray,
-                        ),
+                        style: LumiTextStyles.body(color: AppColors.charcoal.withValues(alpha: 0.6)),
                       ),
                     ],
                   ),
@@ -317,15 +309,15 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
             // File Picker for Desktop
             InkWell(
               onTap: _isLoading ? null : _pickFile,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: LumiBorders.large,
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(48),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryBlue.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(16),
+                  color: AppColors.rosePink.withValues(alpha: 0.05),
+                  borderRadius: LumiBorders.large,
                   border: Border.all(
-                    color: AppColors.primaryBlue.withValues(alpha: 0.3),
+                    color: AppColors.rosePink.withValues(alpha: 0.3),
                     width: 2,
                     style: BorderStyle.solid,
                   ),
@@ -333,27 +325,23 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
                 child: Column(
                   children: [
                     if (_isLoading)
-                      const CircularProgressIndicator(color: AppColors.primaryBlue)
+                      const CircularProgressIndicator(color: AppColors.rosePink)
                     else
                       Icon(
                         Icons.cloud_upload_outlined,
                         size: 64,
-                        color: AppColors.primaryBlue.withValues(alpha: 0.5),
+                        color: AppColors.rosePink.withValues(alpha: 0.5),
                       ),
                     const SizedBox(height: 16),
                     Text(
                       _fileName ?? 'Click to select CSV file',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppColors.primaryBlue,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: LumiTextStyles.h3(color: AppColors.rosePink)
+                          .copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'or drag and drop',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.gray,
-                      ),
+                      style: LumiTextStyles.body(color: AppColors.charcoal.withValues(alpha: 0.6)),
                     ),
                   ],
                 ),
@@ -379,7 +367,7 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(color: AppColors.black, fontSize: 14),
+              style: const TextStyle(color: AppColors.charcoal, fontSize: 14),
             ),
           ),
         ],
@@ -396,7 +384,7 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: AppColors.success.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: LumiBorders.large,
             border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
           ),
           child: Row(
@@ -409,15 +397,13 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
                   children: [
                     Text(
                       'Ready to Import',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.success,
-                      ),
+                      style: LumiTextStyles.body(color: AppColors.success)
+                          .copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '${_parsedRows!.length} students will be imported',
-                      style: const TextStyle(color: AppColors.black, fontSize: 14),
+                      style: const TextStyle(color: AppColors.charcoal, fontSize: 14),
                     ),
                   ],
                 ),
@@ -431,24 +417,22 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
         // Preview Table
         Text(
           'Preview',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: AppColors.black,
-          ),
+          style: LumiTextStyles.h3(color: AppColors.charcoal)
+              .copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
 
         Expanded(
           child: Container(
             decoration: BoxDecoration(
-              border: Border.all(color: AppColors.lightGray),
-              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.charcoal.withValues(alpha: 0.2)),
+              borderRadius: LumiBorders.medium,
             ),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: SingleChildScrollView(
                 child: DataTable(
-                  headingRowColor: WidgetStateProperty.all(AppColors.lightGray.withValues(alpha: 0.3)),
+                  headingRowColor: WidgetStateProperty.all(AppColors.charcoal.withValues(alpha: 0.2).withValues(alpha: 0.3)),
                   columns: const [
                     DataColumn(label: Text('Row', style: TextStyle(fontWeight: FontWeight.bold))),
                     DataColumn(label: Text('Student ID', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -480,7 +464,7 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
             padding: const EdgeInsets.only(top: 8),
             child: Text(
               'Showing first 50 of ${_parsedRows!.length} students',
-              style: const TextStyle(color: AppColors.gray, fontSize: 12),
+              style: const TextStyle(color: AppColors.charcoal.withValues(alpha: 0.6), fontSize: 12),
             ),
           ),
       ],
@@ -496,7 +480,7 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: AppColors.error.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: LumiBorders.large,
             border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
           ),
           child: Row(
@@ -509,15 +493,13 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
                   children: [
                     Text(
                       'Validation Errors',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.error,
-                      ),
+                      style: LumiTextStyles.body(color: AppColors.error)
+                          .copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '${_validationErrors.length} errors found in the CSV file',
-                      style: const TextStyle(color: AppColors.black, fontSize: 14),
+                      style: const TextStyle(color: AppColors.charcoal, fontSize: 14),
                     ),
                   ],
                 ),
@@ -534,8 +516,8 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.lightGray),
+              borderRadius: LumiBorders.medium,
+              border: Border.all(color: AppColors.charcoal.withValues(alpha: 0.2)),
             ),
             child: ListView.separated(
               itemCount: _validationErrors.length,
@@ -549,7 +531,7 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
                     Expanded(
                       child: Text(
                         _validationErrors[index],
-                        style: const TextStyle(color: AppColors.black, fontSize: 14),
+                        style: const TextStyle(color: AppColors.charcoal, fontSize: 14),
                       ),
                     ),
                   ],
@@ -576,7 +558,7 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
             color: hasErrors
                 ? AppColors.warning.withValues(alpha: 0.1)
                 : AppColors.success.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: LumiBorders.large,
             border: Border.all(
               color: hasErrors
                   ? AppColors.warning.withValues(alpha: 0.3)
@@ -597,15 +579,14 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
                   children: [
                     Text(
                       hasErrors ? 'Import Completed with Errors' : 'Import Successful',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: hasErrors ? AppColors.warning : AppColors.success,
-                      ),
+                      style: LumiTextStyles.body(
+                          color: hasErrors ? AppColors.warning : AppColors.success)
+                          .copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '${result.successCount} students imported successfully',
-                      style: const TextStyle(color: AppColors.black, fontSize: 14),
+                      style: const TextStyle(color: AppColors.charcoal, fontSize: 14),
                     ),
                     if (hasErrors)
                       Text(
@@ -625,10 +606,8 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
         if (hasErrors) ...[
           Text(
             'Import Errors',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: AppColors.black,
-            ),
+            style: LumiTextStyles.h3(color: AppColors.charcoal)
+                .copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           Expanded(
@@ -636,8 +615,8 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.lightGray),
+                borderRadius: LumiBorders.medium,
+                border: Border.all(color: AppColors.charcoal.withValues(alpha: 0.2)),
               ),
               child: ListView.separated(
                 itemCount: result.errors.length,
@@ -651,7 +630,7 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
                       Expanded(
                         child: Text(
                           result.errors[index],
-                          style: const TextStyle(color: AppColors.black, fontSize: 14),
+                          style: const TextStyle(color: AppColors.charcoal, fontSize: 14),
                         ),
                       ),
                     ],
@@ -674,10 +653,8 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
                   const SizedBox(height: 16),
                   Text(
                     'All students imported successfully!',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: AppColors.success,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: LumiTextStyles.h3(color: AppColors.success)
+                        .copyWith(fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -696,10 +673,10 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true), // Return true to refresh
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryBlue,
+              backgroundColor: AppColors.rosePink,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(borderRadius: LumiBorders.large),
             ),
             child: const Text('Done', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
@@ -713,7 +690,7 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
         children: [
           TextButton(
             onPressed: _reset,
-            child: const Text('Cancel', style: TextStyle(color: AppColors.gray)),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.charcoal.withValues(alpha: 0.6))),
           ),
           Expanded(
             child: Row(
@@ -723,13 +700,13 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
                   child: OutlinedButton(
                     onPressed: _reset,
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.gray),
+                      side: const BorderSide(color: AppColors.charcoal.withValues(alpha: 0.6)),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(borderRadius: LumiBorders.large),
                     ),
                     child: const Text(
                       'Reset',
-                      style: TextStyle(color: AppColors.gray),
+                      style: TextStyle(color: AppColors.charcoal.withValues(alpha: 0.6)),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -739,10 +716,10 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
                   child: ElevatedButton(
                     onPressed: _isImporting ? null : _importStudents,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryBlue,
+                      backgroundColor: AppColors.rosePink,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(borderRadius: LumiBorders.large),
                     ),
                     child: _isImporting
                         ? const SizedBox(
@@ -770,15 +747,15 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
         children: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.gray)),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.charcoal.withValues(alpha: 0.6))),
           ),
           ElevatedButton(
             onPressed: _reset,
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryBlue,
+              backgroundColor: AppColors.rosePink,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(borderRadius: LumiBorders.large),
             ),
             child: const Text('Choose Different File', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
@@ -791,7 +768,7 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
       children: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel', style: TextStyle(color: AppColors.gray)),
+          child: const Text('Cancel', style: TextStyle(color: AppColors.charcoal.withValues(alpha: 0.6))),
         ),
       ],
     );
