@@ -3,6 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/lumi_card.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/student_link_code_model.dart';
@@ -146,13 +151,13 @@ class _ParentLinkingManagementScreenState
           'This will generate link codes for ${_students.where((s) => !_studentCodes.containsKey(s.id) || _studentCodes[s.id] == null).length} students. Continue?',
         ),
         actions: [
-          TextButton(
+          LumiTextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            text: 'Cancel',
           ),
-          ElevatedButton(
+          LumiPrimaryButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Generate'),
+            text: 'Generate',
           ),
         ],
       ),
@@ -221,14 +226,14 @@ class _ParentLinkingManagementScreenState
       context: context,
       barrierDismissible: false,
       builder: (context) => const Center(
-        child: Card(
+        child: LumiCard(
           child: Padding(
-            padding: EdgeInsets.all(24.0),
+            padding: LumiPadding.allM,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 CircularProgressIndicator(),
-                SizedBox(height: 16),
+                LumiGap.s,
                 Text('Running diagnostic...'),
               ],
             ),
@@ -259,19 +264,17 @@ class _ParentLinkingManagementScreenState
                     result['students']['success'] ? AppColors.success : AppColors.error,
                   ),
                   if (result['students']['students'] != null && (result['students']['students'] as List).isNotEmpty) ...[
-                    const SizedBox(height: 8),
+                    LumiGap.xs,
                     Text(
                       'Student List:',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: LumiTextStyles.bodySmall().copyWith(fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 4),
+                    LumiGap.xxs,
                     ...(result['students']['students'] as List).map((s) => Padding(
-                      padding: const EdgeInsets.only(left: 16.0, bottom: 4),
+                      padding: const EdgeInsets.only(left: LumiSpacing.s, bottom: LumiSpacing.xxs),
                       child: Text(
                         '• ${s['firstName']} ${s['lastName']} (${s['studentId']})',
-                        style: Theme.of(context).textTheme.bodySmall,
+                        style: LumiTextStyles.bodySmall(),
                       ),
                     )),
                   ],
@@ -282,19 +285,17 @@ class _ParentLinkingManagementScreenState
                     result['classes']['success'] ? AppColors.success : AppColors.error,
                   ),
                   if (result['classes']['classes'] != null && (result['classes']['classes'] as List).isNotEmpty) ...[
-                    const SizedBox(height: 8),
+                    LumiGap.xs,
                     Text(
                       'Class List:',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: LumiTextStyles.bodySmall().copyWith(fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 4),
+                    LumiGap.xxs,
                     ...(result['classes']['classes'] as List).map((c) => Padding(
-                      padding: const EdgeInsets.only(left: 16.0, bottom: 4),
+                      padding: const EdgeInsets.only(left: LumiSpacing.s, bottom: LumiSpacing.xxs),
                       child: Text(
                         '• ${c['name']} - ${c['studentCount']} students',
-                        style: Theme.of(context).textTheme.bodySmall,
+                        style: LumiTextStyles.bodySmall(),
                       ),
                     )),
                   ],
@@ -315,12 +316,12 @@ class _ParentLinkingManagementScreenState
                     result['verification']['missingCount'] > 0 ? AppColors.error : AppColors.success,
                   ),
                   if (result['verification']['missingCount'] > 0) ...[
-                    const SizedBox(height: 8),
+                    LumiGap.xs,
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: LumiPadding.allXS,
                       decoration: BoxDecoration(
                         color: AppColors.error.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: LumiBorders.medium,
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -332,10 +333,10 @@ class _ParentLinkingManagementScreenState
                               color: AppColors.error,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          LumiGap.xxs,
                           Text(
                             'Some class arrays reference student IDs that don\'t have corresponding documents.',
-                            style: Theme.of(context).textTheme.bodySmall,
+                            style: LumiTextStyles.bodySmall(),
                           ),
                         ],
                       ),
@@ -345,36 +346,36 @@ class _ParentLinkingManagementScreenState
               ),
             ),
             actions: [
-              TextButton(
+              LumiTextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
+                text: 'Close',
               ),
               if (result['students']['count'] > 0)
-                TextButton.icon(
+                LumiTextButton(
                   onPressed: () {
                     Navigator.pop(context);
                     _fixStudentData();
                   },
-                  icon: const Icon(Icons.build),
-                  label: const Text('Fix Student Data'),
+                  icon: Icons.build,
+                  text: 'Fix Student Data',
                 ),
               if (result['classes']['count'] > result['students']['count'])
-                TextButton.icon(
+                LumiTextButton(
                   onPressed: () {
                     Navigator.pop(context);
                     _cleanupClasses();
                   },
-                  icon: const Icon(Icons.cleaning_services),
-                  label: const Text('Clean Up Classes'),
+                  icon: Icons.cleaning_services,
+                  text: 'Clean Up Classes',
                 ),
               if (result['students']['count'] == 0)
-                ElevatedButton.icon(
+                LumiPrimaryButton(
                   onPressed: () {
                     Navigator.pop(context);
                     _createTestStudent();
                   },
-                  icon: const Icon(Icons.add),
-                  label: const Text('Create Test Student'),
+                  icon: Icons.add,
+                  text: 'Create Test Student',
                 ),
             ],
           ),
@@ -395,30 +396,23 @@ class _ParentLinkingManagementScreenState
 
   Widget _buildDiagnosticSection(String label, String value, Color color) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
+      padding: const EdgeInsets.only(bottom: LumiSpacing.xs),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             label,
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.gray,
-            ),
+            style: LumiTextStyles.body(color: AppColors.charcoal.withValues(alpha: 0.6)),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: LumiSpacing.xs, vertical: LumiSpacing.xxs),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: LumiBorders.large,
             ),
             child: Text(
               value,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
+              style: LumiTextStyles.body(color: color).copyWith(fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -453,14 +447,14 @@ class _ParentLinkingManagementScreenState
       context: context,
       barrierDismissible: false,
       builder: (context) => const Center(
-        child: Card(
+        child: LumiCard(
           child: Padding(
-            padding: EdgeInsets.all(24.0),
+            padding: LumiPadding.allM,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 CircularProgressIndicator(),
-                SizedBox(height: 16),
+                LumiGap.s,
                 Text('Creating test student...'),
               ],
             ),
@@ -514,14 +508,14 @@ class _ParentLinkingManagementScreenState
       context: context,
       barrierDismissible: false,
       builder: (context) => const Center(
-        child: Card(
+        child: LumiCard(
           child: Padding(
-            padding: EdgeInsets.all(24.0),
+            padding: LumiPadding.allM,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 CircularProgressIndicator(),
-                SizedBox(height: 16),
+                LumiGap.s,
                 Text('Fixing student data...'),
               ],
             ),
@@ -579,14 +573,14 @@ class _ParentLinkingManagementScreenState
       context: context,
       barrierDismissible: false,
       builder: (context) => const Center(
-        child: Card(
+        child: LumiCard(
           child: Padding(
-            padding: EdgeInsets.all(24.0),
+            padding: LumiPadding.allM,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 CircularProgressIndicator(),
-                SizedBox(height: 16),
+                LumiGap.s,
                 Text('Cleaning up classes...'),
               ],
             ),
@@ -659,7 +653,7 @@ class _ParentLinkingManagementScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundPrimary,
+      backgroundColor: AppColors.offWhite,
       appBar: AppBar(
         title: const Text('Parent Linking Codes'),
         backgroundColor: Colors.transparent,
@@ -685,11 +679,11 @@ class _ParentLinkingManagementScreenState
                 // Debug info banner (only show if no students)
                 if (_students.isEmpty)
                   Container(
-                    margin: const EdgeInsets.all(16),
-                    padding: const EdgeInsets.all(16),
+                    margin: LumiPadding.allS,
+                    padding: LumiPadding.allS,
                     decoration: BoxDecoration(
                       color: AppColors.warning.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: LumiBorders.large,
                       border: Border.all(
                         color: AppColors.warning.withValues(alpha: 0.3),
                       ),
@@ -703,31 +697,29 @@ class _ParentLinkingManagementScreenState
                               color: AppColors.warning,
                               size: 24,
                             ),
-                            const SizedBox(width: 12),
+                            LumiGap.xs,
                             Expanded(
                               child: Text(
                                 'No students found in database',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.warning,
-                                ),
+                                style: LumiTextStyles.body(color: AppColors.warning)
+                                    .copyWith(fontWeight: FontWeight.bold),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        LumiGap.xs,
                         Text(
                           'Run the diagnostic to check your Firestore data structure, or import students via CSV.',
-                          style: Theme.of(context).textTheme.bodySmall,
+                          style: LumiTextStyles.bodySmall(),
                         ),
-                        const SizedBox(height: 12),
+                        LumiGap.xs,
                         Row(
                           children: [
                             Expanded(
-                              child: OutlinedButton.icon(
+                              child: LumiSecondaryButton(
                                 onPressed: _runDiagnostic,
-                                icon: const Icon(Icons.bug_report),
-                                label: const Text('Run Diagnostic'),
+                                icon: Icons.bug_report,
+                                text: 'Run Diagnostic',
                               ),
                             ),
                           ],
@@ -737,21 +729,10 @@ class _ParentLinkingManagementScreenState
                   ).animate().fadeIn(duration: 500.ms),
 
                 // Stats card
-                Container(
-                  margin: const EdgeInsets.all(16),
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
+                Padding(
+                  padding: LumiPadding.allS,
+                  child: LumiCard(
+                    child: Column(
                     children: [
                       Row(
                         children: [
@@ -760,13 +741,13 @@ class _ParentLinkingManagementScreenState
                               'Total Students',
                               _students.length.toString(),
                               Icons.people,
-                              AppColors.primaryBlue,
+                              AppColors.rosePink,
                             ),
                           ),
                           Container(
                             width: 1,
                             height: 40,
-                            color: AppColors.lightGray,
+                            color: AppColors.charcoal.withValues(alpha: 0.2),
                           ),
                           Expanded(
                             child: _buildStatItem(
@@ -782,7 +763,7 @@ class _ParentLinkingManagementScreenState
                           Container(
                             width: 1,
                             height: 40,
-                            color: AppColors.lightGray,
+                            color: AppColors.charcoal.withValues(alpha: 0.2),
                           ),
                           Expanded(
                             child: _buildStatItem(
@@ -797,24 +778,13 @@ class _ParentLinkingManagementScreenState
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      ElevatedButton.icon(
+                      LumiGap.s,
+                      LumiPrimaryButton(
                         onPressed: _isGeneratingAll ? null : _generateAllCodes,
-                        icon: _isGeneratingAll
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white),
-                                ),
-                              )
-                            : const Icon(Icons.auto_awesome),
-                        label: const Text('Generate All Missing Codes'),
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(48),
-                        ),
+                        icon: Icons.auto_awesome,
+                        isLoading: _isGeneratingAll,
+                        isFullWidth: true,
+                        text: 'Generate All Missing Codes',
                       ),
                     ],
                   ),
@@ -823,40 +793,37 @@ class _ParentLinkingManagementScreenState
                 // Student list
                 Expanded(
                   child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
+                    padding: LumiPadding.allS,
                     itemCount: _students.length,
                     itemBuilder: (context, index) {
                       final student = _students[index];
                       final code = _studentCodes[student.id];
 
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        child: ExpansionTile(
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: LumiSpacing.xs),
+                        child: LumiCard(
+                          child: ExpansionTile(
                           leading: CircleAvatar(
                             backgroundColor:
-                                AppColors.primaryBlue.withValues(alpha: 0.1),
+                                AppColors.rosePink.withValues(alpha: 0.1),
                             child: Text(
                               student.firstName[0].toUpperCase(),
-                              style: const TextStyle(
-                                color: AppColors.primaryBlue,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style: LumiTextStyles.body(color: AppColors.rosePink)
+                                  .copyWith(fontWeight: FontWeight.bold),
                             ),
                           ),
                           title: Text(
                             student.fullName,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: LumiTextStyles.body().copyWith(fontWeight: FontWeight.bold),
                           ),
                           subtitle: Text(
                             code != null
                                 ? 'Code: ${code.code} • ${student.parentIds.isEmpty ? "Not linked" : "${student.parentIds.length} parent(s) linked"}'
                                 : 'No code generated',
-                            style: TextStyle(
+                            style: LumiTextStyles.bodySmall(
                               color: code != null
                                   ? AppColors.success
-                                  : AppColors.gray,
+                                  : AppColors.charcoal.withValues(alpha: 0.6),
                             ),
                           ),
                           trailing: code != null
@@ -871,20 +838,20 @@ class _ParentLinkingManagementScreenState
                               : null,
                           children: [
                             Padding(
-                              padding: const EdgeInsets.all(16),
+                              padding: LumiPadding.allS,
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   if (code != null) ...[
                                     // Code display
                                     Container(
-                                      padding: const EdgeInsets.all(16),
+                                      padding: LumiPadding.allS,
                                       decoration: BoxDecoration(
-                                        color: AppColors.primaryBlue
+                                        color: AppColors.rosePink
                                             .withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(12),
+                                        borderRadius: LumiBorders.large,
                                         border: Border.all(
-                                          color: AppColors.primaryBlue
+                                          color: AppColors.rosePink
                                               .withValues(alpha: 0.3),
                                         ),
                                       ),
@@ -892,29 +859,23 @@ class _ParentLinkingManagementScreenState
                                         children: [
                                           Text(
                                             code.code,
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .displaySmall
-                                                ?.copyWith(
-                                                  fontWeight: FontWeight.bold,
-                                                  color: AppColors.primaryBlue,
-                                                  letterSpacing: 4,
-                                                ),
+                                            style: LumiTextStyles.h1(color: AppColors.rosePink)
+                                                .copyWith(
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 4,
+                                            ),
                                           ),
-                                          const SizedBox(height: 8),
+                                          LumiGap.xs,
                                           Text(
                                             'Parent Link Code',
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .bodySmall
-                                                ?.copyWith(
-                                                  color: AppColors.gray,
-                                                ),
+                                            style: LumiTextStyles.bodySmall(
+                                              color: AppColors.charcoal.withValues(alpha: 0.6),
+                                            ),
                                           ),
                                         ],
                                       ),
                                     ),
-                                    const SizedBox(height: 12),
+                                    LumiGap.xs,
 
                                     // Code info
                                     Row(
@@ -928,10 +889,10 @@ class _ParentLinkingManagementScreenState
                                                 .last,
                                             code.status == LinkCodeStatus.active
                                                 ? AppColors.success
-                                                : AppColors.gray,
+                                                : AppColors.charcoal.withValues(alpha: 0.6),
                                           ),
                                         ),
-                                        const SizedBox(width: 8),
+                                        LumiGap.xs,
                                         Expanded(
                                           child: _buildInfoChip(
                                             'Created',
@@ -941,42 +902,44 @@ class _ParentLinkingManagementScreenState
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 12),
+                                    LumiGap.xs,
 
                                     // Actions
                                     Row(
                                       children: [
                                         Expanded(
-                                          child: OutlinedButton.icon(
+                                          child: LumiSecondaryButton(
                                             onPressed: () =>
                                                 _copyCode(code.code),
-                                            icon: const Icon(Icons.copy),
-                                            label: const Text('Copy'),
+                                            icon: Icons.copy,
+                                            text: 'Copy',
                                           ),
                                         ),
-                                        const SizedBox(width: 8),
+                                        LumiGap.xs,
                                         Expanded(
-                                          child: OutlinedButton.icon(
+                                          child: LumiSecondaryButton(
                                             onPressed: () =>
                                                 _shareCode(student, code),
-                                            icon: const Icon(Icons.share),
-                                            label: const Text('Share'),
+                                            icon: Icons.share,
+                                            text: 'Share',
                                           ),
                                         ),
                                       ],
                                     ),
                                   ] else ...[
-                                    ElevatedButton.icon(
+                                    LumiPrimaryButton(
                                       onPressed: () =>
                                           _generateCode(student.id),
-                                      icon: const Icon(Icons.add),
-                                      label: const Text('Generate Code'),
+                                      icon: Icons.add,
+                                      isFullWidth: true,
+                                      text: 'Generate Code',
                                     ),
                                   ],
                                 ],
                               ),
                             ),
                           ],
+                          ),
                         ),
                       ).animate().fadeIn(delay: (index * 50).ms);
                     },
@@ -992,20 +955,15 @@ class _ParentLinkingManagementScreenState
     return Column(
       children: [
         Icon(icon, color: color, size: 24),
-        const SizedBox(height: 8),
+        LumiGap.xs,
         Text(
           value,
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
+          style: LumiTextStyles.h1(color: color).copyWith(fontWeight: FontWeight.bold),
         ),
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppColors.gray,
+          style: LumiTextStyles.label(
+            color: AppColors.charcoal.withValues(alpha: 0.6),
           ),
           textAlign: TextAlign.center,
         ),
@@ -1015,10 +973,10 @@ class _ParentLinkingManagementScreenState
 
   Widget _buildInfoChip(String label, String value, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: LumiSpacing.xs, vertical: LumiSpacing.xs),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: LumiBorders.medium,
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
@@ -1026,16 +984,11 @@ class _ParentLinkingManagementScreenState
         children: [
           Text(
             label,
-            style: TextStyle(
-              fontSize: 10,
-              color: color,
-              fontWeight: FontWeight.bold,
-            ),
+            style: LumiTextStyles.label(color: color).copyWith(fontWeight: FontWeight.bold),
           ),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 12,
+            style: LumiTextStyles.bodySmall(
               color: color,
             ),
           ),
@@ -1052,38 +1005,36 @@ class _ParentLinkingManagementScreenState
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Share Link Code'),
+        shape: LumiBorders.shapeLarge,
+        title: Text('Share Link Code', style: LumiTextStyles.h2()),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Student: ${student.fullName}'),
-            const SizedBox(height: 8),
+            Text('Student: ${student.fullName}', style: LumiTextStyles.body()),
+            LumiGap.xs,
             Text(
               'Link Code: ${code.code}',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-              ),
+              style: LumiTextStyles.bodyLarge().copyWith(fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 16),
-            const Text(
+            LumiGap.s,
+            Text(
               'Share this code with the parent to link their account to this student.',
-              style: TextStyle(fontSize: 12, color: AppColors.gray),
+              style: LumiTextStyles.bodySmall(color: AppColors.charcoal.withValues(alpha: 0.6)),
             ),
           ],
         ),
         actions: [
-          TextButton(
+          LumiTextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            text: 'Close',
           ),
-          ElevatedButton(
+          LumiPrimaryButton(
             onPressed: () {
               _copyCode(code.code);
               Navigator.pop(context);
             },
-            child: const Text('Copy Code'),
+            text: 'Copy Code',
           ),
         ],
       ),
