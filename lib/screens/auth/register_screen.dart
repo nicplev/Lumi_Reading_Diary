@@ -7,10 +7,17 @@ import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/lumi_card.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../core/routing/app_router.dart';
 import '../../data/models/user_model.dart';
 import '../../services/firebase_service.dart';
+import '../../services/school_code_service.dart';
+import '../../core/services/user_school_index_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   final String? inviteCode;
@@ -29,6 +36,8 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormBuilderState>();
   final FirebaseService _firebaseService = FirebaseService.instance;
+  final UserSchoolIndexService _indexService = UserSchoolIndexService();
+  final SchoolCodeService _schoolCodeService = SchoolCodeService();
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -48,15 +57,66 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final fullName = values['fullName'] as String;
 
       try {
+        print('🔷 [REGISTER] Starting registration for: $email, role: $_selectedRole');
+
+        // Determine school ID based on role
+        late String schoolId;
+        String? schoolCodeId;
+
+        if (_selectedRole == UserRole.teacher) {
+          // For teachers: Validate school code
+          final schoolCode = values['schoolCode'] as String?;
+          print('🔷 [REGISTER] Teacher registration - School code: $schoolCode');
+
+          if (schoolCode == null || schoolCode.isEmpty) {
+            print('❌ [REGISTER] School code is empty');
+            setState(() {
+              _errorMessage = 'School code is required for teachers';
+            });
+            return;
+          }
+
+          try {
+            print('🔷 [REGISTER] Validating school code...');
+            final codeDetails = await _schoolCodeService.validateSchoolCode(schoolCode);
+            schoolId = codeDetails['schoolId']!;
+            schoolCodeId = codeDetails['codeId'];
+            print('✅ [REGISTER] School code validated! SchoolId: $schoolId, CodeId: $schoolCodeId');
+          } on SchoolCodeException catch (e) {
+            print('❌ [REGISTER] School code validation failed: ${e.message}');
+            setState(() {
+              _errorMessage = e.message;
+            });
+            return;
+          }
+        } else {
+          // For parents: Use schoolId from URL parameter (if provided)
+          final widgetSchoolId = widget.schoolId;
+          print('🔷 [REGISTER] Parent registration - SchoolId from URL: $widgetSchoolId');
+
+          if (widgetSchoolId == null || widgetSchoolId.isEmpty) {
+            print('❌ [REGISTER] SchoolId is empty for parent');
+            setState(() {
+              _errorMessage = 'School ID is required. Please use the registration link provided by your school.';
+            });
+            return;
+          }
+
+          schoolId = widgetSchoolId;
+        }
+
         // Create user with email and password
+        print('🔷 [REGISTER] Creating Firebase Auth user...');
         final UserCredential userCredential = await _firebaseService.auth
             .createUserWithEmailAndPassword(
           email: email,
           password: password,
         );
+        print('✅ [REGISTER] Firebase Auth user created: ${userCredential.user?.uid}');
 
         if (userCredential.user != null) {
           // Update display name
+          print('🔷 [REGISTER] Updating display name...');
           await userCredential.user!.updateDisplayName(fullName);
 
           // Create user document in Firestore
@@ -65,15 +125,51 @@ class _RegisterScreenState extends State<RegisterScreen> {
             email: email,
             fullName: fullName,
             role: _selectedRole,
-            schoolId: widget.schoolId,
+            schoolId: schoolId,
             createdAt: DateTime.now(),
             lastLoginAt: DateTime.now(),
           );
 
+          // Determine the correct collection based on role
+          final String collectionName = _selectedRole == UserRole.parent ? 'parents' : 'users';
+
+          // Write to nested school structure
+          print('🔷 [REGISTER] Creating Firestore document at: schools/$schoolId/$collectionName/${userCredential.user!.uid}');
           await _firebaseService.firestore
-              .collection('users')
+              .collection('schools')
+              .doc(schoolId)
+              .collection(collectionName)
               .doc(userCredential.user!.uid)
               .set(user.toFirestore());
+          print('✅ [REGISTER] Firestore document created');
+
+          // Increment appropriate counter on school document
+          final counterField = _selectedRole == UserRole.parent ? 'parentCount' : 'teacherCount';
+          print('🔷 [REGISTER] Incrementing $counterField on school document...');
+          await _firebaseService.firestore
+              .collection('schools')
+              .doc(schoolId)
+              .update({
+            counterField: FieldValue.increment(1),
+          });
+          print('✅ [REGISTER] Counter incremented');
+
+          // Create email-to-school index for fast login lookups
+          print('🔷 [REGISTER] Creating user school index...');
+          await _indexService.createOrUpdateIndex(
+            email: email,
+            schoolId: schoolId,
+            userType: collectionName == 'parents' ? 'parent' : 'user',
+            userId: userCredential.user!.uid,
+          );
+          print('✅ [REGISTER] User school index created');
+
+          // If teacher registration, increment school code usage count
+          if (_selectedRole == UserRole.teacher && schoolCodeId != null) {
+            print('🔷 [REGISTER] Incrementing school code usage count...');
+            await _schoolCodeService.incrementCodeUsage(schoolCodeId);
+            print('✅ [REGISTER] School code usage count incremented');
+          }
 
           // If there's an invite code, link the parent to children
           if (widget.inviteCode != null && _selectedRole == UserRole.parent) {
@@ -88,6 +184,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           // Navigate to appropriate home screen
           if (_selectedRole == UserRole.parent) {
             final homeRoute = AppRouter.getHomeRouteForRole(user.role);
+            // ignore: invalid_use_of_internal_member
             context.go(homeRoute, extra: user);
           } else {
             // For teacher or admin, show pending approval screen
@@ -95,10 +192,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
           }
         }
       } on FirebaseAuthException catch (e) {
+        print('❌ [REGISTER] Firebase Auth Exception: ${e.code} - ${e.message}');
         setState(() {
           _errorMessage = _getErrorMessage(e.code);
         });
-      } catch (e) {
+      } catch (e, stackTrace) {
+        print('❌ [REGISTER] General Exception: $e');
+        print('❌ [REGISTER] Stack trace: $stackTrace');
         setState(() {
           _errorMessage = 'An error occurred. Please try again.';
         });
@@ -114,6 +214,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _linkParentWithInviteCode(String parentId, String inviteCode) async {
     try {
+      if (widget.schoolId == null) return;
+
       // Find students linked to this invite code
       final querySnapshot = await _firebaseService.firestore
           .collection('invites')
@@ -126,17 +228,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
         final invite = querySnapshot.docs.first;
         final studentIds = List<String>.from(invite.data()['studentIds'] ?? []);
 
-        // Link parent to students
+        // Link parent to students using nested structure
         await _firebaseService.firestore
-            .collection('users')
+            .collection('schools')
+            .doc(widget.schoolId)
+            .collection('parents')
             .doc(parentId)
             .update({
           'linkedChildren': studentIds,
         });
 
-        // Add parent to each student
+        // Add parent to each student using nested structure
         for (String studentId in studentIds) {
           await _firebaseService.firestore
+              .collection('schools')
+              .doc(widget.schoolId)
               .collection('students')
               .doc(studentId)
               .update({
@@ -161,15 +267,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('Registration Successful'),
-        content: const Text(
+        shape: LumiBorders.shapeLarge,
+        title: Text(
+          'Registration Successful',
+          style: LumiTextStyles.h3(),
+        ),
+        content: Text(
           'Your account has been created successfully. '
           'Please wait for school admin approval to access the app.',
+          style: LumiTextStyles.body(),
         ),
         actions: [
-          TextButton(
+          LumiTextButton(
             onPressed: () => context.go('/auth/login'),
-            child: const Text('OK'),
+            text: 'OK',
           ),
         ],
       ),
@@ -192,18 +303,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundPrimary,
+      backgroundColor: AppColors.offWhite,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.darkGray),
+          icon: Icon(Icons.arrow_back, color: AppColors.charcoal),
           onPressed: () => Navigator.pop(context),
         ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: LumiPadding.allM,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -221,27 +332,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
 
-              const SizedBox(height: 24),
+              LumiGap.m,
 
               // Title
               Text(
                 'Create Account',
-                style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.darkGray,
-                    ),
+                style: LumiTextStyles.h2(),
                 textAlign: TextAlign.center,
               ).animate().fadeIn(delay: 200.ms, duration: 500.ms),
 
-              const SizedBox(height: 32),
+              LumiGap.l,
 
               // Error message
               if (_errorMessage != null)
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: LumiPadding.allS,
                   decoration: BoxDecoration(
-                    color: AppColors.error.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    color: AppColors.error.withValues(alpha: 0.1),
+                    borderRadius: LumiBorders.medium,
                     border: Border.all(color: AppColors.error, width: 1),
                   ),
                   child: Row(
@@ -251,36 +359,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         color: AppColors.error,
                         size: 20,
                       ),
-                      const SizedBox(width: 8),
+                      LumiGap.xs,
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppColors.error,
-                              ),
+                          style: LumiTextStyles.bodySmall(color: AppColors.error),
                         ),
                       ),
                     ],
                   ),
                 ).animate().fadeIn().shake(),
 
-              const SizedBox(height: 16),
+              LumiGap.s,
 
               // Role Selection
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.offWhite,
-                  borderRadius: BorderRadius.circular(12),
-                ),
+              LumiCard(
+                padding: LumiPadding.allS,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'I am a...',
-                      style: Theme.of(context).textTheme.labelLarge,
+                      style: LumiTextStyles.label(),
                     ),
-                    const SizedBox(height: 12),
+                    LumiGap.s,
                     Row(
                       children: [
                         Expanded(
@@ -292,7 +394,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             }),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        LumiGap.xs,
                         Expanded(
                           child: _RoleCard(
                             role: UserRole.teacher,
@@ -308,19 +410,68 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
 
-              const SizedBox(height: 16),
+              LumiGap.s,
 
               // Registration Form
               FormBuilder(
                 key: _formKey,
                 child: Column(
                   children: [
+                    // School Code field (only for teachers)
+                    if (_selectedRole == UserRole.teacher) ...[
+                      FormBuilderTextField(
+                        name: 'schoolCode',
+                        decoration: InputDecoration(
+                          labelText: 'School Code',
+                          labelStyle: LumiTextStyles.body(
+                            color: AppColors.charcoal.withValues(alpha: 0.7),
+                          ),
+                          prefixIcon: Icon(Icons.vpn_key_outlined, color: AppColors.charcoal),
+                          hintText: 'Enter code from your school admin',
+                          hintStyle: LumiTextStyles.body(
+                            color: AppColors.charcoal.withValues(alpha: 0.5),
+                          ),
+                          helperText: 'Ask your school admin for this code',
+                          helperStyle: LumiTextStyles.bodySmall(
+                            color: AppColors.charcoal.withValues(alpha: 0.7),
+                          ),
+                          border: OutlineInputBorder(borderRadius: LumiBorders.medium),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: LumiBorders.medium,
+                            borderSide: BorderSide(color: AppColors.rosePink, width: 2),
+                          ),
+                          errorStyle: LumiTextStyles.bodySmall(color: AppColors.error),
+                        ),
+                        textCapitalization: TextCapitalization.characters,
+                        textInputAction: TextInputAction.next,
+                        validator: FormBuilderValidators.compose([
+                          FormBuilderValidators.required(
+                            errorText: 'School code is required for teachers',
+                          ),
+                          FormBuilderValidators.minLength(
+                            6,
+                            errorText: 'Code must be at least 6 characters',
+                          ),
+                        ]),
+                      ).animate().fadeIn(delay: 350.ms, duration: 500.ms),
+                      LumiGap.s,
+                    ],
+
                     // Full name field
                     FormBuilderTextField(
                       name: 'fullName',
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Full Name',
-                        prefixIcon: Icon(Icons.person_outline),
+                        labelStyle: LumiTextStyles.body(
+                          color: AppColors.charcoal.withValues(alpha: 0.7),
+                        ),
+                        prefixIcon: Icon(Icons.person_outline, color: AppColors.charcoal),
+                        border: OutlineInputBorder(borderRadius: LumiBorders.medium),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: LumiBorders.medium,
+                          borderSide: BorderSide(color: AppColors.rosePink, width: 2),
+                        ),
+                        errorStyle: LumiTextStyles.bodySmall(color: AppColors.error),
                       ),
                       textInputAction: TextInputAction.next,
                       validator: FormBuilderValidators.compose([
@@ -334,14 +485,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ]),
                     ).animate().fadeIn(delay: 400.ms, duration: 500.ms),
 
-                    const SizedBox(height: 16),
+                    LumiGap.s,
 
                     // Email field
                     FormBuilderTextField(
                       name: 'email',
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Email',
-                        prefixIcon: Icon(Icons.email_outlined),
+                        labelStyle: LumiTextStyles.body(
+                          color: AppColors.charcoal.withValues(alpha: 0.7),
+                        ),
+                        prefixIcon: Icon(Icons.email_outlined, color: AppColors.charcoal),
+                        border: OutlineInputBorder(borderRadius: LumiBorders.medium),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: LumiBorders.medium,
+                          borderSide: BorderSide(color: AppColors.rosePink, width: 2),
+                        ),
+                        errorStyle: LumiTextStyles.bodySmall(color: AppColors.error),
                       ),
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
@@ -355,20 +515,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ]),
                     ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
 
-                    const SizedBox(height: 16),
+                    LumiGap.s,
 
                     // Password field
                     FormBuilderTextField(
                       name: 'password',
                       decoration: InputDecoration(
                         labelText: 'Password',
-                        prefixIcon: const Icon(Icons.lock_outline),
+                        labelStyle: LumiTextStyles.body(
+                          color: AppColors.charcoal.withValues(alpha: 0.7),
+                        ),
+                        prefixIcon: Icon(Icons.lock_outline, color: AppColors.charcoal),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscurePassword
                                 ? Icons.visibility_off
                                 : Icons.visibility,
-                            color: AppColors.gray,
+                            color: AppColors.charcoal.withValues(alpha: 0.7),
                           ),
                           onPressed: () {
                             setState(() {
@@ -376,6 +539,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             });
                           },
                         ),
+                        border: OutlineInputBorder(borderRadius: LumiBorders.medium),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: LumiBorders.medium,
+                          borderSide: BorderSide(color: AppColors.rosePink, width: 2),
+                        ),
+                        errorStyle: LumiTextStyles.bodySmall(color: AppColors.error),
                       ),
                       obscureText: _obscurePassword,
                       textInputAction: TextInputAction.next,
@@ -390,20 +559,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ]),
                     ).animate().fadeIn(delay: 600.ms, duration: 500.ms),
 
-                    const SizedBox(height: 16),
+                    LumiGap.s,
 
                     // Confirm password field
                     FormBuilderTextField(
                       name: 'confirmPassword',
                       decoration: InputDecoration(
                         labelText: 'Confirm Password',
-                        prefixIcon: const Icon(Icons.lock_outline),
+                        labelStyle: LumiTextStyles.body(
+                          color: AppColors.charcoal.withValues(alpha: 0.7),
+                        ),
+                        prefixIcon: Icon(Icons.lock_outline, color: AppColors.charcoal),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscureConfirmPassword
                                 ? Icons.visibility_off
                                 : Icons.visibility,
-                            color: AppColors.gray,
+                            color: AppColors.charcoal.withValues(alpha: 0.7),
                           ),
                           onPressed: () {
                             setState(() {
@@ -411,6 +583,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             });
                           },
                         ),
+                        border: OutlineInputBorder(borderRadius: LumiBorders.medium),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: LumiBorders.medium,
+                          borderSide: BorderSide(color: AppColors.rosePink, width: 2),
+                        ),
+                        errorStyle: LumiTextStyles.bodySmall(color: AppColors.error),
                       ),
                       obscureText: _obscureConfirmPassword,
                       textInputAction: TextInputAction.done,
@@ -427,31 +605,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ).animate().fadeIn(delay: 700.ms, duration: 500.ms),
 
                     if (widget.inviteCode != null) ...[
-                      const SizedBox(height: 16),
+                      LumiGap.s,
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: LumiPadding.allS,
                         decoration: BoxDecoration(
-                          color: AppColors.secondaryGreen.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
+                          color: AppColors.mintGreen.withValues(alpha: 0.1),
+                          borderRadius: LumiBorders.medium,
                           border: Border.all(
-                            color: AppColors.secondaryGreen,
+                            color: AppColors.mintGreen,
                             width: 1,
                           ),
                         ),
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.check_circle_outline,
-                              color: AppColors.secondaryGreen,
+                              color: AppColors.mintGreen,
                               size: 20,
                             ),
-                            const SizedBox(width: 8),
+                            LumiGap.xs,
                             Expanded(
                               child: Text(
                                 'Invite code: ${widget.inviteCode}',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: AppColors.secondaryGreen,
-                                    ),
+                                style: LumiTextStyles.bodySmall(color: AppColors.mintGreen),
                               ),
                             ),
                           ],
@@ -462,29 +638,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
 
-              const SizedBox(height: 32),
+              LumiGap.l,
 
               // Register button
-              ElevatedButton(
+              LumiPrimaryButton(
                 onPressed: _isLoading ? null : _handleRegister,
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(56),
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppColors.white,
-                          ),
-                        ),
-                      )
-                    : const Text('Create Account'),
+                isLoading: _isLoading,
+                text: 'Create Account',
+                isFullWidth: true,
               ).animate().fadeIn(delay: 900.ms, duration: 500.ms),
 
-              const SizedBox(height: 24),
+              LumiGap.m,
 
               // Login link
               Row(
@@ -492,16 +656,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 children: [
                   Text(
                     'Already have an account? ',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.gray,
-                        ),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
+                    style: LumiTextStyles.body(
+                      color: AppColors.charcoal.withValues(alpha: 0.7),
                     ),
-                    child: const Text('Log In'),
+                  ),
+                  LumiTextButton(
+                    onPressed: () => Navigator.pop(context),
+                    text: 'Log In',
                   ),
                 ],
               ).animate().fadeIn(delay: 1000.ms, duration: 500.ms),
@@ -530,14 +691,14 @@ class _RoleCard extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: LumiBorders.large,
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: LumiPadding.allS,
         decoration: BoxDecoration(
-          color: isSelected ? roleInfo['color'].withOpacity(0.1) : AppColors.white,
-          borderRadius: BorderRadius.circular(12),
+          color: isSelected ? roleInfo['color'].withValues(alpha: 0.1) : AppColors.white,
+          borderRadius: LumiBorders.large,
           border: Border.all(
-            color: isSelected ? roleInfo['color'] : AppColors.lightGray,
+            color: isSelected ? roleInfo['color'] : AppColors.charcoal.withValues(alpha: 0.2),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -545,15 +706,15 @@ class _RoleCard extends StatelessWidget {
           children: [
             Icon(
               roleInfo['icon'],
-              color: isSelected ? roleInfo['color'] : AppColors.gray,
+              color: isSelected ? roleInfo['color'] : AppColors.charcoal.withValues(alpha: 0.7),
               size: 32,
             ),
-            const SizedBox(height: 8),
+            LumiGap.xs,
             Text(
               roleInfo['title'],
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: isSelected ? roleInfo['color'] : AppColors.darkGray,
-                  ),
+              style: LumiTextStyles.label(
+                color: isSelected ? roleInfo['color'] : AppColors.charcoal,
+              ),
             ),
           ],
         ),
