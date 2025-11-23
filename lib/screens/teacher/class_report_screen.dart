@@ -8,6 +8,11 @@ import '../../data/models/reading_log_model.dart';
 import '../../services/pdf_report_service.dart';
 import '../../services/firebase_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/lumi_card.dart';
 
 /// Screen for generating class-level summary reports
 /// Used by teachers and admins to get overview of class performance
@@ -33,24 +38,29 @@ class _ClassReportScreenState extends State<ClassReportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.offWhite,
       appBar: AppBar(
-        title: const Text('Class Report'),
-        backgroundColor: AppColors.primaryBlue,
+        title: Text(
+          'Class Report',
+          style: LumiTextStyles.h3(color: AppColors.white),
+        ),
+        backgroundColor: AppColors.rosePink,
+        iconTheme: const IconThemeData(color: AppColors.white),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: LumiPadding.allS,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildClassCard(),
-            const SizedBox(height: 24),
+            LumiGap.m,
             _buildDateRangeSelector(),
-            const SizedBox(height: 24),
+            LumiGap.m,
             _buildReportPreview(),
-            const SizedBox(height: 24),
+            LumiGap.m,
             _buildActionButtons(),
             if (_generatedReport != null) ...[
-              const SizedBox(height: 24),
+              LumiGap.m,
               _buildGeneratedReportCard(),
             ],
           ],
@@ -60,116 +70,104 @@ class _ClassReportScreenState extends State<ClassReportScreen> {
   }
 
   Widget _buildClassCard() {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Class Information',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryBlue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.class_,
-                    size: 32,
-                    color: AppColors.primaryBlue,
-                  ),
+    return LumiCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Class Information',
+            style: LumiTextStyles.bodyMedium(color: AppColors.charcoal),
+          ),
+          LumiGap.s,
+          Row(
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: AppColors.rosePink.withValues(alpha: 0.1),
+                  borderRadius: LumiBorders.medium,
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.classModel.name,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Year ${widget.classModel.yearLevel ?? "N/A"} | Room ${widget.classModel.room ?? "N/A"}',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.grey[600],
-                            ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${widget.classModel.studentIds.length} students',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.grey[600],
-                            ),
-                      ),
-                    ],
-                  ),
+                child: const Icon(
+                  Icons.class_,
+                  size: 32,
+                  color: AppColors.rosePink,
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+              LumiGap.s,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.classModel.name,
+                      style: LumiTextStyles.h3(color: AppColors.charcoal),
+                    ),
+                    LumiGap.xxs,
+                    Text(
+                      'Year ${widget.classModel.yearLevel ?? "N/A"} | Room ${widget.classModel.room ?? "N/A"}',
+                      style: LumiTextStyles.body(
+                        color: AppColors.charcoal.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    LumiGap.xxs,
+                    Text(
+                      '${widget.classModel.studentIds.length} students',
+                      style: LumiTextStyles.bodySmall(
+                        color: AppColors.charcoal.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildDateRangeSelector() {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Report Period',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildDateButton(
-                    label: 'Start Date',
-                    date: _startDate,
-                    onTap: () => _selectDate(context, isStartDate: true),
-                  ),
+    return LumiCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Report Period',
+            style: LumiTextStyles.bodyMedium(color: AppColors.charcoal),
+          ),
+          LumiGap.s,
+          Row(
+            children: [
+              Expanded(
+                child: _buildDateButton(
+                  label: 'Start Date',
+                  date: _startDate,
+                  onTap: () => _selectDate(context, isStartDate: true),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildDateButton(
-                    label: 'End Date',
-                    date: _endDate,
-                    onTap: () => _selectDate(context, isStartDate: false),
-                  ),
+              ),
+              LumiGap.s,
+              Expanded(
+                child: _buildDateButton(
+                  label: 'End Date',
+                  date: _endDate,
+                  onTap: () => _selectDate(context, isStartDate: false),
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _buildQuickRangeChip('Last Week', 7),
-                _buildQuickRangeChip('Last Month', 30),
-                _buildQuickRangeChip('Last Term', 90),
-                _buildQuickRangeChip('This Year', null),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+          LumiGap.s,
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildQuickRangeChip('Last Week', 7),
+              _buildQuickRangeChip('Last Month', 30),
+              _buildQuickRangeChip('Last Term', 90),
+              _buildQuickRangeChip('This Year', null),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -181,28 +179,26 @@ class _ClassReportScreenState extends State<ClassReportScreen> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: LumiBorders.medium,
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: LumiPadding.allXS,
         decoration: BoxDecoration(
-          border: Border.all(color: AppColors.primaryBlue),
-          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.rosePink),
+          borderRadius: LumiBorders.medium,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey[600],
-                  ),
+              style: LumiTextStyles.bodySmall(
+                color: AppColors.charcoal.withValues(alpha: 0.7),
+              ),
             ),
-            const SizedBox(height: 4),
+            LumiGap.xxs,
             Text(
               DateFormat('MMM dd, yyyy').format(date),
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: LumiTextStyles.bodyMedium(color: AppColors.charcoal),
             ),
           ],
         ),
@@ -229,53 +225,47 @@ class _ClassReportScreenState extends State<ClassReportScreen> {
   }
 
   Widget _buildReportPreview() {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.preview, color: AppColors.primaryBlue),
-                const SizedBox(width: 8),
-                Text(
-                  'Report Preview',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _buildPreviewItem(
-              icon: Icons.calendar_today,
-              label: 'Period',
-              value:
-                  '${DateFormat('MMM dd').format(_startDate)} - ${DateFormat('MMM dd, yyyy').format(_endDate)}',
-            ),
-            const Divider(),
-            _buildPreviewItem(
-              icon: Icons.people,
-              label: 'Students',
-              value: '${widget.classModel.studentIds.length} students',
-            ),
-            const Divider(),
-            _buildPreviewItem(
-              icon: Icons.description,
-              label: 'Includes',
-              value:
-                  'Class overview, engagement metrics, top performers, students needing support, trends',
-            ),
-            const Divider(),
-            _buildPreviewItem(
-              icon: Icons.format_size,
-              label: 'Format',
-              value: 'PDF (A4)',
-            ),
-          ],
-        ),
+    return LumiCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.preview, color: AppColors.rosePink),
+              LumiGap.horizontalXS,
+              Text(
+                'Report Preview',
+                style: LumiTextStyles.bodyMedium(color: AppColors.charcoal),
+              ),
+            ],
+          ),
+          LumiGap.s,
+          _buildPreviewItem(
+            icon: Icons.calendar_today,
+            label: 'Period',
+            value:
+                '${DateFormat('MMM dd').format(_startDate)} - ${DateFormat('MMM dd, yyyy').format(_endDate)}',
+          ),
+          Divider(color: AppColors.charcoal.withValues(alpha: 0.2)),
+          _buildPreviewItem(
+            icon: Icons.people,
+            label: 'Students',
+            value: '${widget.classModel.studentIds.length} students',
+          ),
+          Divider(color: AppColors.charcoal.withValues(alpha: 0.2)),
+          _buildPreviewItem(
+            icon: Icons.description,
+            label: 'Includes',
+            value:
+                'Class overview, engagement metrics, top performers, students needing support, trends',
+          ),
+          Divider(color: AppColors.charcoal.withValues(alpha: 0.2)),
+          _buildPreviewItem(
+            icon: Icons.format_size,
+            label: 'Format',
+            value: 'PDF (A4)',
+          ),
+        ],
       ),
     );
   }
@@ -286,26 +276,28 @@ class _ClassReportScreenState extends State<ClassReportScreen> {
     required String value,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: LumiPadding.verticalXS,
       child: Row(
         children: [
-          Icon(icon, size: 20, color: Colors.grey[600]),
-          const SizedBox(width: 12),
+          Icon(
+            icon,
+            size: 20,
+            color: AppColors.charcoal.withValues(alpha: 0.7),
+          ),
+          LumiGap.horizontalXS,
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.grey[600],
-                      ),
+                  style: LumiTextStyles.bodySmall(
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
+                  ),
                 ),
                 Text(
                   value,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
+                  style: LumiTextStyles.bodyMedium(color: AppColors.charcoal),
                 ),
               ],
             ),
@@ -319,43 +311,27 @@ class _ClassReportScreenState extends State<ClassReportScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ElevatedButton.icon(
+        LumiPrimaryButton(
           onPressed: _isGenerating ? null : _generateReport,
-          icon: _isGenerating
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-              : const Icon(Icons.picture_as_pdf),
-          label: Text(_isGenerating ? 'Generating...' : 'Generate Class Report'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primaryBlue,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.all(16),
-          ),
+          text: _isGenerating ? 'Generating...' : 'Generate Class Report',
+          icon: Icons.picture_as_pdf,
+          isLoading: _isGenerating,
+          isFullWidth: true,
         ),
         if (_generatedReport != null) ...[
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
+          LumiGap.s,
+          LumiSecondaryButton(
             onPressed: _shareReport,
-            icon: const Icon(Icons.share),
-            label: const Text('Share Report'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.all(16),
-            ),
+            text: 'Share Report',
+            icon: Icons.share,
+            isFullWidth: true,
           ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
+          LumiGap.xs,
+          LumiSecondaryButton(
             onPressed: _printReport,
-            icon: const Icon(Icons.print),
-            label: const Text('Print Report'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.all(16),
-            ),
+            text: 'Print Report',
+            icon: Icons.print,
+            isFullWidth: true,
           ),
         ],
       ],
@@ -363,39 +339,11 @@ class _ClassReportScreenState extends State<ClassReportScreen> {
   }
 
   Widget _buildGeneratedReportCard() {
-    return Card(
-      elevation: 2,
-      color: Colors.green[50],
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.green[700], size: 32),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Report Generated Successfully!',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green[900],
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Saved to: ${_generatedReport!.path.split('/').last}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.green[700],
-                        ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+    return LumiInfoCard(
+      type: LumiInfoCardType.success,
+      title: 'Report Generated Successfully!',
+      message: 'Saved to: ${_generatedReport!.path.split('/').last}',
+      icon: Icons.check_circle,
     );
   }
 
@@ -476,10 +424,13 @@ class _ClassReportScreenState extends State<ClassReportScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Class report generated successfully!'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(
+            'Class report generated successfully!',
+            style: LumiTextStyles.body(color: AppColors.white),
+          ),
+          backgroundColor: AppColors.success,
+          duration: const Duration(seconds: 2),
         ),
       );
     } catch (e) {
@@ -491,8 +442,11 @@ class _ClassReportScreenState extends State<ClassReportScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error generating report: $e'),
-          backgroundColor: Colors.red,
+          content: Text(
+            'Error generating report: $e',
+            style: LumiTextStyles.body(color: AppColors.white),
+          ),
+          backgroundColor: AppColors.error,
           duration: const Duration(seconds: 3),
         ),
       );
@@ -509,8 +463,11 @@ class _ClassReportScreenState extends State<ClassReportScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error sharing report: $e'),
-          backgroundColor: Colors.red,
+          content: Text(
+            'Error sharing report: $e',
+            style: LumiTextStyles.body(color: AppColors.white),
+          ),
+          backgroundColor: AppColors.error,
         ),
       );
     }
@@ -526,8 +483,11 @@ class _ClassReportScreenState extends State<ClassReportScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error printing report: $e'),
-          backgroundColor: Colors.red,
+          content: Text(
+            'Error printing report: $e',
+            style: LumiTextStyles.body(color: AppColors.white),
+          ),
+          backgroundColor: AppColors.error,
         ),
       );
     }
