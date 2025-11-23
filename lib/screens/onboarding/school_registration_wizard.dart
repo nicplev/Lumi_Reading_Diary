@@ -3,6 +3,10 @@ import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../services/onboarding_service.dart';
 import '../../data/models/school_model.dart';
@@ -215,7 +219,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
 
   Widget _buildProgressIndicator() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: LumiPadding.allM,
       child: Column(
         children: [
           Row(
@@ -231,9 +235,9 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
                         height: 4,
                         decoration: BoxDecoration(
                           color: isCompleted || isCurrent
-                              ? AppColors.primaryBlue
+                              ? AppColors.rosePink
                               : AppColors.lightGray,
-                          borderRadius: BorderRadius.circular(2),
+                          borderRadius: LumiBorders.small,
                         ),
                       ),
                     ),
@@ -251,8 +255,8 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
               return Expanded(
                 child: Text(
                   _steps[index],
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isCurrent ? AppColors.primaryBlue : AppColors.gray,
+                  style: LumiTextStyles.bodySmall()?.copyWith(
+                        color: isCurrent ? AppColors.rosePink : AppColors.charcoal.withValues(alpha: 0.6),
                         fontWeight:
                             isCurrent ? FontWeight.bold : FontWeight.normal,
                       ),
@@ -268,7 +272,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
 
   Widget _buildSchoolInfoStep() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: LumiPadding.allM,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -278,24 +282,24 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
               size: 80,
             ),
           ),
-          const SizedBox(height: 24),
+          LumiGap.m,
           Text(
             'School Information',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+            style: LumiTextStyles.h2()?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: AppColors.darkGray,
+                  color: AppColors.charcoal,
                 ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 8),
+          LumiGap.xs,
           Text(
             'Tell us about your school',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.gray,
+            style: LumiTextStyles.body()?.copyWith(
+                  color: AppColors.charcoal.withValues(alpha: 0.6),
                 ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 32),
+          LumiGap.l,
           FormBuilder(
             key: _schoolInfoFormKey,
             child: Column(
@@ -308,7 +312,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
                   ),
                   validator: FormBuilderValidators.required(),
                 ),
-                const SizedBox(height: 16),
+                LumiGap.s,
                 FormBuilderTextField(
                   name: 'address',
                   decoration: const InputDecoration(
@@ -317,7 +321,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
                   ),
                   maxLines: 2,
                 ),
-                const SizedBox(height: 16),
+                LumiGap.s,
                 FormBuilderTextField(
                   name: 'contactEmail',
                   decoration: const InputDecoration(
@@ -327,7 +331,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
                   keyboardType: TextInputType.emailAddress,
                   validator: FormBuilderValidators.email(),
                 ),
-                const SizedBox(height: 16),
+                LumiGap.s,
                 FormBuilderTextField(
                   name: 'contactPhone',
                   decoration: const InputDecoration(
@@ -346,7 +350,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
 
   Widget _buildAdminAccountStep() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: LumiPadding.allM,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -356,31 +360,31 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
               size: 80,
             ),
           ),
-          const SizedBox(height: 24),
+          LumiGap.m,
           Text(
             'Create Admin Account',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+            style: LumiTextStyles.h2()?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: AppColors.darkGray,
+                  color: AppColors.charcoal,
                 ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 8),
+          LumiGap.xs,
           Text(
             'This will be the main administrator account',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.gray,
+            style: LumiTextStyles.body()?.copyWith(
+                  color: AppColors.charcoal.withValues(alpha: 0.6),
                 ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 32),
+          LumiGap.l,
           if (_errorMessage != null)
             Container(
-              padding: const EdgeInsets.all(12),
-              margin: const EdgeInsets.only(bottom: 16),
+              padding: LumiPadding.allXS,
+              margin: const EdgeInsets.only(bottom: LumiSpacing.s),
               decoration: BoxDecoration(
                 color: AppColors.error.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: LumiBorders.medium,
                 border: Border.all(color: AppColors.error),
               ),
               child: Text(_errorMessage!, style: const TextStyle(color: AppColors.error)),
@@ -397,7 +401,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
                   ),
                   validator: FormBuilderValidators.required(),
                 ),
-                const SizedBox(height: 16),
+                LumiGap.s,
                 FormBuilderTextField(
                   name: 'adminEmail',
                   decoration: const InputDecoration(
@@ -410,7 +414,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
                     FormBuilderValidators.email(),
                   ]),
                 ),
-                const SizedBox(height: 16),
+                LumiGap.s,
                 FormBuilderTextField(
                   name: 'adminPassword',
                   decoration: const InputDecoration(
@@ -423,7 +427,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
                     FormBuilderValidators.minLength(8),
                   ]),
                 ),
-                const SizedBox(height: 16),
+                LumiGap.s,
                 FormBuilderTextField(
                   name: 'adminPasswordConfirm',
                   decoration: const InputDecoration(
@@ -449,7 +453,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
 
   Widget _buildReadingLevelsStep() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: LumiPadding.allM,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -459,24 +463,24 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
               size: 80,
             ),
           ),
-          const SizedBox(height: 24),
+          LumiGap.m,
           Text(
             'Reading Level System',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+            style: LumiTextStyles.h2()?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: AppColors.darkGray,
+                  color: AppColors.charcoal,
                 ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 8),
+          LumiGap.xs,
           Text(
             'Choose your preferred reading level schema',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.gray,
+            style: LumiTextStyles.body()?.copyWith(
+                  color: AppColors.charcoal.withValues(alpha: 0.6),
                 ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 32),
+          LumiGap.l,
           FormBuilder(
             key: _readingLevelsFormKey,
             child: FormBuilderRadioGroup<String>(
@@ -526,7 +530,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
   Widget _buildCompletionStep() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: LumiPadding.allM,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -535,30 +539,28 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
               size: 120,
               message: 'You\'re all set!',
             ),
-            const SizedBox(height: 32),
+            LumiGap.l,
             Text(
               'Welcome to Lumi!',
-              style: Theme.of(context).textTheme.displaySmall?.copyWith(
+              style: LumiTextStyles.h1()?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: AppColors.primaryBlue,
+                    color: AppColors.rosePink,
                   ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 16),
+            LumiGap.s,
             Text(
               'Your school has been successfully registered. You can now start adding teachers, classes, and students.',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: AppColors.gray,
+              style: LumiTextStyles.bodyLarge()?.copyWith(
+                    color: AppColors.charcoal.withValues(alpha: 0.6),
                   ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 48),
-            ElevatedButton(
+            LumiGap.xl,
+            LumiPrimaryButton(
               onPressed: () => context.go('/auth/login'),
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size.fromHeight(56),
-              ),
-              child: const Text('Continue to Login'),
+              text: 'Continue to Login',
+              isFullWidth: true,
             ),
           ],
         ),
@@ -568,37 +570,25 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
 
   Widget _buildNavigationButtons() {
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: LumiPadding.allM,
       child: Row(
         children: [
           if (_currentStep > 0)
             Expanded(
-              child: OutlinedButton(
+              child: LumiSecondaryButton(
                 onPressed: _isLoading ? null : _previousStep,
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(56),
-                ),
-                child: const Text('Back'),
+                text: 'Back',
+                isFullWidth: true,
               ),
             ),
-          if (_currentStep > 0) const SizedBox(width: 16),
+          if (_currentStep > 0) LumiGap.s,
           Expanded(
             flex: 2,
-            child: ElevatedButton(
+            child: LumiPrimaryButton(
               onPressed: _isLoading ? null : _nextStep,
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size.fromHeight(56),
-              ),
-              child: _isLoading
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : Text(_currentStep == 2 ? 'Complete Setup' : 'Continue'),
+              text: _currentStep == 2 ? 'Complete Setup' : 'Continue',
+              isLoading: _isLoading,
+              isFullWidth: true,
             ),
           ),
         ],
