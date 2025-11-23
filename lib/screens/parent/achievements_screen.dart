@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lumi_reading_tracker/data/models/achievement_model.dart';
 import 'package:lumi_reading_tracker/data/models/student_model.dart';
-import 'package:lumi_reading_tracker/core/widgets/glass/glass_achievement_card.dart';
 import 'package:lumi_reading_tracker/core/theme/app_colors.dart';
 import 'package:lumi_reading_tracker/core/theme/lumi_text_styles.dart';
 import 'package:lumi_reading_tracker/core/theme/lumi_spacing.dart';
@@ -224,10 +223,9 @@ class _AchievementsScreenState extends State<AchievementsScreen>
           padding: EdgeInsets.symmetric(vertical: LumiSpacing.xs),
           itemCount: filteredAchievements.length,
           itemBuilder: (context, index) {
-            return GlassAchievementCard(
-              achievement: filteredAchievements[index],
-              animate: index < 5, // Animate first 5
-              onTap: () => _showAchievementDetail(filteredAchievements[index]),
+            return _buildAchievementCard(
+              filteredAchievements[index],
+              animate: index < 5,
             );
           },
         );
@@ -392,6 +390,108 @@ class _AchievementsScreenState extends State<AchievementsScreen>
         ],
       ),
     );
+  }
+
+  Widget _buildAchievementCard(AchievementModel achievement, {bool animate = false}) {
+    final isEarned = achievement.earnedAt.year > 1970; // Check if earned (default DateTime is epoch)
+
+    return GestureDetector(
+      onTap: () => _showAchievementDetail(achievement),
+      child: Container(
+        margin: EdgeInsets.symmetric(horizontal: LumiSpacing.s, vertical: LumiSpacing.xs),
+        padding: LumiPadding.allM,
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: LumiBorders.large,
+          border: Border.all(
+            color: isEarned ? AppColors.rosePink : AppColors.charcoal.withValues(alpha: 0.1),
+            width: isEarned ? 2 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isEarned
+                ? AppColors.rosePink.withValues(alpha: 0.1)
+                : AppColors.charcoal.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Icon/Emoji
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: isEarned
+                  ? AppColors.rosePink.withValues(alpha: 0.1)
+                  : AppColors.charcoal.withValues(alpha: 0.05),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  achievement.icon,
+                  style: const TextStyle(fontSize: 32),
+                ),
+              ),
+            ),
+            SizedBox(width: LumiSpacing.s),
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    achievement.name,
+                    style: LumiTextStyles.h3(
+                      color: isEarned ? AppColors.charcoal : AppColors.charcoal.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  SizedBox(height: LumiSpacing.xxs),
+                  Text(
+                    achievement.description,
+                    style: LumiTextStyles.bodySmall(
+                      color: AppColors.charcoal.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  if (isEarned) ...[
+                    SizedBox(height: LumiSpacing.xxs),
+                    Text(
+                      'Earned ${_formatDate(achievement.earnedAt)}',
+                      style: LumiTextStyles.label(color: AppColors.rosePink),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            // Check icon if earned
+            if (isEarned)
+              const Icon(
+                Icons.check_circle,
+                color: AppColors.rosePink,
+                size: 24,
+              ),
+          ],
+        ),
+      ),
+    ).animate(
+      effects: animate ? [
+        FadeEffect(duration: 300.ms, delay: (50 * (achievement.id.hashCode % 5)).ms),
+        SlideEffect(begin: const Offset(0, 0.1), end: Offset.zero, duration: 300.ms),
+      ] : [],
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) return 'today';
+    if (difference.inDays == 1) return 'yesterday';
+    if (difference.inDays < 7) return '${difference.inDays} days ago';
+    if (difference.inDays < 30) return '${(difference.inDays / 7).floor()} weeks ago';
+    return '${date.day}/${date.month}/${date.year}';
   }
 
   void _showAchievementDetail(AchievementModel achievement) {
