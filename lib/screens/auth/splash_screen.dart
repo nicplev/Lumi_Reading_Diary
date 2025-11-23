@@ -5,6 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../core/routing/app_router.dart';
 import '../../data/models/user_model.dart';
@@ -87,6 +89,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
           // Navigate based on role
           final homeRoute = AppRouter.getHomeRouteForRole(currentUser.role);
+          // ignore: invalid_use_of_internal_member
           context.go(homeRoute, extra: currentUser);
         } else {
           // User document doesn't exist, go to login
@@ -114,7 +117,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundPrimary,
+      backgroundColor: AppColors.offWhite,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -135,32 +138,29 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             ),
 
-            const SizedBox(height: 32),
+            LumiGap.l,
 
             // App title
             Text(
               'Lumi',
-              style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                    color: AppColors.primaryBlue,
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: LumiTextStyles.display(color: AppColors.rosePink),
             ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
 
-            const SizedBox(height: 8),
+            LumiGap.xxs,
 
             // Tagline
             Text(
               'Reading Diary',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: AppColors.gray,
-                  ),
+              style: LumiTextStyles.h2(
+                color: AppColors.charcoal.withValues(alpha: 0.7),
+              ),
             ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
 
-            const SizedBox(height: 48),
+            LumiGap.xl,
 
             // Loading indicator
             CircularProgressIndicator(
-              color: AppColors.primaryBlue,
+              color: AppColors.rosePink,
               strokeWidth: 3,
             ).animate().fadeIn(delay: 800.ms, duration: 500.ms),
           ],
