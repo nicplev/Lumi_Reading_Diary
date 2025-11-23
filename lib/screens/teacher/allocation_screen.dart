@@ -3,6 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/lumi_card.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/student_model.dart';
@@ -198,9 +202,9 @@ class _AllocationScreenState extends State<AllocationScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundPrimary,
+      backgroundColor: AppColors.offWhite,
       appBar: AppBar(
-        title: const Text('Reading Allocation'),
+        title: Text('Reading Allocation', style: LumiTextStyles.h3()),
         backgroundColor: AppColors.white,
         elevation: 0,
         bottom: TabBar(
@@ -209,9 +213,9 @@ class _AllocationScreenState extends State<AllocationScreen>
             Tab(text: 'New Allocation'),
             Tab(text: 'Active Allocations'),
           ],
-          labelColor: AppColors.primaryBlue,
-          unselectedLabelColor: AppColors.gray,
-          indicatorColor: AppColors.primaryBlue,
+          labelColor: AppColors.rosePink,
+          unselectedLabelColor: AppColors.charcoal.withValues(alpha: 0.6),
+          indicatorColor: AppColors.rosePink,
         ),
       ),
       body: TabBarView(
@@ -237,7 +241,7 @@ class _AllocationScreenState extends State<AllocationScreen>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Reading Type Card
-          Card(
+          LumiCard(
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -249,9 +253,7 @@ class _AllocationScreenState extends State<AllocationScreen>
                       const SizedBox(width: 8),
                       Text(
                         'Reading Type',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                        style: LumiTextStyles.h3(),
                       ),
                     ],
                   ),
@@ -272,8 +274,7 @@ class _AllocationScreenState extends State<AllocationScreen>
                         Expanded(
                           child: Text(
                             'Reading levels and book selection system will be customized based on your school\'s requirements',
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                            style: LumiTextStyles.bodySmall().copyWith(
                                       color: AppColors.info,
                                     ),
                           ),
@@ -363,15 +364,14 @@ class _AllocationScreenState extends State<AllocationScreen>
 
                   if (_allocationType == AllocationType.byTitle) ...[
                     const SizedBox(height: 16),
-                    ..._bookTitles.map((title) => Card(
-                          color: AppColors.offWhite,
+                    ..._bookTitles.map((title) => LumiCard(
                           child: ListTile(
                             leading: const Icon(Icons.menu_book,
                                 color: AppColors.secondaryPurple),
                             title: Text(title),
                             trailing: IconButton(
-                              icon: const Icon(Icons.close,
-                                  color: AppColors.gray),
+                              icon: Icon(Icons.close,
+                                  color: AppColors.charcoal.withValues(alpha: 0.6)),
                               onPressed: () {
                                 setState(() {
                                   _bookTitles.remove(title);
@@ -412,7 +412,7 @@ class _AllocationScreenState extends State<AllocationScreen>
                             }
                           },
                           icon: const Icon(Icons.add_circle),
-                          color: AppColors.primaryBlue,
+                          color: AppColors.rosePink,
                           iconSize: 32,
                         ),
                       ],
@@ -426,7 +426,7 @@ class _AllocationScreenState extends State<AllocationScreen>
           const SizedBox(height: 16),
 
           // Duration and Schedule Card
-          Card(
+          LumiCard(
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -435,13 +435,11 @@ class _AllocationScreenState extends State<AllocationScreen>
                   Row(
                     children: [
                       const Icon(Icons.calendar_today,
-                          color: AppColors.primaryBlue),
+                          color: AppColors.rosePink),
                       const SizedBox(width: 8),
                       Text(
                         'Schedule',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                        style: LumiTextStyles.h3(),
                       ),
                     ],
                   ),
@@ -529,7 +527,7 @@ class _AllocationScreenState extends State<AllocationScreen>
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   border:
-                                      Border.all(color: AppColors.lightGray),
+                                      Border.all(color: AppColors.charcoal.withValues(alpha: 0.2)),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Row(
@@ -572,7 +570,7 @@ class _AllocationScreenState extends State<AllocationScreen>
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   border:
-                                      Border.all(color: AppColors.lightGray),
+                                      Border.all(color: AppColors.charcoal.withValues(alpha: 0.2)),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Row(
@@ -614,7 +612,7 @@ class _AllocationScreenState extends State<AllocationScreen>
           const SizedBox(height: 16),
 
           // Student Selection Card
-          Card(
+          LumiCard(
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -626,9 +624,7 @@ class _AllocationScreenState extends State<AllocationScreen>
                       const SizedBox(width: 8),
                       Text(
                         'Students',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                        style: LumiTextStyles.h3(),
                       ),
                     ],
                   ),
@@ -662,7 +658,7 @@ class _AllocationScreenState extends State<AllocationScreen>
                     Container(
                       height: 200,
                       decoration: BoxDecoration(
-                        border: Border.all(color: AppColors.lightGray),
+                        border: Border.all(color: AppColors.charcoal.withValues(alpha: 0.2)),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: ListView.builder(
@@ -674,6 +670,7 @@ class _AllocationScreenState extends State<AllocationScreen>
                             subtitle: Text(
                                 'Level: ${student.currentReadingLevel ?? "Not set"}'),
                             value: _selectedStudentIds.contains(student.id),
+                            activeColor: AppColors.rosePink,
                             onChanged: (value) {
                               setState(() {
                                 if (value!) {
@@ -696,7 +693,7 @@ class _AllocationScreenState extends State<AllocationScreen>
           const SizedBox(height: 16),
 
           // Save as Template Option
-          Card(
+          LumiCard(
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -709,9 +706,7 @@ class _AllocationScreenState extends State<AllocationScreen>
                       const SizedBox(width: 8),
                       Text(
                         'Template (Optional)',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                        style: LumiTextStyles.h3(),
                       ),
                     ],
                   ),
@@ -735,22 +730,11 @@ class _AllocationScreenState extends State<AllocationScreen>
           const SizedBox(height: 24),
 
           // Save Button
-          ElevatedButton(
+          LumiPrimaryButton(
+            text: 'Create Allocation',
             onPressed: _isLoading ? null : _saveAllocation,
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size.fromHeight(56),
-            ),
-            child: _isLoading
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(AppColors.white),
-                    ),
-                  )
-                : const Text('Create Allocation'),
+            isLoading: _isLoading,
+            isFullWidth: true,
           ),
 
           const SizedBox(height: 16),
@@ -785,13 +769,13 @@ class _AllocationScreenState extends State<AllocationScreen>
               children: [
                 const Icon(Icons.error_outline, size: 64, color: AppColors.error),
                 const SizedBox(height: 16),
-                Text('Error loading allocations', style: Theme.of(context).textTheme.titleMedium),
+                Text('Error loading allocations', style: LumiTextStyles.bodyLarge()),
                 const SizedBox(height: 8),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: Text(
                     snapshot.error.toString(),
-                    style: Theme.of(context).textTheme.bodySmall,
+                    style: LumiTextStyles.bodySmall(),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -819,21 +803,21 @@ class _AllocationScreenState extends State<AllocationScreen>
                 Icon(
                   Icons.assignment_outlined,
                   size: 64,
-                  color: AppColors.gray.withValues(alpha: 0.5),
+                  color: AppColors.charcoal.withValues(alpha: 0.1),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   'No active allocations',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppColors.gray,
+                  style: LumiTextStyles.bodyLarge().copyWith(
+                        color: AppColors.charcoal.withValues(alpha: 0.6),
                       ),
                 ),
                 const SizedBox(height: 8),
-                TextButton(
+                LumiTextButton(
+                  text: 'Create New Allocation',
                   onPressed: () {
                     _tabController.animateTo(0);
                   },
-                  child: const Text('Create New Allocation'),
                 ),
               ],
             ),
@@ -936,13 +920,14 @@ class _AllocationCard extends StatelessWidget {
     final daysRemaining = allocation.endDate.difference(DateTime.now()).inDays;
     final isExpiring = daysRemaining <= 2;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: LumiCard(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -953,15 +938,15 @@ class _AllocationCard extends StatelessWidget {
                       Text(
                         _getAllocationTitle(allocation),
                         style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                            LumiTextStyles.bodyLarge().copyWith(
                                   fontWeight: FontWeight.bold,
                                 ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '${allocation.targetMinutes} minutes · ${_getCadenceLabel(allocation.cadence)}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.gray,
+                        style: LumiTextStyles.bodySmall().copyWith(
+                              color: AppColors.charcoal.withValues(alpha: 0.6),
                             ),
                       ),
                     ],
@@ -996,7 +981,7 @@ class _AllocationCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isExpiring
                     ? AppColors.warning.withValues(alpha: 0.1)
-                    : AppColors.lightGray.withValues(alpha: 0.5),
+                    : AppColors.charcoal.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -1004,14 +989,14 @@ class _AllocationCard extends StatelessWidget {
                   Icon(
                     Icons.calendar_today,
                     size: 16,
-                    color: isExpiring ? AppColors.warning : AppColors.gray,
+                    color: isExpiring ? AppColors.warning : AppColors.charcoal.withValues(alpha: 0.6),
                   ),
                   const SizedBox(width: 8),
                   Text(
                     '${DateFormat('MMM dd').format(allocation.startDate)} - ${DateFormat('MMM dd').format(allocation.endDate)}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    style: LumiTextStyles.bodySmall().copyWith(
                           color:
-                              isExpiring ? AppColors.warning : AppColors.gray,
+                              isExpiring ? AppColors.warning : AppColors.charcoal.withValues(alpha: 0.6),
                         ),
                   ),
                   if (isExpiring) ...[
@@ -1025,7 +1010,7 @@ class _AllocationCard extends StatelessWidget {
                       ),
                       child: Text(
                         'Expires soon',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        style: LumiTextStyles.caption().copyWith(
                               color: AppColors.white,
                               fontWeight: FontWeight.bold,
                             ),
@@ -1041,14 +1026,14 @@ class _AllocationCard extends StatelessWidget {
             // Students
             Row(
               children: [
-                const Icon(Icons.groups, size: 16, color: AppColors.gray),
+                Icon(Icons.groups, size: 16, color: AppColors.charcoal.withValues(alpha: 0.6)),
                 const SizedBox(width: 8),
                 Text(
                   allocation.isForWholeClass
                       ? 'Whole class'
                       : '${allocation.studentIds.length} students',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.gray,
+                  style: LumiTextStyles.bodySmall().copyWith(
+                        color: AppColors.charcoal.withValues(alpha: 0.6),
                       ),
                 ),
               ],
@@ -1066,7 +1051,7 @@ class _AllocationCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Text(
                     'Recurring',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    style: LumiTextStyles.bodySmall().copyWith(
                           color: AppColors.secondaryGreen,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1076,6 +1061,7 @@ class _AllocationCard extends StatelessWidget {
             ],
           ],
         ),
+      ),
       ),
     );
   }
