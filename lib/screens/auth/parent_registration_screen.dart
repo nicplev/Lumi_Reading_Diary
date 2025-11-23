@@ -6,9 +6,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/lumi_card.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../core/routing/app_router.dart';
 import '../../services/parent_linking_service.dart';
+import '../../core/services/user_school_index_service.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_link_code_model.dart';
 import '../../core/exceptions/linking_exceptions.dart';
@@ -25,6 +31,7 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
   final _codeFormKey = GlobalKey<FormBuilderState>();
   final _registrationFormKey = GlobalKey<FormBuilderState>();
   final ParentLinkingService _linkingService = ParentLinkingService();
+  final UserSchoolIndexService _indexService = UserSchoolIndexService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -158,8 +165,8 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
 
         final existingDoc = await parentRef.get();
 
-        if (!existingDoc.exists || isNewAccount) {
-          // Create new parent document
+        if (!existingDoc.exists) {
+          // Create new parent document if it doesn't exist
           final parentUser = UserModel(
             id: userId,
             email: email,
@@ -172,6 +179,38 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
           );
 
           await parentRef.set(parentUser.toFirestore());
+
+          // Increment parent count on school document
+          await _firestore
+              .collection('schools')
+              .doc(_verifiedCode!.schoolId)
+              .update({
+            'parentCount': FieldValue.increment(1),
+          });
+
+          // Create email-to-school index for fast login lookups
+          await _indexService.createOrUpdateIndex(
+            email: email,
+            schoolId: _verifiedCode!.schoolId,
+            userType: 'parent',
+            userId: userId,
+          );
+        } else if (isNewAccount) {
+          // If this is a new Firebase Auth account but parent doc exists,
+          // update it with the new student (edge case: account was re-created)
+          await parentRef.update({
+            'fullName': fullName,
+            'email': email,
+            'linkedChildren': FieldValue.arrayUnion([_verifiedCode!.studentId]),
+          });
+
+          // Update email-to-school index (in case email changed)
+          await _indexService.createOrUpdateIndex(
+            email: email,
+            schoolId: _verifiedCode!.schoolId,
+            userType: 'parent',
+            userId: userId,
+          );
         }
 
         // 3. Link parent to student (uses atomic transaction)
@@ -204,6 +243,9 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
         // Sign out if there was an error
         await _auth.signOut();
       } catch (e) {
+        // Log the actual error for debugging
+        print('Parent registration error: $e');
+        print('Error type: ${e.runtimeType}');
         setState(() {
           _errorMessage =
               'An unexpected error occurred. Please try again or contact support.';
@@ -234,22 +276,22 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundPrimary,
+      backgroundColor: AppColors.offWhite,
       appBar: AppBar(
-        title: const Text('Parent Registration'),
+        title: Text('Parent Registration', style: LumiTextStyles.h3()),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: LumiPadding.allM,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Progress indicator
               _buildProgressIndicator(),
 
-              const SizedBox(height: 32),
+              LumiGap.l,
 
               // Content based on step
               if (_currentStep == 0) _buildCodeEntryStep(),
@@ -276,13 +318,13 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
                   height: 4,
                   decoration: BoxDecoration(
                     color: isCompleted || isCurrent
-                        ? AppColors.primaryBlue
-                        : AppColors.lightGray,
-                    borderRadius: BorderRadius.circular(2),
+                        ? AppColors.rosePink
+                        : AppColors.charcoal.withValues(alpha: 0.2),
+                    borderRadius: LumiBorders.small,
                   ),
                 ),
               ),
-              if (index < 2) const SizedBox(width: 4),
+              if (index < 2) LumiGap.xxs,
             ],
           ),
         );
@@ -302,47 +344,44 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
           ),
         ),
 
-        const SizedBox(height: 24),
+        LumiGap.m,
 
         Text(
           'Enter Your Student Code',
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppColors.darkGray,
-              ),
+          style: LumiTextStyles.h2(),
           textAlign: TextAlign.center,
         ),
 
-        const SizedBox(height: 8),
+        LumiGap.xs,
 
         Text(
           'You should have received an 8-character code from your child\'s school',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.gray,
-              ),
+          style: LumiTextStyles.body(
+            color: AppColors.charcoal.withValues(alpha: 0.7),
+          ),
           textAlign: TextAlign.center,
         ),
 
-        const SizedBox(height: 32),
+        LumiGap.l,
 
         // Error message
         if (_errorMessage != null)
           Container(
-            padding: const EdgeInsets.all(12),
-            margin: const EdgeInsets.only(bottom: 16),
+            padding: LumiPadding.allS,
+            margin: EdgeInsets.only(bottom: LumiSpacing.s),
             decoration: BoxDecoration(
               color: AppColors.error.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: LumiBorders.medium,
               border: Border.all(color: AppColors.error),
             ),
             child: Row(
               children: [
                 const Icon(Icons.error_outline, color: AppColors.error),
-                const SizedBox(width: 8),
+                LumiGap.xs,
                 Expanded(
                   child: Text(
                     _errorMessage!,
-                    style: const TextStyle(color: AppColors.error),
+                    style: LumiTextStyles.body(color: AppColors.error),
                   ),
                 ),
               ],
@@ -356,10 +395,22 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
             children: [
               FormBuilderTextField(
                 name: 'code',
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Student Link Code',
-                  prefixIcon: Icon(Icons.qr_code),
+                  labelStyle: LumiTextStyles.body(
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
+                  ),
+                  prefixIcon: Icon(Icons.qr_code, color: AppColors.charcoal),
                   hintText: 'e.g. ABC12345',
+                  hintStyle: LumiTextStyles.body(
+                    color: AppColors.charcoal.withValues(alpha: 0.5),
+                  ),
+                  border: OutlineInputBorder(borderRadius: LumiBorders.medium),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: LumiBorders.medium,
+                    borderSide: BorderSide(color: AppColors.rosePink, width: 2),
+                  ),
+                  errorStyle: LumiTextStyles.bodySmall(color: AppColors.error),
                 ),
                 textCapitalization: TextCapitalization.characters,
                 maxLength: 8,
@@ -374,37 +425,26 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
                 ]),
               ).animate().fadeIn(delay: 200.ms, duration: 500.ms),
 
-              const SizedBox(height: 24),
+              LumiGap.m,
 
-              ElevatedButton(
+              LumiPrimaryButton(
                 onPressed: _isLoading ? null : _verifyCode,
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(56),
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : const Text('Verify Code'),
+                isLoading: _isLoading,
+                text: 'Verify Code',
+                isFullWidth: true,
               ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
             ],
           ),
         ),
 
-        const SizedBox(height: 24),
+        LumiGap.m,
 
         // Info box
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: LumiPadding.allS,
           decoration: BoxDecoration(
             color: AppColors.info.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: LumiBorders.large,
             border: Border.all(
               color: AppColors.info.withValues(alpha: 0.3),
             ),
@@ -412,13 +452,11 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
           child: Row(
             children: [
               const Icon(Icons.info_outline, color: AppColors.info),
-              const SizedBox(width: 12),
+              LumiGap.s,
               Expanded(
                 child: Text(
                   'Don\'t have a code? Contact your child\'s teacher or school administrator.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.info,
-                      ),
+                  style: LumiTextStyles.bodySmall(color: AppColors.info),
                 ),
               ),
             ],
@@ -439,43 +477,37 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
           ),
         ),
 
-        const SizedBox(height: 24),
+        LumiGap.m,
 
         Text(
           'Create Your Account',
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppColors.darkGray,
-              ),
+          style: LumiTextStyles.h2(),
           textAlign: TextAlign.center,
         ),
 
-        const SizedBox(height: 8),
+        LumiGap.xs,
 
         Text(
           'You\'re registering for: ${_studentInfo?['studentFullName']}',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.primaryBlue,
-                fontWeight: FontWeight.w600,
-              ),
+          style: LumiTextStyles.body(color: AppColors.rosePink),
           textAlign: TextAlign.center,
         ),
 
-        const SizedBox(height: 32),
+        LumiGap.l,
 
         // Error message
         if (_errorMessage != null)
           Container(
-            padding: const EdgeInsets.all(12),
-            margin: const EdgeInsets.only(bottom: 16),
+            padding: LumiPadding.allS,
+            margin: EdgeInsets.only(bottom: LumiSpacing.s),
             decoration: BoxDecoration(
               color: AppColors.error.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: LumiBorders.medium,
               border: Border.all(color: AppColors.error),
             ),
             child: Text(
               _errorMessage!,
-              style: const TextStyle(color: AppColors.error),
+              style: LumiTextStyles.body(color: AppColors.error),
             ),
           ).animate().fadeIn().shake(),
 
@@ -486,20 +518,38 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
             children: [
               FormBuilderTextField(
                 name: 'fullName',
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Your Full Name *',
-                  prefixIcon: Icon(Icons.person),
+                  labelStyle: LumiTextStyles.body(
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
+                  ),
+                  prefixIcon: Icon(Icons.person, color: AppColors.charcoal),
+                  border: OutlineInputBorder(borderRadius: LumiBorders.medium),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: LumiBorders.medium,
+                    borderSide: BorderSide(color: AppColors.rosePink, width: 2),
+                  ),
+                  errorStyle: LumiTextStyles.bodySmall(color: AppColors.error),
                 ),
                 validator: FormBuilderValidators.required(),
               ).animate().fadeIn(delay: 200.ms, duration: 500.ms),
 
-              const SizedBox(height: 16),
+              LumiGap.s,
 
               FormBuilderTextField(
                 name: 'email',
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Email Address *',
-                  prefixIcon: Icon(Icons.email),
+                  labelStyle: LumiTextStyles.body(
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
+                  ),
+                  prefixIcon: Icon(Icons.email, color: AppColors.charcoal),
+                  border: OutlineInputBorder(borderRadius: LumiBorders.medium),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: LumiBorders.medium,
+                    borderSide: BorderSide(color: AppColors.rosePink, width: 2),
+                  ),
+                  errorStyle: LumiTextStyles.bodySmall(color: AppColors.error),
                 ),
                 keyboardType: TextInputType.emailAddress,
                 validator: FormBuilderValidators.compose([
@@ -508,14 +558,26 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
                 ]),
               ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
 
-              const SizedBox(height: 16),
+              LumiGap.s,
 
               FormBuilderTextField(
                 name: 'password',
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Password *',
-                  prefixIcon: Icon(Icons.lock),
+                  labelStyle: LumiTextStyles.body(
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
+                  ),
+                  prefixIcon: Icon(Icons.lock, color: AppColors.charcoal),
                   hintText: 'At least 8 characters',
+                  hintStyle: LumiTextStyles.body(
+                    color: AppColors.charcoal.withValues(alpha: 0.5),
+                  ),
+                  border: OutlineInputBorder(borderRadius: LumiBorders.medium),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: LumiBorders.medium,
+                    borderSide: BorderSide(color: AppColors.rosePink, width: 2),
+                  ),
+                  errorStyle: LumiTextStyles.bodySmall(color: AppColors.error),
                 ),
                 obscureText: true,
                 validator: FormBuilderValidators.compose([
@@ -524,13 +586,22 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
                 ]),
               ).animate().fadeIn(delay: 400.ms, duration: 500.ms),
 
-              const SizedBox(height: 16),
+              LumiGap.s,
 
               FormBuilderTextField(
                 name: 'passwordConfirm',
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Confirm Password *',
-                  prefixIcon: Icon(Icons.lock_outline),
+                  labelStyle: LumiTextStyles.body(
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
+                  ),
+                  prefixIcon: Icon(Icons.lock_outline, color: AppColors.charcoal),
+                  border: OutlineInputBorder(borderRadius: LumiBorders.medium),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: LumiBorders.medium,
+                    borderSide: BorderSide(color: AppColors.rosePink, width: 2),
+                  ),
+                  errorStyle: LumiTextStyles.bodySmall(color: AppColors.error),
                 ),
                 obscureText: true,
                 validator: (value) {
@@ -543,24 +614,13 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
                 },
               ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
 
-              const SizedBox(height: 32),
+              LumiGap.l,
 
-              ElevatedButton(
+              LumiPrimaryButton(
                 onPressed: _isLoading ? null : _completeRegistration,
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(56),
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : const Text('Create Account & Link Student'),
+                isLoading: _isLoading,
+                text: 'Create Account & Link Student',
+                isFullWidth: true,
               ).animate().fadeIn(delay: 600.ms, duration: 500.ms),
             ],
           ),
@@ -580,30 +640,27 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
           ),
         ),
 
-        const SizedBox(height: 32),
+        LumiGap.l,
 
         Text(
           'You\'re All Set!',
-          style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppColors.success,
-              ),
+          style: LumiTextStyles.h1(color: AppColors.success),
           textAlign: TextAlign.center,
         ),
 
-        const SizedBox(height: 16),
+        LumiGap.s,
 
         Text(
           'Your account has been created and linked to ${_studentInfo?['studentFullName']}.',
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: AppColors.gray,
-              ),
+          style: LumiTextStyles.bodyLarge(
+            color: AppColors.charcoal.withValues(alpha: 0.7),
+          ),
           textAlign: TextAlign.center,
         ),
 
-        const SizedBox(height: 48),
+        LumiGap.xl,
 
-        ElevatedButton(
+        LumiPrimaryButton(
           onPressed: () async {
             // Fetch the user data before navigating
             final userId = _auth.currentUser?.uid;
@@ -618,23 +675,22 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
               if (parentDoc.exists && mounted) {
                 final parentUser = UserModel.fromFirestore(parentDoc);
                 final homeRoute = AppRouter.getHomeRouteForRole(parentUser.role);
+                // ignore: invalid_use_of_internal_member
                 context.go(homeRoute, extra: parentUser);
               }
             }
           },
-          style: ElevatedButton.styleFrom(
-            minimumSize: const Size.fromHeight(56),
-          ),
-          child: const Text('Start Logging Reading'),
+          text: 'Start Logging Reading',
+          isFullWidth: true,
         ),
 
-        const SizedBox(height: 16),
+        LumiGap.s,
 
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: LumiPadding.allS,
           decoration: BoxDecoration(
             color: AppColors.success.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: LumiBorders.large,
             border: Border.all(
               color: AppColors.success.withValues(alpha: 0.3),
             ),
@@ -646,12 +702,10 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
                 color: AppColors.success,
                 size: 48,
               ),
-              const SizedBox(height: 12),
+              LumiGap.s,
               Text(
                 'You can now log reading minutes, track progress, and stay connected with your child\'s teacher!',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.success,
-                    ),
+                style: LumiTextStyles.body(color: AppColors.success),
                 textAlign: TextAlign.center,
               ),
             ],
