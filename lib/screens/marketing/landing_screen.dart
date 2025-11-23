@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+import '../../core/theme/app_colors.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/lumi_card.dart';
 import '../auth/login_screen.dart';
 import '../onboarding/demo_request_screen.dart';
 
@@ -23,83 +27,20 @@ class _LandingScreenState extends State<LandingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FF),
-      body: Stack(
-        children: [
-          // Animated background blobs
-          Positioned(
-            top: -100,
-            right: -100,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    const Color(0xFF6B8EF9).withValues(alpha: 0.2),
-                    const Color(0xFF6B8EF9).withValues(alpha: 0.0),
-                  ],
-                ),
-              ),
-            )
-                .animate(onPlay: (controller) => controller.repeat())
-                .fadeIn(duration: 2.seconds)
-                .scale(
-                    begin: const Offset(0.8, 0.8),
-                    end: const Offset(1.2, 1.2),
-                    duration: 4.seconds)
-                .then()
-                .scale(
-                    begin: const Offset(1.2, 1.2),
-                    end: const Offset(0.8, 0.8),
-                    duration: 4.seconds),
-          ),
-          Positioned(
-            bottom: -150,
-            left: -150,
-            child: Container(
-              width: 400,
-              height: 400,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    const Color(0xFFFF8C42).withValues(alpha: 0.15),
-                    const Color(0xFFFF8C42).withValues(alpha: 0.0),
-                  ],
-                ),
-              ),
-            )
-                .animate(onPlay: (controller) => controller.repeat())
-                .fadeIn(duration: 2.seconds, delay: 1.seconds)
-                .scale(
-                    begin: const Offset(1.0, 1.0),
-                    end: const Offset(1.3, 1.3),
-                    duration: 5.seconds)
-                .then()
-                .scale(
-                    begin: const Offset(1.3, 1.3),
-                    end: const Offset(1.0, 1.0),
-                    duration: 5.seconds),
-          ),
-
-          // Main content
-          SingleChildScrollView(
-            controller: _scrollController,
-            child: Column(
-              children: [
-                _buildHeader(context),
-                _buildHeroSection(context),
-                _buildFeaturesSection(context),
-                _buildHowItWorksSection(context),
-                _buildBenefitsSection(context),
-                _buildCallToActionSection(context),
-                _buildFooter(context),
-              ],
-            ),
-          ),
-        ],
+      backgroundColor: AppColors.offWhite,
+      body: SingleChildScrollView(
+        controller: _scrollController,
+        child: Column(
+          children: [
+            _buildHeader(context),
+            _buildHeroSection(context),
+            _buildFeaturesSection(context),
+            _buildHowItWorksSection(context),
+            _buildBenefitsSection(context),
+            _buildCallToActionSection(context),
+            _buildFooter(context),
+          ],
+        ),
       ),
     );
   }
@@ -133,7 +74,7 @@ class _LandingScreenState extends State<LandingScreen> {
                 ),
                 child: const Icon(
                   Icons.auto_stories_rounded,
-                  color: Colors.white,
+                  color: AppColors.white,
                   size: 28,
                 ),
               ),
@@ -158,7 +99,8 @@ class _LandingScreenState extends State<LandingScreen> {
           // Navigation buttons
           Row(
             children: [
-              TextButton(
+              LumiTextButton(
+                text: 'Login',
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -166,17 +108,10 @@ class _LandingScreenState extends State<LandingScreen> {
                         builder: (context) => const LoginScreen()),
                   );
                 },
-                child: Text(
-                  'Login',
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF6B8EF9),
-                  ),
-                ),
               ),
               const SizedBox(width: 12),
-              ElevatedButton(
+              LumiPrimaryButton(
+                text: 'Request Demo',
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -184,23 +119,6 @@ class _LandingScreenState extends State<LandingScreen> {
                         builder: (context) => const DemoRequestScreen()),
                   );
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6B8EF9),
-                  foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                ),
-                child: Text(
-                  'Request Demo',
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
               ),
             ],
           )
@@ -226,7 +144,7 @@ class _LandingScreenState extends State<LandingScreen> {
               fontSize: 56,
               fontWeight: FontWeight.bold,
               height: 1.2,
-              color: const Color(0xFF1E1E3F),
+              color: AppColors.charcoal,
             ),
           )
               .animate()
@@ -241,7 +159,7 @@ class _LandingScreenState extends State<LandingScreen> {
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
               fontSize: 20,
-              color: const Color(0xFF6E6E8F),
+              color: AppColors.charcoal.withValues(alpha: 0.7),
               height: 1.6,
             ),
           )
@@ -255,7 +173,8 @@ class _LandingScreenState extends State<LandingScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              ElevatedButton(
+              LumiPrimaryButton(
+                text: 'Start Free Trial',
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -263,33 +182,11 @@ class _LandingScreenState extends State<LandingScreen> {
                         builder: (context) => const DemoRequestScreen()),
                   );
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6B8EF9),
-                  foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  elevation: 8,
-                  shadowColor: const Color(0xFF6B8EF9).withValues(alpha: 0.4),
-                ),
-                child: Row(
-                  children: [
-                    Text(
-                      'Start Free Trial',
-                      style: GoogleFonts.inter(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.arrow_forward_rounded, size: 24),
-                  ],
-                ),
+                icon: Icons.arrow_forward_rounded,
               ),
               const SizedBox(width: 20),
-              OutlinedButton(
+              LumiSecondaryButton(
+                text: 'See How It Works',
                 onPressed: () {
                   // Scroll to how it works section
                   _scrollController.animateTo(
@@ -298,28 +195,7 @@ class _LandingScreenState extends State<LandingScreen> {
                     curve: Curves.easeInOut,
                   );
                 },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF6B8EF9),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-                  side: const BorderSide(color: Color(0xFF6B8EF9), width: 2),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.play_circle_outline_rounded, size: 24),
-                    const SizedBox(width: 8),
-                    Text(
-                      'See How It Works',
-                      style: GoogleFonts.inter(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
+                icon: Icons.play_circle_outline_rounded,
               ),
             ],
           )
@@ -449,7 +325,7 @@ class _LandingScreenState extends State<LandingScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -468,7 +344,7 @@ class _LandingScreenState extends State<LandingScreen> {
             style: GoogleFonts.inter(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: const Color(0xFF1E1E3F),
+              color: AppColors.charcoal,
             ),
           ),
         ],
@@ -479,7 +355,7 @@ class _LandingScreenState extends State<LandingScreen> {
   Widget _buildFeaturesSection(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 80),
-      color: Colors.white,
+      color: AppColors.white,
       child: Column(
         children: [
           Text(
@@ -488,7 +364,7 @@ class _LandingScreenState extends State<LandingScreen> {
             style: GoogleFonts.poppins(
               fontSize: 42,
               fontWeight: FontWeight.bold,
-              color: const Color(0xFF1E1E3F),
+              color: AppColors.charcoal,
             ),
           ),
           const SizedBox(height: 16),
@@ -497,7 +373,7 @@ class _LandingScreenState extends State<LandingScreen> {
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
               fontSize: 18,
-              color: const Color(0xFF6E6E8F),
+              color: AppColors.charcoal.withValues(alpha: 0.7),
             ),
           ),
           const SizedBox(height: 64),
@@ -573,55 +449,51 @@ class _LandingScreenState extends State<LandingScreen> {
     required String title,
     required String description,
   }) {
-    return Container(
+    return SizedBox(
       width: 340,
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FF),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: const Color(0xFFE8EAFF),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              gradient: gradient,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: gradient.colors.first.withValues(alpha: 0.3),
-                  blurRadius: 16,
-                  offset: const Offset(0, 8),
+      child: LumiCard(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  gradient: gradient,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: gradient.colors.first.withValues(alpha: 0.3),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: Icon(icon, color: Colors.white, size: 32),
+                child: Icon(icon, color: Colors.white, size: 32),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                title,
+                style: GoogleFonts.poppins(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.charcoal,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                description,
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  color: AppColors.charcoal.withValues(alpha: 0.7),
+                  height: 1.6,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-          Text(
-            title,
-            style: GoogleFonts.poppins(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: const Color(0xFF1E1E3F),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            description,
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              color: const Color(0xFF6E6E8F),
-              height: 1.6,
-            ),
-          ),
-        ],
+        ),
       ),
     ).animate().fadeIn(duration: 600.ms).slideY(begin: 0.2, end: 0);
   }
@@ -638,7 +510,7 @@ class _LandingScreenState extends State<LandingScreen> {
             style: GoogleFonts.poppins(
               fontSize: 42,
               fontWeight: FontWeight.bold,
-              color: const Color(0xFF1E1E3F),
+              color: AppColors.charcoal,
             ),
           ),
           const SizedBox(height: 16),
@@ -647,7 +519,7 @@ class _LandingScreenState extends State<LandingScreen> {
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
               fontSize: 18,
-              color: const Color(0xFF6E6E8F),
+              color: AppColors.charcoal.withValues(alpha: 0.7),
             ),
           ),
           const SizedBox(height: 64),
@@ -689,80 +561,67 @@ class _LandingScreenState extends State<LandingScreen> {
     required String emoji,
     required Color color,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: color.withValues(alpha: 0.2),
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.1),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [color, color.withValues(alpha: 0.7)],
-              ),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                number,
-                style: GoogleFonts.poppins(
-                  fontSize: 36,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+    return LumiCard(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Row(
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [color, color.withValues(alpha: 0.7)],
                 ),
+                shape: BoxShape.circle,
               ),
-            ),
-          ),
-          const SizedBox(width: 32),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      emoji,
-                      style: const TextStyle(fontSize: 32),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      title,
-                      style: GoogleFonts.poppins(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF1E1E3F),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  description,
-                  style: GoogleFonts.inter(
-                    fontSize: 18,
-                    color: const Color(0xFF6E6E8F),
-                    height: 1.6,
+              child: Center(
+                child: Text(
+                  number,
+                  style: GoogleFonts.poppins(
+                    fontSize: 36,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.white,
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 32),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        emoji,
+                        style: const TextStyle(fontSize: 32),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        title,
+                        style: GoogleFonts.poppins(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.charcoal,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    description,
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      color: AppColors.charcoal.withValues(alpha: 0.7),
+                      height: 1.6,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     ).animate().fadeIn(duration: 600.ms).slideX(begin: -0.1, end: 0);
   }
@@ -770,7 +629,7 @@ class _LandingScreenState extends State<LandingScreen> {
   Widget _buildBenefitsSection(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 80),
-      color: Colors.white,
+      color: AppColors.white,
       child: Column(
         children: [
           Text(
@@ -779,7 +638,7 @@ class _LandingScreenState extends State<LandingScreen> {
             style: GoogleFonts.poppins(
               fontSize: 42,
               fontWeight: FontWeight.bold,
-              color: const Color(0xFF1E1E3F),
+              color: AppColors.charcoal,
             ),
           ),
           const SizedBox(height: 64),
@@ -851,7 +710,7 @@ class _LandingScreenState extends State<LandingScreen> {
             style: GoogleFonts.poppins(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: const Color(0xFF1E1E3F),
+              color: AppColors.charcoal,
             ),
           ),
           const SizedBox(height: 8),
@@ -860,7 +719,7 @@ class _LandingScreenState extends State<LandingScreen> {
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
               fontSize: 16,
-              color: const Color(0xFF6E6E8F),
+              color: AppColors.charcoal.withValues(alpha: 0.7),
               height: 1.6,
             ),
           ),
@@ -903,7 +762,7 @@ class _LandingScreenState extends State<LandingScreen> {
             style: GoogleFonts.poppins(
               fontSize: 42,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: AppColors.white,
               height: 1.3,
             ),
           ),
@@ -921,7 +780,8 @@ class _LandingScreenState extends State<LandingScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              ElevatedButton(
+              LumiPrimaryButton(
+                text: 'Start Your Free Trial',
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -929,32 +789,11 @@ class _LandingScreenState extends State<LandingScreen> {
                         builder: (context) => const DemoRequestScreen()),
                   );
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: const Color(0xFF6B8EF9),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 48, vertical: 28),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  elevation: 8,
-                ),
-                child: Row(
-                  children: [
-                    Text(
-                      'Start Your Free Trial',
-                      style: GoogleFonts.inter(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Icon(Icons.arrow_forward_rounded, size: 24),
-                  ],
-                ),
+                icon: Icons.arrow_forward_rounded,
               ),
               const SizedBox(width: 24),
-              OutlinedButton(
+              LumiSecondaryButton(
+                text: 'Login',
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -962,22 +801,6 @@ class _LandingScreenState extends State<LandingScreen> {
                         builder: (context) => const LoginScreen()),
                   );
                 },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 48, vertical: 28),
-                  side: const BorderSide(color: Colors.white, width: 2),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                child: Text(
-                  'Login',
-                  style: GoogleFonts.inter(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
               ),
             ],
           ),
@@ -1019,7 +842,7 @@ class _LandingScreenState extends State<LandingScreen> {
   Widget _buildFooter(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
-      color: const Color(0xFF1E1E3F),
+      color: AppColors.charcoal,
       child: Column(
         children: [
           Row(
@@ -1043,7 +866,7 @@ class _LandingScreenState extends State<LandingScreen> {
                         ),
                         child: const Icon(
                           Icons.auto_stories_rounded,
-                          color: Colors.white,
+                          color: AppColors.white,
                           size: 24,
                         ),
                       ),
@@ -1053,7 +876,7 @@ class _LandingScreenState extends State<LandingScreen> {
                         style: GoogleFonts.poppins(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: AppColors.white,
                         ),
                       ),
                     ],
@@ -1078,7 +901,7 @@ class _LandingScreenState extends State<LandingScreen> {
                     style: GoogleFonts.poppins(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      color: AppColors.white,
                     ),
                   ),
                   const SizedBox(height: 16),
