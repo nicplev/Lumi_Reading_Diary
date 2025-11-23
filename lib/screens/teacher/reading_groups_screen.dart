@@ -6,6 +6,11 @@ import '../../data/models/student_model.dart';
 import '../../data/models/reading_group_model.dart';
 import '../../services/firebase_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/lumi_card.dart';
 
 /// Screen for managing reading groups within a class
 /// Allows teachers to organize students by ability level or interest
@@ -36,84 +41,88 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.offWhite,
       appBar: AppBar(
-        title: const Text('Reading Groups'),
-        backgroundColor: AppColors.primaryBlue,
+        title: Text(
+          'Reading Groups',
+          style: LumiTextStyles.h2(color: AppColors.white),
+        ),
+        backgroundColor: AppColors.rosePink,
+        iconTheme: const IconThemeData(color: AppColors.white),
         actions: [
           IconButton(
             icon: const Icon(Icons.help_outline),
             onPressed: _showHelp,
-            tooltip: 'Help',
+            color: AppColors.white,
           ),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: AppColors.rosePink,
+              ),
+            )
           : RefreshIndicator(
+              color: AppColors.rosePink,
               onRefresh: _loadData,
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
+                padding: LumiPadding.allS,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _buildClassInfo(),
-                    const SizedBox(height: 16),
+                    LumiGap.s,
                     if (_ungroupedStudents.isNotEmpty) ...[
                       _buildUngroupedStudentsCard(),
-                      const SizedBox(height: 16),
+                      LumiGap.s,
                     ],
                     _buildGroupsList(),
                   ],
                 ),
               ),
             ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: LumiFab(
         onPressed: _createNewGroup,
-        backgroundColor: AppColors.primaryBlue,
-        icon: const Icon(Icons.add),
-        label: const Text('New Group'),
+        icon: Icons.add,
+        label: 'New Group',
       ),
     );
   }
 
   Widget _buildClassInfo() {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.classModel.name,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                _buildInfoChip(
-                  Icons.people,
-                  '${_allStudents.length} Students',
-                  Colors.blue,
-                ),
-                const SizedBox(width: 8),
-                _buildInfoChip(
-                  Icons.group_work,
-                  '${_groups.length} Groups',
-                  Colors.purple,
-                ),
-                const SizedBox(width: 8),
-                _buildInfoChip(
-                  Icons.person_outline,
-                  '${_ungroupedStudents.length} Ungrouped',
-                  Colors.orange,
-                ),
-              ],
-            ),
-          ],
-        ),
+    return LumiCard(
+      padding: LumiPadding.allS,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.classModel.name,
+            style: LumiTextStyles.h2(color: AppColors.charcoal),
+          ),
+          LumiGap.xs,
+          Row(
+            children: [
+              _buildInfoChip(
+                Icons.people,
+                '${_allStudents.length} Students',
+                AppColors.rosePink,
+              ),
+              LumiGap.xs,
+              _buildInfoChip(
+                Icons.group_work,
+                '${_groups.length} Groups',
+                AppColors.skyBlue,
+              ),
+              LumiGap.xs,
+              _buildInfoChip(
+                Icons.person_outline,
+                '${_ungroupedStudents.length} Ungrouped',
+                AppColors.warmOrange,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -122,22 +131,18 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.3)),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: LumiBorders.medium,
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 16, color: color),
-          const SizedBox(width: 4),
+          const SizedBox(width: LumiSpacing.xxs),
           Text(
             label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: color,
-            ),
+            style: LumiTextStyles.label(color: color),
           ),
         ],
       ),
@@ -145,57 +150,53 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
   }
 
   Widget _buildUngroupedStudentsCard() {
-    return Card(
-      elevation: 2,
-      color: Colors.orange[50],
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.warmOrange.withValues(alpha: 0.1),
+        borderRadius: LumiBorders.large,
+      ),
+      child: LumiCard(
+        padding: LumiPadding.allS,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.person_add, color: Colors.orange[700]),
-                const SizedBox(width: 8),
-                Text(
-                  'Ungrouped Students (${_ungroupedStudents.length})',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.person_add, color: AppColors.warmOrange),
+              LumiGap.xs,
+              Text(
+                'Ungrouped Students (${_ungroupedStudents.length})',
+                style: LumiTextStyles.h3(color: AppColors.charcoal),
+              ),
+            ],
+          ),
+          LumiGap.xs,
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _ungroupedStudents.map((student) {
+              return Chip(
+                avatar: CircleAvatar(
+                  backgroundColor: AppColors.warmOrange.withValues(alpha: 0.3),
+                  child: Text(
+                    student.firstName[0].toUpperCase(),
+                    style: LumiTextStyles.bodySmall(color: AppColors.charcoal),
+                  ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _ungroupedStudents.map((student) {
-                return Chip(
-                  avatar: CircleAvatar(
-                    backgroundColor: Colors.orange[200],
-                    child: Text(
-                      student.firstName[0].toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.orange[900],
-                      ),
-                    ),
-                  ),
-                  label: Text(student.fullName),
-                  onDeleted: () => _assignStudentToGroup(student),
-                  deleteIcon: const Icon(Icons.arrow_forward, size: 18),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Tap the arrow to assign students to groups',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey[600],
-                    fontStyle: FontStyle.italic,
-                  ),
-            ),
-          ],
+                label: Text(student.fullName, style: LumiTextStyles.body(color: AppColors.charcoal)),
+                onDeleted: () => _assignStudentToGroup(student),
+                deleteIcon: const Icon(Icons.arrow_forward, size: 18),
+              );
+            }).toList(),
+          ),
+          LumiGap.xxs,
+          Text(
+            'Tap the arrow to assign students to groups',
+            style: LumiTextStyles.bodySmall(
+              color: AppColors.charcoal.withValues(alpha: 0.7),
+            ).copyWith(fontStyle: FontStyle.italic),
+          ),
+        ],
         ),
       ),
     );
@@ -203,40 +204,37 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
 
   Widget _buildGroupsList() {
     if (_groups.isEmpty) {
-      return Card(
-        elevation: 2,
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            children: [
-              Icon(
-                Icons.group_work_outlined,
-                size: 64,
-                color: Colors.grey[400],
+      return LumiCard(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          children: [
+            Icon(
+              Icons.group_work_outlined,
+              size: 64,
+              color: AppColors.charcoal.withValues(alpha: 0.3),
+            ),
+            LumiGap.s,
+            Text(
+              'No Reading Groups Yet',
+              style: LumiTextStyles.h2(
+                color: AppColors.charcoal.withValues(alpha: 0.7),
               ),
-              const SizedBox(height: 16),
-              Text(
-                'No Reading Groups Yet',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Colors.grey[700],
-                    ),
+            ),
+            LumiGap.xxs,
+            Text(
+              'Create groups to organize students by ability level or interest',
+              style: LumiTextStyles.body(
+                color: AppColors.charcoal.withValues(alpha: 0.6),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Create groups to organize students by ability level or interest',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey[600],
-                    ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: _createNewGroup,
-                icon: const Icon(Icons.add),
-                label: const Text('Create First Group'),
-              ),
-            ],
-          ),
+              textAlign: TextAlign.center,
+            ),
+            LumiGap.s,
+            LumiPrimaryButton(
+              text: 'Create First Group',
+              icon: Icons.add,
+              onPressed: _createNewGroup,
+            ),
+          ],
         ),
       );
     }
@@ -246,12 +244,10 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
       children: [
         Text(
           'Reading Groups',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+          style: LumiTextStyles.h3(color: AppColors.charcoal),
         ),
-        const SizedBox(height: 12),
-        ..._groups.map((group) => _buildGroupCard(group)).toList(),
+        LumiGap.xs,
+        ..._groups.map((group) => _buildGroupCard(group)),
       ],
     );
   }
@@ -263,16 +259,13 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
 
     final color = group.color != null
         ? Color(int.parse(group.color!.replaceFirst('#', '0xFF')))
-        : Colors.blue;
+        : AppColors.rosePink;
 
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: LumiSpacing.xs),
+      child: LumiCard(
         onTap: () => _viewGroupDetails(group, studentsInGroup),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
+        padding: LumiPadding.allS,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -296,12 +289,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
                             Expanded(
                               child: Text(
                                 group.name,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                style: LumiTextStyles.h3(color: AppColors.charcoal),
                               ),
                             ),
                             if (group.readingLevel != null)
@@ -311,19 +299,15 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: color.withOpacity(0.1),
+                                  color: color.withValues(alpha:0.1),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: color.withOpacity(0.3),
+                                    color: color.withValues(alpha:0.3),
                                   ),
                                 ),
                                 child: Text(
                                   'Level ${group.readingLevel}',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: color,
-                                  ),
+                                  style: LumiTextStyles.label(color: color),
                                 ),
                               ),
                           ],
@@ -334,33 +318,27 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
                             Icon(
                               Icons.people,
                               size: 16,
-                              color: Colors.grey[600],
+                              color: AppColors.charcoal.withValues(alpha: 0.6),
                             ),
                             const SizedBox(width: 4),
                             Text(
                               '${studentsInGroup.length} students',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: Colors.grey[600],
-                                  ),
+                              style: LumiTextStyles.bodySmall(
+                                color: AppColors.charcoal.withValues(alpha: 0.6),
+                              ),
                             ),
-                            const SizedBox(width: 16),
+                            LumiGap.s,
                             Icon(
                               Icons.schedule,
                               size: 16,
-                              color: Colors.grey[600],
+                              color: AppColors.charcoal.withValues(alpha: 0.6),
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: LumiSpacing.xxs),
                             Text(
                               '${group.targetMinutes} min/day',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: Colors.grey[600],
-                                  ),
+                              style: LumiTextStyles.bodySmall(
+                                color: AppColors.charcoal.withValues(alpha: 0.6),
+                              ),
                             ),
                           ],
                         ),
@@ -389,14 +367,16 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
                           ],
                         ),
                       ),
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'delete',
                         child: Row(
                           children: [
-                            Icon(Icons.delete, size: 20, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('Delete Group',
-                                style: TextStyle(color: Colors.red)),
+                            const Icon(Icons.delete, size: 20, color: AppColors.error),
+                            const SizedBox(width: LumiSpacing.xs),
+                            Text(
+                              'Delete Group',
+                              style: LumiTextStyles.body(color: AppColors.error),
+                            ),
                           ],
                         ),
                       ),
@@ -418,52 +398,48 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
                 ],
               ),
               if (group.description != null) ...[
-                const SizedBox(height: 8),
+                LumiGap.xxs,
                 Text(
                   group.description!,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.grey[600],
-                      ),
+                  style: LumiTextStyles.bodySmall(
+                    color: AppColors.charcoal.withValues(alpha: 0.6),
+                  ),
                 ),
               ],
               if (studentsInGroup.isNotEmpty) ...[
-                const SizedBox(height: 12),
+                LumiGap.xs,
                 const Divider(),
-                const SizedBox(height: 8),
+                LumiGap.xxs,
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: studentsInGroup.take(5).map((student) {
                     return Chip(
                       avatar: CircleAvatar(
-                        backgroundColor: color.withOpacity(0.2),
+                        backgroundColor: color.withValues(alpha:0.2),
                         child: Text(
                           student.firstName[0].toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: color,
-                          ),
+                          style: LumiTextStyles.bodySmall(color: color),
                         ),
                       ),
                       label: Text(student.fullName),
-                      labelStyle: const TextStyle(fontSize: 12),
+                      labelStyle: LumiTextStyles.bodySmall(color: AppColors.charcoal),
                     );
                   }).toList(),
                 ),
                 if (studentsInGroup.length > 5)
                   Padding(
-                    padding: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.only(top: LumiSpacing.xs),
                     child: Text(
                       '+${studentsInGroup.length - 5} more students',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.grey[600],
-                          ),
+                      style: LumiTextStyles.bodySmall(
+                        color: AppColors.charcoal.withValues(alpha: 0.6),
+                      ),
                     ),
                   ),
               ],
             ],
           ),
-        ),
       ),
     );
   }
@@ -478,9 +454,8 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
       // Load students
       final studentDocs =
           await firebaseService.getStudentsInClass(widget.classModel.id);
-      _allStudents = studentDocs
-          .map((doc) => StudentModel.fromFirestore(doc))
-          .toList();
+      _allStudents =
+          studentDocs.map((doc) => StudentModel.fromFirestore(doc)).toList();
 
       // Load groups
       final groupsSnapshot = await firebaseService.firestore
@@ -511,7 +486,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error loading data: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
         ),
       );
     }
@@ -539,7 +514,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Group created successfully!'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
           ),
         );
 
@@ -550,7 +525,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error creating group: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -581,7 +556,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Group updated successfully!'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
           ),
         );
 
@@ -592,7 +567,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error updating group: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -614,7 +589,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
             child: const Text('Delete'),
           ),
         ],
@@ -636,7 +611,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Group deleted successfully!'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
           ),
         );
 
@@ -647,15 +622,14 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error deleting group: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
     }
   }
 
-  void _viewGroupDetails(
-      ReadingGroupModel group, List<StudentModel> students) {
+  void _viewGroupDetails(ReadingGroupModel group, List<StudentModel> students) {
     // Navigate to group details screen (to be implemented)
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -693,7 +667,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Students updated successfully!'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
           ),
         );
 
@@ -704,7 +678,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error updating students: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -730,14 +704,14 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text('Select a group for ${student.fullName}:'),
-            const SizedBox(height: 16),
+            LumiGap.s,
             ..._groups.map((group) {
               return ListTile(
                 title: Text(group.name),
                 subtitle: Text('${group.studentIds.length} students'),
                 onTap: () => Navigator.of(context).pop(group),
               );
-            }).toList(),
+            }),
           ],
         ),
         actions: [
@@ -772,7 +746,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('${student.fullName} added to ${selectedGroup.name}'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
           ),
         );
 
@@ -783,7 +757,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error assigning student: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -794,35 +768,36 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Reading Groups Help'),
-        content: const SingleChildScrollView(
+        title: Text('Reading Groups Help', style: LumiTextStyles.h2(color: AppColors.charcoal)),
+        content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 'What are Reading Groups?',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                style: LumiTextStyles.h3(color: AppColors.charcoal),
               ),
-              SizedBox(height: 8),
+              LumiGap.xs,
               Text(
                 'Reading groups help you organize students by ability level, interest, or any other criteria. This makes it easier to:',
+                style: LumiTextStyles.body(color: AppColors.charcoal),
               ),
-              SizedBox(height: 8),
-              Text('• Assign appropriate books'),
-              Text('• Set different reading targets'),
-              Text('• Track group progress'),
-              Text('• Run guided reading sessions'),
-              SizedBox(height: 16),
+              LumiGap.xs,
+              Text('• Assign appropriate books', style: LumiTextStyles.body(color: AppColors.charcoal)),
+              Text('• Set different reading targets', style: LumiTextStyles.body(color: AppColors.charcoal)),
+              Text('• Track group progress', style: LumiTextStyles.body(color: AppColors.charcoal)),
+              Text('• Run guided reading sessions', style: LumiTextStyles.body(color: AppColors.charcoal)),
+              LumiGap.s,
               Text(
                 'How to Use',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                style: LumiTextStyles.h3(color: AppColors.charcoal),
               ),
-              SizedBox(height: 8),
-              Text('1. Create groups with meaningful names'),
-              Text('2. Assign students to groups'),
-              Text('3. Set reading targets for each group'),
-              Text('4. Monitor group performance'),
+              LumiGap.xs,
+              Text('1. Create groups with meaningful names', style: LumiTextStyles.body(color: AppColors.charcoal)),
+              Text('2. Assign students to groups', style: LumiTextStyles.body(color: AppColors.charcoal)),
+              Text('3. Set reading targets for each group', style: LumiTextStyles.body(color: AppColors.charcoal)),
+              Text('4. Monitor group performance', style: LumiTextStyles.body(color: AppColors.charcoal)),
             ],
           ),
         ),
@@ -918,7 +893,7 @@ class _GroupFormDialogState extends State<_GroupFormDialog> {
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
+              LumiGap.s,
               TextFormField(
                 controller: _descriptionController,
                 decoration: const InputDecoration(
@@ -927,7 +902,7 @@ class _GroupFormDialogState extends State<_GroupFormDialog> {
                 ),
                 maxLines: 2,
               ),
-              const SizedBox(height: 16),
+              LumiGap.s,
               TextFormField(
                 controller: _readingLevelController,
                 decoration: const InputDecoration(
@@ -935,7 +910,7 @@ class _GroupFormDialogState extends State<_GroupFormDialog> {
                   hintText: 'e.g., A, B, C or 1, 2, 3',
                 ),
               ),
-              const SizedBox(height: 16),
+              LumiGap.s,
               TextFormField(
                 controller: _targetMinutesController,
                 decoration: const InputDecoration(
@@ -952,12 +927,12 @@ class _GroupFormDialogState extends State<_GroupFormDialog> {
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
-              const Text(
+              LumiGap.s,
+              Text(
                 'Group Color',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+                style: LumiTextStyles.bodySmall(color: AppColors.charcoal.withValues(alpha: 0.5)),
               ),
-              const SizedBox(height: 8),
+              LumiGap.xxs,
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -973,8 +948,8 @@ class _GroupFormDialogState extends State<_GroupFormDialog> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: Color(
-                            int.parse(color.replaceFirst('#', '0xFF'))),
+                        color:
+                            Color(int.parse(color.replaceFirst('#', '0xFF'))),
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: isSelected ? Colors.black : Colors.transparent,
@@ -1071,8 +1046,8 @@ class _ManageStudentsDialogState extends State<_ManageStudentsDialog> {
 
             return CheckboxListTile(
               title: Text(student.fullName),
-              subtitle: Text(
-                  'Level: ${student.currentReadingLevel ?? "Not set"}'),
+              subtitle:
+                  Text('Level: ${student.currentReadingLevel ?? "Not set"}'),
               value: isSelected,
               onChanged: (value) {
                 setState(() {
