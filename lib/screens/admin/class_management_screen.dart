@@ -3,6 +3,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/lumi_card.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/class_model.dart';
 import '../../services/firebase_service.dart';
@@ -40,46 +45,48 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.white,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Class Management',
-          style: TextStyle(color: AppColors.darkGray),
+          style: LumiTextStyles.h3(color: AppColors.charcoal),
         ),
-        iconTheme: const IconThemeData(color: AppColors.darkGray),
+        iconTheme: const IconThemeData(color: AppColors.charcoal),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: TextButton.icon(
+            padding: LumiPadding.allXS,
+            child: LumiTextButton(
               onPressed: _showImportStudentsDialog,
-              icon: const Icon(Icons.upload_file, color: AppColors.primaryBlue),
-              label: const Text(
-                'Import Students',
-                style: TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.bold),
-              ),
+              text: 'Import Students',
+              icon: Icons.upload_file,
             ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'class_management_fab',
+      floatingActionButton: LumiFab(
         onPressed: _showAddClassDialog,
-        backgroundColor: AppColors.primaryBlue,
-        icon: const Icon(Icons.add),
-        label: const Text('Add Class'),
+        icon: Icons.add,
+        label: 'Add Class',
+        isExtended: true,
       ),
       body: Column(
         children: [
           // Search Bar
           Container(
             color: AppColors.white,
-            padding: const EdgeInsets.all(16),
+            padding: LumiPadding.allS,
             child: TextField(
               decoration: InputDecoration(
                 hintText: 'Search classes...',
-                prefixIcon: const Icon(Icons.search, color: AppColors.gray),
+                hintStyle: LumiTextStyles.body(
+                  color: AppColors.charcoal.withValues(alpha: 0.5),
+                ),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: AppColors.charcoal.withValues(alpha: 0.5),
+                ),
                 filled: true,
                 fillColor: AppColors.offWhite,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
+                  borderRadius: LumiBorders.large,
                   borderSide: BorderSide.none,
                 ),
               ),
@@ -109,7 +116,10 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
                   final classModel = ClassModel.fromFirestore(doc);
                   final searchLower = _searchQuery.toLowerCase();
                   return classModel.name.toLowerCase().contains(searchLower) ||
-                      (classModel.yearLevel?.toLowerCase().contains(searchLower) ?? false);
+                      (classModel.yearLevel
+                              ?.toLowerCase()
+                              .contains(searchLower) ??
+                          false);
                 }).toList();
 
                 if (filteredDocs.isEmpty) {
@@ -120,23 +130,20 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
                         Icon(
                           Icons.groups_outlined,
                           size: 100,
-                          color: AppColors.gray.withOpacity(0.5),
+                          color: AppColors.charcoal.withValues(alpha: 0.3),
                         ),
-                        const SizedBox(height: 16),
+                        LumiGap.s,
                         Text(
                           'No classes found',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                color: AppColors.gray,
-                              ),
-                        ),
-                        const SizedBox(height: 8),
-                        ElevatedButton.icon(
-                          onPressed: _showAddClassDialog,
-                          icon: const Icon(Icons.add),
-                          label: const Text('Create First Class'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primaryBlue,
+                          style: LumiTextStyles.h3(
+                            color: AppColors.charcoal.withValues(alpha: 0.6),
                           ),
+                        ),
+                        LumiGap.xs,
+                        LumiPrimaryButton(
+                          onPressed: _showAddClassDialog,
+                          text: 'Create First Class',
+                          icon: Icons.add,
                         ),
                       ],
                     ),
@@ -144,10 +151,11 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
                 }
 
                 return ListView.builder(
-                  padding: const EdgeInsets.all(16),
+                  padding: LumiPadding.allS,
                   itemCount: filteredDocs.length,
                   itemBuilder: (context, index) {
-                    final classModel = ClassModel.fromFirestore(filteredDocs[index]);
+                    final classModel =
+                        ClassModel.fromFirestore(filteredDocs[index]);
                     return _buildClassCard(classModel);
                   },
                 );
@@ -160,107 +168,108 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
   }
 
   Widget _buildClassCard(ClassModel classModel) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ExpansionTile(
-        leading: CircleAvatar(
-          backgroundColor: AppColors.secondaryPurple.withOpacity(0.2),
-          child: const Icon(
-            Icons.groups,
-            color: AppColors.secondaryPurple,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: LumiSpacing.xs),
+      child: LumiCard(
+        padding: EdgeInsets.zero,
+        child: ExpansionTile(
+          leading: CircleAvatar(
+            backgroundColor: AppColors.skyBlue.withValues(alpha: 0.3),
+            child: Icon(
+              Icons.groups,
+              color: AppColors.skyBlue,
+            ),
           ),
-        ),
-        title: Text(
-          classModel.name,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Row(
-          children: [
-            Expanded(
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  if (classModel.yearLevel != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.info.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        classModel.yearLevel!,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.info,
+          title: Text(
+            classModel.name,
+            style: LumiTextStyles.bodyLarge(),
+          ),
+          subtitle: Row(
+            children: [
+              Expanded(
+                child: Wrap(
+                  spacing: LumiSpacing.xs,
+                  runSpacing: LumiSpacing.xxs,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (classModel.yearLevel != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: LumiSpacing.xs, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.skyBlue.withValues(alpha: 0.2),
+                          borderRadius: LumiBorders.small,
                         ),
+                        child: Text(
+                          classModel.yearLevel!,
+                          style: LumiTextStyles.caption(
+                            color: AppColors.skyBlue,
+                          ),
+                        ),
+                      ),
+                    Text(
+                      '${classModel.studentIds.length} students',
+                      style: LumiTextStyles.bodySmall(
+                        color: AppColors.charcoal.withValues(alpha: 0.6),
                       ),
                     ),
-                  Text(
-                    '${classModel.studentIds.length} students',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.gray,
-                        ),
-                  ),
-                  // Display assigned teachers
-                  Builder(
-                    builder: (context) {
-                      // Filter out empty teacher IDs
-                      final validTeacherIds = classModel.teacherIds
-                          .where((id) => id.isNotEmpty)
-                          .toList();
+                    // Display assigned teachers
+                    Builder(
+                      builder: (context) {
+                        // Filter out empty teacher IDs
+                        final validTeacherIds = classModel.teacherIds
+                            .where((id) => id.isNotEmpty)
+                            .toList();
 
-                      if (validTeacherIds.isNotEmpty) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.teacherColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.person, size: 12, color: AppColors.teacherColor),
-                              const SizedBox(width: 4),
-                              Text(
-                                validTeacherIds.length == 1
-                                    ? '1 teacher'
-                                    : '${validTeacherIds.length} teachers',
-                                style: const TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.teacherColor,
+                        if (validTeacherIds.isNotEmpty) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: LumiSpacing.xs, vertical: 2),
+                            decoration: BoxDecoration(
+                              color:
+                                  AppColors.teacherColor.withValues(alpha: 0.1),
+                              borderRadius: LumiBorders.small,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.person,
+                                    size: 12, color: AppColors.teacherColor),
+                                const SizedBox(width: LumiSpacing.xxs),
+                                Text(
+                                  validTeacherIds.length == 1
+                                      ? '1 teacher'
+                                      : '${validTeacherIds.length} teachers',
+                                  style: LumiTextStyles.caption(
+                                    color: AppColors.teacherColor,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
+                          );
+                        }
+
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: LumiSpacing.xs, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.warning.withValues(alpha: 0.1),
+                            borderRadius: LumiBorders.small,
+                          ),
+                          child: Text(
+                            'No teacher assigned',
+                            style: LumiTextStyles.caption(
+                              color: AppColors.warning,
+                            ),
                           ),
                         );
-                      }
-
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.warning.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Text(
-                          'No teacher assigned',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.warning,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
+                      },
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
         trailing: PopupMenuButton<String>(
           onSelected: (value) => _handleClassAction(value, classModel),
           itemBuilder: (context) => [
@@ -294,33 +303,38 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
                 ],
               ),
             ),
-            const PopupMenuItem(
+            PopupMenuItem(
               value: 'delete',
               child: Row(
                 children: [
-                  Icon(Icons.delete, size: 20, color: AppColors.error),
-                  SizedBox(width: 8),
-                  Text('Delete', style: TextStyle(color: AppColors.error)),
+                  const Icon(Icons.delete, size: 20, color: AppColors.error),
+                  const SizedBox(width: LumiSpacing.xs),
+                  Text(
+                    'Delete',
+                    style: LumiTextStyles.body(color: AppColors.error),
+                  ),
                 ],
               ),
             ),
           ],
         ),
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Class Details
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildStatItem('Students', classModel.studentIds.length.toString()),
-                    _buildStatItem('Reading Goal', '20 min'),
-                    _buildStatItem('Status', classModel.isActive ? 'Active' : 'Inactive'),
-                  ],
-                ),
+          children: [
+            Padding(
+              padding: LumiPadding.allS,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Class Details
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildStatItem(
+                          'Students', classModel.studentIds.length.toString()),
+                      _buildStatItem('Reading Goal', '20 min'),
+                      _buildStatItem(
+                          'Status', classModel.isActive ? 'Active' : 'Inactive'),
+                    ],
+                  ),
 
                 // Assigned Teachers Section
                 ...(() {
@@ -334,16 +348,14 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
                   }
 
                   return <Widget>[
-                    const SizedBox(height: 16),
+                    LumiGap.s,
                     const Divider(),
-                    const SizedBox(height: 8),
+                    LumiGap.xs,
                     Text(
                       'Assigned Teachers',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                      style: LumiTextStyles.bodyLarge(),
                     ),
-                    const SizedBox(height: 8),
+                    LumiGap.xs,
                     ...validTeacherIds.map((teacherId) {
                       return FutureBuilder<DocumentSnapshot>(
                         future: _firebaseService.firestore
@@ -354,41 +366,39 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
                             .get(),
                         builder: (context, snapshot) {
                           if (snapshot.hasData && snapshot.data!.exists) {
-                            final teacher = UserModel.fromFirestore(snapshot.data!);
+                            final teacher =
+                                UserModel.fromFirestore(snapshot.data!);
                             return Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.only(bottom: LumiSpacing.xs),
                               child: Row(
                                 children: [
                                   CircleAvatar(
                                     radius: 16,
-                                    backgroundColor: AppColors.teacherColor.withValues(alpha: 0.2),
+                                    backgroundColor: AppColors.teacherColor
+                                        .withValues(alpha: 0.2),
                                     child: Text(
                                       teacher.fullName.isNotEmpty
                                           ? teacher.fullName[0].toUpperCase()
                                           : '?',
-                                      style: const TextStyle(
+                                      style: LumiTextStyles.bodySmall(
                                         color: AppColors.teacherColor,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
+                                  LumiGap.xs,
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           teacher.fullName,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                          style: LumiTextStyles.body(),
                                         ),
                                         Text(
                                           teacher.email,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: AppColors.gray,
+                                          style: LumiTextStyles.bodySmall(
+                                            color: AppColors.charcoal.withValues(alpha: 0.6),
                                           ),
                                         ),
                                       ],
@@ -405,26 +415,27 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
                   ];
                 }()),
 
-                if (classModel.studentIds.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Recent Activity',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'No recent activity to display',
-                    style: TextStyle(color: AppColors.gray),
-                  ),
+                  if (classModel.studentIds.isNotEmpty) ...[
+                    LumiGap.s,
+                    const Divider(),
+                    LumiGap.xs,
+                    Text(
+                      'Recent Activity',
+                      style: LumiTextStyles.bodyLarge(),
+                    ),
+                    LumiGap.xs,
+                    Text(
+                      'No recent activity to display',
+                      style: LumiTextStyles.body(
+                        color: AppColors.charcoal.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -434,18 +445,13 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
       children: [
         Text(
           value,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: AppColors.darkGray,
-          ),
+          style: LumiTextStyles.h3(color: AppColors.charcoal),
         ),
-        const SizedBox(height: 4),
+        LumiGap.xxs,
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppColors.gray,
+          style: LumiTextStyles.bodySmall(
+            color: AppColors.charcoal.withValues(alpha: 0.6),
           ),
         ),
       ],
@@ -459,40 +465,64 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Add New Class'),
+        shape: LumiBorders.shapeLarge,
+        title: Text('Add New Class', style: LumiTextStyles.h3()),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: nameController,
-              decoration: const InputDecoration(
+              style: LumiTextStyles.body(),
+              decoration: InputDecoration(
                 labelText: 'Class Name',
+                labelStyle: LumiTextStyles.body(
+                  color: AppColors.charcoal.withValues(alpha: 0.7),
+                ),
                 hintText: 'e.g., Year 3A',
-                border: OutlineInputBorder(),
+                hintStyle: LumiTextStyles.body(
+                  color: AppColors.charcoal.withValues(alpha: 0.4),
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: LumiBorders.medium,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: LumiBorders.medium,
+                  borderSide: const BorderSide(color: AppColors.rosePink, width: 2),
+                ),
               ),
             ),
-            const SizedBox(height: 16),
+            LumiGap.s,
             TextField(
               controller: yearLevelController,
-              decoration: const InputDecoration(
+              style: LumiTextStyles.body(),
+              decoration: InputDecoration(
                 labelText: 'Year Level',
+                labelStyle: LumiTextStyles.body(
+                  color: AppColors.charcoal.withValues(alpha: 0.7),
+                ),
                 hintText: 'e.g., Year 3',
-                border: OutlineInputBorder(),
+                hintStyle: LumiTextStyles.body(
+                  color: AppColors.charcoal.withValues(alpha: 0.4),
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: LumiBorders.medium,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: LumiBorders.medium,
+                  borderSide: const BorderSide(color: AppColors.rosePink, width: 2),
+                ),
               ),
             ),
           ],
         ),
         actions: [
-          TextButton(
+          LumiTextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            text: 'Cancel',
           ),
-          ElevatedButton(
+          LumiPrimaryButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryBlue,
-            ),
-            child: const Text('Add Class'),
+            text: 'Add Class',
           ),
         ],
       ),
@@ -506,7 +536,9 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
             .collection('classes')
             .add({
           'name': nameController.text,
-          'yearLevel': yearLevelController.text.isNotEmpty ? yearLevelController.text : null,
+          'yearLevel': yearLevelController.text.isNotEmpty
+              ? yearLevelController.text
+              : null,
           'teacherId': '',
           'studentIds': [],
           'isActive': true,
@@ -556,7 +588,8 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
 
     // Refresh the class list if students were imported
     if (result == true && mounted) {
-      setState(() {}); // This will trigger a rebuild and refresh the StreamBuilder
+      setState(
+          () {}); // This will trigger a rebuild and refresh the StreamBuilder
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Students imported successfully'),
@@ -604,7 +637,8 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No active teachers found. Please add teachers first.'),
+            content:
+                Text('No active teachers found. Please add teachers first.'),
             backgroundColor: AppColors.warning,
           ),
         );
@@ -666,17 +700,20 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Class'),
-        content: Text('Are you sure you want to delete ${classModel.name}? This action cannot be undone.'),
+        shape: LumiBorders.shapeLarge,
+        title: Text('Delete Class', style: LumiTextStyles.h3()),
+        content: Text(
+          'Are you sure you want to delete ${classModel.name}? This action cannot be undone.',
+          style: LumiTextStyles.body(),
+        ),
         actions: [
-          TextButton(
+          LumiTextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            text: 'Cancel',
           ),
-          TextButton(
+          LumiTextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Delete'),
+            text: 'Delete',
           ),
         ],
       ),
@@ -742,7 +779,9 @@ class _AssignTeachersDialogState extends State<_AssignTeachersDialog> {
   List<UserModel> get _filteredTeachers {
     if (_searchQuery.isEmpty) return widget.teachers;
     return widget.teachers.where((teacher) {
-      return teacher.fullName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+      return teacher.fullName
+              .toLowerCase()
+              .contains(_searchQuery.toLowerCase()) ||
           teacher.email.toLowerCase().contains(_searchQuery.toLowerCase());
     }).toList();
   }
@@ -750,16 +789,20 @@ class _AssignTeachersDialogState extends State<_AssignTeachersDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      shape: LumiBorders.shapeLarge,
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Assign Teachers to ${widget.classModel.name}'),
-          const SizedBox(height: 8),
+          Text(
+            'Assign Teachers to ${widget.classModel.name}',
+            style: LumiTextStyles.h3(),
+          ),
+          LumiGap.xs,
           Text(
             '${_selectedTeacherIds.length} teacher(s) selected',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.gray,
-                ),
+            style: LumiTextStyles.bodySmall(
+              color: AppColors.charcoal.withValues(alpha: 0.6),
+            ),
           ),
         ],
       ),
@@ -770,19 +813,23 @@ class _AssignTeachersDialogState extends State<_AssignTeachersDialog> {
           children: [
             // Search bar
             TextField(
+              style: LumiTextStyles.body(),
               decoration: InputDecoration(
                 hintText: 'Search teachers...',
-                prefixIcon: const Icon(Icons.search, color: AppColors.gray),
+                hintStyle: LumiTextStyles.body(
+                  color: AppColors.charcoal.withValues(alpha: 0.5),
+                ),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: AppColors.charcoal.withValues(alpha: 0.5),
+                ),
                 filled: true,
                 fillColor: AppColors.offWhite,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: LumiBorders.medium,
                   borderSide: BorderSide.none,
                 ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
+                contentPadding: LumiPadding.allS,
               ),
               onChanged: (value) {
                 setState(() {
@@ -790,7 +837,7 @@ class _AssignTeachersDialogState extends State<_AssignTeachersDialog> {
                 });
               },
             ),
-            const SizedBox(height: 16),
+            LumiGap.s,
 
             // Teachers list
             Expanded(
@@ -800,58 +847,61 @@ class _AssignTeachersDialogState extends State<_AssignTeachersDialog> {
                         _searchQuery.isEmpty
                             ? 'No teachers available'
                             : 'No teachers match your search',
-                        style: const TextStyle(color: AppColors.gray),
+                        style: LumiTextStyles.body(
+                          color: AppColors.charcoal.withValues(alpha: 0.6),
+                        ),
                       ),
                     )
                   : ListView.builder(
                       itemCount: _filteredTeachers.length,
                       itemBuilder: (context, index) {
                         final teacher = _filteredTeachers[index];
-                        final isSelected = _selectedTeacherIds.contains(teacher.id);
+                        final isSelected =
+                            _selectedTeacherIds.contains(teacher.id);
 
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          elevation: isSelected ? 2 : 0,
-                          color: isSelected
-                              ? AppColors.teacherColor.withValues(alpha: 0.1)
-                              : AppColors.white,
-                          child: CheckboxListTile(
-                            value: isSelected,
-                            onChanged: (bool? value) {
-                              setState(() {
-                                if (value == true) {
-                                  _selectedTeacherIds.add(teacher.id);
-                                } else {
-                                  _selectedTeacherIds.remove(teacher.id);
-                                }
-                              });
-                            },
-                            title: Text(
-                              teacher.fullName,
-                              style: TextStyle(
-                                fontWeight: isSelected
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: LumiSpacing.xs),
+                          child: LumiCard(
+                            showShadow: isSelected,
+                            padding: EdgeInsets.zero,
+                            child: CheckboxListTile(
+                              value: isSelected,
+                              onChanged: (bool? value) {
+                                setState(() {
+                                  if (value == true) {
+                                    _selectedTeacherIds.add(teacher.id);
+                                  } else {
+                                    _selectedTeacherIds.remove(teacher.id);
+                                  }
+                                });
+                              },
+                              tileColor: isSelected
+                                  ? AppColors.teacherColor.withValues(alpha: 0.1)
+                                  : AppColors.white,
+                              title: Text(
+                                teacher.fullName,
+                                style: LumiTextStyles.body(),
                               ),
-                            ),
-                            subtitle: Text(
-                              teacher.email,
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                            secondary: CircleAvatar(
-                              backgroundColor:
-                                  AppColors.teacherColor.withValues(alpha: 0.2),
-                              child: Text(
-                                teacher.fullName.isNotEmpty
-                                    ? teacher.fullName[0].toUpperCase()
-                                    : '?',
-                                style: const TextStyle(
-                                  color: AppColors.teacherColor,
-                                  fontWeight: FontWeight.bold,
+                              subtitle: Text(
+                                teacher.email,
+                                style: LumiTextStyles.bodySmall(
+                                  color: AppColors.charcoal.withValues(alpha: 0.6),
                                 ),
                               ),
+                              secondary: CircleAvatar(
+                                backgroundColor:
+                                    AppColors.teacherColor.withValues(alpha: 0.2),
+                                child: Text(
+                                  teacher.fullName.isNotEmpty
+                                      ? teacher.fullName[0].toUpperCase()
+                                      : '?',
+                                  style: LumiTextStyles.body(
+                                    color: AppColors.teacherColor,
+                                  ),
+                                ),
+                              ),
+                              activeColor: AppColors.teacherColor,
                             ),
-                            activeColor: AppColors.teacherColor,
                           ),
                         );
                       },
@@ -861,28 +911,24 @@ class _AssignTeachersDialogState extends State<_AssignTeachersDialog> {
         ),
       ),
       actions: [
-        TextButton(
+        LumiTextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          text: 'Cancel',
         ),
         if (_selectedTeacherIds.isNotEmpty)
-          TextButton(
+          LumiTextButton(
             onPressed: () {
               setState(() {
                 _selectedTeacherIds.clear();
               });
             },
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Clear All'),
+            text: 'Clear All',
           ),
-        ElevatedButton(
+        LumiPrimaryButton(
           onPressed: () {
             Navigator.pop(context, _selectedTeacherIds.toList());
           },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.teacherColor,
-          ),
-          child: const Text('Assign Teachers'),
+          text: 'Assign Teachers',
         ),
       ],
     );
