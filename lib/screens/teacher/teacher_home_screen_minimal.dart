@@ -3,8 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/minimal_theme.dart';
-import '../../core/widgets/minimal/minimal_widgets.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/lumi_text_styles.dart';
+import '../../core/theme/lumi_spacing.dart';
+import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/lumi_card.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/student_model.dart';
@@ -92,10 +96,10 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: MinimalTheme.cream,
+        backgroundColor: AppColors.offWhite,
         body: const Center(
           child: CircularProgressIndicator(
-            color: MinimalTheme.primaryPurple,
+            color: AppColors.rosePink,
           ),
         ),
       );
@@ -103,13 +107,13 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
 
     if (_classes.isEmpty) {
       return Scaffold(
-        backgroundColor: MinimalTheme.cream,
+        backgroundColor: AppColors.offWhite,
         body: _buildNoClassesView(),
       );
     }
 
     return Scaffold(
-      backgroundColor: MinimalTheme.cream,
+      backgroundColor: AppColors.offWhite,
       body: IndexedStack(
         index: _selectedIndex,
         children: [
@@ -129,7 +133,7 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
   Widget _buildBottomNav() {
     return Container(
       decoration: BoxDecoration(
-        color: MinimalTheme.white,
+        color: AppColors.white,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
@@ -141,8 +145,8 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(
-            horizontal: MinimalTheme.spaceM,
-            vertical: MinimalTheme.spaceS,
+            horizontal: LumiSpacing.m,
+            vertical: LumiSpacing.s,
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -171,9 +175,9 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
         ),
         decoration: BoxDecoration(
           color: isActive
-              ? MinimalTheme.primaryPurple.withValues(alpha: 0.1)
+              ? AppColors.rosePink.withValues(alpha: 0.1)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(MinimalTheme.radiusPill),
+          borderRadius: BorderRadius.circular(100),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -181,19 +185,17 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
             Icon(
               icon,
               color: isActive
-                  ? MinimalTheme.primaryPurple
-                  : MinimalTheme.textSecondary,
+                  ? AppColors.rosePink
+                  : AppColors.charcoal.withValues(alpha: 0.7),
               size: 24,
             ),
             const SizedBox(height: 4),
             Text(
               label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+              style: LumiTextStyles.label(
                 color: isActive
-                    ? MinimalTheme.primaryPurple
-                    : MinimalTheme.textSecondary,
+                    ? AppColors.rosePink
+                    : AppColors.charcoal.withValues(alpha: 0.7),
               ),
             ),
           ],
@@ -213,7 +215,7 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
           // App Bar
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(MinimalTheme.spaceM),
+              padding: const EdgeInsets.all(LumiSpacing.m),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -223,70 +225,90 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          gradient: MinimalTheme.purpleGradient,
+                          color: AppColors.rosePink,
                           shape: BoxShape.circle,
-                          boxShadow: MinimalTheme.softShadow(),
                         ),
                         child: const Icon(
                           Icons.school,
-                          color: MinimalTheme.white,
+                          color: AppColors.white,
                           size: 24,
                         ),
                       ),
-                      const SizedBox(width: MinimalTheme.spaceM),
+                      const SizedBox(width: LumiSpacing.m),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Lumi Reading',
-                              style: Theme.of(context).textTheme.headlineMedium,
+                              style: LumiTextStyles.h3(),
                             ),
                             Text(
                               'Hello ${widget.user.fullName.split(' ').first}',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: MinimalTheme.textSecondary,
+                              style: LumiTextStyles.body(
+                                color: AppColors.charcoal.withValues(alpha: 0.7),
                               ),
                             ),
                           ],
                         ),
                       ),
-                      IconPillButton(
+                      LumiIconButton(
                         icon: Icons.notifications_outlined,
                         onPressed: () {},
                       ),
                     ],
                   ),
-                  const SizedBox(height: MinimalTheme.spaceXL),
+                  const SizedBox(height: LumiSpacing.xl),
 
                   // Class Selector
                   if (_classes.length > 1) ...[
-                    PillTabBar(
-                      tabs: _classes.map((c) => c.name).toList(),
-                      selectedIndex: _classes
-                          .indexWhere((c) => c.id == _selectedClass!.id),
-                      onTabSelected: (index) {
-                        setState(() {
-                          _selectedClass = _classes[index];
-                        });
-                      },
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: _classes.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final classModel = entry.value;
+                          final isSelected = classModel.id == _selectedClass!.id;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: LumiSpacing.s),
+                            child: GestureDetector(
+                              onTap: () => setState(() => _selectedClass = classModel),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: LumiSpacing.m,
+                                  vertical: LumiSpacing.s,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? AppColors.rosePink
+                                      : AppColors.charcoal.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(100),
+                                ),
+                                child: Text(
+                                  classModel.name,
+                                  style: LumiTextStyles.body(
+                                    color: isSelected
+                                        ? AppColors.white
+                                        : AppColors.charcoal,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
                     ),
-                    const SizedBox(height: MinimalTheme.spaceL),
+                    const SizedBox(height: LumiSpacing.l),
                   ],
 
                   // Title
                   Text(
                     'Class Overview',
-                    style: Theme.of(context).textTheme.displayMedium,
+                    style: LumiTextStyles.h2(),
                   ),
                   Text(
                     _selectedClass!.name,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      color: MinimalTheme.primaryPurple,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: LumiTextStyles.h3(color: AppColors.rosePink),
                   ),
                 ],
               ),
@@ -295,24 +317,24 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
 
           // Content
           SliverPadding(
-            padding: const EdgeInsets.all(MinimalTheme.spaceM),
+            padding: const EdgeInsets.all(LumiSpacing.m),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 // Today's Progress
                 _buildTodayProgress(_selectedClass!),
-                const SizedBox(height: MinimalTheme.spaceL),
+                const SizedBox(height: LumiSpacing.l),
 
                 // Weekly Completion Rate
                 _buildWeeklyProgress(_selectedClass!),
-                const SizedBox(height: MinimalTheme.spaceL),
+                const SizedBox(height: LumiSpacing.l),
 
                 // Class Stats
                 _buildClassStats(_selectedClass!),
-                const SizedBox(height: MinimalTheme.spaceL),
+                const SizedBox(height: LumiSpacing.l),
 
                 // Recent Students
                 _buildRecentStudents(_selectedClass!),
-                const SizedBox(height: MinimalTheme.spaceL),
+                const SizedBox(height: LumiSpacing.l),
 
                 // Quick Actions
                 _buildQuickActions(),
@@ -353,9 +375,10 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
             logs.fold<int>(0, (total, log) => total + log.minutesRead);
         final avgMinutes = logs.isEmpty ? 0 : totalMinutes ~/ logs.length;
 
-        return RoundedCard(
-          padding: const EdgeInsets.all(MinimalTheme.spaceL),
-          child: Column(
+        return LumiCard(
+          child: Padding(
+            padding: const EdgeInsets.all(LumiSpacing.l),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
@@ -363,9 +386,7 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
                 children: [
                   Text(
                     'Today\'s Progress',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                    style: LumiTextStyles.h3(),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -373,29 +394,53 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      gradient: MinimalTheme.purpleGradient,
+                      color: AppColors.rosePink,
                       borderRadius:
-                          BorderRadius.circular(MinimalTheme.radiusPill),
+                          BorderRadius.circular(100),
                     ),
                     child: Text(
                       DateFormat('MMM dd').format(_selectedDate),
-                      style: const TextStyle(
-                        color: MinimalTheme.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: LumiTextStyles.label(color: AppColors.white),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: MinimalTheme.spaceL),
-              CircularProgress(
-                progress: completionRate,
-                label: '${(completionRate * 100).toStringAsFixed(0)}%',
-                sublabel: 'Complete',
-                size: 140,
+              const SizedBox(height: LumiSpacing.l),
+              Center(
+                child: SizedBox(
+                  width: 140,
+                  height: 140,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      CircularProgressIndicator(
+                        value: completionRate,
+                        strokeWidth: 12,
+                        backgroundColor: AppColors.charcoal.withValues(alpha: 0.1),
+                        valueColor: const AlwaysStoppedAnimation<Color>(AppColors.rosePink),
+                      ),
+                      Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              '${(completionRate * 100).toStringAsFixed(0)}%',
+                              style: LumiTextStyles.h2(color: AppColors.rosePink),
+                            ),
+                            Text(
+                              'Complete',
+                              style: LumiTextStyles.label(
+                                color: AppColors.charcoal.withValues(alpha: 0.7),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(height: MinimalTheme.spaceL),
+              const SizedBox(height: LumiSpacing.l),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
@@ -403,23 +448,24 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
                     Icons.groups,
                     '${logs.length}/${classModel.studentIds.length}',
                     'Students',
-                    MinimalTheme.blue,
+                    AppColors.skyBlue,
                   ),
                   _buildMiniStat(
                     Icons.timer,
                     '$avgMinutes',
                     'Avg Min',
-                    MinimalTheme.orange,
+                    AppColors.warmOrange,
                   ),
                   _buildMiniStat(
                     Icons.book,
                     '${logs.fold<int>(0, (total, log) => total + log.bookTitles.length)}',
                     'Books',
-                    MinimalTheme.primaryPurple,
+                    AppColors.rosePink,
                   ),
                 ],
               ),
             ],
+          ),
           ),
         );
       },
@@ -431,20 +477,15 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
     return Column(
       children: [
         Icon(icon, color: color, size: 28),
-        const SizedBox(height: MinimalTheme.spaceS),
+        const SizedBox(height: LumiSpacing.s),
         Text(
           value,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
+          style: LumiTextStyles.h3(color: color),
         ),
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: MinimalTheme.textSecondary,
+          style: LumiTextStyles.label(
+            color: AppColors.charcoal.withValues(alpha: 0.7),
           ),
         ),
       ],
@@ -482,18 +523,17 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
           completionByDay[i] = dayLogs.length;
         }
 
-        return RoundedCard(
-          padding: const EdgeInsets.all(MinimalTheme.spaceL),
-          child: Column(
+        return LumiCard(
+          child: Padding(
+            padding: const EdgeInsets.all(LumiSpacing.l),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Weekly Completion',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: LumiTextStyles.h3(),
               ),
-              const SizedBox(height: MinimalTheme.spaceL),
+              const SizedBox(height: LumiSpacing.l),
               SizedBox(
                 height: 150,
                 child: Row(
@@ -511,18 +551,14 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
                       children: [
                         Text(
                           '$count',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: MinimalTheme.textPrimary,
-                          ),
+                          style: LumiTextStyles.label(color: AppColors.charcoal),
                         ),
                         const SizedBox(height: 4),
                         Container(
                           width: 32,
                           height: height,
                           decoration: BoxDecoration(
-                            gradient: MinimalTheme.purpleGradient,
+                            color: AppColors.rosePink,
                             borderRadius: const BorderRadius.vertical(
                               top: Radius.circular(8),
                             ),
@@ -531,9 +567,8 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
                         const SizedBox(height: 8),
                         Text(
                           ['M', 'T', 'W', 'T', 'F', 'S', 'S'][index],
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: MinimalTheme.textSecondary,
+                          style: LumiTextStyles.label(
+                            color: AppColors.charcoal.withValues(alpha: 0.7),
                           ),
                         ),
                       ],
@@ -542,6 +577,7 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
                 ),
               ),
             ],
+          ),
           ),
         );
       },
@@ -552,20 +588,50 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
     return Row(
       children: [
         Expanded(
-          child: StatCard(
-            icon: Icons.people,
-            value: '${classModel.studentIds.length}',
-            label: 'Students',
-            iconColor: MinimalTheme.blue,
+          child: LumiCard(
+            child: Padding(
+              padding: const EdgeInsets.all(LumiSpacing.m),
+              child: Column(
+                children: [
+                  Icon(Icons.people, color: AppColors.skyBlue, size: 32),
+                  const SizedBox(height: LumiSpacing.s),
+                  Text(
+                    '${classModel.studentIds.length}',
+                    style: LumiTextStyles.h2(color: AppColors.skyBlue),
+                  ),
+                  Text(
+                    'Students',
+                    style: LumiTextStyles.label(
+                      color: AppColors.charcoal.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
-        const SizedBox(width: MinimalTheme.spaceM),
+        const SizedBox(width: LumiSpacing.m),
         Expanded(
-          child: StatCard(
-            icon: Icons.calendar_today,
-            value: classModel.yearLevel?.toString() ?? '-',
-            label: 'Year Level',
-            iconColor: MinimalTheme.orange,
+          child: LumiCard(
+            child: Padding(
+              padding: const EdgeInsets.all(LumiSpacing.m),
+              child: Column(
+                children: [
+                  Icon(Icons.calendar_today, color: AppColors.warmOrange, size: 32),
+                  const SizedBox(height: LumiSpacing.s),
+                  Text(
+                    classModel.yearLevel?.toString() ?? '-',
+                    style: LumiTextStyles.h2(color: AppColors.warmOrange),
+                  ),
+                  Text(
+                    'Year Level',
+                    style: LumiTextStyles.label(
+                      color: AppColors.charcoal.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ],
@@ -595,14 +661,12 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
           children: [
             Text(
               'Students',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: LumiTextStyles.h3(),
             ),
-            const SizedBox(height: MinimalTheme.spaceM),
+            const SizedBox(height: LumiSpacing.m),
             Wrap(
-              spacing: MinimalTheme.spaceM,
-              runSpacing: MinimalTheme.spaceM,
+              spacing: LumiSpacing.m,
+              runSpacing: LumiSpacing.m,
               children: students.take(10).map((student) {
                 return _buildStudentAvatar(student);
               }).toList(),
@@ -640,19 +704,17 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
                   height: 50,
                   decoration: BoxDecoration(
                     color: hasLogged
-                        ? MinimalTheme.green.withValues(alpha: 0.2)
-                        : MinimalTheme.lightPurple,
+                        ? AppColors.mintGreen.withValues(alpha: 0.2)
+                        : AppColors.rosePink.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Center(
                     child: Text(
                       student.firstName[0].toUpperCase(),
-                      style: TextStyle(
+                      style: LumiTextStyles.h3(
                         color: hasLogged
-                            ? MinimalTheme.green
-                            : MinimalTheme.primaryPurple,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
+                            ? AppColors.mintGreen
+                            : AppColors.rosePink,
                       ),
                     ),
                   ),
@@ -664,12 +726,12 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
                     child: Container(
                       padding: const EdgeInsets.all(2),
                       decoration: const BoxDecoration(
-                        color: MinimalTheme.white,
+                        color: AppColors.white,
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
                         Icons.check_circle,
-                        color: MinimalTheme.green,
+                        color: AppColors.mintGreen,
                         size: 16,
                       ),
                     ),
@@ -684,9 +746,8 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: MinimalTheme.textSecondary,
+                style: LumiTextStyles.label(
+                  color: AppColors.charcoal.withValues(alpha: 0.7),
                 ),
               ),
             ),
@@ -697,48 +758,48 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
   }
 
   Widget _buildQuickActions() {
-    return RoundedCard(
-      padding: const EdgeInsets.all(MinimalTheme.spaceL),
-      child: Column(
+    return LumiCard(
+      child: Padding(
+        padding: const EdgeInsets.all(LumiSpacing.l),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Quick Actions',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            style: LumiTextStyles.h3(),
           ),
-          const SizedBox(height: MinimalTheme.spaceM),
+          const SizedBox(height: LumiSpacing.m),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildActionButton(
                 Icons.assignment,
                 'Allocate',
-                MinimalTheme.blue,
+                AppColors.skyBlue,
                 () => setState(() => _selectedIndex = 2),
               ),
               _buildActionButton(
                 Icons.message,
                 'Message',
-                MinimalTheme.primaryPurple,
+                AppColors.rosePink,
                 () {},
               ),
               _buildActionButton(
                 Icons.download,
                 'Export',
-                MinimalTheme.green,
+                AppColors.mintGreen,
                 () {},
               ),
               _buildActionButton(
                 Icons.notifications_active,
                 'Nudge',
-                MinimalTheme.orange,
+                AppColors.warmOrange,
                 () {},
               ),
             ],
           ),
         ],
+      ),
       ),
     );
   }
@@ -764,10 +825,7 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
           const SizedBox(height: 8),
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: MinimalTheme.textPrimary,
-            ),
+            style: LumiTextStyles.label(color: AppColors.charcoal),
           ),
         ],
       ),
@@ -777,15 +835,15 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
   Widget _buildClassesView() {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(MinimalTheme.spaceM),
+        padding: const EdgeInsets.all(LumiSpacing.m),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'My Classes',
-              style: Theme.of(context).textTheme.displayMedium,
+              style: LumiTextStyles.h2(),
             ),
-            const SizedBox(height: MinimalTheme.spaceL),
+            const SizedBox(height: LumiSpacing.l),
             Expanded(
               child: ListView.builder(
                 itemCount: _classes.length,
@@ -802,7 +860,7 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
   }
 
   Widget _buildClassCard(ClassModel classModel) {
-    return AnimatedRoundedCard(
+    return GestureDetector(
       onTap: () {
         context.push(
           '/teacher/class-detail/${classModel.id}',
@@ -812,71 +870,91 @@ class _TeacherHomeScreenMinimalState extends State<TeacherHomeScreenMinimal> {
           },
         );
       },
-      child: Row(
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              gradient: MinimalTheme.purpleGradient,
-              borderRadius: BorderRadius.circular(MinimalTheme.radiusMedium),
-              boxShadow: MinimalTheme.softShadow(),
+      child: LumiCard(
+        child: Row(
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: AppColors.rosePink,
+                borderRadius: BorderRadius.circular(LumiBorders.radiusMedium),
+              ),
+              child: const Icon(
+                Icons.groups,
+                color: AppColors.white,
+                size: 32,
+              ),
             ),
-            child: const Icon(
-              Icons.groups,
-              color: MinimalTheme.white,
-              size: 32,
-            ),
-          ),
-          const SizedBox(width: MinimalTheme.spaceM),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  classModel.name,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: MinimalTheme.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${classModel.studentIds.length} students',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: MinimalTheme.textSecondary,
-                  ),
-                ),
-                if (classModel.yearLevel != null)
+            const SizedBox(width: LumiSpacing.m),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    'Year ${classModel.yearLevel}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: MinimalTheme.textSecondary,
+                    classModel.name,
+                    style: LumiTextStyles.h3(color: AppColors.charcoal),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${classModel.studentIds.length} students',
+                    style: LumiTextStyles.body(
+                      color: AppColors.charcoal.withValues(alpha: 0.7),
                     ),
                   ),
-              ],
+                  if (classModel.yearLevel != null)
+                    Text(
+                      'Year ${classModel.yearLevel}',
+                      style: LumiTextStyles.label(
+                        color: AppColors.charcoal.withValues(alpha: 0.7),
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
-          const Icon(
-            Icons.chevron_right,
-            color: MinimalTheme.textSecondary,
-          ),
-        ],
+            Icon(
+              Icons.chevron_right,
+              color: AppColors.charcoal.withValues(alpha: 0.7),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildNoClassesView() {
-    return EmptyState(
-      icon: Icons.school,
-      title: 'No Classes Yet',
-      message:
-          'You don\'t have any classes assigned yet. Please contact your school administrator.',
-      buttonText: 'Refresh',
-      onButtonPressed: _loadClasses,
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(LumiSpacing.xl),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.school,
+              size: 80,
+              color: AppColors.charcoal.withValues(alpha: 0.3),
+            ),
+            const SizedBox(height: LumiSpacing.l),
+            Text(
+              'No Classes Yet',
+              style: LumiTextStyles.h2(),
+            ),
+            const SizedBox(height: LumiSpacing.s),
+            Text(
+              'You don\'t have any classes assigned yet. Please contact your school administrator.',
+              textAlign: TextAlign.center,
+              style: LumiTextStyles.body(
+                color: AppColors.charcoal.withValues(alpha: 0.7),
+              ),
+            ),
+            const SizedBox(height: LumiSpacing.l),
+            LumiPrimaryButton(
+              onPressed: _loadClasses,
+              text: 'Refresh',
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
