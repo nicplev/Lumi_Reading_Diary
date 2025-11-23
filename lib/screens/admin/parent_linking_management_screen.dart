@@ -733,7 +733,7 @@ class _ParentLinkingManagementScreenState
                   padding: LumiPadding.allS,
                   child: LumiCard(
                     child: Column(
-                    children: [
+                      children: [
                       Row(
                         children: [
                           Expanded(
@@ -787,6 +787,7 @@ class _ParentLinkingManagementScreenState
                         text: 'Generate All Missing Codes',
                       ),
                     ],
+                    ),
                   ),
                 ).animate().fadeIn(duration: 500.ms),
 

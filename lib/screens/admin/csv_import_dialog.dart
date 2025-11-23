@@ -90,7 +90,7 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: AppColors.charcoal.withValues(alpha: 0.6)),
+                  icon: Icon(Icons.close, color: AppColors.charcoal.withValues(alpha: 0.6)),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -464,7 +464,7 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
             padding: const EdgeInsets.only(top: 8),
             child: Text(
               'Showing first 50 of ${_parsedRows!.length} students',
-              style: const TextStyle(color: AppColors.charcoal.withValues(alpha: 0.6), fontSize: 12),
+              style: TextStyle(color: AppColors.charcoal.withValues(alpha: 0.6), fontSize: 12),
             ),
           ),
       ],
@@ -690,7 +690,7 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
         children: [
           TextButton(
             onPressed: _reset,
-            child: const Text('Cancel', style: TextStyle(color: AppColors.charcoal.withValues(alpha: 0.6))),
+            child: Text('Cancel', style: TextStyle(color: AppColors.charcoal.withValues(alpha: 0.6))),
           ),
           Expanded(
             child: Row(
@@ -700,11 +700,11 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
                   child: OutlinedButton(
                     onPressed: _reset,
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.charcoal.withValues(alpha: 0.6)),
+                      side: BorderSide(color: AppColors.charcoal.withValues(alpha: 0.6)),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: LumiBorders.large),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Reset',
                       style: TextStyle(color: AppColors.charcoal.withValues(alpha: 0.6)),
                       overflow: TextOverflow.ellipsis,
@@ -747,7 +747,7 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
         children: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.charcoal.withValues(alpha: 0.6))),
+            child: Text('Cancel', style: TextStyle(color: AppColors.charcoal.withValues(alpha: 0.6))),
           ),
           ElevatedButton(
             onPressed: _reset,
@@ -768,7 +768,7 @@ class _CSVImportDialogState extends State<CSVImportDialog> {
       children: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel', style: TextStyle(color: AppColors.charcoal.withValues(alpha: 0.6))),
+          child: Text('Cancel', style: TextStyle(color: AppColors.charcoal.withValues(alpha: 0.6))),
         ),
       ],
     );
