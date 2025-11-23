@@ -1,7 +1,7 @@
 # Lumi Design System Migration - Status & Guide
 
 **Last Updated:** 2025-11-23
-**Progress:** 7/10 Parent Screens Completed (70%)
+**Progress:** 8/10 Parent Screens Completed (80%)
 
 ## 🎯 Mission
 
@@ -9,7 +9,7 @@ Systematically migrate all Parent screens in the Lumi Reading Diary app to use t
 
 ---
 
-## ✅ COMPLETED SCREENS (7/10)
+## ✅ COMPLETED SCREENS (8/10)
 
 ### 1. parent_profile_screen.dart ✓
 - **Commit:** `52c6910` - "refactor: Migrate parent_profile_screen to Lumi Design System"
@@ -127,12 +127,35 @@ Systematically migrate all Parent screens in the Lumi Reading Diary app to use t
   - Updated AlertDialog with LumiBorders.shapeLarge
   - Kept GlassAchievementCard component for specialized badge styling
 
+### 8. offline_management_screen.dart ✓
+- **Commit:** `356046d` - "refactor: Migrate offline_management_screen to Lumi Design System"
+- **Changes:**
+  - Replaced AppBar backgroundColor with AppColors.white and elevation: 0
+  - Replaced Scaffold backgroundColor with AppColors.offWhite
+  - Replaced all Card → LumiCard
+  - Replaced AppColors.primaryBlue → AppColors.rosePink
+  - Replaced all hardcoded TextStyle with LumiTextStyles
+  - Replaced all hardcoded spacing with LumiSpacing/LumiGap/LumiPadding
+  - Replaced ElevatedButton → LumiPrimaryButton
+  - Replaced OutlinedButton → LumiSecondaryButton
+  - Replaced TextButton → LumiTextButton
+  - Applied LumiBorders for all border radius
+  - Replaced .withOpacity() → .withValues(alpha:)
+  - Replaced Colors.green → AppColors.success
+  - Replaced Colors.orange → AppColors.warmOrange
+  - Replaced Colors.grey → AppColors.charcoal
+  - Replaced Colors.red → AppColors.error
+  - Replaced Colors.blue → AppColors.rosePink
+  - Updated SwitchListTile with activeTrackColor and activeThumbColor
+  - Updated status card with conditional success/warning styling
+  - Updated all SnackBar colors with Lumi colors
+  - Updated AlertDialog with LumiBorders.shapeLarge and Lumi components
+
 ---
 
-## 📋 REMAINING SCREENS (3/10)
+## 📋 REMAINING SCREENS (2/10)
 
 ### Medium Priority / Medium Complexity
-8. **offline_management_screen.dart** - Settings and switches
 9. **reminder_settings_screen.dart** - Heavy gradients, needs simplification
 10. **student_report_screen.dart** - Reporting interface
 
