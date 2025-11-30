@@ -101,7 +101,8 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, size: 64, color: AppColors.error.withValues(alpha: 0.6)),
+          Icon(Icons.error_outline,
+              size: 64, color: AppColors.error.withValues(alpha: 0.6)),
           const SizedBox(height: 16),
           Text(
             'Error loading analytics',
@@ -110,9 +111,9 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
           const SizedBox(height: 8),
           Text(
             _error ?? 'Unknown error',
-            style: LumiTextStyles.body()?.copyWith(
-                  color: AppColors.charcoal.withValues(alpha: 0.7),
-                ),
+            style: LumiTextStyles.body().copyWith(
+              color: AppColors.charcoal.withValues(alpha: 0.7),
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
@@ -140,15 +141,15 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
                 children: [
                   Text(
                     'Analytics Period',
-                    style: LumiTextStyles.label()?.copyWith(
-                          color: AppColors.charcoal.withValues(alpha: 0.7),
-                        ),
+                    style: LumiTextStyles.label().copyWith(
+                      color: AppColors.charcoal.withValues(alpha: 0.7),
+                    ),
                   ),
                   Text(
                     '${DateFormat('MMM dd, yyyy').format(_startDate)} - ${DateFormat('MMM dd, yyyy').format(_endDate)}',
-                    style: LumiTextStyles.h3()?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                    style: LumiTextStyles.h3().copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -173,9 +174,9 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
       children: [
         Text(
           'Executive Summary',
-          style: LumiTextStyles.h2()?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+          style: LumiTextStyles.h2().copyWith(
+            fontWeight: FontWeight.bold,
+          ),
         ),
         const SizedBox(height: 12),
         GridView.count(
@@ -244,26 +245,26 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
               children: [
                 Text(
                   value,
-                  style: LumiTextStyles.h1()?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: color,
-                      ),
+                  style: LumiTextStyles.h1().copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   title,
-                  style: LumiTextStyles.label()?.copyWith(
-                        color: AppColors.charcoal.withValues(alpha: 0.7),
-                      ),
+                  style: LumiTextStyles.label().copyWith(
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
+                  ),
                 ),
                 if (subtitle != null) ...[
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: LumiTextStyles.label()?.copyWith(
-                          color: AppColors.charcoal.withValues(alpha: 0.5),
-                          fontSize: 10,
-                        ),
+                    style: LumiTextStyles.label().copyWith(
+                      color: AppColors.charcoal.withValues(alpha: 0.5),
+                      fontSize: 10,
+                    ),
                   ),
                 ],
               ],
@@ -287,9 +288,9 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
           children: [
             Text(
               'Engagement & Performance',
-              style: LumiTextStyles.h3()?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: LumiTextStyles.h3().copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 16),
             _buildProgressRow(
@@ -361,10 +362,10 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
             ),
             Text(
               '$current / $total (${(percentage * 100).toStringAsFixed(0)}%)',
-              style: LumiTextStyles.body()?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
+              style: LumiTextStyles.body().copyWith(
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
             ),
           ],
         ),
@@ -383,17 +384,17 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
       children: [
         Text(
           value,
-          style: LumiTextStyles.h2()?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
+          style: LumiTextStyles.h2().copyWith(
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
         ),
         const SizedBox(height: 4),
         Text(
           label,
-          style: LumiTextStyles.label()?.copyWith(
-                color: AppColors.charcoal.withValues(alpha: 0.7),
-              ),
+          style: LumiTextStyles.label().copyWith(
+            color: AppColors.charcoal.withValues(alpha: 0.7),
+          ),
           textAlign: TextAlign.center,
         ),
       ],
@@ -418,9 +419,9 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
           children: [
             Text(
               'Reading Trends (Weekly)',
-              style: LumiTextStyles.h3()?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: LumiTextStyles.h3().copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 24),
             SizedBox(
@@ -482,7 +483,8 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
                   ),
                   borderData: FlBorderData(
                     show: true,
-                    border: Border.all(color: AppColors.charcoal.withValues(alpha: 0.1)),
+                    border: Border.all(
+                        color: AppColors.charcoal.withValues(alpha: 0.1)),
                   ),
                   minX: 0,
                   maxX: (weeklyData.length - 1).toDouble(),
@@ -547,9 +549,9 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
           children: [
             Text(
               'Class Performance Comparison',
-              style: LumiTextStyles.h3()?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: LumiTextStyles.h3().copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 16),
             Table(
@@ -559,11 +561,13 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
                 2: FlexColumnWidth(1),
                 3: FlexColumnWidth(1),
               },
-              border: TableBorder.all(color: AppColors.charcoal.withValues(alpha: 0.1)),
+              border: TableBorder.all(
+                  color: AppColors.charcoal.withValues(alpha: 0.1)),
               children: [
                 // Header
                 TableRow(
-                  decoration: BoxDecoration(color: AppColors.charcoal.withValues(alpha: 0.03)),
+                  decoration: BoxDecoration(
+                      color: AppColors.charcoal.withValues(alpha: 0.03)),
                   children: [
                     _buildTableHeader('Class'),
                     _buildTableHeader('Students'),
@@ -643,9 +647,9 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
               Expanded(
                 child: Text(
                   'No students currently at risk! All students are actively engaged.',
-                  style: LumiTextStyles.h3()?.copyWith(
-                        color: AppColors.success,
-                      ),
+                  style: LumiTextStyles.h3().copyWith(
+                    color: AppColors.success,
+                  ),
                 ),
               ),
             ],
@@ -666,9 +670,9 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
                 const SizedBox(width: 8),
                 Text(
                   'Students Needing Support (${atRiskStudents.length})',
-                  style: LumiTextStyles.h3()?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                  style: LumiTextStyles.h3().copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -680,7 +684,8 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
                   children: [
                     CircleAvatar(
                       radius: 20,
-                      backgroundColor: AppColors.warmOrange.withValues(alpha: 0.2),
+                      backgroundColor:
+                          AppColors.warmOrange.withValues(alpha: 0.2),
                       child: Text(
                         (student['name'] as String)[0].toUpperCase(),
                         style: LumiTextStyles.h3(color: AppColors.warmOrange),
@@ -693,7 +698,8 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
                         children: [
                           Text(
                             student['name'] as String,
-                            style: LumiTextStyles.body().copyWith(fontWeight: FontWeight.w500),
+                            style: LumiTextStyles.body()
+                                .copyWith(fontWeight: FontWeight.w500),
                           ),
                           Text(
                             student['className'] as String,
@@ -712,7 +718,8 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
                       decoration: BoxDecoration(
                         color: AppColors.warmOrange.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.warmOrange.withValues(alpha: 0.3)),
+                        border: Border.all(
+                            color: AppColors.warmOrange.withValues(alpha: 0.3)),
                       ),
                       child: Text(
                         student['issue'] as String,
@@ -775,9 +782,9 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
                 const SizedBox(width: 8),
                 Text(
                   'Top Performing Classes',
-                  style: LumiTextStyles.h3()?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                  style: LumiTextStyles.h3().copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -844,7 +851,11 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
                         Text(
                           '$avgPerStudent min',
                           style: LumiTextStyles.h3(
-                            color: [AppColors.rosePink, AppColors.mintGreen, AppColors.warmOrange][index % 3],
+                            color: [
+                              AppColors.rosePink,
+                              AppColors.mintGreen,
+                              AppColors.warmOrange
+                            ][index % 3],
                           ),
                         ),
                         Text(

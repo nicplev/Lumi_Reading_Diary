@@ -7,6 +7,7 @@ import 'package:lumi_reading_tracker/core/theme/lumi_text_styles.dart';
 import 'package:lumi_reading_tracker/core/theme/lumi_spacing.dart';
 import 'package:lumi_reading_tracker/core/theme/lumi_borders.dart';
 import 'package:lumi_reading_tracker/core/widgets/lumi/lumi_buttons.dart';
+import 'package:lumi_reading_tracker/core/widgets/glass/glass_achievement_card.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 /// Achievements screen showing earned and locked achievements

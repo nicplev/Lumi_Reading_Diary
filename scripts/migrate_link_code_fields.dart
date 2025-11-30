@@ -7,6 +7,7 @@
 ///
 /// Make sure you have configured Firebase credentials before running:
 /// export GOOGLE_APPLICATION_CREDENTIALS="path/to/service-account-key.json"
+library;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -77,13 +78,13 @@ Future<void> main() async {
     print('  Total documents scanned: ${snapshot.docs.length}');
     print('  Documents migrated: $migratedCount');
     print('  Documents already correct: $alreadyCorrectCount');
-    print('  Documents with issues: ${snapshot.docs.length - migratedCount - alreadyCorrectCount}');
+    print(
+        '  Documents with issues: ${snapshot.docs.length - migratedCount - alreadyCorrectCount}');
     print('━' * 50);
     print('\n✅ Migration complete!');
 
     if (migratedCount > 0) {
-      print(
-          '\n💡 Next steps:');
+      print('\n💡 Next steps:');
       print('   1. Deploy the updated cloud function');
       print('   2. Monitor the cleanup function logs');
       print('   3. Verify expired codes are being cleaned up');

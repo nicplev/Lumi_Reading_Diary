@@ -78,7 +78,8 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
         }
         break;
       case 2:
-        isValid = _readingLevelsFormKey.currentState?.saveAndValidate() ?? false;
+        isValid =
+            _readingLevelsFormKey.currentState?.saveAndValidate() ?? false;
         if (isValid) {
           await _completeOnboarding();
           return; // _completeOnboarding handles navigation
@@ -255,11 +256,12 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
               return Expanded(
                 child: Text(
                   _steps[index],
-                  style: LumiTextStyles.bodySmall()?.copyWith(
-                        color: isCurrent ? AppColors.rosePink : AppColors.charcoal.withValues(alpha: 0.6),
-                        fontWeight:
-                            isCurrent ? FontWeight.bold : FontWeight.normal,
-                      ),
+                  style: LumiTextStyles.bodySmall().copyWith(
+                    color: isCurrent
+                        ? AppColors.rosePink
+                        : AppColors.charcoal.withValues(alpha: 0.6),
+                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                  ),
                   textAlign: TextAlign.center,
                 ),
               );
@@ -285,18 +287,18 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
           LumiGap.m,
           Text(
             'School Information',
-            style: LumiTextStyles.h2()?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.charcoal,
-                ),
+            style: LumiTextStyles.h2().copyWith(
+              fontWeight: FontWeight.bold,
+              color: AppColors.charcoal,
+            ),
             textAlign: TextAlign.center,
           ),
           LumiGap.xs,
           Text(
             'Tell us about your school',
-            style: LumiTextStyles.body()?.copyWith(
-                  color: AppColors.charcoal.withValues(alpha: 0.6),
-                ),
+            style: LumiTextStyles.body().copyWith(
+              color: AppColors.charcoal.withValues(alpha: 0.6),
+            ),
             textAlign: TextAlign.center,
           ),
           LumiGap.l,
@@ -363,18 +365,18 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
           LumiGap.m,
           Text(
             'Create Admin Account',
-            style: LumiTextStyles.h2()?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.charcoal,
-                ),
+            style: LumiTextStyles.h2().copyWith(
+              fontWeight: FontWeight.bold,
+              color: AppColors.charcoal,
+            ),
             textAlign: TextAlign.center,
           ),
           LumiGap.xs,
           Text(
             'This will be the main administrator account',
-            style: LumiTextStyles.body()?.copyWith(
-                  color: AppColors.charcoal.withValues(alpha: 0.6),
-                ),
+            style: LumiTextStyles.body().copyWith(
+              color: AppColors.charcoal.withValues(alpha: 0.6),
+            ),
             textAlign: TextAlign.center,
           ),
           LumiGap.l,
@@ -387,7 +389,8 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
                 borderRadius: LumiBorders.medium,
                 border: Border.all(color: AppColors.error),
               ),
-              child: Text(_errorMessage!, style: const TextStyle(color: AppColors.error)),
+              child: Text(_errorMessage!,
+                  style: const TextStyle(color: AppColors.error)),
             ),
           FormBuilder(
             key: _adminAccountFormKey,
@@ -436,8 +439,9 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
                   ),
                   obscureText: true,
                   validator: (value) {
-                    if (value != _adminAccountFormKey
-                        .currentState?.fields['adminPassword']?.value) {
+                    if (value !=
+                        _adminAccountFormKey
+                            .currentState?.fields['adminPassword']?.value) {
                       return 'Passwords do not match';
                     }
                     return null;
@@ -466,18 +470,18 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
           LumiGap.m,
           Text(
             'Reading Level System',
-            style: LumiTextStyles.h2()?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.charcoal,
-                ),
+            style: LumiTextStyles.h2().copyWith(
+              fontWeight: FontWeight.bold,
+              color: AppColors.charcoal,
+            ),
             textAlign: TextAlign.center,
           ),
           LumiGap.xs,
           Text(
             'Choose your preferred reading level schema',
-            style: LumiTextStyles.body()?.copyWith(
-                  color: AppColors.charcoal.withValues(alpha: 0.6),
-                ),
+            style: LumiTextStyles.body().copyWith(
+              color: AppColors.charcoal.withValues(alpha: 0.6),
+            ),
             textAlign: TextAlign.center,
           ),
           LumiGap.l,
@@ -542,18 +546,18 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
             LumiGap.l,
             Text(
               'Welcome to Lumi!',
-              style: LumiTextStyles.h1()?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.rosePink,
-                  ),
+              style: LumiTextStyles.h1().copyWith(
+                fontWeight: FontWeight.bold,
+                color: AppColors.rosePink,
+              ),
               textAlign: TextAlign.center,
             ),
             LumiGap.s,
             Text(
               'Your school has been successfully registered. You can now start adding teachers, classes, and students.',
-              style: LumiTextStyles.bodyLarge()?.copyWith(
-                    color: AppColors.charcoal.withValues(alpha: 0.6),
-                  ),
+              style: LumiTextStyles.bodyLarge().copyWith(
+                color: AppColors.charcoal.withValues(alpha: 0.6),
+              ),
               textAlign: TextAlign.center,
             ),
             LumiGap.xl,

@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/lumi_borders.dart';
 import '../../core/theme/lumi_text_styles.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_card.dart';
@@ -275,8 +274,8 @@ class _AllocationScreenState extends State<AllocationScreen>
                           child: Text(
                             'Reading levels and book selection system will be customized based on your school\'s requirements',
                             style: LumiTextStyles.bodySmall().copyWith(
-                                      color: AppColors.info,
-                                    ),
+                              color: AppColors.info,
+                            ),
                           ),
                         ),
                       ],
@@ -371,7 +370,8 @@ class _AllocationScreenState extends State<AllocationScreen>
                             title: Text(title),
                             trailing: IconButton(
                               icon: Icon(Icons.close,
-                                  color: AppColors.charcoal.withValues(alpha: 0.6)),
+                                  color: AppColors.charcoal
+                                      .withValues(alpha: 0.6)),
                               onPressed: () {
                                 setState(() {
                                   _bookTitles.remove(title);
@@ -526,8 +526,9 @@ class _AllocationScreenState extends State<AllocationScreen>
                               child: Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  border:
-                                      Border.all(color: AppColors.charcoal.withValues(alpha: 0.2)),
+                                  border: Border.all(
+                                      color: AppColors.charcoal
+                                          .withValues(alpha: 0.2)),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Row(
@@ -569,8 +570,9 @@ class _AllocationScreenState extends State<AllocationScreen>
                               child: Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  border:
-                                      Border.all(color: AppColors.charcoal.withValues(alpha: 0.2)),
+                                  border: Border.all(
+                                      color: AppColors.charcoal
+                                          .withValues(alpha: 0.2)),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Row(
@@ -658,7 +660,8 @@ class _AllocationScreenState extends State<AllocationScreen>
                     Container(
                       height: 200,
                       decoration: BoxDecoration(
-                        border: Border.all(color: AppColors.charcoal.withValues(alpha: 0.2)),
+                        border: Border.all(
+                            color: AppColors.charcoal.withValues(alpha: 0.2)),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: ListView.builder(
@@ -767,9 +770,11 @@ class _AllocationScreenState extends State<AllocationScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline, size: 64, color: AppColors.error),
+                const Icon(Icons.error_outline,
+                    size: 64, color: AppColors.error),
                 const SizedBox(height: 16),
-                Text('Error loading allocations', style: LumiTextStyles.bodyLarge()),
+                Text('Error loading allocations',
+                    style: LumiTextStyles.bodyLarge()),
                 const SizedBox(height: 8),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -809,8 +814,8 @@ class _AllocationScreenState extends State<AllocationScreen>
                 Text(
                   'No active allocations',
                   style: LumiTextStyles.bodyLarge().copyWith(
-                        color: AppColors.charcoal.withValues(alpha: 0.6),
-                      ),
+                    color: AppColors.charcoal.withValues(alpha: 0.6),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 LumiTextButton(
@@ -928,140 +933,144 @@ class _AllocationCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _getAllocationTitle(allocation),
-                        style:
-                            LumiTextStyles.bodyLarge().copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _getAllocationTitle(allocation),
+                          style: LumiTextStyles.bodyLarge().copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${allocation.targetMinutes} minutes · ${_getCadenceLabel(allocation.cadence)}',
+                          style: LumiTextStyles.bodySmall().copyWith(
+                            color: AppColors.charcoal.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'edit') {
+                        onEdit();
+                      } else if (value == 'delete') {
+                        onDelete();
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Text('Edit'),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${allocation.targetMinutes} minutes · ${_getCadenceLabel(allocation.cadence)}',
-                        style: LumiTextStyles.bodySmall().copyWith(
-                              color: AppColors.charcoal.withValues(alpha: 0.6),
-                            ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Text('Delete'),
                       ),
                     ],
                   ),
-                ),
-                PopupMenuButton<String>(
-                  onSelected: (value) {
-                    if (value == 'edit') {
-                      onEdit();
-                    } else if (value == 'delete') {
-                      onDelete();
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Text('Edit'),
-                    ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Text('Delete'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Date range
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: isExpiring
-                    ? AppColors.warning.withValues(alpha: 0.1)
-                    : AppColors.charcoal.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.calendar_today,
-                    size: 16,
-                    color: isExpiring ? AppColors.warning : AppColors.charcoal.withValues(alpha: 0.6),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${DateFormat('MMM dd').format(allocation.startDate)} - ${DateFormat('MMM dd').format(allocation.endDate)}',
-                    style: LumiTextStyles.bodySmall().copyWith(
-                          color:
-                              isExpiring ? AppColors.warning : AppColors.charcoal.withValues(alpha: 0.6),
-                        ),
-                  ),
-                  if (isExpiring) ...[
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.warning,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'Expires soon',
-                        style: LumiTextStyles.caption().copyWith(
-                              color: AppColors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                    ),
-                  ],
                 ],
               ),
-            ),
+              const SizedBox(height: 12),
 
-            const SizedBox(height: 12),
-
-            // Students
-            Row(
-              children: [
-                Icon(Icons.groups, size: 16, color: AppColors.charcoal.withValues(alpha: 0.6)),
-                const SizedBox(width: 8),
-                Text(
-                  allocation.isForWholeClass
-                      ? 'Whole class'
-                      : '${allocation.studentIds.length} students',
-                  style: LumiTextStyles.bodySmall().copyWith(
-                        color: AppColors.charcoal.withValues(alpha: 0.6),
-                      ),
+              // Date range
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isExpiring
+                      ? AppColors.warning.withValues(alpha: 0.1)
+                      : AppColors.charcoal.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              ],
-            ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_today,
+                      size: 16,
+                      color: isExpiring
+                          ? AppColors.warning
+                          : AppColors.charcoal.withValues(alpha: 0.6),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${DateFormat('MMM dd').format(allocation.startDate)} - ${DateFormat('MMM dd').format(allocation.endDate)}',
+                      style: LumiTextStyles.bodySmall().copyWith(
+                        color: isExpiring
+                            ? AppColors.warning
+                            : AppColors.charcoal.withValues(alpha: 0.6),
+                      ),
+                    ),
+                    if (isExpiring) ...[
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          'Expires soon',
+                          style: LumiTextStyles.caption().copyWith(
+                            color: AppColors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
 
-            if (allocation.isRecurring) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
+
+              // Students
               Row(
                 children: [
-                  Icon(
-                    Icons.repeat,
-                    size: 16,
-                    color: AppColors.secondaryGreen,
-                  ),
+                  Icon(Icons.groups,
+                      size: 16,
+                      color: AppColors.charcoal.withValues(alpha: 0.6)),
                   const SizedBox(width: 8),
                   Text(
-                    'Recurring',
+                    allocation.isForWholeClass
+                        ? 'Whole class'
+                        : '${allocation.studentIds.length} students',
                     style: LumiTextStyles.bodySmall().copyWith(
-                          color: AppColors.secondaryGreen,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      color: AppColors.charcoal.withValues(alpha: 0.6),
+                    ),
                   ),
                 ],
               ),
+
+              if (allocation.isRecurring) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.repeat,
+                      size: 16,
+                      color: AppColors.secondaryGreen,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Recurring',
+                      style: LumiTextStyles.bodySmall().copyWith(
+                        color: AppColors.secondaryGreen,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
-          ],
+          ),
         ),
-      ),
       ),
     );
   }

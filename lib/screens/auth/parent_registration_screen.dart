@@ -149,10 +149,10 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
                 });
                 return;
               }
-              throw signInError;
+              rethrow;
             }
           } else {
-            throw e;
+            rethrow;
           }
         }
 
@@ -420,13 +420,12 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
                   ),
                   FormBuilderValidators.match(
                     RegExp(r'^[A-Z0-9]{8}$'),
-                    errorText: 'Code must be 8 characters (letters and numbers)',
+                    errorText:
+                        'Code must be 8 characters (letters and numbers)',
                   ),
                 ]),
               ).animate().fadeIn(delay: 200.ms, duration: 500.ms),
-
               LumiGap.m,
-
               LumiPrimaryButton(
                 onPressed: _isLoading ? null : _verifyCode,
                 isLoading: _isLoading,
@@ -533,9 +532,7 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
                 ),
                 validator: FormBuilderValidators.required(),
               ).animate().fadeIn(delay: 200.ms, duration: 500.ms),
-
               LumiGap.s,
-
               FormBuilderTextField(
                 name: 'email',
                 decoration: InputDecoration(
@@ -557,9 +554,7 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
                   FormBuilderValidators.email(),
                 ]),
               ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
-
               LumiGap.s,
-
               FormBuilderTextField(
                 name: 'password',
                 decoration: InputDecoration(
@@ -585,9 +580,7 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
                   FormBuilderValidators.minLength(8),
                 ]),
               ).animate().fadeIn(delay: 400.ms, duration: 500.ms),
-
               LumiGap.s,
-
               FormBuilderTextField(
                 name: 'passwordConfirm',
                 decoration: InputDecoration(
@@ -595,7 +588,8 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
                   labelStyle: LumiTextStyles.body(
                     color: AppColors.charcoal.withValues(alpha: 0.7),
                   ),
-                  prefixIcon: Icon(Icons.lock_outline, color: AppColors.charcoal),
+                  prefixIcon:
+                      Icon(Icons.lock_outline, color: AppColors.charcoal),
                   border: OutlineInputBorder(borderRadius: LumiBorders.medium),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: LumiBorders.medium,
@@ -613,9 +607,7 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
                   return null;
                 },
               ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
-
               LumiGap.l,
-
               LumiPrimaryButton(
                 onPressed: _isLoading ? null : _completeRegistration,
                 isLoading: _isLoading,
@@ -639,17 +631,13 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
             message: 'Welcome to the Lumi family!',
           ),
         ),
-
         LumiGap.l,
-
         Text(
           'You\'re All Set!',
           style: LumiTextStyles.h1(color: AppColors.success),
           textAlign: TextAlign.center,
         ),
-
         LumiGap.s,
-
         Text(
           'Your account has been created and linked to ${_studentInfo?['studentFullName']}.',
           style: LumiTextStyles.bodyLarge(
@@ -657,9 +645,7 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
           ),
           textAlign: TextAlign.center,
         ),
-
         LumiGap.xl,
-
         LumiPrimaryButton(
           onPressed: () async {
             // Fetch the user data before navigating
@@ -674,7 +660,8 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
 
               if (parentDoc.exists && mounted) {
                 final parentUser = UserModel.fromFirestore(parentDoc);
-                final homeRoute = AppRouter.getHomeRouteForRole(parentUser.role);
+                final homeRoute =
+                    AppRouter.getHomeRouteForRole(parentUser.role);
                 // ignore: invalid_use_of_internal_member
                 context.go(homeRoute, extra: parentUser);
               }
@@ -683,9 +670,7 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
           text: 'Start Logging Reading',
           isFullWidth: true,
         ),
-
         LumiGap.s,
-
         Container(
           padding: LumiPadding.allS,
           decoration: BoxDecoration(

@@ -1,5 +1,6 @@
 /// Custom exceptions for the parent-student linking process
 /// These provide user-friendly error messages for better UX
+library;
 
 abstract class LinkingException implements Exception {
   final String message;

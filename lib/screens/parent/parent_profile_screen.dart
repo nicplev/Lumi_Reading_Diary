@@ -232,7 +232,8 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                       children: _linkedChildren.map((child) {
                         return ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: AppColors.rosePink.withOpacity(0.1),
+                            backgroundColor:
+                                AppColors.rosePink.withOpacity(0.1),
                             child: Text(
                               child.firstName.isNotEmpty
                                   ? child.firstName[0].toUpperCase()
@@ -242,7 +243,8 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                               ),
                             ),
                           ),
-                          title: Text(child.fullName, style: LumiTextStyles.bodyMedium()),
+                          title: Text(child.fullName,
+                              style: LumiTextStyles.bodyMedium()),
                           subtitle: Text(
                             'Level: ${child.currentReadingLevel ?? "Not set"}',
                             style: LumiTextStyles.bodySmall(
@@ -307,8 +309,10 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
               child: Column(
                 children: [
                   SwitchListTile(
-                    title: Text('Daily Reminders', style: LumiTextStyles.bodyMedium()),
-                    subtitle: Text('Get reminded to log daily reading', style: LumiTextStyles.bodySmall()),
+                    title: Text('Daily Reminders',
+                        style: LumiTextStyles.bodyMedium()),
+                    subtitle: Text('Get reminded to log daily reading',
+                        style: LumiTextStyles.bodySmall()),
                     value: _notificationsEnabled,
                     onChanged: (value) {
                       setState(() {
@@ -316,15 +320,17 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                       });
                       _updatePreferences();
                     },
-                    activeColor: AppColors.rosePink,
+                    activeThumbColor: AppColors.rosePink,
                   ),
                   if (_notificationsEnabled) ...[
                     const Divider(height: 1),
                     ListTile(
-                      title: Text('Reminder Time', style: LumiTextStyles.bodyMedium()),
+                      title: Text('Reminder Time',
+                          style: LumiTextStyles.bodyMedium()),
                       subtitle: Text(
                         _reminderTime.format(context),
-                        style: LumiTextStyles.bodySmall(color: AppColors.rosePink),
+                        style:
+                            LumiTextStyles.bodySmall(color: AppColors.rosePink),
                       ),
                       trailing: const Icon(Icons.access_time),
                       onTap: () async {
@@ -356,7 +362,8 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                   ListTile(
                     leading: const Icon(Icons.language),
                     title: Text('Language', style: LumiTextStyles.bodyMedium()),
-                    subtitle: Text('English', style: LumiTextStyles.bodySmall()),
+                    subtitle:
+                        Text('English', style: LumiTextStyles.bodySmall()),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       // Navigate to language settings
@@ -365,7 +372,8 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.help_outline),
-                    title: Text('Help & Support', style: LumiTextStyles.bodyMedium()),
+                    title: Text('Help & Support',
+                        style: LumiTextStyles.bodyMedium()),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       // Navigate to help
@@ -374,7 +382,8 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.privacy_tip_outlined),
-                    title: Text('Privacy Policy', style: LumiTextStyles.bodyMedium()),
+                    title: Text('Privacy Policy',
+                        style: LumiTextStyles.bodyMedium()),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       // Navigate to privacy policy
@@ -383,7 +392,8 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.info_outline),
-                    title: Text('About Lumi', style: LumiTextStyles.bodyMedium()),
+                    title:
+                        Text('About Lumi', style: LumiTextStyles.bodyMedium()),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       _showAboutDialog();
@@ -405,7 +415,8 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                         color: AppColors.rosePink),
                     title: Text(
                       'Enter Invite Code',
-                      style: LumiTextStyles.bodyMedium(color: AppColors.rosePink),
+                      style:
+                          LumiTextStyles.bodyMedium(color: AppColors.rosePink),
                     ),
                     trailing: const Icon(Icons.chevron_right,
                         color: AppColors.rosePink),
