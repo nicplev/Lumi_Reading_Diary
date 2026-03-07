@@ -1,11 +1,14 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/allocation_model.dart';
+import '../../data/models/reading_log_model.dart';
+import '../../data/providers/user_provider.dart';
 import '../../services/firebase_service.dart';
 import '../services/navigation_state_service.dart';
 import '../../screens/auth/splash_screen.dart';
@@ -24,12 +27,14 @@ import '../../screens/parent/offline_management_screen.dart';
 import '../../screens/parent/student_report_screen.dart';
 import '../../screens/parent/parent_profile_screen.dart';
 import '../../screens/parent/book_browser_screen.dart';
+import '../../screens/parent/reading_success_screen.dart';
 import '../../screens/teacher/teacher_home_screen.dart';
 import '../../screens/teacher/allocation_screen.dart';
 import '../../screens/teacher/class_detail_screen.dart';
 import '../../screens/teacher/reading_groups_screen.dart';
 import '../../screens/teacher/class_report_screen.dart';
 import '../../screens/teacher/teacher_profile_screen.dart';
+import '../../screens/teacher/student_detail_screen.dart';
 import '../../screens/admin/admin_home_screen.dart';
 import '../../screens/admin/user_management_screen.dart';
 import '../../screens/admin/student_management_screen.dart';
@@ -43,33 +48,81 @@ import '../../screens/onboarding/demo_request_screen.dart';
 import '../../screens/marketing/landing_screen.dart';
 import '../../screens/design_system_demo_screen.dart';
 
+final routerProvider = Provider<GoRouter>((ref) {
+  final appRouter = AppRouter(ref);
+  return appRouter.router;
+});
+
 /// Global navigation key for GoRouter
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 /// App router configuration with role-based guards and deep linking
 class AppRouter {
-  static final FirebaseService _firebaseService = FirebaseService.instance;
+  final Ref _ref;
 
-  /// Main GoRouter instance
-  static final GoRouter router = GoRouter(
+  AppRouter(this._ref);
+
+  late final GoRouter router = GoRouter(
     navigatorKey: rootNavigatorKey,
     debugLogDiagnostics: true,
     initialLocation: '/splash',
 
-    // Global redirect handler for authentication
+    // Global redirect handler for authentication and authorization
     redirect: (context, state) async {
-      final isLoggedIn = _firebaseService.auth.currentUser != null;
-      final isAuthRoute = state.matchedLocation.startsWith('/auth') ||
-          state.matchedLocation == '/splash';
+      final location = state.matchedLocation;
+      final firebaseService = _ref.read(firebaseServiceProvider);
+      final isLoggedIn = firebaseService.auth.currentUser != null;
 
-      // Allow splash and auth routes
-      if (state.matchedLocation == '/splash' || isAuthRoute) {
+      // Public routes: accessible without authentication
+      final isPublicRoute = location == '/splash' ||
+          location.startsWith('/auth') ||
+          location == '/landing' ||
+          location.startsWith('/onboarding');
+
+      if (isPublicRoute) {
         return null;
       }
 
-      // Redirect to login if not authenticated
+      // Dev routes: block in production (design-system-demo)
+      if (location == '/design-system-demo') {
+        if (!isLoggedIn) return '/auth/login';
+        // Only allow admin access to design system demo
+        final userModel = await _ref.read(userProvider.future);
+        if (userModel == null || userModel.role != UserRole.schoolAdmin) {
+          return '/auth/login';
+        }
+        return null;
+      }
+
+      // All remaining routes require authentication
       if (!isLoggedIn) {
         return '/auth/login';
+      }
+
+      // Always verify the user's role from the server-side provider
+      // Never trust client-side state.extra for authorization decisions
+      UserModel? userModel = await _ref.read(userProvider.future);
+
+      if (userModel == null) {
+        return '/auth/login';
+      }
+
+      final userRole = userModel.role;
+
+      // Web platform check: parent app is mobile-only
+      if (kIsWeb && userRole == UserRole.parent && location.startsWith('/parent')) {
+        return '/auth/web-not-available';
+      }
+
+      // Role-based route protection
+      if (location.startsWith('/parent') && userRole != UserRole.parent) {
+        return getHomeRouteForRole(userRole);
+      }
+      if (location.startsWith('/teacher') && userRole != UserRole.teacher) {
+        return getHomeRouteForRole(userRole);
+      }
+      if (location.startsWith('/admin') && userRole != UserRole.schoolAdmin) {
+        return getHomeRouteForRole(userRole);
       }
 
       return null;
@@ -154,16 +207,9 @@ class AppRouter {
       GoRoute(
         path: '/parent/home',
         name: 'parent-home',
-        redirect: (context, state) => _requireRole(UserRole.parent),
         builder: (context, state) {
           final user = state.extra as UserModel?;
           if (user == null) return const LoginScreen();
-
-          // Check if parent is accessing from web
-          if (kIsWeb) {
-            return const WebNotAvailableScreen();
-          }
-
           return ParentHomeScreen(user: user);
         },
       ),
@@ -171,21 +217,13 @@ class AppRouter {
       GoRoute(
         path: '/parent/log-reading',
         name: 'log-reading',
-        redirect: (context, state) => _requireRole(UserRole.parent),
         builder: (context, state) {
-          // Try to get data from navigation service first
           final tempData = NavigationStateService().getTempData();
-
-          debugPrint('DEBUG: log-reading route - tempData: $tempData');
-
           final parent = tempData?['parent'] as UserModel?;
           final student = tempData?['student'] as StudentModel?;
           final allocation = tempData?['allocation'] as AllocationModel?;
 
-          debugPrint('DEBUG: parent: ${parent?.id}, student: ${student?.id}, allocation: ${allocation?.id}');
-
           if (parent == null || student == null) {
-            debugPrint('DEBUG: parent or student is null, redirecting to login');
             return const LoginScreen();
           }
 
@@ -200,7 +238,6 @@ class AppRouter {
       GoRoute(
         path: '/parent/reading-history',
         name: 'reading-history',
-        redirect: (context, state) => _requireRole(UserRole.parent),
         builder: (context, state) {
           final params = state.extra as Map<String, dynamic>?;
           final student = params?['student'] as StudentModel?;
@@ -216,7 +253,6 @@ class AppRouter {
       GoRoute(
         path: '/parent/student-goals',
         name: 'student-goals',
-        redirect: (context, state) => _requireRole(UserRole.parent),
         builder: (context, state) {
           final params = state.extra as Map<String, dynamic>?;
           final student = params?['student'] as StudentModel?;
@@ -230,7 +266,6 @@ class AppRouter {
       GoRoute(
         path: '/parent/achievements',
         name: 'achievements',
-        redirect: (context, state) => _requireRole(UserRole.parent),
         builder: (context, state) {
           final params = state.extra as Map<String, dynamic>?;
           final student = params?['student'] as StudentModel?;
@@ -245,7 +280,6 @@ class AppRouter {
       GoRoute(
         path: '/parent/reminder-settings',
         name: 'reminder-settings',
-        redirect: (context, state) => _requireRole(UserRole.parent),
         builder: (context, state) {
           final params = state.extra as Map<String, dynamic>?;
           final studentName = params?['studentName'] as String? ?? 'Student';
@@ -256,7 +290,6 @@ class AppRouter {
       GoRoute(
         path: '/parent/offline-management',
         name: 'offline-management',
-        redirect: (context, state) => _requireRole(UserRole.parent),
         builder: (context, state) {
           return const OfflineManagementScreen();
         },
@@ -265,7 +298,6 @@ class AppRouter {
       GoRoute(
         path: '/parent/student-report',
         name: 'student-report',
-        redirect: (context, state) => _requireRole(UserRole.parent),
         builder: (context, state) {
           final params = state.extra as Map<String, dynamic>?;
           final student = params?['student'] as StudentModel?;
@@ -279,17 +311,16 @@ class AppRouter {
       GoRoute(
         path: '/parent/profile',
         name: 'parent-profile',
-        redirect: (context, state) => _requireRole(UserRole.parent),
         builder: (context, state) {
           final user = state.extra as UserModel?;
-          return ParentProfileScreen(user: user!);
+          if (user == null) return const LoginScreen();
+          return ParentProfileScreen(user: user);
         },
       ),
 
       GoRoute(
         path: '/parent/book-browser',
         name: 'book-browser',
-        redirect: (context, state) => _requireRole(UserRole.parent),
         builder: (context, state) {
           final params = state.extra as Map<String, dynamic>?;
           final student = params?['student'] as StudentModel?;
@@ -300,13 +331,33 @@ class AppRouter {
         },
       ),
 
+      GoRoute(
+        path: '/parent/reading-success',
+        name: 'reading-success',
+        builder: (context, state) {
+          final params = state.extra as Map<String, dynamic>?;
+          final student = params?['student'] as StudentModel?;
+          final parent = params?['parent'] as UserModel?;
+          final readingLog = params?['readingLog'] as ReadingLogModel?;
+          final updatedStats = params?['updatedStats'] as Map<String, dynamic>?;
+          if (student == null || parent == null || readingLog == null) {
+            return const LoginScreen();
+          }
+          return ReadingSuccessScreen(
+            student: student,
+            parent: parent,
+            readingLog: readingLog,
+            updatedStats: updatedStats,
+          );
+        },
+      ),
+
       // ============================================
       // TEACHER ROUTES
       // ============================================
       GoRoute(
         path: '/teacher/home',
         name: 'teacher-home',
-        redirect: (context, state) => _requireRole(UserRole.teacher),
         builder: (context, state) {
           final user = state.extra as UserModel?;
           if (user == null) return const LoginScreen();
@@ -317,7 +368,6 @@ class AppRouter {
       GoRoute(
         path: '/teacher/allocation',
         name: 'allocation',
-        redirect: (context, state) => _requireRole(UserRole.teacher),
         builder: (context, state) {
           final params = state.extra as Map<String, dynamic>?;
           final teacher = params?['teacher'] as UserModel?;
@@ -332,7 +382,6 @@ class AppRouter {
       GoRoute(
         path: '/teacher/class-detail/:classId',
         name: 'class-detail',
-        redirect: (context, state) => _requireRole(UserRole.teacher),
         builder: (context, state) {
           final params = state.extra as Map<String, dynamic>?;
           final teacher = params?['teacher'] as UserModel?;
@@ -348,7 +397,6 @@ class AppRouter {
       GoRoute(
         path: '/teacher/reading-groups',
         name: 'reading-groups',
-        redirect: (context, state) => _requireRole(UserRole.teacher),
         builder: (context, state) {
           final params = state.extra as Map<String, dynamic>?;
           final classModel = params?['classModel'] as ClassModel?;
@@ -362,7 +410,6 @@ class AppRouter {
       GoRoute(
         path: '/teacher/class-report',
         name: 'class-report',
-        redirect: (context, state) => _requireRole(UserRole.teacher),
         builder: (context, state) {
           final params = state.extra as Map<String, dynamic>?;
           final classModel = params?['classModel'] as ClassModel?;
@@ -376,10 +423,25 @@ class AppRouter {
       GoRoute(
         path: '/teacher/profile',
         name: 'teacher-profile',
-        redirect: (context, state) => _requireRole(UserRole.teacher),
         builder: (context, state) {
           final user = state.extra as UserModel?;
-          return TeacherProfileScreen(user: user!);
+          if (user == null) return const LoginScreen();
+          return TeacherProfileScreen(user: user);
+        },
+      ),
+
+      GoRoute(
+        path: '/teacher/student-detail/:studentId',
+        name: 'student-detail',
+        builder: (context, state) {
+          final params = state.extra as Map<String, dynamic>?;
+          final teacher = params?['teacher'] as UserModel?;
+          final student = params?['student'] as StudentModel?;
+          if (teacher == null || student == null) return const LoginScreen();
+          return StudentDetailScreen(
+            teacher: teacher,
+            student: student,
+          );
         },
       ),
 
@@ -389,7 +451,6 @@ class AppRouter {
       GoRoute(
         path: '/admin/home',
         name: 'admin-home',
-        redirect: (context, state) => _requireRole(UserRole.schoolAdmin),
         builder: (context, state) {
           final user = state.extra as UserModel?;
           if (user == null) return const LoginScreen();
@@ -400,7 +461,6 @@ class AppRouter {
       GoRoute(
         path: '/admin/user-management',
         name: 'user-management',
-        redirect: (context, state) => _requireRole(UserRole.schoolAdmin),
         builder: (context, state) {
           final user = state.extra as UserModel?;
           if (user == null) return const LoginScreen();
@@ -411,7 +471,6 @@ class AppRouter {
       GoRoute(
         path: '/admin/student-management',
         name: 'student-management',
-        redirect: (context, state) => _requireRole(UserRole.schoolAdmin),
         builder: (context, state) {
           final params = state.extra as Map<String, dynamic>?;
           final adminUser = params?['adminUser'] as UserModel?;
@@ -427,7 +486,6 @@ class AppRouter {
       GoRoute(
         path: '/admin/class-management',
         name: 'class-management',
-        redirect: (context, state) => _requireRole(UserRole.schoolAdmin),
         builder: (context, state) {
           final user = state.extra as UserModel?;
           if (user == null) return const LoginScreen();
@@ -438,7 +496,6 @@ class AppRouter {
       GoRoute(
         path: '/admin/analytics',
         name: 'school-analytics',
-        redirect: (context, state) => _requireRole(UserRole.schoolAdmin),
         builder: (context, state) {
           final user = state.extra as UserModel?;
           if (user == null || user.schoolId == null) return const LoginScreen();
@@ -449,17 +506,16 @@ class AppRouter {
       GoRoute(
         path: '/admin/parent-linking',
         name: 'parent-linking',
-        redirect: (context, state) => _requireRole(UserRole.schoolAdmin),
         builder: (context, state) {
           final user = state.extra as UserModel?;
-          return ParentLinkingManagementScreen(user: user!);
+          if (user == null) return const LoginScreen();
+          return ParentLinkingManagementScreen(user: user);
         },
       ),
 
       GoRoute(
         path: '/admin/database-migration',
         name: 'database-migration',
-        redirect: (context, state) => _requireRole(UserRole.schoolAdmin),
         builder: (context, state) {
           final user = state.extra as UserModel?;
           if (user == null) return const LoginScreen();
@@ -499,22 +555,6 @@ class AppRouter {
       ),
     ),
   );
-
-  /// Role-based route guard
-  static String? _requireRole(UserRole requiredRole) {
-    final currentUser = _firebaseService.auth.currentUser;
-
-    if (currentUser == null) {
-      return '/auth/login';
-    }
-
-    // Note: In a real implementation, you'd need to fetch the user's role
-    // from Firestore here. For now, we return null (allow access).
-    // This could be enhanced with a StreamProvider or FutureProvider
-    // to cache the user's role in memory.
-
-    return null;
-  }
 
   /// Helper method to navigate to the appropriate home screen based on role
   static String getHomeRouteForRole(UserRole role) {

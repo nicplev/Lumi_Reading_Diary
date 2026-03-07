@@ -10,11 +10,12 @@ import '../../core/theme/lumi_text_styles.dart';
 import '../../core/theme/lumi_spacing.dart';
 import '../../core/theme/lumi_borders.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
-import '../../core/widgets/lumi/lumi_card.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../core/routing/app_router.dart';
 import '../../services/parent_linking_service.dart';
 import '../../core/services/user_school_index_service.dart';
+import '../../services/analytics_service.dart';
+import '../../services/crash_reporting_service.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_link_code_model.dart';
 import '../../core/exceptions/linking_exceptions.dart';
@@ -31,7 +32,6 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
   final _codeFormKey = GlobalKey<FormBuilderState>();
   final _registrationFormKey = GlobalKey<FormBuilderState>();
   final ParentLinkingService _linkingService = ParentLinkingService();
-  final UserSchoolIndexService _indexService = UserSchoolIndexService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -49,16 +49,19 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
       });
 
       final code = _codeFormKey.currentState!.value['code'] as String;
+      debugPrint('[ParentReg] Verifying code: $code');
 
       try {
         // Verify the code - this now throws custom exceptions
         final linkCode = await _linkingService.verifyCode(code);
+        debugPrint('[ParentReg] Code verified: schoolId=${linkCode.schoolId}, studentId=${linkCode.studentId}');
 
         // Use student info from link code metadata
         // This avoids needing read permissions on students collection
         final studentInfo = linkCode.metadata ?? {};
+        debugPrint('[ParentReg] Student metadata: $studentInfo');
         if (studentInfo.isEmpty) {
-          throw Exception('Student information not found in code.');
+          throw Exception('Student information not found in code. The code may have been created before metadata was supported.');
         }
 
         setState(() {
@@ -66,15 +69,32 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
           _studentInfo = studentInfo;
           _currentStep = 1;
         });
+        AnalyticsService.instance.logParentCodeVerified();
+        CrashReportingService.instance
+            .setCustomKey('parent_link_code_verified', true);
       } on LinkingException catch (e) {
-        // Use the user-friendly message from custom exceptions
+        debugPrint('[ParentReg] LinkingException during verify: ${e.runtimeType} - ${e.userMessage}');
         setState(() {
           _errorMessage = e.userMessage;
         });
+        AnalyticsService.instance
+            .logParentLinkingFailed(reason: e.runtimeType.toString());
       } catch (e) {
+        debugPrint('[ParentReg] Unexpected error during verify: $e (${e.runtimeType})');
+        String errorDetail = e.toString().replaceAll('Exception: ', '');
+        if (errorDetail.contains('permission-denied')) {
+          errorDetail = 'Permission denied reading student link codes. Please contact support.';
+        }
         setState(() {
-          _errorMessage = e.toString().replaceAll('Exception: ', '');
+          _errorMessage = errorDetail;
         });
+        AnalyticsService.instance
+            .logParentLinkingFailed(reason: errorDetail);
+        CrashReportingService.instance.recordError(
+          e,
+          StackTrace.current,
+          reason: 'Parent code verification failed',
+        );
       } finally {
         setState(() {
           _isLoading = false;
@@ -91,15 +111,17 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
       });
 
       final values = _registrationFormKey.currentState!.value;
-      final email = values['email'] as String;
+      final email = (values['email'] as String).trim().toLowerCase();
       final password = values['password'] as String;
-      final fullName = values['fullName'] as String;
+      final fullName = (values['fullName'] as String).trim();
 
       try {
+        final indexService = UserSchoolIndexService();
         String userId;
         bool isNewAccount = false;
 
         // 1. Try to create Firebase Auth user (with idempotency support)
+        debugPrint('[ParentReg] Step 1: Creating Firebase Auth account for $email');
         try {
           final userCredential = await _auth.createUserWithEmailAndPassword(
             email: email,
@@ -107,15 +129,21 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
           );
           userId = userCredential.user!.uid;
           isNewAccount = true;
+          debugPrint('[ParentReg] Auth account created: $userId');
+          // Send email verification
+          await userCredential.user!.sendEmailVerification();
         } on FirebaseAuthException catch (e) {
+          debugPrint('[ParentReg] Auth error: ${e.code} - ${e.message}');
           if (e.code == 'email-already-in-use') {
             // Account exists - try to sign in and resume linking
             try {
+              debugPrint('[ParentReg] Account exists, attempting sign-in...');
               final userCredential = await _auth.signInWithEmailAndPassword(
                 email: email,
                 password: password,
               );
               userId = userCredential.user!.uid;
+              debugPrint('[ParentReg] Signed in to existing account: $userId');
 
               // Check if this user is already fully registered
               final existingParent = await _firestore
@@ -142,7 +170,9 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
                 // Parent exists but not linked to this student - continue with linking
               }
             } on FirebaseAuthException catch (signInError) {
-              if (signInError.code == 'wrong-password') {
+              debugPrint('[ParentReg] Sign-in error: ${signInError.code}');
+              if (signInError.code == 'wrong-password' ||
+                  signInError.code == 'invalid-credential') {
                 setState(() {
                   _errorMessage =
                       'This email is already registered with a different password. If this is your account, please login instead.';
@@ -157,6 +187,7 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
         }
 
         // 2. Create or update parent user document
+        debugPrint('[ParentReg] Step 2: Creating parent document in schools/${_verifiedCode!.schoolId}/parents/$userId');
         final parentRef = _firestore
             .collection('schools')
             .doc(_verifiedCode!.schoolId)
@@ -164,6 +195,7 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
             .doc(userId);
 
         final existingDoc = await parentRef.get();
+        debugPrint('[ParentReg] Parent doc exists: ${existingDoc.exists}, isNewAccount: $isNewAccount');
 
         if (!existingDoc.exists) {
           // Create new parent document if it doesn't exist
@@ -178,26 +210,38 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
             isActive: true,
           );
 
+          debugPrint('[ParentReg] Writing new parent document...');
           await parentRef.set(parentUser.toFirestore());
+          debugPrint('[ParentReg] Parent document created');
 
           // Increment parent count on school document
-          await _firestore
-              .collection('schools')
-              .doc(_verifiedCode!.schoolId)
-              .update({
-            'parentCount': FieldValue.increment(1),
-          });
+          debugPrint('[ParentReg] Incrementing parent count on school...');
+          try {
+            await _firestore
+                .collection('schools')
+                .doc(_verifiedCode!.schoolId)
+                .update({
+              'parentCount': FieldValue.increment(1),
+            });
+            debugPrint('[ParentReg] School parent count incremented');
+          } catch (e) {
+            // Non-critical — log and continue
+            debugPrint('[ParentReg] Warning: Could not increment parent count: $e');
+          }
 
           // Create email-to-school index for fast login lookups
-          await _indexService.createOrUpdateIndex(
+          debugPrint('[ParentReg] Creating email-to-school index...');
+          await indexService.createOrUpdateIndex(
             email: email,
             schoolId: _verifiedCode!.schoolId,
             userType: 'parent',
             userId: userId,
           );
+          debugPrint('[ParentReg] Index created');
         } else if (isNewAccount) {
           // If this is a new Firebase Auth account but parent doc exists,
           // update it with the new student (edge case: account was re-created)
+          debugPrint('[ParentReg] Updating existing parent document with new student link...');
           await parentRef.update({
             'fullName': fullName,
             'email': email,
@@ -205,7 +249,7 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
           });
 
           // Update email-to-school index (in case email changed)
-          await _indexService.createOrUpdateIndex(
+          await indexService.createOrUpdateIndex(
             email: email,
             schoolId: _verifiedCode!.schoolId,
             userType: 'parent',
@@ -214,48 +258,79 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
         }
 
         // 3. Link parent to student (uses atomic transaction)
+        debugPrint('[ParentReg] Step 3: Linking parent to student via transaction...');
         try {
           await _linkingService.linkParentToStudent(
             code: _verifiedCode!.code,
             parentUserId: userId,
             parentEmail: email,
           );
+          debugPrint('[ParentReg] Parent linked to student successfully');
         } on AlreadyLinkedException {
+          debugPrint('[ParentReg] Parent already linked — treating as success');
           // This is actually success - user is already linked
           // Proceed to success screen
         }
 
         // 4. Move to success step
+        debugPrint('[ParentReg] Step 4: Registration complete!');
         setState(() {
           _currentStep = 2;
         });
+        AnalyticsService.instance.logParentLinkingCompleted();
+        CrashReportingService.instance
+            .setCustomKey('parent_linking_completed', true);
       } on LinkingException catch (e) {
-        // Use user-friendly messages from custom exceptions
+        debugPrint('[ParentReg] LinkingException: ${e.runtimeType} - ${e.userMessage}');
         setState(() {
           _errorMessage = e.userMessage;
         });
-        // Sign out if there was an error
+        AnalyticsService.instance
+            .logParentLinkingFailed(reason: e.runtimeType.toString());
         await _auth.signOut();
       } on FirebaseAuthException catch (e) {
+        debugPrint('[ParentReg] FirebaseAuthException: ${e.code} - ${e.message}');
         setState(() {
           _errorMessage = _getAuthErrorMessage(e.code);
         });
-        // Sign out if there was an error
+        AnalyticsService.instance
+            .logParentLinkingFailed(reason: e.code);
         await _auth.signOut();
-      } catch (e) {
-        // Log the actual error for debugging
-        print('Parent registration error: $e');
-        print('Error type: ${e.runtimeType}');
+      } catch (e, stackTrace) {
+        debugPrint('[ParentReg] Unexpected error: $e');
+        debugPrint('[ParentReg] Error type: ${e.runtimeType}');
+        debugPrint('[ParentReg] Stack trace: $stackTrace');
+
+        // Show the actual error details so we can debug
+        String errorDetail = e.toString();
+        if (errorDetail.contains('permission-denied')) {
+          errorDetail = 'Firestore permission denied. The security rules may need updating for this operation.';
+        } else if (errorDetail.contains('not-found')) {
+          errorDetail = 'A required document was not found in the database.';
+        } else if (errorDetail.contains('unavailable')) {
+          errorDetail = 'Firebase is temporarily unavailable. Check your internet connection.';
+        }
+
         setState(() {
-          _errorMessage =
-              'An unexpected error occurred. Please try again or contact support.';
+          _errorMessage = 'Registration error: $errorDetail';
         });
+        AnalyticsService.instance
+            .logParentLinkingFailed(reason: errorDetail);
+        CrashReportingService.instance.recordError(
+          e,
+          stackTrace,
+          reason: 'Parent registration linking flow failed',
+        );
         // Sign out if there was an error
-        await _auth.signOut();
+        try {
+          await _auth.signOut();
+        } catch (_) {}
       } finally {
-        setState(() {
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     }
   }
@@ -577,7 +652,23 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
                 obscureText: true,
                 validator: FormBuilderValidators.compose([
                   FormBuilderValidators.required(),
-                  FormBuilderValidators.minLength(8),
+                  FormBuilderValidators.minLength(
+                    8,
+                    errorText: 'Password must be at least 8 characters',
+                  ),
+                  (value) {
+                    if (value == null) return null;
+                    if (!RegExp(r'[A-Z]').hasMatch(value)) {
+                      return 'Password must contain at least one uppercase letter';
+                    }
+                    if (!RegExp(r'[a-z]').hasMatch(value)) {
+                      return 'Password must contain at least one lowercase letter';
+                    }
+                    if (!RegExp(r'[0-9]').hasMatch(value)) {
+                      return 'Password must contain at least one number';
+                    }
+                    return null;
+                  },
                 ]),
               ).animate().fadeIn(delay: 400.ms, duration: 500.ms),
               LumiGap.s,

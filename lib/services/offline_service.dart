@@ -63,6 +63,21 @@ class OfflineService {
     }
   }
 
+  // Clear all cached data (call on logout)
+  Future<void> clearAllCaches() async {
+    try {
+      await _readingLogsBox.clear();
+      await _studentsBox.clear();
+      await _allocationsBox.clear();
+      await _pendingSyncBox.clear();
+      await _settingsBox.clear();
+      _syncQueue.clear();
+      debugPrint('All offline caches cleared');
+    } catch (e) {
+      debugPrint('Error clearing offline caches: $e');
+    }
+  }
+
   Future<void> _checkConnectivity() async {
     try {
       final results = await _connectivity.checkConnectivity();

@@ -36,13 +36,15 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormBuilderState>();
   final FirebaseService _firebaseService = FirebaseService.instance;
-  final UserSchoolIndexService _indexService = UserSchoolIndexService();
   final SchoolCodeService _schoolCodeService = SchoolCodeService();
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   String? _errorMessage;
-  UserRole _selectedRole = UserRole.parent;
+  UserRole _selectedRole = UserRole.teacher;
+
+  bool get _allowParentRegistrationFromThisScreen =>
+      widget.schoolId != null && widget.schoolId!.isNotEmpty;
 
   Future<void> _handleRegister() async {
     if (_formKey.currentState?.saveAndValidate() ?? false) {
@@ -52,12 +54,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       });
 
       final values = _formKey.currentState!.value;
-      final email = values['email'] as String;
+      final email = (values['email'] as String).trim().toLowerCase();
       final password = values['password'] as String;
-      final fullName = values['fullName'] as String;
+      final fullName = (values['fullName'] as String).trim();
 
       try {
-        print('🔷 [REGISTER] Starting registration for: $email, role: $_selectedRole');
+        final indexService = UserSchoolIndexService();
+        debugPrint('[REGISTER] Starting registration, role: $_selectedRole');
 
         // Determine school ID based on role
         late String schoolId;
@@ -66,10 +69,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         if (_selectedRole == UserRole.teacher) {
           // For teachers: Validate school code
           final schoolCode = values['schoolCode'] as String?;
-          print('🔷 [REGISTER] Teacher registration - School code: $schoolCode');
+          debugPrint('[REGISTER] Teacher registration - validating school code');
 
           if (schoolCode == null || schoolCode.isEmpty) {
-            print('❌ [REGISTER] School code is empty');
+            debugPrint('[REGISTER] School code is empty');
             setState(() {
               _errorMessage = 'School code is required for teachers';
             });
@@ -77,13 +80,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
           }
 
           try {
-            print('🔷 [REGISTER] Validating school code...');
+            debugPrint('[REGISTER] Validating school code...');
             final codeDetails = await _schoolCodeService.validateSchoolCode(schoolCode);
             schoolId = codeDetails['schoolId']!;
             schoolCodeId = codeDetails['codeId'];
-            print('✅ [REGISTER] School code validated! SchoolId: $schoolId, CodeId: $schoolCodeId');
+            debugPrint('[REGISTER] School code validated');
           } on SchoolCodeException catch (e) {
-            print('❌ [REGISTER] School code validation failed: ${e.message}');
+            debugPrint('[REGISTER] School code validation failed');
             setState(() {
               _errorMessage = e.message;
             });
@@ -92,10 +95,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         } else {
           // For parents: Use schoolId from URL parameter (if provided)
           final widgetSchoolId = widget.schoolId;
-          print('🔷 [REGISTER] Parent registration - SchoolId from URL: $widgetSchoolId');
+          debugPrint('[REGISTER] Parent registration');
 
           if (widgetSchoolId == null || widgetSchoolId.isEmpty) {
-            print('❌ [REGISTER] SchoolId is empty for parent');
+            debugPrint('[REGISTER] SchoolId is empty for parent');
             setState(() {
               _errorMessage = 'School ID is required. Please use the registration link provided by your school.';
             });
@@ -106,18 +109,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
         }
 
         // Create user with email and password
-        print('🔷 [REGISTER] Creating Firebase Auth user...');
+        debugPrint('[REGISTER] Creating Firebase Auth user...');
         final UserCredential userCredential = await _firebaseService.auth
             .createUserWithEmailAndPassword(
           email: email,
           password: password,
         );
-        print('✅ [REGISTER] Firebase Auth user created: ${userCredential.user?.uid}');
+        debugPrint('[REGISTER] Firebase Auth user created');
 
         if (userCredential.user != null) {
-          // Update display name
-          print('🔷 [REGISTER] Updating display name...');
+          // Update display name and send verification email
+          debugPrint('[REGISTER] Updating display name...');
           await userCredential.user!.updateDisplayName(fullName);
+          await _firebaseService.sendEmailVerification();
 
           // Create user document in Firestore
           final user = UserModel(
@@ -134,41 +138,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
           final String collectionName = _selectedRole == UserRole.parent ? 'parents' : 'users';
 
           // Write to nested school structure
-          print('🔷 [REGISTER] Creating Firestore document at: schools/$schoolId/$collectionName/${userCredential.user!.uid}');
+          debugPrint('[REGISTER] Creating Firestore document...');
           await _firebaseService.firestore
               .collection('schools')
               .doc(schoolId)
               .collection(collectionName)
               .doc(userCredential.user!.uid)
               .set(user.toFirestore());
-          print('✅ [REGISTER] Firestore document created');
+          debugPrint('[REGISTER] Firestore document created');
 
           // Increment appropriate counter on school document
           final counterField = _selectedRole == UserRole.parent ? 'parentCount' : 'teacherCount';
-          print('🔷 [REGISTER] Incrementing $counterField on school document...');
+          debugPrint('[REGISTER] Incrementing $counterField...');
           await _firebaseService.firestore
               .collection('schools')
               .doc(schoolId)
               .update({
             counterField: FieldValue.increment(1),
           });
-          print('✅ [REGISTER] Counter incremented');
+          debugPrint('[REGISTER] Counter incremented');
 
           // Create email-to-school index for fast login lookups
-          print('🔷 [REGISTER] Creating user school index...');
-          await _indexService.createOrUpdateIndex(
+          debugPrint('[REGISTER] Creating user school index...');
+          await indexService.createOrUpdateIndex(
             email: email,
             schoolId: schoolId,
             userType: collectionName == 'parents' ? 'parent' : 'user',
             userId: userCredential.user!.uid,
           );
-          print('✅ [REGISTER] User school index created');
+          debugPrint('[REGISTER] User school index created');
 
           // If teacher registration, increment school code usage count
           if (_selectedRole == UserRole.teacher && schoolCodeId != null) {
-            print('🔷 [REGISTER] Incrementing school code usage count...');
+            debugPrint('[REGISTER] Incrementing school code usage count...');
             await _schoolCodeService.incrementCodeUsage(schoolCodeId);
-            print('✅ [REGISTER] School code usage count incremented');
+            debugPrint('[REGISTER] School code usage count incremented');
           }
 
           // If there's an invite code, link the parent to children
@@ -192,13 +196,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
           }
         }
       } on FirebaseAuthException catch (e) {
-        print('❌ [REGISTER] Firebase Auth Exception: ${e.code} - ${e.message}');
+        debugPrint('[REGISTER] Firebase Auth Exception: ${e.code}');
         setState(() {
           _errorMessage = _getErrorMessage(e.code);
         });
       } catch (e, stackTrace) {
-        print('❌ [REGISTER] General Exception: $e');
-        print('❌ [REGISTER] Stack trace: $stackTrace');
+        debugPrint('[REGISTER] General Exception: $e');
+        debugPrint('[REGISTER] Stack trace: $stackTrace');
         setState(() {
           _errorMessage = 'An error occurred. Please try again.';
         });
@@ -294,7 +298,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       case 'invalid-email':
         return 'Please enter a valid email address.';
       case 'weak-password':
-        return 'Password should be at least 6 characters.';
+        return 'Password is too weak. Use at least 8 characters with uppercase, lowercase, and a number.';
       default:
         return 'An error occurred. Please try again.';
     }
@@ -387,16 +391,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       children: [
                         Expanded(
                           child: _RoleCard(
-                            role: UserRole.parent,
-                            isSelected: _selectedRole == UserRole.parent,
-                            onTap: () => setState(() {
-                              _selectedRole = UserRole.parent;
-                            }),
-                          ),
-                        ),
-                        LumiGap.xs,
-                        Expanded(
-                          child: _RoleCard(
                             role: UserRole.teacher,
                             isSelected: _selectedRole == UserRole.teacher,
                             onTap: () => setState(() {
@@ -404,8 +398,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             }),
                           ),
                         ),
+                        if (_allowParentRegistrationFromThisScreen) ...[
+                          LumiGap.xs,
+                          Expanded(
+                            child: _RoleCard(
+                              role: UserRole.parent,
+                              isSelected: _selectedRole == UserRole.parent,
+                              onTap: () => setState(() {
+                                _selectedRole = UserRole.parent;
+                              }),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
+                    if (!_allowParentRegistrationFromThisScreen) ...[
+                      LumiGap.xs,
+                      Text(
+                        'Parents should register from the login screen using "Parent? Register with Student Code".',
+                        style: LumiTextStyles.bodySmall(
+                          color: AppColors.charcoal.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
@@ -553,9 +568,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           errorText: 'Password is required',
                         ),
                         FormBuilderValidators.minLength(
-                          6,
-                          errorText: 'Password must be at least 6 characters',
+                          8,
+                          errorText: 'Password must be at least 8 characters',
                         ),
+                        (value) {
+                          if (value == null) return null;
+                          if (!RegExp(r'[A-Z]').hasMatch(value)) {
+                            return 'Password must contain at least one uppercase letter';
+                          }
+                          if (!RegExp(r'[a-z]').hasMatch(value)) {
+                            return 'Password must contain at least one lowercase letter';
+                          }
+                          if (!RegExp(r'[0-9]').hasMatch(value)) {
+                            return 'Password must contain at least one number';
+                          }
+                          return null;
+                        },
                       ]),
                     ).animate().fadeIn(delay: 600.ms, duration: 500.ms),
 

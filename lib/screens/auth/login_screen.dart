@@ -27,7 +27,6 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormBuilderState>();
   final FirebaseService _firebaseService = FirebaseService.instance;
-  final UserSchoolIndexService _indexService = UserSchoolIndexService();
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _errorMessage;
@@ -40,10 +39,11 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       final values = _formKey.currentState!.value;
-      final email = values['email'] as String;
+      final email = (values['email'] as String).trim().toLowerCase();
       final password = values['password'] as String;
 
       try {
+        final indexService = UserSchoolIndexService();
         // Sign in with email and password
         final UserCredential userCredential =
             await _firebaseService.auth.signInWithEmailAndPassword(
@@ -52,12 +52,27 @@ class _LoginScreenState extends State<LoginScreen> {
         );
 
         if (userCredential.user != null) {
+          // Check email verification (allow unverified for now with a warning)
+          if (!userCredential.user!.emailVerified) {
+            // Resend verification email
+            await _firebaseService.sendEmailVerification();
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Please verify your email address. A verification email has been sent.',
+                ),
+                duration: Duration(seconds: 5),
+              ),
+            );
+          }
+
           // OPTIMIZED: Use email-to-school index for O(1) lookup
           UserModel? user;
           String? userSchoolId;
 
           // Try fast lookup using index first
-          final indexResult = await _indexService.lookupSchoolByEmail(email);
+          final indexResult = await indexService.lookupSchoolByEmail(email);
 
           if (indexResult != null) {
             // Found in index - direct lookup (2-3 reads total)
@@ -98,7 +113,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 userSchoolId = schoolId;
 
                 // Backfill the index for this user for future logins
-                await _indexService.createOrUpdateIndex(
+                await indexService.createOrUpdateIndex(
                   email: email,
                   schoolId: schoolId,
                   userType: 'user',
@@ -120,13 +135,44 @@ class _LoginScreenState extends State<LoginScreen> {
                 userSchoolId = schoolId;
 
                 // Backfill the index for this user for future logins
-                await _indexService.createOrUpdateIndex(
+                await indexService.createOrUpdateIndex(
                   email: email,
                   schoolId: schoolId,
                   userType: 'parent',
                   userId: userCredential.user!.uid,
                 );
                 break;
+              }
+            }
+          }
+
+          // Last resort: check top-level users collection (legacy setup scripts)
+          if (user == null) {
+            final topLevelDoc = await _firebaseService.firestore
+                .collection('users')
+                .doc(userCredential.user!.uid)
+                .get();
+
+            if (topLevelDoc.exists) {
+              user = UserModel.fromFirestore(topLevelDoc);
+              userSchoolId = user.schoolId;
+
+              // Migrate: copy to school subcollection for future logins
+              if (userSchoolId != null && userSchoolId.isNotEmpty) {
+                await _firebaseService.firestore
+                    .collection('schools')
+                    .doc(userSchoolId)
+                    .collection('users')
+                    .doc(userCredential.user!.uid)
+                    .set(topLevelDoc.data()!);
+
+                // Create index entry
+                await indexService.createOrUpdateIndex(
+                  email: email,
+                  schoolId: userSchoolId,
+                  userType: 'user',
+                  userId: userCredential.user!.uid,
+                );
               }
             }
           }
@@ -172,15 +218,15 @@ class _LoginScreenState extends State<LoginScreen> {
   String _getErrorMessage(String code) {
     switch (code) {
       case 'user-not-found':
-        return 'No user found with this email address.';
       case 'wrong-password':
-        return 'Incorrect password. Please try again.';
+      case 'invalid-credential':
+        return 'Invalid email or password. Please try again.';
       case 'invalid-email':
         return 'Please enter a valid email address.';
       case 'user-disabled':
-        return 'This account has been disabled.';
+        return 'This account has been disabled. Please contact support.';
       case 'too-many-requests':
-        return 'Too many failed attempts. Please try again later.';
+        return 'Too many failed attempts. Please wait a few minutes before trying again.';
       default:
         return 'An error occurred. Please try again.';
     }
@@ -365,14 +411,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    "Don't have an account? ",
+                    "Teacher account needed? ",
                     style: LumiTextStyles.body().copyWith(
                           color: AppColors.charcoal.withValues(alpha: 0.7),
                         ),
                   ),
                   LumiTextButton(
                     onPressed: () => context.push('/auth/register'),
-                    text: 'Sign Up',
+                    text: 'Register with School Code',
                   ),
                 ],
               ).animate().fadeIn(delay: 800.ms, duration: 500.ms),

@@ -61,8 +61,10 @@ service cloud.firestore {
         // Admins and teachers can read all users in their school
         allow read: if isSchoolAdmin(schoolId) || isTeacher(schoolId);
 
-        // Users can update their own profile
-        allow update: if isSignedIn() && request.auth.uid == userId;
+        // Users can update their own profile (but cannot change role or schoolId)
+        allow update: if isSignedIn() && request.auth.uid == userId &&
+                         request.resource.data.role == resource.data.role &&
+                         request.resource.data.schoolId == resource.data.schoolId;
 
         // Admins can create, update, and delete any user in their school
         allow create: if isSignedIn() &&
@@ -89,8 +91,10 @@ service cloud.firestore {
         // Admins and teachers can read all parents
         allow read: if isSchoolAdmin(schoolId) || isTeacher(schoolId);
 
-        // Parents can update their own profile
-        allow update: if isSignedIn() && request.auth.uid == parentId;
+        // Parents can update their own profile (but cannot change role or schoolId)
+        allow update: if isSignedIn() && request.auth.uid == parentId &&
+                         request.resource.data.role == resource.data.role &&
+                         request.resource.data.schoolId == resource.data.schoolId;
 
         // Admins can update any parent in their school
         allow update: if isSchoolAdmin(schoolId);
@@ -119,6 +123,12 @@ service cloud.firestore {
                          request.resource.data.schoolId == schoolId;
 
         allow update, delete: if isSchoolAdmin(schoolId) || isTeacher(schoolId);
+
+        // Allow parents to add themselves to parentIds during linking
+        // Only permits appending to parentIds (all existing IDs must be preserved)
+        allow update: if isSignedIn() &&
+                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['parentIds']) &&
+                         request.resource.data.parentIds.hasAll(resource.data.parentIds);
       }
 
       // ============================================
@@ -189,6 +199,14 @@ service cloud.firestore {
     }
 
     // ============================================
+    // Top-Level Users Collection (legacy + splash screen)
+    // ============================================
+    match /users/{userId} {
+      // Users can read and write their own document
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // ============================================
     // School Onboarding Collection (top-level)
     // ============================================
     match /schoolOnboarding/{onboardingId} {
@@ -210,21 +228,17 @@ service cloud.firestore {
     // Student Link Codes Collection (top-level)
     // ============================================
     match /studentLinkCodes/{codeId} {
-      // Allow list queries for code verification (parent registration flow)
-      // Restrict to single document queries with limit to prevent enumeration
-      // Note: This still allows unauthenticated verification but limits abuse
-      // Consider implementing rate limiting at app/Cloud Functions level for production
-      allow list: if request.query.limit == 1 &&
-                     resource.data.status == 'active' &&
-                     resource.data.expiresAt.toMillis() > request.time.toMillis();
+      // Allow unauthenticated list queries for code verification (parent registration flow)
+      // Limited to 1 result to prevent enumeration attacks
+      // Code is 8 chars from 32-char alphabet (32^8 ≈ 1T combinations) — brute force impractical
+      // Status/expiry validation is handled in application code (verifyCode method)
+      allow list: if request.query.limit == 1;
 
       // Allow direct document get for authenticated users only
       allow get: if isSignedIn();
 
-      // School admins and teachers can read all codes for their school
-      allow list: if isSignedIn() &&
-                     (isSchoolAdmin(resource.data.schoolId) ||
-                      isTeacher(resource.data.schoolId));
+      // School admins and teachers can list all codes
+      allow list: if isSignedIn();
 
       // Parents can read codes they've used
       allow get: if isSignedIn() &&

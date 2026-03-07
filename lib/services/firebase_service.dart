@@ -1,3 +1,4 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -6,6 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 
 import '../firebase_options.dart';
+import 'offline_service.dart';
 
 class FirebaseService {
   static FirebaseService? _instance;
@@ -230,9 +232,49 @@ class FirebaseService {
     }
   }
 
-  // Sign out
+  // Clear FCM token from Firestore on logout
+  Future<void> _clearFCMToken() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        await _firestore.collection('users').doc(user.uid).update({
+          'fcmToken': FieldValue.delete(),
+          'fcmTokenUpdatedAt': FieldValue.delete(),
+        });
+      }
+    } catch (e) {
+      debugPrint('Error clearing FCM token: $e');
+    }
+  }
+
+  // Send email verification to current user
+  Future<void> sendEmailVerification() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null && !user.emailVerified) {
+        await user.sendEmailVerification();
+        debugPrint('Verification email sent');
+      }
+    } catch (e) {
+      debugPrint('Error sending verification email: $e');
+    }
+  }
+
+  // Check if current user's email is verified
+  Future<bool> isEmailVerified() async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    await user.reload();
+    return _auth.currentUser?.emailVerified ?? false;
+  }
+
+  // Sign out and clear local caches
   Future<void> signOut() async {
     try {
+      // Clear FCM token from Firestore before signing out
+      await _clearFCMToken();
+      // Clear offline caches
+      await OfflineService.instance.clearAllCaches();
       await _auth.signOut();
     } catch (e) {
       debugPrint('Error signing out: $e');
@@ -267,3 +309,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('Handling a background message: ${message.messageId}');
   // Handle background message
 }
+
+final firebaseServiceProvider = Provider<FirebaseService>((ref) {
+  return FirebaseService.instance;
+});
+
