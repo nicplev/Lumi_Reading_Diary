@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/lumi_text_styles.dart';
-import '../../core/theme/lumi_spacing.dart';
-import '../../core/theme/lumi_borders.dart';
-import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/theme/teacher_constants.dart';
 import '../../data/models/user_model.dart';
 import '../../utils/firestore_migration.dart';
 
@@ -51,38 +48,44 @@ class _DatabaseMigrationScreenState extends State<DatabaseMigrationScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: LumiBorders.shapeLarge,
-        title: Text('Start Database Migration', style: LumiTextStyles.h3()),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusL)),
+        title: Text('Start Database Migration', style: TeacherTypography.h3),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'This will migrate your database to the new nested structure.',
-              style: LumiTextStyles.body(),
+              style: TeacherTypography.bodyMedium,
             ),
-            LumiGap.s,
-            Text('Benefits of migration:', style: LumiTextStyles.bodyMedium()),
-            LumiGap.xs,
-            Text('• Better performance and scalability', style: LumiTextStyles.body()),
-            Text('• Simpler queries without complex indexes', style: LumiTextStyles.body()),
-            Text('• Improved data isolation per school', style: LumiTextStyles.body()),
-            Text('• Easier backup and export', style: LumiTextStyles.body()),
-            LumiGap.s,
+            const SizedBox(height: 8),
+            Text('Benefits of migration:', style: TeacherTypography.bodyMedium),
+            const SizedBox(height: 4),
+            Text('• Better performance and scalability', style: TeacherTypography.bodyMedium),
+            Text('• Simpler queries without complex indexes', style: TeacherTypography.bodyMedium),
+            Text('• Improved data isolation per school', style: TeacherTypography.bodyMedium),
+            Text('• Easier backup and export', style: TeacherTypography.bodyMedium),
+            const SizedBox(height: 8),
             Text(
               'Note: Old data will be preserved until you manually delete it.',
-              style: LumiTextStyles.body(color: AppColors.warning),
+              style: TeacherTypography.bodyMedium.copyWith(color: AppColors.warning),
             ),
           ],
         ),
         actions: [
-          LumiTextButton(
+          TextButton(
             onPressed: () => Navigator.pop(context, false),
-            text: 'Cancel',
+            child: Text('Cancel', style: TeacherTypography.bodyMedium.copyWith(color: AppColors.teacherPrimary)),
           ),
-          LumiPrimaryButton(
+          ElevatedButton.icon(
             onPressed: () => Navigator.pop(context, true),
-            text: 'Start Migration',
+            icon: const SizedBox.shrink(),
+            label: const Text('Start Migration'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.teacherPrimary,
+              foregroundColor: AppColors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+            ),
           ),
         ],
       ),
@@ -167,36 +170,42 @@ class _DatabaseMigrationScreenState extends State<DatabaseMigrationScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: LumiBorders.shapeLarge,
-        title: Text('⚠️ Delete Old Collections', style: LumiTextStyles.h3()),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusL)),
+        title: Text('⚠️ Delete Old Collections', style: TeacherTypography.h3),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               'WARNING: This will permanently delete all data from the old collections!',
-              style: LumiTextStyles.bodyMedium(color: AppColors.error),
+              style: TeacherTypography.bodyMedium.copyWith(color: AppColors.error),
             ),
-            LumiGap.s,
-            Text('Only do this after:', style: LumiTextStyles.body()),
-            Text('• Migration is complete', style: LumiTextStyles.body()),
-            Text('• Verification shows matching counts', style: LumiTextStyles.body()),
-            Text('• You have tested the app with new structure', style: LumiTextStyles.body()),
-            Text('• You have a backup of your data', style: LumiTextStyles.body()),
-            LumiGap.s,
+            const SizedBox(height: 8),
+            Text('Only do this after:', style: TeacherTypography.bodyMedium),
+            Text('• Migration is complete', style: TeacherTypography.bodyMedium),
+            Text('• Verification shows matching counts', style: TeacherTypography.bodyMedium),
+            Text('• You have tested the app with new structure', style: TeacherTypography.bodyMedium),
+            Text('• You have a backup of your data', style: TeacherTypography.bodyMedium),
+            const SizedBox(height: 8),
             Text(
               'This action CANNOT be undone!',
-              style: LumiTextStyles.bodyMedium(color: AppColors.error),
+              style: TeacherTypography.bodyMedium.copyWith(color: AppColors.error),
             ),
           ],
         ),
         actions: [
-          LumiTextButton(
+          TextButton(
             onPressed: () => Navigator.pop(context, false),
-            text: 'Cancel',
+            child: Text('Cancel', style: TeacherTypography.bodyMedium.copyWith(color: AppColors.teacherPrimary)),
           ),
-          LumiPrimaryButton(
+          ElevatedButton.icon(
             onPressed: () => Navigator.pop(context, true),
-            text: 'Delete Old Data',
+            icon: const SizedBox.shrink(),
+            label: const Text('Delete Old Data'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.teacherPrimary,
+              foregroundColor: AppColors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+            ),
           ),
         ],
       ),
@@ -208,21 +217,27 @@ class _DatabaseMigrationScreenState extends State<DatabaseMigrationScreen> {
     final doubleConfirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: LumiBorders.shapeLarge,
-        title: Text('Final Confirmation', style: LumiTextStyles.h3()),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusL)),
+        title: Text('Final Confirmation', style: TeacherTypography.h3),
         content: Text(
           'Are you ABSOLUTELY SURE you want to delete all old collections? '
           'Type "DELETE" to confirm.',
-          style: LumiTextStyles.body(),
+          style: TeacherTypography.bodyMedium,
         ),
         actions: [
-          LumiTextButton(
+          TextButton(
             onPressed: () => Navigator.pop(context, false),
-            text: 'Cancel',
+            child: Text('Cancel', style: TeacherTypography.bodyMedium.copyWith(color: AppColors.teacherPrimary)),
           ),
-          LumiPrimaryButton(
+          ElevatedButton.icon(
             onPressed: () => Navigator.pop(context, true),
-            text: 'DELETE',
+            icon: const SizedBox.shrink(),
+            label: const Text('DELETE'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.teacherPrimary,
+              foregroundColor: AppColors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+            ),
           ),
         ],
       ),
@@ -268,26 +283,26 @@ class _DatabaseMigrationScreenState extends State<DatabaseMigrationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.offWhite,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.teacherPrimary,
+        foregroundColor: AppColors.white,
         elevation: 0,
-        title: Text(
+        title: const Text(
           'Database Migration',
-          style: LumiTextStyles.h2(color: AppColors.charcoal),
+          style: TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.w700),
         ),
-        iconTheme: const IconThemeData(color: AppColors.charcoal),
       ),
       body: Column(
         children: [
           // Info Card
           Container(
             width: double.infinity,
-            margin: LumiPadding.allS,
-            padding: LumiPadding.allS,
+            margin: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: AppColors.info.withValues(alpha: 0.1),
-              borderRadius: LumiBorders.medium,
+              borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
               border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
             ),
             child: Column(
@@ -296,18 +311,18 @@ class _DatabaseMigrationScreenState extends State<DatabaseMigrationScreen> {
                 Row(
                   children: [
                     Icon(Icons.info_outline, color: AppColors.info, size: 20),
-                    LumiGap.xs,
+                    const SizedBox(height: 4),
                     Text(
                       'Database Structure Migration',
-                      style: LumiTextStyles.bodyMedium(color: AppColors.info),
+                      style: TeacherTypography.bodyMedium.copyWith(color: AppColors.info),
                     ),
                   ],
                 ),
-                LumiGap.xs,
+                const SizedBox(height: 4),
                 Text(
                   'This tool migrates your database from a flat structure to an optimized '
                   'nested structure for better performance and scalability.',
-                  style: LumiTextStyles.bodySmall(),
+                  style: TeacherTypography.bodySmall,
                 ),
               ],
             ),
@@ -315,34 +330,36 @@ class _DatabaseMigrationScreenState extends State<DatabaseMigrationScreen> {
 
           // Action Buttons
           Padding(
-            padding: LumiPadding.horizontalS,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(
               children: [
                 Expanded(
-                  child: LumiPrimaryButton(
-                    onPressed:
-                        _isMigrating || _isVerifying ? null : _startMigration,
-                    text: _isMigrating ? 'Migrating...' : 'Start Migration',
-                    icon: _migrationComplete
-                        ? Icons.check_circle
-                        : Icons.play_arrow,
-                    isLoading: _isMigrating,
-                    isFullWidth: true,
+                  child: ElevatedButton.icon(
+                    onPressed: (_isMigrating || _isVerifying) ? null : _startMigration,
+                    icon: _isMigrating
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: AppColors.white, strokeWidth: 2))
+                        : Icon(_migrationComplete ? Icons.check_circle : Icons.play_arrow),
+                    label: Text(_isMigrating ? 'Migrating...' : 'Start Migration'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.teacherPrimary,
+                      foregroundColor: AppColors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                    ),
                   ),
                 ),
-                LumiGap.xs,
+                const SizedBox(height: 4),
                 Expanded(
-                  child: LumiSecondaryButton(
-                    onPressed:
-                        (_isMigrating || _isVerifying || !_migrationComplete)
-                            ? null
-                            : _verifyMigration,
-                    text: _isVerifying ? 'Verifying...' : 'Verify Migration',
-                    icon: _verificationComplete
-                        ? Icons.check_circle
-                        : Icons.verified_user,
-                    isLoading: _isVerifying,
-                    isFullWidth: true,
+                  child: OutlinedButton.icon(
+                    onPressed: (_isMigrating || _isVerifying || !_migrationComplete) ? null : _verifyMigration,
+                    icon: _isVerifying
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: AppColors.teacherPrimary, strokeWidth: 2))
+                        : Icon(_verificationComplete ? Icons.check_circle : Icons.verified_user),
+                    label: Text(_isVerifying ? 'Verifying...' : 'Verify Migration'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.teacherPrimary,
+                      side: const BorderSide(color: AppColors.teacherPrimary),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                    ),
                   ),
                 ),
               ],
@@ -351,39 +368,44 @@ class _DatabaseMigrationScreenState extends State<DatabaseMigrationScreen> {
 
           if (_migrationComplete && _verificationComplete)
             Padding(
-              padding: LumiPadding.allS,
-              child: LumiPrimaryButton(
+              padding: const EdgeInsets.all(8),
+              child: ElevatedButton.icon(
                 onPressed: _cleanupOldData,
-                text: 'Delete Old Collections (Dangerous!)',
-                icon: Icons.delete_forever,
+                icon: const Icon(Icons.delete_forever),
+                label: const Text('Delete Old Collections (Dangerous!)'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.teacherPrimary,
+                  foregroundColor: AppColors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                ),
               ),
             ),
 
           // Logs Display
           Expanded(
             child: Container(
-              margin: LumiPadding.allS,
+              margin: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Colors.black87,
-                borderRadius: LumiBorders.small,
+                borderRadius: BorderRadius.circular(TeacherDimensions.radiusS),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: LumiPadding.allXS,
+                    padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
                       color: Colors.black,
                       borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(LumiBorders.radiusSmall),
-                        topRight: Radius.circular(LumiBorders.radiusSmall),
+                        topLeft: Radius.circular(TeacherDimensions.radiusS),
+                        topRight: Radius.circular(TeacherDimensions.radiusS),
                       ),
                     ),
                     child: Row(
                       children: [
                         Text(
                           'Migration Logs',
-                          style: LumiTextStyles.bodySmall(color: Colors.white70),
+                          style: TeacherTypography.bodySmall.copyWith(color: Colors.white70),
                         ),
                         const Spacer(),
                         if (_logs.isNotEmpty)
@@ -400,7 +422,7 @@ class _DatabaseMigrationScreenState extends State<DatabaseMigrationScreen> {
                   Expanded(
                     child: ListView.builder(
                       controller: _scrollController,
-                      padding: LumiPadding.allXS,
+                      padding: const EdgeInsets.all(4),
                       itemCount: _logs.length,
                       itemBuilder: (context, index) {
                         final log = _logs[index];
@@ -418,7 +440,8 @@ class _DatabaseMigrationScreenState extends State<DatabaseMigrationScreen> {
                           padding: const EdgeInsets.only(bottom: 4),
                           child: Text(
                             log,
-                            style: LumiTextStyles.bodySmall(color: textColor).copyWith(
+                            style: TeacherTypography.bodySmall.copyWith(
+                              color: textColor,
                               fontFamily: 'monospace',
                             ),
                           ),

@@ -8,9 +8,10 @@ import 'app_colors.dart';
 ///
 /// Radius Values:
 /// Small: 8pt  - Small elements, chips, tags
-/// Medium: 12pt - Buttons, inputs, most interactive elements
-/// Large: 16pt  - Cards, containers, modals
+/// Medium: 12pt - Inputs, most interactive elements
+/// Large: 20pt  - Cards, containers, modals
 /// XLarge: 24pt - Large modals, bottom sheets
+/// Pill: 28pt   - Primary/secondary buttons (pill shape)
 class LumiBorders {
   // ============================================
   // BORDER RADIUS VALUES
@@ -24,13 +25,17 @@ class LumiBorders {
   /// Usage: Primary buttons, inputs, most interactive elements
   static const double radiusMedium = 12.0;
 
-  /// Large radius - 16pt
+  /// Large radius - 20pt
   /// Usage: Cards, containers, list items
-  static const double radiusLarge = 16.0;
+  static const double radiusLarge = 20.0;
 
   /// Extra large radius - 24pt
   /// Usage: Large modals, bottom sheets, hero sections
   static const double radiusXLarge = 24.0;
+
+  /// Pill radius - 28pt
+  /// Usage: Primary and secondary buttons (pill shape)
+  static const double radiusPill = 28.0;
 
   /// Circular radius (for perfect circles)
   /// Usage: Avatars, icon buttons, floating action buttons
@@ -51,6 +56,9 @@ class LumiBorders {
 
   /// Extra large border radius - 24pt (all corners)
   static const BorderRadius xLarge = BorderRadius.all(Radius.circular(radiusXLarge));
+
+  /// Pill border radius - 28pt (all corners)
+  static const BorderRadius pill = BorderRadius.all(Radius.circular(radiusPill));
 
   /// Circular border radius (perfect circle)
   static const BorderRadius circular = BorderRadius.all(Radius.circular(radiusCircular));
@@ -96,14 +104,14 @@ class LumiBorders {
   /// Default border - 1pt solid, 10% opacity charcoal
   /// Usage: Dividers, subtle separators
   static final Border defaultBorder = Border.all(
-    color: AppColors.charcoal.withOpacity(0.1),
+    color: AppColors.charcoal.withValues(alpha: 0.1),
     width: 1.0,
   );
 
   /// Input border - 2pt solid, 10% opacity charcoal
   /// Usage: Input fields, form elements
   static final Border inputBorder = Border.all(
-    color: AppColors.charcoal.withOpacity(0.1),
+    color: AppColors.charcoal.withValues(alpha: 0.1),
     width: 2.0,
   );
 
@@ -145,7 +153,7 @@ class LumiBorders {
         borderRadius: large,
         boxShadow: [
           BoxShadow(
-            color: AppColors.charcoal.withOpacity(0.08),
+            color: AppColors.charcoal.withValues(alpha: 0.08),
             blurRadius: 16,
             offset: const Offset(0, 2),
           ),
@@ -159,7 +167,7 @@ class LumiBorders {
         borderRadius: large,
         boxShadow: [
           BoxShadow(
-            color: AppColors.charcoal.withOpacity(0.08),
+            color: AppColors.charcoal.withValues(alpha: 0.08),
             blurRadius: 16,
             offset: const Offset(0, 2),
           ),
@@ -172,7 +180,7 @@ class LumiBorders {
         color: AppColors.white,
         borderRadius: medium,
         border: Border.all(
-          color: AppColors.charcoal.withOpacity(0.1),
+          color: AppColors.charcoal.withValues(alpha: 0.1),
           width: 2.0,
         ),
       );
@@ -190,32 +198,32 @@ class LumiBorders {
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.rosePink.withOpacity(0.1),
+            color: AppColors.rosePink.withValues(alpha: 0.1),
             blurRadius: 0,
             spreadRadius: 4,
           ),
         ],
       );
 
-  /// Button decoration - rose pink background, medium radius, shadow
+  /// Button decoration - rose pink background, pill radius, shadow
   /// Usage: Primary buttons
   static BoxDecoration get button => BoxDecoration(
         color: AppColors.rosePink,
-        borderRadius: medium,
+        borderRadius: pill,
         boxShadow: [
           BoxShadow(
-            color: AppColors.rosePink.withOpacity(0.3),
+            color: AppColors.rosePink.withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
       );
 
-  /// Secondary button decoration - white background, medium radius, primary border
+  /// Secondary button decoration - white background, pill radius, primary border
   /// Usage: Secondary buttons
   static BoxDecoration get buttonSecondary => BoxDecoration(
         color: AppColors.white,
-        borderRadius: medium,
+        borderRadius: pill,
         border: const Border.fromBorderSide(
           BorderSide(
             color: AppColors.rosePink,
@@ -231,7 +239,7 @@ class LumiBorders {
         borderRadius: topXLarge,
         boxShadow: [
           BoxShadow(
-            color: AppColors.charcoal.withOpacity(0.16),
+            color: AppColors.charcoal.withValues(alpha: 0.16),
             blurRadius: 32,
             offset: const Offset(0, 8),
           ),
@@ -245,7 +253,7 @@ class LumiBorders {
         borderRadius: large,
         boxShadow: [
           BoxShadow(
-            color: AppColors.charcoal.withOpacity(0.16),
+            color: AppColors.charcoal.withValues(alpha: 0.16),
             blurRadius: 32,
             offset: const Offset(0, 8),
           ),
@@ -266,9 +274,14 @@ class LumiBorders {
     borderRadius: large,
   );
 
-  /// Rounded rectangle shape border with primary border - medium radius
+  /// Rounded rectangle shape border - pill radius (for buttons)
+  static const RoundedRectangleBorder shapePill = RoundedRectangleBorder(
+    borderRadius: pill,
+  );
+
+  /// Rounded rectangle shape border with primary border - pill radius
   static const RoundedRectangleBorder shapePrimaryBorder = RoundedRectangleBorder(
-    borderRadius: medium,
+    borderRadius: pill,
     side: BorderSide(
       color: AppColors.rosePink,
       width: 2.0,

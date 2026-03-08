@@ -1,28 +1,59 @@
-// This is a basic Flutter widget test for Lumi Reading Tracker.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:lumi_reading_tracker/data/providers/user_provider.dart';
 import 'package:lumi_reading_tracker/main.dart';
+import 'package:lumi_reading_tracker/services/firebase_service.dart';
+import 'package:firebase_auth_mocks/firebase_auth_mocks.dart';
+
+import 'helpers/firebase_mock.dart';
+import 'helpers/mock_firebase_service.dart';
 
 void main() {
-  testWidgets('Lumi app launches successfully', (WidgetTester tester) async {
+  final mockAuth = MockFirebaseAuth(
+    signedIn: true,
+    mockUser: MockUser(
+      isAnonymous: false,
+      uid: 'some_uid',
+      email: 'test@example.com',
+      displayName: 'Test User',
+    ),
+  );
+
+  // Create a mock implementation of the FirebaseService
+  final mockFirebaseService = MockFirebaseService(mockAuth: mockAuth);
+
+  // Create a container with the mocked dependencies
+  final container = ProviderContainer(
+    overrides: [
+      firebaseServiceProvider.overrideWithValue(mockFirebaseService),
+      userRepositoryProvider.overrideWithValue(MockUserRepository()),
+    ],
+  );
+
+  setUpAll(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+  });
+
+  testWidgets('Splash screen shows Lumi text', (WidgetTester tester) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(
-      const ProviderScope(
-        child: LumiApp(),
+      UncontrolledProviderScope(
+        container: container,
+        child: const LumiApp(),
       ),
     );
 
-    // Wait for any animations to complete
-    await tester.pumpAndSettle();
+    // Pump through splash delay and first navigation frame without waiting for
+    // perpetual progress indicators/animations to settle.
+    await tester.pump(const Duration(seconds: 3));
 
     // Verify that the app launches (checking for common UI elements)
     // The splash screen should show the app title
-    expect(find.text('Lumi'), findsWidgets);
+    expect(find.text('Lumi'), findsOneWidget);
+
+    // Dispose and advance fake time so pending splash timers are drained.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 3));
   });
 }

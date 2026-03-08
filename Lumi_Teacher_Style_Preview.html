@@ -1,0 +1,1678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lumi Teacher/Admin - UI Style Preview</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Primary Colors */
+            --lumi-coral: #FF8698;
+            --lumi-peach: #FFAB91;
+            --lumi-mint: #BCE7F0;
+            --lumi-lavender: #D2EBBF;
+
+            /* Secondary Colors */
+            --sunny-yellow: #FFF6A4;
+            --sky-blue: #90CAF9;
+            --soft-orange: #FFCC80;
+            --sage-green: #A5D6A7;
+
+            /* Teacher-specific Colors */
+            --teacher-primary: #5C6BC0;
+            --teacher-primary-light: #C5CAE9;
+            --teacher-accent: #7986CB;
+            --decodable-blue: #64B5F6;
+            --library-green: #81C784;
+
+            /* Tier Colors */
+            --tier-red: #EF9A9A;
+            --tier-orange: #FFCC80;
+            --tier-yellow: #FFF59D;
+            --tier-green: #A5D6A7;
+            --tier-blue: #90CAF9;
+            --tier-purple: #CE93D8;
+
+            /* Neutrals */
+            --bg: #F5F5F7;
+            --card-white: #FFFFFF;
+            --text-primary: #121211;
+            --text-secondary: #6B7280;
+            --divider: #E5E7EB;
+
+            /* Semantic */
+            --success: #4CAF50;
+            --warning: #FFC107;
+            --error: #EF5350;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: var(--bg);
+            color: var(--text-primary);
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 36px;
+            font-weight: 800;
+            text-align: center;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--teacher-primary), var(--teacher-accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 48px;
+            font-size: 18px;
+        }
+
+        .badge {
+            display: inline-block;
+            background: var(--teacher-primary-light);
+            color: var(--teacher-primary);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        .section {
+            margin-bottom: 60px;
+        }
+
+        .section-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 24px;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 4px;
+            height: 28px;
+            background: var(--teacher-primary);
+            border-radius: 2px;
+        }
+
+        /* Navigation Tabs */
+        .nav-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+        }
+
+        .nav-tab {
+            padding: 12px 24px;
+            background: var(--card-white);
+            border: 2px solid var(--divider);
+            border-radius: 12px;
+            font-family: 'Nunito', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .nav-tab:hover {
+            border-color: var(--teacher-primary-light);
+            color: var(--teacher-primary);
+        }
+
+        .nav-tab.active {
+            background: var(--teacher-primary);
+            border-color: var(--teacher-primary);
+            color: white;
+        }
+
+        /* Phone Mockup */
+        .phone-container {
+            display: flex;
+            gap: 32px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .phone {
+            width: 390px;
+            background: var(--card-white);
+            border-radius: 40px;
+            padding: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.12);
+        }
+
+        .phone-screen {
+            background: var(--bg);
+            border-radius: 32px;
+            overflow: hidden;
+            min-height: 780px;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            background: var(--card-white);
+        }
+
+        .screen-content {
+            padding: 0 16px 16px;
+        }
+
+        /* Dashboard Header */
+        .dashboard-header {
+            background: linear-gradient(135deg, var(--teacher-primary), var(--teacher-accent));
+            padding: 20px;
+            margin: -16px -16px 20px -16px;
+            color: white;
+        }
+
+        .dashboard-header h2 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .dashboard-header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        /* Stat Cards */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: var(--card-white);
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+
+        .stat-card .stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 12px;
+            font-size: 20px;
+        }
+
+        .stat-card .stat-value {
+            font-size: 28px;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+
+        .stat-card .stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* Class Card */
+        .class-card {
+            background: var(--card-white);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            margin-bottom: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .class-card:hover {
+            border-color: var(--teacher-primary-light);
+            transform: translateY(-2px);
+        }
+
+        .class-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .class-name {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .class-count {
+            background: var(--teacher-primary-light);
+            color: var(--teacher-primary);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        /* Chart Container */
+        .chart-card {
+            background: var(--card-white);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            margin-bottom: 16px;
+        }
+
+        .chart-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chart-period {
+            font-size: 12px;
+            color: var(--text-secondary);
+            background: var(--bg);
+            padding: 6px 12px;
+            border-radius: 8px;
+        }
+
+        .bar-chart {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            height: 120px;
+            padding: 0 8px;
+        }
+
+        .bar-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .bar {
+            width: 32px;
+            border-radius: 8px 8px 0 0;
+            transition: height 0.3s;
+        }
+
+        .bar-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        /* Student List */
+        .student-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .student-item {
+            background: var(--card-white);
+            border-radius: 12px;
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .student-item:hover {
+            background: var(--teacher-primary-light);
+        }
+
+        .student-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 16px;
+            color: white;
+        }
+
+        .student-info {
+            flex: 1;
+        }
+
+        .student-name {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .student-books {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .student-streak {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--soft-orange);
+        }
+
+        /* Book Assignment */
+        .book-assignment-card {
+            background: var(--card-white);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+
+        .book-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .book-cover {
+            width: 50px;
+            height: 70px;
+            border-radius: 6px;
+            flex-shrink: 0;
+        }
+
+        .book-details {
+            flex: 1;
+        }
+
+        .book-title {
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+
+        .book-author {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .book-type-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .badge-decodable {
+            background: #E3F2FD;
+            color: #1976D2;
+        }
+
+        .badge-library {
+            background: #E8F5E9;
+            color: #388E3C;
+        }
+
+        .assign-btn {
+            background: var(--teacher-primary);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 10px;
+            font-family: 'Nunito', sans-serif;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        /* Scanner Card */
+        .scanner-card {
+            background: linear-gradient(135deg, var(--teacher-primary), var(--teacher-accent));
+            border-radius: 20px;
+            padding: 24px;
+            color: white;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .scanner-icon {
+            width: 64px;
+            height: 64px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            font-size: 28px;
+        }
+
+        .scanner-card h3 {
+            font-size: 18px;
+            margin-bottom: 8px;
+        }
+
+        .scanner-card p {
+            opacity: 0.9;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        .scan-btn {
+            background: white;
+            color: var(--teacher-primary);
+            border: none;
+            padding: 12px 32px;
+            border-radius: 25px;
+            font-family: 'Nunito', sans-serif;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        /* Library Grid */
+        .library-filters {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+        }
+
+        .filter-chip {
+            padding: 8px 16px;
+            background: var(--card-white);
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .filter-chip:hover {
+            border-color: var(--teacher-primary-light);
+        }
+
+        .filter-chip.active {
+            background: var(--teacher-primary);
+            color: white;
+        }
+
+        .tier-section {
+            margin-bottom: 20px;
+        }
+
+        .tier-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .tier-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .tier-name {
+            font-weight: 700;
+            font-size: 16px;
+        }
+
+        .tier-count {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .book-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .book-grid-item {
+            background: var(--card-white);
+            border-radius: 12px;
+            padding: 10px;
+            text-align: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .book-grid-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .book-grid-cover {
+            width: 100%;
+            height: 80px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+
+        .book-grid-title {
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        /* Settings & Profile */
+        .settings-section {
+            background: var(--card-white);
+            border-radius: 16px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+
+        .settings-header {
+            padding: 14px 16px;
+            font-weight: 700;
+            font-size: 13px;
+            color: var(--text-secondary);
+            background: var(--bg);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .settings-item {
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            border-bottom: 1px solid var(--divider);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .settings-item:last-child {
+            border-bottom: none;
+        }
+
+        .settings-item:hover {
+            background: var(--bg);
+        }
+
+        .settings-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .settings-label {
+            flex: 1;
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        .settings-arrow {
+            color: var(--text-secondary);
+        }
+
+        .toggle-switch {
+            width: 48px;
+            height: 28px;
+            background: var(--sage-green);
+            border-radius: 14px;
+            position: relative;
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            top: 3px;
+            right: 3px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        /* Profile Card */
+        .profile-card {
+            background: var(--card-white);
+            border-radius: 20px;
+            padding: 24px;
+            text-align: center;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+
+        .profile-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--teacher-primary), var(--teacher-accent));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            font-size: 32px;
+            color: white;
+            font-weight: 700;
+        }
+
+        .profile-name {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .profile-role {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        .profile-stats {
+            display: flex;
+            justify-content: center;
+            gap: 32px;
+        }
+
+        .profile-stat {
+            text-align: center;
+        }
+
+        .profile-stat-value {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--teacher-primary);
+        }
+
+        .profile-stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            background: var(--card-white);
+            padding: 12px 8px 20px;
+            border-radius: 0 0 32px 32px;
+            margin-top: auto;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .nav-item.active {
+            color: var(--teacher-primary);
+        }
+
+        .nav-item svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .nav-item span {
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* Components Grid */
+        .components-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+        }
+
+        .component-card {
+            background: var(--card-white);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+
+        .component-title {
+            font-weight: 700;
+            margin-bottom: 16px;
+            font-size: 16px;
+        }
+
+        /* Alert Banner */
+        .alert-banner {
+            background: #FFF3E0;
+            border-left: 4px solid var(--soft-orange);
+            border-radius: 0 12px 12px 0;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .alert-banner.success {
+            background: #E8F5E9;
+            border-color: var(--sage-green);
+        }
+
+        .alert-icon {
+            font-size: 20px;
+        }
+
+        .alert-text {
+            flex: 1;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        /* Action Button */
+        .action-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            padding: 14px;
+            background: var(--teacher-primary);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-family: 'Nunito', sans-serif;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            background: var(--teacher-accent);
+            transform: translateY(-1px);
+        }
+
+        .action-btn.secondary {
+            background: var(--bg);
+            color: var(--teacher-primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Lumi Teacher Dashboard</h1>
+        <p class="subtitle">UI Style Preview - Admin & Teacher Interface <span class="badge">v1.0</span></p>
+
+        <!-- Page Navigation -->
+        <div class="section">
+            <div class="nav-tabs">
+                <button class="nav-tab active">Dashboard</button>
+                <button class="nav-tab">Classroom</button>
+                <button class="nav-tab">Library</button>
+                <button class="nav-tab">Settings</button>
+                <button class="nav-tab">Profile</button>
+            </div>
+        </div>
+
+        <!-- Screen Previews -->
+        <div class="section">
+            <h2 class="section-title">Screen Previews</h2>
+
+            <div class="phone-container">
+
+                <!-- Dashboard Screen -->
+                <div class="phone">
+                    <div class="phone-screen">
+                        <div class="status-bar">
+                            <span>9:41</span>
+                            <span style="display: flex; gap: 4px;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C7.5 3 3.75 5.5 2 9c1.75 3.5 5.5 6 10 6s8.25-2.5 10-6c-1.75-3.5-5.5-6-10-6zm0 10c-2.2 0-4-1.8-4-4s1.8-4 4-4 4 1.8 4 4-1.8 4-4 4z"/></svg>
+                            </span>
+                        </div>
+
+                        <div class="dashboard-header">
+                            <h2>Good Morning, Ms. Johnson</h2>
+                            <p>Monday, February 22, 2026</p>
+                        </div>
+
+                        <div class="screen-content">
+                            <!-- Stats Row -->
+                            <div class="stats-row">
+                                <div class="stat-card">
+                                    <div class="stat-icon" style="background: var(--lumi-mint);">👨‍🎓</div>
+                                    <div class="stat-value">24</div>
+                                    <div class="stat-label">Total Students</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-icon" style="background: var(--sage-green);">✓</div>
+                                    <div class="stat-value" style="color: var(--success);">18</div>
+                                    <div class="stat-label">Read Last Night</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-icon" style="background: var(--soft-orange);">🔥</div>
+                                    <div class="stat-value" style="color: var(--soft-orange);">12</div>
+                                    <div class="stat-label">On 7+ Day Streak</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-icon" style="background: var(--lumi-coral);">📚</div>
+                                    <div class="stat-value">47</div>
+                                    <div class="stat-label">Books Assigned</div>
+                                </div>
+                            </div>
+
+                            <!-- Class Card -->
+                            <div class="class-card">
+                                <div class="class-card-header">
+                                    <span class="class-name">Year 1 Blue</span>
+                                    <span class="class-count">24 Students</span>
+                                </div>
+                                <div style="display: flex; gap: 6px;">
+                                    <div style="flex: 1; height: 6px; background: var(--sage-green); border-radius: 3px;"></div>
+                                    <div style="width: 25%; height: 6px; background: var(--divider); border-radius: 3px;"></div>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--text-secondary);">
+                                    <span>75% reading rate this week</span>
+                                    <span style="color: var(--teacher-primary);">View →</span>
+                                </div>
+                            </div>
+
+                            <!-- Weekly Chart -->
+                            <div class="chart-card">
+                                <div class="chart-title">
+                                    <span>Weekly Reading Activity</span>
+                                    <span class="chart-period">This Week</span>
+                                </div>
+                                <div class="bar-chart">
+                                    <div class="bar-item">
+                                        <div class="bar" style="height: 85%; background: var(--teacher-primary);"></div>
+                                        <span class="bar-label">Mon</span>
+                                    </div>
+                                    <div class="bar-item">
+                                        <div class="bar" style="height: 70%; background: var(--teacher-primary);"></div>
+                                        <span class="bar-label">Tue</span>
+                                    </div>
+                                    <div class="bar-item">
+                                        <div class="bar" style="height: 90%; background: var(--teacher-primary);"></div>
+                                        <span class="bar-label">Wed</span>
+                                    </div>
+                                    <div class="bar-item">
+                                        <div class="bar" style="height: 65%; background: var(--teacher-primary);"></div>
+                                        <span class="bar-label">Thu</span>
+                                    </div>
+                                    <div class="bar-item">
+                                        <div class="bar" style="height: 75%; background: var(--teacher-accent);"></div>
+                                        <span class="bar-label">Fri</span>
+                                    </div>
+                                    <div class="bar-item">
+                                        <div class="bar" style="height: 30%; background: var(--divider);"></div>
+                                        <span class="bar-label">Sat</span>
+                                    </div>
+                                    <div class="bar-item">
+                                        <div class="bar" style="height: 0%; background: var(--divider);"></div>
+                                        <span class="bar-label">Sun</span>
+                                    </div>
+                                </div>
+                                <div style="text-align: center; margin-top: 12px; font-size: 13px; color: var(--text-secondary);">
+                                    Average: <strong style="color: var(--teacher-primary);">18/24 students</strong> per night
+                                </div>
+                            </div>
+
+                            <!-- Alert -->
+                            <div class="alert-banner">
+                                <span class="alert-icon">⚠️</span>
+                                <span class="alert-text">6 students haven't logged reading this week</span>
+                            </div>
+                        </div>
+
+                        <!-- Bottom Nav -->
+                        <div class="bottom-nav">
+                            <div class="nav-item active">
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+                                <span>Dashboard</span>
+                            </div>
+                            <div class="nav-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                <span>Class</span>
+                            </div>
+                            <div class="nav-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                                <span>Library</span>
+                            </div>
+                            <div class="nav-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                                <span>Settings</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Classroom Screen -->
+                <div class="phone">
+                    <div class="phone-screen">
+                        <div class="status-bar">
+                            <span>9:41</span>
+                            <span style="display: flex; gap: 4px;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C7.5 3 3.75 5.5 2 9c1.75 3.5 5.5 6 10 6s8.25-2.5 10-6c-1.75-3.5-5.5-6-10-6zm0 10c-2.2 0-4-1.8-4-4s1.8-4 4-4 4 1.8 4 4-1.8 4-4 4z"/></svg>
+                            </span>
+                        </div>
+
+                        <div class="screen-content" style="padding-top: 20px;">
+                            <h2 style="font-size: 22px; font-weight: 700; margin-bottom: 4px;">Year 1 Blue</h2>
+                            <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 20px;">24 Students • 47 Books Assigned</p>
+
+                            <!-- Scanner Card -->
+                            <div class="scanner-card">
+                                <div class="scanner-icon">📷</div>
+                                <h3>Scan ISBN to Assign Books</h3>
+                                <p>Quickly assign books to students by scanning the barcode</p>
+                                <button class="scan-btn">Open Scanner</button>
+                            </div>
+
+                            <!-- Student List -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                <span style="font-weight: 700; font-size: 16px;">Students</span>
+                                <span style="color: var(--text-secondary); font-size: 13px;">Sort by: Name ▼</span>
+                            </div>
+
+                            <div class="student-list">
+                                <div class="student-item">
+                                    <div class="student-avatar" style="background: var(--lumi-coral);">E</div>
+                                    <div class="student-info">
+                                        <div class="student-name">Emma Thompson</div>
+                                        <div class="student-books">3 books assigned</div>
+                                    </div>
+                                    <div class="student-streak">🔥 14</div>
+                                </div>
+                                <div class="student-item">
+                                    <div class="student-avatar" style="background: var(--sky-blue);">L</div>
+                                    <div class="student-info">
+                                        <div class="student-name">Liam Chen</div>
+                                        <div class="student-books">2 books assigned</div>
+                                    </div>
+                                    <div class="student-streak">🔥 8</div>
+                                </div>
+                                <div class="student-item">
+                                    <div class="student-avatar" style="background: var(--sage-green);">O</div>
+                                    <div class="student-info">
+                                        <div class="student-name">Olivia Martinez</div>
+                                        <div class="student-books">2 books assigned</div>
+                                    </div>
+                                    <div class="student-streak">🔥 21</div>
+                                </div>
+                                <div class="student-item">
+                                    <div class="student-avatar" style="background: var(--soft-orange);">N</div>
+                                    <div class="student-info">
+                                        <div class="student-name">Noah Williams</div>
+                                        <div class="student-books">1 book assigned</div>
+                                    </div>
+                                    <div class="student-streak" style="color: var(--text-secondary);">—</div>
+                                </div>
+                                <div class="student-item">
+                                    <div class="student-avatar" style="background: var(--lumi-lavender);">A</div>
+                                    <div class="student-info">
+                                        <div class="student-name">Ava Johnson</div>
+                                        <div class="student-books">3 books assigned</div>
+                                    </div>
+                                    <div class="student-streak">🔥 5</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bottom Nav -->
+                        <div class="bottom-nav">
+                            <div class="nav-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+                                <span>Dashboard</span>
+                            </div>
+                            <div class="nav-item active">
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                <span>Class</span>
+                            </div>
+                            <div class="nav-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                                <span>Library</span>
+                            </div>
+                            <div class="nav-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                                <span>Settings</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Library Screen -->
+                <div class="phone">
+                    <div class="phone-screen">
+                        <div class="status-bar">
+                            <span>9:41</span>
+                            <span style="display: flex; gap: 4px;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C7.5 3 3.75 5.5 2 9c1.75 3.5 5.5 6 10 6s8.25-2.5 10-6c-1.75-3.5-5.5-6-10-6zm0 10c-2.2 0-4-1.8-4-4s1.8-4 4-4 4 1.8 4 4-1.8 4-4 4z"/></svg>
+                            </span>
+                        </div>
+
+                        <div class="screen-content" style="padding-top: 20px;">
+                            <h2 style="font-size: 22px; font-weight: 700; margin-bottom: 4px;">Book Library</h2>
+                            <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 16px;">156 Decodable Books Available</p>
+
+                            <!-- Search -->
+                            <div style="background: var(--card-white); border-radius: 12px; padding: 12px 16px; display: flex; align-items: center; gap: 10px; margin-bottom: 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                                <span style="color: var(--text-secondary); font-size: 14px;">Search books...</span>
+                            </div>
+
+                            <!-- Filters -->
+                            <div class="library-filters">
+                                <div class="filter-chip active">All</div>
+                                <div class="filter-chip">Decodable</div>
+                                <div class="filter-chip">Library</div>
+                                <div class="filter-chip">Recently Added</div>
+                            </div>
+
+                            <!-- Tier: Red (Beginning) -->
+                            <div class="tier-section">
+                                <div class="tier-header">
+                                    <div class="tier-dot" style="background: var(--tier-red);"></div>
+                                    <span class="tier-name">Level 1 - CVC Words</span>
+                                    <span class="tier-count">(24 books)</span>
+                                </div>
+                                <div class="book-grid">
+                                    <div class="book-grid-item">
+                                        <div class="book-grid-cover" style="background: linear-gradient(135deg, #ffcdd2, #ef9a9a);"></div>
+                                        <div class="book-grid-title">Sam the Cat</div>
+                                    </div>
+                                    <div class="book-grid-item">
+                                        <div class="book-grid-cover" style="background: linear-gradient(135deg, #f8bbd9, #f48fb1);"></div>
+                                        <div class="book-grid-title">Hop on Top</div>
+                                    </div>
+                                    <div class="book-grid-item">
+                                        <div class="book-grid-cover" style="background: linear-gradient(135deg, #e1bee7, #ce93d8);"></div>
+                                        <div class="book-grid-title">Big Pig</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tier: Yellow (Developing) -->
+                            <div class="tier-section">
+                                <div class="tier-header">
+                                    <div class="tier-dot" style="background: var(--tier-yellow);"></div>
+                                    <span class="tier-name">Level 2 - Digraphs</span>
+                                    <span class="tier-count">(32 books)</span>
+                                </div>
+                                <div class="book-grid">
+                                    <div class="book-grid-item">
+                                        <div class="book-grid-cover" style="background: linear-gradient(135deg, #fff9c4, #fff176);"></div>
+                                        <div class="book-grid-title">Ship Trip</div>
+                                    </div>
+                                    <div class="book-grid-item">
+                                        <div class="book-grid-cover" style="background: linear-gradient(135deg, #ffe0b2, #ffcc80);"></div>
+                                        <div class="book-grid-title">Chip Chat</div>
+                                    </div>
+                                    <div class="book-grid-item">
+                                        <div class="book-grid-cover" style="background: linear-gradient(135deg, #ffecb3, #ffe082);"></div>
+                                        <div class="book-grid-title">The Fish Wish</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tier: Green (Progressing) -->
+                            <div class="tier-section">
+                                <div class="tier-header">
+                                    <div class="tier-dot" style="background: var(--tier-green);"></div>
+                                    <span class="tier-name">Level 3 - Blends</span>
+                                    <span class="tier-count">(28 books)</span>
+                                </div>
+                                <div class="book-grid">
+                                    <div class="book-grid-item">
+                                        <div class="book-grid-cover" style="background: linear-gradient(135deg, #c8e6c9, #a5d6a7);"></div>
+                                        <div class="book-grid-title">Frog on a Log</div>
+                                    </div>
+                                    <div class="book-grid-item">
+                                        <div class="book-grid-cover" style="background: linear-gradient(135deg, #dcedc8, #c5e1a5);"></div>
+                                        <div class="book-grid-title">Drum Fun</div>
+                                    </div>
+                                    <div class="book-grid-item">
+                                        <div class="book-grid-cover" style="background: linear-gradient(135deg, #b2dfdb, #80cbc4);"></div>
+                                        <div class="book-grid-title">Clap Snap</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bottom Nav -->
+                        <div class="bottom-nav">
+                            <div class="nav-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+                                <span>Dashboard</span>
+                            </div>
+                            <div class="nav-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                <span>Class</span>
+                            </div>
+                            <div class="nav-item active">
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                                <span>Library</span>
+                            </div>
+                            <div class="nav-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                                <span>Settings</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Settings & Profile Screens -->
+        <div class="section">
+            <h2 class="section-title">Settings & Profile Screens</h2>
+
+            <div class="phone-container">
+
+                <!-- Settings Screen -->
+                <div class="phone">
+                    <div class="phone-screen">
+                        <div class="status-bar">
+                            <span>9:41</span>
+                            <span style="display: flex; gap: 4px;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C7.5 3 3.75 5.5 2 9c1.75 3.5 5.5 6 10 6s8.25-2.5 10-6c-1.75-3.5-5.5-6-10-6zm0 10c-2.2 0-4-1.8-4-4s1.8-4 4-4 4 1.8 4 4-1.8 4-4 4z"/></svg>
+                            </span>
+                        </div>
+
+                        <div class="screen-content" style="padding-top: 20px;">
+                            <h2 style="font-size: 22px; font-weight: 700; margin-bottom: 20px;">Settings</h2>
+
+                            <div class="settings-section">
+                                <div class="settings-header">Classroom</div>
+                                <div class="settings-item">
+                                    <div class="settings-icon" style="background: var(--teacher-primary-light); color: var(--teacher-primary);">🏫</div>
+                                    <span class="settings-label">Manage Classes</span>
+                                    <span class="settings-arrow">›</span>
+                                </div>
+                                <div class="settings-item">
+                                    <div class="settings-icon" style="background: var(--lumi-mint); color: #4a9ea8;">👨‍🎓</div>
+                                    <span class="settings-label">Student Management</span>
+                                    <span class="settings-arrow">›</span>
+                                </div>
+                                <div class="settings-item">
+                                    <div class="settings-icon" style="background: var(--sage-green); color: #388E3C;">📚</div>
+                                    <span class="settings-label">Book Levels</span>
+                                    <span class="settings-arrow">›</span>
+                                </div>
+                            </div>
+
+                            <div class="settings-section">
+                                <div class="settings-header">Notifications</div>
+                                <div class="settings-item">
+                                    <div class="settings-icon" style="background: var(--soft-orange); color: #E65100;">🔔</div>
+                                    <span class="settings-label">Push Notifications</span>
+                                    <div class="toggle-switch"></div>
+                                </div>
+                                <div class="settings-item">
+                                    <div class="settings-icon" style="background: var(--lumi-coral); color: #C62828;">📧</div>
+                                    <span class="settings-label">Email Summaries</span>
+                                    <div class="toggle-switch"></div>
+                                </div>
+                                <div class="settings-item">
+                                    <div class="settings-icon" style="background: var(--sunny-yellow); color: #F57F17;">⚠️</div>
+                                    <span class="settings-label">Inactivity Alerts</span>
+                                    <div class="toggle-switch"></div>
+                                </div>
+                            </div>
+
+                            <div class="settings-section">
+                                <div class="settings-header">App</div>
+                                <div class="settings-item">
+                                    <div class="settings-icon" style="background: var(--sky-blue); color: #1565C0;">🌙</div>
+                                    <span class="settings-label">Dark Mode</span>
+                                    <div class="toggle-switch" style="background: var(--divider);">
+                                        <div style="position: absolute; left: 3px; top: 3px; width: 22px; height: 22px; background: white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>
+                                    </div>
+                                </div>
+                                <div class="settings-item">
+                                    <div class="settings-icon" style="background: var(--lumi-lavender); color: #558B2F;">🔒</div>
+                                    <span class="settings-label">Privacy & Security</span>
+                                    <span class="settings-arrow">›</span>
+                                </div>
+                                <div class="settings-item">
+                                    <div class="settings-icon" style="background: #E0E0E0; color: #616161;">❓</div>
+                                    <span class="settings-label">Help & Support</span>
+                                    <span class="settings-arrow">›</span>
+                                </div>
+                            </div>
+
+                            <div style="text-align: center; margin-top: 24px;">
+                                <button class="action-btn secondary" style="max-width: 200px;">Log Out</button>
+                            </div>
+                        </div>
+
+                        <!-- Bottom Nav -->
+                        <div class="bottom-nav">
+                            <div class="nav-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+                                <span>Dashboard</span>
+                            </div>
+                            <div class="nav-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                <span>Class</span>
+                            </div>
+                            <div class="nav-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                                <span>Library</span>
+                            </div>
+                            <div class="nav-item active">
+                                <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                                <span>Settings</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Profile Screen -->
+                <div class="phone">
+                    <div class="phone-screen">
+                        <div class="status-bar">
+                            <span>9:41</span>
+                            <span style="display: flex; gap: 4px;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C7.5 3 3.75 5.5 2 9c1.75 3.5 5.5 6 10 6s8.25-2.5 10-6c-1.75-3.5-5.5-6-10-6zm0 10c-2.2 0-4-1.8-4-4s1.8-4 4-4 4 1.8 4 4-1.8 4-4 4z"/></svg>
+                            </span>
+                        </div>
+
+                        <div class="screen-content" style="padding-top: 20px;">
+                            <h2 style="font-size: 22px; font-weight: 700; margin-bottom: 20px;">Profile</h2>
+
+                            <!-- Profile Card -->
+                            <div class="profile-card">
+                                <div class="profile-avatar">SJ</div>
+                                <div class="profile-name">Sarah Johnson</div>
+                                <div class="profile-role">Year 1 Teacher • Oakwood Primary</div>
+                                <div class="profile-stats">
+                                    <div class="profile-stat">
+                                        <div class="profile-stat-value">24</div>
+                                        <div class="profile-stat-label">Students</div>
+                                    </div>
+                                    <div class="profile-stat">
+                                        <div class="profile-stat-value">156</div>
+                                        <div class="profile-stat-label">Books</div>
+                                    </div>
+                                    <div class="profile-stat">
+                                        <div class="profile-stat-value">89%</div>
+                                        <div class="profile-stat-label">Engagement</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Quick Stats -->
+                            <div class="chart-card">
+                                <div class="chart-title">
+                                    <span>This Term's Progress</span>
+                                </div>
+                                <div style="display: flex; gap: 16px; margin-bottom: 16px;">
+                                    <div style="flex: 1; text-align: center; padding: 16px; background: var(--bg); border-radius: 12px;">
+                                        <div style="font-size: 28px; font-weight: 800; color: var(--success);">1,247</div>
+                                        <div style="font-size: 12px; color: var(--text-secondary);">Total Reading Sessions</div>
+                                    </div>
+                                    <div style="flex: 1; text-align: center; padding: 16px; background: var(--bg); border-radius: 12px;">
+                                        <div style="font-size: 28px; font-weight: 800; color: var(--teacher-primary);">52</div>
+                                        <div style="font-size: 12px; color: var(--text-secondary);">School Days</div>
+                                    </div>
+                                </div>
+                                <div class="alert-banner success">
+                                    <span class="alert-icon">🎉</span>
+                                    <span class="alert-text">Your class is in the top 10% for reading consistency!</span>
+                                </div>
+                            </div>
+
+                            <!-- Account Settings -->
+                            <div class="settings-section">
+                                <div class="settings-item">
+                                    <div class="settings-icon" style="background: var(--teacher-primary-light); color: var(--teacher-primary);">✏️</div>
+                                    <span class="settings-label">Edit Profile</span>
+                                    <span class="settings-arrow">›</span>
+                                </div>
+                                <div class="settings-item">
+                                    <div class="settings-icon" style="background: var(--lumi-mint); color: #4a9ea8;">🏫</div>
+                                    <span class="settings-label">School Settings</span>
+                                    <span class="settings-arrow">›</span>
+                                </div>
+                                <div class="settings-item">
+                                    <div class="settings-icon" style="background: var(--sage-green); color: #388E3C;">📊</div>
+                                    <span class="settings-label">Export Reports</span>
+                                    <span class="settings-arrow">›</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bottom Nav -->
+                        <div class="bottom-nav">
+                            <div class="nav-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+                                <span>Dashboard</span>
+                            </div>
+                            <div class="nav-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                <span>Class</span>
+                            </div>
+                            <div class="nav-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                                <span>Library</span>
+                            </div>
+                            <div class="nav-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                                <span>Settings</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Student Detail Screen -->
+                <div class="phone">
+                    <div class="phone-screen">
+                        <div class="status-bar">
+                            <span>9:41</span>
+                            <span style="display: flex; gap: 4px;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C7.5 3 3.75 5.5 2 9c1.75 3.5 5.5 6 10 6s8.25-2.5 10-6c-1.75-3.5-5.5-6-10-6zm0 10c-2.2 0-4-1.8-4-4s1.8-4 4-4 4 1.8 4 4-1.8 4-4 4z"/></svg>
+                            </span>
+                        </div>
+
+                        <div class="screen-content" style="padding-top: 12px;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 20px;">
+                                <span style="color: var(--teacher-primary); cursor: pointer;">← Back</span>
+                            </div>
+
+                            <!-- Student Header -->
+                            <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px;">
+                                <div class="student-avatar" style="background: var(--lumi-coral); width: 64px; height: 64px; font-size: 24px;">E</div>
+                                <div>
+                                    <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 2px;">Emma Thompson</h2>
+                                    <p style="color: var(--text-secondary); font-size: 14px;">Year 1 Blue</p>
+                                </div>
+                            </div>
+
+                            <!-- Quick Stats -->
+                            <div class="stats-row">
+                                <div class="stat-card" style="text-align: center;">
+                                    <div style="font-size: 32px; font-weight: 800; color: var(--soft-orange);">🔥 14</div>
+                                    <div class="stat-label">Day Streak</div>
+                                </div>
+                                <div class="stat-card" style="text-align: center;">
+                                    <div style="font-size: 32px; font-weight: 800; color: var(--success);">47</div>
+                                    <div class="stat-label">Total Nights</div>
+                                </div>
+                            </div>
+
+                            <!-- Assigned Books -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin: 20px 0 12px;">
+                                <span style="font-weight: 700; font-size: 16px;">Assigned Books</span>
+                                <button style="background: var(--teacher-primary); color: white; border: none; padding: 8px 16px; border-radius: 8px; font-family: 'Nunito', sans-serif; font-weight: 600; font-size: 12px; cursor: pointer;">+ Assign</button>
+                            </div>
+
+                            <div class="book-assignment-card">
+                                <div class="book-row">
+                                    <div class="book-cover" style="background: linear-gradient(135deg, #ffcdd2, #ef9a9a);"></div>
+                                    <div class="book-details">
+                                        <div class="book-title">Sam the Cat</div>
+                                        <div class="book-author">Level 1 - CVC Words</div>
+                                        <span class="book-type-badge badge-decodable">Decodable</span>
+                                    </div>
+                                    <div style="color: var(--success); font-size: 20px;">✓</div>
+                                </div>
+                            </div>
+
+                            <div class="book-assignment-card">
+                                <div class="book-row">
+                                    <div class="book-cover" style="background: linear-gradient(135deg, #c8e6c9, #a5d6a7);"></div>
+                                    <div class="book-details">
+                                        <div class="book-title">The Big Fish</div>
+                                        <div class="book-author">Level 2 - Digraphs</div>
+                                        <span class="book-type-badge badge-decodable">Decodable</span>
+                                    </div>
+                                    <div style="color: var(--text-secondary); font-size: 14px;">In progress</div>
+                                </div>
+                            </div>
+
+                            <div class="book-assignment-card">
+                                <div class="book-row">
+                                    <div class="book-cover" style="background: linear-gradient(135deg, #b3e5fc, #81d4fa);"></div>
+                                    <div class="book-details">
+                                        <div class="book-title">Where the Wild Things Are</div>
+                                        <div class="book-author">Maurice Sendak</div>
+                                        <span class="book-type-badge badge-library">Library</span>
+                                    </div>
+                                    <div style="color: var(--text-secondary); font-size: 14px;">New</div>
+                                </div>
+                            </div>
+
+                            <!-- Parent Comment -->
+                            <div style="margin-top: 20px;">
+                                <span style="font-weight: 700; font-size: 16px;">Latest Parent Comment</span>
+                                <div style="background: var(--bg); border-radius: 12px; padding: 14px; margin-top: 12px; border-left: 4px solid var(--teacher-primary);">
+                                    <p style="font-size: 14px; line-height: 1.5; margin-bottom: 8px;">"Emma read beautifully tonight! She sounded out all the tricky words by herself."</p>
+                                    <p style="font-size: 12px; color: var(--text-secondary);">— Parent • Yesterday</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Teacher Components -->
+        <div class="section">
+            <h2 class="section-title">Teacher UI Components</h2>
+
+            <div class="components-grid">
+
+                <!-- Stat Cards -->
+                <div class="component-card">
+                    <div class="component-title">Dashboard Stat Cards</div>
+                    <div class="stats-row">
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background: var(--lumi-mint);">👨‍🎓</div>
+                            <div class="stat-value">24</div>
+                            <div class="stat-label">Total Students</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background: var(--sage-green);">✓</div>
+                            <div class="stat-value" style="color: var(--success);">18</div>
+                            <div class="stat-label">Read Last Night</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Student List Item -->
+                <div class="component-card">
+                    <div class="component-title">Student List Items</div>
+                    <div class="student-list">
+                        <div class="student-item">
+                            <div class="student-avatar" style="background: var(--lumi-coral);">E</div>
+                            <div class="student-info">
+                                <div class="student-name">Emma Thompson</div>
+                                <div class="student-books">3 books assigned</div>
+                            </div>
+                            <div class="student-streak">🔥 14</div>
+                        </div>
+                        <div class="student-item">
+                            <div class="student-avatar" style="background: var(--sky-blue);">L</div>
+                            <div class="student-info">
+                                <div class="student-name">Liam Chen</div>
+                                <div class="student-books">2 books assigned</div>
+                            </div>
+                            <div class="student-streak" style="color: var(--text-secondary);">—</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Book Assignment -->
+                <div class="component-card">
+                    <div class="component-title">Book Assignment Card</div>
+                    <div class="book-assignment-card" style="margin: 0;">
+                        <div class="book-row">
+                            <div class="book-cover" style="background: linear-gradient(135deg, #ffcdd2, #ef9a9a);"></div>
+                            <div class="book-details">
+                                <div class="book-title">Sam the Cat</div>
+                                <div class="book-author">Level 1 - CVC Words</div>
+                                <span class="book-type-badge badge-decodable">Decodable</span>
+                            </div>
+                            <button class="assign-btn">Assign</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alert Banners -->
+                <div class="component-card">
+                    <div class="component-title">Alert Banners</div>
+                    <div class="alert-banner" style="margin-bottom: 12px;">
+                        <span class="alert-icon">⚠️</span>
+                        <span class="alert-text">6 students haven't logged reading this week</span>
+                    </div>
+                    <div class="alert-banner success">
+                        <span class="alert-icon">🎉</span>
+                        <span class="alert-text">Your class reached 100% participation today!</span>
+                    </div>
+                </div>
+
+                <!-- Tier Indicators -->
+                <div class="component-card">
+                    <div class="component-title">Book Tier/Level Indicators</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 16px; height: 16px; border-radius: 50%; background: var(--tier-red);"></div>
+                            <span style="font-size: 14px;">Level 1 - CVC</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 16px; height: 16px; border-radius: 50%; background: var(--tier-orange);"></div>
+                            <span style="font-size: 14px;">Level 2 - Digraphs</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 16px; height: 16px; border-radius: 50%; background: var(--tier-yellow);"></div>
+                            <span style="font-size: 14px;">Level 3 - Blends</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 16px; height: 16px; border-radius: 50%; background: var(--tier-green);"></div>
+                            <span style="font-size: 14px;">Level 4 - CVCE</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 16px; height: 16px; border-radius: 50%; background: var(--tier-blue);"></div>
+                            <span style="font-size: 14px;">Level 5 - Vowel Teams</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 16px; height: 16px; border-radius: 50%; background: var(--tier-purple);"></div>
+                            <span style="font-size: 14px;">Level 6 - R-Controlled</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Buttons -->
+                <div class="component-card">
+                    <div class="component-title">Action Buttons</div>
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        <button class="action-btn">
+                            <span>📷</span> Scan ISBN to Assign
+                        </button>
+                        <button class="action-btn secondary">
+                            View All Students
+                        </button>
+                        <button class="assign-btn" style="width: 100%;">+ Assign Book</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Color Palette -->
+        <div class="section">
+            <h2 class="section-title">Teacher Color Palette</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px;">
+                <div class="component-card" style="padding: 0; overflow: hidden;">
+                    <div style="height: 60px; background: var(--teacher-primary);"></div>
+                    <div style="padding: 12px; text-align: center;">
+                        <div style="font-weight: 600; font-size: 13px;">Teacher Primary</div>
+                        <div style="font-size: 11px; color: var(--text-secondary); font-family: monospace;">#5C6BC0</div>
+                    </div>
+                </div>
+                <div class="component-card" style="padding: 0; overflow: hidden;">
+                    <div style="height: 60px; background: var(--teacher-accent);"></div>
+                    <div style="padding: 12px; text-align: center;">
+                        <div style="font-weight: 600; font-size: 13px;">Teacher Accent</div>
+                        <div style="font-size: 11px; color: var(--text-secondary); font-family: monospace;">#7986CB</div>
+                    </div>
+                </div>
+                <div class="component-card" style="padding: 0; overflow: hidden;">
+                    <div style="height: 60px; background: var(--teacher-primary-light);"></div>
+                    <div style="padding: 12px; text-align: center;">
+                        <div style="font-weight: 600; font-size: 13px;">Primary Light</div>
+                        <div style="font-size: 11px; color: var(--text-secondary); font-family: monospace;">#C5CAE9</div>
+                    </div>
+                </div>
+                <div class="component-card" style="padding: 0; overflow: hidden;">
+                    <div style="height: 60px; background: var(--decodable-blue);"></div>
+                    <div style="padding: 12px; text-align: center;">
+                        <div style="font-weight: 600; font-size: 13px;">Decodable Blue</div>
+                        <div style="font-size: 11px; color: var(--text-secondary); font-family: monospace;">#64B5F6</div>
+                    </div>
+                </div>
+                <div class="component-card" style="padding: 0; overflow: hidden;">
+                    <div style="height: 60px; background: var(--library-green);"></div>
+                    <div style="padding: 12px; text-align: center;">
+                        <div style="font-weight: 600; font-size: 13px;">Library Green</div>
+                        <div style="font-size: 11px; color: var(--text-secondary); font-family: monospace;">#81C784</div>
+                    </div>
+                </div>
+                <div class="component-card" style="padding: 0; overflow: hidden;">
+                    <div style="height: 60px; background: var(--success);"></div>
+                    <div style="padding: 12px; text-align: center;">
+                        <div style="font-weight: 600; font-size: 13px;">Success</div>
+                        <div style="font-size: 11px; color: var(--text-secondary); font-family: monospace;">#4CAF50</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</body>
+</html>

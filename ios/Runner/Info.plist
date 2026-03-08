@@ -41,6 +41,10 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Lumi needs camera access to take photos of reading logs.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Lumi needs photo library access to attach images to reading logs.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

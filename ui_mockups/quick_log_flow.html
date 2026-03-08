@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=414, initial-scale=1.0">
+  <title>Lumi Quick Log Flow - 3 Tap Design</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #F8F8F8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px;
+      gap: 24px;
+    }
+
+    :root {
+      --lumi-rose: #FF8698;
+      --lumi-mint: #D2EBBF;
+      --lumi-charcoal: #121211;
+    }
+
+    h1 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--lumi-charcoal);
+      text-align: center;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #666;
+      text-align: center;
+      margin-top: -16px;
+    }
+
+    .flow-container {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    /* Phone Frame */
+    .phone {
+      width: 280px;
+      height: 560px;
+      background: white;
+      border-radius: 32px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .phone-header {
+      height: 44px;
+      background: linear-gradient(180deg, #FFF6F7 0%, #FFFFFF 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .notch {
+      width: 80px;
+      height: 24px;
+      background: #000;
+      border-radius: 12px;
+    }
+
+    .phone-content {
+      padding: 16px;
+      height: calc(100% - 44px);
+      overflow-y: auto;
+    }
+
+    .step-label {
+      position: absolute;
+      top: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--lumi-rose);
+      color: white;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-family: 'Poppins', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .phone-wrapper {
+      position: relative;
+      padding-top: 40px;
+    }
+
+    /* Step 1: Log Reading Button */
+    .step1-content {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding-top: 20px;
+    }
+
+    .tonight-mini {
+      background: white;
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    }
+
+    .tonight-mini-header {
+      font-family: 'Poppins', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--lumi-charcoal);
+      margin-bottom: 12px;
+    }
+
+    .book-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .book-thumb {
+      width: 50px;
+      height: 70px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #FF8C00, #FFA500);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 24px;
+    }
+
+    .book-info-mini {
+      flex: 1;
+    }
+
+    .book-title-mini {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--lumi-charcoal);
+    }
+
+    .book-level-mini {
+      font-size: 12px;
+      color: #888;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .level-dot-mini {
+      width: 8px;
+      height: 8px;
+      border-radius: 4px;
+      background: #FF8C00;
+    }
+
+    .log-btn {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #FF8698 0%, #FF6B7A 100%);
+      color: white;
+      font-family: 'Poppins', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 6px 20px rgba(255, 134, 152, 0.4);
+      cursor: pointer;
+    }
+
+    .tap-indicator {
+      position: absolute;
+      width: 50px;
+      height: 50px;
+      border-radius: 25px;
+      background: rgba(255, 134, 152, 0.3);
+      border: 3px solid var(--lumi-rose);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.2); opacity: 0.7; }
+    }
+
+    /* Step 2: Duration Selection */
+    .step2-content {
+      padding-top: 20px;
+    }
+
+    .duration-header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .duration-title {
+      font-family: 'Poppins', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--lumi-charcoal);
+    }
+
+    .duration-subtitle {
+      font-size: 14px;
+      color: #888;
+      margin-top: 4px;
+    }
+
+    .duration-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .duration-btn {
+      padding: 20px 16px;
+      border-radius: 16px;
+      border: 2px solid #E8E8E8;
+      background: white;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .duration-btn.selected {
+      border-color: var(--lumi-rose);
+      background: rgba(255, 134, 152, 0.1);
+    }
+
+    .duration-btn.recommended {
+      position: relative;
+    }
+
+    .duration-btn.recommended::after {
+      content: 'Recommended';
+      position: absolute;
+      top: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--lumi-rose);
+      color: white;
+      font-size: 9px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 8px;
+    }
+
+    .duration-time {
+      font-family: 'Poppins', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--lumi-charcoal);
+    }
+
+    .duration-label {
+      font-size: 12px;
+      color: #888;
+    }
+
+    .custom-duration {
+      padding: 14px;
+      border-radius: 12px;
+      border: 2px dashed #DDD;
+      background: #FAFAFA;
+      text-align: center;
+      color: #888;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .optional-section {
+      margin-top: 20px;
+      padding: 16px;
+      background: #F8F8F8;
+      border-radius: 12px;
+    }
+
+    .optional-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .optional-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: #666;
+    }
+
+    .optional-toggle {
+      font-size: 12px;
+      color: var(--lumi-rose);
+    }
+
+    /* Step 3: Success */
+    .step3-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .success-emoji {
+      font-size: 80px;
+      margin-bottom: 20px;
+      animation: bounce 0.6s ease-out;
+    }
+
+    @keyframes bounce {
+      0% { transform: scale(0); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+
+    .success-title {
+      font-family: 'Poppins', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--lumi-charcoal);
+      margin-bottom: 8px;
+    }
+
+    .success-subtitle {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 24px;
+    }
+
+    .streak-update {
+      background: linear-gradient(135deg, #FF8698, #FF6B7A);
+      color: white;
+      padding: 16px 24px;
+      border-radius: 16px;
+      margin-bottom: 20px;
+    }
+
+    .streak-new {
+      font-family: 'Poppins', sans-serif;
+      font-size: 32px;
+      font-weight: 700;
+    }
+
+    .streak-text {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .confetti {
+      position: absolute;
+      font-size: 24px;
+      animation: fall 2s ease-out forwards;
+    }
+
+    @keyframes fall {
+      0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(100px) rotate(360deg); opacity: 0; }
+    }
+
+    .done-btn {
+      padding: 14px 48px;
+      border: none;
+      border-radius: 12px;
+      background: var(--lumi-mint);
+      color: #2D5016;
+      font-family: 'Poppins', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Arrow between phones */
+    .arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      color: var(--lumi-rose);
+      padding-top: 200px;
+    }
+
+    /* Design notes */
+    .design-notes {
+      max-width: 900px;
+      padding: 24px;
+      background: #FFF9E6;
+      border-radius: 16px;
+      border: 2px dashed #FFD700;
+    }
+
+    .design-notes h3 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: #996600;
+      margin-bottom: 12px;
+    }
+
+    .design-notes ul {
+      font-size: 14px;
+      color: #666;
+      padding-left: 24px;
+      line-height: 1.8;
+    }
+
+    .design-notes li {
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Quick Log Flow: 3 Taps to Done</h1>
+  <p class="subtitle">Reducing friction is key to daily engagement</p>
+
+  <div class="flow-container">
+    <!-- Step 1 -->
+    <div class="phone-wrapper">
+      <div class="step-label">TAP 1: Start Logging</div>
+      <div class="phone">
+        <div class="phone-header">
+          <div class="notch"></div>
+        </div>
+        <div class="phone-content step1-content">
+          <div class="tonight-mini">
+            <div class="tonight-mini-header">Tonight's Reading</div>
+            <div class="book-row">
+              <div class="book-thumb">📖</div>
+              <div class="book-info-mini">
+                <div class="book-title-mini">The Magic Faraway Tree</div>
+                <div class="book-level-mini">
+                  <div class="level-dot-mini"></div>
+                  Level 14 · Orange
+                </div>
+              </div>
+            </div>
+          </div>
+          <button class="log-btn" style="position: relative;">
+            <span>📚</span>
+            Log Tonight's Reading
+            <div class="tap-indicator" style="right: -10px; bottom: -10px;"></div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow">→</div>
+
+    <!-- Step 2 -->
+    <div class="phone-wrapper">
+      <div class="step-label">TAP 2: Select Duration</div>
+      <div class="phone">
+        <div class="phone-header">
+          <div class="notch"></div>
+        </div>
+        <div class="phone-content step2-content">
+          <div class="duration-header">
+            <div class="duration-title">How long did Sophie read?</div>
+            <div class="duration-subtitle">Select reading duration</div>
+          </div>
+
+          <div class="duration-grid">
+            <div class="duration-btn">
+              <div class="duration-time">10</div>
+              <div class="duration-label">minutes</div>
+            </div>
+            <div class="duration-btn selected recommended" style="position: relative;">
+              <div class="duration-time">15</div>
+              <div class="duration-label">minutes</div>
+              <div class="tap-indicator" style="right: -5px; bottom: -5px; width: 40px; height: 40px;"></div>
+            </div>
+            <div class="duration-btn">
+              <div class="duration-time">20</div>
+              <div class="duration-label">minutes</div>
+            </div>
+            <div class="duration-btn">
+              <div class="duration-time">30</div>
+              <div class="duration-label">minutes</div>
+            </div>
+          </div>
+
+          <div class="custom-duration">
+            ⏱️ Custom duration...
+          </div>
+
+          <div class="optional-section">
+            <div class="optional-header">
+              <div class="optional-title">📝 Add notes or photo (optional)</div>
+              <div class="optional-toggle">Expand ▼</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow">→</div>
+
+    <!-- Step 3 -->
+    <div class="phone-wrapper">
+      <div class="step-label">TAP 3: Done! 🎉</div>
+      <div class="phone">
+        <div class="phone-header">
+          <div class="notch"></div>
+        </div>
+        <div class="phone-content step3-content" style="position: relative; overflow: hidden;">
+          <!-- Confetti -->
+          <span class="confetti" style="left: 20%; animation-delay: 0s;">🎉</span>
+          <span class="confetti" style="left: 40%; animation-delay: 0.2s;">⭐</span>
+          <span class="confetti" style="left: 60%; animation-delay: 0.1s;">🌟</span>
+          <span class="confetti" style="left: 80%; animation-delay: 0.3s;">✨</span>
+
+          <div class="success-emoji">🎊</div>
+          <div class="success-title">Great Reading!</div>
+          <div class="success-subtitle">Sophie read for 15 minutes tonight</div>
+
+          <div class="streak-update">
+            <div class="streak-new">🔥 13</div>
+            <div class="streak-text">Day streak! Keep it up!</div>
+          </div>
+
+          <button class="done-btn" style="position: relative;">
+            Done
+            <div class="tap-indicator" style="right: -10px; bottom: -10px; width: 40px; height: 40px;"></div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Design Notes -->
+  <div class="design-notes">
+    <h3>🎨 Design Rationale</h3>
+    <ul>
+      <li><strong>3 Tap Maximum:</strong> Parents are busy. Reducing steps from 5+ to 3 significantly increases completion rates.</li>
+      <li><strong>Pre-selected Defaults:</strong> 15 minutes is marked "Recommended" based on Victorian guidelines for Year 1-2.</li>
+      <li><strong>Optional Details:</strong> Notes and photos are collapsed by default - never required but always available.</li>
+      <li><strong>Instant Gratification:</strong> Celebration animation triggers immediately to reinforce the behaviour.</li>
+      <li><strong>Streak Visibility:</strong> Showing the updated streak creates anticipation for maintaining the habit.</li>
+      <li><strong>No Keyboard Required:</strong> The entire flow can be completed with taps only - no typing needed.</li>
+      <li><strong>Smart Defaults:</strong> Book is pre-filled from current allocation. Duration defaults to teacher's target.</li>
+    </ul>
+  </div>
+</body>
+</html>

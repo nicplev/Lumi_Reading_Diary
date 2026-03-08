@@ -7,6 +7,7 @@ import '../../core/theme/teacher_constants.dart';
 import '../../core/widgets/lumi/teacher_stat_card.dart';
 import '../../core/widgets/lumi/teacher_settings_section.dart';
 import '../../core/widgets/lumi/teacher_settings_item.dart';
+import '../../core/widgets/lumi/lumi_skeleton.dart';
 import 'package:go_router/go_router.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/school_model.dart';
@@ -176,9 +177,61 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     if (_isLoading) {
       return Scaffold(
         backgroundColor: AppColors.background,
-        body: const Center(
-          child: CircularProgressIndicator(
-            color: AppColors.teacherPrimary,
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 120,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.teacherPrimary.withValues(alpha: 0.1),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(20),
+                    bottomRight: Radius.circular(20),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const LumiSkeleton(width: 60, height: 60, borderRadius: 12),
+                    const SizedBox(width: 16),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        LumiSkeleton(width: 150, height: 28),
+                        SizedBox(height: 8),
+                        LumiSkeleton(width: 100, height: 16),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    Row(
+                      children: const [
+                        Expanded(child: LumiSkeleton(height: 120, borderRadius: 16)),
+                        SizedBox(width: 12),
+                        Expanded(child: LumiSkeleton(height: 120, borderRadius: 16)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: const [
+                        Expanded(child: LumiSkeleton(height: 120, borderRadius: 16)),
+                        SizedBox(width: 12),
+                        Expanded(child: LumiSkeleton(height: 120, borderRadius: 16)),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    const LumiSkeleton(height: 250, borderRadius: 16, width: double.infinity),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       );
@@ -1016,14 +1069,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             Container(
               width: 150,
               height: 150,
-              decoration: const BoxDecoration(
-                color: AppColors.teacherPrimary,
+              decoration: BoxDecoration(
+                color: AppColors.teacherPrimaryLight.withValues(alpha: 0.3),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
-                Icons.school,
+                Icons.school_outlined,
                 size: 80,
-                color: AppColors.white,
+                color: AppColors.teacherPrimary,
               ),
             ),
             const SizedBox(height: 24),
@@ -1034,11 +1087,56 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Please contact support to set up your school.',
+              'Your account is not linked to any school. Please contact support to set up your school environment.',
               style: TeacherTypography.bodyMedium.copyWith(
                 color: AppColors.textSecondary,
               ),
               textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _loadSchoolData(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.white,
+                      foregroundColor: AppColors.teacherPrimary,
+                      side: const BorderSide(color: AppColors.teacherPrimary),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                      ),
+                    ),
+                    child: const Text('Refresh', style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Support dialog coming soon')),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.teacherPrimary,
+                      foregroundColor: AppColors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                      ),
+                    ),
+                    child: const Text('Contact Support', style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            TextButton.icon(
+              onPressed: _handleSignOut,
+              icon: const Icon(Icons.logout, color: AppColors.warmOrange),
+              label: const Text('Sign Out', style: TextStyle(color: AppColors.warmOrange, fontWeight: FontWeight.w600)),
             ),
           ],
         ),

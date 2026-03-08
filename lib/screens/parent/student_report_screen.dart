@@ -354,43 +354,11 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
   }
 
   Widget _buildGeneratedReportCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.success.withValues(alpha: 0.1),
-        borderRadius: LumiBorders.large,
-      ),
-      child: LumiCard(
-        padding: EdgeInsets.zero,
-        child: Padding(
-          padding: LumiPadding.allS,
-          child: Row(
-            children: [
-              Icon(Icons.check_circle, color: AppColors.success, size: 32),
-              LumiGap.horizontalS,
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Report Generated Successfully!',
-                      style: LumiTextStyles.h3(
-                        color: AppColors.success,
-                      ),
-                    ),
-                    LumiGap.xxs,
-                    Text(
-                      'Saved to: ${_generatedReport!.path.split('/').last}',
-                      style: LumiTextStyles.bodySmall(
-                        color: AppColors.success.withValues(alpha: 0.8),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return LumiInfoCard(
+      type: LumiInfoCardType.success,
+      title: 'Report Generated Successfully!',
+      message: 'Saved to: ${_generatedReport!.path.split('/').last}',
+      icon: Icons.check_circle,
     );
   }
 

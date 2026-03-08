@@ -278,8 +278,8 @@ class _LoginScreenState extends State<LoginScreen> {
               Text(
                 'Log In',
                 style: LumiTextStyles.display().copyWith(
-                      color: AppColors.charcoal,
-                    ),
+                  color: AppColors.charcoal,
+                ),
                 textAlign: TextAlign.center,
               ).animate().fadeIn(delay: 200.ms, duration: 500.ms),
 
@@ -289,8 +289,8 @@ class _LoginScreenState extends State<LoginScreen> {
               Text(
                 'Enter your credentials to continue',
                 style: LumiTextStyles.body().copyWith(
-                      color: AppColors.charcoal.withValues(alpha: 0.7),
-                    ),
+                  color: AppColors.charcoal.withValues(alpha: 0.7),
+                ),
                 textAlign: TextAlign.center,
               ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
 
@@ -317,8 +317,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Text(
                           _errorMessage!,
                           style: LumiTextStyles.bodySmall().copyWith(
-                                    color: AppColors.error,
-                                  ),
+                            color: AppColors.error,
+                          ),
                         ),
                       ),
                     ],
@@ -407,14 +407,16 @@ class _LoginScreenState extends State<LoginScreen> {
               LumiGap.m,
 
               // Register link
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 4,
                 children: [
                   Text(
-                    "Teacher account needed? ",
+                    'Teacher account needed?',
                     style: LumiTextStyles.body().copyWith(
-                          color: AppColors.charcoal.withValues(alpha: 0.7),
-                        ),
+                      color: AppColors.charcoal.withValues(alpha: 0.7),
+                    ),
                   ),
                   LumiTextButton(
                     onPressed: () => context.push('/auth/register'),

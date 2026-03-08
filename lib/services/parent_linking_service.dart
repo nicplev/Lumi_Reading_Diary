@@ -6,7 +6,10 @@ import '../data/models/user_model.dart';
 import '../core/exceptions/linking_exceptions.dart';
 
 class ParentLinkingService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFirestore _firestore;
+
+  ParentLinkingService({FirebaseFirestore? firestore})
+      : _firestore = firestore ?? FirebaseFirestore.instance;
 
   // Generate unique 8-character code
   String _generateCode() {
@@ -16,6 +19,25 @@ class ParentLinkingService {
         .join();
   }
 
+  Future<bool> _isCodeUnique(String candidateCode) async {
+    final existing = await _firestore
+        .collection('studentLinkCodes')
+        .where('code', isEqualTo: candidateCode)
+        .limit(1)
+        .get();
+    return existing.docs.isEmpty;
+  }
+
+  Future<String> _generateUniqueCode() async {
+    const maxAttempts = 40;
+    for (var i = 0; i < maxAttempts; i++) {
+      final code = _generateCode();
+      final isUnique = await _isCodeUnique(code);
+      if (isUnique) return code;
+    }
+    throw Exception('Unable to generate unique link code after max attempts');
+  }
+
   // Create linking code for a student
   Future<StudentLinkCodeModel> createLinkCode({
     required String studentId,
@@ -23,19 +45,7 @@ class ParentLinkingService {
     required String createdBy,
     int validityDays = 365, // Code valid for 1 year by default
   }) async {
-    String code;
-    bool isUnique = false;
-
-    // Generate unique code
-    do {
-      code = _generateCode();
-      final existing = await _firestore
-          .collection('studentLinkCodes')
-          .where('code', isEqualTo: code)
-          .where('status', isEqualTo: 'active')
-          .get();
-      isUnique = existing.docs.isEmpty;
-    } while (!isUnique);
+    final code = await _generateUniqueCode();
 
     // Fetch student info to store in metadata
     // This allows parents to see student name without needing read access to students collection
@@ -52,7 +62,8 @@ class ParentLinkingService {
       metadata = {
         'studentFirstName': studentData['firstName'],
         'studentLastName': studentData['lastName'],
-        'studentFullName': '${studentData['firstName']} ${studentData['lastName']}',
+        'studentFullName':
+            '${studentData['firstName']} ${studentData['lastName']}',
       };
     }
 
@@ -68,9 +79,26 @@ class ParentLinkingService {
       metadata: metadata,
     );
 
-    final docRef = await _firestore
+    // Enforce one-active-code-per-student lifecycle policy.
+    final activeCodesQuery = await _firestore
         .collection('studentLinkCodes')
-        .add(linkCode.toFirestore());
+        .where('studentId', isEqualTo: studentId)
+        .where('status', isEqualTo: 'active')
+        .get();
+
+    final batch = _firestore.batch();
+    for (final codeDoc in activeCodesQuery.docs) {
+      batch.update(codeDoc.reference, {
+        'status': LinkCodeStatus.revoked.toString().split('.').last,
+        'revokedBy': createdBy,
+        'revokedAt': FieldValue.serverTimestamp(),
+        'revokeReason': 'Superseded by newly generated link code',
+      });
+    }
+
+    final docRef = _firestore.collection('studentLinkCodes').doc();
+    batch.set(docRef, linkCode.toFirestore());
+    await batch.commit();
 
     return linkCode.copyWith(id: docRef.id);
   }
@@ -83,15 +111,26 @@ class ParentLinkingService {
     int validityDays = 365,
   }) async {
     final Map<String, StudentLinkCodeModel> codes = {};
+    final dedupedStudentIds = studentIds.toSet().toList(growable: false);
+    const chunkSize = 25;
 
-    for (final studentId in studentIds) {
-      final code = await createLinkCode(
-        studentId: studentId,
-        schoolId: schoolId,
-        createdBy: createdBy,
-        validityDays: validityDays,
+    for (var i = 0; i < dedupedStudentIds.length; i += chunkSize) {
+      final chunk = dedupedStudentIds.skip(i).take(chunkSize).toList();
+      final generatedChunk = await Future.wait(
+        chunk.map((studentId) async {
+          final code = await createLinkCode(
+            studentId: studentId,
+            schoolId: schoolId,
+            createdBy: createdBy,
+            validityDays: validityDays,
+          );
+          return MapEntry(studentId, code);
+        }),
       );
-      codes[studentId] = code;
+
+      for (final entry in generatedChunk) {
+        codes[entry.key] = entry.value;
+      }
     }
 
     return codes;
@@ -102,34 +141,49 @@ class ParentLinkingService {
     final query = await _firestore
         .collection('studentLinkCodes')
         .where('code', isEqualTo: code.toUpperCase())
-        .limit(1)
+        .limit(10)
         .get();
 
     if (query.docs.isEmpty) {
       throw InvalidCodeException();
     }
 
-    final linkCode = StudentLinkCodeModel.fromFirestore(query.docs.first);
+    final parsedCodes =
+        query.docs.map(StudentLinkCodeModel.fromFirestore).toList()
+          ..sort((a, b) {
+            final aPriority = _priorityForCode(a);
+            final bPriority = _priorityForCode(b);
+            if (aPriority != bPriority) return aPriority.compareTo(bPriority);
+            return b.createdAt.compareTo(a.createdAt);
+          });
 
-    // Check if code is usable and throw specific exceptions
-    if (linkCode.status == LinkCodeStatus.used) {
+    final bestCode = parsedCodes.first;
+
+    if (bestCode.status == LinkCodeStatus.active && !bestCode.isExpired) {
+      return bestCode;
+    }
+
+    if (bestCode.status == LinkCodeStatus.used) {
       throw CodeAlreadyUsedException();
     }
 
-    if (linkCode.status == LinkCodeStatus.revoked) {
-      throw CodeRevokedException(reason: linkCode.revokeReason);
+    if (bestCode.status == LinkCodeStatus.revoked) {
+      throw CodeRevokedException(reason: bestCode.revokeReason);
     }
 
-    if (linkCode.status == LinkCodeStatus.expired ||
-        DateTime.now().isAfter(linkCode.expiresAt)) {
+    if (bestCode.status == LinkCodeStatus.expired || bestCode.isExpired) {
       throw CodeExpiredException();
     }
 
-    if (!linkCode.isUsable) {
-      throw InvalidCodeException();
-    }
+    throw InvalidCodeException();
+  }
 
-    return linkCode;
+  int _priorityForCode(StudentLinkCodeModel code) {
+    if (code.status == LinkCodeStatus.active && !code.isExpired) return 0;
+    if (code.status == LinkCodeStatus.used) return 1;
+    if (code.status == LinkCodeStatus.revoked) return 2;
+    if (code.status == LinkCodeStatus.expired || code.isExpired) return 3;
+    return 4;
   }
 
   // Link parent to student using code
@@ -139,46 +193,68 @@ class ParentLinkingService {
     required String parentUserId,
     required String parentEmail,
   }) async {
+    final normalizedCode = code.toUpperCase().trim();
+    final verifiedCode = await verifyCode(normalizedCode);
+
     return await _firestore.runTransaction<bool>((transaction) async {
       try {
-        // 1. Verify code and get link code document
-        final codeQuery = await _firestore
-            .collection('studentLinkCodes')
-            .where('code', isEqualTo: code.toUpperCase())
-            .limit(1)
-            .get();
-
-        if (codeQuery.docs.isEmpty) {
+        // 1. Re-read verified code inside transaction to prevent race conditions.
+        final linkCodeRef =
+            _firestore.collection('studentLinkCodes').doc(verifiedCode.id);
+        final freshCodeSnapshot = await transaction.get(linkCodeRef);
+        if (!freshCodeSnapshot.exists) {
           throw InvalidCodeException();
         }
 
-        final codeDoc = codeQuery.docs.first;
-        final linkCode = StudentLinkCodeModel.fromFirestore(codeDoc);
+        final freshCodeData = freshCodeSnapshot.data()!;
+        final freshStatus = freshCodeData['status'] as String? ?? '';
+        final freshCodeValue =
+            (freshCodeData['code'] as String? ?? '').toUpperCase();
+        if (freshCodeValue != normalizedCode) {
+          throw InvalidCodeException();
+        }
 
-        // Check if code is usable (active and not expired)
-        if (linkCode.status == LinkCodeStatus.used) {
+        final dynamic expiresAtRaw =
+            freshCodeData['expiresAt'] ?? freshCodeData['expiryDate'];
+        DateTime? expiresAt;
+        if (expiresAtRaw is Timestamp) {
+          expiresAt = expiresAtRaw.toDate();
+        } else if (expiresAtRaw is DateTime) {
+          expiresAt = expiresAtRaw;
+        } else if (expiresAtRaw is String) {
+          expiresAt = DateTime.tryParse(expiresAtRaw);
+        }
+        if (expiresAt == null) {
+          throw InvalidCodeException();
+        }
+
+        if (freshStatus == 'used') {
           throw CodeAlreadyUsedException();
         }
-
-        if (linkCode.status == LinkCodeStatus.revoked) {
-          throw CodeRevokedException(reason: linkCode.revokeReason);
+        if (freshStatus == 'revoked') {
+          throw CodeRevokedException(
+            reason: freshCodeData['revokeReason'] as String?,
+          );
         }
-
-        if (linkCode.status == LinkCodeStatus.expired ||
-            DateTime.now().isAfter(linkCode.expiresAt)) {
+        if (freshStatus == 'expired' || DateTime.now().isAfter(expiresAt)) {
           throw CodeExpiredException();
         }
-
-        if (!linkCode.isUsable) {
+        if (freshStatus != 'active') {
           throw InvalidCodeException();
         }
 
-        // 2. Get student document reference and read within transaction
+        final schoolId = freshCodeData['schoolId'] as String? ?? '';
+        final studentId = freshCodeData['studentId'] as String? ?? '';
+        if (schoolId.isEmpty || studentId.isEmpty) {
+          throw InvalidCodeException();
+        }
+
+        // 2. Get student document reference and read within transaction.
         final studentRef = _firestore
             .collection('schools')
-            .doc(linkCode.schoolId)
+            .doc(schoolId)
             .collection('students')
-            .doc(linkCode.studentId);
+            .doc(studentId);
 
         final studentSnapshot = await transaction.get(studentRef);
 
@@ -196,27 +272,9 @@ class ParentLinkingService {
         // 4. Get parent document reference
         final parentRef = _firestore
             .collection('schools')
-            .doc(linkCode.schoolId)
+            .doc(schoolId)
             .collection('parents')
             .doc(parentUserId);
-
-        // 5. Get code document reference
-        final linkCodeRef = _firestore
-            .collection('studentLinkCodes')
-            .doc(linkCode.id);
-
-        // Re-check code status within transaction to prevent race condition
-        // This ensures another parent hasn't used the code between our initial check and now
-        final freshCodeSnapshot = await transaction.get(linkCodeRef);
-        if (!freshCodeSnapshot.exists) {
-          throw InvalidCodeException();
-        }
-
-        final freshCodeData = freshCodeSnapshot.data()!;
-
-        if (freshCodeData['status'] != 'active') {
-          throw CodeAlreadyUsedException();
-        }
 
         // 6. ATOMIC UPDATES - All operations succeed or all fail
 
@@ -225,11 +283,15 @@ class ParentLinkingService {
           'parentIds': FieldValue.arrayUnion([parentUserId]),
         });
 
-        // Update parent with linked child
-        transaction.update(parentRef, {
-          'linkedChildren': FieldValue.arrayUnion([linkCode.studentId]),
-          'schoolId': linkCode.schoolId,
-        });
+        // Update parent with linked child (upsert for recovery-safe retries).
+        transaction.set(
+            parentRef,
+            {
+              'linkedChildren': FieldValue.arrayUnion([studentId]),
+              'schoolId': schoolId,
+              'updatedAt': FieldValue.serverTimestamp(),
+            },
+            SetOptions(merge: true));
 
         // Mark code as used
         transaction.update(linkCodeRef, {
@@ -243,8 +305,8 @@ class ParentLinkingService {
         // Using Future.delayed to ensure it runs after transaction completes
         Future.delayed(Duration.zero, () {
           _createLinkNotification(
-            schoolId: linkCode.schoolId,
-            studentId: linkCode.studentId,
+            schoolId: schoolId,
+            studentId: studentId,
             parentUserId: parentUserId,
             parentEmail: parentEmail,
           ).catchError((error) {
@@ -335,10 +397,29 @@ class ParentLinkingService {
     List<String> studentIds,
   ) async {
     final Map<String, StudentLinkCodeModel?> codes = {};
+    final dedupedStudentIds = studentIds.toSet().toList(growable: false);
 
-    for (final studentId in studentIds) {
-      final code = await getActiveCodeForStudent(studentId);
-      codes[studentId] = code;
+    if (dedupedStudentIds.isEmpty) {
+      return codes;
+    }
+
+    for (var i = 0; i < dedupedStudentIds.length; i += 30) {
+      final chunk = dedupedStudentIds.skip(i).take(30).toList();
+      final query = await _firestore
+          .collection('studentLinkCodes')
+          .where('studentId', whereIn: chunk)
+          .where('status', isEqualTo: 'active')
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      for (final doc in query.docs) {
+        final model = StudentLinkCodeModel.fromFirestore(doc);
+        codes.putIfAbsent(model.studentId, () => model);
+      }
+    }
+
+    for (final studentId in dedupedStudentIds) {
+      codes.putIfAbsent(studentId, () => null);
     }
 
     return codes;
@@ -349,6 +430,8 @@ class ParentLinkingService {
     required String schoolId,
     required String studentId,
     required String parentUserId,
+    String? unlinkedBy,
+    String? reason,
   }) async {
     // Use transaction to ensure atomic updates (both succeed or both fail)
     await _firestore.runTransaction((transaction) async {
@@ -403,9 +486,9 @@ class ParentLinkingService {
       for (final codeDoc in linkCodesSnapshot.docs) {
         transaction.update(codeDoc.reference, {
           'status': 'revoked',
-          'revokedBy': parentUserId,
+          'revokedBy': unlinkedBy ?? parentUserId,
           'revokedAt': FieldValue.serverTimestamp(),
-          'revokeReason': 'Parent unlinked from student',
+          'revokeReason': reason ?? 'Parent unlinked from student',
         });
       }
     });

@@ -341,6 +341,147 @@ void main() {
       });
     });
 
+    group('ReadingFeeling and parent comment', () {
+      test('childFeeling serializes and deserializes via local storage', () {
+        final log = ReadingLogModel(
+          id: 'feeling-log',
+          studentId: 'student-1',
+          parentId: 'parent-1',
+          schoolId: 'school-1',
+          classId: 'class-1',
+          date: testDateTime,
+          minutesRead: 20,
+          targetMinutes: 20,
+          bookTitles: ['Test Book'],
+          status: LogStatus.completed,
+          createdAt: testDateTime,
+          childFeeling: ReadingFeeling.great,
+          parentComment: 'Great job!',
+        );
+
+        final localMap = log.toLocal();
+        expect(localMap['childFeeling'], equals('great'));
+        expect(localMap['parentComment'], equals('Great job!'));
+
+        final restored = ReadingLogModel.fromLocal(localMap);
+        expect(restored.childFeeling, equals(ReadingFeeling.great));
+        expect(restored.parentComment, equals('Great job!'));
+      });
+
+      test('childFeeling serializes and deserializes via Firestore', () async {
+        final firestore = TestHelpers.createFakeFirestore();
+        final log = ReadingLogModel(
+          id: 'feeling-firestore',
+          studentId: 'student-1',
+          parentId: 'parent-1',
+          schoolId: 'school-1',
+          classId: 'class-1',
+          date: testDateTime,
+          minutesRead: 20,
+          targetMinutes: 20,
+          bookTitles: ['Test Book'],
+          status: LogStatus.completed,
+          createdAt: testDateTime,
+          childFeeling: ReadingFeeling.tricky,
+          parentComment: 'Sounded out words well',
+        );
+
+        await firestore
+            .collection('readingLogs')
+            .doc(log.id)
+            .set(log.toFirestore());
+
+        final doc =
+            await firestore.collection('readingLogs').doc(log.id).get();
+        final restored = ReadingLogModel.fromFirestore(doc);
+
+        expect(restored.childFeeling, equals(ReadingFeeling.tricky));
+        expect(restored.parentComment, equals('Sounded out words well'));
+      });
+
+      test('null childFeeling is handled correctly', () {
+        final log = ReadingLogModel(
+          id: 'no-feeling-log',
+          studentId: 'student-1',
+          parentId: 'parent-1',
+          schoolId: 'school-1',
+          classId: 'class-1',
+          date: testDateTime,
+          minutesRead: 20,
+          targetMinutes: 20,
+          bookTitles: [],
+          status: LogStatus.completed,
+          createdAt: testDateTime,
+          childFeeling: null,
+          parentComment: null,
+        );
+
+        final map = log.toFirestore();
+        expect(map['childFeeling'], isNull);
+        expect(map['parentComment'], isNull);
+      });
+
+      test('all ReadingFeeling values roundtrip through local storage', () {
+        for (final feeling in ReadingFeeling.values) {
+          final log = ReadingLogModel(
+            id: 'feeling-${feeling.name}',
+            studentId: 'student-1',
+            parentId: 'parent-1',
+            schoolId: 'school-1',
+            classId: 'class-1',
+            date: testDateTime,
+            minutesRead: 20,
+            targetMinutes: 20,
+            bookTitles: [],
+            status: LogStatus.completed,
+            createdAt: testDateTime,
+            childFeeling: feeling,
+          );
+
+          final localMap = log.toLocal();
+          final restored = ReadingLogModel.fromLocal(localMap);
+          expect(restored.childFeeling, equals(feeling),
+              reason: 'Failed roundtrip for ${feeling.name}');
+        }
+      });
+
+      test('copyWith updates childFeeling and parentComment', () {
+        final original = ReadingLogModel(
+          id: 'copy-feeling',
+          studentId: 'student-1',
+          parentId: 'parent-1',
+          schoolId: 'school-1',
+          classId: 'class-1',
+          date: testDateTime,
+          minutesRead: 20,
+          targetMinutes: 20,
+          bookTitles: [],
+          status: LogStatus.completed,
+          createdAt: testDateTime,
+          childFeeling: ReadingFeeling.okay,
+          parentComment: 'Original comment',
+        );
+
+        final updated = original.copyWith(
+          childFeeling: ReadingFeeling.great,
+          parentComment: 'Updated comment',
+        );
+
+        expect(updated.childFeeling, equals(ReadingFeeling.great));
+        expect(updated.parentComment, equals('Updated comment'));
+        expect(updated.id, equals(original.id));
+      });
+
+      test('ReadingFeeling enum has 5 values', () {
+        expect(ReadingFeeling.values.length, equals(5));
+        expect(ReadingFeeling.values, contains(ReadingFeeling.hard));
+        expect(ReadingFeeling.values, contains(ReadingFeeling.tricky));
+        expect(ReadingFeeling.values, contains(ReadingFeeling.okay));
+        expect(ReadingFeeling.values, contains(ReadingFeeling.good));
+        expect(ReadingFeeling.values, contains(ReadingFeeling.great));
+      });
+    });
+
     group('edge cases', () {
       test('handles empty book titles list', () {
         final log = ReadingLogModel(

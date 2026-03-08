@@ -7,6 +7,16 @@ enum LogStatus {
   pending,
 }
 
+/// How the child felt about the reading session.
+/// Maps to the 5 blob character assets in assets/blobs/.
+enum ReadingFeeling {
+  hard,    // blob-hard.png
+  tricky,  // blob-tricky.png
+  okay,    // blob-okay.png
+  good,    // blob-good.png
+  great,   // blob-great.png
+}
+
 class ReadingLogModel {
   final String id;
   final String studentId;
@@ -25,6 +35,12 @@ class ReadingLogModel {
   final DateTime? syncedAt;
   final String? allocationId; // Links to the allocation this fulfills
   final Map<String, dynamic>? metadata;
+
+  // Child's self-assessment of how the reading went
+  final ReadingFeeling? childFeeling;
+
+  // Parent's comment using template chips
+  final String? parentComment;
 
   // For teacher feedback
   final String? teacherComment;
@@ -49,6 +65,8 @@ class ReadingLogModel {
     this.syncedAt,
     this.allocationId,
     this.metadata,
+    this.childFeeling,
+    this.parentComment,
     this.teacherComment,
     this.commentedAt,
     this.commentedBy,
@@ -84,6 +102,13 @@ class ReadingLogModel {
           : null,
       allocationId: data['allocationId'],
       metadata: data['metadata'],
+      childFeeling: data['childFeeling'] != null
+          ? ReadingFeeling.values.firstWhere(
+              (e) => e.toString() == 'ReadingFeeling.${data['childFeeling']}',
+              orElse: () => ReadingFeeling.okay,
+            )
+          : null,
+      parentComment: data['parentComment'],
       teacherComment: data['teacherComment'],
       commentedAt: data['commentedAt'] != null
           ? (data['commentedAt'] as Timestamp).toDate()
@@ -110,6 +135,8 @@ class ReadingLogModel {
       'syncedAt': syncedAt != null ? Timestamp.fromDate(syncedAt!) : null,
       'allocationId': allocationId,
       'metadata': metadata,
+      'childFeeling': childFeeling?.toString().split('.').last,
+      'parentComment': parentComment,
       'teacherComment': teacherComment,
       'commentedAt': commentedAt != null
           ? Timestamp.fromDate(commentedAt!)
@@ -136,6 +163,8 @@ class ReadingLogModel {
     DateTime? syncedAt,
     String? allocationId,
     Map<String, dynamic>? metadata,
+    ReadingFeeling? childFeeling,
+    String? parentComment,
     String? teacherComment,
     DateTime? commentedAt,
     String? commentedBy,
@@ -158,6 +187,8 @@ class ReadingLogModel {
       syncedAt: syncedAt ?? this.syncedAt,
       allocationId: allocationId ?? this.allocationId,
       metadata: metadata ?? this.metadata,
+      childFeeling: childFeeling ?? this.childFeeling,
+      parentComment: parentComment ?? this.parentComment,
       teacherComment: teacherComment ?? this.teacherComment,
       commentedAt: commentedAt ?? this.commentedAt,
       commentedBy: commentedBy ?? this.commentedBy,
@@ -184,6 +215,8 @@ class ReadingLogModel {
       'syncedAt': syncedAt?.toIso8601String(),
       'allocationId': allocationId,
       'metadata': metadata,
+      'childFeeling': childFeeling?.toString().split('.').last,
+      'parentComment': parentComment,
       'teacherComment': teacherComment,
       'commentedAt': commentedAt?.toIso8601String(),
       'commentedBy': commentedBy,
@@ -216,6 +249,13 @@ class ReadingLogModel {
           : null,
       allocationId: map['allocationId'],
       metadata: map['metadata'],
+      childFeeling: map['childFeeling'] != null
+          ? ReadingFeeling.values.firstWhere(
+              (e) => e.toString() == 'ReadingFeeling.${map['childFeeling']}',
+              orElse: () => ReadingFeeling.okay,
+            )
+          : null,
+      parentComment: map['parentComment'],
       teacherComment: map['teacherComment'],
       commentedAt: map['commentedAt'] != null
           ? DateTime.parse(map['commentedAt'])

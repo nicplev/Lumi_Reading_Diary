@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
-import 'dart:io';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/lumi_text_styles.dart';
-import '../../core/theme/lumi_spacing.dart';
-import '../../core/theme/lumi_borders.dart';
-import '../../core/widgets/lumi_mascot.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_card.dart';
+import '../../core/widgets/lumi/blob_selector.dart';
+import '../../core/widgets/lumi/comment_chips.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/allocation_model.dart';
@@ -36,12 +33,25 @@ class LogReadingScreen extends StatefulWidget {
 
 class _LogReadingScreenState extends State<LogReadingScreen> {
   final FirebaseService _firebaseService = FirebaseService.instance;
-  final TextEditingController _notesController = TextEditingController();
+  final PageController _pageController = PageController();
   final TextEditingController _bookTitleController = TextEditingController();
-  final List<String> _bookTitles = [];
+  final TextEditingController _notesController = TextEditingController();
 
+  int _currentStep = 0;
+  static const _totalSteps = 4;
+
+  // Step 1: Book selection
+  final List<String> _bookTitles = [];
+  String? _selectedBookTitle;
   int _selectedMinutes = 20;
-  File? _selectedImage;
+
+  // Step 2: Child feeling
+  ReadingFeeling? _selectedFeeling;
+
+  // Step 3: Parent comment
+  List<String> _selectedComments = [];
+
+  // Step 4: Confirmation
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -50,105 +60,98 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
     super.initState();
     _selectedMinutes = widget.allocation?.targetMinutes ?? 20;
 
-    // Pre-populate book titles if allocation has specific titles
     if (widget.allocation != null &&
         widget.allocation!.bookTitles != null &&
         widget.allocation!.bookTitles!.isNotEmpty) {
       _bookTitles.addAll(widget.allocation!.bookTitles!);
+      _selectedBookTitle = _bookTitles.first;
     }
   }
 
   @override
   void dispose() {
-    _notesController.dispose();
+    _pageController.dispose();
     _bookTitleController.dispose();
+    _notesController.dispose();
     super.dispose();
   }
 
-  Future<void> _selectImage() async {
-    final ImagePicker picker = ImagePicker();
+  void _nextStep() {
+    if (_currentStep == 0 && _selectedBookTitle == null && _bookTitles.isEmpty) {
+      setState(() => _errorMessage = 'Please select or enter a book');
+      return;
+    }
+    setState(() => _errorMessage = null);
 
-    showModalBottomSheet(
-      context: context,
-      builder: (BuildContext context) {
-        return SafeArea(
-          child: Wrap(
-            children: <Widget>[
-              ListTile(
-                leading: const Icon(Icons.photo_library),
-                title: const Text('Choose from Gallery'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  final XFile? image = await picker.pickImage(
-                    source: ImageSource.gallery,
-                    maxWidth: 1024,
-                    maxHeight: 1024,
-                    imageQuality: 85,
-                  );
-                  if (image != null) {
-                    setState(() {
-                      _selectedImage = File(image.path);
-                    });
-                  }
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_camera),
-                title: const Text('Take a Photo'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  final XFile? image = await picker.pickImage(
-                    source: ImageSource.camera,
-                    maxWidth: 1024,
-                    maxHeight: 1024,
-                    imageQuality: 85,
-                  );
-                  if (image != null) {
-                    setState(() {
-                      _selectedImage = File(image.path);
-                    });
-                  }
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
+    if (_currentStep < _totalSteps - 1) {
+      setState(() => _currentStep++);
+      _pageController.animateToPage(
+        _currentStep,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  void _previousStep() {
+    if (_currentStep > 0) {
+      setState(() {
+        _currentStep--;
+        _errorMessage = null;
+      });
+      _pageController.animateToPage(
+        _currentStep,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  List<String> get _finalBookTitles {
+    if (_selectedBookTitle != null && !_bookTitles.contains(_selectedBookTitle)) {
+      return [_selectedBookTitle!, ..._bookTitles];
+    }
+    if (_selectedBookTitle != null) {
+      return [_selectedBookTitle!];
+    }
+    return _bookTitles;
+  }
+
+  String get _parentCommentText {
+    final chips = _selectedComments.join('. ');
+    final notes = _notesController.text.trim();
+    if (chips.isNotEmpty && notes.isNotEmpty) {
+      return '$chips. $notes';
+    }
+    return chips.isNotEmpty ? chips : notes;
   }
 
   Future<void> _saveReadingLog() async {
-    if (_bookTitles.isEmpty) {
-      setState(() {
-        _errorMessage = 'Please add at least one book title';
-      });
-      return;
-    }
-
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      // Create reading log
+      final now = DateTime.now();
       final log = ReadingLogModel(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        id: now.millisecondsSinceEpoch.toString(),
         studentId: widget.student.id,
         parentId: widget.parent.id,
         schoolId: widget.student.schoolId,
         classId: widget.student.classId,
-        date: DateTime.now(),
+        date: now,
         minutesRead: _selectedMinutes,
         targetMinutes: widget.allocation?.targetMinutes ?? 20,
         status: LogStatus.completed,
-        bookTitles: _bookTitles,
+        bookTitles: _finalBookTitles,
         notes: _notesController.text.isNotEmpty ? _notesController.text : null,
-        createdAt: DateTime.now(),
+        childFeeling: _selectedFeeling,
+        parentComment: _parentCommentText.isNotEmpty ? _parentCommentText : null,
+        createdAt: now,
         allocationId: widget.allocation?.id,
       );
 
-      // Save to Firestore using nested structure
       await _firebaseService.firestore
           .collection('schools')
           .doc(widget.parent.schoolId)
@@ -156,12 +159,15 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
           .doc(log.id)
           .set(log.toFirestore());
 
-      // Update student stats
-      await _updateStudentStats();
+      final updatedStats = await _updateStudentStats();
 
-      // Show success animation
       if (mounted) {
-        _showSuccessDialog();
+        context.go('/parent/reading-success', extra: {
+          'student': widget.student,
+          'parent': widget.parent,
+          'readingLog': log,
+          'updatedStats': updatedStats,
+        });
       }
     } catch (e) {
       setState(() {
@@ -171,13 +177,15 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
     }
   }
 
-  Future<void> _updateStudentStats() async {
+  Future<Map<String, dynamic>?> _updateStudentStats() async {
     try {
       final studentRef = _firebaseService.firestore
           .collection('schools')
           .doc(widget.parent.schoolId)
           .collection('students')
           .doc(widget.student.id);
+
+      Map<String, dynamic>? newStats;
 
       await _firebaseService.firestore.runTransaction((transaction) async {
         final studentDoc = await transaction.get(studentRef);
@@ -192,7 +200,6 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
           final totalBooksRead = stats['totalBooksRead'] ?? 0;
           final totalReadingDays = stats['totalReadingDays'] ?? 0;
 
-          // Check if this continues a streak
           final lastReadingDate = stats['lastReadingDate'] != null
               ? (stats['lastReadingDate'] as Timestamp).toDate()
               : null;
@@ -204,78 +211,31 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
             if (daysSinceLastReading == 1) {
               newStreak = currentStreak + 1;
             } else if (daysSinceLastReading == 0) {
-              // Already logged today, don't update streak
               newStreak = currentStreak;
             }
           }
 
-          transaction.update(studentRef, {
-            'stats': {
-              'totalMinutesRead': totalMinutesRead + _selectedMinutes,
-              'totalBooksRead': totalBooksRead + _bookTitles.length,
-              'currentStreak': newStreak,
-              'longestStreak':
-                  newStreak > longestStreak ? newStreak : longestStreak,
-              'lastReadingDate': FieldValue.serverTimestamp(),
-              'totalReadingDays': totalReadingDays + 1,
-              'averageMinutesPerDay': (totalMinutesRead + _selectedMinutes) /
-                  (totalReadingDays + 1),
-            },
-          });
+          newStats = {
+            'totalMinutesRead': totalMinutesRead + _selectedMinutes,
+            'totalBooksRead': totalBooksRead + _finalBookTitles.length,
+            'currentStreak': newStreak,
+            'longestStreak':
+                newStreak > longestStreak ? newStreak : longestStreak,
+            'lastReadingDate': FieldValue.serverTimestamp(),
+            'totalReadingDays': totalReadingDays + 1,
+            'averageMinutesPerDay': (totalMinutesRead + _selectedMinutes) /
+                (totalReadingDays + 1),
+          };
+
+          transaction.update(studentRef, {'stats': newStats});
         }
       });
+
+      return newStats;
     } catch (e) {
       debugPrint('Error updating student stats: $e');
+      return null;
     }
-  }
-
-  void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape: LumiBorders.shapeLarge,
-          child: Container(
-            padding: LumiPadding.allM,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Animate(
-                  effects: const [
-                    ScaleEffect(duration: Duration(milliseconds: 500)),
-                  ],
-                  child: const LumiMascot(
-                    mood: LumiMood.celebrating,
-                    size: 120,
-                  ),
-                ),
-                LumiGap.s,
-                Text(
-                  'Great Job!',
-                  style: LumiTextStyles.h2(color: AppColors.charcoal),
-                ),
-                LumiGap.xs,
-                Text(
-                  '${widget.student.firstName} completed $_selectedMinutes minutes of reading!',
-                  textAlign: TextAlign.center,
-                  style: LumiTextStyles.bodyLarge(color: AppColors.charcoal.withValues(alpha: 0.7)),
-                ),
-                LumiGap.m,
-                LumiPrimaryButton(
-                  onPressed: () {
-                    context.pop(); // Close dialog
-                    context.pop(true); // Return to home with success
-                  },
-                  text: 'Continue',
-                  isFullWidth: true,
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
   }
 
   @override
@@ -283,306 +243,52 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
     return Scaffold(
       backgroundColor: AppColors.offWhite,
       appBar: AppBar(
-        title: Text('Log Reading - ${widget.student.firstName}', style: LumiTextStyles.h3()),
+        title: Text(
+          'Log Reading - ${widget.student.firstName}',
+          style: LumiTextStyles.h3(),
+        ),
         backgroundColor: AppColors.white,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => context.pop(),
+        ),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: LumiPadding.allS,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Minutes selector
-              LumiCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.timer, color: AppColors.rosePink),
-                        LumiGap.horizontalXS,
-                        Text(
-                          'Reading Time',
-                          style: LumiTextStyles.h3(),
-                        ),
-                      ],
-                    ),
-                    LumiGap.s,
+        child: Column(
+          children: [
+            // Step indicator
+            _buildStepIndicator(),
 
-                    Center(
-                      child: Column(
-                        children: [
-                          Text(
-                            '$_selectedMinutes',
-                            style: LumiTextStyles.display(color: AppColors.rosePink),
-                          ),
-                          Text(
-                            'minutes',
-                            style: LumiTextStyles.h3(color: AppColors.charcoal.withValues(alpha: 0.7)),
-                          ),
-                        ],
-                      ),
-                    ),
+            // Page content
+            Expanded(
+              child: PageView(
+                controller: _pageController,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  _buildStep1BookSelection(),
+                  _buildStep2ChildAssessment(),
+                  _buildStep3ParentComment(),
+                  _buildStep4Confirmation(),
+                ],
+              ),
+            ),
 
-                    LumiGap.s,
-
-                    // Quick select buttons
-                    Wrap(
-                      spacing: LumiSpacing.xs,
-                      runSpacing: LumiSpacing.xs,
-                      alignment: WrapAlignment.center,
-                      children: [10, 15, 20, 25, 30, 45, 60].map((minutes) {
-                        return ChoiceChip(
-                          label: Text('$minutes min'),
-                          selected: _selectedMinutes == minutes,
-                          onSelected: (selected) {
-                            if (selected) {
-                              setState(() {
-                                _selectedMinutes = minutes;
-                              });
-                            }
-                          },
-                          selectedColor: AppColors.rosePink,
-                          labelStyle: TextStyle(
-                            color: _selectedMinutes == minutes
-                                ? AppColors.white
-                                : AppColors.charcoal,
-                            fontWeight: _selectedMinutes == minutes
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
-                        );
-                      }).toList(),
-                    ),
-
-                    LumiGap.xs,
-
-                    // Custom slider
-                    Slider(
-                      value: _selectedMinutes.toDouble(),
-                      min: 5,
-                      max: 120,
-                      divisions: 23,
-                      label: '$_selectedMinutes minutes',
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedMinutes = value.round();
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ).animate().fadeIn(),
-
-              LumiGap.s,
-
-              // Books read
-              LumiCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.book, color: AppColors.secondaryPurple),
-                        LumiGap.horizontalXS,
-                        Text(
-                          'Books Read',
-                          style: LumiTextStyles.h3(),
-                        ),
-                      ],
-                    ),
-                    LumiGap.xs,
-
-                    // Note about flexible book system
-                    if (widget.allocation == null ||
-                        widget.allocation!.type ==
-                            AllocationType.freeChoice) ...[
-                      Container(
-                        padding: LumiPadding.allXS,
-                        decoration: BoxDecoration(
-                          color: AppColors.info.withValues(alpha: 0.1),
-                          borderRadius: LumiBorders.small,
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.info_outline,
-                                color: AppColors.info, size: 20),
-                            LumiGap.horizontalXS,
-                            Expanded(
-                              child: Text(
-                                'Add any books or reading materials',
-                                style: LumiTextStyles.bodySmall(color: AppColors.info),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      LumiGap.xs,
-                    ],
-
-                    // Book list
-                    ..._bookTitles.map((title) => Padding(
-                          padding: EdgeInsets.only(bottom: LumiSpacing.xxs),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.offWhite,
-                              borderRadius: LumiBorders.medium,
-                            ),
-                            child: ListTile(
-                              leading: const Icon(Icons.menu_book,
-                                  color: AppColors.secondaryPurple),
-                              title: Text(title),
-                              trailing: IconButton(
-                                icon: Icon(Icons.close,
-                                    color: AppColors.charcoal.withValues(alpha: 0.7)),
-                                onPressed: () {
-                                  setState(() {
-                                    _bookTitles.remove(title);
-                                  });
-                                },
-                              ),
-                            ),
-                          ),
-                        )),
-
-                    LumiGap.xs,
-
-                    // Add book field
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _bookTitleController,
-                            decoration: const InputDecoration(
-                              hintText: 'Enter book title or material',
-                              prefixIcon: Icon(Icons.add),
-                            ),
-                            textInputAction: TextInputAction.done,
-                            onSubmitted: (value) {
-                              if (value.isNotEmpty) {
-                                setState(() {
-                                  _bookTitles.add(value);
-                                  _bookTitleController.clear();
-                                });
-                              }
-                            },
-                          ),
-                        ),
-                        LumiGap.horizontalXS,
-                        IconButton(
-                          onPressed: () {
-                            if (_bookTitleController.text.isNotEmpty) {
-                              setState(() {
-                                _bookTitles.add(_bookTitleController.text);
-                                _bookTitleController.clear();
-                              });
-                            }
-                          },
-                          icon: const Icon(Icons.add_circle),
-                          color: AppColors.rosePink,
-                          iconSize: 32,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ).animate().fadeIn(delay: 200.ms),
-
-              LumiGap.s,
-
-              // Optional notes
-              LumiCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.note, color: AppColors.secondaryYellow),
-                        LumiGap.horizontalXS,
-                        Text(
-                          'Notes (Optional)',
-                          style: LumiTextStyles.h3(),
-                        ),
-                      ],
-                    ),
-                    LumiGap.xs,
-                    TextField(
-                      controller: _notesController,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        hintText:
-                            'How did the reading go? Any challenges or achievements?',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ],
-                ),
-              ).animate().fadeIn(delay: 400.ms),
-
-              LumiGap.s,
-
-              // Photo attachment
-              LumiCard(
-                child: InkWell(
-                  onTap: _selectImage,
-                  borderRadius: LumiBorders.large,
-                  child: Column(
-                    children: [
-                      if (_selectedImage != null) ...[
-                        ClipRRect(
-                          borderRadius: LumiBorders.medium,
-                          child: Image.file(
-                            _selectedImage!,
-                            height: 200,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        LumiGap.xs,
-                        LumiTextButton(
-                          onPressed: () {
-                            setState(() {
-                              _selectedImage = null;
-                            });
-                          },
-                          text: 'Remove Photo',
-                          icon: Icons.delete,
-                        ),
-                      ] else ...[
-                        Icon(
-                          Icons.add_a_photo,
-                          size: 48,
-                          color: AppColors.charcoal.withValues(alpha: 0.7),
-                        ),
-                        LumiGap.xs,
-                        Text(
-                          'Add a photo (optional)',
-                          style: LumiTextStyles.bodyLarge(
-                            color: AppColors.charcoal.withValues(alpha: 0.7),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ).animate().fadeIn(delay: 600.ms),
-
-              // Error message
-              if (_errorMessage != null) ...[
-                LumiGap.s,
-                Container(
-                  padding: LumiPadding.allXS,
+            // Error message
+            if (_errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: AppColors.error.withValues(alpha: 0.1),
-                    borderRadius: LumiBorders.small,
-                    border: Border.all(color: AppColors.error),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     children: [
                       const Icon(Icons.error_outline,
                           color: AppColors.error, size: 20),
-                      LumiGap.horizontalXS,
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _errorMessage!,
@@ -592,22 +298,413 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
                     ],
                   ),
                 ),
+              ),
+
+            // Navigation buttons
+            _buildNavigationButtons(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStepIndicator() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+      child: Row(
+        children: List.generate(_totalSteps, (index) {
+          final isActive = index == _currentStep;
+          final isCompleted = index < _currentStep;
+          return Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(right: index < _totalSteps - 1 ? 8 : 0),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isCompleted
+                      ? AppColors.rosePink
+                      : isActive
+                          ? AppColors.rosePink.withValues(alpha: 0.6)
+                          : AppColors.charcoal.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  // ─── Step 1: Book Selection ──────────────────────────────
+
+  Widget _buildStep1BookSelection() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('What did you read?', style: LumiTextStyles.h2()),
+          const SizedBox(height: 8),
+          Text(
+            'Select a book or add your own',
+            style: LumiTextStyles.bodySmall(
+              color: AppColors.charcoal.withValues(alpha: 0.6),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Assigned books as radio list
+          if (_bookTitles.isNotEmpty) ...[
+            LumiCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Assigned Books', style: LumiTextStyles.label()),
+                  const SizedBox(height: 12),
+                  ..._bookTitles.map((title) => RadioListTile<String>(
+                        title: Text(title, style: LumiTextStyles.body()),
+                        value: title,
+                        groupValue: _selectedBookTitle,
+                        activeColor: AppColors.rosePink,
+                        onChanged: (value) {
+                          setState(() => _selectedBookTitle = value);
+                        },
+                        contentPadding: EdgeInsets.zero,
+                      )),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // Manual entry
+          LumiCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Or add a book', style: LumiTextStyles.label()),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _bookTitleController,
+                        decoration: const InputDecoration(
+                          hintText: 'Enter book title',
+                          prefixIcon: Icon(Icons.add),
+                        ),
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (value) {
+                          if (value.isNotEmpty) {
+                            setState(() {
+                              _selectedBookTitle = value;
+                              _bookTitleController.clear();
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: () {
+                        if (_bookTitleController.text.isNotEmpty) {
+                          setState(() {
+                            _selectedBookTitle = _bookTitleController.text;
+                            _bookTitleController.clear();
+                          });
+                        }
+                      },
+                      icon: const Icon(Icons.add_circle),
+                      color: AppColors.rosePink,
+                      iconSize: 32,
+                    ),
+                  ],
+                ),
+                if (_selectedBookTitle != null &&
+                    !_bookTitles.contains(_selectedBookTitle))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Chip(
+                      label: Text(_selectedBookTitle!),
+                      deleteIcon: const Icon(Icons.close, size: 18),
+                      onDeleted: () {
+                        setState(() => _selectedBookTitle = null);
+                      },
+                    ),
+                  ),
               ],
+            ),
+          ),
 
-              LumiGap.m,
+          const SizedBox(height: 24),
 
-              // Save button
-              LumiPrimaryButton(
+          // Minutes selector
+          LumiCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.timer, color: AppColors.rosePink),
+                    const SizedBox(width: 8),
+                    Text('Reading Time', style: LumiTextStyles.label()),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Center(
+                  child: Text(
+                    '$_selectedMinutes min',
+                    style: LumiTextStyles.display(color: AppColors.rosePink),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.center,
+                  children: [10, 15, 20, 25, 30].map((minutes) {
+                    return ChoiceChip(
+                      label: Text('$minutes'),
+                      selected: _selectedMinutes == minutes,
+                      onSelected: (selected) {
+                        if (selected) setState(() => _selectedMinutes = minutes);
+                      },
+                      selectedColor: AppColors.rosePink,
+                      labelStyle: TextStyle(
+                        color: _selectedMinutes == minutes
+                            ? AppColors.white
+                            : AppColors.charcoal,
+                        fontWeight: _selectedMinutes == minutes
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn();
+  }
+
+  // ─── Step 2: Child Assessment ────────────────────────────
+
+  Widget _buildStep2ChildAssessment() {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: BlobSelector(
+          selectedFeeling: _selectedFeeling,
+          onFeelingSelected: (feeling) {
+            setState(() => _selectedFeeling = feeling);
+          },
+        ),
+      ),
+    ).animate().fadeIn();
+  }
+
+  // ─── Step 3: Parent Comment ──────────────────────────────
+
+  Widget _buildStep3ParentComment() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CommentChips(
+            selectedComments: _selectedComments,
+            onCommentsChanged: (comments) {
+              setState(() => _selectedComments = comments);
+            },
+          ),
+          const SizedBox(height: 24),
+          Text('Additional notes', style: LumiTextStyles.label()),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _notesController,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              hintText: 'Anything else to add? (optional)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn();
+  }
+
+  // ─── Step 4: Confirmation ────────────────────────────────
+
+  Widget _buildStep4Confirmation() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Text('Confirm Reading', style: LumiTextStyles.h2()),
+          const SizedBox(height: 8),
+          Text(
+            'Review and confirm tonight\'s reading',
+            style: LumiTextStyles.bodySmall(
+              color: AppColors.charcoal.withValues(alpha: 0.6),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Summary card
+          LumiCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSummaryRow(
+                  Icons.menu_book,
+                  'Book',
+                  _selectedBookTitle ?? 'Not selected',
+                ),
+                const Divider(height: 24),
+                _buildSummaryRow(
+                  Icons.timer,
+                  'Duration',
+                  '$_selectedMinutes minutes',
+                ),
+                if (_selectedFeeling != null) ...[
+                  const Divider(height: 24),
+                  _buildSummaryRow(
+                    Icons.emoji_emotions,
+                    'How it felt',
+                    _selectedFeeling!.name[0].toUpperCase() +
+                        _selectedFeeling!.name.substring(1),
+                  ),
+                ],
+                if (_selectedComments.isNotEmpty) ...[
+                  const Divider(height: 24),
+                  _buildSummaryRow(
+                    Icons.chat_bubble_outline,
+                    'Comments',
+                    _selectedComments.join(', '),
+                  ),
+                ],
+                if (_notesController.text.isNotEmpty) ...[
+                  const Divider(height: 24),
+                  _buildSummaryRow(
+                    Icons.note,
+                    'Notes',
+                    _notesController.text,
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 32),
+
+          // Confirmation button with green gradient
+          SizedBox(
+            width: double.infinity,
+            height: 60,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF4CAF50), Color(0xFF66BB6A)],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF4CAF50).withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ElevatedButton.icon(
                 onPressed: _isLoading ? null : _saveReadingLog,
-                text: 'Complete Reading',
-                isFullWidth: true,
-                isLoading: _isLoading,
-              ).animate().fadeIn(delay: 800.ms),
+                icon: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(AppColors.white),
+                        ),
+                      )
+                    : const Icon(Icons.check, color: AppColors.white),
+                label: Text(
+                  'I read with my child tonight',
+                  style: LumiTextStyles.button(),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn();
+  }
 
-              LumiGap.s,
+  Widget _buildSummaryRow(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: AppColors.rosePink),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: LumiTextStyles.caption(
+                  color: AppColors.charcoal.withValues(alpha: 0.6),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(value, style: LumiTextStyles.body()),
             ],
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildNavigationButtons() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          if (_currentStep > 0)
+            Expanded(
+              child: LumiSecondaryButton(
+                onPressed: _previousStep,
+                text: 'Back',
+                icon: Icons.arrow_back,
+              ),
+            ),
+          if (_currentStep > 0) const SizedBox(width: 12),
+          if (_currentStep < _totalSteps - 1)
+            Expanded(
+              child: LumiPrimaryButton(
+                onPressed: _nextStep,
+                text: _currentStep == 0
+                    ? 'Next'
+                    : _currentStep == 1
+                        ? (_selectedFeeling != null ? 'Next' : 'Skip')
+                        : 'Review',
+                isFullWidth: true,
+              ),
+            ),
+        ],
       ),
     );
   }

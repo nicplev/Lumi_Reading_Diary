@@ -8,6 +8,7 @@ import '../../core/theme/lumi_spacing.dart';
 import '../../core/theme/lumi_borders.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_card.dart';
+import '../../core/widgets/lumi/lumi_book_card.dart';
 
 /// Screen for browsing and discovering books
 /// Shows personalized recommendations and popular books
@@ -687,21 +688,17 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
               itemCount: similar.length,
               itemBuilder: (context, index) {
                 final similarBook = similar[index];
-                return ListTile(
-                  title: Text(
-                    similarBook.title,
-                    style: LumiTextStyles.body(),
+                return Padding(
+                  padding: EdgeInsets.only(bottom: LumiSpacing.xs),
+                  child: LumiBookCard(
+                    title: similarBook.title,
+                    author: similarBook.author,
+                    coverUrl: similarBook.coverImageUrl,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _showBookDetails(similarBook);
+                    },
                   ),
-                  subtitle: Text(
-                    similarBook.author ?? 'Unknown',
-                    style: LumiTextStyles.bodySmall(
-                      color: AppColors.charcoal.withValues(alpha: 0.6),
-                    ),
-                  ),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _showBookDetails(similarBook);
-                  },
                 );
               },
             ),
@@ -767,21 +764,17 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
                     itemCount: books.length,
                     itemBuilder: (context, index) {
                       final book = books[index];
-                      return ListTile(
-                        title: Text(
-                          book.title,
-                          style: LumiTextStyles.body(),
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: LumiSpacing.xs),
+                        child: LumiBookCard(
+                          title: book.title,
+                          author: book.author,
+                          coverUrl: book.coverImageUrl,
+                          onTap: () {
+                            Navigator.of(context).pop();
+                            _showBookDetails(book);
+                          },
                         ),
-                        subtitle: Text(
-                          book.author ?? 'Unknown',
-                          style: LumiTextStyles.bodySmall(
-                            color: AppColors.charcoal.withValues(alpha: 0.6),
-                          ),
-                        ),
-                        onTap: () {
-                          Navigator.of(context).pop();
-                          _showBookDetails(book);
-                        },
                       );
                     },
                   ),

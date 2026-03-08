@@ -265,6 +265,7 @@ class LumiEmptyCard extends StatelessWidget {
   final String message;
   final String? actionText;
   final VoidCallback? onAction;
+  final Color? accentColor;
 
   const LumiEmptyCard({
     super.key,
@@ -273,10 +274,13 @@ class LumiEmptyCard extends StatelessWidget {
     required this.message,
     this.actionText,
     this.onAction,
+    this.accentColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final accent = accentColor ?? AppColors.rosePink;
+
     return LumiCard(
       child: Center(
         child: Column(
@@ -286,13 +290,13 @@ class LumiEmptyCard extends StatelessWidget {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: AppColors.rosePink.withOpacity(0.1),
+                color: accent.withValues(alpha: 0.1),
                 borderRadius: LumiBorders.circular,
               ),
               child: Icon(
                 icon,
                 size: 40,
-                color: AppColors.rosePink,
+                color: accent,
               ),
             ),
             const SizedBox(height: LumiSpacing.m),
@@ -322,7 +326,7 @@ class LumiEmptyCard extends StatelessWidget {
               ElevatedButton(
                 onPressed: onAction,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.rosePink,
+                  backgroundColor: accent,
                   foregroundColor: AppColors.white,
                   padding: const EdgeInsets.symmetric(
                     vertical: 12,

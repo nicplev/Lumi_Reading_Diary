@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=414, initial-scale=1.0">
+  <title>Lumi Parent Home - Redesigned</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(180deg, #FFF6F7 0%, #FFFFFF 100%);
+      min-height: 100vh;
+      max-width: 414px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    /* Lumi Colour Palette */
+    :root {
+      --lumi-rose: #FF8698;
+      --lumi-mint: #D2EBBF;
+      --lumi-yellow: #FFF6A4;
+      --lumi-orange: #FF8B5A;
+      --lumi-sky: #BCE7F0;
+      --lumi-charcoal: #121211;
+      --lumi-white: #FFFFFF;
+
+      /* PM Colour Bands */
+      --pm-magenta: #FF00FF;
+      --pm-red: #FF0000;
+      --pm-yellow: #FFFF00;
+      --pm-blue: #0066CC;
+      --pm-green: #00CC00;
+      --pm-orange: #FF8C00;
+      --pm-turquoise: #40E0D0;
+      --pm-purple: #9966CC;
+      --pm-gold: #FFD700;
+      --pm-silver: #C0C0C0;
+    }
+
+    /* Header */
+    .header {
+      padding: 20px 24px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .greeting {
+      font-family: 'Poppins', sans-serif;
+    }
+
+    .greeting-text {
+      font-size: 14px;
+      color: #666;
+      font-weight: 500;
+    }
+
+    .child-name {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--lumi-charcoal);
+    }
+
+    .profile-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 22px;
+      background: var(--lumi-sky);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      cursor: pointer;
+    }
+
+    .profile-btn img {
+      width: 40px;
+      height: 40px;
+      border-radius: 20px;
+    }
+
+    /* Child Selector Pills */
+    .child-selector {
+      padding: 0 24px 16px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+    }
+
+    .child-pill {
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+
+    .child-pill.active {
+      background: var(--lumi-rose);
+      color: white;
+    }
+
+    .child-pill:not(.active) {
+      background: #F5F5F5;
+      color: #666;
+    }
+
+    /* Streak Banner */
+    .streak-banner {
+      margin: 0 24px 16px;
+      padding: 16px 20px;
+      background: linear-gradient(135deg, #FF8698 0%, #FF6B7A 100%);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: white;
+    }
+
+    .streak-icon {
+      font-size: 32px;
+    }
+
+    .streak-info {
+      flex: 1;
+    }
+
+    .streak-count {
+      font-family: 'Poppins', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .streak-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .streak-best {
+      text-align: right;
+      font-size: 12px;
+      opacity: 0.8;
+    }
+
+    /* Tonight's Reading Card */
+    .tonight-card {
+      margin: 0 24px 16px;
+      padding: 24px;
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    }
+
+    .tonight-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .tonight-title {
+      font-family: 'Poppins', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--lumi-charcoal);
+    }
+
+    .reading-level-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .level-orange {
+      background: rgba(255, 140, 0, 0.15);
+      color: #CC7000;
+    }
+
+    .level-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 6px;
+      background: var(--pm-orange);
+    }
+
+    .book-info {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .book-cover {
+      width: 80px;
+      height: 110px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #FF8C00 0%, #FFA500 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 36px;
+      box-shadow: 0 4px 12px rgba(255, 140, 0, 0.3);
+    }
+
+    .book-details {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .book-title {
+      font-family: 'Poppins', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--lumi-charcoal);
+      margin-bottom: 4px;
+    }
+
+    .book-author {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 8px;
+    }
+
+    .book-progress {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .progress-bar {
+      flex: 1;
+      height: 6px;
+      background: #E8E8E8;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--lumi-mint);
+      border-radius: 3px;
+      width: 65%;
+    }
+
+    .progress-text {
+      font-size: 12px;
+      color: #888;
+      font-weight: 500;
+    }
+
+    /* Log Button */
+    .log-button {
+      width: 100%;
+      padding: 18px;
+      border: none;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #FF8698 0%, #FF6B7A 100%);
+      color: white;
+      font-family: 'Poppins', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: 0 6px 20px rgba(255, 134, 152, 0.4);
+    }
+
+    .log-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(255, 134, 152, 0.5);
+    }
+
+    .log-button:active {
+      transform: scale(0.98);
+    }
+
+    /* Weekly Progress */
+    .weekly-progress {
+      margin: 0 24px 16px;
+      padding: 20px;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    }
+
+    .weekly-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .weekly-title {
+      font-family: 'Poppins', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--lumi-charcoal);
+    }
+
+    .weekly-count {
+      font-size: 14px;
+      color: #888;
+    }
+
+    .days-row {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .day-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .day-circle {
+      width: 40px;
+      height: 40px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .day-circle.completed {
+      background: var(--lumi-mint);
+    }
+
+    .day-circle.today {
+      background: var(--lumi-rose);
+      box-shadow: 0 4px 12px rgba(255, 134, 152, 0.4);
+    }
+
+    .day-circle.pending {
+      background: #F0F0F0;
+      color: #CCC;
+    }
+
+    .day-label {
+      font-size: 12px;
+      color: #888;
+      font-weight: 500;
+    }
+
+    .day-label.today {
+      color: var(--lumi-rose);
+      font-weight: 600;
+    }
+
+    /* Teacher Message */
+    .teacher-message {
+      margin: 0 24px 16px;
+      padding: 16px;
+      background: var(--lumi-sky);
+      border-radius: 16px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .teacher-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 20px;
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .teacher-content {
+      flex: 1;
+    }
+
+    .teacher-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--lumi-charcoal);
+      margin-bottom: 4px;
+    }
+
+    .teacher-text {
+      font-size: 14px;
+      color: #444;
+      line-height: 1.4;
+    }
+
+    .message-time {
+      font-size: 11px;
+      color: #888;
+      margin-top: 6px;
+    }
+
+    /* Reading Level Progress */
+    .level-progress {
+      margin: 0 24px 24px;
+      padding: 20px;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    }
+
+    .level-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .level-title {
+      font-family: 'Poppins', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--lumi-charcoal);
+    }
+
+    .level-current {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .current-badge {
+      width: 24px;
+      height: 24px;
+      border-radius: 12px;
+      background: var(--pm-orange);
+    }
+
+    .current-text {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--lumi-charcoal);
+    }
+
+    .level-bar-container {
+      margin-bottom: 12px;
+    }
+
+    .level-bar {
+      height: 10px;
+      background: #E8E8E8;
+      border-radius: 5px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .level-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--pm-orange) 0%, var(--pm-turquoise) 100%);
+      border-radius: 5px;
+      width: 70%;
+      transition: width 0.5s ease;
+    }
+
+    .level-labels {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .level-start, .level-end {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #666;
+    }
+
+    .level-dot-small {
+      width: 10px;
+      height: 10px;
+      border-radius: 5px;
+    }
+
+    .level-dot-small.orange {
+      background: var(--pm-orange);
+    }
+
+    .level-dot-small.turquoise {
+      background: var(--pm-turquoise);
+    }
+
+    /* Bottom Navigation */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 414px;
+      background: white;
+      padding: 12px 24px 28px;
+      display: flex;
+      justify-content: space-around;
+      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.06);
+      border-radius: 24px 24px 0 0;
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 8px;
+    }
+
+    .nav-icon {
+      font-size: 24px;
+    }
+
+    .nav-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: #888;
+    }
+
+    .nav-item.active .nav-label {
+      color: var(--lumi-rose);
+    }
+
+    /* Spacer for bottom nav */
+    .nav-spacer {
+      height: 100px;
+    }
+
+    /* Design Notes */
+    .design-notes {
+      margin: 24px;
+      padding: 20px;
+      background: #FFF9E6;
+      border-radius: 16px;
+      border: 2px dashed #FFD700;
+    }
+
+    .design-notes h3 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      color: #996600;
+      margin-bottom: 12px;
+    }
+
+    .design-notes ul {
+      font-size: 13px;
+      color: #666;
+      padding-left: 20px;
+      line-height: 1.8;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <div class="header">
+    <div class="greeting">
+      <div class="greeting-text">Good evening 👋</div>
+      <div class="child-name">Sophie's Reading</div>
+    </div>
+    <button class="profile-btn">
+      <div style="width: 40px; height: 40px; border-radius: 20px; background: linear-gradient(135deg, #FF8698, #FF6B7A); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600;">S</div>
+    </button>
+  </div>
+
+  <!-- Child Selector -->
+  <div class="child-selector">
+    <button class="child-pill active">Sophie</button>
+    <button class="child-pill">Oliver</button>
+  </div>
+
+  <!-- Streak Banner -->
+  <div class="streak-banner">
+    <div class="streak-icon">🔥</div>
+    <div class="streak-info">
+      <div class="streak-count">12 Day Streak!</div>
+      <div class="streak-label">Keep it going tonight</div>
+    </div>
+    <div class="streak-best">Best: 21 days</div>
+  </div>
+
+  <!-- Tonight's Reading Card -->
+  <div class="tonight-card">
+    <div class="tonight-header">
+      <div class="tonight-title">Tonight's Reading</div>
+      <div class="reading-level-badge level-orange">
+        <div class="level-dot"></div>
+        Level 14 · Orange
+      </div>
+    </div>
+
+    <div class="book-info">
+      <div class="book-cover">📖</div>
+      <div class="book-details">
+        <div class="book-title">The Magic Faraway Tree</div>
+        <div class="book-author">Enid Blyton</div>
+        <div class="book-progress">
+          <div class="progress-bar">
+            <div class="progress-fill"></div>
+          </div>
+          <div class="progress-text">65%</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="log-button">
+      <span>📚</span>
+      Log Tonight's Reading
+    </button>
+  </div>
+
+  <!-- Weekly Progress -->
+  <div class="weekly-progress">
+    <div class="weekly-header">
+      <div class="weekly-title">This Week</div>
+      <div class="weekly-count">4 of 7 days</div>
+    </div>
+    <div class="days-row">
+      <div class="day-item">
+        <div class="day-circle completed">✓</div>
+        <div class="day-label">Mon</div>
+      </div>
+      <div class="day-item">
+        <div class="day-circle completed">✓</div>
+        <div class="day-label">Tue</div>
+      </div>
+      <div class="day-item">
+        <div class="day-circle completed">✓</div>
+        <div class="day-label">Wed</div>
+      </div>
+      <div class="day-item">
+        <div class="day-circle completed">✓</div>
+        <div class="day-label">Thu</div>
+      </div>
+      <div class="day-item">
+        <div class="day-circle today">📖</div>
+        <div class="day-label today">Fri</div>
+      </div>
+      <div class="day-item">
+        <div class="day-circle pending">○</div>
+        <div class="day-label">Sat</div>
+      </div>
+      <div class="day-item">
+        <div class="day-circle pending">○</div>
+        <div class="day-label">Sun</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Teacher Message -->
+  <div class="teacher-message">
+    <div class="teacher-avatar">👩‍🏫</div>
+    <div class="teacher-content">
+      <div class="teacher-name">Mrs. Thompson</div>
+      <div class="teacher-text">Sophie did a great job with her reading fluency today! Keep up the good work at home. 🌟</div>
+      <div class="message-time">Today at 3:30 PM</div>
+    </div>
+  </div>
+
+  <!-- Reading Level Progress -->
+  <div class="level-progress">
+    <div class="level-header">
+      <div class="level-title">Reading Level Progress</div>
+      <div class="level-current">
+        <div class="current-badge"></div>
+        <div class="current-text">Level 14</div>
+      </div>
+    </div>
+    <div class="level-bar-container">
+      <div class="level-bar">
+        <div class="level-fill"></div>
+      </div>
+    </div>
+    <div class="level-labels">
+      <div class="level-start">
+        <div class="level-dot-small orange"></div>
+        Orange (13)
+      </div>
+      <div class="level-end">
+        <div class="level-dot-small turquoise"></div>
+        Turquoise (15)
+      </div>
+    </div>
+  </div>
+
+  <!-- Design Notes -->
+  <div class="design-notes">
+    <h3>🎨 Design Notes (Not Shown in Final App)</h3>
+    <ul>
+      <li><strong>PM Colour Bands</strong> integrated throughout - parents recognise these from physical books</li>
+      <li><strong>One prominent CTA</strong> - "Log Tonight's Reading" is the primary action</li>
+      <li><strong>Streak gamification</strong> visible immediately to encourage consistency</li>
+      <li><strong>Teacher messages</strong> create connection between school and home</li>
+      <li><strong>Progress visualisation</strong> shows journey to next reading level</li>
+      <li><strong>Multi-child support</strong> via easy pill selector</li>
+    </ul>
+  </div>
+
+  <div class="nav-spacer"></div>
+
+  <!-- Bottom Navigation -->
+  <div class="bottom-nav">
+    <button class="nav-item active">
+      <div class="nav-icon">🏠</div>
+      <div class="nav-label">Home</div>
+    </button>
+    <button class="nav-item">
+      <div class="nav-icon">📊</div>
+      <div class="nav-label">Progress</div>
+    </button>
+    <button class="nav-item">
+      <div class="nav-icon">📚</div>
+      <div class="nav-label">Books</div>
+    </button>
+    <button class="nav-item">
+      <div class="nav-icon">🏆</div>
+      <div class="nav-label">Awards</div>
+    </button>
+  </div>
+</body>
+</html>

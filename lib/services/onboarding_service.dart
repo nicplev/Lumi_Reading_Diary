@@ -6,8 +6,14 @@ import '../data/models/school_model.dart';
 import '../data/models/user_model.dart';
 
 class OnboardingService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore;
+  final FirebaseAuth _auth;
+
+  OnboardingService({
+    FirebaseFirestore? firestore,
+    FirebaseAuth? auth,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _auth = auth ?? FirebaseAuth.instance;
 
   // Create a demo request
   Future<String> createDemoRequest({
@@ -79,6 +85,32 @@ class OnboardingService {
     });
   }
 
+  Future<void> _appendCompletedSteps(
+    String onboardingId,
+    List<OnboardingStep> steps, {
+    OnboardingStep? currentStep,
+  }) async {
+    final doc =
+        await _firestore.collection('schoolOnboarding').doc(onboardingId).get();
+    if (!doc.exists) return;
+
+    final onboarding = SchoolOnboardingModel.fromFirestore(doc);
+    final updatedSteps = List<OnboardingStep>.from(onboarding.completedSteps);
+    for (final step in steps) {
+      if (!updatedSteps.contains(step)) {
+        updatedSteps.add(step);
+      }
+    }
+
+    await _firestore.collection('schoolOnboarding').doc(onboardingId).update({
+      'completedSteps':
+          updatedSteps.map((e) => e.toString().split('.').last).toList(),
+      if (currentStep != null)
+        'currentStep': currentStep.toString().split('.').last,
+      'lastUpdatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   // Create school and admin account during onboarding
   Future<Map<String, String>> createSchoolAndAdmin({
     required String onboardingId,
@@ -95,9 +127,12 @@ class OnboardingService {
     String? primaryColor,
     String? secondaryColor,
   }) async {
+    UserCredential? userCredential;
+    DocumentReference<Map<String, dynamic>>? schoolDoc;
+
     try {
       // 1. Create admin user account
-      final userCredential = await _auth.createUserWithEmailAndPassword(
+      userCredential = await _auth.createUserWithEmailAndPassword(
         email: adminEmail,
         password: adminPassword,
       );
@@ -124,7 +159,7 @@ class OnboardingService {
         isActive: true,
       );
 
-      final schoolDoc =
+      schoolDoc =
           await _firestore.collection('schools').add(school.toFirestore());
       final schoolId = schoolDoc.id;
 
@@ -150,24 +185,84 @@ class OnboardingService {
       await _firestore.collection('schoolOnboarding').doc(onboardingId).update({
         'schoolId': schoolId,
         'adminUserId': adminUserId,
-        'status': OnboardingStatus.setupInProgress.toString().split('.').last,
+        'status': OnboardingStatus.registered.toString().split('.').last,
+        'currentStep': OnboardingStep.readingLevels.toString().split('.').last,
+        'registeredAt': FieldValue.serverTimestamp(),
         'lastUpdatedAt': FieldValue.serverTimestamp(),
       });
 
-      // 5. Complete the admin account step
-      await completeStep(onboardingId, OnboardingStep.adminAccount);
+      await _appendCompletedSteps(
+        onboardingId,
+        [OnboardingStep.schoolInfo, OnboardingStep.adminAccount],
+        currentStep: OnboardingStep.readingLevels,
+      );
+
+      await _firestore.collection('schoolOnboarding').doc(onboardingId).update({
+        'status': OnboardingStatus.setupInProgress.toString().split('.').last,
+        'lastUpdatedAt': FieldValue.serverTimestamp(),
+      });
 
       return {
         'schoolId': schoolId,
         'adminUserId': adminUserId,
       };
     } catch (e) {
+      // Best effort rollback to avoid orphaned auth users during partial failures.
+      if (schoolDoc == null && userCredential?.user != null) {
+        try {
+          await userCredential!.user!.delete();
+        } catch (_) {}
+      }
+
+      await _firestore.collection('schoolOnboarding').doc(onboardingId).update({
+        'status': OnboardingStatus.interested.toString().split('.').last,
+        'currentStep': OnboardingStep.adminAccount.toString().split('.').last,
+        'lastError': e.toString(),
+        'lastUpdatedAt': FieldValue.serverTimestamp(),
+      });
       throw Exception('Failed to create school and admin: $e');
     }
   }
 
+  Future<void> applyReadingLevelConfiguration({
+    required String onboardingId,
+    required ReadingLevelSchema levelSchema,
+    List<String>? customLevels,
+  }) async {
+    final doc =
+        await _firestore.collection('schoolOnboarding').doc(onboardingId).get();
+    if (!doc.exists) {
+      throw Exception('Onboarding record not found');
+    }
+
+    final onboarding = SchoolOnboardingModel.fromFirestore(doc);
+    if (onboarding.schoolId == null || onboarding.schoolId!.isEmpty) {
+      throw Exception('School not created yet for onboarding');
+    }
+
+    await _firestore.collection('schools').doc(onboarding.schoolId).update({
+      'levelSchema': levelSchema.toString().split('.').last,
+      'customLevels': levelSchema == ReadingLevelSchema.custom
+          ? (customLevels ?? [])
+          : null,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    await _appendCompletedSteps(
+      onboardingId,
+      [OnboardingStep.readingLevels],
+      currentStep: OnboardingStep.completed,
+    );
+  }
+
   // Complete onboarding and activate school
   Future<void> completeOnboarding(String onboardingId) async {
+    await _appendCompletedSteps(
+      onboardingId,
+      [OnboardingStep.completed],
+      currentStep: OnboardingStep.completed,
+    );
+
     await _firestore.collection('schoolOnboarding').doc(onboardingId).update({
       'status': OnboardingStatus.active.toString().split('.').last,
       'currentStep': OnboardingStep.completed.toString().split('.').last,

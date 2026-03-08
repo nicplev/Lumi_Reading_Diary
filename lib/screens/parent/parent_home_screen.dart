@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 
@@ -10,6 +11,10 @@ import '../../core/theme/lumi_spacing.dart';
 import '../../core/theme/lumi_borders.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_card.dart';
+import '../../core/widgets/lumi/stats_card.dart';
+import '../../core/widgets/lumi/week_progress_bar.dart';
+import '../../core/widgets/lumi/progress_ring.dart';
+import '../../core/widgets/lumi/lumi_book_card.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../core/services/navigation_state_service.dart';
 import '../../data/models/user_model.dart';
@@ -20,7 +25,7 @@ import '../../services/firebase_service.dart';
 import 'reading_history_screen.dart';
 import 'parent_profile_screen.dart';
 
-class ParentHomeScreen extends StatefulWidget {
+class ParentHomeScreen extends ConsumerStatefulWidget {
   final UserModel user;
 
   const ParentHomeScreen({
@@ -29,11 +34,10 @@ class ParentHomeScreen extends StatefulWidget {
   });
 
   @override
-  State<ParentHomeScreen> createState() => _ParentHomeScreenState();
+  ConsumerState<ParentHomeScreen> createState() => _ParentHomeScreenState();
 }
 
-class _ParentHomeScreenState extends State<ParentHomeScreen> {
-  final FirebaseService _firebaseService = FirebaseService.instance;
+class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
   int _selectedIndex = 0;
   String? _selectedChildId;
   List<StudentModel> _children = [];
@@ -47,6 +51,7 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
 
   Future<void> _loadChildren() async {
     try {
+      final firebaseService = ref.read(firebaseServiceProvider);
       if (widget.user.linkedChildren.isEmpty) {
         setState(() {
           _isLoading = false;
@@ -56,7 +61,7 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
 
       final List<StudentModel> children = [];
       for (String childId in widget.user.linkedChildren) {
-        final doc = await _firebaseService.firestore
+        final doc = await firebaseService.firestore
             .collection('schools')
             .doc(widget.user.schoolId)
             .collection('students')
@@ -117,26 +122,54 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
           ParentProfileScreen(user: widget.user),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (index) => setState(() => _selectedIndex = index),
-        backgroundColor: AppColors.white,
-        selectedItemColor: AppColors.rosePink,
-        unselectedItemColor: AppColors.charcoal.withValues(alpha: 0.6),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Today',
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(24),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history),
-            label: 'History',
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.charcoal.withValues(alpha: 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(24),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
+          child: BottomNavigationBar(
+            currentIndex: _selectedIndex,
+            onTap: (index) => setState(() => _selectedIndex = index),
+            backgroundColor: AppColors.white,
+            selectedItemColor: AppColors.rosePink,
+            unselectedItemColor: AppColors.textSecondary,
+            elevation: 0,
+            type: BottomNavigationBarType.fixed,
+            selectedLabelStyle: LumiTextStyles.caption(color: AppColors.rosePink)
+                .copyWith(fontWeight: FontWeight.w600),
+            unselectedLabelStyle: LumiTextStyles.caption(),
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.home_outlined),
+                activeIcon: Icon(Icons.home),
+                label: 'Home',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.history_outlined),
+                activeIcon: Icon(Icons.history),
+                label: 'History',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.person_outline),
+                activeIcon: Icon(Icons.person),
+                label: 'Profile',
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -146,6 +179,7 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
       (child) => child.id == _selectedChildId,
       orElse: () => _children.first,
     );
+    final firebaseService = ref.read(firebaseServiceProvider);
 
     return SafeArea(
       child: CustomScrollView(
@@ -205,7 +239,7 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
               delegate: SliverChildListDelegate([
                 // Today's Reading Card
                 StreamBuilder<QuerySnapshot>(
-                  stream: _firebaseService.firestore
+                  stream: firebaseService.firestore
                       .collection('schools')
                       .doc(widget.user.schoolId)
                       .collection('readingLogs')
@@ -221,7 +255,7 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
                         logSnapshot.data!.docs.isNotEmpty;
 
                     return StreamBuilder<QuerySnapshot>(
-                      stream: _firebaseService.firestore
+                      stream: firebaseService.firestore
                           .collection('schools')
                           .doc(widget.user.schoolId!)
                           .collection('allocations')
@@ -270,24 +304,24 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
 
                 LumiGap.m,
 
-                // Weekly Progress
-                _WeeklyProgressCard(
+                // Progress Ring + Weekly Progress
+                _ProgressAndWeekSection(
                   studentId: selectedChild.id,
                   schoolId: widget.user.schoolId!,
-                ).animate().fadeIn(delay: 200.ms),
+                ).animate().fadeIn(delay: 100.ms),
 
                 LumiGap.m,
 
-                // Reading Streak
+                // Reading Stats
                 StreamBuilder<StudentStats?>(
                   stream: _getStudentStats(selectedChild.id),
                   builder: (context, snapshot) {
                     final stats = snapshot.data;
-                    return _StreakCard(
+                    return StatsCard(
                       currentStreak: stats?.currentStreak ?? 0,
-                      longestStreak: stats?.longestStreak ?? 0,
-                      totalMinutes: stats?.totalMinutesRead ?? 0,
-                    ).animate().fadeIn(delay: 400.ms);
+                      bestStreak: stats?.longestStreak ?? 0,
+                      totalNights: stats?.totalReadingDays ?? 0,
+                    ).animate().fadeIn(delay: 300.ms);
                   },
                 ),
               ]),
@@ -337,7 +371,8 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
   }
 
   Stream<StudentStats?> _getStudentStats(String studentId) {
-    return _firebaseService.firestore
+    final firebaseService = ref.read(firebaseServiceProvider);
+    return firebaseService.firestore
         .collection('schools')
         .doc(widget.user.schoolId!)
         .collection('students')
@@ -352,6 +387,7 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
     });
   }
 }
+
 
 class _TodayCard extends StatelessWidget {
   final StudentModel student;
@@ -416,22 +452,37 @@ class _TodayCard extends StatelessWidget {
                 '${allocation!.targetMinutes} minutes',
               ),
               LumiGap.xs,
-              if (allocation!.type == AllocationType.byLevel)
-                _buildRequirement(
-                  context,
-                  Icons.book_outlined,
-                  'Level ${allocation!.levelStart}${allocation!.levelEnd != null ? ' - ${allocation!.levelEnd}' : ''} books',
+              if (allocation!.type == AllocationType.byLevel) ...[
+                Text(
+                  "Tonight's Books",
+                  style: LumiTextStyles.bodyMedium(
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
+                  ),
                 ),
+                LumiGap.xs,
+                LumiBookCard(
+                  title: 'Level ${allocation!.levelStart}${allocation!.levelEnd != null ? ' - ${allocation!.levelEnd}' : ''}',
+                  bookType: BookType.decodable,
+                  statusText: 'Assigned',
+                ),
+              ],
               if (allocation!.type == AllocationType.byTitle &&
-                  allocation!.bookTitles != null)
+                  allocation!.bookTitles != null) ...[
+                Text(
+                  "Tonight's Books",
+                  style: LumiTextStyles.bodyMedium(
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
+                  ),
+                ),
+                LumiGap.xs,
                 ...allocation!.bookTitles!.map((title) => Padding(
-                      padding: EdgeInsets.only(bottom: LumiSpacing.xxs),
-                      child: _buildRequirement(
-                        context,
-                        Icons.book_outlined,
-                        title,
+                      padding: EdgeInsets.only(bottom: LumiSpacing.xs),
+                      child: LumiBookCard(
+                        title: title,
+                        statusText: 'Assigned',
                       ),
                     )),
+              ],
             ] else ...[
               _buildRequirement(
                 context,
@@ -482,196 +533,122 @@ class _TodayCard extends StatelessWidget {
   }
 }
 
-class _WeeklyProgressCard extends StatelessWidget {
+class _ProgressAndWeekSection extends ConsumerWidget {
   final String studentId;
   final String schoolId;
 
-  const _WeeklyProgressCard({
+  const _ProgressAndWeekSection({
     required this.studentId,
     required this.schoolId,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final startOfWeek = DateTime.now().subtract(
       Duration(days: DateTime.now().weekday - 1),
     );
+    final firebaseService = ref.read(firebaseServiceProvider);
 
-    return LumiCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'This Week',
-            style: LumiTextStyles.h2(color: AppColors.charcoal),
-          ),
-          LumiGap.m,
-          StreamBuilder<QuerySnapshot>(
-            stream: FirebaseService.instance.firestore
-                .collection('schools')
-                .doc(schoolId)
-                .collection('readingLogs')
-                .where('studentId', isEqualTo: studentId)
-                .where('date',
-                    isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeek))
-                .snapshots(),
-            builder: (context, snapshot) {
-              final logs = <ReadingLogModel>[];
-              if (snapshot.hasData) {
-                logs.addAll(
-                  snapshot.data!.docs
-                      .map((doc) => ReadingLogModel.fromFirestore(doc)),
+    return StreamBuilder<QuerySnapshot>(
+      stream: firebaseService.firestore
+          .collection('schools')
+          .doc(schoolId)
+          .collection('readingLogs')
+          .where('studentId', isEqualTo: studentId)
+          .where('date',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeek))
+          .snapshots(),
+      builder: (context, snapshot) {
+        final logs = <ReadingLogModel>[];
+        if (snapshot.hasData) {
+          logs.addAll(
+            snapshot.data!.docs
+                .map((doc) => ReadingLogModel.fromFirestore(doc)),
+          );
+        }
+
+        final completedDays = <int>{};
+        for (final log in logs) {
+          final dayOfWeek = log.date.weekday; // 1=Mon, 7=Sun
+          completedDays.add(dayOfWeek);
+        }
+
+        final todayComplete = completedDays.contains(DateTime.now().weekday);
+
+        return Column(
+          children: [
+            // Progress Ring Card
+            StreamBuilder<DocumentSnapshot>(
+              stream: firebaseService.firestore
+                  .collection('schools')
+                  .doc(schoolId)
+                  .collection('students')
+                  .doc(studentId)
+                  .snapshots(),
+              builder: (context, studentSnapshot) {
+                int totalNights = 0;
+                int currentStreak = 0;
+                if (studentSnapshot.hasData && studentSnapshot.data!.exists) {
+                  final student = StudentModel.fromFirestore(studentSnapshot.data!);
+                  totalNights = student.stats?.totalReadingDays ?? 0;
+                  currentStreak = student.stats?.currentStreak ?? 0;
+                }
+
+                return LumiCard(
+                  child: Column(
+                    children: [
+                      ProgressRing(
+                        totalNights: totalNights,
+                        weeklyProgress: completedDays.length,
+                        todayComplete: todayComplete,
+                      ),
+                      LumiGap.s,
+                      if (currentStreak > 0)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.local_fire_department,
+                              color: AppColors.rosePink,
+                              size: 20,
+                            ),
+                            LumiGap.horizontalXXS,
+                            Text(
+                              '$currentStreak day streak!',
+                              style: LumiTextStyles.bodyMedium(
+                                color: AppColors.rosePink,
+                              ).copyWith(fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
                 );
-              }
-
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: List.generate(7, (index) {
-                  final date = startOfWeek.add(Duration(days: index));
-                  final hasLog = logs.any((log) =>
-                      log.date.year == date.year &&
-                      log.date.month == date.month &&
-                      log.date.day == date.day);
-
-                  final dayStr = DateFormat('E').format(date);
-                  return _DayIndicator(
-                    day: dayStr.isNotEmpty ? dayStr.substring(0, 1) : '?',
-                    isCompleted: hasLog,
-                    isToday: DateUtils.isSameDay(date, DateTime.now()),
-                  );
-                }),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DayIndicator extends StatelessWidget {
-  final String day;
-  final bool isCompleted;
-  final bool isToday;
-
-  const _DayIndicator({
-    required this.day,
-    required this.isCompleted,
-    required this.isToday,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: isCompleted
-            ? AppColors.mintGreen
-            : (isToday
-                ? AppColors.rosePink.withValues(alpha: 0.2)
-                : AppColors.skyBlue),
-        shape: BoxShape.circle,
-        border: isToday
-            ? Border.all(color: AppColors.rosePink, width: 2)
-            : null,
-      ),
-      child: Center(
-        child: Text(
-          day,
-          style: LumiTextStyles.label(
-            color: isCompleted ? AppColors.white : AppColors.charcoal,
-          ).copyWith(
-            fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StreakCard extends StatelessWidget {
-  final int currentStreak;
-  final int longestStreak;
-  final int totalMinutes;
-
-  const _StreakCard({
-    required this.currentStreak,
-    required this.longestStreak,
-    required this.totalMinutes,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return LumiCard(
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildMiniStat(
-              icon: Icons.local_fire_department,
-              color: AppColors.warmOrange,
-              value: currentStreak.toString(),
-              label: 'Current Streak',
+              },
             ),
-          ),
-          Container(
-            width: 1,
-            height: 50,
-            color: AppColors.skyBlue,
-          ),
-          Expanded(
-            child: _buildMiniStat(
-              icon: Icons.emoji_events,
-              color: AppColors.gold,
-              value: longestStreak.toString(),
-              label: 'Best Streak',
-            ),
-          ),
-          Container(
-            width: 1,
-            height: 50,
-            color: AppColors.skyBlue,
-          ),
-          Expanded(
-            child: _buildMiniStat(
-              icon: Icons.timer,
-              color: AppColors.rosePink,
-              value: '${totalMinutes ~/ 60}h',
-              label: 'Total Time',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildMiniStat({
-    required IconData icon,
-    required Color color,
-    required String value,
-    required String label,
-  }) {
-    return Column(
-      children: [
-        Icon(
-          icon,
-          color: color,
-          size: 32,
-        ),
-        LumiGap.xs,
-        Text(
-          value,
-          style: LumiTextStyles.h2(color: AppColors.charcoal),
-        ),
-        LumiGap.xxs,
-        Text(
-          label,
-          style: LumiTextStyles.bodySmall(
-            color: AppColors.charcoal.withValues(alpha: 0.7),
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
+            LumiGap.m,
+
+            // Week Progress Card
+            LumiCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'This Week',
+                    style: LumiTextStyles.h2(color: AppColors.charcoal),
+                  ),
+                  LumiGap.m,
+                  WeekProgressBar(
+                    completedDays: completedDays,
+                    currentDay: DateTime.now().weekday,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

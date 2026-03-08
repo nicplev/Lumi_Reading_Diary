@@ -9,6 +9,8 @@ import '../../core/theme/lumi_borders.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../services/onboarding_service.dart';
+import '../../services/analytics_service.dart';
+import '../../services/crash_reporting_service.dart';
 import 'school_registration_wizard.dart';
 
 class DemoRequestScreen extends StatefulWidget {
@@ -59,6 +61,12 @@ class _DemoRequestScreenState extends State<DemoRequestScreen> {
               0,
         );
 
+        AnalyticsService.instance.logOnboardingStepCompleted(step: 'demo_request');
+        CrashReportingService.instance.setCustomKey(
+          'onboarding_last_step',
+          'demo_request',
+        );
+
         if (!mounted) return;
 
         // Show success message and navigate to registration wizard
@@ -96,6 +104,13 @@ class _DemoRequestScreenState extends State<DemoRequestScreen> {
           ),
         );
       } catch (e) {
+        AnalyticsService.instance
+            .logOnboardingFailed(step: 'demo_request', reason: e.toString());
+        CrashReportingService.instance.recordError(
+          e,
+          StackTrace.current,
+          reason: 'Demo request submission failed',
+        );
         setState(() {
           _errorMessage = 'Failed to submit request. Please try again.';
         });

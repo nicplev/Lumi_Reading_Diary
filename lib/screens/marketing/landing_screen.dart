@@ -81,7 +81,7 @@ class _LandingScreenState extends State<LandingScreen> {
               const SizedBox(width: 12),
               Text(
                 'Lumi',
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.nunito(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
                   foreground: Paint()
@@ -140,7 +140,7 @@ class _LandingScreenState extends State<LandingScreen> {
           Text(
             'Transform Reading into\nMagical Adventures',
             textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.nunito(
               fontSize: 56,
               fontWeight: FontWeight.bold,
               height: 1.2,
@@ -157,7 +157,7 @@ class _LandingScreenState extends State<LandingScreen> {
           Text(
             'The digital reading diary that makes tracking student progress simple,\nengaging, and fun for teachers, parents, and students.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
+            style: GoogleFonts.nunito(
               fontSize: 20,
               color: AppColors.charcoal.withValues(alpha: 0.7),
               height: 1.6,
@@ -249,7 +249,7 @@ class _LandingScreenState extends State<LandingScreen> {
                           const SizedBox(height: 24),
                           Text(
                             '📚 Dashboard Preview',
-                            style: GoogleFonts.poppins(
+                            style: GoogleFonts.nunito(
                               fontSize: 32,
                               fontWeight: FontWeight.w600,
                               color: AppColors.skyBlue,
@@ -341,7 +341,7 @@ class _LandingScreenState extends State<LandingScreen> {
           const SizedBox(width: 8),
           Text(
             text,
-            style: GoogleFonts.inter(
+            style: GoogleFonts.nunito(
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: AppColors.charcoal,
@@ -361,7 +361,7 @@ class _LandingScreenState extends State<LandingScreen> {
           Text(
             'Everything You Need in One Place',
             textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.nunito(
               fontSize: 42,
               fontWeight: FontWeight.bold,
               color: AppColors.charcoal,
@@ -371,7 +371,7 @@ class _LandingScreenState extends State<LandingScreen> {
           Text(
             'Powerful features designed for teachers, parents, and school administrators',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
+            style: GoogleFonts.nunito(
               fontSize: 18,
               color: AppColors.charcoal.withValues(alpha: 0.7),
             ),
@@ -476,7 +476,7 @@ class _LandingScreenState extends State<LandingScreen> {
               const SizedBox(height: 24),
               Text(
                 title,
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.nunito(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
                   color: AppColors.charcoal,
@@ -485,7 +485,7 @@ class _LandingScreenState extends State<LandingScreen> {
               const SizedBox(height: 12),
               Text(
                 description,
-                style: GoogleFonts.inter(
+                style: GoogleFonts.nunito(
                   fontSize: 16,
                   color: AppColors.charcoal.withValues(alpha: 0.7),
                   height: 1.6,
@@ -507,7 +507,7 @@ class _LandingScreenState extends State<LandingScreen> {
           Text(
             'How Lumi Works',
             textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.nunito(
               fontSize: 42,
               fontWeight: FontWeight.bold,
               color: AppColors.charcoal,
@@ -517,7 +517,7 @@ class _LandingScreenState extends State<LandingScreen> {
           Text(
             'Three simple steps to transform reading at your school',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
+            style: GoogleFonts.nunito(
               fontSize: 18,
               color: AppColors.charcoal.withValues(alpha: 0.7),
             ),
@@ -578,7 +578,7 @@ class _LandingScreenState extends State<LandingScreen> {
               child: Center(
                 child: Text(
                   number,
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.nunito(
                     fontSize: 36,
                     fontWeight: FontWeight.bold,
                     color: AppColors.white,
@@ -600,7 +600,7 @@ class _LandingScreenState extends State<LandingScreen> {
                       const SizedBox(width: 12),
                       Text(
                         title,
-                        style: GoogleFonts.poppins(
+                        style: GoogleFonts.nunito(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
                           color: AppColors.charcoal,
@@ -611,7 +611,7 @@ class _LandingScreenState extends State<LandingScreen> {
                   const SizedBox(height: 12),
                   Text(
                     description,
-                    style: GoogleFonts.inter(
+                    style: GoogleFonts.nunito(
                       fontSize: 18,
                       color: AppColors.charcoal.withValues(alpha: 0.7),
                       height: 1.6,
@@ -635,7 +635,7 @@ class _LandingScreenState extends State<LandingScreen> {
           Text(
             'Why Schools Love Lumi',
             textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.nunito(
               fontSize: 42,
               fontWeight: FontWeight.bold,
               color: AppColors.charcoal,
@@ -707,7 +707,7 @@ class _LandingScreenState extends State<LandingScreen> {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.nunito(
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: AppColors.charcoal,
@@ -717,7 +717,7 @@ class _LandingScreenState extends State<LandingScreen> {
           Text(
             description,
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
+            style: GoogleFonts.nunito(
               fontSize: 16,
               color: AppColors.charcoal.withValues(alpha: 0.7),
               height: 1.6,
@@ -759,7 +759,7 @@ class _LandingScreenState extends State<LandingScreen> {
           Text(
             'Ready to Transform Reading at Your School?',
             textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.nunito(
               fontSize: 42,
               fontWeight: FontWeight.bold,
               color: AppColors.white,
@@ -770,7 +770,7 @@ class _LandingScreenState extends State<LandingScreen> {
           Text(
             'Join hundreds of schools using Lumi to inspire a love of reading',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
+            style: GoogleFonts.nunito(
               fontSize: 20,
               color: Colors.white.withValues(alpha: 0.9),
               height: 1.6,
@@ -829,7 +829,7 @@ class _LandingScreenState extends State<LandingScreen> {
         const SizedBox(width: 8),
         Text(
           text,
-          style: GoogleFonts.inter(
+          style: GoogleFonts.nunito(
             fontSize: 16,
             color: Colors.white.withValues(alpha: 0.9),
             fontWeight: FontWeight.w500,
@@ -873,7 +873,7 @@ class _LandingScreenState extends State<LandingScreen> {
                       const SizedBox(width: 12),
                       Text(
                         'Lumi',
-                        style: GoogleFonts.poppins(
+                        style: GoogleFonts.nunito(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                           color: AppColors.white,
@@ -884,7 +884,7 @@ class _LandingScreenState extends State<LandingScreen> {
                   const SizedBox(height: 16),
                   Text(
                     'Making reading magical for every child',
-                    style: GoogleFonts.inter(
+                    style: GoogleFonts.nunito(
                       fontSize: 16,
                       color: Colors.white.withValues(alpha: 0.7),
                     ),
@@ -898,7 +898,7 @@ class _LandingScreenState extends State<LandingScreen> {
                 children: [
                   Text(
                     'Quick Links',
-                    style: GoogleFonts.poppins(
+                    style: GoogleFonts.nunito(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
                       color: AppColors.white,
@@ -929,7 +929,7 @@ class _LandingScreenState extends State<LandingScreen> {
           Text(
             '© 2025 Lumi Reading Diary. All rights reserved.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
+            style: GoogleFonts.nunito(
               fontSize: 14,
               color: Colors.white.withValues(alpha: 0.6),
             ),
@@ -946,7 +946,7 @@ class _LandingScreenState extends State<LandingScreen> {
         onTap: onTap,
         child: Text(
           text,
-          style: GoogleFonts.inter(
+          style: GoogleFonts.nunito(
             fontSize: 16,
             color: Colors.white.withValues(alpha: 0.8),
             decoration: TextDecoration.none,

@@ -3,10 +3,21 @@ import 'package:lumi_reading_tracker/services/offline_service.dart';
 import 'package:lumi_reading_tracker/data/models/reading_log_model.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'dart:io';
+import 'package:flutter/services.dart';
 
 void main() {
-  // Initialize Flutter bindings for tests
-  TestWidgetsFlutterBinding.ensureInitialized();
+  final binding = TestWidgetsFlutterBinding.ensureInitialized();
+
+  // Mock the connectivity plugin
+  binding.defaultBinaryMessenger.setMockMethodCallHandler(
+    const MethodChannel('dev.fluttercommunity.plus/connectivity'),
+    (MethodCall methodCall) async {
+      if (methodCall.method == 'check') {
+        return ['wifi'];
+      }
+      return null;
+    },
+  );
 
   group('OfflineService', () {
     late OfflineService offlineService;

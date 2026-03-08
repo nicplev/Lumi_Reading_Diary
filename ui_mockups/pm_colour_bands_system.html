@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1200, initial-scale=1.0">
+  <title>Lumi PM Colour Band System - Victorian Schools</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%);
+      min-height: 100vh;
+      padding: 40px;
+    }
+
+    :root {
+      --lumi-rose: #FF8698;
+      --lumi-charcoal: #121211;
+
+      /* PM Colour Bands - Official */
+      --pm-magenta: #E91E8C;
+      --pm-red: #EF4444;
+      --pm-yellow: #FCD34D;
+      --pm-blue: #3B82F6;
+      --pm-green: #22C55E;
+      --pm-orange: #F97316;
+      --pm-turquoise: #14B8A6;
+      --pm-purple: #A855F7;
+      --pm-gold: #EAB308;
+      --pm-silver: #9CA3AF;
+      --pm-emerald: #10B981;
+      --pm-ruby: #DC2626;
+    }
+
+    h1 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--lumi-charcoal);
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: #666;
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    /* Colour Band Grid */
+    .bands-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      max-width: 1100px;
+      margin: 0 auto 40px;
+    }
+
+    .band-card {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .band-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+    }
+
+    .band-card.magenta::before { background: var(--pm-magenta); }
+    .band-card.red::before { background: var(--pm-red); }
+    .band-card.yellow::before { background: var(--pm-yellow); }
+    .band-card.blue::before { background: var(--pm-blue); }
+    .band-card.green::before { background: var(--pm-green); }
+    .band-card.orange::before { background: var(--pm-orange); }
+    .band-card.turquoise::before { background: var(--pm-turquoise); }
+    .band-card.purple::before { background: var(--pm-purple); }
+    .band-card.gold::before { background: var(--pm-gold); }
+    .band-card.silver::before { background: var(--pm-silver); }
+    .band-card.emerald::before { background: var(--pm-emerald); }
+    .band-card.ruby::before { background: var(--pm-ruby); }
+
+    .band-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .colour-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 12px;
+    }
+
+    .colour-dot.magenta { background: var(--pm-magenta); }
+    .colour-dot.red { background: var(--pm-red); }
+    .colour-dot.yellow { background: var(--pm-yellow); }
+    .colour-dot.blue { background: var(--pm-blue); }
+    .colour-dot.green { background: var(--pm-green); }
+    .colour-dot.orange { background: var(--pm-orange); }
+    .colour-dot.turquoise { background: var(--pm-turquoise); }
+    .colour-dot.purple { background: var(--pm-purple); }
+    .colour-dot.gold { background: var(--pm-gold); }
+    .colour-dot.silver { background: var(--pm-silver); }
+    .colour-dot.emerald { background: var(--pm-emerald); }
+    .colour-dot.ruby { background: var(--pm-ruby); }
+
+    .band-name {
+      font-family: 'Poppins', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--lumi-charcoal);
+    }
+
+    .band-levels {
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 8px;
+    }
+
+    .band-year {
+      display: inline-block;
+      padding: 4px 10px;
+      background: #F3F4F6;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #666;
+      margin-bottom: 12px;
+    }
+
+    .band-description {
+      font-size: 13px;
+      color: #555;
+      line-height: 1.5;
+    }
+
+    /* Implementation Examples */
+    .section-title {
+      font-family: 'Poppins', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--lumi-charcoal);
+      margin-bottom: 24px;
+      text-align: center;
+    }
+
+    .examples-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      max-width: 1100px;
+      margin: 0 auto 40px;
+    }
+
+    .example-card {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    }
+
+    .example-title {
+      font-family: 'Poppins', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--lumi-charcoal);
+      margin-bottom: 16px;
+    }
+
+    /* Badge Example */
+    .badge-examples {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .level-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .badge-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 6px;
+    }
+
+    .badge-orange {
+      background: rgba(249, 115, 22, 0.15);
+      color: #C2410C;
+    }
+    .badge-orange .badge-dot { background: var(--pm-orange); }
+
+    .badge-turquoise {
+      background: rgba(20, 184, 166, 0.15);
+      color: #0D9488;
+    }
+    .badge-turquoise .badge-dot { background: var(--pm-turquoise); }
+
+    .badge-purple {
+      background: rgba(168, 85, 247, 0.15);
+      color: #7E22CE;
+    }
+    .badge-purple .badge-dot { background: var(--pm-purple); }
+
+    /* Progress Bar Example */
+    .progress-example {
+      background: #F8F8F8;
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .progress-current, .progress-next {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .progress-bar-container {
+      height: 12px;
+      background: #E5E5E5;
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-fill-gradient {
+      height: 100%;
+      width: 65%;
+      background: linear-gradient(90deg, var(--pm-orange), var(--pm-turquoise));
+      border-radius: 6px;
+    }
+
+    .progress-label {
+      text-align: center;
+      margin-top: 8px;
+      font-size: 12px;
+      color: #666;
+    }
+
+    /* Book Card Example */
+    .book-card-example {
+      display: flex;
+      gap: 12px;
+      background: #F8F8F8;
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .book-cover-example {
+      width: 60px;
+      height: 80px;
+      border-radius: 8px;
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(135deg, #3B82F6, #60A5FA);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 28px;
+    }
+
+    .book-level-tag {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 16px;
+      height: 16px;
+      border-radius: 8px;
+      border: 2px solid white;
+    }
+
+    .book-details-example {
+      flex: 1;
+    }
+
+    .book-title-example {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--lumi-charcoal);
+      margin-bottom: 2px;
+    }
+
+    .book-author-example {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 6px;
+    }
+
+    .book-level-text {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: #666;
+    }
+
+    .mini-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 4px;
+    }
+
+    /* Data Model */
+    .code-block {
+      background: #1E293B;
+      border-radius: 12px;
+      padding: 20px;
+      overflow-x: auto;
+      max-width: 1100px;
+      margin: 0 auto 40px;
+    }
+
+    .code-block pre {
+      font-family: 'Fira Code', 'Consolas', monospace;
+      font-size: 13px;
+      color: #E2E8F0;
+      line-height: 1.6;
+    }
+
+    .code-comment { color: #64748B; }
+    .code-keyword { color: #F472B6; }
+    .code-string { color: #34D399; }
+    .code-type { color: #60A5FA; }
+
+    /* Design Notes */
+    .design-notes {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px;
+      background: #FFF9E6;
+      border-radius: 16px;
+      border: 2px dashed #FFD700;
+    }
+
+    .design-notes h3 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      color: #996600;
+      margin-bottom: 16px;
+    }
+
+    .design-notes ul {
+      font-size: 14px;
+      color: #666;
+      padding-left: 24px;
+      line-height: 2;
+    }
+  </style>
+</head>
+<body>
+  <h1>PM Colour Band System for Lumi</h1>
+  <p class="subtitle">Aligning with Victorian primary school reading levels for instant parent recognition</p>
+
+  <!-- Colour Band Cards -->
+  <div class="bands-grid">
+    <div class="band-card magenta">
+      <div class="band-header">
+        <div class="colour-dot magenta"></div>
+        <div class="band-name">Magenta</div>
+      </div>
+      <div class="band-levels">PM Level 1</div>
+      <div class="band-year">Foundation (Start)</div>
+      <div class="band-description">Emergent reader. Learning print concepts and directionality.</div>
+    </div>
+
+    <div class="band-card red">
+      <div class="band-header">
+        <div class="colour-dot red"></div>
+        <div class="band-name">Red</div>
+      </div>
+      <div class="band-levels">PM Levels 2-4</div>
+      <div class="band-year">Foundation</div>
+      <div class="band-description">Developing basic sight word vocabulary. Simple repetitive text.</div>
+    </div>
+
+    <div class="band-card yellow">
+      <div class="band-header">
+        <div class="colour-dot yellow"></div>
+        <div class="band-name">Yellow</div>
+      </div>
+      <div class="band-levels">PM Levels 5-6</div>
+      <div class="band-year">Foundation (End)</div>
+      <div class="band-description">Early reader. Reading simple sentences with support.</div>
+    </div>
+
+    <div class="band-card blue">
+      <div class="band-header">
+        <div class="colour-dot blue"></div>
+        <div class="band-name">Blue</div>
+      </div>
+      <div class="band-levels">PM Levels 7-10</div>
+      <div class="band-year">Year 1 (Mid)</div>
+      <div class="band-description">Increasing independence with familiar text patterns.</div>
+    </div>
+
+    <div class="band-card green">
+      <div class="band-header">
+        <div class="colour-dot green"></div>
+        <div class="band-name">Green</div>
+      </div>
+      <div class="band-levels">PM Levels 11-12</div>
+      <div class="band-year">Year 1</div>
+      <div class="band-description">Transitional reader. More complex sentence structures.</div>
+    </div>
+
+    <div class="band-card orange">
+      <div class="band-header">
+        <div class="colour-dot orange"></div>
+        <div class="band-name">Orange</div>
+      </div>
+      <div class="band-levels">PM Levels 13-14</div>
+      <div class="band-year">Year 1 (End)</div>
+      <div class="band-description">Building reading stamina. Longer texts with chapters.</div>
+    </div>
+
+    <div class="band-card turquoise">
+      <div class="band-header">
+        <div class="colour-dot turquoise"></div>
+        <div class="band-name">Turquoise</div>
+      </div>
+      <div class="band-levels">PM Levels 15-17</div>
+      <div class="band-year">Year 2 (Mid)</div>
+      <div class="band-description">Extending reader. Reading longer texts independently.</div>
+    </div>
+
+    <div class="band-card purple">
+      <div class="band-header">
+        <div class="colour-dot purple"></div>
+        <div class="band-name">Purple</div>
+      </div>
+      <div class="band-levels">PM Levels 18-19</div>
+      <div class="band-year">Year 2 (End)</div>
+      <div class="band-description">Varied text types and genres. Developing preferences.</div>
+    </div>
+
+    <div class="band-card gold">
+      <div class="band-header">
+        <div class="colour-dot gold"></div>
+        <div class="band-name">Gold</div>
+      </div>
+      <div class="band-levels">PM Levels 20-22</div>
+      <div class="band-year">Year 3</div>
+      <div class="band-description">Fluent reader. Chapter books with complex narratives.</div>
+    </div>
+
+    <div class="band-card silver">
+      <div class="band-header">
+        <div class="colour-dot silver"></div>
+        <div class="band-name">Silver</div>
+      </div>
+      <div class="band-levels">PM Levels 23-25</div>
+      <div class="band-year">Year 4</div>
+      <div class="band-description">Advanced vocabulary. Inferential comprehension.</div>
+    </div>
+
+    <div class="band-card emerald">
+      <div class="band-header">
+        <div class="colour-dot emerald"></div>
+        <div class="band-name">Emerald</div>
+      </div>
+      <div class="band-levels">PM Levels 26-28</div>
+      <div class="band-year">Year 5</div>
+      <div class="band-description">Sophisticated texts across genres. Critical analysis.</div>
+    </div>
+
+    <div class="band-card ruby">
+      <div class="band-header">
+        <div class="colour-dot ruby"></div>
+        <div class="band-name">Ruby</div>
+      </div>
+      <div class="band-levels">PM Levels 29-30</div>
+      <div class="band-year">Year 6</div>
+      <div class="band-description">Independent reader. Complex themes and ideas.</div>
+    </div>
+  </div>
+
+  <!-- Implementation Examples -->
+  <h2 class="section-title">UI Implementation Examples</h2>
+
+  <div class="examples-grid">
+    <div class="example-card">
+      <div class="example-title">Level Badges</div>
+      <div class="badge-examples">
+        <div class="level-badge badge-orange">
+          <div class="badge-dot"></div>
+          Level 14 · Orange
+        </div>
+        <div class="level-badge badge-turquoise">
+          <div class="badge-dot"></div>
+          Level 16 · Turquoise
+        </div>
+        <div class="level-badge badge-purple">
+          <div class="badge-dot"></div>
+          Level 19 · Purple
+        </div>
+      </div>
+    </div>
+
+    <div class="example-card">
+      <div class="example-title">Progress Bar</div>
+      <div class="progress-example">
+        <div class="progress-header">
+          <div class="progress-current">
+            <div class="mini-dot" style="background: var(--pm-orange);"></div>
+            Orange (14)
+          </div>
+          <div class="progress-next">
+            <div class="mini-dot" style="background: var(--pm-turquoise);"></div>
+            Turquoise (15)
+          </div>
+        </div>
+        <div class="progress-bar-container">
+          <div class="progress-fill-gradient"></div>
+        </div>
+        <div class="progress-label">65% to next colour band</div>
+      </div>
+    </div>
+
+    <div class="example-card">
+      <div class="example-title">Book Card</div>
+      <div class="book-card-example">
+        <div class="book-cover-example">
+          📖
+          <div class="book-level-tag" style="background: var(--pm-blue);"></div>
+        </div>
+        <div class="book-details-example">
+          <div class="book-title-example">The Magic Key</div>
+          <div class="book-author-example">Oxford Reading Tree</div>
+          <div class="book-level-text">
+            <div class="mini-dot" style="background: var(--pm-blue);"></div>
+            Blue · Level 8
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Data Model -->
+  <h2 class="section-title">Recommended Data Model</h2>
+
+  <div class="code-block">
+    <pre><span class="code-comment">// Add to school_model.dart</span>
+
+<span class="code-keyword">class</span> <span class="code-type">PMColourBand</span> {
+  <span class="code-keyword">final</span> <span class="code-type">String</span> name;         <span class="code-comment">// "Orange"</span>
+  <span class="code-keyword">final</span> <span class="code-type">String</span> hexColor;     <span class="code-comment">// "#F97316"</span>
+  <span class="code-keyword">final</span> <span class="code-type">int</span> levelStart;      <span class="code-comment">// 13</span>
+  <span class="code-keyword">final</span> <span class="code-type">int</span> levelEnd;        <span class="code-comment">// 14</span>
+  <span class="code-keyword">final</span> <span class="code-type">String</span> yearLevel;    <span class="code-comment">// "Year 1 (End)"</span>
+  <span class="code-keyword">final</span> <span class="code-type">String</span> stage;        <span class="code-comment">// "Transitional"</span>
+  <span class="code-keyword">final</span> <span class="code-type">String</span> description;  <span class="code-comment">// "Building reading stamina..."</span>
+
+  <span class="code-keyword">const</span> PMColourBand({
+    <span class="code-keyword">required</span> <span class="code-keyword">this</span>.name,
+    <span class="code-keyword">required</span> <span class="code-keyword">this</span>.hexColor,
+    <span class="code-keyword">required</span> <span class="code-keyword">this</span>.levelStart,
+    <span class="code-keyword">required</span> <span class="code-keyword">this</span>.levelEnd,
+    <span class="code-keyword">required</span> <span class="code-keyword">this</span>.yearLevel,
+    <span class="code-keyword">required</span> <span class="code-keyword">this</span>.stage,
+    <span class="code-keyword">required</span> <span class="code-keyword">this</span>.description,
+  });
+
+  <span class="code-comment">// Check if a PM level falls within this band</span>
+  <span class="code-type">bool</span> containsLevel(<span class="code-type">int</span> level) => level >= levelStart && level <= levelEnd;
+}
+
+<span class="code-comment">// Pre-configured Victorian PM Colour Bands</span>
+<span class="code-keyword">const</span> <span class="code-type">List</span>&lt;<span class="code-type">PMColourBand</span>&gt; victorianPMBands = [
+  PMColourBand(
+    name: <span class="code-string">'Magenta'</span>,
+    hexColor: <span class="code-string">'#E91E8C'</span>,
+    levelStart: 1, levelEnd: 1,
+    yearLevel: <span class="code-string">'Foundation (Start)'</span>,
+    stage: <span class="code-string">'Emergent'</span>,
+    description: <span class="code-string">'Learning print concepts and directionality'</span>,
+  ),
+  <span class="code-comment">// ... additional bands</span>
+  PMColourBand(
+    name: <span class="code-string">'Orange'</span>,
+    hexColor: <span class="code-string">'#F97316'</span>,
+    levelStart: 13, levelEnd: 14,
+    yearLevel: <span class="code-string">'Year 1 (End)'</span>,
+    stage: <span class="code-string">'Transitional'</span>,
+    description: <span class="code-string">'Building reading stamina. Longer texts with chapters.'</span>,
+  ),
+  <span class="code-comment">// ... remaining bands</span>
+];
+
+<span class="code-comment">// Helper to get colour band for a student's current level</span>
+<span class="code-type">PMColourBand</span>? getColourBandForLevel(<span class="code-type">int</span> pmLevel) {
+  <span class="code-keyword">return</span> victorianPMBands.firstWhereOrNull(
+    (band) => band.containsLevel(pmLevel),
+  );
+}</pre>
+  </div>
+
+  <!-- Design Notes -->
+  <div class="design-notes">
+    <h3>🎨 Implementation Notes</h3>
+    <ul>
+      <li><strong>Why Colour Bands Matter:</strong> Parents in Victoria see these exact colours on physical book stickers. Using them in-app creates instant recognition and trust.</li>
+      <li><strong>Accessibility:</strong> Always pair colour with text labels (e.g., "Orange · Level 14") for colour-blind users.</li>
+      <li><strong>Progress Visualisation:</strong> The gradient progress bar shows movement between adjacent colour bands - highly motivating for both children and parents.</li>
+      <li><strong>Book Integration:</strong> When implementing ISBN scanning, cross-reference PM level from book metadata and display the corresponding colour band.</li>
+      <li><strong>Teacher Override:</strong> Allow teachers to manually adjust colour band assignments if their school uses a slightly different mapping.</li>
+      <li><strong>Celebration Moments:</strong> Trigger special animations when a student advances to a new colour band - these are milestone moments!</li>
+    </ul>
+  </div>
+</body>
+</html>

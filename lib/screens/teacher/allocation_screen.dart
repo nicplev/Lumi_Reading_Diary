@@ -3,9 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/lumi_text_styles.dart';
-import '../../core/widgets/lumi/lumi_buttons.dart';
-import '../../core/widgets/lumi/lumi_card.dart';
+import '../../core/theme/teacher_constants.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/student_model.dart';
@@ -201,10 +199,17 @@ class _AllocationScreenState extends State<AllocationScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.offWhite,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text('Reading Allocation', style: LumiTextStyles.h3()),
-        backgroundColor: AppColors.white,
+        title: const Text(
+          'Reading Allocation',
+          style: TextStyle(
+            fontFamily: 'Nunito',
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        backgroundColor: AppColors.teacherPrimary,
+        foregroundColor: AppColors.white,
         elevation: 0,
         bottom: TabBar(
           controller: _tabController,
@@ -212,9 +217,12 @@ class _AllocationScreenState extends State<AllocationScreen>
             Tab(text: 'New Allocation'),
             Tab(text: 'Active Allocations'),
           ],
-          labelColor: AppColors.rosePink,
-          unselectedLabelColor: AppColors.charcoal.withValues(alpha: 0.6),
-          indicatorColor: AppColors.rosePink,
+          labelColor: AppColors.white,
+          unselectedLabelColor: AppColors.white.withValues(alpha: 0.6),
+          indicatorColor: AppColors.white,
+          labelStyle: TeacherTypography.bodyMedium
+              .copyWith(fontWeight: FontWeight.w600),
+          unselectedLabelStyle: TeacherTypography.bodyMedium,
         ),
       ),
       body: TabBarView(
@@ -229,515 +237,493 @@ class _AllocationScreenState extends State<AllocationScreen>
 
   Widget _buildNewAllocationView() {
     if (widget.selectedClass == null) {
-      return const Center(
-        child: Text('Please select a class from the dashboard'),
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.class_, size: 48, color: AppColors.textSecondary),
+            const SizedBox(height: 12),
+            Text(
+              'Please select a class from the dashboard',
+              style: TeacherTypography.bodyMedium
+                  .copyWith(color: AppColors.textSecondary),
+            ),
+          ],
+        ),
       );
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Reading Type Card
-          LumiCard(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+          _buildCard(
+            icon: Icons.book,
+            title: 'Reading Type',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Info note
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.teacherPrimaryLight.withValues(alpha: 0.5),
+                    borderRadius:
+                        BorderRadius.circular(TeacherDimensions.radiusM),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline,
+                          color: AppColors.teacherPrimary, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Reading levels and book selection system will be customized based on your school\'s requirements',
+                          style: TeacherTypography.bodySmall.copyWith(
+                            color: AppColors.teacherPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Allocation type selection
+                _buildRadioOption(
+                  title: 'Free Choice',
+                  subtitle: 'Students can read any appropriate material',
+                  value: AllocationType.freeChoice,
+                  groupValue: _allocationType,
+                  onChanged: (value) =>
+                      setState(() => _allocationType = value!),
+                ),
+                _buildRadioOption(
+                  title: 'By Reading Level',
+                  subtitle: 'Specify a range of reading levels',
+                  value: AllocationType.byLevel,
+                  groupValue: _allocationType,
+                  onChanged: (value) =>
+                      setState(() => _allocationType = value!),
+                ),
+                _buildRadioOption(
+                  title: 'Specific Books',
+                  subtitle: 'List specific titles or materials',
+                  value: AllocationType.byTitle,
+                  groupValue: _allocationType,
+                  onChanged: (value) =>
+                      setState(() => _allocationType = value!),
+                ),
+
+                // Conditional fields based on type
+                if (_allocationType == AllocationType.byLevel) ...[
+                  const SizedBox(height: 16),
                   Row(
                     children: [
-                      const Icon(Icons.book, color: AppColors.secondaryPurple),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Reading Type',
-                        style: LumiTextStyles.h3(),
+                      Expanded(
+                        child: TextField(
+                          decoration: InputDecoration(
+                            labelText: 'Start Level',
+                            hintText: 'e.g., A, 1, or custom',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(
+                                  TeacherDimensions.radiusM),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(
+                                  TeacherDimensions.radiusM),
+                              borderSide: BorderSide(
+                                  color: AppColors.teacherPrimary),
+                            ),
+                          ),
+                          style: TeacherTypography.bodyMedium,
+                          onChanged: (value) =>
+                              setState(() => _levelRangeStart = value),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: TextField(
+                          decoration: InputDecoration(
+                            labelText: 'End Level (optional)',
+                            hintText: 'e.g., C, 5, or custom',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(
+                                  TeacherDimensions.radiusM),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(
+                                  TeacherDimensions.radiusM),
+                              borderSide: BorderSide(
+                                  color: AppColors.teacherPrimary),
+                            ),
+                          ),
+                          style: TeacherTypography.bodyMedium,
+                          onChanged: (value) =>
+                              setState(() => _levelRangeEnd = value),
+                        ),
                       ),
                     ],
                   ),
+                ],
+
+                if (_allocationType == AllocationType.byTitle) ...[
                   const SizedBox(height: 16),
-
-                  // Note about flexible system
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.info.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.info_outline,
-                            color: AppColors.info, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Reading levels and book selection system will be customized based on your school\'s requirements',
-                            style: LumiTextStyles.bodySmall().copyWith(
-                              color: AppColors.info,
-                            ),
-                          ),
+                  ..._bookTitles.map((title) => Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(
+                              TeacherDimensions.radiusM),
+                          boxShadow: TeacherDimensions.cardShadow,
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Allocation type selection
-                  Column(
-                    children: [
-                      RadioListTile<AllocationType>(
-                        title: const Text('Free Choice'),
-                        subtitle: const Text(
-                            'Students can read any appropriate material'),
-                        value: AllocationType.freeChoice,
-                        groupValue: _allocationType,
-                        onChanged: (value) {
-                          setState(() {
-                            _allocationType = value!;
-                          });
-                        },
-                      ),
-                      RadioListTile<AllocationType>(
-                        title: const Text('By Reading Level'),
-                        subtitle:
-                            const Text('Specify a range of reading levels'),
-                        value: AllocationType.byLevel,
-                        groupValue: _allocationType,
-                        onChanged: (value) {
-                          setState(() {
-                            _allocationType = value!;
-                          });
-                        },
-                      ),
-                      RadioListTile<AllocationType>(
-                        title: const Text('Specific Books'),
-                        subtitle:
-                            const Text('List specific titles or materials'),
-                        value: AllocationType.byTitle,
-                        groupValue: _allocationType,
-                        onChanged: (value) {
-                          setState(() {
-                            _allocationType = value!;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-
-                  // Conditional fields based on type
-                  if (_allocationType == AllocationType.byLevel) ...[
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            decoration: const InputDecoration(
-                              labelText: 'Start Level',
-                              hintText: 'e.g., A, 1, or custom',
-                            ),
-                            onChanged: (value) {
-                              setState(() {
-                                _levelRangeStart = value;
-                              });
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: TextField(
-                            decoration: const InputDecoration(
-                              labelText: 'End Level (optional)',
-                              hintText: 'e.g., C, 5, or custom',
-                            ),
-                            onChanged: (value) {
-                              setState(() {
-                                _levelRangeEnd = value;
-                              });
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-
-                  if (_allocationType == AllocationType.byTitle) ...[
-                    const SizedBox(height: 16),
-                    ..._bookTitles.map((title) => LumiCard(
-                          child: ListTile(
-                            leading: const Icon(Icons.menu_book,
-                                color: AppColors.secondaryPurple),
-                            title: Text(title),
-                            trailing: IconButton(
+                        child: Row(
+                          children: [
+                            Icon(Icons.menu_book,
+                                color: AppColors.teacherPrimary, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                                child: Text(title,
+                                    style: TeacherTypography.bodyMedium)),
+                            IconButton(
                               icon: Icon(Icons.close,
-                                  color: AppColors.charcoal
-                                      .withValues(alpha: 0.6)),
-                              onPressed: () {
-                                setState(() {
-                                  _bookTitles.remove(title);
-                                });
-                              },
+                                  color: AppColors.textSecondary, size: 18),
+                              onPressed: () =>
+                                  setState(() => _bookTitles.remove(title)),
                             ),
-                          ),
-                        )),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _bookTitlesController,
-                            decoration: const InputDecoration(
-                              hintText: 'Enter book or material title',
-                              prefixIcon: Icon(Icons.add),
-                            ),
-                            textInputAction: TextInputAction.done,
-                            onSubmitted: (value) {
-                              if (value.isNotEmpty) {
-                                setState(() {
-                                  _bookTitles.add(value);
-                                  _bookTitlesController.clear();
-                                });
-                              }
-                            },
-                          ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          onPressed: () {
-                            if (_bookTitlesController.text.isNotEmpty) {
+                      )),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _bookTitlesController,
+                          decoration: InputDecoration(
+                            hintText: 'Enter book or material title',
+                            prefixIcon: const Icon(Icons.add),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(
+                                  TeacherDimensions.radiusM),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(
+                                  TeacherDimensions.radiusM),
+                              borderSide: BorderSide(
+                                  color: AppColors.teacherPrimary),
+                            ),
+                          ),
+                          style: TeacherTypography.bodyMedium,
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (value) {
+                            if (value.isNotEmpty) {
                               setState(() {
-                                _bookTitles.add(_bookTitlesController.text);
+                                _bookTitles.add(value);
                                 _bookTitlesController.clear();
                               });
                             }
                           },
-                          icon: const Icon(Icons.add_circle),
-                          color: AppColors.rosePink,
-                          iconSize: 32,
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: () {
+                          if (_bookTitlesController.text.isNotEmpty) {
+                            setState(() {
+                              _bookTitles.add(_bookTitlesController.text);
+                              _bookTitlesController.clear();
+                            });
+                          }
+                        },
+                        icon: const Icon(Icons.add_circle),
+                        color: AppColors.teacherPrimary,
+                        iconSize: 32,
+                      ),
+                    ],
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
 
           const SizedBox(height: 16),
 
           // Duration and Schedule Card
-          LumiCard(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.calendar_today,
-                          color: AppColors.rosePink),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Schedule',
-                        style: LumiTextStyles.h3(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Cadence
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Frequency'),
-                            const SizedBox(height: 8),
-                            DropdownButtonFormField<AllocationCadence>(
-                              initialValue: _cadence,
-                              decoration: const InputDecoration(
-                                isDense: true,
+          _buildCard(
+            icon: Icons.calendar_today,
+            title: 'Schedule',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Cadence + minutes
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Frequency',
+                              style: TeacherTypography.bodySmall),
+                          const SizedBox(height: 8),
+                          DropdownButtonFormField<AllocationCadence>(
+                            initialValue: _cadence,
+                            decoration: InputDecoration(
+                              isDense: true,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(
+                                    TeacherDimensions.radiusM),
                               ),
-                              items: AllocationCadence.values.map((cadence) {
-                                return DropdownMenuItem(
-                                  value: cadence,
-                                  child: Text(_getCadenceLabel(cadence)),
-                                );
-                              }).toList(),
-                              onChanged: (value) {
-                                setState(() {
-                                  _cadence = value!;
-                                  _updateEndDate();
-                                });
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Minutes Target'),
-                            const SizedBox(height: 8),
-                            TextField(
-                              controller: _minutesController,
-                              decoration: const InputDecoration(
-                                isDense: true,
-                                suffixText: 'min',
-                              ),
-                              keyboardType: TextInputType.number,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Date range
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Start Date'),
-                            const SizedBox(height: 8),
-                            InkWell(
-                              onTap: () async {
-                                final picked = await showDatePicker(
-                                  context: context,
-                                  initialDate: _startDate,
-                                  firstDate: DateTime.now(),
-                                  lastDate: DateTime.now()
-                                      .add(const Duration(days: 365)),
-                                );
-                                if (picked != null) {
-                                  setState(() {
-                                    _startDate = picked;
-                                    _updateEndDate();
-                                  });
-                                }
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                      color: AppColors.charcoal
-                                          .withValues(alpha: 0.2)),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(DateFormat('MMM dd, yyyy')
-                                        .format(_startDate)),
-                                    const Icon(Icons.calendar_today, size: 16),
-                                  ],
-                                ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(
+                                    TeacherDimensions.radiusM),
+                                borderSide: BorderSide(
+                                    color: AppColors.teacherPrimary),
                               ),
                             ),
-                          ],
-                        ),
+                            style: TeacherTypography.bodyMedium.copyWith(
+                                color: AppColors.charcoal),
+                            items: AllocationCadence.values.map((cadence) {
+                              return DropdownMenuItem(
+                                value: cadence,
+                                child: Text(_getCadenceLabel(cadence)),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _cadence = value!;
+                                _updateEndDate();
+                              });
+                            },
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('End Date'),
-                            const SizedBox(height: 8),
-                            InkWell(
-                              onTap: () async {
-                                final picked = await showDatePicker(
-                                  context: context,
-                                  initialDate: _endDate,
-                                  firstDate: _startDate,
-                                  lastDate: DateTime.now()
-                                      .add(const Duration(days: 365)),
-                                );
-                                if (picked != null) {
-                                  setState(() {
-                                    _endDate = picked;
-                                  });
-                                }
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                      color: AppColors.charcoal
-                                          .withValues(alpha: 0.2)),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(DateFormat('MMM dd, yyyy')
-                                        .format(_endDate)),
-                                    const Icon(Icons.calendar_today, size: 16),
-                                  ],
-                                ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Minutes Target',
+                              style: TeacherTypography.bodySmall),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _minutesController,
+                            decoration: InputDecoration(
+                              isDense: true,
+                              suffixText: 'min',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(
+                                    TeacherDimensions.radiusM),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(
+                                    TeacherDimensions.radiusM),
+                                borderSide: BorderSide(
+                                    color: AppColors.teacherPrimary),
                               ),
                             ),
-                          ],
-                        ),
+                            style: TeacherTypography.bodyMedium,
+                            keyboardType: TextInputType.number,
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
+                ),
 
-                  const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-                  // Recurring option
-                  SwitchListTile(
-                    title: const Text('Recurring'),
-                    subtitle:
-                        const Text('Automatically repeat this allocation'),
-                    value: _isRecurring,
-                    onChanged: (value) {
-                      setState(() {
-                        _isRecurring = value;
-                      });
-                    },
-                  ),
-                ],
-              ),
+                // Date range
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildDatePicker(
+                        label: 'Start Date',
+                        date: _startDate,
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _startDate,
+                            firstDate: DateTime.now(),
+                            lastDate:
+                                DateTime.now().add(const Duration(days: 365)),
+                          );
+                          if (picked != null) {
+                            setState(() {
+                              _startDate = picked;
+                              _updateEndDate();
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildDatePicker(
+                        label: 'End Date',
+                        date: _endDate,
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _endDate,
+                            firstDate: _startDate,
+                            lastDate:
+                                DateTime.now().add(const Duration(days: 365)),
+                          );
+                          if (picked != null) {
+                            setState(() => _endDate = picked);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // Recurring option
+                SwitchListTile(
+                  title: Text('Recurring', style: TeacherTypography.bodyMedium),
+                  subtitle: Text('Automatically repeat this allocation',
+                      style: TeacherTypography.bodySmall),
+                  value: _isRecurring,
+                  activeTrackColor:
+                      AppColors.teacherPrimary.withValues(alpha: 0.4),
+                  activeThumbColor: AppColors.teacherPrimary,
+                  contentPadding: EdgeInsets.zero,
+                  onChanged: (value) => setState(() => _isRecurring = value),
+                ),
+              ],
             ),
           ),
 
           const SizedBox(height: 16),
 
           // Student Selection Card
-          LumiCard(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.groups, color: AppColors.secondaryGreen),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Students',
-                        style: LumiTextStyles.h3(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  RadioListTile<bool>(
-                    title: Text('Whole Class (${_students.length} students)'),
-                    value: true,
-                    groupValue: _selectAllStudents,
-                    onChanged: (value) {
-                      setState(() {
-                        _selectAllStudents = value!;
-                        if (_selectAllStudents) {
-                          _selectedStudentIds =
-                              _students.map((s) => s.id).toList();
-                        }
-                      });
-                    },
-                  ),
-                  RadioListTile<bool>(
-                    title: const Text('Select Students'),
-                    value: false,
-                    groupValue: _selectAllStudents,
-                    onChanged: (value) {
-                      setState(() {
-                        _selectAllStudents = value!;
-                      });
-                    },
-                  ),
-                  if (!_selectAllStudents) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      height: 200,
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                            color: AppColors.charcoal.withValues(alpha: 0.2)),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: ListView.builder(
-                        itemCount: _students.length,
-                        itemBuilder: (context, index) {
-                          final student = _students[index];
-                          return CheckboxListTile(
-                            title: Text(student.fullName),
-                            subtitle: Text(
-                                'Level: ${student.currentReadingLevel ?? "Not set"}'),
-                            value: _selectedStudentIds.contains(student.id),
-                            activeColor: AppColors.rosePink,
-                            onChanged: (value) {
-                              setState(() {
-                                if (value!) {
-                                  _selectedStudentIds.add(student.id);
-                                } else {
-                                  _selectedStudentIds.remove(student.id);
-                                }
-                              });
-                            },
-                          );
-                        },
-                      ),
+          _buildCard(
+            icon: Icons.groups,
+            title: 'Students',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildRadioOption(
+                  title: 'Whole Class (${_students.length} students)',
+                  value: true,
+                  groupValue: _selectAllStudents,
+                  onChanged: (value) {
+                    setState(() {
+                      _selectAllStudents = value!;
+                      if (_selectAllStudents) {
+                        _selectedStudentIds =
+                            _students.map((s) => s.id).toList();
+                      }
+                    });
+                  },
+                ),
+                _buildRadioOption(
+                  title: 'Select Students',
+                  value: false,
+                  groupValue: _selectAllStudents,
+                  onChanged: (value) =>
+                      setState(() => _selectAllStudents = value!),
+                ),
+                if (!_selectAllStudents) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    height: 200,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.divider),
+                      borderRadius:
+                          BorderRadius.circular(TeacherDimensions.radiusM),
                     ),
-                  ],
+                    child: ListView.builder(
+                      itemCount: _students.length,
+                      itemBuilder: (context, index) {
+                        final student = _students[index];
+                        return CheckboxListTile(
+                          title: Text(student.fullName,
+                              style: TeacherTypography.bodyMedium),
+                          subtitle: Text(
+                              'Level: ${student.currentReadingLevel ?? "Not set"}',
+                              style: TeacherTypography.bodySmall),
+                          value: _selectedStudentIds.contains(student.id),
+                          activeColor: AppColors.teacherPrimary,
+                          onChanged: (value) {
+                            setState(() {
+                              if (value!) {
+                                _selectedStudentIds.add(student.id);
+                              } else {
+                                _selectedStudentIds.remove(student.id);
+                              }
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
 
           const SizedBox(height: 16),
 
           // Save as Template Option
-          LumiCard(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.save_alt,
-                          color: AppColors.secondaryYellow),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Template (Optional)',
-                        style: LumiTextStyles.h3(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    decoration: const InputDecoration(
-                      hintText: 'Save as template (e.g., "Monday Reading")',
-                      prefixIcon: Icon(Icons.bookmark_outline),
-                    ),
-                    onChanged: (value) {
-                      setState(() {
-                        _templateName = value.isEmpty ? null : value;
-                      });
-                    },
-                  ),
-                ],
+          _buildCard(
+            icon: Icons.save_alt,
+            title: 'Template (Optional)',
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: 'Save as template (e.g., "Monday Reading")',
+                prefixIcon: Icon(Icons.bookmark_outline,
+                    color: AppColors.teacherPrimary),
+                border: OutlineInputBorder(
+                  borderRadius:
+                      BorderRadius.circular(TeacherDimensions.radiusM),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius:
+                      BorderRadius.circular(TeacherDimensions.radiusM),
+                  borderSide:
+                      BorderSide(color: AppColors.teacherPrimary),
+                ),
               ),
+              style: TeacherTypography.bodyMedium,
+              onChanged: (value) =>
+                  setState(() => _templateName = value.isEmpty ? null : value),
             ),
           ),
 
           const SizedBox(height: 24),
 
           // Save Button
-          LumiPrimaryButton(
-            text: 'Create Allocation',
-            onPressed: _isLoading ? null : _saveAllocation,
-            isLoading: _isLoading,
-            isFullWidth: true,
+          SizedBox(
+            height: 48,
+            child: ElevatedButton(
+              onPressed: _isLoading ? null : _saveAllocation,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.teacherPrimary,
+                foregroundColor: AppColors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(TeacherDimensions.radiusM),
+                ),
+                elevation: 0,
+              ),
+              child: _isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: AppColors.white))
+                  : Text('Create Allocation',
+                      style: TeacherTypography.buttonText),
+            ),
           ),
 
           const SizedBox(height: 16),
@@ -748,8 +734,19 @@ class _AllocationScreenState extends State<AllocationScreen>
 
   Widget _buildActiveAllocationsView() {
     if (widget.selectedClass == null) {
-      return const Center(
-        child: Text('Please select a class from the dashboard'),
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.class_, size: 48, color: AppColors.textSecondary),
+            const SizedBox(height: 12),
+            Text(
+              'Please select a class from the dashboard',
+              style: TeacherTypography.bodyMedium
+                  .copyWith(color: AppColors.textSecondary),
+            ),
+          ],
+        ),
       );
     }
 
@@ -774,13 +771,13 @@ class _AllocationScreenState extends State<AllocationScreen>
                     size: 64, color: AppColors.error),
                 const SizedBox(height: 16),
                 Text('Error loading allocations',
-                    style: LumiTextStyles.bodyLarge()),
+                    style: TeacherTypography.bodyLarge),
                 const SizedBox(height: 8),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: Text(
                     snapshot.error.toString(),
-                    style: LumiTextStyles.bodySmall(),
+                    style: TeacherTypography.bodySmall,
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -790,7 +787,9 @@ class _AllocationScreenState extends State<AllocationScreen>
         }
 
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+              child:
+                  CircularProgressIndicator(color: AppColors.teacherPrimary));
         }
 
         // Filter allocations in code to avoid composite index requirement
@@ -805,24 +804,24 @@ class _AllocationScreenState extends State<AllocationScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.assignment_outlined,
-                  size: 64,
-                  color: AppColors.charcoal.withValues(alpha: 0.1),
-                ),
+                Icon(Icons.assignment_outlined,
+                    size: 64, color: AppColors.textSecondary),
                 const SizedBox(height: 16),
                 Text(
                   'No active allocations',
-                  style: LumiTextStyles.bodyLarge().copyWith(
-                    color: AppColors.charcoal.withValues(alpha: 0.6),
-                  ),
+                  style: TeacherTypography.bodyLarge
+                      .copyWith(color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: 8),
-                LumiTextButton(
-                  text: 'Create New Allocation',
-                  onPressed: () {
-                    _tabController.animateTo(0);
-                  },
+                TextButton(
+                  onPressed: () => _tabController.animateTo(0),
+                  child: Text(
+                    'Create New Allocation',
+                    style: TeacherTypography.bodyMedium.copyWith(
+                      color: AppColors.teacherPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -830,7 +829,7 @@ class _AllocationScreenState extends State<AllocationScreen>
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           itemCount: allocations.length,
           itemBuilder: (context, index) {
             final allocation = allocations[index];
@@ -843,18 +842,28 @@ class _AllocationScreenState extends State<AllocationScreen>
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
-                    title: const Text('Delete Allocation'),
-                    content: const Text(
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(TeacherDimensions.radiusL),
+                    ),
+                    title: Text('Delete Allocation',
+                        style: TeacherTypography.h3),
+                    content: Text(
                       'Are you sure you want to delete this allocation?',
+                      style: TeacherTypography.bodyMedium,
                     ),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Cancel'),
+                        child: Text('Cancel',
+                            style: TeacherTypography.bodyMedium
+                                .copyWith(color: AppColors.textSecondary)),
                       ),
                       TextButton(
                         onPressed: () => Navigator.pop(context, true),
-                        child: const Text('Delete'),
+                        child: Text('Delete',
+                            style: TeacherTypography.bodyMedium
+                                .copyWith(color: AppColors.error)),
                       ),
                     ],
                   ),
@@ -873,6 +882,92 @@ class _AllocationScreenState extends State<AllocationScreen>
           },
         );
       },
+    );
+  }
+
+  // -- Helpers --
+
+  Widget _buildCard({
+    required IconData icon,
+    required String title,
+    required Widget child,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(TeacherDimensions.paddingXL),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+        boxShadow: TeacherDimensions.cardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: AppColors.teacherPrimary, size: 22),
+              const SizedBox(width: 8),
+              Text(title, style: TeacherTypography.h3),
+            ],
+          ),
+          const SizedBox(height: 16),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRadioOption<T>({
+    required String title,
+    String? subtitle,
+    required T value,
+    required T groupValue,
+    required ValueChanged<T?> onChanged,
+  }) {
+    return RadioListTile<T>(
+      title: Text(title, style: TeacherTypography.bodyMedium),
+      subtitle: subtitle != null
+          ? Text(subtitle, style: TeacherTypography.bodySmall)
+          : null,
+      value: value,
+      groupValue: groupValue,
+      activeColor: AppColors.teacherPrimary,
+      contentPadding: EdgeInsets.zero,
+      onChanged: onChanged,
+    );
+  }
+
+  Widget _buildDatePicker({
+    required String label,
+    required DateTime date,
+    required VoidCallback onTap,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TeacherTypography.bodySmall),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.divider),
+              borderRadius:
+                  BorderRadius.circular(TeacherDimensions.radiusM),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(DateFormat('MMM dd, yyyy').format(date),
+                    style: TeacherTypography.bodyMedium),
+                Icon(Icons.calendar_today,
+                    size: 16, color: AppColors.teacherPrimary),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -927,149 +1022,145 @@ class _AllocationCard extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: LumiCard(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _getAllocationTitle(allocation),
-                          style: LumiTextStyles.bodyLarge().copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${allocation.targetMinutes} minutes · ${_getCadenceLabel(allocation.cadence)}',
-                          style: LumiTextStyles.bodySmall().copyWith(
-                            color: AppColors.charcoal.withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  PopupMenuButton<String>(
-                    onSelected: (value) {
-                      if (value == 'edit') {
-                        onEdit();
-                      } else if (value == 'delete') {
-                        onDelete();
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Text('Edit'),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+          boxShadow: TeacherDimensions.cardShadow,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _getAllocationTitle(allocation),
+                        style: TeacherTypography.bodyLarge
+                            .copyWith(fontWeight: FontWeight.w700),
                       ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Text('Delete'),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${allocation.targetMinutes} minutes · ${_getCadenceLabel(allocation.cadence)}',
+                        style: TeacherTypography.bodySmall,
                       ),
                     ],
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // Date range
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isExpiring
-                      ? AppColors.warning.withValues(alpha: 0.1)
-                      : AppColors.charcoal.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.calendar_today,
-                      size: 16,
-                      color: isExpiring
-                          ? AppColors.warning
-                          : AppColors.charcoal.withValues(alpha: 0.6),
+                PopupMenuButton<String>(
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      onEdit();
+                    } else if (value == 'delete') {
+                      onDelete();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Text('Edit'),
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${DateFormat('MMM dd').format(allocation.startDate)} - ${DateFormat('MMM dd').format(allocation.endDate)}',
-                      style: LumiTextStyles.bodySmall().copyWith(
-                        color: isExpiring
-                            ? AppColors.warning
-                            : AppColors.charcoal.withValues(alpha: 0.6),
-                      ),
-                    ),
-                    if (isExpiring) ...[
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.warning,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          'Expires soon',
-                          style: LumiTextStyles.caption().copyWith(
-                            color: AppColors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // Students
-              Row(
-                children: [
-                  Icon(Icons.groups,
-                      size: 16,
-                      color: AppColors.charcoal.withValues(alpha: 0.6)),
-                  const SizedBox(width: 8),
-                  Text(
-                    allocation.isForWholeClass
-                        ? 'Whole class'
-                        : '${allocation.studentIds.length} students',
-                    style: LumiTextStyles.bodySmall().copyWith(
-                      color: AppColors.charcoal.withValues(alpha: 0.6),
-                    ),
-                  ),
-                ],
-              ),
-
-              if (allocation.isRecurring) ...[
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.repeat,
-                      size: 16,
-                      color: AppColors.secondaryGreen,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Recurring',
-                      style: LumiTextStyles.bodySmall().copyWith(
-                        color: AppColors.secondaryGreen,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Text('Delete'),
                     ),
                   ],
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+
+            // Date range
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isExpiring
+                    ? AppColors.warning.withValues(alpha: 0.1)
+                    : AppColors.background,
+                borderRadius:
+                    BorderRadius.circular(TeacherDimensions.radiusS),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.calendar_today,
+                    size: 16,
+                    color: isExpiring
+                        ? AppColors.warning
+                        : AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${DateFormat('MMM dd').format(allocation.startDate)} - ${DateFormat('MMM dd').format(allocation.endDate)}',
+                    style: TeacherTypography.bodySmall.copyWith(
+                      color: isExpiring
+                          ? AppColors.warning
+                          : AppColors.textSecondary,
+                    ),
+                  ),
+                  if (isExpiring) ...[
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning,
+                        borderRadius: BorderRadius.circular(
+                            TeacherDimensions.radiusRound),
+                      ),
+                      child: Text(
+                        'Expires soon',
+                        style: TeacherTypography.caption.copyWith(
+                          color: AppColors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Students
+            Row(
+              children: [
+                Icon(Icons.groups,
+                    size: 16, color: AppColors.textSecondary),
+                const SizedBox(width: 8),
+                Text(
+                  allocation.isForWholeClass
+                      ? 'Whole class'
+                      : '${allocation.studentIds.length} students',
+                  style: TeacherTypography.bodySmall,
+                ),
+              ],
+            ),
+
+            if (allocation.isRecurring) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.repeat,
+                      size: 16, color: AppColors.teacherPrimary),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Recurring',
+                    style: TeacherTypography.bodySmall.copyWith(
+                      color: AppColors.teacherPrimary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
             ],
-          ),
+          ],
         ),
       ),
     );

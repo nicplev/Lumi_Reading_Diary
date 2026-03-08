@@ -47,7 +47,7 @@ class LumiMascot extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.gray.withOpacity(0.1),
+                  color: AppColors.charcoal.withValues(alpha: 0.1),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -56,7 +56,7 @@ class LumiMascot extends StatelessWidget {
             child: Text(
               message!,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.primaryBlue,
+                    color: AppColors.rosePink,
                     fontWeight: FontWeight.w500,
                   ),
             ),
@@ -390,10 +390,10 @@ class LumiPainter extends CustomPainter {
       case LumiMood.celebrating:
         // Draw confetti around
         final colors = [
-          AppColors.secondaryOrange,
-          AppColors.secondaryYellow,
-          AppColors.secondaryGreen,
-          AppColors.secondaryPurple,
+          AppColors.warmOrange,
+          AppColors.softYellow,
+          AppColors.mintGreen,
+          AppColors.rosePink,
         ];
 
         for (int i = 0; i < 8; i++) {
@@ -422,7 +422,7 @@ class LumiPainter extends CustomPainter {
       case LumiMood.reading:
         // Draw a small book
         final bookPaint = Paint()
-          ..color = AppColors.secondaryPurple
+          ..color = AppColors.rosePink
           ..style = PaintingStyle.fill;
 
         final bookRect = Rect.fromCenter(
@@ -440,7 +440,7 @@ class LumiPainter extends CustomPainter {
           text: const TextSpan(
             text: 'Z',
             style: TextStyle(
-              color: AppColors.primaryBlue,
+              color: AppColors.rosePink,
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),

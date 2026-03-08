@@ -9,6 +9,7 @@ import '../../core/theme/teacher_constants.dart';
 import '../../core/widgets/lumi/teacher_stat_card.dart';
 import '../../core/widgets/lumi/teacher_class_card.dart';
 import '../../core/widgets/lumi/teacher_alert_banner.dart';
+import '../../core/widgets/lumi/lumi_skeleton.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/class_model.dart';
@@ -84,11 +85,57 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: AppColors.background,
-        body: Center(
-          child: CircularProgressIndicator(
-            color: AppColors.teacherPrimary,
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 120,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.teacherPrimary.withValues(alpha: 0.1),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(20),
+                    bottomRight: Radius.circular(20),
+                  ),
+                ),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    LumiSkeleton(width: 200, height: 28),
+                    SizedBox(height: 8),
+                    LumiSkeleton(width: 150, height: 16),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Row(
+                      children: const [
+                        Expanded(child: LumiSkeleton(height: 120, borderRadius: 16)),
+                        SizedBox(width: 12),
+                        Expanded(child: LumiSkeleton(height: 120, borderRadius: 16)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: const [
+                        Expanded(child: LumiSkeleton(height: 120, borderRadius: 16)),
+                        SizedBox(width: 12),
+                        Expanded(child: LumiSkeleton(height: 120, borderRadius: 16)),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const LumiSkeleton(height: 200, borderRadius: 16, width: double.infinity),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       );
@@ -270,28 +317,25 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
           Row(
             children: [
               if (_classes.length > 1)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.white.withValues(alpha: 0.2),
+                Material(
+                  color: AppColors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(20),
+                  child: InkWell(
                     borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: DropdownButton<ClassModel>(
-                    value: _selectedClass,
-                    items: _classes.map((classModel) {
-                      return DropdownMenuItem(
-                        value: classModel,
-                        child: Text(classModel.name),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() => _selectedClass = value);
-                    },
-                    underline: const SizedBox(),
-                    style: TeacherTypography.bodyMedium.copyWith(color: AppColors.white),
-                    dropdownColor: AppColors.teacherPrimary,
-                    iconEnabledColor: AppColors.white,
-                    isDense: true,
+                    onTap: () => _showClassSelectorBottomSheet(context),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Row(
+                        children: [
+                          Text(
+                            _selectedClass?.name ?? 'Select Class',
+                            style: TeacherTypography.bodyMedium.copyWith(color: AppColors.white, fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.keyboard_arrow_down, color: AppColors.white, size: 18),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               const SizedBox(width: 8),
@@ -361,10 +405,69 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                   ),
                   textAlign: TextAlign.center,
                 ),
+                const SizedBox(height: 32),
+                ElevatedButton(
+                  onPressed: () => _loadClasses(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.teacherPrimary,
+                    foregroundColor: AppColors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: const Text('Refresh', style: TeacherTypography.buttonText),
+                ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showClassSelectorBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.divider,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text('Select Class', style: TeacherTypography.h3),
+            const SizedBox(height: 16),
+            ..._classes.map((c) => ListTile(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  tileColor: _selectedClass?.id == c.id ? AppColors.teacherPrimaryLight.withValues(alpha: 0.3) : null,
+                  title: Text(
+                    c.name,
+                    style: TeacherTypography.bodyLarge.copyWith(
+                      fontWeight: _selectedClass?.id == c.id ? FontWeight.w700 : FontWeight.w500,
+                      color: _selectedClass?.id == c.id ? AppColors.teacherPrimary : AppColors.charcoal,
+                    ),
+                  ),
+                  trailing: _selectedClass?.id == c.id ? const Icon(Icons.check_circle, color: AppColors.teacherPrimary) : null,
+                  onTap: () {
+                    setState(() => _selectedClass = c);
+                    Navigator.pop(context);
+                  },
+                )),
+          ],
+        ),
       ),
     );
   }

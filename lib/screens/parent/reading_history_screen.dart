@@ -251,7 +251,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                       title: 'Books Read',
                       value: totalBooks.toString(),
                       icon: Icons.book,
-                      color: AppColors.secondaryPurple,
+                      color: AppColors.rosePink,
                     ),
                   ),
                   LumiGap.horizontalS,

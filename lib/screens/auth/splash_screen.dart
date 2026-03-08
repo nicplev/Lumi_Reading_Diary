@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -9,19 +9,19 @@ import '../../core/theme/lumi_text_styles.dart';
 import '../../core/theme/lumi_spacing.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../core/routing/app_router.dart';
-import '../../data/models/user_model.dart';
+import '../../data/providers/user_provider.dart';
 import '../../services/firebase_service.dart';
+import '../../services/analytics_service.dart';
+import '../../services/crash_reporting_service.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
-  final FirebaseService _firebaseService = FirebaseService.instance;
-
+class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void initState() {
     super.initState();
@@ -34,63 +34,33 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (!mounted) return;
 
-    // Check if user is logged in
-    final User? firebaseUser = _firebaseService.currentUser;
+    final firebaseService = ref.read(firebaseServiceProvider);
+    final firebaseUser = firebaseService.auth.currentUser;
 
     if (firebaseUser != null) {
-      // User is logged in, get their role and navigate accordingly
+      // User is logged in — read user document directly (avoids StreamProvider hang)
       try {
-        UserModel? user;
-
-        // Search through all schools for the user (nested structure)
-        final schoolsSnapshot =
-            await _firebaseService.firestore.collection('schools').get();
-
-        for (final schoolDoc in schoolsSnapshot.docs) {
-          final schoolId = schoolDoc.id;
-
-          // Try users collection
-          final userDoc = await _firebaseService.firestore
-              .collection('schools')
-              .doc(schoolId)
-              .collection('users')
-              .doc(firebaseUser.uid)
-              .get();
-
-          if (userDoc.exists) {
-            user = UserModel.fromFirestore(userDoc);
-            break;
-          }
-
-          // Also check parents collection
-          final parentDoc = await _firebaseService.firestore
-              .collection('schools')
-              .doc(schoolId)
-              .collection('parents')
-              .doc(firebaseUser.uid)
-              .get();
-
-          if (parentDoc.exists) {
-            user = UserModel.fromFirestore(parentDoc);
-            break;
-          }
-        }
+        final userRepository = ref.read(userRepositoryProvider);
+        final user = await userRepository.getUser(firebaseUser.uid);
 
         if (user != null && mounted) {
-          // Assign to non-nullable variable for type promotion
-          final currentUser = user;
+          // Set analytics & crash reporting user context
+          AnalyticsService.instance.setUserId(user.id);
+          AnalyticsService.instance.setUserRole(user.role.name);
+          AnalyticsService.instance.logAppOpened(role: user.role.name);
+          CrashReportingService.instance.setUserId(user.id);
+          CrashReportingService.instance.setCustomKey('role', user.role.name);
 
           // Check if parent is trying to access web
-          final redirectRoute = AppRouter.checkParentWebAccess(currentUser.role);
+          final redirectRoute = AppRouter.checkParentWebAccess(user.role);
           if (redirectRoute != null) {
             context.go(redirectRoute);
             return;
           }
 
           // Navigate based on role
-          final homeRoute = AppRouter.getHomeRouteForRole(currentUser.role);
-          // ignore: invalid_use_of_internal_member
-          context.go(homeRoute, extra: currentUser);
+          final homeRoute = AppRouter.getHomeRouteForRole(user.role);
+          context.go(homeRoute, extra: user);
         } else {
           // User document doesn't exist, go to login
           _navigateToLogin();

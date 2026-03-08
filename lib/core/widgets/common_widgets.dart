@@ -124,7 +124,7 @@ class CommonWidgets {
   static Widget buildLoadingIndicator() {
     return const Center(
       child: CircularProgressIndicator(
-        color: AppColors.primaryBlue,
+        color: AppColors.rosePink,
       ),
     );
   }
@@ -231,7 +231,7 @@ class CommonWidgets {
           Icon(
             icon,
             size: 32,
-            color: color ?? AppColors.primaryBlue,
+            color: color ?? AppColors.rosePink,
           ),
         if (icon != null) const SizedBox(height: 8),
         Text(
@@ -362,11 +362,11 @@ class CommonWidgets {
 
     return CircleAvatar(
       radius: size / 2,
-      backgroundColor: backgroundColor ?? AppColors.primaryBlue.withOpacity(0.2),
+      backgroundColor: backgroundColor ?? AppColors.rosePink.withValues(alpha: 0.2),
       child: Text(
         initials,
         style: TextStyle(
-          color: textColor ?? AppColors.primaryBlue,
+          color: textColor ?? AppColors.rosePink,
           fontWeight: FontWeight.bold,
           fontSize: size * 0.4,
         ),

@@ -11,6 +11,7 @@ import '../../core/widgets/lumi_mascot.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
 import '../../services/firebase_service.dart';
+import '../../core/widgets/lumi/feedback_widget.dart';
 
 class ParentProfileScreen extends StatefulWidget {
   final UserModel user;
@@ -377,6 +378,23 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       // Navigate to help
+                    },
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.feedback_outlined,
+                        color: AppColors.rosePink),
+                    title: Text('Send Feedback',
+                        style: LumiTextStyles.bodyMedium(
+                            color: AppColors.rosePink)),
+                    trailing: const Icon(Icons.chevron_right,
+                        color: AppColors.rosePink),
+                    onTap: () {
+                      showFeedbackSheet(
+                        context,
+                        userId: widget.user.id,
+                        userRole: widget.user.role.name,
+                      );
                     },
                   ),
                   const Divider(height: 1),

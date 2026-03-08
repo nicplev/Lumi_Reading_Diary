@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/lumi_text_styles.dart';
-import '../../core/theme/lumi_spacing.dart';
-import '../../core/theme/lumi_borders.dart';
-import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/theme/teacher_constants.dart';
+import '../../core/widgets/lumi/teacher_profile_card.dart';
+import '../../core/widgets/lumi/teacher_settings_section.dart';
+import '../../core/widgets/lumi/teacher_settings_item.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/class_model.dart';
 import '../../services/firebase_service.dart';
-import '../auth/login_screen.dart';
+import '../../core/widgets/lumi/feedback_widget.dart';
 
 class TeacherProfileScreen extends StatefulWidget {
   final UserModel user;
@@ -79,169 +79,57 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
     }
   }
 
-  Future<void> _handleSignOut() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: LumiBorders.shapeLarge,
-        title: Text('Sign Out', style: LumiTextStyles.h2()),
-        content: Text(
-          'Are you sure you want to sign out?',
-          style: LumiTextStyles.body(),
-        ),
-        actions: [
-          LumiTextButton(
-            onPressed: () => Navigator.pop(context, false),
-            text: 'Cancel',
-          ),
-          LumiTextButton(
-            onPressed: () => Navigator.pop(context, true),
-            text: 'Sign Out',
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      await _firebaseService.signOut();
-      if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-          (route) => false,
-        );
-      }
+  int get _totalStudents {
+    int total = 0;
+    for (final c in _classes) {
+      total += c.studentIds.length;
     }
+    return total;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.offWhite,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text('Profile', style: LumiTextStyles.h2()),
-        backgroundColor: AppColors.white,
+        title: const Text(
+          'Profile',
+          style: TextStyle(
+            fontFamily: 'Nunito',
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        backgroundColor: AppColors.teacherPrimary,
+        foregroundColor: AppColors.white,
         elevation: 0,
       ),
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Profile header
-            Container(
-              color: AppColors.white,
-              padding: LumiPadding.allM,
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: AppColors.teacherColor,
-                    child: Text(
-                      widget.user.fullName.isNotEmpty
-                          ? widget.user.fullName[0].toUpperCase()
-                          : '?',
-                      style: LumiTextStyles.display(color: AppColors.white),
-                    ),
-                  ),
-                  LumiGap.s,
-                  Text(
-                    widget.user.fullName,
-                    style: LumiTextStyles.h1(),
-                  ),
-                  LumiGap.xxs,
-                  Text(
-                    widget.user.email,
-                    style: LumiTextStyles.bodyMedium(
-                      color: AppColors.charcoal.withValues(alpha: 0.7),
-                    ),
-                  ),
-                  LumiGap.xs,
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.teacherColor.withValues(alpha: 0.1),
-                      borderRadius: LumiBorders.circular,
-                    ),
-                    child: Text(
-                      'Teacher',
-                      style: LumiTextStyles.label(color: AppColors.teacherColor),
-                    ),
-                  ),
-                ],
+            const SizedBox(height: 20),
+
+            // Profile card
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: TeacherProfileCard(
+                initials: widget.user.fullName.isNotEmpty
+                    ? widget.user.fullName[0].toUpperCase()
+                    : '?',
+                fullName: widget.user.fullName,
+                subtitle: 'Teacher',
+                stats: _isLoading
+                    ? []
+                    : [
+                        ProfileStat(
+                            value: '${_classes.length}', label: 'Classes'),
+                        ProfileStat(
+                            value: '$_totalStudents', label: 'Students'),
+                        ProfileStat(value: '0', label: 'Reports'),
+                      ],
               ),
             ),
 
-            LumiGap.s,
-
-            // Classes Section
-            _buildSectionTitle(context, 'My Classes', Icons.groups),
-            Container(
-              color: AppColors.white,
-              child: _isLoading
-                  ? const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: CircularProgressIndicator(),
-                      ),
-                    )
-                  : _classes.isEmpty
-                      ? ListTile(
-                          leading: Icon(
-                            Icons.info_outline,
-                            color: AppColors.charcoal.withValues(alpha: 0.7),
-                          ),
-                          title: Text(
-                            'No classes assigned',
-                            style: LumiTextStyles.bodyMedium(
-                              color: AppColors.charcoal.withValues(alpha: 0.7),
-                            ),
-                          ),
-                        )
-                      : Column(
-                          children: _classes.map((classModel) {
-                            final isMainTeacher = classModel.teacherId == widget.user.id;
-                            return ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: AppColors.teacherColor.withValues(alpha: 0.1),
-                                child: const Icon(
-                                  Icons.groups,
-                                  color: AppColors.teacherColor,
-                                ),
-                              ),
-                              title: Text(
-                                classModel.name,
-                                style: LumiTextStyles.bodyMedium(),
-                              ),
-                              subtitle: Text(
-                                '${classModel.studentIds.length} students • ${classModel.yearLevel != null ? 'Year ${classModel.yearLevel}' : ''}',
-                                style: LumiTextStyles.bodySmall(
-                                  color: AppColors.charcoal.withValues(alpha: 0.7),
-                                ),
-                              ),
-                              trailing: isMainTeacher
-                                  ? null
-                                  : Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.info.withValues(alpha: 0.1),
-                                        borderRadius: LumiBorders.medium,
-                                      ),
-                                      child: Text(
-                                        'Assistant',
-                                        style: LumiTextStyles.label(color: AppColors.info),
-                                      ),
-                                    ),
-                            );
-                          }).toList(),
-                        ),
-            ),
-
-            LumiGap.s,
+            const SizedBox(height: 20),
 
             // School Info
             StreamBuilder<DocumentSnapshot>(
@@ -254,133 +142,181 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                   return const SizedBox();
                 }
 
-                final schoolData = snapshot.data!.data() as Map<String, dynamic>;
+                final schoolData =
+                    snapshot.data!.data() as Map<String, dynamic>;
                 final schoolName = schoolData['name'] ?? 'School';
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildSectionTitle(context, 'School', Icons.school),
-                    Container(
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
                       color: AppColors.white,
-                      child: ListTile(
-                        leading: const Icon(Icons.school, color: AppColors.rosePink),
-                        title: Text(schoolName, style: LumiTextStyles.bodyMedium()),
-                        subtitle: widget.user.schoolId != null
-                            ? Text(
-                                'School ID: ${widget.user.schoolId!.substring(0, 8)}...',
-                                style: LumiTextStyles.bodySmall(
-                                  color: AppColors.charcoal.withValues(alpha: 0.7),
-                                ),
-                              )
-                            : null,
-                      ),
+                      borderRadius:
+                          BorderRadius.circular(TeacherDimensions.radiusL),
+                      boxShadow: TeacherDimensions.cardShadow,
                     ),
-                  ],
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: AppColors.teacherPrimaryLight,
+                            borderRadius: BorderRadius.circular(
+                                TeacherDimensions.radiusS),
+                          ),
+                          child: Icon(Icons.school,
+                              color: AppColors.teacherPrimary, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(schoolName,
+                                  style: TeacherTypography.bodyLarge.copyWith(
+                                      fontWeight: FontWeight.w600)),
+                              Text(
+                                widget.user.email,
+                                style: TeacherTypography.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 );
               },
             ),
 
-            LumiGap.s,
+            const SizedBox(height: 20),
 
-            // Settings
-            _buildSectionTitle(context, 'Settings', Icons.settings_outlined),
-            Container(
-              color: AppColors.white,
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.notifications_outlined),
-                    title: Text(
-                      'Notification Settings',
-                      style: LumiTextStyles.bodyMedium(),
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
+            // My Classes
+            if (!_isLoading && _classes.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius:
+                        BorderRadius.circular(TeacherDimensions.radiusL),
+                    boxShadow: TeacherDimensions.cardShadow,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                        child:
+                            Text('My Classes', style: TeacherTypography.h3),
+                      ),
+                      ..._classes.map((classModel) {
+                        final isMainTeacher =
+                            classModel.teacherId == widget.user.id;
+                        return ListTile(
+                          leading: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: AppColors.teacherPrimaryLight,
+                              borderRadius: BorderRadius.circular(
+                                  TeacherDimensions.radiusS),
+                            ),
+                            child: Icon(Icons.groups,
+                                color: AppColors.teacherPrimary, size: 18),
+                          ),
+                          title: Text(classModel.name,
+                              style: TeacherTypography.bodyMedium
+                                  .copyWith(fontWeight: FontWeight.w600)),
+                          subtitle: Text(
+                            '${classModel.studentIds.length} students${classModel.yearLevel != null ? ' · Year ${classModel.yearLevel}' : ''}',
+                            style: TeacherTypography.bodySmall,
+                          ),
+                          trailing: isMainTeacher
+                              ? null
+                              : Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.teacherPrimaryLight,
+                                    borderRadius: BorderRadius.circular(
+                                        TeacherDimensions.radiusRound),
+                                  ),
+                                  child: Text(
+                                    'Assistant',
+                                    style:
+                                        TeacherTypography.caption.copyWith(
+                                      color: AppColors.teacherPrimary,
+                                    ),
+                                  ),
+                                ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ),
+
+            const SizedBox(height: 20),
+
+            // Actions
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: TeacherSettingsSection(
+                title: 'ACTIONS',
+                items: [
+                  TeacherSettingsItem(
+                    icon: Icons.edit_outlined,
+                    iconBgColor: AppColors.teacherPrimaryLight,
+                    label: 'Edit Profile',
                     onTap: () {
-                      // Navigate to notification settings
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('Edit Profile coming soon')),
+                      );
                     },
                   ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.help_outline),
-                    title: Text(
-                      'Help & Support',
-                      style: LumiTextStyles.bodyMedium(),
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
+                  TeacherSettingsItem(
+                    icon: Icons.feedback_outlined,
+                    iconBgColor:
+                        AppColors.teacherAccent.withValues(alpha: 0.2),
+                    label: 'Send Feedback',
                     onTap: () {
-                      // Navigate to help
+                      showFeedbackSheet(
+                        context,
+                        userId: widget.user.id,
+                        userRole: widget.user.role.name,
+                      );
                     },
                   ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.privacy_tip_outlined),
-                    title: Text(
-                      'Privacy Policy',
-                      style: LumiTextStyles.bodyMedium(),
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
+                  TeacherSettingsItem(
+                    icon: Icons.download_outlined,
+                    iconBgColor: AppColors.mintGreen.withValues(alpha: 0.2),
+                    label: 'Export Reports',
                     onTap: () {
-                      // Navigate to privacy policy
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('Export Reports coming soon')),
+                      );
                     },
                   ),
                 ],
               ),
             ),
 
-            LumiGap.s,
-
-            // Actions
-            Container(
-              color: AppColors.white,
-              child: ListTile(
-                leading: const Icon(Icons.logout, color: AppColors.error),
-                title: Text(
-                  'Sign Out',
-                  style: LumiTextStyles.bodyMedium(color: AppColors.error),
-                ),
-                onTap: _handleSignOut,
-              ),
-            ),
-
-            LumiGap.l,
+            const SizedBox(height: 16),
 
             // Version info
             Text(
               'Version 1.0.0',
-              style: LumiTextStyles.bodySmall(
-                color: AppColors.charcoal.withValues(alpha: 0.7),
-              ),
+              style: TeacherTypography.bodySmall,
             ),
 
-            LumiGap.s,
+            const SizedBox(height: 20),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(BuildContext context, String title, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        LumiSpacing.s,
-        LumiSpacing.s,
-        LumiSpacing.s,
-        LumiSpacing.xs,
-      ),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            size: 20,
-            color: AppColors.charcoal.withValues(alpha: 0.7),
-          ),
-          LumiGap.xs,
-          Text(
-            title,
-            style: LumiTextStyles.h3(color: AppColors.charcoal),
-          ),
-        ],
       ),
     );
   }

@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1200, initial-scale=1.0">
+  <title>Lumi Parent Onboarding - 60 Second Flow</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%);
+      min-height: 100vh;
+      padding: 40px;
+    }
+
+    :root {
+      --lumi-rose: #FF8698;
+      --lumi-mint: #D2EBBF;
+      --lumi-sky: #BCE7F0;
+      --lumi-charcoal: #121211;
+    }
+
+    h1 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--lumi-charcoal);
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: #666;
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    /* Flow Container */
+    .flow-container {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-bottom: 40px;
+      flex-wrap: wrap;
+    }
+
+    /* Phone Frame */
+    .phone-wrapper {
+      position: relative;
+    }
+
+    .step-badge {
+      position: absolute;
+      top: -16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--lumi-rose);
+      color: white;
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-family: 'Poppins', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      z-index: 10;
+    }
+
+    .time-badge {
+      position: absolute;
+      bottom: -16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--lumi-mint);
+      color: #2D5016;
+      padding: 6px 14px;
+      border-radius: 16px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .phone {
+      width: 260px;
+      height: 520px;
+      background: white;
+      border-radius: 32px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+      overflow: hidden;
+      margin-top: 24px;
+      margin-bottom: 24px;
+    }
+
+    .phone-header {
+      height: 44px;
+      background: linear-gradient(180deg, #FFF6F7 0%, #FFFFFF 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .notch {
+      width: 70px;
+      height: 22px;
+      background: #000;
+      border-radius: 11px;
+    }
+
+    .phone-content {
+      padding: 20px;
+      height: calc(100% - 44px);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Arrow */
+    .arrow {
+      display: flex;
+      align-items: center;
+      font-size: 32px;
+      color: var(--lumi-rose);
+      padding-top: 200px;
+    }
+
+    /* Step 1: Scan QR */
+    .welcome-screen {
+      text-align: center;
+      padding-top: 20px;
+    }
+
+    .lumi-logo {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .welcome-title {
+      font-family: 'Poppins', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--lumi-charcoal);
+      margin-bottom: 8px;
+    }
+
+    .welcome-subtitle {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 24px;
+    }
+
+    .qr-scanner {
+      width: 160px;
+      height: 160px;
+      margin: 0 auto 20px;
+      border: 3px solid var(--lumi-rose);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 64px;
+      background: #FAFAFA;
+      position: relative;
+    }
+
+    .qr-corner {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border: 4px solid var(--lumi-rose);
+    }
+
+    .qr-corner.tl { top: -2px; left: -2px; border-right: none; border-bottom: none; border-radius: 8px 0 0 0; }
+    .qr-corner.tr { top: -2px; right: -2px; border-left: none; border-bottom: none; border-radius: 0 8px 0 0; }
+    .qr-corner.bl { bottom: -2px; left: -2px; border-right: none; border-top: none; border-radius: 0 0 0 8px; }
+    .qr-corner.br { bottom: -2px; right: -2px; border-left: none; border-top: none; border-radius: 0 0 8px 0; }
+
+    .scan-hint {
+      font-size: 13px;
+      color: #888;
+    }
+
+    .alt-method {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #EEE;
+    }
+
+    .alt-link {
+      font-size: 13px;
+      color: var(--lumi-rose);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    /* Step 2: Confirm Child */
+    .confirm-screen {
+      padding-top: 10px;
+    }
+
+    .confirm-header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .confirm-icon {
+      font-size: 48px;
+      margin-bottom: 8px;
+    }
+
+    .confirm-title {
+      font-family: 'Poppins', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--lumi-charcoal);
+    }
+
+    .school-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: var(--lumi-sky);
+      border-radius: 16px;
+      font-size: 12px;
+      color: #1E6B7B;
+      margin-top: 8px;
+    }
+
+    .child-card {
+      background: #F8F8F8;
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .child-card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .child-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 24px;
+      background: linear-gradient(135deg, var(--lumi-rose), #FF6B7A);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-family: 'Poppins', sans-serif;
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .child-info {
+      flex: 1;
+    }
+
+    .child-name-confirm {
+      font-family: 'Poppins', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--lumi-charcoal);
+    }
+
+    .child-class {
+      font-size: 13px;
+      color: #666;
+    }
+
+    .child-level {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #888;
+    }
+
+    .level-dot-confirm {
+      width: 10px;
+      height: 10px;
+      border-radius: 5px;
+      background: #F97316;
+    }
+
+    .confirm-check {
+      width: 24px;
+      height: 24px;
+      border-radius: 12px;
+      background: var(--lumi-mint);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #2D5016;
+      font-size: 14px;
+    }
+
+    .not-right {
+      text-align: center;
+      font-size: 12px;
+      color: #888;
+    }
+
+    .not-right a {
+      color: var(--lumi-rose);
+      text-decoration: none;
+    }
+
+    .confirm-btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--lumi-rose), #FF6B7A);
+      color: white;
+      font-family: 'Poppins', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      margin-top: auto;
+    }
+
+    /* Step 3: Reminder Time */
+    .reminder-screen {
+      padding-top: 10px;
+    }
+
+    .reminder-header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .reminder-icon {
+      font-size: 48px;
+      margin-bottom: 8px;
+    }
+
+    .reminder-title {
+      font-family: 'Poppins', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--lumi-charcoal);
+    }
+
+    .reminder-subtitle {
+      font-size: 13px;
+      color: #888;
+      margin-top: 4px;
+    }
+
+    .time-options {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .time-option {
+      display: flex;
+      align-items: center;
+      padding: 14px;
+      border-radius: 12px;
+      border: 2px solid #E8E8E8;
+      background: white;
+    }
+
+    .time-option.selected {
+      border-color: var(--lumi-rose);
+      background: rgba(255, 134, 152, 0.05);
+    }
+
+    .time-radio {
+      width: 20px;
+      height: 20px;
+      border-radius: 10px;
+      border: 2px solid #DDD;
+      margin-right: 12px;
+    }
+
+    .time-option.selected .time-radio {
+      border-color: var(--lumi-rose);
+      background: var(--lumi-rose);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .time-option.selected .time-radio::after {
+      content: '✓';
+      color: white;
+      font-size: 12px;
+    }
+
+    .time-text {
+      flex: 1;
+      font-size: 14px;
+      color: var(--lumi-charcoal);
+    }
+
+    .time-tag {
+      font-size: 11px;
+      padding: 3px 8px;
+      background: var(--lumi-mint);
+      color: #2D5016;
+      border-radius: 8px;
+    }
+
+    .custom-time {
+      display: flex;
+      align-items: center;
+      padding: 14px;
+      border-radius: 12px;
+      background: #F8F8F8;
+      font-size: 14px;
+      color: #888;
+    }
+
+    .skip-option {
+      text-align: center;
+      font-size: 13px;
+      color: #888;
+      margin-top: 12px;
+    }
+
+    .skip-option a {
+      color: var(--lumi-rose);
+      text-decoration: none;
+    }
+
+    /* Step 4: Ready */
+    .ready-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      height: 100%;
+    }
+
+    .ready-emoji {
+      font-size: 72px;
+      margin-bottom: 16px;
+      animation: bounce 0.6s ease-out;
+    }
+
+    @keyframes bounce {
+      0% { transform: scale(0); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+
+    .ready-title {
+      font-family: 'Poppins', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--lumi-charcoal);
+      margin-bottom: 8px;
+    }
+
+    .ready-subtitle {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+
+    .ready-info {
+      background: var(--lumi-sky);
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: #1E6B7B;
+    }
+
+    .start-btn {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--lumi-rose), #FF6B7A);
+      color: white;
+      font-family: 'Poppins', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      box-shadow: 0 6px 20px rgba(255, 134, 152, 0.4);
+    }
+
+    /* Timeline */
+    .timeline {
+      max-width: 900px;
+      margin: 0 auto 40px;
+      background: white;
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    }
+
+    .timeline-title {
+      font-family: 'Poppins', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--lumi-charcoal);
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .timeline-bar {
+      display: flex;
+      align-items: center;
+      position: relative;
+    }
+
+    .timeline-line {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--lumi-rose), var(--lumi-mint));
+      transform: translateY(-50%);
+      border-radius: 2px;
+    }
+
+    .timeline-step {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .timeline-dot {
+      width: 40px;
+      height: 40px;
+      border-radius: 20px;
+      background: white;
+      border: 4px solid var(--lumi-rose);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      margin-bottom: 8px;
+    }
+
+    .timeline-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--lumi-charcoal);
+    }
+
+    .timeline-time {
+      font-size: 11px;
+      color: #888;
+    }
+
+    /* Design Notes */
+    .design-notes {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px;
+      background: #FFF9E6;
+      border-radius: 16px;
+      border: 2px dashed #FFD700;
+    }
+
+    .design-notes h3 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      color: #996600;
+      margin-bottom: 16px;
+    }
+
+    .design-notes ul {
+      font-size: 14px;
+      color: #666;
+      padding-left: 24px;
+      line-height: 2;
+    }
+  </style>
+</head>
+<body>
+  <h1>Parent Onboarding: 60 Seconds</h1>
+  <p class="subtitle">Frictionless setup drives adoption. 4 screens, no typing required.</p>
+
+  <div class="flow-container">
+    <!-- Step 1: Scan QR -->
+    <div class="phone-wrapper">
+      <div class="step-badge">Step 1: Scan QR Code</div>
+      <div class="phone">
+        <div class="phone-header"><div class="notch"></div></div>
+        <div class="phone-content welcome-screen">
+          <div class="lumi-logo">📖</div>
+          <div class="welcome-title">Welcome to Lumi</div>
+          <div class="welcome-subtitle">Connect with your child's reading journey</div>
+
+          <div class="qr-scanner">
+            <div class="qr-corner tl"></div>
+            <div class="qr-corner tr"></div>
+            <div class="qr-corner bl"></div>
+            <div class="qr-corner br"></div>
+            📱
+          </div>
+
+          <div class="scan-hint">Scan the QR code from your child's teacher</div>
+
+          <div class="alt-method">
+            <a href="#" class="alt-link">Enter code manually →</a>
+          </div>
+        </div>
+      </div>
+      <div class="time-badge">⏱️ 10 seconds</div>
+    </div>
+
+    <div class="arrow">→</div>
+
+    <!-- Step 2: Confirm Child -->
+    <div class="phone-wrapper">
+      <div class="step-badge">Step 2: Confirm Your Child</div>
+      <div class="phone">
+        <div class="phone-header"><div class="notch"></div></div>
+        <div class="phone-content confirm-screen">
+          <div class="confirm-header">
+            <div class="confirm-icon">👋</div>
+            <div class="confirm-title">Is this your child?</div>
+            <div class="school-badge">
+              🏫 Sunshine Primary School
+            </div>
+          </div>
+
+          <div class="child-card">
+            <div class="child-card-header">
+              <div class="child-avatar">S</div>
+              <div class="child-info">
+                <div class="child-name-confirm">Sophie Anderson</div>
+                <div class="child-class">Grade 2B · Mrs Thompson</div>
+              </div>
+              <div class="confirm-check">✓</div>
+            </div>
+            <div class="child-level">
+              <div class="level-dot-confirm"></div>
+              Reading Level: Orange (14)
+            </div>
+          </div>
+
+          <div class="not-right">
+            Not right? <a href="#">Contact the school</a>
+          </div>
+
+          <button class="confirm-btn">Yes, That's My Child</button>
+        </div>
+      </div>
+      <div class="time-badge">⏱️ 5 seconds</div>
+    </div>
+
+    <div class="arrow">→</div>
+
+    <!-- Step 3: Set Reminder -->
+    <div class="phone-wrapper">
+      <div class="step-badge">Step 3: Set Reminder</div>
+      <div class="phone">
+        <div class="phone-header"><div class="notch"></div></div>
+        <div class="phone-content reminder-screen">
+          <div class="reminder-header">
+            <div class="reminder-icon">🔔</div>
+            <div class="reminder-title">Reading Reminder</div>
+            <div class="reminder-subtitle">We'll gently nudge you each evening</div>
+          </div>
+
+          <div class="time-options">
+            <div class="time-option">
+              <div class="time-radio"></div>
+              <div class="time-text">6:00 PM</div>
+            </div>
+            <div class="time-option selected">
+              <div class="time-radio"></div>
+              <div class="time-text">6:30 PM</div>
+              <div class="time-tag">Most popular</div>
+            </div>
+            <div class="time-option">
+              <div class="time-radio"></div>
+              <div class="time-text">7:00 PM</div>
+            </div>
+          </div>
+
+          <div class="custom-time">
+            ⏰ Choose a custom time...
+          </div>
+
+          <div class="skip-option">
+            <a href="#">Skip for now</a>
+          </div>
+
+          <button class="confirm-btn" style="margin-top: 16px;">Continue</button>
+        </div>
+      </div>
+      <div class="time-badge">⏱️ 10 seconds</div>
+    </div>
+
+    <div class="arrow">→</div>
+
+    <!-- Step 4: Ready -->
+    <div class="phone-wrapper">
+      <div class="step-badge">Step 4: You're Ready!</div>
+      <div class="phone">
+        <div class="phone-header"><div class="notch"></div></div>
+        <div class="phone-content ready-screen">
+          <div class="ready-emoji">🎉</div>
+          <div class="ready-title">You're All Set!</div>
+          <div class="ready-subtitle">Sophie's reading journey starts tonight. Let's build those reading habits together!</div>
+
+          <div class="ready-info">
+            📖 Tonight: Read for 15 minutes at Orange level
+          </div>
+
+          <button class="start-btn">Start Reading Journey</button>
+        </div>
+      </div>
+      <div class="time-badge">⏱️ 5 seconds</div>
+    </div>
+  </div>
+
+  <!-- Timeline -->
+  <div class="timeline">
+    <div class="timeline-title">Total Onboarding Time: Under 30 Seconds</div>
+    <div class="timeline-bar">
+      <div class="timeline-line"></div>
+      <div class="timeline-step">
+        <div class="timeline-dot">📱</div>
+        <div class="timeline-label">Scan QR</div>
+        <div class="timeline-time">10 sec</div>
+      </div>
+      <div class="timeline-step">
+        <div class="timeline-dot">👋</div>
+        <div class="timeline-label">Confirm</div>
+        <div class="timeline-time">5 sec</div>
+      </div>
+      <div class="timeline-step">
+        <div class="timeline-dot">🔔</div>
+        <div class="timeline-label">Reminder</div>
+        <div class="timeline-time">10 sec</div>
+      </div>
+      <div class="timeline-step">
+        <div class="timeline-dot">🎉</div>
+        <div class="timeline-label">Done!</div>
+        <div class="timeline-time">5 sec</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Design Notes -->
+  <div class="design-notes">
+    <h3>🎨 Why This Flow Works</h3>
+    <ul>
+      <li><strong>QR Code First:</strong> Teachers print QR codes on letters home. No typing email addresses or searching for schools - just scan and go.</li>
+      <li><strong>Pre-filled Data:</strong> Child's name, class, teacher, and reading level are all pulled from school data. Parent just confirms.</li>
+      <li><strong>Smart Defaults:</strong> 6:30 PM is pre-selected as the most popular reminder time. Most parents accept the default.</li>
+      <li><strong>No Account Creation:</strong> Parents don't create passwords in this flow. They authenticate via the QR code link (Firebase Dynamic Links + email link auth).</li>
+      <li><strong>Immediate Value:</strong> The "Tonight" card shows them exactly what to do before they even finish onboarding - reduces overwhelm.</li>
+      <li><strong>Escape Hatches:</strong> "Enter code manually" and "Skip for now" give control without cluttering the happy path.</li>
+      <li><strong>Zero Typing:</strong> The entire flow can be completed with taps only. Critical for parents doing this one-handed while holding a child.</li>
+    </ul>
+  </div>
+</body>
+</html>

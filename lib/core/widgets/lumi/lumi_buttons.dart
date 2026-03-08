@@ -7,22 +7,17 @@ import '../../theme/lumi_borders.dart';
 
 /// Lumi Design System - Primary Button
 ///
-/// Rose pink background, white text, 16pt padding vertical, 24pt horizontal
-/// Border radius: 12pt, with shadow
-///
-/// Usage:
-/// ```dart
-/// LumiPrimaryButton(
-///   onPressed: () => doSomething(),
-///   text: 'Submit',
-/// )
-/// ```
+/// Default: Rose pink background, white text, pill shape (28pt radius)
+/// Pass [color] for teacher/admin indigo variant.
+/// Pass [borderRadius] to override pill shape (e.g. 14px for teacher buttons).
 class LumiPrimaryButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final String text;
   final IconData? icon;
   final bool isLoading;
   final bool isFullWidth;
+  final Color? color;
+  final BorderRadius? borderRadius;
 
   const LumiPrimaryButton({
     super.key,
@@ -31,23 +26,30 @@ class LumiPrimaryButton extends StatelessWidget {
     this.icon,
     this.isLoading = false,
     this.isFullWidth = false,
+    this.color,
+    this.borderRadius,
   });
 
   @override
   Widget build(BuildContext context) {
+    final primaryColor = color ?? AppColors.rosePink;
+    final shape = borderRadius != null
+        ? RoundedRectangleBorder(borderRadius: borderRadius!)
+        : LumiBorders.shapePill;
+
     return SizedBox(
       width: isFullWidth ? double.infinity : null,
       height: 56,
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.rosePink,
+          backgroundColor: primaryColor,
           foregroundColor: AppColors.white,
-          disabledBackgroundColor: AppColors.rosePink.withOpacity(0.4),
+          disabledBackgroundColor: primaryColor.withValues(alpha: 0.4),
           padding: LumiPadding.button,
-          shape: LumiBorders.shapeMedium,
+          shape: shape,
           elevation: 2,
-          shadowColor: AppColors.rosePink.withOpacity(0.3),
+          shadowColor: primaryColor.withValues(alpha: 0.3),
         ),
         child: isLoading
             ? const SizedBox(
@@ -73,7 +75,6 @@ class LumiPrimaryButton extends StatelessWidget {
               ),
       ),
     ).animate(
-      // Subtle scale animation on tap
       target: onPressed != null && !isLoading ? 1 : 0,
     ).scale(
       duration: 150.ms,
@@ -86,22 +87,17 @@ class LumiPrimaryButton extends StatelessWidget {
 
 /// Lumi Design System - Secondary Button
 ///
-/// White background with rose pink border and text
-/// Border radius: 12pt
-///
-/// Usage:
-/// ```dart
-/// LumiSecondaryButton(
-///   onPressed: () => doSomething(),
-///   text: 'Cancel',
-/// )
-/// ```
+/// Default: White background with rose pink border and text, pill shape
+/// Pass [color] for teacher/admin indigo variant.
+/// Pass [borderRadius] to override pill shape.
 class LumiSecondaryButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final String text;
   final IconData? icon;
   final bool isLoading;
   final bool isFullWidth;
+  final Color? color;
+  final BorderRadius? borderRadius;
 
   const LumiSecondaryButton({
     super.key,
@@ -110,10 +106,19 @@ class LumiSecondaryButton extends StatelessWidget {
     this.icon,
     this.isLoading = false,
     this.isFullWidth = false,
+    this.color,
+    this.borderRadius,
   });
 
   @override
   Widget build(BuildContext context) {
+    final accentColor = color ?? AppColors.rosePink;
+    final br = borderRadius ?? LumiBorders.pill;
+    final shape = RoundedRectangleBorder(
+      borderRadius: br,
+      side: BorderSide(color: accentColor, width: 2.0),
+    );
+
     return SizedBox(
       width: isFullWidth ? double.infinity : null,
       height: 56,
@@ -121,25 +126,22 @@ class LumiSecondaryButton extends StatelessWidget {
         onPressed: isLoading ? null : onPressed,
         style: OutlinedButton.styleFrom(
           backgroundColor: AppColors.white,
-          foregroundColor: AppColors.rosePink,
-          disabledForegroundColor: AppColors.charcoal.withOpacity(0.4),
+          foregroundColor: accentColor,
+          disabledForegroundColor: AppColors.charcoal.withValues(alpha: 0.4),
           padding: const EdgeInsets.symmetric(
-            vertical: 14, // Adjusted for 2pt border
+            vertical: 14,
             horizontal: 22,
           ),
-          shape: LumiBorders.shapePrimaryBorder,
-          side: const BorderSide(
-            color: AppColors.rosePink,
-            width: 2.0,
-          ),
+          shape: shape,
+          side: BorderSide(color: accentColor, width: 2.0),
         ),
         child: isLoading
-            ? const SizedBox(
+            ? SizedBox(
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.rosePink),
+                  valueColor: AlwaysStoppedAnimation<Color>(accentColor),
                 ),
               )
             : Row(
@@ -151,7 +153,7 @@ class LumiSecondaryButton extends StatelessWidget {
                   ],
                   Text(
                     text,
-                    style: LumiTextStyles.button(color: AppColors.rosePink),
+                    style: LumiTextStyles.button(color: accentColor),
                   ),
                 ],
               ),
@@ -162,21 +164,14 @@ class LumiSecondaryButton extends StatelessWidget {
 
 /// Lumi Design System - Text Button
 ///
-/// Transparent background with rose pink text
-/// Shows background tint on hover
-///
-/// Usage:
-/// ```dart
-/// LumiTextButton(
-///   onPressed: () => doSomething(),
-///   text: 'Learn More',
-/// )
-/// ```
+/// Transparent background with rose pink text.
+/// Pass [color] for teacher/admin indigo variant.
 class LumiTextButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final String text;
   final IconData? icon;
   final bool isLoading;
+  final Color? color;
 
   const LumiTextButton({
     super.key,
@@ -184,15 +179,18 @@ class LumiTextButton extends StatelessWidget {
     required this.text,
     this.icon,
     this.isLoading = false,
+    this.color,
   });
 
   @override
   Widget build(BuildContext context) {
+    final foregroundColor = color ?? AppColors.rosePink;
+
     return TextButton(
       onPressed: isLoading ? null : onPressed,
       style: TextButton.styleFrom(
-        foregroundColor: AppColors.rosePink,
-        disabledForegroundColor: AppColors.charcoal.withOpacity(0.4),
+        foregroundColor: foregroundColor,
+        disabledForegroundColor: AppColors.charcoal.withValues(alpha: 0.4),
         padding: const EdgeInsets.symmetric(
           vertical: 8,
           horizontal: 12,
@@ -202,12 +200,12 @@ class LumiTextButton extends StatelessWidget {
         ),
       ),
       child: isLoading
-          ? const SizedBox(
+          ? SizedBox(
               width: 16,
               height: 16,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(AppColors.rosePink),
+                valueColor: AlwaysStoppedAnimation<Color>(foregroundColor),
               ),
             )
           : Row(
@@ -219,7 +217,7 @@ class LumiTextButton extends StatelessWidget {
                 ],
                 Text(
                   text,
-                  style: LumiTextStyles.button(color: AppColors.rosePink),
+                  style: LumiTextStyles.button(color: foregroundColor),
                 ),
               ],
             ),
@@ -229,16 +227,7 @@ class LumiTextButton extends StatelessWidget {
 
 /// Lumi Design System - Icon Button
 ///
-/// Circular button with icon only
-/// Used for actions like close, back, etc.
-///
-/// Usage:
-/// ```dart
-/// LumiIconButton(
-///   onPressed: () => Navigator.pop(context),
-///   icon: Icons.close,
-/// )
-/// ```
+/// Circular button with icon only.
 class LumiIconButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final IconData icon;
@@ -276,20 +265,13 @@ class LumiIconButton extends StatelessWidget {
 
 /// Lumi Design System - Floating Action Button
 ///
-/// Circular FAB with rose pink background
-///
-/// Usage:
-/// ```dart
-/// LumiFab(
-///   onPressed: () => addItem(),
-///   icon: Icons.add,
-/// )
-/// ```
+/// Default: Rose pink background. Pass [color] for teacher/admin variant.
 class LumiFab extends StatelessWidget {
   final VoidCallback? onPressed;
   final IconData icon;
   final String? label;
   final bool isExtended;
+  final Color? color;
 
   const LumiFab({
     super.key,
@@ -297,10 +279,13 @@ class LumiFab extends StatelessWidget {
     required this.icon,
     this.label,
     this.isExtended = false,
+    this.color,
   });
 
   @override
   Widget build(BuildContext context) {
+    final bgColor = color ?? AppColors.rosePink;
+
     if (isExtended && label != null) {
       return FloatingActionButton.extended(
         onPressed: onPressed,
@@ -309,7 +294,7 @@ class LumiFab extends StatelessWidget {
           label!,
           style: LumiTextStyles.button(),
         ),
-        backgroundColor: AppColors.rosePink,
+        backgroundColor: bgColor,
         foregroundColor: AppColors.white,
         elevation: 4,
       );
@@ -317,7 +302,7 @@ class LumiFab extends StatelessWidget {
 
     return FloatingActionButton(
       onPressed: onPressed,
-      backgroundColor: AppColors.rosePink,
+      backgroundColor: bgColor,
       foregroundColor: AppColors.white,
       elevation: 4,
       child: Icon(icon),

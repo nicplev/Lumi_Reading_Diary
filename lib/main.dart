@@ -10,6 +10,7 @@ import 'core/theme/app_theme.dart';
 import 'core/routing/app_router.dart';
 import 'services/firebase_service.dart';
 import 'services/crash_reporting_service.dart';
+import 'services/analytics_service.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -41,6 +42,9 @@ void main() async {
       // Initialize Firebase services
       await FirebaseService.instance.initialize();
 
+      // Initialize analytics
+      await AnalyticsService.instance.initialize();
+
       // Configure Flutter Animate
       Animate.restartOnHotReload = true;
 
@@ -58,18 +62,19 @@ void main() async {
   );
 }
 
-class LumiApp extends StatelessWidget {
+class LumiApp extends ConsumerWidget {
   const LumiApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(routerProvider);
     return MaterialApp.router(
       title: 'Lumi Reading Diary',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme(),
       darkTheme: AppTheme.darkTheme(),
       themeMode: ThemeMode.light,
-      routerConfig: AppRouter.router,
+      routerConfig: router,
     );
   }
 }

@@ -3,12 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/lumi_text_styles.dart';
-import '../../core/theme/lumi_spacing.dart';
-import '../../core/theme/lumi_borders.dart';
-import '../../core/widgets/lumi/lumi_buttons.dart';
-import '../../core/widgets/lumi/lumi_card.dart';
-import '../../core/widgets/common_widgets.dart';
+import '../../core/theme/teacher_constants.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/user_model.dart';
@@ -80,22 +75,22 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.offWhite,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.teacherPrimary,
+        foregroundColor: AppColors.white,
         elevation: 0,
         title: Text(
           '${widget.classModel.name} - Students',
-          style: LumiTextStyles.h3(color: AppColors.charcoal),
+          style: const TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.w700),
         ),
-        iconTheme: const IconThemeData(color: AppColors.charcoal),
         actions: [
-          LumiIconButton(
-            icon: Icons.upload_file,
+          IconButton(
+            icon: const Icon(Icons.upload_file, color: AppColors.white),
             onPressed: _showCSVImportDialog,
           ),
-          LumiIconButton(
-            icon: Icons.person_add,
+          IconButton(
+            icon: const Icon(Icons.person_add, color: AppColors.white),
             onPressed: _showAddStudentDialog,
           ),
           PopupMenuButton<String>(
@@ -152,9 +147,21 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
           // Search Bar
           Container(
             color: AppColors.white,
-            padding: LumiPadding.allS,
-            child: CommonWidgets.buildSearchBar(
-              hintText: 'Search by name or student ID...',
+            padding: const EdgeInsets.all(8),
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: 'Search by name or student ID...',
+                hintStyle: TeacherTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
+                prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+                filled: true,
+                fillColor: AppColors.background,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+              style: TeacherTypography.bodyMedium,
               onChanged: (value) {
                 setState(() => _searchQuery = value);
               },
@@ -176,24 +183,31 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                           size: 64,
                           color: AppColors.error,
                         ),
-                        LumiGap.s,
+                        const SizedBox(height: 8),
                         Text(
                           'Error loading students',
-                          style: LumiTextStyles.h3(),
+                          style: TeacherTypography.h3,
                         ),
-                        LumiGap.xs,
+                        const SizedBox(height: 4),
                         Text(
                           snapshot.error.toString(),
-                          style: LumiTextStyles.body(
+                          style: TeacherTypography.bodyMedium.copyWith(
                             color: AppColors.charcoal.withValues(alpha: 0.6),
                           ),
                           textAlign: TextAlign.center,
                         ),
-                        LumiGap.s,
-                        LumiPrimaryButton(
+                        const SizedBox(height: 8),
+                        ElevatedButton.icon(
                           onPressed: () => setState(() {}),
-                          text: 'Retry',
-                          icon: Icons.refresh,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Retry'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.teacherPrimary,
+                            foregroundColor: AppColors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -201,7 +215,9 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                 }
 
                 if (!snapshot.hasData) {
-                  return CommonWidgets.buildLoadingIndicator();
+                  return const Center(
+                    child: CircularProgressIndicator(color: AppColors.teacherPrimary),
+                  );
                 }
 
                 var students = snapshot.data!.docs
@@ -213,21 +229,67 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
 
                 if (students.isEmpty) {
                   if (_searchQuery.isNotEmpty) {
-                    return CommonWidgets.buildEmptyState(
-                      icon: Icons.search_off,
-                      title: 'No results found',
-                      subtitle: 'Try a different search term',
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.search_off,
+                            size: 64,
+                            color: AppColors.charcoal.withValues(alpha: 0.3),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No results found',
+                            style: TeacherTypography.h3,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Try a different search term',
+                            style: TeacherTypography.bodyMedium.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
                     );
                   }
 
-                  return CommonWidgets.buildEmptyState(
-                    icon: Icons.school_outlined,
-                    title: 'No students yet',
-                    subtitle: 'Add students to ${widget.classModel.name} to get started',
-                    action: LumiPrimaryButton(
-                      onPressed: _showAddStudentDialog,
-                      text: 'Add Student',
-                      icon: Icons.person_add,
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.school_outlined,
+                          size: 64,
+                          color: AppColors.charcoal.withValues(alpha: 0.3),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No students yet',
+                          style: TeacherTypography.h3,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Add students to ${widget.classModel.name} to get started',
+                          style: TeacherTypography.bodyMedium.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: _showAddStudentDialog,
+                          icon: const Icon(Icons.person_add),
+                          label: const Text('Add Student'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.teacherPrimary,
+                            foregroundColor: AppColors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   );
                 }
@@ -236,19 +298,19 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                   children: [
                     // Student Count Header
                     Container(
-                      padding: LumiPadding.allS,
+                      padding: const EdgeInsets.all(8),
                       color: AppColors.white,
                       child: Row(
                         children: [
                           const Icon(
                             Icons.people,
-                            color: AppColors.rosePink,
+                            color: AppColors.teacherPrimary,
                             size: 20,
                           ),
-                          LumiGap.xs,
+                          const SizedBox(width: 4),
                           Text(
                             '${students.length} ${students.length == 1 ? 'Student' : 'Students'}',
-                            style: LumiTextStyles.bodyLarge(color: AppColors.charcoal),
+                            style: TeacherTypography.bodyLarge.copyWith(color: AppColors.charcoal),
                           ),
                         ],
                       ),
@@ -257,7 +319,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                     // Student List
                     Expanded(
                       child: ListView.builder(
-                        padding: LumiPadding.allS,
+                        padding: const EdgeInsets.all(8),
                         itemCount: students.length,
                         itemBuilder: (context, index) {
                           return _buildStudentCard(students[index]);
@@ -271,29 +333,50 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
           ),
         ],
       ),
-      floatingActionButton: LumiFab(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddStudentDialog,
-        icon: Icons.person_add,
-        label: 'Add Student',
-        isExtended: true,
+        icon: const Icon(Icons.person_add),
+        label: const Text('Add Student'),
+        backgroundColor: AppColors.teacherPrimary,
+        foregroundColor: AppColors.white,
       ),
     );
   }
 
   Widget _buildStudentCard(StudentModel student) {
+    final initials = student.fullName.isNotEmpty
+        ? student.fullName
+            .split(' ')
+            .take(2)
+            .map((word) => word.isNotEmpty ? word[0].toUpperCase() : '')
+            .join()
+        : '?';
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: LumiSpacing.xs),
-      child: LumiCard(
+      padding: const EdgeInsets.only(bottom: 4.0),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+          boxShadow: TeacherDimensions.cardShadow,
+        ),
         child: Row(
           children: [
             // Avatar
-            CommonWidgets.buildAvatar(
-              name: student.fullName,
-              size: 50,
-              backgroundColor: AppColors.rosePink.withValues(alpha: 0.1),
-              textColor: AppColors.rosePink,
+            CircleAvatar(
+              radius: 25,
+              backgroundColor: AppColors.teacherPrimary.withValues(alpha: 0.1),
+              child: Text(
+                initials,
+                style: TextStyle(
+                  color: AppColors.teacherPrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 50 * 0.4,
+                ),
+              ),
             ),
-            LumiGap.s,
+            const SizedBox(width: 8),
 
             // Student Info
             Expanded(
@@ -302,29 +385,29 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                 children: [
                   Text(
                     student.fullName,
-                    style: LumiTextStyles.bodyLarge(),
+                    style: TeacherTypography.bodyLarge,
                   ),
-                  LumiGap.xxs,
+                  const SizedBox(height: 2),
                   if (student.studentId != null && student.studentId!.isNotEmpty)
                     Text(
                       'ID: ${student.studentId}',
-                      style: LumiTextStyles.body(
+                      style: TeacherTypography.bodyMedium.copyWith(
                         color: AppColors.charcoal.withValues(alpha: 0.6),
                       ),
                     ),
-                  LumiGap.xs,
+                  const SizedBox(height: 4),
                   Row(
                     children: [
                       if (student.currentReadingLevel != null &&
                           student.currentReadingLevel!.isNotEmpty)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: LumiSpacing.xs,
-                            vertical: LumiSpacing.xxs,
+                            horizontal: 4.0,
+                            vertical: 2.0,
                           ),
                           decoration: BoxDecoration(
                             color: AppColors.skyBlue.withValues(alpha: 0.2),
-                            borderRadius: LumiBorders.small,
+                            borderRadius: BorderRadius.circular(TeacherDimensions.radiusS),
                             border: Border.all(
                               color: AppColors.skyBlue.withValues(alpha: 0.5),
                             ),
@@ -337,10 +420,10 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                                 size: 14,
                                 color: AppColors.skyBlue,
                               ),
-                              const SizedBox(width: LumiSpacing.xxs),
+                              const SizedBox(width: 2.0),
                               Text(
                                 student.currentReadingLevel!,
-                                style: LumiTextStyles.bodySmall(
+                                style: TeacherTypography.bodySmall.copyWith(
                                   color: AppColors.skyBlue,
                                 ),
                               ),
@@ -348,10 +431,10 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                           ),
                         ),
                       if (student.dateOfBirth != null) ...[
-                        LumiGap.xs,
+                        const SizedBox(width: 4),
                         Text(
                           'Age: ${_calculateAge(student.dateOfBirth!)}',
-                          style: LumiTextStyles.bodySmall(
+                          style: TeacherTypography.bodySmall.copyWith(
                             color: AppColors.charcoal.withValues(alpha: 0.6),
                           ),
                         ),
@@ -404,10 +487,10 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                   child: Row(
                     children: [
                       const Icon(Icons.remove_circle_outline, size: 20, color: AppColors.error),
-                      const SizedBox(width: LumiSpacing.xs),
+                      const SizedBox(width: 4.0),
                       Text(
                         'Remove from Class',
-                        style: LumiTextStyles.body(color: AppColors.error),
+                        style: TeacherTypography.bodyMedium.copyWith(color: AppColors.error),
                       ),
                     ],
                   ),
@@ -440,9 +523,12 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
 
     if (result == true && mounted) {
       setState(() {});
-      CommonWidgets.showSuccessSnackbar(
-        context,
-        'Students imported successfully',
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Students imported successfully'),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     }
   }
@@ -516,7 +602,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                         selectedDate != null
                             ? DateFormat('yyyy-MM-dd').format(selectedDate!)
                             : 'Select date...',
-                        style: LumiTextStyles.body(
+                        style: TeacherTypography.bodyMedium.copyWith(
                           color: selectedDate != null
                               ? AppColors.charcoal
                               : AppColors.charcoal.withValues(alpha: 0.4),
@@ -547,16 +633,19 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                 if (studentIdController.text.trim().isEmpty ||
                     firstNameController.text.trim().isEmpty ||
                     lastNameController.text.trim().isEmpty) {
-                  CommonWidgets.showErrorSnackbar(
-                    context,
-                    'Please fill in all required fields',
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please fill in all required fields'),
+                      backgroundColor: AppColors.error,
+                      behavior: SnackBarBehavior.floating,
+                    ),
                   );
                   return;
                 }
                 Navigator.pop(context, true);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.rosePink,
+                backgroundColor: AppColors.teacherPrimary,
                 foregroundColor: Colors.white,
               ),
               child: const Text('Add Student'),
@@ -596,9 +685,12 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
 
       if (existingStudent.docs.isNotEmpty) {
         if (mounted) {
-          CommonWidgets.showErrorSnackbar(
-            context,
-            'Student ID $studentId already exists',
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Student ID $studentId already exists'),
+              backgroundColor: AppColors.error,
+              behavior: SnackBarBehavior.floating,
+            ),
           );
         }
         return;
@@ -646,16 +738,22 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
       });
 
       if (mounted) {
-        CommonWidgets.showSuccessSnackbar(
-          context,
-          'Student $firstName $lastName added successfully',
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Student $firstName $lastName added successfully'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        CommonWidgets.showErrorSnackbar(
-          context,
-          'Error adding student: $e',
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error adding student: $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -729,7 +827,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                         selectedDate != null
                             ? DateFormat('yyyy-MM-dd').format(selectedDate!)
                             : 'Select date...',
-                        style: LumiTextStyles.body(
+                        style: TeacherTypography.bodyMedium.copyWith(
                           color: selectedDate != null
                               ? AppColors.charcoal
                               : AppColors.charcoal.withValues(alpha: 0.4),
@@ -759,16 +857,19 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                 if (studentIdController.text.trim().isEmpty ||
                     firstNameController.text.trim().isEmpty ||
                     lastNameController.text.trim().isEmpty) {
-                  CommonWidgets.showErrorSnackbar(
-                    context,
-                    'Please fill in all required fields',
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please fill in all required fields'),
+                      backgroundColor: AppColors.error,
+                      behavior: SnackBarBehavior.floating,
+                    ),
                   );
                   return;
                 }
                 Navigator.pop(context, true);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.rosePink,
+                backgroundColor: AppColors.teacherPrimary,
                 foregroundColor: Colors.white,
               ),
               child: const Text('Save Changes'),
@@ -811,9 +912,12 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
 
         if (existingStudent.docs.isNotEmpty) {
           if (mounted) {
-            CommonWidgets.showErrorSnackbar(
-              context,
-              'Student ID $studentId already exists',
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Student ID $studentId already exists'),
+                backgroundColor: AppColors.error,
+                behavior: SnackBarBehavior.floating,
+              ),
             );
           }
           return;
@@ -834,16 +938,22 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
       });
 
       if (mounted) {
-        CommonWidgets.showSuccessSnackbar(
-          context,
-          'Student updated successfully',
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Student updated successfully'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        CommonWidgets.showErrorSnackbar(
-          context,
-          'Error updating student: $e',
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating student: $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -894,16 +1004,19 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
           ElevatedButton(
             onPressed: () {
               if (levelController.text.trim().isEmpty) {
-                CommonWidgets.showErrorSnackbar(
-                  context,
-                  'Please enter a reading level',
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please enter a reading level'),
+                    backgroundColor: AppColors.error,
+                    behavior: SnackBarBehavior.floating,
+                  ),
                 );
                 return;
               }
               Navigator.pop(context, true);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.rosePink,
+              backgroundColor: AppColors.teacherPrimary,
               foregroundColor: Colors.white,
             ),
             child: const Text('Update Level'),
@@ -955,29 +1068,47 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
       });
 
       if (mounted) {
-        CommonWidgets.showSuccessSnackbar(
-          context,
-          'Reading level updated to $newLevel',
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Reading level updated to $newLevel'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        CommonWidgets.showErrorSnackbar(
-          context,
-          'Error updating reading level: $e',
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating reading level: $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
   }
 
   Future<void> _removeStudentFromClass(StudentModel student) async {
-    final confirm = await CommonWidgets.showConfirmDialog(
+    final confirm = await showDialog<bool>(
       context: context,
-      title: 'Remove Student from Class',
-      message:
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Student from Class'),
+        content: Text(
           'Are you sure you want to remove ${student.fullName} from ${widget.classModel.name}?\n\nThe student will remain in the system but will not be assigned to any class.',
-      confirmText: 'Remove',
-      isDangerous: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
     );
 
     if (confirm == true) {
@@ -1003,16 +1134,22 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
         });
 
         if (mounted) {
-          CommonWidgets.showSuccessSnackbar(
-            context,
-            '${student.fullName} removed from class',
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${student.fullName} removed from class'),
+              backgroundColor: AppColors.success,
+              behavior: SnackBarBehavior.floating,
+            ),
           );
         }
       } catch (e) {
         if (mounted) {
-          CommonWidgets.showErrorSnackbar(
-            context,
-            'Error removing student: $e',
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error removing student: $e'),
+              backgroundColor: AppColors.error,
+              behavior: SnackBarBehavior.floating,
+            ),
           );
         }
       }

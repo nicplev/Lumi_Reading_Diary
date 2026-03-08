@@ -35,6 +35,10 @@ class AppColors {
   /// Accessibility: Use with charcoal text (#121211)
   static const Color skyBlue = Color(0xFFBCE7F0);
 
+  /// Gradient endpoint for primary gradient
+  /// Usage: Primary button gradient end, warm CTA backgrounds
+  static const Color lumiPeach = Color(0xFFFFAB91);
+
   /// Base color - Main backgrounds, cards, overlays
   /// Usage: Primary screen background, card backgrounds
   static const Color white = Color(0xFFFFFFFF);
@@ -43,6 +47,26 @@ class AppColors {
   /// Usage: Body text, headings, icons, dark UI elements
   /// Accessibility: Provides 18.5:1 contrast on white background
   static const Color charcoal = Color(0xFF121211);
+
+  /// Secondary text color
+  /// Usage: Descriptions, placeholders, secondary labels
+  static const Color textSecondary = Color(0xFF6B7280);
+
+  /// Divider/border color
+  /// Usage: Card borders, list dividers, input borders
+  static const Color divider = Color(0xFFE5E7EB);
+
+  /// App background color
+  /// Usage: Scaffold background, page backgrounds
+  static const Color background = Color(0xFFF5F5F7);
+
+  /// Library book badge color
+  /// Usage: Library book type indicator badge
+  static const Color libraryGreen = Color(0xFF81C784);
+
+  /// Decodable book badge color
+  /// Usage: Decodable book type indicator badge
+  static const Color decodableBlue = Color(0xFF64B5F6);
 
   // ============================================
   // LEGACY COLORS (Backwards Compatibility)
@@ -84,9 +108,33 @@ class AppColors {
   static const Color lumiEyes = Color(0xFF2E3440);
 
   // Role-based colors
-  static const Color parentColor = Color(0xFF4A90E2);
-  static const Color teacherColor = Color(0xFF6BCB77);
-  static const Color adminColor = Color(0xFF9B59B6);
+  static const Color parentColor = rosePink;
+  static const Color teacherColor = Color(0xFF5C6BC0);
+  static const Color adminColor = Color(0xFF5C6BC0);
+
+  // ============================================
+  // TEACHER/ADMIN THEME COLORS (Indigo Purple)
+  // ============================================
+
+  /// Teacher/Admin primary - Indigo purple
+  /// Usage: AppBar backgrounds, primary buttons, active nav items for staff screens
+  static const Color teacherPrimary = Color(0xFF5C6BC0);
+
+  /// Teacher/Admin accent - Lighter indigo
+  /// Usage: Gradient endpoints, hover states, secondary accents
+  static const Color teacherAccent = Color(0xFF7986CB);
+
+  /// Teacher/Admin primary light - Very light indigo
+  /// Usage: Chip backgrounds, hover backgrounds, subtle tints
+  static const Color teacherPrimaryLight = Color(0xFFC5CAE9);
+
+  // Book Level/Tier Colors (for reading allocation levels)
+  static const Color levelCVC = Color(0xFFEF9A9A);
+  static const Color levelDigraphs = Color(0xFFFFCC80);
+  static const Color levelBlends = Color(0xFFFFF59D);
+  static const Color levelCVCE = Color(0xFFA5D6A7);
+  static const Color levelVowelTeams = Color(0xFF90CAF9);
+  static const Color levelRControlled = Color(0xFFCE93D8);
 
   // Achievement colors
   static const Color gold = Color(0xFFFFD700);
@@ -118,6 +166,34 @@ class AppColors {
   static Color charcoalWithOpacity(double opacity) {
     return charcoal.withOpacity(opacity);
   }
+
+  // ============================================
+  // GRADIENTS
+  // ============================================
+
+  /// Primary gradient - Rose Pink to Lumi Peach (135deg)
+  /// Usage: Primary buttons, hero sections, CTAs
+  static const LinearGradient primaryGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [rosePink, lumiPeach],
+  );
+
+  /// Success gradient - Green tones
+  /// Usage: Success states, confirmation buttons
+  static const LinearGradient successGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF4CAF50), Color(0xFF66BB6A)],
+  );
+
+  /// Teacher/Admin gradient - Indigo to lighter indigo (135deg)
+  /// Usage: Dashboard headers, scanner cards, staff hero sections
+  static const LinearGradient teacherGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [teacherPrimary, teacherAccent],
+  );
 }
 
 /// Lumi Design System - Semantic Color Aliases
@@ -130,7 +206,7 @@ extension LumiSemanticColors on AppColors {
   static Color get secondary => AppColors.mintGreen;
 
   /// Background color for main screens
-  static Color get background => AppColors.white;
+  static Color get background => AppColors.background;
 
   /// Background color for cards and elevated surfaces
   static Color get surface => AppColors.white;
@@ -142,7 +218,7 @@ extension LumiSemanticColors on AppColors {
   static Color get onPrimary => AppColors.white;
 
   /// Border color for inputs and dividers
-  static Color get border => AppColors.charcoal.withOpacity(0.1);
+  static Color get border => AppColors.divider;
 
   /// Disabled state color
   static Color get disabled => AppColors.charcoal.withOpacity(0.4);

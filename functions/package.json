@@ -7,6 +7,7 @@
     "lint": "eslint --ext .js,.ts .",
     "build": "tsc",
     "build:watch": "tsc --watch",
+    "test:rules": "JAVA_HOME=\"${JAVA_HOME:-/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home}\" PATH=\"$JAVA_HOME/bin:$PATH\" firebase emulators:exec --only firestore \"node --test test/firestore.rules.test.js\"",
     "serve": "npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
@@ -21,11 +22,13 @@
     "firebase-functions": "^4.5.0"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.0",
     "@typescript-eslint/eslint-plugin": "^5.12.0",
     "@typescript-eslint/parser": "^5.12.0",
     "eslint": "^8.9.0",
     "eslint-config-google": "^0.14.0",
     "eslint-plugin-import": "^2.25.4",
+    "firebase-tools": "^13.35.1",
     "typescript": "^4.9.5"
   },
   "private": true

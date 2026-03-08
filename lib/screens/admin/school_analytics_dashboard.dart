@@ -7,9 +7,7 @@ import '../../data/models/student_model.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../services/firebase_service.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/lumi_text_styles.dart';
-import '../../core/widgets/lumi/lumi_buttons.dart';
-import '../../core/widgets/lumi/lumi_card.dart';
+import '../../core/theme/teacher_constants.dart';
 
 /// Comprehensive analytics dashboard for school administrators
 /// Provides executive-level insights into reading program performance
@@ -50,8 +48,12 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('School Analytics Dashboard'),
-        backgroundColor: AppColors.rosePink,
+        title: const Text(
+          'School Analytics Dashboard',
+          style: TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.w700),
+        ),
+        backgroundColor: AppColors.teacherPrimary,
+        foregroundColor: AppColors.white,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -106,21 +108,28 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
           const SizedBox(height: 16),
           Text(
             'Error loading analytics',
-            style: LumiTextStyles.h2(),
+            style: TeacherTypography.h2,
           ),
           const SizedBox(height: 8),
           Text(
             _error ?? 'Unknown error',
-            style: LumiTextStyles.body().copyWith(
+            style: TeacherTypography.bodyMedium.copyWith(
               color: AppColors.charcoal.withValues(alpha: 0.7),
             ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
-          LumiPrimaryButton(
+          ElevatedButton.icon(
             onPressed: _loadAnalyticsData,
-            text: 'Retry',
-            icon: Icons.refresh,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.teacherPrimary,
+              foregroundColor: AppColors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+              ),
+            ),
           ),
         ],
       ),
@@ -128,38 +137,46 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
   }
 
   Widget _buildDateRangeBanner() {
-    return LumiCard(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Icon(Icons.date_range, color: AppColors.rosePink),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Analytics Period',
-                    style: LumiTextStyles.label().copyWith(
-                      color: AppColors.charcoal.withValues(alpha: 0.7),
-                    ),
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+        boxShadow: TeacherDimensions.cardShadow,
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.date_range, color: AppColors.teacherPrimary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Analytics Period',
+                  style: TeacherTypography.bodySmall.copyWith(
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
                   ),
-                  Text(
-                    '${DateFormat('MMM dd, yyyy').format(_startDate)} - ${DateFormat('MMM dd, yyyy').format(_endDate)}',
-                    style: LumiTextStyles.h3().copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                ),
+                Text(
+                  '${DateFormat('MMM dd, yyyy').format(_startDate)} - ${DateFormat('MMM dd, yyyy').format(_endDate)}',
+                  style: TeacherTypography.h3.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
-                ],
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: _showDateRangePicker,
+            child: Text(
+              'Change',
+              style: TeacherTypography.bodyMedium.copyWith(
+                color: AppColors.teacherPrimary,
               ),
             ),
-            LumiTextButton(
-              onPressed: _showDateRangePicker,
-              text: 'Change',
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -174,7 +191,7 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
       children: [
         Text(
           'Executive Summary',
-          style: LumiTextStyles.h2().copyWith(
+          style: TeacherTypography.h2.copyWith(
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -191,14 +208,14 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
               'Total Students',
               '${metrics['totalStudents']}',
               Icons.people,
-              AppColors.rosePink,
+              AppColors.teacherPrimary,
               subtitle: '${metrics['activeStudents']} active',
             ),
             _buildMetricCard(
               'Total Classes',
               '${metrics['totalClasses']}',
               Icons.class_,
-              AppColors.rosePink,
+              AppColors.teacherPrimary,
             ),
             _buildMetricCard(
               'Reading Minutes',
@@ -227,50 +244,53 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
     Color color, {
     String? subtitle,
   }) {
-    return LumiCard(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                Icon(icon, color: color, size: 24),
-                const Spacer(),
-              ],
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+        boxShadow: TeacherDimensions.cardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 24),
+              const Spacer(),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: TeacherTypography.h1.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                title,
+                style: TeacherTypography.bodySmall.copyWith(
+                  color: AppColors.charcoal.withValues(alpha: 0.7),
+                ),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 2),
                 Text(
-                  value,
-                  style: LumiTextStyles.h1().copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: color,
+                  subtitle,
+                  style: TeacherTypography.bodySmall.copyWith(
+                    color: AppColors.charcoal.withValues(alpha: 0.5),
+                    fontSize: 10,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  title,
-                  style: LumiTextStyles.label().copyWith(
-                    color: AppColors.charcoal.withValues(alpha: 0.7),
-                  ),
-                ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: LumiTextStyles.label().copyWith(
-                      color: AppColors.charcoal.withValues(alpha: 0.5),
-                      fontSize: 10,
-                    ),
-                  ),
-                ],
               ],
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -280,69 +300,72 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
 
     final metrics = _schoolMetrics!;
 
-    return LumiCard(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Engagement & Performance',
-              style: LumiTextStyles.h3().copyWith(
-                fontWeight: FontWeight.bold,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+        boxShadow: TeacherDimensions.cardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Engagement & Performance',
+            style: TeacherTypography.h3.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildProgressRow(
+            'Students Meeting Daily Target',
+            metrics['studentsMetTarget'] ?? 0,
+            metrics['totalStudents'] ?? 1,
+            AppColors.mintGreen,
+          ),
+          const SizedBox(height: 12),
+          _buildProgressRow(
+            'Students with Active Streak',
+            metrics['studentsWithStreak'] ?? 0,
+            metrics['totalStudents'] ?? 1,
+            AppColors.warmOrange,
+          ),
+          const SizedBox(height: 12),
+          _buildProgressRow(
+            'Classes Above Average',
+            metrics['classesAboveAverage'] ?? 0,
+            metrics['totalClasses'] ?? 1,
+            AppColors.teacherPrimary,
+          ),
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatColumn(
+                  'Avg Minutes/Student',
+                  '${metrics['avgMinutesPerStudent']?.toStringAsFixed(1) ?? "0"}',
+                  AppColors.skyBlue,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            _buildProgressRow(
-              'Students Meeting Daily Target',
-              metrics['studentsMetTarget'] ?? 0,
-              metrics['totalStudents'] ?? 1,
-              AppColors.mintGreen,
-            ),
-            const SizedBox(height: 12),
-            _buildProgressRow(
-              'Students with Active Streak',
-              metrics['studentsWithStreak'] ?? 0,
-              metrics['totalStudents'] ?? 1,
-              AppColors.warmOrange,
-            ),
-            const SizedBox(height: 12),
-            _buildProgressRow(
-              'Classes Above Average',
-              metrics['classesAboveAverage'] ?? 0,
-              metrics['totalClasses'] ?? 1,
-              AppColors.rosePink,
-            ),
-            const SizedBox(height: 16),
-            const Divider(),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatColumn(
-                    'Avg Minutes/Student',
-                    '${metrics['avgMinutesPerStudent']?.toStringAsFixed(1) ?? "0"}',
-                    AppColors.skyBlue,
-                  ),
+              Expanded(
+                child: _buildStatColumn(
+                  'Total Books Read',
+                  '${metrics['totalBooks'] ?? 0}',
+                  AppColors.skyBlue,
                 ),
-                Expanded(
-                  child: _buildStatColumn(
-                    'Total Books Read',
-                    '${metrics['totalBooks'] ?? 0}',
-                    AppColors.skyBlue,
-                  ),
+              ),
+              Expanded(
+                child: _buildStatColumn(
+                  'Longest Streak',
+                  '${metrics['longestStreak'] ?? 0} days',
+                  AppColors.softYellow,
                 ),
-                Expanded(
-                  child: _buildStatColumn(
-                    'Longest Streak',
-                    '${metrics['longestStreak'] ?? 0} days',
-                    AppColors.softYellow,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -358,11 +381,11 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
           children: [
             Text(
               label,
-              style: LumiTextStyles.body(),
+              style: TeacherTypography.bodyMedium,
             ),
             Text(
               '$current / $total (${(percentage * 100).toStringAsFixed(0)}%)',
-              style: LumiTextStyles.body().copyWith(
+              style: TeacherTypography.bodyMedium.copyWith(
                 fontWeight: FontWeight.bold,
                 color: color,
               ),
@@ -384,7 +407,7 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
       children: [
         Text(
           value,
-          style: LumiTextStyles.h2().copyWith(
+          style: TeacherTypography.h2.copyWith(
             fontWeight: FontWeight.bold,
             color: color,
           ),
@@ -392,7 +415,7 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
         const SizedBox(height: 4),
         Text(
           label,
-          style: LumiTextStyles.label().copyWith(
+          style: TeacherTypography.bodySmall.copyWith(
             color: AppColors.charcoal.withValues(alpha: 0.7),
           ),
           textAlign: TextAlign.center,
@@ -411,109 +434,112 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
       return const SizedBox.shrink();
     }
 
-    return LumiCard(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Reading Trends (Weekly)',
-              style: LumiTextStyles.h3().copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+        boxShadow: TeacherDimensions.cardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Reading Trends (Weekly)',
+            style: TeacherTypography.h3.copyWith(
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 24),
-            SizedBox(
-              height: 200,
-              child: LineChart(
-                LineChartData(
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    horizontalInterval: 1000,
-                    getDrawingHorizontalLine: (value) {
-                      return FlLine(
-                        color: AppColors.charcoal.withValues(alpha: 0.1),
-                        strokeWidth: 1,
-                      );
-                    },
-                  ),
-                  titlesData: FlTitlesData(
-                    show: true,
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 30,
-                        interval: 1,
-                        getTitlesWidget: (value, meta) {
-                          if (value.toInt() >= 0 &&
-                              value.toInt() < weeklyData.length) {
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Text(
-                                weeklyData[value.toInt()]['label'] as String,
-                                style: LumiTextStyles.label(),
-                              ),
-                            );
-                          }
-                          return const Text('');
-                        },
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        interval: 1000,
-                        reservedSize: 50,
-                        getTitlesWidget: (value, meta) {
-                          return Text(
-                            '${(value / 1000).toStringAsFixed(0)}k',
-                            style: LumiTextStyles.label(),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  borderData: FlBorderData(
-                    show: true,
-                    border: Border.all(
-                        color: AppColors.charcoal.withValues(alpha: 0.1)),
-                  ),
-                  minX: 0,
-                  maxX: (weeklyData.length - 1).toDouble(),
-                  minY: 0,
-                  maxY: _getMaxYValue(weeklyData),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: weeklyData.asMap().entries.map((entry) {
-                        return FlSpot(
-                          entry.key.toDouble(),
-                          (entry.value['minutes'] as int).toDouble(),
-                        );
-                      }).toList(),
-                      isCurved: true,
-                      color: AppColors.rosePink,
-                      barWidth: 3,
-                      isStrokeCapRound: true,
-                      dotData: const FlDotData(show: true),
-                      belowBarData: BarAreaData(
-                        show: true,
-                        color: AppColors.rosePink.withValues(alpha: 0.1),
-                      ),
-                    ),
-                  ],
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            height: 200,
+            child: LineChart(
+              LineChartData(
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: 1000,
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: AppColors.charcoal.withValues(alpha: 0.1),
+                      strokeWidth: 1,
+                    );
+                  },
                 ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 30,
+                      interval: 1,
+                      getTitlesWidget: (value, meta) {
+                        if (value.toInt() >= 0 &&
+                            value.toInt() < weeklyData.length) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              weeklyData[value.toInt()]['label'] as String,
+                              style: TeacherTypography.bodySmall,
+                            ),
+                          );
+                        }
+                        return const Text('');
+                      },
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      interval: 1000,
+                      reservedSize: 50,
+                      getTitlesWidget: (value, meta) {
+                        return Text(
+                          '${(value / 1000).toStringAsFixed(0)}k',
+                          style: TeacherTypography.bodySmall,
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(
+                  show: true,
+                  border: Border.all(
+                      color: AppColors.charcoal.withValues(alpha: 0.1)),
+                ),
+                minX: 0,
+                maxX: (weeklyData.length - 1).toDouble(),
+                minY: 0,
+                maxY: _getMaxYValue(weeklyData),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: weeklyData.asMap().entries.map((entry) {
+                      return FlSpot(
+                        entry.key.toDouble(),
+                        (entry.value['minutes'] as int).toDouble(),
+                      );
+                    }).toList(),
+                    isCurved: true,
+                    color: AppColors.teacherPrimary,
+                    barWidth: 3,
+                    isStrokeCapRound: true,
+                    dotData: const FlDotData(show: true),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: AppColors.teacherPrimary.withValues(alpha: 0.1),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -541,63 +567,66 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
       return bMinutes.compareTo(aMinutes);
     });
 
-    return LumiCard(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Class Performance Comparison',
-              style: LumiTextStyles.h3().copyWith(
-                fontWeight: FontWeight.bold,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+        boxShadow: TeacherDimensions.cardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Class Performance Comparison',
+            style: TeacherTypography.h3.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Table(
+            columnWidths: const {
+              0: FlexColumnWidth(2),
+              1: FlexColumnWidth(1),
+              2: FlexColumnWidth(1),
+              3: FlexColumnWidth(1),
+            },
+            border: TableBorder.all(
+                color: AppColors.charcoal.withValues(alpha: 0.1)),
+            children: [
+              // Header
+              TableRow(
+                decoration: BoxDecoration(
+                    color: AppColors.charcoal.withValues(alpha: 0.03)),
+                children: [
+                  _buildTableHeader('Class'),
+                  _buildTableHeader('Students'),
+                  _buildTableHeader('Minutes'),
+                  _buildTableHeader('Avg/Student'),
+                ],
               ),
-            ),
-            const SizedBox(height: 16),
-            Table(
-              columnWidths: const {
-                0: FlexColumnWidth(2),
-                1: FlexColumnWidth(1),
-                2: FlexColumnWidth(1),
-                3: FlexColumnWidth(1),
-              },
-              border: TableBorder.all(
-                  color: AppColors.charcoal.withValues(alpha: 0.1)),
-              children: [
-                // Header
-                TableRow(
-                  decoration: BoxDecoration(
-                      color: AppColors.charcoal.withValues(alpha: 0.03)),
-                  children: [
-                    _buildTableHeader('Class'),
-                    _buildTableHeader('Students'),
-                    _buildTableHeader('Minutes'),
-                    _buildTableHeader('Avg/Student'),
-                  ],
-                ),
-                // Data rows
-                ...sortedClasses.map((classModel) {
-                  final metrics = _classMetrics[classModel.id];
-                  final totalMinutes = metrics?['totalMinutes'] ?? 0;
-                  final studentCount =
-                      _studentsByClass[classModel.id]?.length ?? 0;
-                  final avgPerStudent = studentCount > 0
-                      ? (totalMinutes / studentCount).round()
-                      : 0;
+              // Data rows
+              ...sortedClasses.map((classModel) {
+                final metrics = _classMetrics[classModel.id];
+                final totalMinutes = metrics?['totalMinutes'] ?? 0;
+                final studentCount =
+                    _studentsByClass[classModel.id]?.length ?? 0;
+                final avgPerStudent = studentCount > 0
+                    ? (totalMinutes / studentCount).round()
+                    : 0;
 
-                  return TableRow(
-                    children: [
-                      _buildTableCell(classModel.name),
-                      _buildTableCell('$studentCount'),
-                      _buildTableCell('$totalMinutes'),
-                      _buildTableCell('$avgPerStudent'),
-                    ],
-                  );
-                }),
-              ],
-            ),
-          ],
-        ),
+                return TableRow(
+                  children: [
+                    _buildTableCell(classModel.name),
+                    _buildTableCell('$studentCount'),
+                    _buildTableCell('$totalMinutes'),
+                    _buildTableCell('$avgPerStudent'),
+                  ],
+                );
+              }),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -607,7 +636,7 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
       padding: const EdgeInsets.all(12),
       child: Text(
         text,
-        style: LumiTextStyles.body().copyWith(
+        style: TeacherTypography.bodyMedium.copyWith(
           fontWeight: FontWeight.bold,
           fontSize: 12,
         ),
@@ -620,7 +649,7 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
       padding: const EdgeInsets.all(12),
       child: Text(
         text,
-        style: LumiTextStyles.label(),
+        style: TeacherTypography.bodySmall,
       ),
     );
   }
@@ -647,7 +676,7 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
               Expanded(
                 child: Text(
                   'No students currently at risk! All students are actively engaged.',
-                  style: LumiTextStyles.h3().copyWith(
+                  style: TeacherTypography.h3.copyWith(
                     color: AppColors.success,
                   ),
                 ),
@@ -658,94 +687,99 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
       );
     }
 
-    return LumiCard(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.warning_amber_rounded, color: AppColors.warmOrange),
-                const SizedBox(width: 8),
-                Text(
-                  'Students Needing Support (${atRiskStudents.length})',
-                  style: LumiTextStyles.h3().copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ...atRiskStudents.take(10).map((student) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundColor:
-                          AppColors.warmOrange.withValues(alpha: 0.2),
-                      child: Text(
-                        (student['name'] as String)[0].toUpperCase(),
-                        style: LumiTextStyles.h3(color: AppColors.warmOrange),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            student['name'] as String,
-                            style: LumiTextStyles.body()
-                                .copyWith(fontWeight: FontWeight.w500),
-                          ),
-                          Text(
-                            student['className'] as String,
-                            style: LumiTextStyles.label(
-                              color: AppColors.charcoal.withValues(alpha: 0.7),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.warmOrange.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color: AppColors.warmOrange.withValues(alpha: 0.3)),
-                      ),
-                      child: Text(
-                        student['issue'] as String,
-                        style: LumiTextStyles.label(
-                          color: AppColors.warmOrange,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-            if (atRiskStudents.length > 10) ...[
-              const SizedBox(height: 8),
-              Center(
-                child: TextButton(
-                  onPressed: () {
-                    // Show all at-risk students
-                    _showAllAtRiskStudents(atRiskStudents);
-                  },
-                  child: Text('View all ${atRiskStudents.length} students'),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+        boxShadow: TeacherDimensions.cardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: AppColors.warmOrange),
+              const SizedBox(width: 8),
+              Text(
+                'Students Needing Support (${atRiskStudents.length})',
+                style: TeacherTypography.h3.copyWith(
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 16),
+          ...atRiskStudents.take(10).map((student) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor:
+                        AppColors.warmOrange.withValues(alpha: 0.2),
+                    child: Text(
+                      (student['name'] as String)[0].toUpperCase(),
+                      style: TeacherTypography.h3.copyWith(
+                        color: AppColors.warmOrange,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          student['name'] as String,
+                          style: TeacherTypography.bodyMedium
+                              .copyWith(fontWeight: FontWeight.w500),
+                        ),
+                        Text(
+                          student['className'] as String,
+                          style: TeacherTypography.bodySmall.copyWith(
+                            color: AppColors.charcoal.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.warmOrange.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: AppColors.warmOrange.withValues(alpha: 0.3)),
+                    ),
+                    child: Text(
+                      student['issue'] as String,
+                      style: TeacherTypography.bodySmall.copyWith(
+                        color: AppColors.warmOrange,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          if (atRiskStudents.length > 10) ...[
+            const SizedBox(height: 8),
+            Center(
+              child: TextButton(
+                onPressed: () {
+                  // Show all at-risk students
+                  _showAllAtRiskStudents(atRiskStudents);
+                },
+                child: Text('View all ${atRiskStudents.length} students'),
+              ),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -770,108 +804,111 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
 
     final topClasses = sortedClasses.take(3).toList();
 
-    return LumiCard(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.emoji_events, color: AppColors.softYellow),
-                const SizedBox(width: 8),
-                Text(
-                  'Top Performing Classes',
-                  style: LumiTextStyles.h3().copyWith(
-                    fontWeight: FontWeight.bold,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+        boxShadow: TeacherDimensions.cardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.emoji_events, color: AppColors.softYellow),
+              const SizedBox(width: 8),
+              Text(
+                'Top Performing Classes',
+                style: TeacherTypography.h3.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...topClasses.asMap().entries.map((entry) {
+            final index = entry.key;
+            final classModel = entry.value;
+            final metrics = _classMetrics[classModel.id];
+            final studentCount = _studentsByClass[classModel.id]?.length ?? 0;
+            final totalMinutes = metrics?['totalMinutes'] ?? 0;
+            final avgPerStudent =
+                studentCount > 0 ? (totalMinutes / studentCount).round() : 0;
+
+            final medals = ['🥇', '🥈', '🥉'];
+            final bgColors = [
+              AppColors.softYellow.withValues(alpha: 0.1),
+              AppColors.charcoal.withValues(alpha: 0.05),
+              AppColors.warmOrange.withValues(alpha: 0.1),
+            ];
+            final borderColors = [
+              AppColors.softYellow.withValues(alpha: 0.3),
+              AppColors.charcoal.withValues(alpha: 0.2),
+              AppColors.warmOrange.withValues(alpha: 0.3),
+            ];
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: bgColors[index],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: borderColors[index]),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    medals[index],
+                    style: TeacherTypography.bodyMedium.copyWith(fontSize: 32),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ...topClasses.asMap().entries.map((entry) {
-              final index = entry.key;
-              final classModel = entry.value;
-              final metrics = _classMetrics[classModel.id];
-              final studentCount = _studentsByClass[classModel.id]?.length ?? 0;
-              final totalMinutes = metrics?['totalMinutes'] ?? 0;
-              final avgPerStudent =
-                  studentCount > 0 ? (totalMinutes / studentCount).round() : 0;
-
-              final medals = ['🥇', '🥈', '🥉'];
-              final bgColors = [
-                AppColors.softYellow.withValues(alpha: 0.1),
-                AppColors.charcoal.withValues(alpha: 0.05),
-                AppColors.warmOrange.withValues(alpha: 0.1),
-              ];
-              final borderColors = [
-                AppColors.softYellow.withValues(alpha: 0.3),
-                AppColors.charcoal.withValues(alpha: 0.2),
-                AppColors.warmOrange.withValues(alpha: 0.3),
-              ];
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: bgColors[index],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: borderColors[index]),
-                ),
-                child: Row(
-                  children: [
-                    Text(
-                      medals[index],
-                      style: LumiTextStyles.body().copyWith(fontSize: 32),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            classModel.name,
-                            style: LumiTextStyles.body().copyWith(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          Text(
-                            '$studentCount students',
-                            style: LumiTextStyles.label(
-                              color: AppColors.charcoal.withValues(alpha: 0.7),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '$avgPerStudent min',
-                          style: LumiTextStyles.h3(
-                            color: [
-                              AppColors.rosePink,
-                              AppColors.mintGreen,
-                              AppColors.warmOrange
-                            ][index % 3],
+                          classModel.name,
+                          style: TeacherTypography.bodyMedium.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
                           ),
                         ),
                         Text(
-                          'per student',
-                          style: LumiTextStyles.label(
+                          '$studentCount students',
+                          style: TeacherTypography.bodySmall.copyWith(
                             color: AppColors.charcoal.withValues(alpha: 0.7),
                           ),
                         ),
                       ],
                     ),
-                  ],
-                ),
-              );
-            }),
-          ],
-        ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '$avgPerStudent min',
+                        style: TeacherTypography.h3.copyWith(
+                          color: [
+                            AppColors.teacherPrimary,
+                            AppColors.mintGreen,
+                            AppColors.warmOrange
+                          ][index % 3],
+                        ),
+                      ),
+                      Text(
+                        'per student',
+                        style: TeacherTypography.bodySmall.copyWith(
+                          color: AppColors.charcoal.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
       ),
     );
   }
@@ -1078,7 +1115,9 @@ class _SchoolAnalyticsDashboardState extends State<SchoolAnalyticsDashboard> {
                   backgroundColor: AppColors.warmOrange.withValues(alpha: 0.2),
                   child: Text(
                     (student['name'] as String)[0].toUpperCase(),
-                    style: LumiTextStyles.h3(color: AppColors.warmOrange),
+                    style: TeacherTypography.h3.copyWith(
+                      color: AppColors.warmOrange,
+                    ),
                   ),
                 ),
                 title: Text(student['name'] as String),

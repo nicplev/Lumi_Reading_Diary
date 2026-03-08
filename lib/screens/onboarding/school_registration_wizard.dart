@@ -9,14 +9,18 @@ import '../../core/theme/lumi_borders.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../services/onboarding_service.dart';
+import '../../services/analytics_service.dart';
+import '../../services/crash_reporting_service.dart';
 import '../../data/models/school_model.dart';
 
 class SchoolRegistrationWizard extends StatefulWidget {
   final String onboardingId;
+  final OnboardingService? onboardingService;
 
   const SchoolRegistrationWizard({
     super.key,
     required this.onboardingId,
+    this.onboardingService,
   });
 
   @override
@@ -26,7 +30,7 @@ class SchoolRegistrationWizard extends StatefulWidget {
 
 class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
   final PageController _pageController = PageController();
-  final OnboardingService _onboardingService = OnboardingService();
+  late final OnboardingService _onboardingService;
 
   int _currentStep = 0;
   bool _isLoading = false;
@@ -40,6 +44,8 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
   // Data collection
   Map<String, dynamic> _schoolData = {};
   Map<String, dynamic> _adminData = {};
+  Map<String, dynamic> _readingLevelData = {};
+  String _selectedLevelSchema = 'aToZ';
 
   final List<String> _steps = [
     'School Info',
@@ -47,6 +53,12 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
     'Reading Levels',
     'Complete',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _onboardingService = widget.onboardingService ?? OnboardingService();
+  }
 
   @override
   void dispose() {
@@ -72,22 +84,22 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
         isValid = _adminAccountFormKey.currentState?.saveAndValidate() ?? false;
         if (isValid) {
           _adminData = _adminAccountFormKey.currentState!.value;
-          // Create school and admin account
-          await _createSchoolAndAdmin();
-          return; // _createSchoolAndAdmin handles navigation
         }
         break;
       case 2:
         isValid =
             _readingLevelsFormKey.currentState?.saveAndValidate() ?? false;
         if (isValid) {
-          await _completeOnboarding();
-          return; // _completeOnboarding handles navigation
+          _readingLevelData = _readingLevelsFormKey.currentState!.value;
+          await _createSchoolAndCompleteOnboarding();
+          return;
         }
         break;
     }
 
     if (isValid && _currentStep < _steps.length - 1) {
+      AnalyticsService.instance
+          .logOnboardingStepCompleted(step: _steps[_currentStep]);
       setState(() {
         _currentStep++;
       });
@@ -99,58 +111,68 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
     }
   }
 
-  Future<void> _createSchoolAndAdmin() async {
+  ReadingLevelSchema _schemaFromValue(String? value) {
+    switch (value) {
+      case 'pmBenchmark':
+        return ReadingLevelSchema.pmBenchmark;
+      case 'lexile':
+        return ReadingLevelSchema.lexile;
+      case 'custom':
+        return ReadingLevelSchema.custom;
+      case 'aToZ':
+      default:
+        return ReadingLevelSchema.aToZ;
+    }
+  }
+
+  List<String>? _parseCustomLevels(String? raw) {
+    if (raw == null) return null;
+    final values = raw
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    return values.isEmpty ? null : values;
+  }
+
+  Future<void> _createSchoolAndCompleteOnboarding() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
+      final schema = _schemaFromValue(_readingLevelData['levelSchema'] as String?);
+      final customLevels =
+          _parseCustomLevels(_readingLevelData['customLevels'] as String?);
+
       await _onboardingService.createSchoolAndAdmin(
         onboardingId: widget.onboardingId,
         schoolName: _schoolData['schoolName'] as String,
         adminEmail: _adminData['adminEmail'] as String,
         adminPassword: _adminData['adminPassword'] as String,
         adminFullName: _adminData['adminFullName'] as String,
-        levelSchema: ReadingLevelSchema.aToZ, // Will be set in next step
+        levelSchema: schema,
+        customLevels: customLevels,
         address: _schoolData['address'] as String?,
         contactEmail: _schoolData['contactEmail'] as String?,
         contactPhone: _schoolData['contactPhone'] as String?,
       );
 
-      // Move to next step
-      setState(() {
-        _currentStep++;
-      });
-      _pageController.animateToPage(
-        _currentStep,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
+      await _onboardingService.applyReadingLevelConfiguration(
+        onboardingId: widget.onboardingId,
+        levelSchema: schema,
+        customLevels: customLevels,
       );
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to create account: ${e.toString()}';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
 
-  Future<void> _completeOnboarding() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      // Complete onboarding
       await _onboardingService.completeOnboarding(widget.onboardingId);
 
-      // Move to final step
+      AnalyticsService.instance.logOnboardingStepCompleted(step: 'completed');
+      CrashReportingService.instance
+          .setCustomKey('onboarding_last_step', 'completed');
+
       setState(() {
-        _currentStep++;
+        _currentStep = 3;
       });
       _pageController.animateToPage(
         _currentStep,
@@ -158,8 +180,17 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
         curve: Curves.easeInOut,
       );
     } catch (e) {
+      AnalyticsService.instance
+          .logOnboardingFailed(step: 'school_setup', reason: e.toString());
+      CrashReportingService.instance.recordError(
+        e,
+        StackTrace.current,
+        reason: 'School setup failed during onboarding',
+      );
       setState(() {
-        _errorMessage = 'Failed to complete setup: ${e.toString()}';
+        _errorMessage =
+            'Setup could not be completed. Please review details and retry. '
+            'If this keeps failing, use a different admin email and contact support.\n\n$e';
       });
     } finally {
       setState(() {
@@ -485,44 +516,90 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
             textAlign: TextAlign.center,
           ),
           LumiGap.l,
+          if (_errorMessage != null)
+            Container(
+              padding: LumiPadding.allXS,
+              margin: const EdgeInsets.only(bottom: LumiSpacing.s),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.1),
+                borderRadius: LumiBorders.medium,
+                border: Border.all(color: AppColors.error),
+              ),
+              child: Text(
+                _errorMessage!,
+                style: const TextStyle(color: AppColors.error),
+              ),
+            ),
           FormBuilder(
             key: _readingLevelsFormKey,
-            child: FormBuilderRadioGroup<String>(
-              name: 'levelSchema',
-              decoration: const InputDecoration(
-                labelText: 'Select Reading Level System *',
-                border: InputBorder.none,
-              ),
-              validator: FormBuilderValidators.required(),
-              options: [
-                const FormBuilderFieldOption(
-                  value: 'aToZ',
-                  child: ListTile(
-                    title: Text('A-Z Levels'),
-                    subtitle: Text('Traditional A through Z reading levels'),
+            child: Column(
+              children: [
+                FormBuilderRadioGroup<String>(
+                  name: 'levelSchema',
+                  initialValue: _selectedLevelSchema,
+                  decoration: const InputDecoration(
+                    labelText: 'Select Reading Level System *',
+                    border: InputBorder.none,
                   ),
+                  validator: FormBuilderValidators.required(),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _selectedLevelSchema = value);
+                  },
+                  options: [
+                    const FormBuilderFieldOption(
+                      value: 'aToZ',
+                      child: ListTile(
+                        title: Text('A-Z Levels'),
+                        subtitle: Text('Traditional A through Z reading levels'),
+                      ),
+                    ),
+                    const FormBuilderFieldOption(
+                      value: 'pmBenchmark',
+                      child: ListTile(
+                        title: Text('PM Benchmark'),
+                        subtitle: Text('Levels 1-30'),
+                      ),
+                    ),
+                    const FormBuilderFieldOption(
+                      value: 'lexile',
+                      child: ListTile(
+                        title: Text('Lexile'),
+                        subtitle: Text('BR to 1400L'),
+                      ),
+                    ),
+                    const FormBuilderFieldOption(
+                      value: 'custom',
+                      child: ListTile(
+                        title: Text('Custom'),
+                        subtitle: Text('Define your own levels'),
+                      ),
+                    ),
+                  ],
                 ),
-                const FormBuilderFieldOption(
-                  value: 'pmBenchmark',
-                  child: ListTile(
-                    title: Text('PM Benchmark'),
-                    subtitle: Text('Levels 1-30'),
+                if (_selectedLevelSchema == 'custom') ...[
+                  LumiGap.s,
+                  FormBuilderTextField(
+                    name: 'customLevels',
+                    decoration: const InputDecoration(
+                      labelText: 'Custom Levels (comma separated) *',
+                      hintText: 'e.g. Blue, Green, Orange, Purple',
+                      prefixIcon: Icon(Icons.tune),
+                    ),
+                    validator: (valueCandidate) {
+                      if (_selectedLevelSchema != 'custom') return null;
+                      final raw = valueCandidate?.trim() ?? '';
+                      if (raw.isEmpty) {
+                        return 'Please enter at least one custom reading level';
+                      }
+                      final parsed = _parseCustomLevels(raw) ?? [];
+                      if (parsed.isEmpty) {
+                        return 'Please enter valid comma-separated level names';
+                      }
+                      return null;
+                    },
                   ),
-                ),
-                const FormBuilderFieldOption(
-                  value: 'lexile',
-                  child: ListTile(
-                    title: Text('Lexile'),
-                    subtitle: Text('BR to 1400L'),
-                  ),
-                ),
-                const FormBuilderFieldOption(
-                  value: 'custom',
-                  child: ListTile(
-                    title: Text('Custom'),
-                    subtitle: Text('Define your own levels'),
-                  ),
-                ),
+                ],
               ],
             ),
           ),
@@ -554,7 +631,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
             ),
             LumiGap.s,
             Text(
-              'Your school has been successfully registered. You can now start adding teachers, classes, and students.',
+              'Your school setup is active. Next: import students, generate parent link codes, and share the CSV with families.',
               style: LumiTextStyles.bodyLarge().copyWith(
                 color: AppColors.charcoal.withValues(alpha: 0.6),
               ),

@@ -42,6 +42,12 @@ class StudentLinkCodeModel {
 
   factory StudentLinkCodeModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    final resolvedCreatedAt =
+        _readDateTime(data['createdAt']) ?? DateTime.now();
+    final resolvedExpiresAt =
+        _readDateTime(data['expiresAt'] ?? data['expiryDate']) ??
+            resolvedCreatedAt.add(const Duration(days: 365));
+
     return StudentLinkCodeModel(
       id: doc.id,
       studentId: data['studentId'] ?? '',
@@ -51,17 +57,13 @@ class StudentLinkCodeModel {
         (e) => e.toString() == 'LinkCodeStatus.${data['status']}',
         orElse: () => LinkCodeStatus.active,
       ),
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
-      expiresAt: (data['expiresAt'] as Timestamp).toDate(),
+      createdAt: resolvedCreatedAt,
+      expiresAt: resolvedExpiresAt,
       createdBy: data['createdBy'] ?? '',
       usedBy: data['usedBy'],
-      usedAt: data['usedAt'] != null
-          ? (data['usedAt'] as Timestamp).toDate()
-          : null,
+      usedAt: _readDateTime(data['usedAt']),
       revokedBy: data['revokedBy'],
-      revokedAt: data['revokedAt'] != null
-          ? (data['revokedAt'] as Timestamp).toDate()
-          : null,
+      revokedAt: _readDateTime(data['revokedAt']),
       revokeReason: data['revokeReason'],
       metadata: data['metadata'],
     );
@@ -120,6 +122,18 @@ class StudentLinkCodeModel {
   }
 
   bool get isExpired => DateTime.now().isAfter(expiresAt);
-  bool get isUsable =>
-      status == LinkCodeStatus.active && !isExpired;
+  bool get isUsable => status == LinkCodeStatus.active && !isExpired;
+
+  static DateTime? _readDateTime(
+    dynamic value, {
+    DateTime? fallback,
+  }) {
+    if (value == null) return fallback;
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    if (value is String) {
+      return DateTime.tryParse(value) ?? fallback;
+    }
+    return fallback;
+  }
 }

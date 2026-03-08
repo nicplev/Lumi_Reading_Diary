@@ -6,11 +6,7 @@ import '../../data/models/student_model.dart';
 import '../../data/models/reading_group_model.dart';
 import '../../services/firebase_service.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/lumi_text_styles.dart';
-import '../../core/theme/lumi_spacing.dart';
-import '../../core/theme/lumi_borders.dart';
-import '../../core/widgets/lumi/lumi_buttons.dart';
-import '../../core/widgets/lumi/lumi_card.dart';
+import '../../core/theme/teacher_constants.dart';
 
 /// Screen for managing reading groups within a class
 /// Allows teachers to organize students by ability level or interest
@@ -41,80 +37,87 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.offWhite,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text(
+        title: const Text(
           'Reading Groups',
-          style: LumiTextStyles.h2(color: AppColors.white),
+          style: TextStyle(
+            fontFamily: 'Nunito',
+            fontWeight: FontWeight.w700,
+          ),
         ),
-        backgroundColor: AppColors.rosePink,
-        iconTheme: const IconThemeData(color: AppColors.white),
+        backgroundColor: AppColors.teacherPrimary,
+        foregroundColor: AppColors.white,
+        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.help_outline),
             onPressed: _showHelp,
-            color: AppColors.white,
           ),
         ],
       ),
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(
-                color: AppColors.rosePink,
+                color: AppColors.teacherPrimary,
               ),
             )
           : RefreshIndicator(
-              color: AppColors.rosePink,
+              color: AppColors.teacherPrimary,
               onRefresh: _loadData,
               child: SingleChildScrollView(
-                padding: LumiPadding.allS,
+                padding: const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _buildClassInfo(),
-                    LumiGap.s,
+                    const SizedBox(height: 16),
                     if (_ungroupedStudents.isNotEmpty) ...[
                       _buildUngroupedStudentsCard(),
-                      LumiGap.s,
+                      const SizedBox(height: 16),
                     ],
                     _buildGroupsList(),
                   ],
                 ),
               ),
             ),
-      floatingActionButton: LumiFab(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: _createNewGroup,
-        icon: Icons.add,
-        label: 'New Group',
+        icon: const Icon(Icons.add),
+        label: Text('New Group', style: TeacherTypography.buttonText),
+        backgroundColor: AppColors.teacherPrimary,
+        foregroundColor: AppColors.white,
       ),
     );
   }
 
   Widget _buildClassInfo() {
-    return LumiCard(
-      padding: LumiPadding.allS,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+        boxShadow: TeacherDimensions.cardShadow,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            widget.classModel.name,
-            style: LumiTextStyles.h2(color: AppColors.charcoal),
-          ),
-          LumiGap.xs,
+          Text(widget.classModel.name, style: TeacherTypography.h2),
+          const SizedBox(height: 8),
           Row(
             children: [
               _buildInfoChip(
                 Icons.people,
                 '${_allStudents.length} Students',
-                AppColors.rosePink,
+                AppColors.teacherPrimary,
               ),
-              LumiGap.xs,
+              const SizedBox(width: 8),
               _buildInfoChip(
                 Icons.group_work,
                 '${_groups.length} Groups',
                 AppColors.skyBlue,
               ),
-              LumiGap.xs,
+              const SizedBox(width: 8),
               _buildInfoChip(
                 Icons.person_outline,
                 '${_ungroupedStudents.length} Ungrouped',
@@ -132,17 +135,17 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: LumiBorders.medium,
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 16, color: color),
-          const SizedBox(width: LumiSpacing.xxs),
+          const SizedBox(width: 4),
           Text(
             label,
-            style: LumiTextStyles.label(color: color),
+            style: TeacherTypography.caption.copyWith(color: color),
           ),
         ],
       ),
@@ -151,26 +154,26 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
 
   Widget _buildUngroupedStudentsCard() {
     return Container(
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.warmOrange.withValues(alpha: 0.1),
-        borderRadius: LumiBorders.large,
+        color: AppColors.warmOrange.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+        border: Border.all(color: AppColors.warmOrange.withValues(alpha: 0.2)),
       ),
-      child: LumiCard(
-        padding: LumiPadding.allS,
-        child: Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.person_add, color: AppColors.warmOrange),
-              LumiGap.xs,
+              Icon(Icons.person_add, color: AppColors.warmOrange, size: 20),
+              const SizedBox(width: 8),
               Text(
                 'Ungrouped Students (${_ungroupedStudents.length})',
-                style: LumiTextStyles.h3(color: AppColors.charcoal),
+                style: TeacherTypography.h3,
               ),
             ],
           ),
-          LumiGap.xs,
+          const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -180,59 +183,76 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
                   backgroundColor: AppColors.warmOrange.withValues(alpha: 0.3),
                   child: Text(
                     student.firstName[0].toUpperCase(),
-                    style: LumiTextStyles.bodySmall(color: AppColors.charcoal),
+                    style: TeacherTypography.bodySmall
+                        .copyWith(color: AppColors.charcoal),
                   ),
                 ),
-                label: Text(student.fullName, style: LumiTextStyles.body(color: AppColors.charcoal)),
+                label: Text(student.fullName,
+                    style: TeacherTypography.bodySmall),
                 onDeleted: () => _assignStudentToGroup(student),
                 deleteIcon: const Icon(Icons.arrow_forward, size: 18),
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(TeacherDimensions.radiusM),
+                ),
               );
             }).toList(),
           ),
-          LumiGap.xxs,
+          const SizedBox(height: 4),
           Text(
             'Tap the arrow to assign students to groups',
-            style: LumiTextStyles.bodySmall(
-              color: AppColors.charcoal.withValues(alpha: 0.7),
-            ).copyWith(fontStyle: FontStyle.italic),
+            style: TeacherTypography.bodySmall
+                .copyWith(fontStyle: FontStyle.italic),
           ),
         ],
-        ),
       ),
     );
   }
 
   Widget _buildGroupsList() {
     if (_groups.isEmpty) {
-      return LumiCard(
+      return Container(
         padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+          boxShadow: TeacherDimensions.cardShadow,
+        ),
         child: Column(
           children: [
             Icon(
               Icons.group_work_outlined,
               size: 64,
-              color: AppColors.charcoal.withValues(alpha: 0.3),
+              color: AppColors.textSecondary,
             ),
-            LumiGap.s,
+            const SizedBox(height: 12),
             Text(
               'No Reading Groups Yet',
-              style: LumiTextStyles.h2(
-                color: AppColors.charcoal.withValues(alpha: 0.7),
-              ),
+              style: TeacherTypography.h2
+                  .copyWith(color: AppColors.textSecondary),
             ),
-            LumiGap.xxs,
+            const SizedBox(height: 4),
             Text(
               'Create groups to organize students by ability level or interest',
-              style: LumiTextStyles.body(
-                color: AppColors.charcoal.withValues(alpha: 0.6),
-              ),
+              style: TeacherTypography.bodyMedium
+                  .copyWith(color: AppColors.textSecondary),
               textAlign: TextAlign.center,
             ),
-            LumiGap.s,
-            LumiPrimaryButton(
-              text: 'Create First Group',
-              icon: Icons.add,
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
               onPressed: _createNewGroup,
+              icon: const Icon(Icons.add),
+              label: Text('Create First Group',
+                  style: TeacherTypography.buttonText),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.teacherPrimary,
+                foregroundColor: AppColors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(TeacherDimensions.radiusM),
+                ),
+                elevation: 0,
+              ),
             ),
           ],
         ),
@@ -242,11 +262,8 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Reading Groups',
-          style: LumiTextStyles.h3(color: AppColors.charcoal),
-        ),
-        LumiGap.xs,
+        Text('Reading Groups', style: TeacherTypography.h3),
+        const SizedBox(height: 8),
         ..._groups.map((group) => _buildGroupCard(group)),
       ],
     );
@@ -259,13 +276,19 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
 
     final color = group.color != null
         ? Color(int.parse(group.color!.replaceFirst('#', '0xFF')))
-        : AppColors.rosePink;
+        : AppColors.teacherPrimary;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: LumiSpacing.xs),
-      child: LumiCard(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: GestureDetector(
         onTap: () => _viewGroupDetails(group, studentsInGroup),
-        padding: LumiPadding.allS,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+            boxShadow: TeacherDimensions.cardShadow,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -287,10 +310,8 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
                         Row(
                           children: [
                             Expanded(
-                              child: Text(
-                                group.name,
-                                style: LumiTextStyles.h3(color: AppColors.charcoal),
-                              ),
+                              child: Text(group.name,
+                                  style: TeacherTypography.h3),
                             ),
                             if (group.readingLevel != null)
                               Container(
@@ -299,15 +320,17 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: color.withValues(alpha:0.1),
-                                  borderRadius: BorderRadius.circular(12),
+                                  color: color.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(
+                                      TeacherDimensions.radiusM),
                                   border: Border.all(
-                                    color: color.withValues(alpha:0.3),
+                                    color: color.withValues(alpha: 0.3),
                                   ),
                                 ),
                                 child: Text(
                                   'Level ${group.readingLevel}',
-                                  style: LumiTextStyles.label(color: color),
+                                  style: TeacherTypography.caption
+                                      .copyWith(color: color),
                                 ),
                               ),
                           ],
@@ -315,30 +338,20 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            Icon(
-                              Icons.people,
-                              size: 16,
-                              color: AppColors.charcoal.withValues(alpha: 0.6),
-                            ),
+                            Icon(Icons.people,
+                                size: 16, color: AppColors.textSecondary),
                             const SizedBox(width: 4),
                             Text(
                               '${studentsInGroup.length} students',
-                              style: LumiTextStyles.bodySmall(
-                                color: AppColors.charcoal.withValues(alpha: 0.6),
-                              ),
+                              style: TeacherTypography.bodySmall,
                             ),
-                            LumiGap.s,
-                            Icon(
-                              Icons.schedule,
-                              size: 16,
-                              color: AppColors.charcoal.withValues(alpha: 0.6),
-                            ),
-                            const SizedBox(width: LumiSpacing.xxs),
+                            const SizedBox(width: 12),
+                            Icon(Icons.schedule,
+                                size: 16, color: AppColors.textSecondary),
+                            const SizedBox(width: 4),
                             Text(
                               '${group.targetMinutes} min/day',
-                              style: LumiTextStyles.bodySmall(
-                                color: AppColors.charcoal.withValues(alpha: 0.6),
-                              ),
+                              style: TeacherTypography.bodySmall,
                             ),
                           ],
                         ),
@@ -371,11 +384,13 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
                         value: 'delete',
                         child: Row(
                           children: [
-                            const Icon(Icons.delete, size: 20, color: AppColors.error),
-                            const SizedBox(width: LumiSpacing.xs),
+                            const Icon(Icons.delete,
+                                size: 20, color: AppColors.error),
+                            const SizedBox(width: 8),
                             Text(
                               'Delete Group',
-                              style: LumiTextStyles.body(color: AppColors.error),
+                              style: TeacherTypography.bodyMedium
+                                  .copyWith(color: AppColors.error),
                             ),
                           ],
                         ),
@@ -398,48 +413,50 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
                 ],
               ),
               if (group.description != null) ...[
-                LumiGap.xxs,
+                const SizedBox(height: 4),
                 Text(
                   group.description!,
-                  style: LumiTextStyles.bodySmall(
-                    color: AppColors.charcoal.withValues(alpha: 0.6),
-                  ),
+                  style: TeacherTypography.bodySmall,
                 ),
               ],
               if (studentsInGroup.isNotEmpty) ...[
-                LumiGap.xs,
-                const Divider(),
-                LumiGap.xxs,
+                const SizedBox(height: 8),
+                Divider(color: AppColors.divider),
+                const SizedBox(height: 4),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: studentsInGroup.take(5).map((student) {
                     return Chip(
                       avatar: CircleAvatar(
-                        backgroundColor: color.withValues(alpha:0.2),
+                        backgroundColor: color.withValues(alpha: 0.2),
                         child: Text(
                           student.firstName[0].toUpperCase(),
-                          style: LumiTextStyles.bodySmall(color: color),
+                          style: TeacherTypography.bodySmall
+                              .copyWith(color: color),
                         ),
                       ),
                       label: Text(student.fullName),
-                      labelStyle: LumiTextStyles.bodySmall(color: AppColors.charcoal),
+                      labelStyle: TeacherTypography.bodySmall,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                            TeacherDimensions.radiusM),
+                      ),
                     );
                   }).toList(),
                 ),
                 if (studentsInGroup.length > 5)
                   Padding(
-                    padding: const EdgeInsets.only(top: LumiSpacing.xs),
+                    padding: const EdgeInsets.only(top: 8),
                     child: Text(
                       '+${studentsInGroup.length - 5} more students',
-                      style: LumiTextStyles.bodySmall(
-                        color: AppColors.charcoal.withValues(alpha: 0.6),
-                      ),
+                      style: TeacherTypography.bodySmall,
                     ),
                   ),
               ],
             ],
           ),
+        ),
       ),
     );
   }
@@ -578,19 +595,27 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Group'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+        ),
+        title: Text('Delete Group', style: TeacherTypography.h3),
         content: Text(
           'Are you sure you want to delete "${group.name}"? Students will be moved to ungrouped.',
+          style: TeacherTypography.bodyMedium,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text('Cancel',
+                style: TeacherTypography.bodyMedium
+                    .copyWith(color: AppColors.textSecondary)),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Delete'),
+            child: Text('Delete',
+                style: TeacherTypography.bodyMedium
+                    .copyWith(color: AppColors.error)),
           ),
         ],
       ),
@@ -629,8 +654,8 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
     }
   }
 
-  void _viewGroupDetails(ReadingGroupModel group, List<StudentModel> students) {
-    // Navigate to group details screen (to be implemented)
+  void _viewGroupDetails(
+      ReadingGroupModel group, List<StudentModel> students) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('View details for ${group.name}'),
@@ -698,17 +723,23 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
     final selectedGroup = await showDialog<ReadingGroupModel>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Assign to Group'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+        ),
+        title: Text('Assign to Group', style: TeacherTypography.h3),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Select a group for ${student.fullName}:'),
-            LumiGap.s,
+            Text('Select a group for ${student.fullName}:',
+                style: TeacherTypography.bodyMedium),
+            const SizedBox(height: 12),
             ..._groups.map((group) {
               return ListTile(
-                title: Text(group.name),
-                subtitle: Text('${group.studentIds.length} students'),
+                title:
+                    Text(group.name, style: TeacherTypography.bodyMedium),
+                subtitle: Text('${group.studentIds.length} students',
+                    style: TeacherTypography.bodySmall),
                 onTap: () => Navigator.of(context).pop(group),
               );
             }),
@@ -717,7 +748,9 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text('Cancel',
+                style: TeacherTypography.bodyMedium
+                    .copyWith(color: AppColors.textSecondary)),
           ),
         ],
       ),
@@ -745,7 +778,8 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${student.fullName} added to ${selectedGroup.name}'),
+            content:
+                Text('${student.fullName} added to ${selectedGroup.name}'),
             backgroundColor: AppColors.success,
           ),
         );
@@ -768,43 +802,61 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Reading Groups Help', style: LumiTextStyles.h2(color: AppColors.charcoal)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+        ),
+        title: Text('Reading Groups Help', style: TeacherTypography.h2),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'What are Reading Groups?',
-                style: LumiTextStyles.h3(color: AppColors.charcoal),
-              ),
-              LumiGap.xs,
+              Text('What are Reading Groups?',
+                  style: TeacherTypography.h3),
+              const SizedBox(height: 8),
               Text(
                 'Reading groups help you organize students by ability level, interest, or any other criteria. This makes it easier to:',
-                style: LumiTextStyles.body(color: AppColors.charcoal),
+                style: TeacherTypography.bodyMedium,
               ),
-              LumiGap.xs,
-              Text('• Assign appropriate books', style: LumiTextStyles.body(color: AppColors.charcoal)),
-              Text('• Set different reading targets', style: LumiTextStyles.body(color: AppColors.charcoal)),
-              Text('• Track group progress', style: LumiTextStyles.body(color: AppColors.charcoal)),
-              Text('• Run guided reading sessions', style: LumiTextStyles.body(color: AppColors.charcoal)),
-              LumiGap.s,
-              Text(
-                'How to Use',
-                style: LumiTextStyles.h3(color: AppColors.charcoal),
-              ),
-              LumiGap.xs,
-              Text('1. Create groups with meaningful names', style: LumiTextStyles.body(color: AppColors.charcoal)),
-              Text('2. Assign students to groups', style: LumiTextStyles.body(color: AppColors.charcoal)),
-              Text('3. Set reading targets for each group', style: LumiTextStyles.body(color: AppColors.charcoal)),
-              Text('4. Monitor group performance', style: LumiTextStyles.body(color: AppColors.charcoal)),
+              const SizedBox(height: 8),
+              ...[
+                'Assign appropriate books',
+                'Set different reading targets',
+                'Track group progress',
+                'Run guided reading sessions',
+              ].map((item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('  \u2022  ', style: TeacherTypography.bodyMedium),
+                        Expanded(
+                            child: Text(item,
+                                style: TeacherTypography.bodyMedium)),
+                      ],
+                    ),
+                  )),
+              const SizedBox(height: 16),
+              Text('How to Use', style: TeacherTypography.h3),
+              const SizedBox(height: 8),
+              ...[
+                '1. Create groups with meaningful names',
+                '2. Assign students to groups',
+                '3. Set reading targets for each group',
+                '4. Monitor group performance',
+              ].map((item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(item, style: TeacherTypography.bodyMedium),
+                  )),
             ],
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Got it!'),
+            child: Text('Got it!',
+                style: TeacherTypography.bodyMedium
+                    .copyWith(color: AppColors.teacherPrimary)),
           ),
         ],
       ),
@@ -872,7 +924,13 @@ class _GroupFormDialogState extends State<_GroupFormDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.existingGroup == null ? 'New Group' : 'Edit Group'),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+      ),
+      title: Text(
+        widget.existingGroup == null ? 'New Group' : 'Edit Group',
+        style: TeacherTypography.h3,
+      ),
       content: SingleChildScrollView(
         child: Form(
           key: _formKey,
@@ -882,10 +940,21 @@ class _GroupFormDialogState extends State<_GroupFormDialog> {
             children: [
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Group Name *',
                   hintText: 'e.g., Advanced Readers',
+                  border: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(TeacherDimensions.radiusM),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(TeacherDimensions.radiusM),
+                    borderSide:
+                        BorderSide(color: AppColors.teacherPrimary),
+                  ),
                 ),
+                style: TeacherTypography.bodyMedium,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter a name';
@@ -893,29 +962,62 @@ class _GroupFormDialogState extends State<_GroupFormDialog> {
                   return null;
                 },
               ),
-              LumiGap.s,
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _descriptionController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Description (optional)',
                   hintText: 'Brief description of this group',
+                  border: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(TeacherDimensions.radiusM),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(TeacherDimensions.radiusM),
+                    borderSide:
+                        BorderSide(color: AppColors.teacherPrimary),
+                  ),
                 ),
+                style: TeacherTypography.bodyMedium,
                 maxLines: 2,
               ),
-              LumiGap.s,
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _readingLevelController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Reading Level (optional)',
                   hintText: 'e.g., A, B, C or 1, 2, 3',
+                  border: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(TeacherDimensions.radiusM),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(TeacherDimensions.radiusM),
+                    borderSide:
+                        BorderSide(color: AppColors.teacherPrimary),
+                  ),
                 ),
+                style: TeacherTypography.bodyMedium,
               ),
-              LumiGap.s,
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _targetMinutesController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Daily Target (minutes) *',
+                  border: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(TeacherDimensions.radiusM),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(TeacherDimensions.radiusM),
+                    borderSide:
+                        BorderSide(color: AppColors.teacherPrimary),
+                  ),
                 ),
+                style: TeacherTypography.bodyMedium,
                 keyboardType: TextInputType.number,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -927,32 +1029,27 @@ class _GroupFormDialogState extends State<_GroupFormDialog> {
                   return null;
                 },
               ),
-              LumiGap.s,
-              Text(
-                'Group Color',
-                style: LumiTextStyles.bodySmall(color: AppColors.charcoal.withValues(alpha: 0.5)),
-              ),
-              LumiGap.xxs,
+              const SizedBox(height: 12),
+              Text('Group Color', style: TeacherTypography.bodySmall),
+              const SizedBox(height: 4),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: _colors.map((color) {
                   final isSelected = color == _selectedColor;
                   return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedColor = color;
-                      });
-                    },
+                    onTap: () => setState(() => _selectedColor = color),
                     child: Container(
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color:
-                            Color(int.parse(color.replaceFirst('#', '0xFF'))),
+                        color: Color(
+                            int.parse(color.replaceFirst('#', '0xFF'))),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isSelected ? Colors.black : Colors.transparent,
+                          color: isSelected
+                              ? Colors.black
+                              : Colors.transparent,
                           width: 3,
                         ),
                       ),
@@ -970,11 +1067,22 @@ class _GroupFormDialogState extends State<_GroupFormDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text('Cancel',
+              style: TeacherTypography.bodyMedium
+                  .copyWith(color: AppColors.textSecondary)),
         ),
         ElevatedButton(
           onPressed: _saveGroup,
-          child: const Text('Save'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.teacherPrimary,
+            foregroundColor: AppColors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius:
+                  BorderRadius.circular(TeacherDimensions.radiusM),
+            ),
+            elevation: 0,
+          ),
+          child: Text('Save', style: TeacherTypography.buttonText),
         ),
       ],
     );
@@ -1034,7 +1142,11 @@ class _ManageStudentsDialogState extends State<_ManageStudentsDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('Manage Students - ${widget.group.name}'),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+      ),
+      title: Text('Manage Students - ${widget.group.name}',
+          style: TeacherTypography.h3),
       content: SizedBox(
         width: double.maxFinite,
         child: ListView.builder(
@@ -1045,10 +1157,13 @@ class _ManageStudentsDialogState extends State<_ManageStudentsDialog> {
             final isSelected = _selectedStudentIds.contains(student.id);
 
             return CheckboxListTile(
-              title: Text(student.fullName),
-              subtitle:
-                  Text('Level: ${student.currentReadingLevel ?? "Not set"}'),
+              title: Text(student.fullName,
+                  style: TeacherTypography.bodyMedium),
+              subtitle: Text(
+                  'Level: ${student.currentReadingLevel ?? "Not set"}',
+                  style: TeacherTypography.bodySmall),
               value: isSelected,
+              activeColor: AppColors.teacherPrimary,
               onChanged: (value) {
                 setState(() {
                   if (value == true) {
@@ -1065,13 +1180,22 @@ class _ManageStudentsDialogState extends State<_ManageStudentsDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text('Cancel',
+              style: TeacherTypography.bodyMedium
+                  .copyWith(color: AppColors.textSecondary)),
         ),
         ElevatedButton(
-          onPressed: () {
-            Navigator.of(context).pop(_selectedStudentIds);
-          },
-          child: const Text('Save'),
+          onPressed: () => Navigator.of(context).pop(_selectedStudentIds),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.teacherPrimary,
+            foregroundColor: AppColors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius:
+                  BorderRadius.circular(TeacherDimensions.radiusM),
+            ),
+            elevation: 0,
+          ),
+          child: Text('Save', style: TeacherTypography.buttonText),
         ),
       ],
     );

@@ -3,12 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/lumi_text_styles.dart';
-import '../../core/theme/lumi_spacing.dart';
-import '../../core/theme/lumi_borders.dart';
-import '../../core/widgets/lumi/lumi_buttons.dart';
-import '../../core/widgets/lumi/lumi_card.dart';
-import '../../core/widgets/common_widgets.dart';
+import '../../core/theme/teacher_constants.dart';
 import '../../data/models/user_model.dart';
 import '../../services/firebase_service.dart';
 
@@ -68,20 +63,20 @@ class _UserManagementScreenState extends State<UserManagementScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.offWhite,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.teacherPrimary,
+        foregroundColor: AppColors.white,
         elevation: 0,
         title: Text(
           'User Management',
-          style: LumiTextStyles.h3(color: AppColors.charcoal),
+          style: const TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.w700),
         ),
-        iconTheme: const IconThemeData(color: AppColors.charcoal),
         bottom: TabBar(
           controller: _tabController,
-          labelColor: AppColors.rosePink,
-          unselectedLabelColor: AppColors.charcoal.withValues(alpha: 0.7),
-          indicatorColor: AppColors.rosePink,
+          labelColor: AppColors.white,
+          unselectedLabelColor: AppColors.white.withValues(alpha: 0.6),
+          indicatorColor: AppColors.white,
           tabs: const [
             Tab(text: 'All'),
             Tab(text: 'Teachers'),
@@ -90,7 +85,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
           ],
         ),
       ),
-      floatingActionButton: LumiFab(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           if (_tabController.index == 3) {
             _showAddStudentDialog();
@@ -98,20 +93,36 @@ class _UserManagementScreenState extends State<UserManagementScreen>
             _showAddUserDialog();
           }
         },
-        isExtended: true,
-        icon: Icons.add,
-        label: _tabController.index == 3 ? 'Add Student' : 'Add User',
+        icon: const Icon(Icons.add),
+        label: Text(_tabController.index == 3 ? 'Add Student' : 'Add User'),
+        backgroundColor: AppColors.teacherPrimary,
+        foregroundColor: AppColors.white,
       ),
       body: Column(
         children: [
           // Search Bar
-          CommonWidgets.buildSearchBar(
-            hintText: 'Search users...',
-            onChanged: (value) {
-              setState(() {
-                _searchQuery = value.toLowerCase();
-              });
-            },
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: 'Search users...',
+                hintStyle: TeacherTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
+                prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+                filled: true,
+                fillColor: AppColors.background,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+              style: TeacherTypography.bodyMedium,
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value.toLowerCase();
+                });
+              },
+            ),
           ),
 
           // Content
@@ -144,17 +155,17 @@ class _UserManagementScreenState extends State<UserManagementScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const CircularProgressIndicator(
-                  color: AppColors.rosePink,
+                  color: AppColors.teacherPrimary,
                 ),
-                LumiGap.s,
+                const SizedBox(height: 8),
                 Text(
                   'Loading users...',
-                  style: LumiTextStyles.body(color: AppColors.charcoal.withValues(alpha: 0.7)),
+                  style: TeacherTypography.bodyMedium.copyWith(color: AppColors.charcoal.withValues(alpha: 0.7)),
                 ),
-                LumiGap.xs,
-                LumiTextButton(
+                const SizedBox(height: 4),
+                TextButton(
                   onPressed: () => setState(() {}),
-                  text: 'Retry',
+                  child: Text('Retry', style: TeacherTypography.bodyMedium.copyWith(color: AppColors.teacherPrimary)),
                 ),
               ],
             ),
@@ -162,7 +173,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
         }
 
         if (!snapshot.hasData) {
-          return CommonWidgets.buildLoadingIndicator();
+          return const Center(child: CircularProgressIndicator(color: AppColors.teacherPrimary));
         }
 
         final docs = snapshot.data!.docs;
@@ -174,15 +185,22 @@ class _UserManagementScreenState extends State<UserManagementScreen>
         }).toList();
 
         if (filteredDocs.isEmpty) {
-          return CommonWidgets.buildEmptyState(
-            icon: Icons.people_outline,
-            title: 'No users found',
-            subtitle: 'Try adjusting your search or add a new user',
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.people_outline, size: 64, color: AppColors.textSecondary),
+                const SizedBox(height: 16),
+                Text('No users found', style: TeacherTypography.h3),
+                const SizedBox(height: 8),
+                Text('Try adjusting your search or add a new user', style: TeacherTypography.bodyMedium.copyWith(color: AppColors.textSecondary)),
+              ],
+            ),
           );
         }
 
         return ListView.builder(
-          padding: LumiPadding.allS,
+          padding: const EdgeInsets.all(8),
           itemCount: filteredDocs.length,
           itemBuilder: (context, index) {
             final user = UserModel.fromFirestore(filteredDocs[index]);
@@ -206,17 +224,17 @@ class _UserManagementScreenState extends State<UserManagementScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const CircularProgressIndicator(
-                  color: AppColors.rosePink,
+                  color: AppColors.teacherPrimary,
                 ),
-                LumiGap.s,
+                const SizedBox(height: 8),
                 Text(
                   'Loading users...',
-                  style: LumiTextStyles.body(color: AppColors.charcoal.withValues(alpha: 0.7)),
+                  style: TeacherTypography.bodyMedium.copyWith(color: AppColors.charcoal.withValues(alpha: 0.7)),
                 ),
-                LumiGap.xs,
-                LumiTextButton(
+                const SizedBox(height: 4),
+                TextButton(
                   onPressed: () => setState(() {}),
-                  text: 'Retry',
+                  child: Text('Retry', style: TeacherTypography.bodyMedium.copyWith(color: AppColors.teacherPrimary)),
                 ),
               ],
             ),
@@ -224,7 +242,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
         }
 
         if (!snapshot.hasData) {
-          return CommonWidgets.buildLoadingIndicator();
+          return const Center(child: CircularProgressIndicator(color: AppColors.teacherPrimary));
         }
 
         final docs = snapshot.data!.docs;
@@ -240,15 +258,22 @@ class _UserManagementScreenState extends State<UserManagementScreen>
         }).toList();
 
         if (filteredDocs.isEmpty) {
-          return CommonWidgets.buildEmptyState(
-            icon: Icons.school_outlined,
-            title: 'No students found',
-            subtitle: 'Try adjusting your search or add a new student',
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.school_outlined, size: 64, color: AppColors.textSecondary),
+                const SizedBox(height: 16),
+                Text('No students found', style: TeacherTypography.h3),
+                const SizedBox(height: 8),
+                Text('Try adjusting your search or add a new student', style: TeacherTypography.bodyMedium.copyWith(color: AppColors.textSecondary)),
+              ],
+            ),
           );
         }
 
         return ListView.builder(
-          padding: LumiPadding.allS,
+          padding: const EdgeInsets.all(8),
           itemCount: filteredDocs.length,
           itemBuilder: (context, index) {
             final doc = filteredDocs[index];
@@ -266,9 +291,13 @@ class _UserManagementScreenState extends State<UserManagementScreen>
     final roleIcon = _getRoleIcon(roleString);
 
     return Padding(
-      padding: EdgeInsets.only(bottom: LumiSpacing.listItemSpacing),
-      child: LumiCard(
-        padding: EdgeInsets.zero,
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+          boxShadow: TeacherDimensions.cardShadow,
+        ),
         child: ListTile(
         leading: CircleAvatar(
           backgroundColor: roleColor.withValues(alpha: 0.2),
@@ -276,32 +305,33 @@ class _UserManagementScreenState extends State<UserManagementScreen>
         ),
         title: Text(
           user.fullName,
-          style: LumiTextStyles.bodyLarge().copyWith(fontWeight: FontWeight.w600),
+          style: TeacherTypography.bodyLarge.copyWith(fontWeight: FontWeight.w600),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(user.email),
-            LumiGap.xxs,
+            const SizedBox(height: 2),
             Row(
               children: [
                 Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: LumiSpacing.xs,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4.0,
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
                     color: roleColor.withValues(alpha: 0.1),
-                    borderRadius: LumiBorders.medium,
+                    borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
                   ),
                   child: Text(
                     roleString.toUpperCase(),
-                    style: LumiTextStyles.caption(color: roleColor).copyWith(
+                    style: TeacherTypography.caption.copyWith(
+                      color: roleColor,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-                LumiGap.horizontalXS,
+                const SizedBox(width: 4),
                 if (!user.isActive)
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -310,11 +340,12 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                     ),
                     decoration: BoxDecoration(
                       color: AppColors.error.withValues(alpha: 0.1),
-                      borderRadius: LumiBorders.medium,
+                      borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
                     ),
                     child: Text(
                       'INACTIVE',
-                      style: LumiTextStyles.caption(color: AppColors.error).copyWith(
+                      style: TeacherTypography.caption.copyWith(
+                        color: AppColors.error,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -331,7 +362,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
               child: Row(
                 children: [
                   Icon(Icons.edit, size: 20),
-                  LumiGap.horizontalXS,
+                  SizedBox(width: 4),
                   Text('Edit'),
                 ],
               ),
@@ -344,7 +375,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                     user.isActive ? Icons.block : Icons.check_circle,
                     size: 20,
                   ),
-                  LumiGap.horizontalXS,
+                  const SizedBox(width: 4),
                   Text(user.isActive ? 'Deactivate' : 'Activate'),
                 ],
               ),
@@ -354,7 +385,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
               child: Row(
                 children: [
                   Icon(Icons.lock_reset, size: 20),
-                  LumiGap.horizontalXS,
+                  SizedBox(width: 4),
                   Text('Reset Password'),
                 ],
               ),
@@ -364,8 +395,8 @@ class _UserManagementScreenState extends State<UserManagementScreen>
               child: Row(
                 children: [
                   Icon(Icons.delete, size: 20, color: AppColors.error),
-                  LumiGap.horizontalXS,
-                  Text('Delete', style: LumiTextStyles.body(color: AppColors.error)),
+                  const SizedBox(width: 4),
+                  Text('Delete', style: TeacherTypography.bodyMedium.copyWith(color: AppColors.error)),
                 ],
               ),
             ),
@@ -384,28 +415,33 @@ class _UserManagementScreenState extends State<UserManagementScreen>
     final isActive = data['isActive'] ?? true;
 
     return Padding(
-      padding: EdgeInsets.only(bottom: LumiSpacing.listItemSpacing),
-      child: LumiCard(
-        padding: EdgeInsets.zero,
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+          boxShadow: TeacherDimensions.cardShadow,
+        ),
         child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: AppColors.rosePink.withValues(alpha: 0.2),
+          backgroundColor: AppColors.teacherPrimary.withValues(alpha: 0.2),
           child: Text(
             firstName.isNotEmpty ? firstName[0].toUpperCase() : '?',
-            style: LumiTextStyles.body(color: AppColors.rosePink).copyWith(
+            style: TeacherTypography.bodyMedium.copyWith(
+              color: AppColors.teacherPrimary,
               fontWeight: FontWeight.bold,
             ),
           ),
         ),
         title: Text(
           '$firstName $lastName',
-          style: LumiTextStyles.bodyLarge().copyWith(fontWeight: FontWeight.w600),
+          style: TeacherTypography.bodyLarge.copyWith(fontWeight: FontWeight.w600),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Student ID: ${data['studentId'] ?? studentId}'),
-            LumiGap.xxs,
+            const SizedBox(height: 2),
             Row(
               children: [
                 if (yearLevel.isNotEmpty)
@@ -415,18 +451,19 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.secondaryPurple.withValues(alpha: 0.1),
-                      borderRadius: LumiBorders.medium,
+                      color: AppColors.teacherPrimary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
                     ),
                     child: Text(
                       yearLevel,
-                      style: LumiTextStyles.caption(color: AppColors.secondaryPurple).copyWith(
+                      style: TeacherTypography.caption.copyWith(
+                        color: AppColors.teacherPrimary,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                 if (className.isNotEmpty) ...[
-                  LumiGap.horizontalXS,
+                  const SizedBox(width: 4),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -434,18 +471,19 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                     ),
                     decoration: BoxDecoration(
                       color: AppColors.teacherColor.withValues(alpha: 0.1),
-                      borderRadius: LumiBorders.medium,
+                      borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
                     ),
                     child: Text(
                       className,
-                      style: LumiTextStyles.caption(color: AppColors.teacherColor).copyWith(
+                      style: TeacherTypography.caption.copyWith(
+                        color: AppColors.teacherColor,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                 ],
                 if (!isActive) ...[
-                  LumiGap.horizontalXS,
+                  const SizedBox(width: 4),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -453,11 +491,12 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                     ),
                     decoration: BoxDecoration(
                       color: AppColors.error.withValues(alpha: 0.1),
-                      borderRadius: LumiBorders.medium,
+                      borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
                     ),
                     child: Text(
                       'INACTIVE',
-                      style: LumiTextStyles.caption(color: AppColors.error).copyWith(
+                      style: TeacherTypography.caption.copyWith(
+                        color: AppColors.error,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -475,7 +514,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
               child: Row(
                 children: [
                   Icon(Icons.edit, size: 20),
-                  LumiGap.horizontalXS,
+                  SizedBox(width: 4),
                   Text('Edit'),
                 ],
               ),
@@ -488,7 +527,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                     isActive ? Icons.block : Icons.check_circle,
                     size: 20,
                   ),
-                  LumiGap.horizontalXS,
+                  const SizedBox(width: 4),
                   Text(isActive ? 'Deactivate' : 'Activate'),
                 ],
               ),
@@ -498,8 +537,8 @@ class _UserManagementScreenState extends State<UserManagementScreen>
               child: Row(
                 children: [
                   Icon(Icons.delete, size: 20, color: AppColors.error),
-                  LumiGap.horizontalXS,
-                  Text('Delete', style: LumiTextStyles.body(color: AppColors.error)),
+                  const SizedBox(width: 4),
+                  Text('Delete', style: TeacherTypography.bodyMedium.copyWith(color: AppColors.error)),
                 ],
               ),
             ),
@@ -515,7 +554,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
       case 'teacher':
         return AppColors.teacherColor;
       case 'parent':
-        return AppColors.rosePink;
+        return AppColors.teacherPrimary;
       case 'schoolAdmin':
         return AppColors.adminColor;
       default:
@@ -586,16 +625,19 @@ class _UserManagementScreenState extends State<UserManagementScreen>
       });
 
       if (mounted) {
-        CommonWidgets.showSuccessSnackbar(
-          context,
-          user.isActive
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(user.isActive
               ? 'User deactivated successfully'
-              : 'User activated successfully',
-        );
+              : 'User activated successfully'),
+          backgroundColor: AppColors.success,
+        ));
       }
     } catch (e) {
       if (mounted) {
-        CommonWidgets.showErrorSnackbar(context, 'Error updating user: $e');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error updating user: $e'),
+          backgroundColor: AppColors.error,
+        ));
       }
     }
   }
@@ -613,16 +655,19 @@ class _UserManagementScreenState extends State<UserManagementScreen>
       });
 
       if (mounted) {
-        CommonWidgets.showSuccessSnackbar(
-          context,
-          currentStatus
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(currentStatus
               ? 'Student deactivated successfully'
-              : 'Student activated successfully',
-        );
+              : 'Student activated successfully'),
+          backgroundColor: AppColors.success,
+        ));
       }
     } catch (e) {
       if (mounted) {
-        CommonWidgets.showErrorSnackbar(context, 'Error updating student: $e');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error updating student: $e'),
+          backgroundColor: AppColors.error,
+        ));
       }
     }
   }
@@ -632,14 +677,17 @@ class _UserManagementScreenState extends State<UserManagementScreen>
       await FirebaseAuth.instance.sendPasswordResetEmail(email: user.email);
 
       if (mounted) {
-        CommonWidgets.showSuccessSnackbar(
-          context,
-          'Password reset email sent to ${user.email}',
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Password reset email sent to ${user.email}'),
+          backgroundColor: AppColors.success,
+        ));
       }
     } catch (e) {
       if (mounted) {
-        CommonWidgets.showErrorSnackbar(context, 'Error sending reset email: $e');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error sending reset email: $e'),
+          backgroundColor: AppColors.error,
+        ));
       }
     }
   }
@@ -651,19 +699,19 @@ class _UserManagementScreenState extends State<UserManagementScreen>
         title: const Text('Delete User'),
         content: Text('Are you sure you want to delete ${user.fullName}? This action cannot be undone.'),
         actions: [
-          LumiTextButton(
+          TextButton(
             onPressed: () => Navigator.pop(context, false),
-            text: 'Cancel',
+            child: Text('Cancel', style: TeacherTypography.bodyMedium.copyWith(color: AppColors.teacherPrimary)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(
               foregroundColor: AppColors.error,
               shape: RoundedRectangleBorder(
-                borderRadius: LumiBorders.small,
+                borderRadius: BorderRadius.circular(TeacherDimensions.radiusS),
               ),
             ),
-            child: Text('Delete', style: LumiTextStyles.button(color: AppColors.error)),
+            child: Text('Delete', style: TeacherTypography.buttonText.copyWith(color: AppColors.error)),
           ),
         ],
       ),
@@ -679,11 +727,17 @@ class _UserManagementScreenState extends State<UserManagementScreen>
             .delete();
 
         if (mounted) {
-          CommonWidgets.showSuccessSnackbar(context, 'User deleted successfully');
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('User deleted successfully'),
+            backgroundColor: AppColors.success,
+          ));
         }
       } catch (e) {
         if (mounted) {
-          CommonWidgets.showErrorSnackbar(context, 'Error deleting user: $e');
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Error deleting user: $e'),
+            backgroundColor: AppColors.error,
+          ));
         }
       }
     }
@@ -696,19 +750,19 @@ class _UserManagementScreenState extends State<UserManagementScreen>
         title: const Text('Delete Student'),
         content: const Text('Are you sure you want to delete this student? This action cannot be undone.'),
         actions: [
-          LumiTextButton(
+          TextButton(
             onPressed: () => Navigator.pop(context, false),
-            text: 'Cancel',
+            child: Text('Cancel', style: TeacherTypography.bodyMedium.copyWith(color: AppColors.teacherPrimary)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(
               foregroundColor: AppColors.error,
               shape: RoundedRectangleBorder(
-                borderRadius: LumiBorders.small,
+                borderRadius: BorderRadius.circular(TeacherDimensions.radiusS),
               ),
             ),
-            child: Text('Delete', style: LumiTextStyles.button(color: AppColors.error)),
+            child: Text('Delete', style: TeacherTypography.buttonText.copyWith(color: AppColors.error)),
           ),
         ],
       ),
@@ -724,11 +778,17 @@ class _UserManagementScreenState extends State<UserManagementScreen>
             .delete();
 
         if (mounted) {
-          CommonWidgets.showSuccessSnackbar(context, 'Student deleted successfully');
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Student deleted successfully'),
+            backgroundColor: AppColors.success,
+          ));
         }
       } catch (e) {
         if (mounted) {
-          CommonWidgets.showErrorSnackbar(context, 'Error deleting student: $e');
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Error deleting student: $e'),
+            backgroundColor: AppColors.error,
+          ));
         }
       }
     }
@@ -780,7 +840,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       });
                     },
                   ),
-                  LumiGap.s,
+                  const SizedBox(height: 8),
                   // First Name
                   TextFormField(
                     controller: firstNameController,
@@ -795,7 +855,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       return null;
                     },
                   ),
-                  LumiGap.s,
+                  const SizedBox(height: 8),
                   // Last Name
                   TextFormField(
                     controller: lastNameController,
@@ -810,7 +870,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       return null;
                     },
                   ),
-                  LumiGap.s,
+                  const SizedBox(height: 8),
                   // Email
                   TextFormField(
                     controller: emailController,
@@ -829,7 +889,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       return null;
                     },
                   ),
-                  LumiGap.s,
+                  const SizedBox(height: 8),
                   // Password
                   TextFormField(
                     controller: passwordController,
@@ -854,17 +914,24 @@ class _UserManagementScreenState extends State<UserManagementScreen>
             ),
           ),
           actions: [
-            LumiTextButton(
+            TextButton(
               onPressed: () => Navigator.pop(context, false),
-              text: 'Cancel',
+              child: Text('Cancel', style: TeacherTypography.bodyMedium.copyWith(color: AppColors.teacherPrimary)),
             ),
-            LumiPrimaryButton(
+            ElevatedButton(
               onPressed: () {
                 if (formKey.currentState!.validate()) {
                   Navigator.pop(context, true);
                 }
               },
-              text: 'Add User',
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.teacherPrimary,
+                foregroundColor: AppColors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                ),
+              ),
+              child: const Text('Add User'),
             ),
           ],
         ),
@@ -953,7 +1020,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
               'User $firstName $lastName has been created.\n\nPlease sign in again to continue.',
             ),
             actions: [
-              LumiPrimaryButton(
+              ElevatedButton(
                 onPressed: () {
                   Navigator.of(context).pop();
                   // Navigate to login screen
@@ -962,7 +1029,14 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                     (route) => false,
                   );
                 },
-                text: 'Go to Login',
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.teacherPrimary,
+                  foregroundColor: AppColors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                  ),
+                ),
+                child: const Text('Go to Login'),
               ),
             ],
           ),
@@ -971,7 +1045,10 @@ class _UserManagementScreenState extends State<UserManagementScreen>
     } catch (e) {
       if (mounted) {
         Navigator.of(context).pop(); // Close loading dialog
-        CommonWidgets.showErrorSnackbar(context, 'Error creating user: $e');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error creating user: $e'),
+          backgroundColor: AppColors.error,
+        ));
       }
     }
   }
@@ -1058,17 +1135,24 @@ class _UserManagementScreenState extends State<UserManagementScreen>
           ),
         ),
         actions: [
-          LumiTextButton(
+          TextButton(
             onPressed: () => Navigator.pop(context, false),
-            text: 'Cancel',
+            child: Text('Cancel', style: TeacherTypography.bodyMedium.copyWith(color: AppColors.teacherPrimary)),
           ),
-          LumiPrimaryButton(
+          ElevatedButton(
             onPressed: () {
               if (formKey.currentState!.validate()) {
                 Navigator.pop(context, true);
               }
             },
-            text: 'Add Student',
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.teacherPrimary,
+              foregroundColor: AppColors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+              ),
+            ),
+            child: const Text('Add Student'),
           ),
         ],
       ),
@@ -1109,14 +1193,17 @@ class _UserManagementScreenState extends State<UserManagementScreen>
       });
 
       if (mounted) {
-        CommonWidgets.showSuccessSnackbar(
-          context,
-          'Student $firstName $lastName added successfully',
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Student $firstName $lastName added successfully'),
+          backgroundColor: AppColors.success,
+        ));
       }
     } catch (e) {
       if (mounted) {
-        CommonWidgets.showErrorSnackbar(context, 'Error adding student: $e');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error adding student: $e'),
+          backgroundColor: AppColors.error,
+        ));
       }
     }
   }
@@ -1171,7 +1258,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       });
                     },
                   ),
-                  LumiGap.s,
+                  const SizedBox(height: 8),
                   // First Name
                   TextFormField(
                     controller: firstNameController,
@@ -1186,7 +1273,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       return null;
                     },
                   ),
-                  LumiGap.s,
+                  const SizedBox(height: 8),
                   // Last Name
                   TextFormField(
                     controller: lastNameController,
@@ -1201,7 +1288,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       return null;
                     },
                   ),
-                  LumiGap.s,
+                  const SizedBox(height: 8),
                   // Email (read-only)
                   TextFormField(
                     controller: emailController,
@@ -1217,17 +1304,24 @@ class _UserManagementScreenState extends State<UserManagementScreen>
             ),
           ),
           actions: [
-            LumiTextButton(
+            TextButton(
               onPressed: () => Navigator.pop(context, false),
-              text: 'Cancel',
+              child: Text('Cancel', style: TeacherTypography.bodyMedium.copyWith(color: AppColors.teacherPrimary)),
             ),
-            LumiPrimaryButton(
+            ElevatedButton(
               onPressed: () {
                 if (formKey.currentState!.validate()) {
                   Navigator.pop(context, true);
                 }
               },
-              text: 'Update User',
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.teacherPrimary,
+                foregroundColor: AppColors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                ),
+              ),
+              child: const Text('Update User'),
             ),
           ],
         ),
@@ -1266,14 +1360,17 @@ class _UserManagementScreenState extends State<UserManagementScreen>
       });
 
       if (mounted) {
-        CommonWidgets.showSuccessSnackbar(
-          context,
-          'User $fullName updated successfully',
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('User $fullName updated successfully'),
+          backgroundColor: AppColors.success,
+        ));
       }
     } catch (e) {
       if (mounted) {
-        CommonWidgets.showErrorSnackbar(context, 'Error updating user: $e');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error updating user: $e'),
+          backgroundColor: AppColors.error,
+        ));
       }
     }
   }
@@ -1360,17 +1457,24 @@ class _UserManagementScreenState extends State<UserManagementScreen>
           ),
         ),
         actions: [
-          LumiTextButton(
+          TextButton(
             onPressed: () => Navigator.pop(context, false),
-            text: 'Cancel',
+            child: Text('Cancel', style: TeacherTypography.bodyMedium.copyWith(color: AppColors.teacherPrimary)),
           ),
-          LumiPrimaryButton(
+          ElevatedButton(
             onPressed: () {
               if (formKey.currentState!.validate()) {
                 Navigator.pop(context, true);
               }
             },
-            text: 'Update Student',
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.teacherPrimary,
+              foregroundColor: AppColors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+              ),
+            ),
+            child: const Text('Update Student'),
           ),
         ],
       ),
@@ -1409,14 +1513,17 @@ class _UserManagementScreenState extends State<UserManagementScreen>
       });
 
       if (mounted) {
-        CommonWidgets.showSuccessSnackbar(
-          context,
-          'Student $firstName $lastName updated successfully',
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Student $firstName $lastName updated successfully'),
+          backgroundColor: AppColors.success,
+        ));
       }
     } catch (e) {
       if (mounted) {
-        CommonWidgets.showErrorSnackbar(context, 'Error updating student: $e');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error updating student: $e'),
+          backgroundColor: AppColors.error,
+        ));
       }
     }
   }

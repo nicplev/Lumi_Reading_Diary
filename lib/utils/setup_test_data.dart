@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:crypto/crypto.dart';
 
 class TestDataSetup {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -216,6 +218,110 @@ class TestDataSetup {
       print('4. Parents can register and link to students');
     } catch (e) {
       print('❌ Error creating test data: $e');
+      rethrow;
+    }
+  }
+
+  /// Creates a NEW school admin account for Beaumaris Primary School
+  /// Use this when the original admin account is inaccessible
+  /// Email: newadmin@bps.edu.au
+  /// Password: LumiAdmin2025!
+  static Future<void> createNewSchoolAdmin() async {
+    try {
+      print('Creating new school admin account...');
+
+      const schoolId = 'beaumaris_primary_school';
+      const adminEmail = 'newadmin@bps.edu.au';
+      const adminPassword = 'LumiAdmin2025!';
+
+      // Create the Firebase Auth account
+      UserCredential adminCredential;
+      String adminUid;
+
+      try {
+        adminCredential = await _auth.createUserWithEmailAndPassword(
+          email: adminEmail,
+          password: adminPassword,
+        );
+        adminUid = adminCredential.user!.uid;
+        print('Auth account created: $adminUid');
+      } catch (e) {
+        if (e.toString().contains('email-already-in-use')) {
+          // Already exists — sign in to get UID
+          print('Account already exists, signing in...');
+          adminCredential = await _auth.signInWithEmailAndPassword(
+            email: adminEmail,
+            password: adminPassword,
+          );
+          adminUid = adminCredential.user!.uid;
+          print('Signed in to existing account: $adminUid');
+        } else {
+          rethrow;
+        }
+      }
+
+      // Create Firestore user document in the school's users subcollection
+      // (login screen searches schools/{schoolId}/users/{uid})
+      final now = FieldValue.serverTimestamp();
+      final userData = {
+        'uid': adminUid,
+        'email': adminEmail,
+        'displayName': 'School Administrator',
+        'firstName': 'Admin',
+        'lastName': 'User',
+        'role': 'schoolAdmin',
+        'schoolId': schoolId,
+        'schoolName': 'Beaumaris Primary School',
+        'isActive': true,
+        'isApproved': true,
+        'permissions': {
+          'manageTeachers': true,
+          'manageStudents': true,
+          'manageClasses': true,
+          'viewReports': true,
+          'manageSchoolSettings': true,
+        },
+        'createdAt': now,
+        'updatedAt': now,
+        'lastLogin': now,
+        'lastLoginAt': now,
+      };
+
+      // Write to school subcollection (where login screen looks)
+      await _firestore
+          .collection('schools')
+          .doc(schoolId)
+          .collection('users')
+          .doc(adminUid)
+          .set(userData);
+
+      // Also write to top-level users collection (for splash screen / userProvider)
+      await _firestore.collection('users').doc(adminUid).set(userData);
+
+      // Create email-to-school index entry (for fast login lookup)
+      final emailHash = sha256.convert(utf8.encode(adminEmail.toLowerCase().trim())).toString();
+      await _firestore.collection('userSchoolIndex').doc(emailHash).set({
+        'email': adminEmail,
+        'schoolId': schoolId,
+        'userType': 'user',
+        'userId': adminUid,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      print('Firestore user document created');
+      print('');
+      print('=== NEW ADMIN ACCOUNT ===');
+      print('Email:    $adminEmail');
+      print('Password: $adminPassword');
+      print('School:   Beaumaris Primary School');
+      print('UID:      $adminUid');
+      print('=========================');
+
+      // Sign out so the user can log in manually from the login screen
+      await _auth.signOut();
+      print('Signed out. You can now log in with the new admin credentials.');
+    } catch (e) {
+      print('Error creating admin: $e');
       rethrow;
     }
   }

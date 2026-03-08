@@ -1,0 +1,48 @@
+import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/teacher_constants.dart';
+
+/// Lumi Design System - Teacher Filter Chip
+///
+/// Toggle chip with active (primary filled) and inactive (white) states.
+/// Per spec: 20px radius, 16px horizontal / 8px vertical padding.
+class TeacherFilterChip extends StatelessWidget {
+  final String label;
+  final bool isActive;
+  final VoidCallback? onTap;
+
+  const TeacherFilterChip({
+    super.key,
+    required this.label,
+    required this.isActive,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.teacherPrimary : AppColors.white,
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
+          border: Border.all(
+            color: isActive ? AppColors.teacherPrimary : AppColors.divider,
+            width: 1.5,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Nunito',
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: isActive ? AppColors.white : AppColors.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+}
