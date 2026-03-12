@@ -137,6 +137,7 @@ flutter:
     - assets/animations/
     - assets/icons/
     - assets/blobs/
+    - assets/data/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

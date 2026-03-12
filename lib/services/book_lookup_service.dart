@@ -5,32 +5,51 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../data/models/book_model.dart';
+import 'llll_book_database.dart';
 
 /// Resolves ISBN codes to full book metadata using a fallback chain:
-/// Firestore cache → Google Books API → Open Library API → null
+/// Local LLLL database → Firestore cache → Google Books API → Open Library API → null
 class BookLookupService {
   BookLookupService({
     FirebaseFirestore? firestore,
     http.Client? httpClient,
     String? googleBooksApiKey,
+    LlllBookDatabase? llllDatabase,
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
         _httpClient = httpClient ?? http.Client(),
         _googleBooksApiKey = googleBooksApiKey ??
-            const String.fromEnvironment('GOOGLE_BOOKS_API_KEY');
+            const String.fromEnvironment('GOOGLE_BOOKS_API_KEY'),
+        _llllDatabase = llllDatabase ?? LlllBookDatabase();
 
   final FirebaseFirestore _firestore;
   final http.Client _httpClient;
   final String _googleBooksApiKey;
+  final LlllBookDatabase _llllDatabase;
 
   static const _httpTimeout = Duration(seconds: 5);
 
+  /// Access the local LLLL book database for direct queries.
+  LlllBookDatabase get llllDatabase => _llllDatabase;
+
+  /// Ensure the local LLLL database is loaded. Call at app startup.
+  Future<void> loadLocalDatabase() => _llllDatabase.load();
+
   /// Look up a book by ISBN. Returns a [BookModel] if found, null otherwise.
+  /// Checks local LLLL database first, then Firestore cache, then external APIs.
   /// Results from APIs are cached to Firestore for future lookups.
   Future<BookModel?> lookupByIsbn({
     required String isbn,
     required String schoolId,
     required String actorId,
   }) async {
+    // 0. Local LLLL database (instant, no network)
+    if (_llllDatabase.isLoaded) {
+      final llllResult = _llllDatabase.lookupByIsbn(isbn);
+      if (llllResult != null) {
+        return _llllDatabase.toBookModel(llllResult);
+      }
+    }
+
     // 1. Firestore cache
     final cached = await _lookupInFirestore(isbn);
     if (cached != null && cached.metadata?['placeholder'] != true) {
@@ -77,6 +96,14 @@ class BookLookupService {
   }) async {
     final normalized = normalizeTitle(title);
     if (normalized.isEmpty) return null;
+
+    // 0. Local LLLL database title search
+    if (_llllDatabase.isLoaded) {
+      final llllResults = _llllDatabase.searchByTitle(title, limit: 1);
+      if (llllResults.isNotEmpty) {
+        return _llllDatabase.toBookModel(llllResults.first);
+      }
+    }
 
     // 1. Firestore cache by normalized title
     final cached = await _lookupByTitleInFirestore(normalized);
@@ -147,6 +174,23 @@ class BookLookupService {
       final data = doc.data();
       final isbn = data['isbnNormalized'] as String? ?? data['isbn'] as String?;
       if (isbn == null || isbn.isEmpty) continue;
+
+      // Try local LLLL database first
+      if (_llllDatabase.isLoaded) {
+        final llllResult = _llllDatabase.lookupByIsbn(isbn);
+        if (llllResult != null) {
+          final book = _llllDatabase.toBookModel(llllResult);
+          await _cacheBookInFirestore(
+            isbn: isbn,
+            book: book,
+            source: 'llll_local_db',
+            schoolId: schoolId,
+            actorId: 'system',
+          );
+          resolved++;
+          continue;
+        }
+      }
 
       final book = await _fetchFromGoogleBooks(isbn) ??
           await _fetchFromOpenLibrary(isbn);
