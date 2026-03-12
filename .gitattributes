@@ -1,0 +1,2 @@
+scripts/cover_images/*.jpg filter=lfs diff=lfs merge=lfs -text
+scripts/cover_images/*.png filter=lfs diff=lfs merge=lfs -text

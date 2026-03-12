@@ -1,0 +1,1562 @@
+[
+  {
+    "product_code": "LLWKBK1",
+    "name": "Stage 1 Workbook",
+    "barcode": "978-1-923158-15-3",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S1_WB_Cover_Large_45a23f83-f79f-4f7b-b334-97e6f3d8f5c8_800x.png?v=1772312394",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK1.png",
+    "shopify_handle": "stage-1-workbook"
+  },
+  {
+    "product_code": "LLWKBK1-2",
+    "name": "Stage 1 Workbook (NSW)",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S1_WB_Cover_Large_45a23f83-f79f-4f7b-b334-97e6f3d8f5c8_800x.png?v=1772312394",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK1-2.png",
+    "shopify_handle": "stage-1-workbook"
+  },
+  {
+    "product_code": "LLWKBK1-3",
+    "name": "Stage 1 Workbook (QLD)",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S1_WB_Cover_Large_45a23f83-f79f-4f7b-b334-97e6f3d8f5c8_800x.png?v=1772312394",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK1-3.png",
+    "shopify_handle": "stage-1-workbook"
+  },
+  {
+    "product_code": "LLWKBK1-4",
+    "name": "Stage 1 Workbook (SA)",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S1_WB_Cover_Large_45a23f83-f79f-4f7b-b334-97e6f3d8f5c8_800x.png?v=1772312394",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK1-4.png",
+    "shopify_handle": "stage-1-workbook"
+  },
+  {
+    "product_code": "LLWKBK1-5",
+    "name": "Stage 1 Workbook (TAS)",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S1_WB_Cover_Large_45a23f83-f79f-4f7b-b334-97e6f3d8f5c8_800x.png?v=1772312394",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK1-5.png",
+    "shopify_handle": "stage-1-workbook"
+  },
+  {
+    "product_code": "LLWKBK1-6",
+    "name": "Stage 1 Workbook (VIC)",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S1_WB_Cover_Large_45a23f83-f79f-4f7b-b334-97e6f3d8f5c8_800x.png?v=1772312394",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK1-6.png",
+    "shopify_handle": "stage-1-workbook"
+  },
+  {
+    "product_code": "LLWKBK2",
+    "name": "Stage 2 Workbook",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S2_WB_Cover_Large_1cdd58ca-0995-4d74-949d-bc557f4ed6b4_800x.png?v=1772312483",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK2.png",
+    "shopify_handle": "stage-2-workbook"
+  },
+  {
+    "product_code": "LLWKBK2-2",
+    "name": "Stage 2 Workbook (NSW)",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S2_WB_Cover_Large_1cdd58ca-0995-4d74-949d-bc557f4ed6b4_800x.png?v=1772312483",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK2-2.png",
+    "shopify_handle": "stage-2-workbook"
+  },
+  {
+    "product_code": "LLWKBK2-3",
+    "name": "Stage 2 Workbook (QLD)",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S2_WB_Cover_Large_1cdd58ca-0995-4d74-949d-bc557f4ed6b4_800x.png?v=1772312483",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK2-3.png",
+    "shopify_handle": "stage-2-workbook"
+  },
+  {
+    "product_code": "LLWKBK2-4",
+    "name": "Stage 2 Workbook (SA)",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S2_WB_Cover_Large_1cdd58ca-0995-4d74-949d-bc557f4ed6b4_800x.png?v=1772312483",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK2-4.png",
+    "shopify_handle": "stage-2-workbook"
+  },
+  {
+    "product_code": "LLWKBK2-5",
+    "name": "Stage 2 Workbook (TAS)",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S2_WB_Cover_Large_1cdd58ca-0995-4d74-949d-bc557f4ed6b4_800x.png?v=1772312483",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK2-5.png",
+    "shopify_handle": "stage-2-workbook"
+  },
+  {
+    "product_code": "LLWKBK2-6",
+    "name": "Stage 2 Workbook (VIC)",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S2_WB_Cover_Large_1cdd58ca-0995-4d74-949d-bc557f4ed6b4_800x.png?v=1772312483",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK2-6.png",
+    "shopify_handle": "stage-2-workbook"
+  },
+  {
+    "product_code": "LLWKBK3",
+    "name": "Stage 3 Workbook",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S3_WB_Cover_Large_0c79513c-2a6e-4603-9e02-1f7c35d8a0ee_800x.png?v=1772312613",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK3.png",
+    "shopify_handle": "stage-3-workbook"
+  },
+  {
+    "product_code": "LLWKBK3-2",
+    "name": "Stage 3 Workbook (NSW)",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S3_WB_Cover_Large_0c79513c-2a6e-4603-9e02-1f7c35d8a0ee_800x.png?v=1772312613",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK3-2.png",
+    "shopify_handle": "stage-3-workbook"
+  },
+  {
+    "product_code": "LLWKBK3-3",
+    "name": "Stage 3 Workbook (QLD)",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S3_WB_Cover_Large_0c79513c-2a6e-4603-9e02-1f7c35d8a0ee_800x.png?v=1772312613",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK3-3.png",
+    "shopify_handle": "stage-3-workbook"
+  },
+  {
+    "product_code": "LLWKBK3-4",
+    "name": "Stage 3 Workbook (SA)",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S3_WB_Cover_Large_0c79513c-2a6e-4603-9e02-1f7c35d8a0ee_800x.png?v=1772312613",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK3-4.png",
+    "shopify_handle": "stage-3-workbook"
+  },
+  {
+    "product_code": "LLWKBK3-5",
+    "name": "Stage 3 Workbook (TAS)",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S3_WB_Cover_Large_0c79513c-2a6e-4603-9e02-1f7c35d8a0ee_800x.png?v=1772312613",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK3-5.png",
+    "shopify_handle": "stage-3-workbook"
+  },
+  {
+    "product_code": "LLWKBK3-6",
+    "name": "Stage 3 Workbook (VIC)",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S3_WB_Cover_Large_0c79513c-2a6e-4603-9e02-1f7c35d8a0ee_800x.png?v=1772312613",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK3-6.png",
+    "shopify_handle": "stage-3-workbook"
+  },
+  {
+    "product_code": "LLWKBK4",
+    "name": "Stage 4 Workbook",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S4_WB_Cover_Large_c4f7d69d-c2a6-4fb9-a261-436151f1cbb8_800x.png?v=1772312813",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK4.png",
+    "shopify_handle": "stage-4-workbook"
+  },
+  {
+    "product_code": "LLWKBK4-2",
+    "name": "Stage 4 Workbook (NSW)",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S4_WB_Cover_Large_c4f7d69d-c2a6-4fb9-a261-436151f1cbb8_800x.png?v=1772312813",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK4-2.png",
+    "shopify_handle": "stage-4-workbook"
+  },
+  {
+    "product_code": "LLWKBK4-3",
+    "name": "Stage 4 Workbook (QLD)",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S4_WB_Cover_Large_c4f7d69d-c2a6-4fb9-a261-436151f1cbb8_800x.png?v=1772312813",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK4-3.png",
+    "shopify_handle": "stage-4-workbook"
+  },
+  {
+    "product_code": "LLWKBK4-4",
+    "name": "Stage 4 Workbook (SA)",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S4_WB_Cover_Large_c4f7d69d-c2a6-4fb9-a261-436151f1cbb8_800x.png?v=1772312813",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK4-4.png",
+    "shopify_handle": "stage-4-workbook"
+  },
+  {
+    "product_code": "LLWKBK4-5",
+    "name": "Stage 4 Workbook (TAS)",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S4_WB_Cover_Large_c4f7d69d-c2a6-4fb9-a261-436151f1cbb8_800x.png?v=1772312813",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK4-5.png",
+    "shopify_handle": "stage-4-workbook"
+  },
+  {
+    "product_code": "LLWKBK4-6",
+    "name": "Stage 4 Workbook (VIC)",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S4_WB_Cover_Large_c4f7d69d-c2a6-4fb9-a261-436151f1cbb8_800x.png?v=1772312813",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK4-6.png",
+    "shopify_handle": "stage-4-workbook"
+  },
+  {
+    "product_code": "LLWKBKP4",
+    "name": "Stage 4+ Workbook",
+    "barcode": "978-1-923158-93-1",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S4_WB_Cover_Large_c4f7d69d-c2a6-4fb9-a261-436151f1cbb8_800x.png?v=1772312813",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBKP4.png",
+    "shopify_handle": "stage-4-workbook"
+  },
+  {
+    "product_code": "LLWKBKP4-2",
+    "name": "Stage 4+ Workbook (NSW)",
+    "barcode": "978-1-923578-58-6",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S4_WB_Cover_Large_c4f7d69d-c2a6-4fb9-a261-436151f1cbb8_800x.png?v=1772312813",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBKP4-2.png",
+    "shopify_handle": "stage-4-workbook"
+  },
+  {
+    "product_code": "LLWKBKP4-6",
+    "name": "Stage 4+ Workbook (VIC)",
+    "barcode": "978-1-923578-59-3",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S4_WB_Cover_Large_c4f7d69d-c2a6-4fb9-a261-436151f1cbb8_800x.png?v=1772312813",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBKP4-6.png",
+    "shopify_handle": "stage-4-workbook"
+  },
+  {
+    "product_code": "LLWKBK5",
+    "name": "Stage 5 Workbooks 1 and 2",
+    "barcode": "978-1-923158-94-8",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S5_WB_Cover_Large_5ce6f104-3758-4e01-ab68-238574f6127c_800x.png?v=1772312924",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK5.png",
+    "shopify_handle": "stage-5-workbooks-1-and-2"
+  },
+  {
+    "product_code": "LLWKBK5-2",
+    "name": "Stage 5 Workbooks 1 and 2 (NSW)",
+    "barcode": "978-1-923578-63-0",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S5_WB_Cover_Large_5ce6f104-3758-4e01-ab68-238574f6127c_800x.png?v=1772312924",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK5-2.png",
+    "shopify_handle": "stage-5-workbooks-1-and-2"
+  },
+  {
+    "product_code": "LLWKBK5-6",
+    "name": "Stage 5 Workbooks 1 and 2 (VIC)",
+    "barcode": "978-1-923578-71-5",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S5_WB_Cover_Large_5ce6f104-3758-4e01-ab68-238574f6127c_800x.png?v=1772312924",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK5-6.png",
+    "shopify_handle": "stage-5-workbooks-1-and-2"
+  },
+  {
+    "product_code": "LLWKBK6",
+    "name": "Stage 6 Workbooks 1 and 2",
+    "barcode": "978-1-923578-35-7",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S6_WB_Cover_800x.png?v=1771958344",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK6.png",
+    "shopify_handle": "stage-6-workbooks-1-and-2"
+  },
+  {
+    "product_code": "LLWKBK6-2",
+    "name": "Stage 6 Workbooks 1 and 2 (NSW)",
+    "barcode": "978-1-923578-73-9",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S6_WB_Cover_800x.png?v=1771958344",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK6-2.png",
+    "shopify_handle": "stage-6-workbooks-1-and-2"
+  },
+  {
+    "product_code": "LLWKBK6-6",
+    "name": "Stage 6 Workbooks 1 and 2 (VIC)",
+    "barcode": "978-1-923578-81-4",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S6_WB_Cover_800x.png?v=1771958344",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK6-6.png",
+    "shopify_handle": "stage-6-workbooks-1-and-2"
+  },
+  {
+    "product_code": "LLWKBK71YF-2",
+    "name": "Stage 7 Unit 1 Foundation Workbooks 1 and 2 (NSW)",
+    "barcode": "978-1-923616-23-3",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S7.1F_WB_Cover_Large_5bed682d-2d51-4a0e-88cd-3053ab61c0b0_800x.png?v=1772042502",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK71YF-2.png",
+    "shopify_handle": "stage-7-unit-1-foundation-workbooks-1-and-2"
+  },
+  {
+    "product_code": "LLWKBK71YF-6",
+    "name": "Stage 7 Unit 1 Foundation Workbooks 1 and 2 (VIC)",
+    "barcode": "978-1-923616-25-7",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S7.1F_WB_Cover_Large_5bed682d-2d51-4a0e-88cd-3053ab61c0b0_800x.png?v=1772042502",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK71YF-6.png",
+    "shopify_handle": "stage-7-unit-1-foundation-workbooks-1-and-2"
+  },
+  {
+    "product_code": "LLWKBK71F",
+    "name": "Stage 7 Unit 1 Foundation Workbooks 1 and 2 LLLL Sassoon Font",
+    "barcode": "978-1-923578-41-8",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S7.1F_WB_Cover_Large_5bed682d-2d51-4a0e-88cd-3053ab61c0b0_800x.png?v=1772042502",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK71F.png",
+    "shopify_handle": "stage-7-unit-1-foundation-workbooks-1-and-2"
+  },
+  {
+    "product_code": "LLWKBK71Y1",
+    "name": "Stage 7 Unit 1 Year 1 Workbooks 1 and 2",
+    "barcode": "978-1-923578-43-2",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S7.1Y1_WB_Cover_Large_681a783d-36ff-4aeb-b746-4fc2f33dbdda_800x.png?v=1772216807",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK71Y1.png",
+    "shopify_handle": "stage-7-unit-1-year-1-workbooks-1-and-2"
+  },
+  {
+    "product_code": "LLWKBK71Y1-2",
+    "name": "Stage 7 Unit 1 Year 1 Workbooks 1 and 2 (NSW)",
+    "barcode": "978-1-923616-13-4",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S7.1Y1_WB_Cover_Large_681a783d-36ff-4aeb-b746-4fc2f33dbdda_800x.png?v=1772216807",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK71Y1-2.png",
+    "shopify_handle": "stage-7-unit-1-year-1-workbooks-1-and-2"
+  },
+  {
+    "product_code": "LLWKBK71Y1-6",
+    "name": "Stage 7 Unit 1 Year 1 Workbooks 1 and 2 (VIC)",
+    "barcode": "978-1-923616-15-8",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S7.1Y1_WB_Cover_Large_681a783d-36ff-4aeb-b746-4fc2f33dbdda_800x.png?v=1772216807",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK71Y1-6.png",
+    "shopify_handle": "stage-7-unit-1-year-1-workbooks-1-and-2"
+  },
+  {
+    "product_code": "LLWKBK72",
+    "name": "Stage 7 Unit 2 Workbooks 1 and 2",
+    "barcode": "978-1-923158-91-7",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S7.2_WB_Cover_Large_8b72a813-1e85-4675-9153-a46d6fbafc7e_800x.png?v=1772220904",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK72.png",
+    "shopify_handle": "stage-7-unit-2-workbooks-1-and-2"
+  },
+  {
+    "product_code": "LLWKBK72-2",
+    "name": "Stage 7 Unit 2 Workbooks 1 and 2 (NSW)",
+    "barcode": "978-1-923578-48-7",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S7.2_WB_Cover_Large_8b72a813-1e85-4675-9153-a46d6fbafc7e_800x.png?v=1772220904",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK72-2.png",
+    "shopify_handle": "stage-7-unit-2-workbooks-1-and-2"
+  },
+  {
+    "product_code": "LLWKBK72-6",
+    "name": "Stage 7 Unit 2 Workbooks 1 and 2 (VIC)",
+    "barcode": "978-1-923578-50-0",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S7.2_WB_Cover_Large_8b72a813-1e85-4675-9153-a46d6fbafc7e_800x.png?v=1772220904",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK72-6.png",
+    "shopify_handle": "stage-7-unit-2-workbooks-1-and-2"
+  },
+  {
+    "product_code": "LLWKBK73",
+    "name": "Stage 7 Unit 3 Workbooks 1 and 2",
+    "barcode": "978-1-923578-45-6",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S7.3_WB_Cover_Large_2f81a67a-ca47-4d52-99fc-8067e0c77a18_800x.png?v=1772223478",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK73.png",
+    "shopify_handle": "stage-7-unit-3-workbooks-1-and-2"
+  },
+  {
+    "product_code": "LLWKBK74",
+    "name": "Stage 7 Unit 4 Workbooks 1-6",
+    "barcode": "978-1-923578-37-1",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S7.4WBCoverLarge_800x.png?v=1772262265",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK74.png",
+    "shopify_handle": "stage-7-unit-4-workbooks-1-6"
+  },
+  {
+    "product_code": "LLWKBK74-4",
+    "name": "Stage 7 Unit 4 Workbooks 1-6 (SA)",
+    "barcode": "978-1-923578-89-0",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S7.4WBCoverLarge_800x.png?v=1772262265",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK74-4.png",
+    "shopify_handle": "stage-7-unit-4-workbooks-1-6"
+  },
+  {
+    "product_code": "LLWKBK74-6",
+    "name": "Stage 7 Unit 4 Workbooks 1-6 (VIC)",
+    "barcode": "978-1-923578-86-9",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/S7.4WBCoverLarge_800x.png?v=1772262265",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWKBK74-6.png",
+    "shopify_handle": "stage-7-unit-4-workbooks-1-6"
+  },
+  {
+    "product_code": "PMorphPack",
+    "name": "Morphology Poster Pack (8 x A2 posters)",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/Screenshot2026-01-29at1.51.11pm_800x.png?v=1769655133",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/PMorphPack.png",
+    "shopify_handle": "morphology-poster-pack-8-x-a2-posters"
+  },
+  {
+    "product_code": "MSS",
+    "name": "Sound Swap",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/sp3-llll-spelling-pack_800x.jpg?v=1607395749",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/MSS.jpg",
+    "shopify_handle": "spelling-pack-soundcheck-1-2-plus-sound-swap"
+  },
+  {
+    "product_code": "TAR75PT1",
+    "name": "Teacher Activity Resource Stage 7 Unit 5 Part 1",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/8_9016036f-9458-4d93-b4dd-5eb6516dbe96_800x.png?v=1759360220",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/TAR75PT1.png",
+    "shopify_handle": "teacher-activity-resource-stage-7-unit-5-part-1"
+  },
+  {
+    "product_code": "TAR75PT2",
+    "name": "Teacher Activity Resource Stage 7 Unit 5 Part 2",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/9_82e5ccc8-9242-4030-bf11-58fb1e46c14a_800x.png?v=1759360233",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/TAR75PT2.png",
+    "shopify_handle": "teacher-activity-resource-stage-7-unit-5-part-2"
+  },
+  {
+    "product_code": "LLFK1",
+    "name": "(Book 1) Fox Kid and the Rat Bot",
+    "barcode": "978-1-922663-58-0",
+    "cover_image_url": null,
+    "local_image_path": null,
+    "shopify_handle": null
+  },
+  {
+    "product_code": "LLFK10",
+    "name": "(Book 10) Fox Kid and the Fright Night",
+    "barcode": "",
+    "cover_image_url": null,
+    "local_image_path": null,
+    "shopify_handle": null
+  },
+  {
+    "product_code": "LLFK2",
+    "name": "(Book 2) Fox Kid and the Mud Men",
+    "barcode": "978-1-922663-59-7",
+    "cover_image_url": null,
+    "local_image_path": null,
+    "shopify_handle": null
+  },
+  {
+    "product_code": "LLFK3",
+    "name": "(Book 3) Fox Kid and the Endless Frost",
+    "barcode": "978-1-922663-66-5",
+    "cover_image_url": null,
+    "local_image_path": null,
+    "shopify_handle": null
+  },
+  {
+    "product_code": "LLFK4",
+    "name": "(Book 4) Fox Kid and the Pond Trolls",
+    "barcode": "978-1-922663-70-2",
+    "cover_image_url": null,
+    "local_image_path": null,
+    "shopify_handle": null
+  },
+  {
+    "product_code": "LLFK5",
+    "name": "(Book 5) Fox Kid and the Big Sting",
+    "barcode": "978-1-922663-71-9",
+    "cover_image_url": null,
+    "local_image_path": null,
+    "shopify_handle": null
+  },
+  {
+    "product_code": "LLFK6",
+    "name": "(Book 6) Fox Kid and the Skull Twins",
+    "barcode": "978-1-922663-72-6",
+    "cover_image_url": null,
+    "local_image_path": null,
+    "shopify_handle": null
+  },
+  {
+    "product_code": "LLFK7",
+    "name": "(Book 7) Fox Kid and the Stink Bug",
+    "barcode": "978-1-923158-40-5",
+    "cover_image_url": null,
+    "local_image_path": null,
+    "shopify_handle": null
+  },
+  {
+    "product_code": "LLFK8",
+    "name": "(Book 8) Fox Kid Vs Fox Kid",
+    "barcode": "978-1-923158-41-2",
+    "cover_image_url": null,
+    "local_image_path": null,
+    "shopify_handle": null
+  },
+  {
+    "product_code": "LLFK9",
+    "name": "(Book 9) Fox Kid and The Extractor",
+    "barcode": "",
+    "cover_image_url": null,
+    "local_image_path": null,
+    "shopify_handle": null
+  },
+  {
+    "product_code": "AAP",
+    "name": "Ally the alligator puppet",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/aap-llll-ally-the-alligator-puppet_800x.jpg?v=1607323193",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/AAP.jpg",
+    "shopify_handle": "ally-the-alligator-puppet"
+  },
+  {
+    "product_code": "SGRN-LLBW1-4",
+    "name": "Big World Nonfiction Small Group Reading Teacher Notes Stages 1-4",
+    "barcode": "978-1-925916-96-6",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/LLBW-SGR-TN-S1-4-Cover-1800x1800_800x.png?v=1709359646",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/SGRN-LLBW1-4.png",
+    "shopify_handle": "big-world-nonfiction-small-group-reading-teacher-notes-stages-1-4"
+  },
+  {
+    "product_code": "SGRN-LLBW71-4",
+    "name": "Big World Nonfiction Small Group Reading Teacher Notes Stages 7.1-7.4",
+    "barcode": "978-1-923158-01-6",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/LLBW-SGR-TN-S7-Cover-1800x1800_800x.png?v=1755688168",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/SGRN-LLBW71-4.png",
+    "shopify_handle": "big-world-nonfiction-small-group-reading-teacher-notes-stages-7-1-7-4-print-digital"
+  },
+  {
+    "product_code": "SGRN-LLBWP456",
+    "name": "Big World Nonfiction Small Group Reading Teacher Notes Stages Plus 4, 5, 6",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/TWKSGRPrint_DigitalPacks_2_f2f2de28-d810-420a-b409-eafb2a41b162_800x.png?v=1759360528",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/SGRN-LLBWP456.png",
+    "shopify_handle": "big-world-nonfiction-small-group-reading-teacher-notes-stages-plus-4-5-6"
+  },
+  {
+    "product_code": "BGP4",
+    "name": "Bingo Games Stage Plus 4",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/bgp4-llll-bingo-games-stage-plus-4-cover_800x.jpg?v=1615953028",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/BGP4.jpg",
+    "shopify_handle": "bingo-games-plus-4"
+  },
+  {
+    "product_code": "BG12",
+    "name": "Bingo Games Stages 1-2",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/bg12-llll-bingo-games-stage-1-2-cover_800x.jpg?v=1607323207",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/BG12.jpg",
+    "shopify_handle": "bingo-games-stages-1-2"
+  },
+  {
+    "product_code": "BG34",
+    "name": "Bingo Games Stages 3-4",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/bg34-llll-bingo-games-stage-3-4-cover_800x.jpg?v=1615952997",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/BG34.jpg",
+    "shopify_handle": "bingo-games-stages-3-4"
+  },
+  {
+    "product_code": "FF-ST7REV1",
+    "name": "Fluency Fun 1: Slime Time and Other Fun Things to Read (Stage 7 Review - Year 2)",
+    "barcode": "978-1-923158-48-1",
+    "cover_image_url": null,
+    "local_image_path": null,
+    "shopify_handle": null
+  },
+  {
+    "product_code": "FF-ST7REV2",
+    "name": "Fluency Fun 2: Power Poodle and Other Fun Things to Read (Stage 7 Review - Year 2)",
+    "barcode": "",
+    "cover_image_url": null,
+    "local_image_path": null,
+    "shopify_handle": null
+  },
+  {
+    "product_code": "FF-ST7U51",
+    "name": "Fluency Fun 3: Rex's Treasure and Other Fun Things to Read (Stage 7 Unit 5 - Year 2)",
+    "barcode": "978-1-923158-50-4",
+    "cover_image_url": null,
+    "local_image_path": null,
+    "shopify_handle": null
+  },
+  {
+    "product_code": "FF-ST7U521",
+    "name": "Fluency Fun 4: Perfect Surfing and Other Fun Things to Read (Stage 7 Unit 5 - Year 2)",
+    "barcode": "978-1-923158-51-1",
+    "cover_image_url": null,
+    "local_image_path": null,
+    "shopify_handle": null
+  },
+  {
+    "product_code": "FF-ST7U53",
+    "name": "Fluency Fun 5: Looper Land and Other Fun Things to Read (Stage 7 Unit 5, Year 2)",
+    "barcode": "978-1-923158-58-0",
+    "cover_image_url": null,
+    "local_image_path": null,
+    "shopify_handle": null
+  },
+  {
+    "product_code": "FF-ST7U54",
+    "name": "Fluency Fun 6: The Bear's Hair and Other Fun Things to Read (Stage 7 Unit 5, Year 2)",
+    "barcode": "",
+    "cover_image_url": null,
+    "local_image_path": null,
+    "shopify_handle": null
+  },
+  {
+    "product_code": "FF-ST81",
+    "name": "Fluency Fun 7: Danny's Assignment and Other Fun Things to Read",
+    "barcode": "TBC",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/FF_DannysAssign_3D_800x.png?v=1768775322",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/FF-ST81.png",
+    "shopify_handle": "fluency-fun-7-dannys-assignment-and-other-fun-things-to-read"
+  },
+  {
+    "product_code": "FF-ST82",
+    "name": "Fluency Fun 8: Be Sensible and Other Fun Things to Read",
+    "barcode": "TBC",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/23_291e3a39-9558-40be-8e7e-196d2d62b0cd_800x.png?v=1770191639",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/FF-ST82.png",
+    "shopify_handle": "fluency-fun-8-be-sensible-and-other-fun-things-to-read"
+  },
+  {
+    "product_code": "LLFKBOX1",
+    "name": "Fox Kid Ka-Blam! Box 1",
+    "barcode": "978-1-922663-98-6",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/ka-blam_box1_3d_800x.jpg?v=1698238883",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLFKBOX1.jpg",
+    "shopify_handle": "fox-kid-ka-blam-box-1"
+  },
+  {
+    "product_code": "LLFKBOX2",
+    "name": "Fox Kid Ka-Blam! Box 2",
+    "barcode": "978-1-922663-99-3",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/ka-blam_box2_3d_800x.jpg?v=1698238869",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLFKBOX2.jpg",
+    "shopify_handle": "fox-kid-ka-blam-box-2"
+  },
+  {
+    "product_code": "LLFKBOX3",
+    "name": "Fox Kid Ka-Blam! Box 3",
+    "barcode": "978-1-925916-95-9",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/ka-blam_box3_3d_800x.jpg?v=1698238848",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLFKBOX3.jpg",
+    "shopify_handle": "fox-kid-ka-blam-box-3"
+  },
+  {
+    "product_code": "LLFKBOX4",
+    "name": "Fox Kid Ka-Blam! Box 4",
+    "barcode": "978-1-923158-38-2",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/26190818-7bc6-4f76-b8c9-2f08077995b4_800x.png?v=1740362336",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLFKBOX4.png",
+    "shopify_handle": "fox-kid-ka-blam-box-4"
+  },
+  {
+    "product_code": "LLFKBOX5",
+    "name": "Fox Kid Ka-Blam! Box 5",
+    "barcode": "978-1-923158-38-2",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/Ka-Blam_BOX5_3D_800x.png?v=1756083373",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLFKBOX5.png",
+    "shopify_handle": "fox-kid-ka-blam-box-5"
+  },
+  {
+    "product_code": "LLFKWB1",
+    "name": "Fox Kid Workbook 1",
+    "barcode": "978-1-922663-90-0",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/fk_wb_01_3d_800x.png?v=1698237866",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLFKWB1.png",
+    "shopify_handle": "fox-kid-workbook-1"
+  },
+  {
+    "product_code": "LLFKWB2",
+    "name": "Fox Kid Workbook 2",
+    "barcode": "978-1-922663-91-7",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/fk_wb_02_3d_800x.png?v=1698237914",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLFKWB2.png",
+    "shopify_handle": "fox-kid-workbook-2"
+  },
+  {
+    "product_code": "LLFKWB3",
+    "name": "Fox Kid Workbook 3",
+    "barcode": "978-1-922663-92-4",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/fk_wb_03_3d_800x.png?v=1698237981",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLFKWB3.png",
+    "shopify_handle": "fox-kid-workbook-3"
+  },
+  {
+    "product_code": "LLFKWB4",
+    "name": "Fox Kid Workbook 4",
+    "barcode": "978-1-922663-93-1",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/fk_wb_04_3d_800x.png?v=1698238027",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLFKWB4.png",
+    "shopify_handle": "fox-kid-workbook-4"
+  },
+  {
+    "product_code": "LLFKWB5",
+    "name": "Fox Kid Workbook 5",
+    "barcode": "978-1-922663-94-8",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/fk_wb_05_3d_800x.png?v=1698238087",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLFKWB5.png",
+    "shopify_handle": "fox-kid-workbook-5"
+  },
+  {
+    "product_code": "LLFKWB6",
+    "name": "Fox Kid Workbook 6",
+    "barcode": "978-1-922663-95-5",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/fk_wb_06_3d_800x.png?v=1698238127",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLFKWB6.png",
+    "shopify_handle": "fox-kid-workbook-6"
+  },
+  {
+    "product_code": "LLFKWB7",
+    "name": "Fox Kid Workbook 7",
+    "barcode": "978-1-923158-45-0",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/7dfc5174-b106-4c5d-8a5d-a0f307c9afa3_800x.png?v=1740565926",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLFKWB7.png",
+    "shopify_handle": "fox-kid-workbook-7"
+  },
+  {
+    "product_code": "LLFKWB8",
+    "name": "Fox Kid Workbook 8",
+    "barcode": "978-1-923158-46-7",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/ff212bf5-5e2d-4659-8a85-cc837fcc598b_800x.png?v=1740566007",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLFKWB8.png",
+    "shopify_handle": "fox-kid-workbook-8"
+  },
+  {
+    "product_code": "LLFKWB9",
+    "name": "Fox Kid Workbook 9",
+    "barcode": "978-1-923158-54-2",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/2f5a7f8a-4158-4dc7-b0d1-58219fe7a87c_800x.jpg?v=1756082447",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLFKWB9.jpg",
+    "shopify_handle": "fox-kid-workbook-9"
+  },
+  {
+    "product_code": "HWP1-7",
+    "name": "Heart Word Posters Stages 1-7",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/hwp1-6-llll-posters-heart-words-stage-1-6_800x.jpg?v=1607323270",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/HWP1-7.jpg",
+    "shopify_handle": "heart-word-posters-stages-1-7"
+  },
+  {
+    "product_code": "HRJF",
+    "name": "Home Reading Journal Foundation",
+    "barcode": "978-1-922663-88-7",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/hrj-f-cover-1800x1800_800x.jpg?v=1696653581",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/HRJF.jpg",
+    "shopify_handle": "home-reading-journal-foundation"
+  },
+  {
+    "product_code": "HRJ1",
+    "name": "Home Reading Journal Year 1",
+    "barcode": "978-1-922663-89-4",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/hrj-y1-cover-1800x1800_800x.jpg?v=1696653767",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/HRJ1.jpg",
+    "shopify_handle": "home-reading-journal-year-1"
+  },
+  {
+    "product_code": "LLARS",
+    "name": "Little Learners Assessment of Reading Skills",
+    "barcode": "978-1-922663-69-6",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/LLARS_Pack_Shot_1800x1800_bff63c60-d027-4b3f-822b-8437bd9d549f_800x.jpg?v=1689207656",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLARS.jpg",
+    "shopify_handle": "little-learners-assessment-of-reading-skills"
+  },
+  {
+    "product_code": "LLASS1",
+    "name": "Little Learners Assessment of Spelling Skills",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llass1_little-learners-assessment-of-spelling-skills-cover_800x.jpg?v=1615952827",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLASS1.jpg",
+    "shopify_handle": "little-learners-assessment-of-spelling-skills"
+  },
+  {
+    "product_code": "LLBWQ",
+    "name": "Little Learners Big World Quiz - Stages 7.1 - 7.2",
+    "barcode": "978-1-923158-42-9",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/ceaae4ea-8577-44ea-a1d3-7fbfdcbd6937_800x.png?v=1740353110",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLBWQ.png",
+    "shopify_handle": "little-learners-big-world-nonfiction-quiz-7-1-and-7-2"
+  },
+  {
+    "product_code": "LLBWQ1",
+    "name": "Little Learners Big World Quiz - Stages 7.3 and 7.4",
+    "barcode": "978-1-923158-42-9",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/fbe53e1d-e6f1-4115-a385-2681bc16d584_800x.png?v=1756083720",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLBWQ1.png",
+    "shopify_handle": "little-learners-big-world-quiz-stages-7-3-and-7-4"
+  },
+  {
+    "product_code": "LLBW1",
+    "name": "Little Learners, Big World Nonfiction Stage 1",
+    "barcode": "978-1-925916-93-5",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/db-nf-s1-view-a_800x.jpg?v=1633238953",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLBW1.jpg",
+    "shopify_handle": "little-learners-big-world-nonfiction-stage-1"
+  },
+  {
+    "product_code": "LLBW2",
+    "name": "Little Learners, Big World Nonfiction Stage 2",
+    "barcode": "978-1-925916-94-2",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/db-nf-s2-view-a_800x.jpg?v=1633236909",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLBW2.jpg",
+    "shopify_handle": "little-learners-big-world-nonfiction-stage-2"
+  },
+  {
+    "product_code": "LLBW3",
+    "name": "Little Learners, Big World Nonfiction Stage 3",
+    "barcode": "978-1-922663-05-4",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/db-nf-s3-view-a_800x.jpg?v=1633236917",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLBW3.jpg",
+    "shopify_handle": "little-learners-big-world-nonfiction-stage-3"
+  },
+  {
+    "product_code": "LLBW4",
+    "name": "Little Learners, Big World Nonfiction Stage 4",
+    "barcode": "978-1-922663-06-1",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/db-nf-s4-view-a_800x.jpg?v=1633236924",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLBW4.jpg",
+    "shopify_handle": "little-learners-big-world-nonfiction-stage-4"
+  },
+  {
+    "product_code": "LLBW4+",
+    "name": "Little Learners, Big World Nonfiction Stage 4+",
+    "barcode": "978-1-922663-07-8",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/db-nf-s4-view-a_800x.jpg?v=1633236924",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLBW4plus.jpg",
+    "shopify_handle": "little-learners-big-world-nonfiction-stage-4"
+  },
+  {
+    "product_code": "LLBW5",
+    "name": "Little Learners, Big World Nonfiction Stage 5",
+    "barcode": "978-1-922663-08-5",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/db-nf-s5-view-a_800x.jpg?v=1633236931",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLBW5.jpg",
+    "shopify_handle": "little-learners-big-world-nonfiction-stage-5"
+  },
+  {
+    "product_code": "LLBW6",
+    "name": "Little Learners, Big World Nonfiction Stage 6",
+    "barcode": "978-1-922663-09-2",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/db-nf-s6-view-a_800x.jpg?v=1633236936",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLBW6.jpg",
+    "shopify_handle": "little-learners-big-world-nonfiction-stage-6"
+  },
+  {
+    "product_code": "LLBW71",
+    "name": "Little Learners, Big World Nonfiction Stage 7 Unit 1",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llbw-071-bookcovers_800x.jpg?v=1651490125",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLBW71.jpg",
+    "shopify_handle": "little-learners-big-world-nonfiction-stage-7-unit-1"
+  },
+  {
+    "product_code": "LLBW72",
+    "name": "Little Learners, Big World Nonfiction Stage 7 Unit 2",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llbw-072-bookcovers_800x.jpg?v=1651490132",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLBW72.jpg",
+    "shopify_handle": "little-learners-big-world-nonfiction-stage-7-unit-2"
+  },
+  {
+    "product_code": "LLBW73",
+    "name": "Little Learners, Big World Nonfiction Stage 7 Unit 3",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llbw-073-bookcovers_800x.jpg?v=1651490141",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLBW73.jpg",
+    "shopify_handle": "little-learners-big-world-nonfiction-stage-7-unit-3"
+  },
+  {
+    "product_code": "LLBW74",
+    "name": "Little Learners, Big World Nonfiction Stage 7 Unit 4",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llbw-074-bookcovers_800x.jpg?v=1651490115",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLBW74.jpg",
+    "shopify_handle": "little-learners-big-world-nonfiction-stage-7-unit-4"
+  },
+  {
+    "product_code": "LLBW75",
+    "name": "Little Learners, Big World Nonfiction Stage 7 Unit 5",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llbw-075-bookcovers_800x.jpg?v=1651490226",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLBW75.jpg",
+    "shopify_handle": "little-learners-big-world-nonfiction-stage-7-unit-5"
+  },
+  {
+    "product_code": "MAG",
+    "name": "Milo's Alphabet Games",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/mag-llll-milos-alphabet-games-front_800x.jpg?v=1607323195",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/MAG.jpg",
+    "shopify_handle": "milos-alphabet-games"
+  },
+  {
+    "product_code": "MBS",
+    "name": "Milo's Birthday Surprise",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/mbs-llll-milo-birthday-surprise-book-front-cover_800x.jpg?v=1607323184",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/MBS.jpg",
+    "shopify_handle": "milos-birthday-surprise"
+  },
+  {
+    "product_code": "MAF",
+    "name": "Milo's Birthday Surprise Alphabet Frieze",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/maf-milos-alphabet-frieze-cover_800x.jpg?v=1615954194",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/MAF.jpg",
+    "shopify_handle": "milos-alphabet-frieze"
+  },
+  {
+    "product_code": "MBSP",
+    "name": "Milo's Birthday Surprise Placemat",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/MBSP-Milos-birthday-surprise-placemat-front_800x.jpg?v=1615954245",
+    "local_image_path": null,
+    "shopify_handle": "milos-birthday-surprise-placemat"
+  },
+  {
+    "product_code": "MFB",
+    "name": "Milo's Flipbook",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llll-milos-flipbook-front_800x.jpg?v=1615953578",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/MFB.jpg",
+    "shopify_handle": "milos-flipbook"
+  },
+  {
+    "product_code": "MMWP",
+    "name": "Milo's Making Words Placemats",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/MBS-Placemat-front_800x.jpg?v=1653282907",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/MMWP.jpg",
+    "shopify_handle": "milos-making-words-placemats"
+  },
+  {
+    "product_code": "MRMG",
+    "name": "Milo's Read and Match Word Game",
+    "barcode": "978-0-9805975-9-2",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/mrmg-milos-read-and-match-cover_800x.jpg?v=1615954329",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/MRMG.jpg",
+    "shopify_handle": "milos-read-match-game"
+  },
+  {
+    "product_code": "SCMINI7",
+    "name": "Mini Sounds Chart Stage 7 Pack of 10",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/SCMINI7-sound-chart-mini_800x.jpg?v=1617020456",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/SCMINI7.jpg",
+    "shopify_handle": "mini-sounds-chart-stage-7-pack-of-10"
+  },
+  {
+    "product_code": "SCMINI1-6",
+    "name": "Mini Sounds Chart Stages 1-6 Pack of 10",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/SCMINI1-6-sound-chart-mini_800x.jpg?v=1617020522",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/SCMINI1-6.jpg",
+    "shopify_handle": "mini-sounds-chart-stages-1-6-pack-of-10"
+  },
+  {
+    "product_code": "MACCCLASSROOM",
+    "name": "Morphemes and Chants Cards Classroom Set",
+    "barcode": "9.78192E+12",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/4dcbb566-c844-42b3-a2f9-26ea253660ce_800x.jpg?v=1759962256",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/MACCCLASSROOM.jpg",
+    "shopify_handle": "morphemes-and-chants-cards-pack"
+  },
+  {
+    "product_code": "MACCDISPLAY",
+    "name": "Morphemes and Chants Cards Display Set",
+    "barcode": "97819315866",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/4dcbb566-c844-42b3-a2f9-26ea253660ce_800x.jpg?v=1759962256",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/MACCDISPLAY.jpg",
+    "shopify_handle": "morphemes-and-chants-cards-pack"
+  },
+  {
+    "product_code": "MWDB",
+    "name": "My Word Detective Book",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llll-my-word-detective-book-cover_800x.jpg?v=1615953670",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/MWDB.jpg",
+    "shopify_handle": "my-word-detective-book"
+  },
+  {
+    "product_code": "CCS7PAT",
+    "name": "Pip and Tim Character Cards Stage 7",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/character_cards_s7_800x.jpg?v=1623282672",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/CCS7PAT.jpg",
+    "shopify_handle": "pip-and-tim-character-cards-stage-7"
+  },
+  {
+    "product_code": "CCS1-6PAT",
+    "name": "Pip and Tim Character Cards Stages 1-6",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/character_cards_s1_800x.jpg?v=1623282610",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/CCS1-6PAT.jpg",
+    "shopify_handle": "pip-and-tim-character-cards-stages-1-6"
+  },
+  {
+    "product_code": "SGRN-LLRS1-4",
+    "name": "Pip and Tim Small Group Reading Teacher Notes Stages 1-4",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/PT-SGR-TN-S1-4-Cover-1800x1800_800x.jpg?v=1692679834",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/SGRN-LLRS1-4.jpg",
+    "shopify_handle": "pip-and-tim-small-group-reading-teacher-notes-stages-1-4"
+  },
+  {
+    "product_code": "SGRN-LLRS7",
+    "name": "Pip and Tim Small Group Reading Teacher Notes Stages 7.1-7.4 Print only",
+    "barcode": "978-1-922663-87-0",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/PT-SGR-TN-S7-Cover-1800x1800_800x.jpg?v=1692765830",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/SGRN-LLRS7.jpg",
+    "shopify_handle": "pip-and-tim-small-group-reading-teacher-notes-stages-7-1-7-4"
+  },
+  {
+    "product_code": "SGRN-LLRSP456",
+    "name": "Pip and Tim Small Group Reading Teacher Notes Stages Plus 4, 5, 6",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/PT-SGR-TN-Sp456-Cover-1800x1800_800x.jpg?v=1692679497",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/SGRN-LLRSP456.jpg",
+    "shopify_handle": "pip-and-tim-small-group-reading-teacher-notes-stages-plus-4-5-6"
+  },
+  {
+    "product_code": "LLRS1",
+    "name": "Pip and Tim Stage 1",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llrs1-llll-pip-tim-decodable-books-stage-1-pack_800x.jpg?v=1607323284",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLRS1.jpg",
+    "shopify_handle": "pip-and-tim-stage-1"
+  },
+  {
+    "product_code": "LLRS2",
+    "name": "Pip and Tim Stage 2",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llrs2-llll-pip-tim-decodable-books-stage-2-pack_800x.jpg?v=1607323287",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLRS2.jpg",
+    "shopify_handle": "pip-and-tim-stage-2"
+  },
+  {
+    "product_code": "LLRS3",
+    "name": "Pip and Tim Stage 3",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llrs3-llll-pip-tim-decodable-books-stage-3-pack_800x.jpg?v=1607323290",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLRS3.jpg",
+    "shopify_handle": "pip-and-tim-stage-3"
+  },
+  {
+    "product_code": "LLRS4",
+    "name": "Pip and Tim Stage 4",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llrs4-llll-pip-tim-decodable-books-stage-4-pack_800x.jpg?v=1607323293",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLRS4.jpg",
+    "shopify_handle": "pip-and-tim-stage-4"
+  },
+  {
+    "product_code": "LLRS4+",
+    "name": "Pip and Tim Stage 4+",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llrs4-llll-pip-tim-decodable-books-stage-4-pack_800x.jpg?v=1607323293",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLRS4plus.jpg",
+    "shopify_handle": "pip-and-tim-stage-4"
+  },
+  {
+    "product_code": "LLRS5",
+    "name": "Pip and Tim Stage 5",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llrs5-llll-pip-tim-decodable-books-stage-5-pack_800x.jpg?v=1607323296",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLRS5.jpg",
+    "shopify_handle": "pip-and-tim-stage-5"
+  },
+  {
+    "product_code": "LLRS6",
+    "name": "Pip and Tim Stage 6",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llrs6-llll-pip-tim-decodable-books-stage-6-pack_800x.jpg?v=1607323301",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLRS6.jpg",
+    "shopify_handle": "pip-and-tim-stage-6"
+  },
+  {
+    "product_code": "LLRS71",
+    "name": "Pip and Tim Stage 7 Unit 1",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llrs71-llll-pip-tim-decodable-books-stage-7-unit-1-pack_800x.jpg?v=1607323304",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLRS71.jpg",
+    "shopify_handle": "pip-and-tim-stage-7-unit-1"
+  },
+  {
+    "product_code": "LLRS72",
+    "name": "Pip and Tim Stage 7 Unit 2",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llrs72-llll-pip-tim-decodable-books-stage-7-unit-2-pack_800x.jpg?v=1607323744",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLRS72.jpg",
+    "shopify_handle": "pip-and-tim-stage-7-unit-2"
+  },
+  {
+    "product_code": "LLRS73",
+    "name": "Pip and Tim Stage 7 Unit 3",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llrs73-llll-pip-tim-decodable-books-stage-7-unit-3-pack_800x.jpg?v=1607323310",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLRS73.jpg",
+    "shopify_handle": "pip-and-tim-stage-7-unit-3"
+  },
+  {
+    "product_code": "LLRS74",
+    "name": "Pip and Tim Stage 7 Unit 4",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llrs74-llll-pip-tim-decodable-books-stage-7-unit-4-pack_800x.jpg?v=1607323313",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLRS74.jpg",
+    "shopify_handle": "pip-and-tim-stage-7-unit-4"
+  },
+  {
+    "product_code": "LLRS75",
+    "name": "Pip and Tim Stage 7 Unit 5",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llrs75-llll-pip-tim-decodable-books-stage-7-unit-5-pack_800x.jpg?v=1607323316",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLRS75.jpg",
+    "shopify_handle": "pip-and-tim-stage-7-unit-5"
+  },
+  {
+    "product_code": "MRG1G",
+    "name": "Read and Grab Word Game Box 1",
+    "barcode": "978-0-9805975-7-8",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/mrg1g-llll-read-and-grab-box-1-front_800x.jpg?v=1607323196",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/MRG1G.jpg",
+    "shopify_handle": "milos-read-and-grab-word-game-1-green"
+  },
+  {
+    "product_code": "MRG10",
+    "name": "Read and Grab Word Game Box 10",
+    "barcode": "978-0-9946383-1-1",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/mrg10b-llll-read-and-grab-box-10-front_800x.jpg?v=1607323206",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/MRG10.jpg",
+    "shopify_handle": "milos-read-and-grab-word-game-10-blue"
+  },
+  {
+    "product_code": "MRG2Y",
+    "name": "Read and Grab Word Game Box 2",
+    "barcode": "978-0-9805975-8-5",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/mrg2y-llll-read-and-grab-box-2-front_800x.jpg?v=1607323197",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/MRG2Y.jpg",
+    "shopify_handle": "read-and-grab-word-game-2-yellow"
+  },
+  {
+    "product_code": "MRG3P",
+    "name": "Read and Grab Word Game Box 3",
+    "barcode": "978-0-9807525-8-8",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/mrg3p-llll-read-and-grab-box-3-front_800x.jpg?v=1607323198",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/MRG3P.jpg",
+    "shopify_handle": "milos-read-and-grab-word-game-3-pink"
+  },
+  {
+    "product_code": "MRG4P",
+    "name": "Read and Grab Word Game Box 4",
+    "barcode": "978-0-9872645-1-0",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/mrg4p-llll-read-and-grab-box-4-front_800x.jpg?v=1607323199",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/MRG4P.jpg",
+    "shopify_handle": "milos-read-and-grab-word-game-4-purple"
+  },
+  {
+    "product_code": "MRG5O",
+    "name": "Read and Grab Word Game Box 5",
+    "barcode": "978-0-9807581-6-0",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/mrg5o-llll-read-and-grab-box-5-front_800x.jpg?v=1607323200",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/MRG5O.jpg",
+    "shopify_handle": "milos-read-and-grab-word-game-5-orange"
+  },
+  {
+    "product_code": "MRG6A",
+    "name": "Read and Grab Word Game Box 6",
+    "barcode": "978-0-9807581-7-7",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llll-read-and-grab-box-6-front_800x.jpg?v=1615954010",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/MRG6A.jpg",
+    "shopify_handle": "milos-read-and-grab-word-game-6-aqua"
+  },
+  {
+    "product_code": "MRG7R",
+    "name": "Read and Grab Word Game Box 7",
+    "barcode": "978-0-9945129-9-4",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llll-read-and-grab-box-7-front_800x.jpg?v=1615954004",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/MRG7R.jpg",
+    "shopify_handle": "milos-read-and-grab-word-game-7-red"
+  },
+  {
+    "product_code": "MRG8E",
+    "name": "Read and Grab Word Game Box 8",
+    "barcode": "978-0-9807581-8-4",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/mrg8e-llll-read-and-grab-box-8-front_800x.jpg?v=1607323203",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/MRG8E.jpg",
+    "shopify_handle": "milos-read-and-grab-word-game-8-emerald"
+  },
+  {
+    "product_code": "MRG9C",
+    "name": "Read and Grab Word Game Box 9",
+    "barcode": "978-0-9946383-0-4",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/mrg9c-llll-read-and-grab-box-9-front_800x.jpg?v=1607323204",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/MRG9C.jpg",
+    "shopify_handle": "milos-read-and-grab-word-game-9-coral"
+  },
+  {
+    "product_code": "RRW456",
+    "name": "Read, Write and Draw - Stages Plus 4, 5, 6",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/RWD-S_456-Box-Front_800x.png?v=1751250501",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/RRW456.png",
+    "shopify_handle": "read-write-and-draw-stages-plus-4-5-and-6"
+  },
+  {
+    "product_code": "RRW1-4",
+    "name": "Read, Write and Draw Stages 1-4",
+    "barcode": "978-1-922663-54-2",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/rwd-s1-4-box-front_800x.jpg?v=1691995591",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/RRW1-4.jpg",
+    "shopify_handle": "read-write-and-draw-stages-1-4"
+  },
+  {
+    "product_code": "RRW71-2",
+    "name": "Read, Write and Draw Stages 7.1 and 7.2",
+    "barcode": "978-1-922663-53-5",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/rwd-s0701-s0702-box-front_800x.jpg?v=1672884564",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/RRW71-2.jpg",
+    "shopify_handle": "read-write-and-draw-stages-7-1-7-2"
+  },
+  {
+    "product_code": "RRW73-4",
+    "name": "Read, Write and Draw Stages 7.3 and 7.4",
+    "barcode": "978-1-922663-53-5",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/rwd-s73-s74-box-frontcopy_800x.jpg?v=1691995314",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/RRW73-4.jpg",
+    "shopify_handle": "read-write-and-draw-stages-7-3-and-7-4"
+  },
+  {
+    "product_code": "SC1",
+    "name": "SoundCheck",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llll-sound-check-1-cover_800x.jpg?v=1615960187",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/SC1.jpg",
+    "shopify_handle": "soundcheck"
+  },
+  {
+    "product_code": "SC2",
+    "name": "SoundCheck 2",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llll-sound-check-2-cover_800x.jpg?v=1615960206",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/SC2.jpg",
+    "shopify_handle": "soundcheck-2"
+  },
+  {
+    "product_code": "PSC1-6",
+    "name": "Sounds Chart Stages 1-6 (A0)",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/Untitleddesign_3_8763277a-ce36-49bb-902f-8bc11666767d_800x.png?v=1644489744",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/PSC1-6.png",
+    "shopify_handle": "sounds-chart-stages-1-6"
+  },
+  {
+    "product_code": "PSC1-7",
+    "name": "Sounds Chart Stages 1-7 (A0)",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/Untitleddesign_4_800x.png?v=1644489818",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/PSC1-7.png",
+    "shopify_handle": "sounds-chart-stages-1-7"
+  },
+  {
+    "product_code": "SSC1S",
+    "name": "Speed Sounds and Chants Cards Stage 1-6 Mini Set",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/ssc1s-speed-sounds-chants-stages-1-6-mini-set-cover_800x.jpg?v=1615960535",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/SSC1S.jpg",
+    "shopify_handle": "speed-sounds-and-chants-cards-stage-1-6-mini-set"
+  },
+  {
+    "product_code": "SSC7M",
+    "name": "Speed Sounds and Chants Cards Stage 7 Classroom Set",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/ssc7m-speed-sounds-chants-stage-7-classroom-set-cover_800x.jpg?v=1615960833",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/SSC7M.jpg",
+    "shopify_handle": "speed-sounds-and-chants-cards-stage-7-classroom-size"
+  },
+  {
+    "product_code": "SSC7L",
+    "name": "Speed Sounds and Chants Cards Stage 7 Display Set",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/ssc7l-speed-sounds-chants-stage-7-display-set-cover_800x.jpg?v=1615960745",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/SSC7L.jpg",
+    "shopify_handle": "speed-sounds-and-chants-cards-stage-7-display-size"
+  },
+  {
+    "product_code": "SSC7S",
+    "name": "Speed Sounds and Chants Cards Stage 7 Mini Set",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/ssc7s-speed-sounds-chants-stage-7-mini-set-cover_800x.jpg?v=1615960921",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/SSC7S.jpg",
+    "shopify_handle": "speed-sounds-and-chants-cards-stage-7-mini-set"
+  },
+  {
+    "product_code": "SSC1M",
+    "name": "Speed Sounds and Chants Cards Stages 1-6 Classroom Set",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/ssc1m-speed-sounds-chants-stages-1-6-classroom-set-cover_800x.jpg?v=1615960337",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/SSC1M.jpg",
+    "shopify_handle": "speed-sounds-and-chants-cards-stage-1-6-classroom-size"
+  },
+  {
+    "product_code": "SSC1L",
+    "name": "Speed Sounds and Chants Cards Stages 1-6 Display Set",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/ssc1l-speed-sounds-chants-stages-1-6-display-set-cover_800x.jpg?v=1615960352",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/SSC1L.jpg",
+    "shopify_handle": "speed-sounds-and-chants-cards-stage-1-6-display-size"
+  },
+  {
+    "product_code": "SSCP71-4",
+    "name": "Stage 7 Speed Sounds Posters (A2)",
+    "barcode": "",
+    "cover_image_url": null,
+    "local_image_path": null,
+    "shopify_handle": null
+  },
+  {
+    "product_code": "SSCP1-6",
+    "name": "Stages 1-6 Speed Sounds Posters (A2)",
+    "barcode": "",
+    "cover_image_url": null,
+    "local_image_path": null,
+    "shopify_handle": null
+  },
+  {
+    "product_code": "TAR+45",
+    "name": "Teacher Activity Resource Stage + 4, 5",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/4_3c6b9131-b3bc-4697-9999-e7eb2cd653d3_800x.png?v=1759359707",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/TARplus45.png",
+    "shopify_handle": "teacher-activity-resource-stage-4-5"
+  },
+  {
+    "product_code": "TAR6",
+    "name": "Teacher Activity Resource Stage 6",
+    "barcode": "978-1-923158-09-2",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/5_e64b5f6e-9408-443e-98ee-3b628d22e60a_800x.png?v=1756249997",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/TAR6.png",
+    "shopify_handle": "teacher-activity-resource-stage-6"
+  },
+  {
+    "product_code": "TAR7REV",
+    "name": "Teacher Activity Resource Stage 7 Review (Year 2)",
+    "barcode": "978-1-923158-47-4",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/1cac346b-29b5-408f-8ea8-fc6bd1a284eb_800x.png?v=1759359893",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/TAR7REV.png",
+    "shopify_handle": "teacher-activity-resource-stage-7-review-year-2"
+  },
+  {
+    "product_code": "TAR701",
+    "name": "Teacher Activity Resource Stage 7 Unit 1",
+    "barcode": "978-0-6483495-2-5",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/2_89a48b3d-29d6-495a-8e71-f089243d58bc_800x.png?v=1765840561",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/TAR701.png",
+    "shopify_handle": "teacher-activity-resource-stage-7-unit-1"
+  },
+  {
+    "product_code": "TAR702BD",
+    "name": "Teacher Activity Resource Stage 7 Unit 2",
+    "barcode": "978-1-925916-19-5",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/SGRPrint_DigitalPacks_2_b26396e6-21bb-436d-b3b9-8b984210eaac_800x.png?v=1756879947",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/TAR702BD.png",
+    "shopify_handle": "teacher-activity-resource-book-stage-7-unit-2"
+  },
+  {
+    "product_code": "TAR703BD",
+    "name": "Teacher Activity Resource Stage 7 Unit 3",
+    "barcode": "978-1-925916-20-1",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/2_865781d5-a4b6-44ad-835e-d5dffff190db_800x.png?v=1765838773",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/TAR703BD.png",
+    "shopify_handle": "teacher-activity-resource-book-stage-7-unit-3"
+  },
+  {
+    "product_code": "TAR74PT1",
+    "name": "Teacher Activity Resource Stage 7 Unit 4 Part 1",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/TAR_7.4_P1_1_800x.png?v=1763592052",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/TAR74PT1.png",
+    "shopify_handle": "teacher-activity-resource-stage-7-unit-4-part-1-print-and-digital"
+  },
+  {
+    "product_code": "TAR74PT2",
+    "name": "Teacher Activity Resource Stage 7 Unit 4 Part 2",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/TAR_7.4_P2_800x.png?v=1759969436",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/TAR74PT2.png",
+    "shopify_handle": "teacher-activity-resource-stage-7-unit-4-part-2-print-and-digital"
+  },
+  {
+    "product_code": "TAR8",
+    "name": "Teacher Activity Resource Stage 8",
+    "barcode": "TBC",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/a2a776a2-7649-4542-aa3c-0afd1d79348d_800x.png?v=1757300413",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/TAR8.png",
+    "shopify_handle": "teacher-activity-resource-stage-8-print-and-digital"
+  },
+  {
+    "product_code": "TAR102",
+    "name": "Teacher Activity Resource Stages 1-2",
+    "barcode": "978-1-922663-52-8",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/1_127d8771-4abd-45bc-934a-3a1a454f12cf_800x.png?v=1709693990",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/TAR102.png",
+    "shopify_handle": "teacher-activity-resource-stages-1-2-print-and-digital"
+  },
+  {
+    "product_code": "TAR304",
+    "name": "Teacher Activity Resource Stages 3-4",
+    "barcode": "978-1-922663-56-6",
+    "cover_image_url": null,
+    "local_image_path": null,
+    "shopify_handle": null
+  },
+  {
+    "product_code": "CCTWK",
+    "name": "The Wiz Kids Character Cards Stages 1-4",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/character_cards_wiz_s1_800x.jpg?v=1623282746",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/CCTWK.jpg",
+    "shopify_handle": "the-wiz-kids-character-cards-stages-1-4"
+  },
+  {
+    "product_code": "TWKQ",
+    "name": "The Wiz Kids Quiz",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/TheWizKidsQuiz_SLP_3D_Front_800x.jpg?v=1668662815",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/TWKQ.jpg",
+    "shopify_handle": "the-wiz-kids-quiz"
+  },
+  {
+    "product_code": "SGRN-TWK1-4",
+    "name": "The Wiz Kids Small Group Reading Teacher Notes Stages 1-4",
+    "barcode": "978-1-922663-96-2",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/WK-SGR-TN-S1-4_1800x1800_Cover_800x.jpg?v=1697804683",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/SGRN-TWK1-4.jpg",
+    "shopify_handle": "the-wiz-kids-small-group-reading-teacher-notes-stages-1-4"
+  },
+  {
+    "product_code": "SGRN-TWKP456",
+    "name": "The Wiz Kids Small Group Reading Teacher Notes Stages Plus 4, 5, 6",
+    "barcode": "978-1-922663-97-9",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/wk-sgr-tn-sp4-6_1800x1800_cover_800x.jpg?v=1697803093",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/SGRN-TWKP456.jpg",
+    "shopify_handle": "the-wiz-kids-small-group-reading-teacher-notes-stages-plus-4-5-6"
+  },
+  {
+    "product_code": "TWK1",
+    "name": "The Wiz Kids Stage 1",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/llll-wiz-kids-decodable-books-stage-1-pack_800x.jpg?v=1639352761",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/TWK1.jpg",
+    "shopify_handle": "the-wiz-kids-stage-1"
+  },
+  {
+    "product_code": "TWK2",
+    "name": "The Wiz Kids Stage 2",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/twk2-llll-wiz-kids-decodable-books-stage-2-pack_800x.jpg?v=1755692475",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/TWK2.jpg",
+    "shopify_handle": "the-wiz-kids-stage-2"
+  },
+  {
+    "product_code": "TWK3",
+    "name": "The Wiz Kids Stage 3",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/twk3-llll-wiz-kids-decodable-books-stage-3-pack_800x.jpg?v=1755692475",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/TWK3.jpg",
+    "shopify_handle": "the-wiz-kids-stage-3"
+  },
+  {
+    "product_code": "TWK4",
+    "name": "The Wiz Kids Stage 4",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/twk4-llll-wiz-kids-decodable-books-stage-4-pack_800x.jpg?v=1755692475",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/TWK4.jpg",
+    "shopify_handle": "the-wiz-kids-stage-4"
+  },
+  {
+    "product_code": "TWKP4",
+    "name": "The Wiz Kids Stage 4+",
+    "barcode": "978-1-925916-18-8",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/twk4-llll-wiz-kids-decodable-books-stage-4-pack_800x.jpg?v=1755692475",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/TWKP4.jpg",
+    "shopify_handle": "the-wiz-kids-stage-4"
+  },
+  {
+    "product_code": "TWK5",
+    "name": "The Wiz Kids Stage 5",
+    "barcode": "978-1-922663-78-8",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/s5_cvrs_x1800_81bf8876-01f4-4a7d-be2b-9e3bdef8134d_800x.jpg?v=1755692475",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/TWK5.jpg",
+    "shopify_handle": "the-wiz-kids-stage-5"
+  },
+  {
+    "product_code": "TWK6",
+    "name": "The Wiz Kids Stage 6",
+    "barcode": "978-1-922663-79-5",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/s6_cvrs_x1800_86f34d90-18df-41b7-99c6-b90a497cc192_800x.jpg?v=1755692475",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/TWK6.jpg",
+    "shopify_handle": "the-wiz-kids-stage-6"
+  },
+  {
+    "product_code": "TQ456",
+    "name": "Tim's Quiz Stages Plus 4, 5 & 6",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/products/tq456-llll-tims-quiz-stage-plus-4-5-6-front_800x.jpg?v=1607323210",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/TQ456.jpg",
+    "shopify_handle": "tims-quiz-stages-plus-4-5-and-6"
+  },
+  {
+    "product_code": "LLWDRTM",
+    "name": "Wild Detectives 'Read to me'",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/56ebd789-32c7-4db1-b679-7b8b399a5a00_800x.png?v=1753148801",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWDRTM.png",
+    "shopify_handle": "wild-detectives-read-to-me"
+  },
+  {
+    "product_code": "SGRN-LLWD1-4",
+    "name": "Wild Detectives Small Group Reading Teacher Notes Stages 1-4",
+    "barcode": "978-1-922663-85-6",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/c36a7dd9-b158-44ef-92d6-fb8bad8ac86b_800x.png?v=1753311145",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/SGRN-LLWD1-4.png",
+    "shopify_handle": "wild-detectives-small-group-reading-teacher-notes-stages-1-4"
+  },
+  {
+    "product_code": "LLWD1",
+    "name": "Wild Detectives Stage 1",
+    "barcode": "978-0-9807525-9-5",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/1b0fa0ed-5650-4e2c-9588-d0c6f854dda0_800x.jpg?v=1753147508",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWD1.jpg",
+    "shopify_handle": "wild-detectives-stage-1"
+  },
+  {
+    "product_code": "LLWD2",
+    "name": "Wild Detectives Stage 2",
+    "barcode": "978-0-9807525-9-5",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/9f709b40-0d00-4d5f-9aed-ce937b6c9fe9_800x.jpg?v=1753147584",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWD2.jpg",
+    "shopify_handle": "wild-detectives-stage-2"
+  },
+  {
+    "product_code": "LLWD3",
+    "name": "Wild Detectives Stage 3",
+    "barcode": "978-0-9807525-9-5",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/2d1da7f8-546f-4da4-ba82-673370ad6c31_800x.jpg?v=1753147647",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWD3.jpg",
+    "shopify_handle": "wild-detectives-stage-3"
+  },
+  {
+    "product_code": "LLWD4",
+    "name": "Wild Detectives Stage 4",
+    "barcode": "978-0-9807525-9-5",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/29ee6230-2ba4-4fa4-9444-5dcda2585e05_800x.jpg?v=1753147711",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWD4.jpg",
+    "shopify_handle": "wild-detectives-stage-4"
+  },
+  {
+    "product_code": "LLWD4+",
+    "name": "Wild Detectives Stage 4+",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/29ee6230-2ba4-4fa4-9444-5dcda2585e05_800x.jpg?v=1753147711",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWD4plus.jpg",
+    "shopify_handle": "wild-detectives-stage-4"
+  },
+  {
+    "product_code": "LLWD5",
+    "name": "Wild Detectives Stage 5",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/WD-S5-BookCovers-Fan_800x.png?v=1771490820",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWD5.png",
+    "shopify_handle": "wild-detectives-stage-5"
+  },
+  {
+    "product_code": "LLWD6",
+    "name": "Wild Detectives Stage 6",
+    "barcode": "",
+    "cover_image_url": "https://cdn.shopify.com/s/files/1/0482/2030/7613/files/WD-S6-BookCovers-Fan_800x.png?v=1771490961",
+    "local_image_path": "/Users/nicplev/lumi_reading_tracker/scripts/cover_images/LLWD6.png",
+    "shopify_handle": "wild-detectives-stage-6"
+  }
+]
