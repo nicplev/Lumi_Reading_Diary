@@ -15,7 +15,9 @@ import '../../core/widgets/lumi_mascot.dart';
 import '../../core/routing/app_router.dart';
 import '../../data/models/user_model.dart';
 import '../../services/firebase_service.dart';
+import '../../services/notification_service.dart';
 import '../../core/services/user_school_index_service.dart';
+import '../../utils/setup_test_data.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -189,6 +191,14 @@ class _LoginScreenState extends State<LoginScreen> {
               'lastLoginAt': FieldValue.serverTimestamp(),
             });
 
+            // Save FCM token to correct parent Firestore path
+            if (user.role == UserRole.parent) {
+              NotificationService.instance.saveTokenForUser(
+                userSchoolId,
+                userCredential.user!.uid,
+              );
+            }
+
             if (!mounted) return;
 
             // Navigate based on role
@@ -244,6 +254,87 @@ class _LoginScreenState extends State<LoginScreen> {
     final homeRoute = AppRouter.getHomeRouteForRole(user.role);
     // ignore: invalid_use_of_internal_member
     context.go(homeRoute, extra: user);
+  }
+
+  void _showCreateAdminDialog() {
+    final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Create Admin Account'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Use a real email you can verify.',
+              style: LumiTextStyles.bodySmall().copyWith(
+                color: AppColors.charcoal.withValues(alpha: 0.7),
+              ),
+            ),
+            LumiGap.s,
+            TextField(
+              controller: emailController,
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                hintText: 'your.email@example.com',
+              ),
+              keyboardType: TextInputType.emailAddress,
+            ),
+            LumiGap.xs,
+            TextField(
+              controller: passwordController,
+              decoration: const InputDecoration(
+                labelText: 'Password',
+                hintText: 'Min 8 chars, mixed case + number',
+              ),
+              obscureText: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final email = emailController.text.trim();
+              final password = passwordController.text;
+              if (email.isEmpty || password.isEmpty) return;
+
+              Navigator.of(dialogContext).pop();
+
+              setState(() => _isLoading = true);
+              try {
+                await TestDataSetup.createNewSchoolAdmin(
+                  email: email,
+                  password: password,
+                );
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Admin account created for $email. Check your inbox to verify, then log in.',
+                    ),
+                    duration: const Duration(seconds: 8),
+                  ),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error: $e')),
+                );
+              } finally {
+                if (mounted) setState(() => _isLoading = false);
+              }
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -442,6 +533,37 @@ class _LoginScreenState extends State<LoginScreen> {
                 text: 'School? Request a Demo',
                 icon: Icons.school,
               ).animate().fadeIn(delay: 1000.ms, duration: 500.ms),
+
+              LumiGap.l,
+
+              // DEV ONLY: Create admin account button
+              Container(
+                padding: LumiPadding.allS,
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.1),
+                  borderRadius: LumiBorders.small,
+                  border: Border.all(
+                    color: Colors.orange.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      'DEV ONLY',
+                      style: LumiTextStyles.bodySmall().copyWith(
+                        color: Colors.orange,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    LumiGap.xs,
+                    LumiTextButton(
+                      onPressed: () => _showCreateAdminDialog(),
+                      text: 'Create Admin Account',
+                      icon: Icons.admin_panel_settings,
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),

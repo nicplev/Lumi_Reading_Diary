@@ -10,11 +10,11 @@ enum LogStatus {
 /// How the child felt about the reading session.
 /// Maps to the 5 blob character assets in assets/blobs/.
 enum ReadingFeeling {
-  hard,    // blob-hard.png
-  tricky,  // blob-tricky.png
-  okay,    // blob-okay.png
-  good,    // blob-good.png
-  great,   // blob-great.png
+  hard, // blob-hard.png
+  tricky, // blob-tricky.png
+  okay, // blob-okay.png
+  good, // blob-good.png
+  great, // blob-great.png
 }
 
 class ReadingLogModel {
@@ -41,6 +41,8 @@ class ReadingLogModel {
 
   // Parent's comment using template chips
   final String? parentComment;
+  final List<String> parentCommentSelections;
+  final String? parentCommentFreeText;
 
   // For teacher feedback
   final String? teacherComment;
@@ -67,6 +69,8 @@ class ReadingLogModel {
     this.metadata,
     this.childFeeling,
     this.parentComment,
+    this.parentCommentSelections = const [],
+    this.parentCommentFreeText,
     this.teacherComment,
     this.commentedAt,
     this.commentedBy,
@@ -96,7 +100,9 @@ class ReadingLogModel {
           ? List<String>.from(data['photoUrls'])
           : null,
       isOfflineCreated: data['isOfflineCreated'] ?? false,
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
+      createdAt: data['createdAt'] != null
+          ? (data['createdAt'] as Timestamp).toDate()
+          : DateTime.now(),
       syncedAt: data['syncedAt'] != null
           ? (data['syncedAt'] as Timestamp).toDate()
           : null,
@@ -109,6 +115,9 @@ class ReadingLogModel {
             )
           : null,
       parentComment: data['parentComment'],
+      parentCommentSelections:
+          List<String>.from(data['parentCommentSelections'] ?? []),
+      parentCommentFreeText: data['parentCommentFreeText'],
       teacherComment: data['teacherComment'],
       commentedAt: data['commentedAt'] != null
           ? (data['commentedAt'] as Timestamp).toDate()
@@ -137,10 +146,11 @@ class ReadingLogModel {
       'metadata': metadata,
       'childFeeling': childFeeling?.toString().split('.').last,
       'parentComment': parentComment,
+      'parentCommentSelections': parentCommentSelections,
+      'parentCommentFreeText': parentCommentFreeText,
       'teacherComment': teacherComment,
-      'commentedAt': commentedAt != null
-          ? Timestamp.fromDate(commentedAt!)
-          : null,
+      'commentedAt':
+          commentedAt != null ? Timestamp.fromDate(commentedAt!) : null,
       'commentedBy': commentedBy,
     };
   }
@@ -165,6 +175,8 @@ class ReadingLogModel {
     Map<String, dynamic>? metadata,
     ReadingFeeling? childFeeling,
     String? parentComment,
+    List<String>? parentCommentSelections,
+    String? parentCommentFreeText,
     String? teacherComment,
     DateTime? commentedAt,
     String? commentedBy,
@@ -189,6 +201,10 @@ class ReadingLogModel {
       metadata: metadata ?? this.metadata,
       childFeeling: childFeeling ?? this.childFeeling,
       parentComment: parentComment ?? this.parentComment,
+      parentCommentSelections:
+          parentCommentSelections ?? this.parentCommentSelections,
+      parentCommentFreeText:
+          parentCommentFreeText ?? this.parentCommentFreeText,
       teacherComment: teacherComment ?? this.teacherComment,
       commentedAt: commentedAt ?? this.commentedAt,
       commentedBy: commentedBy ?? this.commentedBy,
@@ -217,6 +233,8 @@ class ReadingLogModel {
       'metadata': metadata,
       'childFeeling': childFeeling?.toString().split('.').last,
       'parentComment': parentComment,
+      'parentCommentSelections': parentCommentSelections,
+      'parentCommentFreeText': parentCommentFreeText,
       'teacherComment': teacherComment,
       'commentedAt': commentedAt?.toIso8601String(),
       'commentedBy': commentedBy,
@@ -239,14 +257,12 @@ class ReadingLogModel {
       ),
       bookTitles: List<String>.from(map['bookTitles'] ?? []),
       notes: map['notes'],
-      photoUrls: map['photoUrls'] != null
-          ? List<String>.from(map['photoUrls'])
-          : null,
+      photoUrls:
+          map['photoUrls'] != null ? List<String>.from(map['photoUrls']) : null,
       isOfflineCreated: map['isOfflineCreated'] ?? true,
       createdAt: DateTime.parse(map['createdAt']),
-      syncedAt: map['syncedAt'] != null
-          ? DateTime.parse(map['syncedAt'])
-          : null,
+      syncedAt:
+          map['syncedAt'] != null ? DateTime.parse(map['syncedAt']) : null,
       allocationId: map['allocationId'],
       metadata: map['metadata'],
       childFeeling: map['childFeeling'] != null
@@ -256,6 +272,9 @@ class ReadingLogModel {
             )
           : null,
       parentComment: map['parentComment'],
+      parentCommentSelections:
+          List<String>.from(map['parentCommentSelections'] ?? []),
+      parentCommentFreeText: map['parentCommentFreeText'],
       teacherComment: map['teacherComment'],
       commentedAt: map['commentedAt'] != null
           ? DateTime.parse(map['commentedAt'])

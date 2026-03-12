@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
+import '../../core/widgets/lumi/lumi_skeleton.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/class_model.dart';
 import '../../services/firebase_service.dart';
@@ -57,11 +59,13 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.upload_file, color: AppColors.white, size: 18),
+                  const Icon(Icons.upload_file,
+                      color: AppColors.white, size: 18),
                   const SizedBox(width: 4),
                   Text(
                     'Import Students',
-                    style: TeacherTypography.bodyMedium.copyWith(color: AppColors.white),
+                    style: TeacherTypography.bodyMedium
+                        .copyWith(color: AppColors.white),
                   ),
                 ],
               ),
@@ -70,6 +74,7 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_class_management',
         onPressed: _showAddClassDialog,
         icon: const Icon(Icons.add),
         label: const Text('Add Class'),
@@ -79,28 +84,39 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
       body: Column(
         children: [
           // Search Bar
-          Container(
-            color: AppColors.white,
-            padding: const EdgeInsets.all(8),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search classes...',
-                hintStyle: TeacherTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
-                prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
-                filled: true,
-                fillColor: AppColors.background,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius:
+                    BorderRadius.circular(TeacherDimensions.radiusRound),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.charcoal.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              style: TeacherTypography.bodyMedium,
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value.toLowerCase();
-                });
-              },
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: 'Search classes...',
+                  hintStyle: TeacherTypography.bodyMedium
+                      .copyWith(color: AppColors.textSecondary),
+                  prefixIcon:
+                      const Icon(Icons.search, color: AppColors.textSecondary),
+                  border: InputBorder.none,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                ),
+                style: TeacherTypography.bodyMedium,
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value.toLowerCase();
+                  });
+                },
+              ),
             ),
           ),
 
@@ -114,7 +130,41 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
                 }
 
                 if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: 4,
+                    itemBuilder: (context, index) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Container(
+                        height: 90,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.white,
+                          borderRadius:
+                              BorderRadius.circular(TeacherDimensions.radiusL),
+                          boxShadow: TeacherDimensions.cardShadow,
+                        ),
+                        child: Row(
+                          children: [
+                            const LumiSkeleton(
+                                width: 48, height: 48, isCircular: true),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: const [
+                                  LumiSkeleton(height: 18, width: 150),
+                                  SizedBox(height: 8),
+                                  LumiSkeleton(height: 14, width: 100),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
                 }
 
                 final docs = snapshot.data!.docs;
@@ -152,7 +202,8 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
                             backgroundColor: AppColors.teacherPrimary,
                             foregroundColor: AppColors.white,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                              borderRadius: BorderRadius.circular(
+                                  TeacherDimensions.radiusM),
                             ),
                           ),
                           child: Row(
@@ -170,7 +221,8 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
                 }
 
                 return ListView.builder(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.only(
+                      left: 16, right: 16, top: 8, bottom: 80),
                   itemCount: filteredDocs.length,
                   itemBuilder: (context, index) {
                     final classModel =
@@ -188,7 +240,7 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
 
   Widget _buildClassCard(ClassModel classModel) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4.0),
+      padding: const EdgeInsets.only(bottom: 12.0),
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.white,
@@ -222,7 +274,8 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
                             horizontal: 4.0, vertical: 2),
                         decoration: BoxDecoration(
                           color: AppColors.skyBlue.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(TeacherDimensions.radiusS),
+                          borderRadius:
+                              BorderRadius.circular(TeacherDimensions.radiusS),
                         ),
                         child: Text(
                           classModel.yearLevel!,
@@ -252,7 +305,8 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
                             decoration: BoxDecoration(
                               color:
                                   AppColors.teacherColor.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(TeacherDimensions.radiusS),
+                              borderRadius: BorderRadius.circular(
+                                  TeacherDimensions.radiusS),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -278,7 +332,8 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
                               horizontal: 4.0, vertical: 2),
                           decoration: BoxDecoration(
                             color: AppColors.warning.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(TeacherDimensions.radiusS),
+                            borderRadius: BorderRadius.circular(
+                                TeacherDimensions.radiusS),
                           ),
                           child: Text(
                             'No teacher assigned',
@@ -294,54 +349,55 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
               ),
             ],
           ),
-        trailing: PopupMenuButton<String>(
-          onSelected: (value) => _handleClassAction(value, classModel),
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'edit',
-              child: Row(
-                children: [
-                  Icon(Icons.edit, size: 20),
-                  SizedBox(width: 8),
-                  Text('Edit'),
-                ],
+          trailing: PopupMenuButton<String>(
+            onSelected: (value) => _handleClassAction(value, classModel),
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit, size: 20),
+                    SizedBox(width: 8),
+                    Text('Edit'),
+                  ],
+                ),
               ),
-            ),
-            const PopupMenuItem(
-              value: 'assign_teacher',
-              child: Row(
-                children: [
-                  Icon(Icons.person_add, size: 20),
-                  SizedBox(width: 8),
-                  Text('Assign Teacher'),
-                ],
+              const PopupMenuItem(
+                value: 'assign_teacher',
+                child: Row(
+                  children: [
+                    Icon(Icons.person_add, size: 20),
+                    SizedBox(width: 8),
+                    Text('Assign Teacher'),
+                  ],
+                ),
               ),
-            ),
-            const PopupMenuItem(
-              value: 'manage_students',
-              child: Row(
-                children: [
-                  Icon(Icons.group, size: 20),
-                  SizedBox(width: 8),
-                  Text('Manage Students'),
-                ],
+              const PopupMenuItem(
+                value: 'manage_students',
+                child: Row(
+                  children: [
+                    Icon(Icons.group, size: 20),
+                    SizedBox(width: 8),
+                    Text('Manage Students'),
+                  ],
+                ),
               ),
-            ),
-            PopupMenuItem(
-              value: 'delete',
-              child: Row(
-                children: [
-                  const Icon(Icons.delete, size: 20, color: AppColors.error),
-                  const SizedBox(width: 4.0),
-                  Text(
-                    'Delete',
-                    style: TeacherTypography.bodyMedium.copyWith(color: AppColors.error),
-                  ),
-                ],
+              PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    const Icon(Icons.delete, size: 20, color: AppColors.error),
+                    const SizedBox(width: 4.0),
+                    Text(
+                      'Delete',
+                      style: TeacherTypography.bodyMedium
+                          .copyWith(color: AppColors.error),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
           children: [
             Padding(
               padding: const EdgeInsets.all(8),
@@ -355,89 +411,92 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
                       _buildStatItem(
                           'Students', classModel.studentIds.length.toString()),
                       _buildStatItem('Reading Goal', '20 min'),
-                      _buildStatItem(
-                          'Status', classModel.isActive ? 'Active' : 'Inactive'),
+                      _buildStatItem('Status',
+                          classModel.isActive ? 'Active' : 'Inactive'),
                     ],
                   ),
 
-                // Assigned Teachers Section
-                ...(() {
-                  // Filter out empty teacher IDs
-                  final validTeacherIds = classModel.teacherIds
-                      .where((id) => id.isNotEmpty)
-                      .toList();
+                  // Assigned Teachers Section
+                  ...(() {
+                    // Filter out empty teacher IDs
+                    final validTeacherIds = classModel.teacherIds
+                        .where((id) => id.isNotEmpty)
+                        .toList();
 
-                  if (validTeacherIds.isEmpty) {
-                    return <Widget>[];
-                  }
+                    if (validTeacherIds.isEmpty) {
+                      return <Widget>[];
+                    }
 
-                  return <Widget>[
-                    const SizedBox(height: 8),
-                    const Divider(),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Assigned Teachers',
-                      style: TeacherTypography.bodyLarge,
-                    ),
-                    const SizedBox(height: 4),
-                    ...validTeacherIds.map((teacherId) {
-                      return FutureBuilder<DocumentSnapshot>(
-                        future: _firebaseService.firestore
-                            .collection('schools')
-                            .doc(widget.adminUser.schoolId)
-                            .collection('users')
-                            .doc(teacherId)
-                            .get(),
-                        builder: (context, snapshot) {
-                          if (snapshot.hasData && snapshot.data!.exists) {
-                            final teacher =
-                                UserModel.fromFirestore(snapshot.data!);
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 4.0),
-                              child: Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 16,
-                                    backgroundColor: AppColors.teacherColor
-                                        .withValues(alpha: 0.2),
-                                    child: Text(
-                                      teacher.fullName.isNotEmpty
-                                          ? teacher.fullName[0].toUpperCase()
-                                          : '?',
-                                      style: TeacherTypography.bodySmall.copyWith(
-                                        color: AppColors.teacherColor,
+                    return <Widget>[
+                      const SizedBox(height: 8),
+                      const Divider(),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Assigned Teachers',
+                        style: TeacherTypography.bodyLarge,
+                      ),
+                      const SizedBox(height: 4),
+                      ...validTeacherIds.map((teacherId) {
+                        return FutureBuilder<DocumentSnapshot>(
+                          future: _firebaseService.firestore
+                              .collection('schools')
+                              .doc(widget.adminUser.schoolId)
+                              .collection('users')
+                              .doc(teacherId)
+                              .get(),
+                          builder: (context, snapshot) {
+                            if (snapshot.hasData && snapshot.data!.exists) {
+                              final teacher =
+                                  UserModel.fromFirestore(snapshot.data!);
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 4.0),
+                                child: Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 16,
+                                      backgroundColor: AppColors.teacherColor
+                                          .withValues(alpha: 0.2),
+                                      child: Text(
+                                        teacher.fullName.isNotEmpty
+                                            ? teacher.fullName[0].toUpperCase()
+                                            : '?',
+                                        style: TeacherTypography.bodySmall
+                                            .copyWith(
+                                          color: AppColors.teacherColor,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          teacher.fullName,
-                                          style: TeacherTypography.bodyMedium,
-                                        ),
-                                        Text(
-                                          teacher.email,
-                                          style: TeacherTypography.bodySmall.copyWith(
-                                            color: AppColors.charcoal.withValues(alpha: 0.6),
+                                    const SizedBox(height: 4),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            teacher.fullName,
+                                            style: TeacherTypography.bodyMedium,
                                           ),
-                                        ),
-                                      ],
+                                          Text(
+                                            teacher.email,
+                                            style: TeacherTypography.bodySmall
+                                                .copyWith(
+                                              color: AppColors.charcoal
+                                                  .withValues(alpha: 0.6),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }
-                          return const SizedBox.shrink();
-                        },
-                      );
-                    }),
-                  ];
-                }()),
+                                  ],
+                                ),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
+                        );
+                      }),
+                    ];
+                  }()),
 
                   if (classModel.studentIds.isNotEmpty) ...[
                     const SizedBox(height: 8),
@@ -461,7 +520,7 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
           ],
         ),
       ),
-    );
+    ).animate().fadeIn(duration: 300.ms, curve: Curves.easeOut);
   }
 
   Widget _buildStatItem(String label, String value) {
@@ -489,7 +548,8 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusL)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(TeacherDimensions.radiusL)),
         title: Text('Add New Class', style: TeacherTypography.h3),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -507,11 +567,14 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
                   color: AppColors.charcoal.withValues(alpha: 0.4),
                 ),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                  borderRadius:
+                      BorderRadius.circular(TeacherDimensions.radiusM),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
-                  borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2),
+                  borderRadius:
+                      BorderRadius.circular(TeacherDimensions.radiusM),
+                  borderSide: const BorderSide(
+                      color: AppColors.teacherPrimary, width: 2),
                 ),
               ),
             ),
@@ -529,11 +592,14 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
                   color: AppColors.charcoal.withValues(alpha: 0.4),
                 ),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                  borderRadius:
+                      BorderRadius.circular(TeacherDimensions.radiusM),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
-                  borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2),
+                  borderRadius:
+                      BorderRadius.circular(TeacherDimensions.radiusM),
+                  borderSide: const BorderSide(
+                      color: AppColors.teacherPrimary, width: 2),
                 ),
               ),
             ),
@@ -542,7 +608,9 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: TeacherTypography.bodyMedium.copyWith(color: AppColors.teacherPrimary)),
+            child: Text('Cancel',
+                style: TeacherTypography.bodyMedium
+                    .copyWith(color: AppColors.teacherPrimary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -642,7 +710,13 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
         await _showAssignTeacherDialog(classModel);
         break;
       case 'manage_students':
-        context.push('/admin/student-management', extra: widget.adminUser);
+        context.push(
+          '/admin/student-management',
+          extra: {
+            'adminUser': widget.adminUser,
+            'classModel': classModel,
+          },
+        );
         break;
       case 'delete':
         await _deleteClass(classModel);
@@ -731,7 +805,8 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusL)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(TeacherDimensions.radiusL)),
         title: Text('Delete Class', style: TeacherTypography.h3),
         content: Text(
           'Are you sure you want to delete ${classModel.name}? This action cannot be undone.',
@@ -740,11 +815,15 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: TeacherTypography.bodyMedium.copyWith(color: AppColors.teacherPrimary)),
+            child: Text('Cancel',
+                style: TeacherTypography.bodyMedium
+                    .copyWith(color: AppColors.teacherPrimary)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('Delete', style: TeacherTypography.bodyMedium.copyWith(color: AppColors.teacherPrimary)),
+            child: Text('Delete',
+                style: TeacherTypography.bodyMedium
+                    .copyWith(color: AppColors.teacherPrimary)),
           ),
         ],
       ),
@@ -820,7 +899,8 @@ class _AssignTeachersDialogState extends State<_AssignTeachersDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusL)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusL)),
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -847,15 +927,19 @@ class _AssignTeachersDialogState extends State<_AssignTeachersDialog> {
               style: TeacherTypography.bodyMedium,
               decoration: InputDecoration(
                 hintText: 'Search teachers...',
-                hintStyle: TeacherTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
-                prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+                hintStyle: TeacherTypography.bodyMedium
+                    .copyWith(color: AppColors.textSecondary),
+                prefixIcon:
+                    const Icon(Icons.search, color: AppColors.textSecondary),
                 filled: true,
                 fillColor: AppColors.background,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                  borderRadius:
+                      BorderRadius.circular(TeacherDimensions.radiusM),
                   borderSide: BorderSide.none,
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
               onChanged: (value) {
                 setState(() {
@@ -890,8 +974,11 @@ class _AssignTeachersDialogState extends State<_AssignTeachersDialog> {
                           child: Container(
                             decoration: BoxDecoration(
                               color: AppColors.white,
-                              borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
-                              boxShadow: isSelected ? TeacherDimensions.cardShadow : null,
+                              borderRadius: BorderRadius.circular(
+                                  TeacherDimensions.radiusL),
+                              boxShadow: isSelected
+                                  ? TeacherDimensions.cardShadow
+                                  : null,
                             ),
                             clipBehavior: Clip.antiAlias,
                             child: CheckboxListTile(
@@ -906,7 +993,8 @@ class _AssignTeachersDialogState extends State<_AssignTeachersDialog> {
                                 });
                               },
                               tileColor: isSelected
-                                  ? AppColors.teacherColor.withValues(alpha: 0.1)
+                                  ? AppColors.teacherColor
+                                      .withValues(alpha: 0.1)
                                   : AppColors.white,
                               title: Text(
                                 teacher.fullName,
@@ -915,12 +1003,13 @@ class _AssignTeachersDialogState extends State<_AssignTeachersDialog> {
                               subtitle: Text(
                                 teacher.email,
                                 style: TeacherTypography.bodySmall.copyWith(
-                                  color: AppColors.charcoal.withValues(alpha: 0.6),
+                                  color:
+                                      AppColors.charcoal.withValues(alpha: 0.6),
                                 ),
                               ),
                               secondary: CircleAvatar(
-                                backgroundColor:
-                                    AppColors.teacherColor.withValues(alpha: 0.2),
+                                backgroundColor: AppColors.teacherColor
+                                    .withValues(alpha: 0.2),
                                 child: Text(
                                   teacher.fullName.isNotEmpty
                                       ? teacher.fullName[0].toUpperCase()
@@ -943,7 +1032,9 @@ class _AssignTeachersDialogState extends State<_AssignTeachersDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text('Cancel', style: TeacherTypography.bodyMedium.copyWith(color: AppColors.teacherPrimary)),
+          child: Text('Cancel',
+              style: TeacherTypography.bodyMedium
+                  .copyWith(color: AppColors.teacherPrimary)),
         ),
         if (_selectedTeacherIds.isNotEmpty)
           TextButton(
@@ -952,7 +1043,9 @@ class _AssignTeachersDialogState extends State<_AssignTeachersDialog> {
                 _selectedTeacherIds.clear();
               });
             },
-            child: Text('Clear All', style: TeacherTypography.bodyMedium.copyWith(color: AppColors.teacherPrimary)),
+            child: Text('Clear All',
+                style: TeacherTypography.bodyMedium
+                    .copyWith(color: AppColors.teacherPrimary)),
           ),
         ElevatedButton(
           onPressed: () {

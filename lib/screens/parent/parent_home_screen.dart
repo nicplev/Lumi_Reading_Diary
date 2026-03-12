@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -88,6 +90,42 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
     }
   }
 
+  /// Combines two Firestore query streams into a single stream of both results.
+  Stream<List<QuerySnapshot>> _combineStreams(
+    Stream<QuerySnapshot> stream1,
+    Stream<QuerySnapshot> stream2,
+  ) {
+    QuerySnapshot? latest1;
+    QuerySnapshot? latest2;
+    late final StreamController<List<QuerySnapshot>> controller;
+
+    StreamSubscription? sub1;
+    StreamSubscription? sub2;
+
+    controller = StreamController<List<QuerySnapshot>>(
+      onListen: () {
+        sub1 = stream1.listen((snapshot) {
+          latest1 = snapshot;
+          if (latest2 != null) {
+            controller.add([latest1!, latest2!]);
+          }
+        });
+        sub2 = stream2.listen((snapshot) {
+          latest2 = snapshot;
+          if (latest1 != null) {
+            controller.add([latest1!, latest2!]);
+          }
+        });
+      },
+      onCancel: () {
+        sub1?.cancel();
+        sub2?.cancel();
+      },
+    );
+
+    return controller.stream;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -158,9 +196,9 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
                 label: 'Home',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.history_outlined),
-                activeIcon: Icon(Icons.history),
-                label: 'History',
+                icon: Icon(Icons.auto_stories_outlined),
+                activeIcon: Icon(Icons.auto_stories),
+                label: 'Bookshelf',
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.person_outline),
@@ -239,63 +277,88 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
               delegate: SliverChildListDelegate([
                 // Today's Reading Card
                 StreamBuilder<QuerySnapshot>(
-                  stream: firebaseService.firestore
-                      .collection('schools')
-                      .doc(widget.user.schoolId)
-                      .collection('readingLogs')
-                      .where('studentId', isEqualTo: selectedChild.id)
-                      .where('date',
-                          isGreaterThanOrEqualTo: Timestamp.fromDate(
-                            DateTime.now().subtract(const Duration(hours: 24)),
-                          ))
-                      .limit(1)
-                      .snapshots(),
+                  stream: () {
+                    final now = DateTime.now();
+                    final startOfDay = DateTime(now.year, now.month, now.day);
+                    return firebaseService.firestore
+                        .collection('schools')
+                        .doc(widget.user.schoolId)
+                        .collection('readingLogs')
+                        .where('studentId', isEqualTo: selectedChild.id)
+                        .where('date',
+                            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+                        .orderBy('date', descending: true)
+                        .snapshots();
+                  }(),
                   builder: (context, logSnapshot) {
-                    final hasLoggedToday = logSnapshot.hasData &&
-                        logSnapshot.data!.docs.isNotEmpty;
+                    final todayLogs = logSnapshot.hasData
+                        ? logSnapshot.data!.docs
+                            .map((doc) => ReadingLogModel.fromFirestore(doc))
+                            .toList()
+                        : <ReadingLogModel>[];
+                    final hasLoggedToday = todayLogs.isNotEmpty;
 
-                    return StreamBuilder<QuerySnapshot>(
-                      stream: firebaseService.firestore
-                          .collection('schools')
-                          .doc(widget.user.schoolId!)
-                          .collection('allocations')
-                          .where('studentIds', arrayContains: selectedChild.id)
-                          .where('startDate',
-                              isLessThanOrEqualTo: Timestamp.now())
-                          .where('endDate',
-                              isGreaterThanOrEqualTo: Timestamp.now())
-                          .where('isActive', isEqualTo: true)
-                          .snapshots(),
+                    // Query 1: Allocations specifically for this student
+                    final studentAllocationsStream = firebaseService.firestore
+                        .collection('schools')
+                        .doc(widget.user.schoolId!)
+                        .collection('allocations')
+                        .where('studentIds', arrayContains: selectedChild.id)
+                        .where('isActive', isEqualTo: true)
+                        .snapshots();
+
+                    // Query 2: Whole-class allocations (studentIds is empty)
+                    final classAllocationsStream = firebaseService.firestore
+                        .collection('schools')
+                        .doc(widget.user.schoolId!)
+                        .collection('allocations')
+                        .where('classId', isEqualTo: selectedChild.classId)
+                        .where('studentIds', isEqualTo: [])
+                        .where('isActive', isEqualTo: true)
+                        .snapshots();
+
+                    return StreamBuilder<List<QuerySnapshot>>(
+                      stream: _combineStreams(
+                        studentAllocationsStream,
+                        classAllocationsStream,
+                      ),
                       builder: (context, allocationSnapshot) {
                         AllocationModel? allocation;
-                        if (allocationSnapshot.hasData &&
-                            allocationSnapshot.data!.docs.isNotEmpty) {
-                          allocation = AllocationModel.fromFirestore(
-                            allocationSnapshot.data!.docs.first,
-                          );
+                        if (allocationSnapshot.hasData) {
+                          final now = DateTime.now();
+                          final allDocs = allocationSnapshot.data!
+                              .expand((qs) => qs.docs)
+                              .toList();
+                          for (final doc in allDocs) {
+                            final candidate =
+                                AllocationModel.fromFirestore(doc);
+                            if (candidate.startDate.isBefore(now) &&
+                                candidate.endDate.isAfter(now)) {
+                              allocation = candidate;
+                              break;
+                            }
+                          }
                         }
 
                         return _TodayCard(
                           student: selectedChild,
                           allocation: allocation,
                           hasLoggedToday: hasLoggedToday,
-                          onTap: hasLoggedToday
-                              ? null
-                              : () async {
-                                  // Store data in navigation service
-                                  NavigationStateService().setTempData({
-                                    'parent': widget.user,
-                                    'student': selectedChild,
-                                    'allocation': allocation,
-                                  });
-                                  debugPrint('DEBUG: Setting temp data - parent: ${widget.user.id}, student: ${selectedChild.id}');
+                          todayLogs: todayLogs,
+                          onTap: () async {
+                            // Store data in navigation service
+                            NavigationStateService().setTempData({
+                              'parent': widget.user,
+                              'student': selectedChild,
+                              'allocation': allocation,
+                            });
 
-                                  final result = await context.push('/parent/log-reading');
-                                  if (result == true) {
-                                    // Refresh after logging
-                                    setState(() {});
-                                  }
-                                },
+                            final result = await context.push('/parent/log-reading');
+                            if (result == true) {
+                              // Refresh after logging
+                              setState(() {});
+                            }
+                          },
                         ).animate().fadeIn().scale();
                       },
                     );
@@ -393,12 +456,14 @@ class _TodayCard extends StatelessWidget {
   final StudentModel student;
   final AllocationModel? allocation;
   final bool hasLoggedToday;
+  final List<ReadingLogModel> todayLogs;
   final VoidCallback? onTap;
 
   const _TodayCard({
     required this.student,
     this.allocation,
     required this.hasLoggedToday,
+    this.todayLogs = const [],
     this.onTap,
   });
 
@@ -445,7 +510,22 @@ class _TodayCard extends StatelessWidget {
               style: LumiTextStyles.h2(color: AppColors.charcoal),
             ),
             LumiGap.s,
-            if (allocation != null) ...[
+            if (hasLoggedToday) ...[
+              // Show actual minutes logged today (summed across all sessions)
+              _buildRequirement(
+                context,
+                Icons.timer_outlined,
+                '${todayLogs.fold<int>(0, (total, log) => total + log.minutesRead)} minutes read today',
+              ),
+              if (todayLogs.length > 1) ...[
+                LumiGap.xs,
+                _buildRequirement(
+                  context,
+                  Icons.repeat,
+                  '${todayLogs.length} sessions logged',
+                ),
+              ],
+            ] else if (allocation != null) ...[
               _buildRequirement(
                 context,
                 Icons.timer_outlined,
@@ -496,17 +576,15 @@ class _TodayCard extends StatelessWidget {
                 'Any reading material',
               ),
             ],
-            if (!hasLoggedToday) ...[
-              LumiGap.m,
-              SizedBox(
-                width: double.infinity,
-                child: LumiPrimaryButton(
-                  onPressed: onTap,
-                  text: 'Tap to Mark as Done',
-                  icon: Icons.check_circle_outline,
-                ),
+            LumiGap.m,
+            SizedBox(
+              width: double.infinity,
+              child: LumiPrimaryButton(
+                onPressed: onTap,
+                text: hasLoggedToday ? 'Log Another Session' : 'Tap to Mark as Done',
+                icon: hasLoggedToday ? Icons.add_circle_outline : Icons.check_circle_outline,
               ),
-            ],
+            ),
           ],
         ),
       ),

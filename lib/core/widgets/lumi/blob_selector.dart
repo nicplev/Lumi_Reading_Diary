@@ -94,22 +94,14 @@ class _BlobSelectorState extends State<BlobSelector> {
       onTapDown: (_) => setState(() => _hoveredFeeling = blob.feeling),
       onTapUp: (_) => setState(() => _hoveredFeeling = null),
       onTapCancel: () => setState(() => _hoveredFeeling = null),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
+      child: Padding(
         padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? blob.color.withValues(alpha: 0.3)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             AnimatedScale(
               scale: isSelected
-                  ? 1.25
+                  ? 1.35
                   : isHovered
                       ? 1.15
                       : 1.0,
@@ -136,7 +128,10 @@ class _BlobSelectorState extends State<BlobSelector> {
                 ),
               ),
             ),
-            const SizedBox(height: 6),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              height: isSelected ? 28 : 6,
+            ),
             Text(
               blob.label,
               style: LumiTextStyles.caption(
@@ -144,7 +139,7 @@ class _BlobSelectorState extends State<BlobSelector> {
                     ? blob.color
                     : AppColors.charcoal.withValues(alpha: 0.7),
               ).copyWith(
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
               ),
             ),
           ],

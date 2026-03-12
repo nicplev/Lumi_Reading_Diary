@@ -334,6 +334,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_student_management',
         onPressed: _showAddStudentDialog,
         icon: const Icon(Icons.person_add),
         label: const Text('Add Student'),

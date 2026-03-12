@@ -83,7 +83,9 @@ class _OfflineManagementScreenState extends State<OfflineManagementScreen> {
                       Container(
                         padding: LumiPadding.allXS,
                         decoration: BoxDecoration(
-                          color: isOnline ? AppColors.success : AppColors.warmOrange,
+                          color: isOnline
+                              ? AppColors.success
+                              : AppColors.warmOrange,
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
@@ -113,7 +115,8 @@ class _OfflineManagementScreenState extends State<OfflineManagementScreen> {
                               style: LumiTextStyles.body(
                                 color: isOnline
                                     ? AppColors.success.withValues(alpha: 0.8)
-                                    : AppColors.warmOrange.withValues(alpha: 0.8),
+                                    : AppColors.warmOrange
+                                        .withValues(alpha: 0.8),
                               ),
                             ),
                           ],

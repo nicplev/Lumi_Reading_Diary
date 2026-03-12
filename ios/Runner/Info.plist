@@ -42,7 +42,7 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>Lumi needs camera access to take photos of reading logs.</string>
+	<string>Lumi needs camera access to scan ISBN barcodes and capture reading evidence.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Lumi needs photo library access to attach images to reading logs.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>

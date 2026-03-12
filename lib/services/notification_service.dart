@@ -1,4 +1,6 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -6,8 +8,19 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'dart:io' show Platform;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../firebase_options.dart';
+
+// Background message handler (must be top-level function)
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  debugPrint('Handling a background message: ${message.messageId}');
+}
+
 /// Smart notification service for Lumi Reading Diary
-/// Handles push notifications, local notifications, and scheduled reminders
+/// Single owner of all notification/FCM logic (push + local + scheduled)
 class NotificationService {
   static NotificationService? _instance;
   static NotificationService get instance => _instance ??= NotificationService._();
@@ -19,6 +32,10 @@ class NotificationService {
 
   FirebaseMessaging? _messaging;
   bool _initialized = false;
+
+  // Stored so token refresh can persist to the correct parent document
+  String? _currentSchoolId;
+  String? _currentUserId;
 
   // Notification channels
   static const String _readingReminderChannel = 'reading_reminders';
@@ -122,15 +139,22 @@ class NotificationService {
   Future<void> _initializeFirebaseMessaging() async {
     _messaging = FirebaseMessaging.instance;
 
-    // Request permission (iOS)
-    final settings = await _messaging!.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      provisional: false,
-    );
+    // Register background message handler
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    debugPrint('Notification permission: ${settings.authorizationStatus}');
+    // Request permission (iOS + Android 13+)
+    try {
+      final settings = await _messaging!.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+        provisional: false,
+      );
+
+      debugPrint('Notification permission: ${settings.authorizationStatus}');
+    } catch (e) {
+      debugPrint('Error requesting notification permission: $e');
+    }
 
     // Handle foreground messages
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
@@ -143,6 +167,13 @@ class NotificationService {
     if (initialMessage != null) {
       _handleMessageTap(initialMessage);
     }
+
+    // Listen for token refresh and persist to the correct parent document
+    _messaging!.onTokenRefresh.listen((token) {
+      if (_currentSchoolId != null && _currentUserId != null) {
+        _persistToken(token, _currentSchoolId!, _currentUserId!);
+      }
+    });
   }
 
   /// Handle foreground Firebase messages
@@ -228,27 +259,106 @@ class NotificationService {
     );
   }
 
-  /// Schedule daily reading reminder
-  Future<void> scheduleDailyReminder({
+  // Notification ID scheme: childIndex * 10 + slot
+  // slot 0 = daily (all days), slots 1-7 = specific weekday (Mon=1 .. Sun=7)
+  static const String _scheduledIdsKey = 'scheduled_notification_ids';
+
+  static int _notificationId(int childIndex, int slot) => childIndex * 10 + slot;
+
+  /// Schedule reading reminders for one or more children.
+  ///
+  /// [childNames] — list of linked children's first names.
+  /// [hour], [minute] — time of day for the reminder.
+  /// [days] — weekdays to remind on (1=Mon .. 7=Sun). Empty/null = every day.
+  Future<void> scheduleReminders({
+    required List<String> childNames,
     required int hour,
     required int minute,
-    required String studentName,
+    List<int>? days,
   }) async {
     if (!_initialized) {
       debugPrint('Notification service not initialized');
       return;
     }
 
-    // Cancel existing reminder
-    await cancelDailyReminder();
+    // Cancel only previously-scheduled IDs (not a blind 200-iteration loop)
+    await cancelAllReminders();
 
-    // Schedule new reminder
-    final now = DateTime.now();
-    var scheduledDate = DateTime(now.year, now.month, now.day, hour, minute);
+    final effectiveDays = (days == null || days.isEmpty) ? <int>[] : days;
+    final isDaily = effectiveDays.isEmpty;
+    final scheduledIds = <int>[];
 
-    // If time has passed today, schedule for tomorrow
-    if (scheduledDate.isBefore(now)) {
-      scheduledDate = scheduledDate.add(const Duration(days: 1));
+    for (int childIdx = 0; childIdx < childNames.length; childIdx++) {
+      final name = childNames[childIdx];
+      final body = "Don't forget to log $name's reading today!";
+
+      if (isDaily) {
+        final id = _notificationId(childIdx, 0);
+        await _scheduleOne(
+          id: id,
+          body: body,
+          hour: hour,
+          minute: minute,
+          matchComponents: DateTimeComponents.time,
+        );
+        scheduledIds.add(id);
+      } else {
+        for (final day in effectiveDays) {
+          final id = _notificationId(childIdx, day);
+          await _scheduleOne(
+            id: id,
+            body: body,
+            hour: hour,
+            minute: minute,
+            weekday: day,
+            matchComponents: DateTimeComponents.dayOfWeekAndTime,
+          );
+          scheduledIds.add(id);
+        }
+      }
+    }
+
+    // Persist scheduled IDs + preferences
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(
+      _scheduledIdsKey,
+      scheduledIds.map((id) => id.toString()).toList(),
+    );
+    await prefs.setInt('reminder_hour', hour);
+    await prefs.setInt('reminder_minute', minute);
+    await prefs.setBool('reminders_enabled', true);
+    await prefs.setStringList(
+      'reminder_days',
+      effectiveDays.map((d) => d.toString()).toList(),
+    );
+
+    debugPrint(
+      'Reminders scheduled: ${scheduledIds.length} notifications for '
+      '${childNames.length} child(ren) at '
+      '$hour:${minute.toString().padLeft(2, '0')} on '
+      '${isDaily ? "every day" : "days $effectiveDays"}',
+    );
+  }
+
+  /// Internal: schedule a single local notification.
+  Future<void> _scheduleOne({
+    required int id,
+    required String body,
+    required int hour,
+    required int minute,
+    int? weekday,
+    required DateTimeComponents matchComponents,
+  }) async {
+    final now = tz.TZDateTime.now(tz.local);
+    var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+
+    if (weekday != null) {
+      // Advance to the next occurrence of this weekday
+      while (scheduled.weekday != weekday || scheduled.isBefore(now)) {
+        scheduled = scheduled.add(const Duration(days: 1));
+      }
+    } else if (scheduled.isBefore(now)) {
+      scheduled = scheduled.add(const Duration(days: 1));
     }
 
     final androidDetails = AndroidNotificationDetails(
@@ -272,32 +382,54 @@ class NotificationService {
     );
 
     await _localNotifications.zonedSchedule(
-      0, // ID for daily reminder
+      id,
       'Time to read with Lumi! 📚',
-      "Don't forget to log $studentName's reading today!",
-      tz.TZDateTime.from(scheduledDate, tz.local),
+      body,
+      scheduled,
       details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.time, // Repeat daily
+      matchDateTimeComponents: matchComponents,
     );
-
-    // Save preference
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('reminder_hour', hour);
-    await prefs.setInt('reminder_minute', minute);
-    await prefs.setBool('reminders_enabled', true);
-
-    debugPrint('Daily reminder scheduled for $hour:$minute');
   }
 
-  /// Cancel daily reminder
-  Future<void> cancelDailyReminder() async {
-    await _localNotifications.cancel(0);
-
+  /// Cancel only the notification IDs we previously scheduled.
+  Future<void> cancelAllReminders() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('reminders_enabled', false);
+    final idStrings = prefs.getStringList(_scheduledIdsKey) ?? [];
 
-    debugPrint('Daily reminder cancelled');
+    // Cancel only the IDs we actually scheduled
+    for (final idStr in idStrings) {
+      final id = int.tryParse(idStr);
+      if (id != null) {
+        await _localNotifications.cancel(id);
+      }
+    }
+
+    await prefs.remove(_scheduledIdsKey);
+    await prefs.setBool('reminders_enabled', false);
+    await prefs.remove('reminder_days');
+
+    debugPrint('Cancelled ${idStrings.length} scheduled reminders');
+  }
+
+  /// Backward-compatible wrappers ------------------------------------------------
+
+  /// Schedule a daily reminder for a single child (legacy callers).
+  Future<void> scheduleDailyReminder({
+    required int hour,
+    required int minute,
+    required String studentName,
+  }) async {
+    await scheduleReminders(
+      childNames: [studentName],
+      hour: hour,
+      minute: minute,
+    );
+  }
+
+  /// Cancel all reminders (legacy callers).
+  Future<void> cancelDailyReminder() async {
+    await cancelAllReminders();
   }
 
   /// Check if reminders are enabled
@@ -317,6 +449,13 @@ class NotificationService {
     final minute = prefs.getInt('reminder_minute') ?? 0;
 
     return {'hour': hour, 'minute': minute};
+  }
+
+  /// Get reminder days (empty = every day)
+  Future<List<int>> getReminderDays() async {
+    final prefs = await SharedPreferences.getInstance();
+    final dayStrings = prefs.getStringList('reminder_days') ?? [];
+    return dayStrings.map((s) => int.tryParse(s) ?? 0).where((d) => d >= 1 && d <= 7).toList();
   }
 
   /// Request notification permissions
@@ -360,6 +499,68 @@ class NotificationService {
       channelId: _achievementChannel,
       payload: 'achievement:$achievementName',
     );
+  }
+
+  /// Save FCM token to the correct parent document in Firestore
+  /// Called after login/auto-login once the user's schoolId and userId are known
+  Future<void> saveTokenForUser(String schoolId, String userId) async {
+    _currentSchoolId = schoolId;
+    _currentUserId = userId;
+
+    if (_messaging == null || kIsWeb) return;
+
+    try {
+      final token = await _messaging!.getToken();
+      if (token != null) {
+        await _persistToken(token, schoolId, userId);
+        debugPrint('FCM token saved for parent $userId in school $schoolId');
+      }
+    } catch (e) {
+      // APNS token not available on iOS Simulator - expected
+      if (e.toString().contains('apns-token-not-set')) {
+        debugPrint('APNS not available (iOS Simulator) - notifications will work on physical devices');
+      } else {
+        debugPrint('Error saving FCM token: $e');
+      }
+    }
+  }
+
+  /// Persist token to the parent's Firestore document
+  Future<void> _persistToken(String token, String schoolId, String userId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('schools')
+          .doc(schoolId)
+          .collection('parents')
+          .doc(userId)
+          .update({
+        'fcmToken': token,
+        'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('Error persisting FCM token: $e');
+    }
+  }
+
+  /// Clear FCM token from Firestore on logout
+  Future<void> clearTokenForUser() async {
+    if (_currentSchoolId != null && _currentUserId != null) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('schools')
+            .doc(_currentSchoolId!)
+            .collection('parents')
+            .doc(_currentUserId!)
+            .update({
+          'fcmToken': FieldValue.delete(),
+          'fcmTokenUpdatedAt': FieldValue.delete(),
+        });
+      } catch (e) {
+        debugPrint('Error clearing FCM token: $e');
+      }
+    }
+    _currentSchoolId = null;
+    _currentUserId = null;
   }
 
   /// Test notification (for debugging)

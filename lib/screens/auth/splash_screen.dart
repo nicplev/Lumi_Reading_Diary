@@ -10,7 +10,9 @@ import '../../core/theme/lumi_spacing.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../core/routing/app_router.dart';
 import '../../data/providers/user_provider.dart';
+import '../../data/models/user_model.dart';
 import '../../services/firebase_service.dart';
+import '../../services/notification_service.dart';
 import '../../services/analytics_service.dart';
 import '../../services/crash_reporting_service.dart';
 
@@ -38,6 +40,18 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     final firebaseUser = firebaseService.auth.currentUser;
 
     if (firebaseUser != null) {
+      // Reload to get fresh emailVerified status from Firebase server
+      await firebaseUser.reload();
+      final refreshedUser = firebaseService.auth.currentUser;
+
+      // Enforce email verification on returning sessions too
+      if (refreshedUser == null || !refreshedUser.emailVerified) {
+        await firebaseService.auth.signOut();
+        if (!mounted) return;
+        _navigateToLogin();
+        return;
+      }
+
       // User is logged in — read user document directly (avoids StreamProvider hang)
       try {
         final userRepository = ref.read(userRepositoryProvider);
@@ -50,6 +64,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           AnalyticsService.instance.logAppOpened(role: user.role.name);
           CrashReportingService.instance.setUserId(user.id);
           CrashReportingService.instance.setCustomKey('role', user.role.name);
+
+          // Save FCM token for parents on auto-login
+          if (user.role == UserRole.parent && user.schoolId != null) {
+            NotificationService.instance.saveTokenForUser(
+              user.schoolId!,
+              user.id,
+            );
+          }
 
           // Check if parent is trying to access web
           final redirectRoute = AppRouter.checkParentWebAccess(user.role);

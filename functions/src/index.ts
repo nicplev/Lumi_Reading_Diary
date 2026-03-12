@@ -140,106 +140,305 @@ export const aggregateStudentStats = functions.firestore
     }
   });
 
+// ---------------------------------------------------------------------------
+// Reading reminders — scalable, cost-effective, per-parent scheduling
+// ---------------------------------------------------------------------------
+
+/** Max messages per sendEach call (FCM limit) */
+const FCM_BATCH_LIMIT = 500;
+
+/** How many schools to process concurrently (prevents OOM on large deployments) */
+const SCHOOL_CONCURRENCY = 10;
+
+/** Firestore `in` query limit */
+const FIRESTORE_IN_LIMIT = 30;
+
 /**
- * Send reading reminder notifications to parents
- * Scheduled to run daily at configurable times
+ * Helper: resolve local hour & ISO weekday for a timezone.
  */
-export const sendReadingReminders = functions.pubsub
-  .schedule("0 18 * * *") // 6 PM daily
-  .timeZone("America/New_York") // Configurable per school
-  .onRun(async (context) => {
-    functions.logger.info("Starting daily reading reminders");
+function getLocalTime(utcNow: Date, tz: string): {hour: number; weekday: number} {
+  try {
+    const hf = new Intl.DateTimeFormat("en-GB", {timeZone: tz, hour: "numeric", hour12: false});
+    const hour = parseInt(hf.format(utcNow), 10);
 
-    try {
-      // Get all schools to check their quiet hours
-      const schoolsSnapshot = await db.collection("schools").get();
+    const df = new Intl.DateTimeFormat("en-GB", {timeZone: tz, weekday: "short"});
+    const dayMap: Record<string, number> = {Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7};
+    const weekday = dayMap[df.format(utcNow)] ?? 1;
 
-      for (const schoolDoc of schoolsSnapshot.docs) {
-        const schoolId = schoolDoc.id;
-        const schoolData = schoolDoc.data();
-        const quietHours = schoolData.quietHours;
+    return {hour, weekday};
+  } catch {
+    const hour = utcNow.getUTCHours();
+    const weekday = utcNow.getUTCDay() === 0 ? 7 : utcNow.getUTCDay();
+    return {hour, weekday};
+  }
+}
 
-        // Skip if in quiet hours
-        if (quietHours?.enabled) {
-          const now = new Date();
-          const currentHour = now.getHours();
-          if (currentHour >= quietHours.start || currentHour < quietHours.end) {
-            functions.logger.info(`Skipping ${schoolId} - quiet hours active`);
-            continue;
-          }
-        }
+/**
+ * Helper: split array into chunks of `size`.
+ */
+function chunk<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
+}
 
-        // Get students who haven't logged reading today
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const todayTimestamp = admin.firestore.Timestamp.fromDate(today);
+/**
+ * Helper: process an array with limited concurrency.
+ */
+async function mapConcurrent<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = [];
+  const batches = chunk(items, concurrency);
+  for (const batch of batches) {
+    const batchResults = await Promise.all(batch.map(fn));
+    results.push(...batchResults);
+  }
+  return results;
+}
 
-        const studentsSnapshot = await db
-          .collection(`schools/${schoolId}/students`)
-          .get();
+/**
+ * Process reminders for a single school.
+ *
+ * Flow:
+ *  1. Determine local hour/weekday from school timezone.
+ *  2. Fetch parents with tokens — filter eligible in memory.
+ *  3. Gather student IDs from eligible parents' linkedChildren (no full students read).
+ *  4. Check which of those students logged today (batched `in` queries).
+ *  5. Build ONE message per parent listing all un-logged children.
+ *  6. Send via sendEach in 500-msg chunks.
+ *  7. Clean up stale tokens.
+ */
+async function processSchool(
+  schoolId: string,
+  schoolData: FirebaseFirestore.DocumentData,
+  utcNow: Date,
+): Promise<{sent: number; failed: number; stale: number}> {
+  const schoolTz = schoolData.timezone || "Europe/London";
+  const {hour: localHour, weekday: localWeekday} = getLocalTime(utcNow, schoolTz);
 
-        for (const studentDoc of studentsSnapshot.docs) {
-          const studentId = studentDoc.id;
-          const studentData = studentDoc.data();
+  // Quiet hours check
+  const qh = schoolData.quietHours;
+  if (qh?.enabled && (localHour >= qh.start || localHour < qh.end)) {
+    return {sent: 0, failed: 0, stale: 0};
+  }
 
-          // Check if student has logged today
-          const todayLogsSnapshot = await db
-            .collection(`schools/${schoolId}/readingLogs`)
-            .where("studentId", "==", studentId)
-            .where("date", ">=", todayTimestamp)
-            .limit(1)
-            .get();
+  // ---- Step 1: Fetch parents who have a token ----
+  const parentsSnap = await db
+    .collection(`schools/${schoolId}/parents`)
+    .where("fcmToken", "!=", null)
+    .get();
 
-          if (todayLogsSnapshot.empty && studentData.parentIds?.length > 0) {
-            // Send notification to all linked parents
-            for (const parentId of studentData.parentIds) {
-              const parentDoc = await db
-                .doc(`schools/${schoolId}/parents/${parentId}`)
-                .get();
+  if (parentsSnap.empty) return {sent: 0, failed: 0, stale: 0};
 
-              const parentData = parentDoc.data();
-              if (parentData?.fcmToken) {
-                const message = {
-                  token: parentData.fcmToken,
-                  notification: {
-                    title: "Time to read with Lumi! 📚",
-                    body: `Don't forget to log ${studentData.firstName}'s reading today!`,
-                  },
-                  data: {
-                    type: "reading_reminder",
-                    studentId: studentId,
-                    schoolId: schoolId,
-                  },
-                  apns: {
-                    payload: {
-                      aps: {
-                        sound: "default",
-                      },
-                    },
-                  },
-                  android: {
-                    priority: "high" as const,
-                    notification: {
-                      sound: "default",
-                      clickAction: "FLUTTER_NOTIFICATION_CLICK",
-                    },
-                  },
-                };
+  // ---- Step 2: Filter eligible parents in memory ----
+  // Also collect ALL student IDs we need to check (from linkedChildren)
+  interface EligibleParent {
+    id: string;
+    token: string;
+    linkedChildren: string[]; // student IDs
+  }
 
-                try {
-                  await admin.messaging().send(message);
-                  functions.logger.info("Reminder sent", {parentId, studentId});
-                } catch (error) {
-                  functions.logger.error("Failed to send reminder", {
-                    parentId,
-                    error: error instanceof Error ? error.message : String(error),
-                  });
-                }
-              }
-            }
-          }
+  const eligible: EligibleParent[] = [];
+  const allStudentIds = new Set<string>();
+
+  for (const pDoc of parentsSnap.docs) {
+    const p = pDoc.data();
+    if (!p.fcmToken) continue;
+    if (p.preferences?.notificationsEnabled === false) continue;
+
+    // Hour check (default 18 / 6 PM)
+    let prefHour = 18;
+    if (p.preferences?.reminderTime) {
+      const parts = (p.preferences.reminderTime as string).split(":");
+      prefHour = parseInt(parts[0], 10) || 18;
+    }
+    if (prefHour !== localHour) continue;
+
+    // Day-of-week check (empty = every day)
+    const days: number[] = p.preferences?.reminderDays ?? [];
+    if (days.length > 0 && !days.includes(localWeekday)) continue;
+
+    const children: string[] = p.linkedChildren ?? [];
+    if (children.length === 0) continue;
+
+    eligible.push({id: pDoc.id, token: p.fcmToken, linkedChildren: children});
+    children.forEach((c) => allStudentIds.add(c));
+  }
+
+  if (eligible.length === 0) return {sent: 0, failed: 0, stale: 0};
+
+  // ---- Step 3: Check which students logged today ----
+  // Use batched `in` queries on readingLogs (max 30 per query)
+  const today = new Date(utcNow);
+  today.setHours(0, 0, 0, 0);
+  const todayTs = admin.firestore.Timestamp.fromDate(today);
+
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowTs = admin.firestore.Timestamp.fromDate(tomorrow);
+
+  const loggedToday = new Set<string>();
+  const studentIdBatches = chunk([...allStudentIds], FIRESTORE_IN_LIMIT);
+
+  await Promise.all(studentIdBatches.map(async (batch) => {
+    const snap = await db
+      .collection(`schools/${schoolId}/readingLogs`)
+      .where("studentId", "in", batch)
+      .where("date", ">=", todayTs)
+      .where("date", "<", tomorrowTs)
+      .select("studentId")
+      .get();
+    snap.docs.forEach((d) => loggedToday.add(d.data().studentId as string));
+  }));
+
+  // ---- Step 4: Fetch student first names for un-logged children ----
+  // Only read student docs we actually need (children not yet logged)
+  const unloggedIds = [...allStudentIds].filter((id) => !loggedToday.has(id));
+  if (unloggedIds.length === 0) return {sent: 0, failed: 0, stale: 0};
+
+  const studentNames = new Map<string, string>();
+  const nameBatches = chunk(unloggedIds, FIRESTORE_IN_LIMIT);
+
+  await Promise.all(nameBatches.map(async (batch) => {
+    // getAll is more efficient than individual reads
+    const refs = batch.map((id) => db.doc(`schools/${schoolId}/students/${id}`));
+    const docs = await db.getAll(...refs);
+    docs.forEach((d) => {
+      if (d.exists) {
+        studentNames.set(d.id, d.data()?.firstName ?? "your child");
+      }
+    });
+  }));
+
+  // ---- Step 5: Build ONE message per parent ----
+  const messages: admin.messaging.TokenMessage[] = [];
+  const msgParentIds: string[] = [];
+
+  for (const parent of eligible) {
+    const unloggedChildren = parent.linkedChildren
+      .filter((id) => !loggedToday.has(id))
+      .map((id) => studentNames.get(id))
+      .filter((name): name is string => !!name);
+
+    if (unloggedChildren.length === 0) continue;
+
+    // Build a human-readable body
+    let body: string;
+    if (unloggedChildren.length === 1) {
+      body = `Don't forget to log ${unloggedChildren[0]}'s reading today!`;
+    } else if (unloggedChildren.length === 2) {
+      body = `Don't forget to log ${unloggedChildren[0]} and ${unloggedChildren[1]}'s reading today!`;
+    } else {
+      const last = unloggedChildren.pop();
+      body = `Don't forget to log ${unloggedChildren.join(", ")} and ${last}'s reading today!`;
+    }
+
+    messages.push({
+      token: parent.token,
+      notification: {
+        title: "Time to read with Lumi! 📚",
+        body,
+      },
+      data: {
+        type: "reading_reminder",
+        schoolId,
+      },
+      apns: {payload: {aps: {sound: "default"}}},
+      android: {
+        priority: "high" as const,
+        notification: {sound: "default", clickAction: "FLUTTER_NOTIFICATION_CLICK"},
+      },
+    });
+    msgParentIds.push(parent.id);
+  }
+
+  if (messages.length === 0) return {sent: 0, failed: 0, stale: 0};
+
+  // ---- Step 6: Send in 500-message chunks ----
+  let totalSent = 0;
+  let totalFailed = 0;
+  const staleParentIds = new Set<string>();
+
+  const msgChunks = chunk(messages, FCM_BATCH_LIMIT);
+  const idChunks = chunk(msgParentIds, FCM_BATCH_LIMIT);
+
+  for (let i = 0; i < msgChunks.length; i++) {
+    const results = await admin.messaging().sendEach(msgChunks[i]);
+    totalSent += results.successCount;
+    totalFailed += results.failureCount;
+
+    results.responses.forEach((resp, idx) => {
+      if (!resp.success && resp.error) {
+        const code = resp.error.code;
+        if (
+          code === "messaging/registration-token-not-registered" ||
+          code === "messaging/invalid-registration-token"
+        ) {
+          staleParentIds.add(idChunks[i][idx]);
         }
       }
+    });
+  }
+
+  // ---- Step 7: Clean up stale tokens ----
+  if (staleParentIds.size > 0) {
+    const staleBatches = chunk([...staleParentIds], 500); // Firestore batch limit
+    for (const batch of staleBatches) {
+      const writeBatch = db.batch();
+      for (const pid of batch) {
+        writeBatch.update(db.doc(`schools/${schoolId}/parents/${pid}`), {
+          fcmToken: admin.firestore.FieldValue.delete(),
+          fcmTokenUpdatedAt: admin.firestore.FieldValue.delete(),
+        });
+      }
+      await writeBatch.commit();
+    }
+  }
+
+  return {sent: totalSent, failed: totalFailed, stale: staleParentIds.size};
+}
+
+/**
+ * Send reading reminder notifications to parents.
+ *
+ * Runs every hour. Uses school timezone to match each parent's preferred
+ * reminder hour and day-of-week. One notification per parent (not per child).
+ * Processes schools with bounded concurrency and sends FCM in 500-msg chunks.
+ *
+ * Firestore reads per school ≈ parents(with token) + unlogged_students + log_checks
+ * (NOT all students × all logs like the naive approach)
+ */
+export const sendReadingReminders = functions
+  .runWith({timeoutSeconds: 300, memory: "512MB"})
+  .pubsub.schedule("0 * * * *") // Every hour on the hour
+  .timeZone("UTC")
+  .onRun(async () => {
+    const utcNow = new Date();
+    functions.logger.info("sendReadingReminders tick", {utcHour: utcNow.getUTCHours()});
+
+    try {
+      const schoolsSnap = await db.collection("schools").get();
+
+      const results = await mapConcurrent(
+        schoolsSnap.docs,
+        SCHOOL_CONCURRENCY,
+        (doc) => processSchool(doc.id, doc.data(), utcNow),
+      );
+
+      const totals = results.reduce(
+        (acc, r) => ({sent: acc.sent + r.sent, failed: acc.failed + r.failed, stale: acc.stale + r.stale}),
+        {sent: 0, failed: 0, stale: 0},
+      );
+
+      functions.logger.info("sendReadingReminders complete", {
+        schools: schoolsSnap.size,
+        ...totals,
+      });
 
       return null;
     } catch (error) {

@@ -366,7 +366,7 @@ class _ParentLinkingManagementScreenState
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                value: selectedParentId,
+                initialValue: selectedParentId,
                 items: student.parentIds
                     .map(
                       (id) => DropdownMenuItem(

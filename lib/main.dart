@@ -9,6 +9,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'core/theme/app_theme.dart';
 import 'core/routing/app_router.dart';
 import 'services/firebase_service.dart';
+import 'services/notification_service.dart';
 import 'services/crash_reporting_service.dart';
 import 'services/analytics_service.dart';
 import 'firebase_options.dart';
@@ -41,6 +42,9 @@ void main() async {
 
       // Initialize Firebase services
       await FirebaseService.instance.initialize();
+
+      // Initialize notification service (local notifications, FCM, timezone data)
+      await NotificationService.instance.initialize();
 
       // Initialize analytics
       await AnalyticsService.instance.initialize();

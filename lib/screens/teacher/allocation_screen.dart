@@ -13,11 +13,13 @@ import '../../services/firebase_service.dart';
 class AllocationScreen extends StatefulWidget {
   final UserModel teacher;
   final ClassModel? selectedClass;
+  final String? preselectedStudentId;
 
   const AllocationScreen({
     super.key,
     required this.teacher,
     this.selectedClass,
+    this.preselectedStudentId,
   });
 
   @override
@@ -89,7 +91,14 @@ class _AllocationScreenState extends State<AllocationScreen>
 
       setState(() {
         _students = students;
-        _selectedStudentIds = students.map((s) => s.id).toList();
+        if (widget.preselectedStudentId != null &&
+            students.any((s) => s.id == widget.preselectedStudentId)) {
+          _selectAllStudents = false;
+          _selectedStudentIds = [widget.preselectedStudentId!];
+          _allocationType = AllocationType.byTitle;
+        } else {
+          _selectedStudentIds = students.map((s) => s.id).toList();
+        }
         _isLoading = false;
       });
     } catch (e) {
@@ -185,8 +194,15 @@ class _AllocationScreenState extends State<AllocationScreen>
       _cadence = AllocationCadence.weekly;
       _startDate = DateTime.now();
       _endDate = DateTime.now().add(const Duration(days: 7));
-      _selectedStudentIds = _students.map((s) => s.id).toList();
-      _selectAllStudents = true;
+      if (widget.preselectedStudentId != null &&
+          _students.any((s) => s.id == widget.preselectedStudentId)) {
+        _selectAllStudents = false;
+        _selectedStudentIds = [widget.preselectedStudentId!];
+        _allocationType = AllocationType.byTitle;
+      } else {
+        _selectedStudentIds = _students.map((s) => s.id).toList();
+        _selectAllStudents = true;
+      }
       _levelRangeStart = null;
       _levelRangeEnd = null;
       _bookTitles.clear();
@@ -334,8 +350,8 @@ class _AllocationScreenState extends State<AllocationScreen>
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(
                                   TeacherDimensions.radiusM),
-                              borderSide: BorderSide(
-                                  color: AppColors.teacherPrimary),
+                              borderSide:
+                                  BorderSide(color: AppColors.teacherPrimary),
                             ),
                           ),
                           style: TeacherTypography.bodyMedium,
@@ -356,8 +372,8 @@ class _AllocationScreenState extends State<AllocationScreen>
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(
                                   TeacherDimensions.radiusM),
-                              borderSide: BorderSide(
-                                  color: AppColors.teacherPrimary),
+                              borderSide:
+                                  BorderSide(color: AppColors.teacherPrimary),
                             ),
                           ),
                           style: TeacherTypography.bodyMedium,
@@ -377,8 +393,8 @@ class _AllocationScreenState extends State<AllocationScreen>
                             horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
                           color: AppColors.background,
-                          borderRadius: BorderRadius.circular(
-                              TeacherDimensions.radiusM),
+                          borderRadius:
+                              BorderRadius.circular(TeacherDimensions.radiusM),
                           boxShadow: TeacherDimensions.cardShadow,
                         ),
                         child: Row(
@@ -414,8 +430,8 @@ class _AllocationScreenState extends State<AllocationScreen>
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(
                                   TeacherDimensions.radiusM),
-                              borderSide: BorderSide(
-                                  color: AppColors.teacherPrimary),
+                              borderSide:
+                                  BorderSide(color: AppColors.teacherPrimary),
                             ),
                           ),
                           style: TeacherTypography.bodyMedium,
@@ -467,8 +483,7 @@ class _AllocationScreenState extends State<AllocationScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Frequency',
-                              style: TeacherTypography.bodySmall),
+                          Text('Frequency', style: TeacherTypography.bodySmall),
                           const SizedBox(height: 8),
                           DropdownButtonFormField<AllocationCadence>(
                             initialValue: _cadence,
@@ -481,12 +496,12 @@ class _AllocationScreenState extends State<AllocationScreen>
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(
                                     TeacherDimensions.radiusM),
-                                borderSide: BorderSide(
-                                    color: AppColors.teacherPrimary),
+                                borderSide:
+                                    BorderSide(color: AppColors.teacherPrimary),
                               ),
                             ),
-                            style: TeacherTypography.bodyMedium.copyWith(
-                                color: AppColors.charcoal),
+                            style: TeacherTypography.bodyMedium
+                                .copyWith(color: AppColors.charcoal),
                             items: AllocationCadence.values.map((cadence) {
                               return DropdownMenuItem(
                                 value: cadence,
@@ -523,8 +538,8 @@ class _AllocationScreenState extends State<AllocationScreen>
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(
                                     TeacherDimensions.radiusM),
-                                borderSide: BorderSide(
-                                    color: AppColors.teacherPrimary),
+                                borderSide:
+                                    BorderSide(color: AppColors.teacherPrimary),
                               ),
                             ),
                             style: TeacherTypography.bodyMedium,
@@ -689,8 +704,7 @@ class _AllocationScreenState extends State<AllocationScreen>
                 focusedBorder: OutlineInputBorder(
                   borderRadius:
                       BorderRadius.circular(TeacherDimensions.radiusM),
-                  borderSide:
-                      BorderSide(color: AppColors.teacherPrimary),
+                  borderSide: BorderSide(color: AppColors.teacherPrimary),
                 ),
               ),
               style: TeacherTypography.bodyMedium,
@@ -846,8 +860,8 @@ class _AllocationScreenState extends State<AllocationScreen>
                       borderRadius:
                           BorderRadius.circular(TeacherDimensions.radiusL),
                     ),
-                    title: Text('Delete Allocation',
-                        style: TeacherTypography.h3),
+                    title:
+                        Text('Delete Allocation', style: TeacherTypography.h3),
                     content: Text(
                       'Are you sure you want to delete this allocation?',
                       style: TeacherTypography.bodyMedium,
@@ -953,8 +967,7 @@ class _AllocationScreenState extends State<AllocationScreen>
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               border: Border.all(color: AppColors.divider),
-              borderRadius:
-                  BorderRadius.circular(TeacherDimensions.radiusM),
+              borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1082,8 +1095,7 @@ class _AllocationCard extends StatelessWidget {
                 color: isExpiring
                     ? AppColors.warning.withValues(alpha: 0.1)
                     : AppColors.background,
-                borderRadius:
-                    BorderRadius.circular(TeacherDimensions.radiusS),
+                borderRadius: BorderRadius.circular(TeacherDimensions.radiusS),
               ),
               child: Row(
                 children: [
@@ -1131,8 +1143,7 @@ class _AllocationCard extends StatelessWidget {
             // Students
             Row(
               children: [
-                Icon(Icons.groups,
-                    size: 16, color: AppColors.textSecondary),
+                Icon(Icons.groups, size: 16, color: AppColors.textSecondary),
                 const SizedBox(width: 8),
                 Text(
                   allocation.isForWholeClass
@@ -1147,8 +1158,7 @@ class _AllocationCard extends StatelessWidget {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(Icons.repeat,
-                      size: 16, color: AppColors.teacherPrimary),
+                  Icon(Icons.repeat, size: 16, color: AppColors.teacherPrimary),
                   const SizedBox(width: 8),
                   Text(
                     'Recurring',

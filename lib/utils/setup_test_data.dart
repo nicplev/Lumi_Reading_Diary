@@ -223,16 +223,17 @@ class TestDataSetup {
   }
 
   /// Creates a NEW school admin account for Beaumaris Primary School
-  /// Use this when the original admin account is inaccessible
-  /// Email: newadmin@bps.edu.au
-  /// Password: LumiAdmin2025!
-  static Future<void> createNewSchoolAdmin() async {
+  /// Accepts custom email/password so you can use a real verifiable email.
+  static Future<void> createNewSchoolAdmin({
+    required String email,
+    required String password,
+  }) async {
     try {
       print('Creating new school admin account...');
 
       const schoolId = 'beaumaris_primary_school';
-      const adminEmail = 'newadmin@bps.edu.au';
-      const adminPassword = 'LumiAdmin2025!';
+      final adminEmail = email.trim().toLowerCase();
+      final adminPassword = password;
 
       // Create the Firebase Auth account
       UserCredential adminCredential;
@@ -247,14 +248,21 @@ class TestDataSetup {
         print('Auth account created: $adminUid');
       } catch (e) {
         if (e.toString().contains('email-already-in-use')) {
-          // Already exists — sign in to get UID
+          // Already exists — try to sign in to get UID
           print('Account already exists, signing in...');
-          adminCredential = await _auth.signInWithEmailAndPassword(
-            email: adminEmail,
-            password: adminPassword,
-          );
-          adminUid = adminCredential.user!.uid;
-          print('Signed in to existing account: $adminUid');
+          try {
+            adminCredential = await _auth.signInWithEmailAndPassword(
+              email: adminEmail,
+              password: adminPassword,
+            );
+            adminUid = adminCredential.user!.uid;
+            print('Signed in to existing account: $adminUid');
+          } catch (_) {
+            throw Exception(
+              'An account with this email already exists but the password does not match. '
+              'Use the correct password for the existing account, or try a different email.',
+            );
+          }
         } else {
           rethrow;
         }
@@ -309,6 +317,13 @@ class TestDataSetup {
       });
 
       print('Firestore user document created');
+
+      // Send verification email before signing out
+      if (_auth.currentUser != null && !_auth.currentUser!.emailVerified) {
+        await _auth.currentUser!.sendEmailVerification();
+        print('Verification email sent to $adminEmail');
+      }
+
       print('');
       print('=== NEW ADMIN ACCOUNT ===');
       print('Email:    $adminEmail');
@@ -319,7 +334,7 @@ class TestDataSetup {
 
       // Sign out so the user can log in manually from the login screen
       await _auth.signOut();
-      print('Signed out. You can now log in with the new admin credentials.');
+      print('Signed out. Verify your email, then log in.');
     } catch (e) {
       print('Error creating admin: $e');
       rethrow;

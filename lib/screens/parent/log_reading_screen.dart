@@ -41,8 +41,9 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
   static const _totalSteps = 4;
 
   // Step 1: Book selection
-  final List<String> _bookTitles = [];
-  String? _selectedBookTitle;
+  final List<String> _assignedBookTitles = [];
+  final Set<String> _selectedBookTitles = {};
+  final List<String> _customBookTitles = [];
   int _selectedMinutes = 20;
 
   // Step 2: Child feeling
@@ -63,8 +64,7 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
     if (widget.allocation != null &&
         widget.allocation!.bookTitles != null &&
         widget.allocation!.bookTitles!.isNotEmpty) {
-      _bookTitles.addAll(widget.allocation!.bookTitles!);
-      _selectedBookTitle = _bookTitles.first;
+      _assignedBookTitles.addAll(widget.allocation!.bookTitles!);
     }
   }
 
@@ -77,7 +77,9 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
   }
 
   void _nextStep() {
-    if (_currentStep == 0 && _selectedBookTitle == null && _bookTitles.isEmpty) {
+    if (_currentStep == 0 &&
+        _selectedBookTitles.isEmpty &&
+        _customBookTitles.isEmpty) {
       setState(() => _errorMessage = 'Please select or enter a book');
       return;
     }
@@ -108,13 +110,7 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
   }
 
   List<String> get _finalBookTitles {
-    if (_selectedBookTitle != null && !_bookTitles.contains(_selectedBookTitle)) {
-      return [_selectedBookTitle!, ..._bookTitles];
-    }
-    if (_selectedBookTitle != null) {
-      return [_selectedBookTitle!];
-    }
-    return _bookTitles;
+    return [..._selectedBookTitles, ..._customBookTitles];
   }
 
   String get _parentCommentText {
@@ -147,17 +143,26 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
         bookTitles: _finalBookTitles,
         notes: _notesController.text.isNotEmpty ? _notesController.text : null,
         childFeeling: _selectedFeeling,
-        parentComment: _parentCommentText.isNotEmpty ? _parentCommentText : null,
+        parentComment:
+            _parentCommentText.isNotEmpty ? _parentCommentText : null,
+        parentCommentSelections: List<String>.from(_selectedComments),
+        parentCommentFreeText: _notesController.text.trim().isNotEmpty
+            ? _notesController.text.trim()
+            : null,
         createdAt: now,
         allocationId: widget.allocation?.id,
       );
+
+      final logData = log.toFirestore();
+      // Use server timestamp for audit trail (teachers can see exact submission time)
+      logData['createdAt'] = FieldValue.serverTimestamp();
 
       await _firebaseService.firestore
           .collection('schools')
           .doc(widget.parent.schoolId)
           .collection('readingLogs')
           .doc(log.id)
-          .set(log.toFirestore());
+          .set(logData);
 
       final updatedStats = await _updateStudentStats();
 
@@ -201,19 +206,32 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
           final totalReadingDays = stats['totalReadingDays'] ?? 0;
 
           final lastReadingDate = stats['lastReadingDate'] != null
-              ? (stats['lastReadingDate'] as Timestamp).toDate()
+              ? (stats['lastReadingDate'] as Timestamp).toDate().toLocal()
               : null;
 
           int newStreak = 1;
+          bool isNewDay = true;
           if (lastReadingDate != null) {
-            final daysSinceLastReading =
-                DateTime.now().difference(lastReadingDate).inDays;
-            if (daysSinceLastReading == 1) {
+            final now = DateTime.now();
+            final today = DateTime(now.year, now.month, now.day);
+            final lastDay = DateTime(
+              lastReadingDate.year,
+              lastReadingDate.month,
+              lastReadingDate.day,
+            );
+            final calendarDaysDiff = today.difference(lastDay).inDays;
+
+            if (calendarDaysDiff == 1) {
               newStreak = currentStreak + 1;
-            } else if (daysSinceLastReading == 0) {
+            } else if (calendarDaysDiff == 0) {
               newStreak = currentStreak;
+              isNewDay = false; // Same day — don't double-count
             }
+            // calendarDaysDiff > 1 means streak is broken, newStreak stays 1
           }
+
+          final newTotalDays =
+              isNewDay ? totalReadingDays + 1 : totalReadingDays;
 
           newStats = {
             'totalMinutesRead': totalMinutesRead + _selectedMinutes,
@@ -222,9 +240,9 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
             'longestStreak':
                 newStreak > longestStreak ? newStreak : longestStreak,
             'lastReadingDate': FieldValue.serverTimestamp(),
-            'totalReadingDays': totalReadingDays + 1,
+            'totalReadingDays': newTotalDays,
             'averageMinutesPerDay': (totalMinutesRead + _selectedMinutes) /
-                (totalReadingDays + 1),
+                (newTotalDays > 0 ? newTotalDays : 1),
           };
 
           transaction.update(studentRef, {'stats': newStats});
@@ -292,7 +310,8 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: LumiTextStyles.bodySmall(color: AppColors.error),
+                          style:
+                              LumiTextStyles.bodySmall(color: AppColors.error),
                         ),
                       ),
                     ],
@@ -355,23 +374,29 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Assigned books as radio list
-          if (_bookTitles.isNotEmpty) ...[
+          // Assigned books as checkbox list
+          if (_assignedBookTitles.isNotEmpty) ...[
             LumiCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Assigned Books', style: LumiTextStyles.label()),
                   const SizedBox(height: 12),
-                  ..._bookTitles.map((title) => RadioListTile<String>(
+                  ..._assignedBookTitles.map((title) => CheckboxListTile(
                         title: Text(title, style: LumiTextStyles.body()),
-                        value: title,
-                        groupValue: _selectedBookTitle,
+                        value: _selectedBookTitles.contains(title),
                         activeColor: AppColors.rosePink,
-                        onChanged: (value) {
-                          setState(() => _selectedBookTitle = value);
+                        onChanged: (checked) {
+                          setState(() {
+                            if (checked == true) {
+                              _selectedBookTitles.add(title);
+                            } else {
+                              _selectedBookTitles.remove(title);
+                            }
+                          });
                         },
                         contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
                       )),
                 ],
               ),
@@ -384,7 +409,12 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Or add a book', style: LumiTextStyles.label()),
+                Text(
+                  _assignedBookTitles.isNotEmpty
+                      ? 'Or add a book'
+                      : 'Add a book',
+                  style: LumiTextStyles.label(),
+                ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -397,9 +427,10 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
                         ),
                         textInputAction: TextInputAction.done,
                         onSubmitted: (value) {
-                          if (value.isNotEmpty) {
+                          if (value.isNotEmpty &&
+                              !_customBookTitles.contains(value)) {
                             setState(() {
-                              _selectedBookTitle = value;
+                              _customBookTitles.add(value);
                               _bookTitleController.clear();
                             });
                           }
@@ -409,9 +440,11 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
                     const SizedBox(width: 8),
                     IconButton(
                       onPressed: () {
-                        if (_bookTitleController.text.isNotEmpty) {
+                        final value = _bookTitleController.text.trim();
+                        if (value.isNotEmpty &&
+                            !_customBookTitles.contains(value)) {
                           setState(() {
-                            _selectedBookTitle = _bookTitleController.text;
+                            _customBookTitles.add(value);
                             _bookTitleController.clear();
                           });
                         }
@@ -422,16 +455,22 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
                     ),
                   ],
                 ),
-                if (_selectedBookTitle != null &&
-                    !_bookTitles.contains(_selectedBookTitle))
+                if (_customBookTitles.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 12),
-                    child: Chip(
-                      label: Text(_selectedBookTitle!),
-                      deleteIcon: const Icon(Icons.close, size: 18),
-                      onDeleted: () {
-                        setState(() => _selectedBookTitle = null);
-                      },
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _customBookTitles
+                          .map((title) => Chip(
+                                label: Text(title),
+                                deleteIcon: const Icon(Icons.close, size: 18),
+                                onDeleted: () {
+                                  setState(
+                                      () => _customBookTitles.remove(title));
+                                },
+                              ))
+                          .toList(),
                     ),
                   ),
               ],
@@ -469,7 +508,9 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
                       label: Text('$minutes'),
                       selected: _selectedMinutes == minutes,
                       onSelected: (selected) {
-                        if (selected) setState(() => _selectedMinutes = minutes);
+                        if (selected) {
+                          setState(() => _selectedMinutes = minutes);
+                        }
                       },
                       selectedColor: AppColors.rosePink,
                       labelStyle: TextStyle(
@@ -561,8 +602,10 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
               children: [
                 _buildSummaryRow(
                   Icons.menu_book,
-                  'Book',
-                  _selectedBookTitle ?? 'Not selected',
+                  _finalBookTitles.length == 1 ? 'Book' : 'Books',
+                  _finalBookTitles.isNotEmpty
+                      ? _finalBookTitles.join(', ')
+                      : 'Not selected',
                 ),
                 const Divider(height: 24),
                 _buildSummaryRow(

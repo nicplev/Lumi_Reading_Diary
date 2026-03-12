@@ -7,10 +7,12 @@ import '../../core/theme/lumi_text_styles.dart';
 import '../../core/theme/lumi_spacing.dart';
 import '../../core/theme/lumi_borders.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/lumi_card.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
 import '../../services/firebase_service.dart';
+import '../../services/notification_service.dart';
 import '../../core/widgets/lumi/feedback_widget.dart';
 
 class ParentProfileScreen extends StatefulWidget {
@@ -27,10 +29,18 @@ class ParentProfileScreen extends StatefulWidget {
 
 class _ParentProfileScreenState extends State<ParentProfileScreen> {
   final FirebaseService _firebaseService = FirebaseService.instance;
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _settingsKey = GlobalKey();
   bool _notificationsEnabled = true;
   TimeOfDay _reminderTime = const TimeOfDay(hour: 19, minute: 0);
+  // Selected weekdays (1=Mon..7=Sun). Empty = every day.
+  List<int> _reminderDays = [];
   bool _isLoading = false;
   List<StudentModel> _linkedChildren = [];
+  bool _settingsExpanded = false;
+
+  static const _dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  static const _dayValues = [1, 2, 3, 4, 5, 6, 7]; // DateTime weekdays
 
   @override
   void initState() {
@@ -39,26 +49,38 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
     _loadLinkedChildren();
   }
 
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadPreferences() async {
-    // Load user preferences
     final preferences = widget.user.preferences;
     if (preferences != null) {
       setState(() {
         _notificationsEnabled = preferences['notificationsEnabled'] ?? true;
         if (preferences['reminderTime'] != null) {
-          final timeString = preferences['reminderTime'];
+          final timeString = preferences['reminderTime'] as String;
           if (timeString.contains(':')) {
-            final time = timeString.split(':');
-            if (time.length >= 2) {
+            final parts = timeString.split(':');
+            if (parts.length >= 2) {
               _reminderTime = TimeOfDay(
-                hour: int.tryParse(time[0]) ?? 20,
-                minute: int.tryParse(time[1]) ?? 0,
+                hour: int.tryParse(parts[0]) ?? 19,
+                minute: int.tryParse(parts[1]) ?? 0,
               );
             }
           }
         }
+        // Load selected days (empty = every day)
+        if (preferences['reminderDays'] != null) {
+          _reminderDays = List<int>.from(preferences['reminderDays']);
+        }
       });
     }
+
+    // Sync local notifications after children are loaded
+    // (called again from _loadLinkedChildren once children are available)
   }
 
   Future<void> _loadLinkedChildren() async {
@@ -77,6 +99,23 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
     setState(() {
       _linkedChildren = children;
     });
+
+    // Now that children are loaded, sync local notification state
+    await _syncLocalNotifications();
+  }
+
+  /// Schedule or cancel local notifications based on current preferences.
+  Future<void> _syncLocalNotifications() async {
+    if (_notificationsEnabled && _linkedChildren.isNotEmpty) {
+      await NotificationService.instance.scheduleReminders(
+        childNames: _linkedChildren.map((c) => c.firstName).toList(),
+        hour: _reminderTime.hour,
+        minute: _reminderTime.minute,
+        days: _reminderDays.isEmpty ? null : _reminderDays,
+      );
+    } else {
+      await NotificationService.instance.cancelAllReminders();
+    }
   }
 
   Future<void> _updatePreferences() async {
@@ -85,6 +124,7 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
     });
 
     try {
+      // Save to Firestore (including reminder days)
       await _firebaseService.firestore
           .collection('schools')
           .doc(widget.user.schoolId)
@@ -94,8 +134,12 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
         'preferences': {
           'notificationsEnabled': _notificationsEnabled,
           'reminderTime': '${_reminderTime.hour}:${_reminderTime.minute}',
+          'reminderDays': _reminderDays, // [] = every day
         },
       });
+
+      // Sync local notifications
+      await _syncLocalNotifications();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -146,249 +190,591 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
     }
   }
 
+  void _scrollToSettings() {
+    setState(() {
+      _settingsExpanded = true;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final context = _settingsKey.currentContext;
+      if (context != null) {
+        Scrollable.ensureVisible(
+          context,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.offWhite,
-      appBar: AppBar(
-        title: Text('Profile', style: LumiTextStyles.h3()),
-        backgroundColor: AppColors.white,
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Profile header
-            Container(
-              color: AppColors.white,
-              padding: LumiPadding.allM,
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: AppColors.rosePink,
-                    child: Text(
-                      widget.user.fullName.isNotEmpty
-                          ? widget.user.fullName[0].toUpperCase()
-                          : '?',
-                      style: LumiTextStyles.display(color: AppColors.white),
-                    ),
-                  ),
-                  LumiGap.s,
-                  Text(
-                    widget.user.fullName,
-                    style: LumiTextStyles.h2(),
-                  ),
-                  LumiGap.xxs,
-                  Text(
-                    widget.user.email,
-                    style: LumiTextStyles.bodySmall(
-                      color: AppColors.charcoal.withOpacity(0.7),
-                    ),
-                  ),
-                  LumiGap.xs,
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: LumiSpacing.inputPaddingVertical,
-                      vertical: LumiSpacing.elementSpacing - 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.rosePink.withOpacity(0.1),
-                      borderRadius: LumiBorders.circular,
-                    ),
-                    child: Text(
-                      'Parent',
-                      style: LumiTextStyles.label(color: AppColors.rosePink),
-                    ),
-                  ),
-                ],
+      body: SafeArea(
+        child: SingleChildScrollView(
+          controller: _scrollController,
+          padding: LumiPadding.allS,
+          child: Column(
+            children: [
+              _buildProfileHeader(),
+              LumiGap.m,
+              _buildLinkedChildrenCard(),
+              LumiGap.m,
+              _buildNotificationsCard(),
+              LumiGap.m,
+              _buildInviteCodeCard(),
+              LumiGap.m,
+              _buildSettingsCard(),
+              LumiGap.m,
+              LumiTextButton(
+                onPressed: _handleSignOut,
+                text: 'Sign Out',
+                color: AppColors.charcoal.withValues(alpha: 0.5),
               ),
+              LumiGap.xs,
+              Text(
+                'Version 1.0.0',
+                style: LumiTextStyles.caption(),
+              ),
+              LumiGap.l,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileHeader() {
+    // Compute aggregate streak from linked children
+    final childCount = _linkedChildren.length;
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: AppColors.primaryGradient,
+        borderRadius: LumiBorders.large,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.rosePink.withValues(alpha: 0.3),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              LumiSpacing.m,
+              LumiSpacing.m,
+              LumiSpacing.m,
+              LumiSpacing.m,
             ),
-
-            LumiGap.s,
-
-            // Linked Children Section
-            _buildSectionTitle(
-                context, 'Linked Children', Icons.family_restroom),
-            Container(
-              color: AppColors.white,
-              child: _linkedChildren.isEmpty
-                  ? ListTile(
-                      leading: Icon(Icons.info_outline,
-                          color: AppColors.charcoal.withOpacity(0.5)),
-                      title: Text(
-                        'No children linked',
-                        style: LumiTextStyles.body(
-                          color: AppColors.charcoal.withOpacity(0.7),
-                        ),
-                      ),
-                      trailing: LumiTextButton(
-                        onPressed: () {
-                          // Navigate to add child
-                        },
-                        text: 'Add Child',
-                      ),
-                    )
-                  : Column(
-                      children: _linkedChildren.map((child) {
-                        return ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor:
-                                AppColors.rosePink.withOpacity(0.1),
-                            child: Text(
-                              child.firstName.isNotEmpty
-                                  ? child.firstName[0].toUpperCase()
-                                  : '?',
-                              style: LumiTextStyles.bodyMedium(
-                                color: AppColors.rosePink,
-                              ),
-                            ),
-                          ),
-                          title: Text(child.fullName,
-                              style: LumiTextStyles.bodyMedium()),
-                          subtitle: Text(
-                            'Level: ${child.currentReadingLevel ?? "Not set"}',
-                            style: LumiTextStyles.bodySmall(
-                              color: AppColors.charcoal.withOpacity(0.7),
-                            ),
-                          ),
-                          trailing: StreamBuilder<DocumentSnapshot>(
-                            stream: _firebaseService.firestore
-                                .collection('schools')
-                                .doc(widget.user.schoolId)
-                                .collection('students')
-                                .doc(child.id)
-                                .snapshots(),
-                            builder: (context, snapshot) {
-                              if (!snapshot.hasData) return const SizedBox();
-                              final data = snapshot.data!.data()
-                                  as Map<String, dynamic>?;
-                              final stats =
-                                  data?['stats'] as Map<String, dynamic>?;
-                              final streak = stats?['currentStreak'] ?? 0;
-                              return Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: LumiSpacing.xs,
-                                  vertical: LumiSpacing.xxs,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.warmOrange.withOpacity(0.1),
-                                  borderRadius: LumiBorders.medium,
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.local_fire_department,
-                                      size: 16,
-                                      color: AppColors.warmOrange,
-                                    ),
-                                    LumiGap.horizontalXXS,
-                                    Text(
-                                      '$streak',
-                                      style: LumiTextStyles.label(
-                                        color: AppColors.warmOrange,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                        );
-                      }).toList(),
-                    ),
-            ),
-
-            LumiGap.s,
-
-            // Notification Settings
-            _buildSectionTitle(
-                context, 'Notifications', Icons.notifications_outlined),
-            Container(
-              color: AppColors.white,
-              child: Column(
-                children: [
-                  SwitchListTile(
-                    title: Text('Daily Reminders',
-                        style: LumiTextStyles.bodyMedium()),
-                    subtitle: Text('Get reminded to log daily reading',
-                        style: LumiTextStyles.bodySmall()),
-                    value: _notificationsEnabled,
-                    onChanged: (value) {
-                      setState(() {
-                        _notificationsEnabled = value;
-                      });
-                      _updatePreferences();
-                    },
-                    activeThumbColor: AppColors.rosePink,
+            child: Column(
+              children: [
+                const LumiMascot(mood: LumiMood.waving, size: 80),
+                LumiGap.s,
+                Text(
+                  widget.user.fullName,
+                  style: LumiTextStyles.h2(color: AppColors.white),
+                ),
+                LumiGap.xxs,
+                Text(
+                  widget.user.email,
+                  style: LumiTextStyles.bodySmall(
+                    color: AppColors.white.withValues(alpha: 0.85),
                   ),
-                  if (_notificationsEnabled) ...[
-                    const Divider(height: 1),
-                    ListTile(
-                      title: Text('Reminder Time',
-                          style: LumiTextStyles.bodyMedium()),
-                      subtitle: Text(
-                        _reminderTime.format(context),
-                        style:
-                            LumiTextStyles.bodySmall(color: AppColors.rosePink),
-                      ),
-                      trailing: const Icon(Icons.access_time),
-                      onTap: () async {
-                        final TimeOfDay? picked = await showTimePicker(
-                          context: context,
-                          initialTime: _reminderTime,
-                        );
-                        if (picked != null && picked != _reminderTime) {
-                          setState(() {
-                            _reminderTime = picked;
-                          });
-                          _updatePreferences();
+                ),
+                LumiGap.s,
+                // Stat chips row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildStatChip(
+                      Icons.people_outline,
+                      '$childCount ${childCount == 1 ? 'child' : 'children'}',
+                    ),
+                    LumiGap.horizontalS,
+                    // Aggregate streak chip
+                    StreamBuilder<List<DocumentSnapshot>>(
+                      stream: _linkedChildren.isNotEmpty
+                          ? _buildAggregateStreakStream()
+                          : const Stream.empty(),
+                      builder: (context, snapshot) {
+                        int totalStreak = 0;
+                        if (snapshot.hasData) {
+                          for (final doc in snapshot.data!) {
+                            final data =
+                                doc.data() as Map<String, dynamic>?;
+                            final stats =
+                                data?['stats'] as Map<String, dynamic>?;
+                            totalStreak +=
+                                (stats?['currentStreak'] ?? 0) as int;
+                          }
                         }
+                        return _buildStatChip(
+                          Icons.local_fire_department,
+                          '$totalStreak day streak',
+                        );
                       },
                     ),
                   ],
-                ],
+                ),
+              ],
+            ),
+          ),
+          // Settings gear icon at top-right
+          Positioned(
+            top: LumiSpacing.xs,
+            right: LumiSpacing.xs,
+            child: LumiIconButton(
+              onPressed: _scrollToSettings,
+              icon: Icons.settings_outlined,
+              iconColor: AppColors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Stream<List<DocumentSnapshot>> _buildAggregateStreakStream() {
+    final streams = _linkedChildren.map((child) {
+      return _firebaseService.firestore
+          .collection('schools')
+          .doc(widget.user.schoolId)
+          .collection('students')
+          .doc(child.id)
+          .snapshots();
+    }).toList();
+
+    return streams.first.asyncExpand((firstDoc) {
+      if (streams.length == 1) {
+        return Stream.value([firstDoc]);
+      }
+      // Combine all streams
+      return _combineStreams(streams);
+    });
+  }
+
+  Stream<List<DocumentSnapshot>> _combineStreams(
+      List<Stream<DocumentSnapshot>> streams) {
+    final latest = List<DocumentSnapshot?>.filled(streams.length, null);
+    return Stream.multi((controller) {
+      for (int i = 0; i < streams.length; i++) {
+        final index = i;
+        streams[index].listen(
+          (doc) {
+            latest[index] = doc;
+            if (latest.every((d) => d != null)) {
+              controller.add(latest.cast<DocumentSnapshot>());
+            }
+          },
+          onError: controller.addError,
+        );
+      }
+    });
+  }
+
+  Widget _buildStatChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: LumiSpacing.xs + 4,
+        vertical: LumiSpacing.xxs + 2,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.white.withValues(alpha: 0.2),
+        borderRadius: LumiBorders.circular,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: AppColors.white),
+          LumiGap.horizontalXXS,
+          Text(
+            label,
+            style: LumiTextStyles.label(color: AppColors.white),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLinkedChildrenCard() {
+    if (_linkedChildren.isEmpty) {
+      return LumiEmptyCard(
+        icon: Icons.family_restroom,
+        title: 'No children linked',
+        message: 'Link a child to start tracking their reading progress.',
+        actionText: 'Add Child',
+        onAction: () {
+          // Navigate to add child
+        },
+      );
+    }
+
+    return LumiCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section title inside the card
+          Row(
+            children: [
+              Icon(Icons.family_restroom,
+                  size: 20,
+                  color: AppColors.charcoal.withValues(alpha: 0.7)),
+              LumiGap.horizontalXS,
+              Text('Your Children', style: LumiTextStyles.h3()),
+            ],
+          ),
+          LumiGap.s,
+          // Child rows
+          ..._linkedChildren.map((child) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: LumiSpacing.xs),
+              child: Container(
+                padding: const EdgeInsets.all(LumiSpacing.xs + 4),
+                decoration: BoxDecoration(
+                  color: AppColors.offWhite,
+                  borderRadius: LumiBorders.medium,
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor:
+                          AppColors.rosePink.withValues(alpha: 0.1),
+                      child: Text(
+                        child.firstName.isNotEmpty
+                            ? child.firstName[0].toUpperCase()
+                            : '?',
+                        style: LumiTextStyles.bodyMedium(
+                          color: AppColors.rosePink,
+                        ),
+                      ),
+                    ),
+                    LumiGap.horizontalS,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(child.fullName,
+                              style: LumiTextStyles.bodyMedium()),
+                          Text(
+                            'Level: ${child.currentReadingLevel ?? "Not set"}',
+                            style: LumiTextStyles.bodySmall(
+                              color:
+                                  AppColors.charcoal.withValues(alpha: 0.7),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    StreamBuilder<DocumentSnapshot>(
+                      stream: _firebaseService.firestore
+                          .collection('schools')
+                          .doc(widget.user.schoolId)
+                          .collection('students')
+                          .doc(child.id)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) return const SizedBox();
+                        final data = snapshot.data!.data()
+                            as Map<String, dynamic>?;
+                        final stats =
+                            data?['stats'] as Map<String, dynamic>?;
+                        final streak = stats?['currentStreak'] ?? 0;
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: LumiSpacing.xs,
+                            vertical: LumiSpacing.xxs,
+                          ),
+                          decoration: BoxDecoration(
+                            color:
+                                AppColors.warmOrange.withValues(alpha: 0.1),
+                            borderRadius: LumiBorders.medium,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.local_fire_department,
+                                size: 16,
+                                color: AppColors.warmOrange,
+                              ),
+                              LumiGap.horizontalXXS,
+                              Text(
+                                '$streak',
+                                style: LumiTextStyles.label(
+                                  color: AppColors.warmOrange,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationsCard() {
+    return LumiCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row with toggle
+          Row(
+            children: [
+              Icon(Icons.notifications_outlined,
+                  size: 20,
+                  color: AppColors.charcoal.withValues(alpha: 0.7)),
+              LumiGap.horizontalXS,
+              Text('Reminders', style: LumiTextStyles.h3()),
+              const Spacer(),
+              Switch.adaptive(
+                value: _notificationsEnabled,
+                onChanged: (value) {
+                  setState(() {
+                    _notificationsEnabled = value;
+                  });
+                  _updatePreferences();
+                },
+                activeTrackColor: AppColors.rosePink,
+              ),
+            ],
+          ),
+          // Content when enabled or disabled
+          AnimatedCrossFade(
+            firstChild: _buildNotificationDetails(),
+            secondChild: Padding(
+              padding: const EdgeInsets.only(top: LumiSpacing.xs),
+              child: Text(
+                'Reminders are off',
+                style: LumiTextStyles.bodySmall(
+                  color: AppColors.charcoal.withValues(alpha: 0.5),
+                ),
               ),
             ),
+            crossFadeState: _notificationsEnabled
+                ? CrossFadeState.showFirst
+                : CrossFadeState.showSecond,
+            duration: const Duration(milliseconds: 250),
+          ),
+        ],
+      ),
+    );
+  }
 
+  Widget _buildNotificationDetails() {
+    return Padding(
+      padding: const EdgeInsets.only(top: LumiSpacing.s),
+      child: Container(
+        padding: const EdgeInsets.all(LumiSpacing.s),
+        decoration: BoxDecoration(
+          color: AppColors.rosePink.withValues(alpha: 0.06),
+          borderRadius: LumiBorders.medium,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Time row
+            Row(
+              children: [
+                Icon(Icons.access_time,
+                    size: 18,
+                    color: AppColors.charcoal.withValues(alpha: 0.7)),
+                LumiGap.horizontalXS,
+                Text('Remind me at', style: LumiTextStyles.bodySmall()),
+                LumiGap.horizontalXS,
+                GestureDetector(
+                  onTap: () async {
+                    final TimeOfDay? picked = await showTimePicker(
+                      context: context,
+                      initialTime: _reminderTime,
+                    );
+                    if (picked != null && picked != _reminderTime) {
+                      setState(() {
+                        _reminderTime = picked;
+                      });
+                      _updatePreferences();
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: LumiSpacing.xs + 4,
+                      vertical: LumiSpacing.xxs,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.rosePink,
+                      borderRadius: LumiBorders.circular,
+                    ),
+                    child: Text(
+                      _reminderTime.format(context),
+                      style: LumiTextStyles.label(color: AppColors.white),
+                    ),
+                  ),
+                ),
+              ],
+            ),
             LumiGap.s,
+            // Day chips row
+            Text(
+              _reminderDays.isEmpty ? 'On these days (every day)' : 'On these days',
+              style: LumiTextStyles.bodySmall(),
+            ),
+            LumiGap.xs,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: List.generate(7, (index) {
+                final day = _dayValues[index];
+                final isSelected =
+                    _reminderDays.isEmpty || _reminderDays.contains(day);
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      if (_reminderDays.isEmpty) {
+                        _reminderDays = List.from(_dayValues);
+                        _reminderDays.remove(day);
+                      } else if (_reminderDays.contains(day)) {
+                        _reminderDays.remove(day);
+                        if (_reminderDays.isEmpty) {
+                          _reminderDays = [];
+                        }
+                      } else {
+                        _reminderDays.add(day);
+                        _reminderDays.sort();
+                        if (_reminderDays.length == 7) {
+                          _reminderDays = [];
+                        }
+                      }
+                    });
+                    _updatePreferences();
+                  },
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColors.rosePink
+                          : AppColors.rosePink.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      _dayLabels[index],
+                      style: LumiTextStyles.label(
+                        color: isSelected
+                            ? AppColors.white
+                            : AppColors.rosePink,
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-            // App Settings
-            _buildSectionTitle(context, 'Settings', Icons.settings_outlined),
-            Container(
-              color: AppColors.white,
+  Widget _buildInviteCodeCard() {
+    return LumiCard(
+      onTap: () {
+        // Navigate to enter invite code
+      },
+      child: Row(
+        children: [
+          Icon(Icons.qr_code_scanner, color: AppColors.rosePink, size: 24),
+          LumiGap.horizontalS,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Enter Invite Code',
+                  style: LumiTextStyles.bodyMedium(color: AppColors.rosePink),
+                ),
+                Text(
+                  'Link a new child to your account',
+                  style: LumiTextStyles.bodySmall(
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.chevron_right,
+            color: AppColors.rosePink,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingsCard() {
+    return LumiCard(
+      key: _settingsKey,
+      child: Column(
+        children: [
+          // Header row — always visible
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _settingsExpanded = !_settingsExpanded;
+              });
+            },
+            behavior: HitTestBehavior.opaque,
+            child: Row(
+              children: [
+                Icon(Icons.settings_outlined,
+                    size: 20,
+                    color: AppColors.charcoal.withValues(alpha: 0.7)),
+                LumiGap.horizontalXS,
+                Text('Settings', style: LumiTextStyles.h3()),
+                const Spacer(),
+                AnimatedRotation(
+                  turns: _settingsExpanded ? 0.5 : 0.0,
+                  duration: const Duration(milliseconds: 250),
+                  child: const Icon(Icons.expand_more),
+                ),
+              ],
+            ),
+          ),
+          // Expandable content
+          AnimatedCrossFade(
+            firstChild: const SizedBox.shrink(),
+            secondChild: Padding(
+              padding: const EdgeInsets.only(top: LumiSpacing.s),
               child: Column(
                 children: [
-                  ListTile(
-                    leading: const Icon(Icons.language),
-                    title: Text('Language', style: LumiTextStyles.bodyMedium()),
-                    subtitle:
-                        Text('English', style: LumiTextStyles.bodySmall()),
-                    trailing: const Icon(Icons.chevron_right),
+                  _buildSettingsRow(
+                    Icons.language,
+                    'Language',
+                    subtitle: 'English',
                     onTap: () {
                       // Navigate to language settings
                     },
                   ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.help_outline),
-                    title: Text('Help & Support',
-                        style: LumiTextStyles.bodyMedium()),
-                    trailing: const Icon(Icons.chevron_right),
+                  _buildSettingsRow(
+                    Icons.help_outline,
+                    'Help & Support',
                     onTap: () {
                       // Navigate to help
                     },
                   ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.feedback_outlined,
-                        color: AppColors.rosePink),
-                    title: Text('Send Feedback',
-                        style: LumiTextStyles.bodyMedium(
-                            color: AppColors.rosePink)),
-                    trailing: const Icon(Icons.chevron_right,
-                        color: AppColors.rosePink),
+                  _buildSettingsRow(
+                    Icons.feedback_outlined,
+                    'Send Feedback',
+                    color: AppColors.rosePink,
                     onTap: () {
                       showFeedbackSheet(
                         context,
@@ -397,97 +783,84 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                       );
                     },
                   ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.privacy_tip_outlined),
-                    title: Text('Privacy Policy',
-                        style: LumiTextStyles.bodyMedium()),
-                    trailing: const Icon(Icons.chevron_right),
+                  _buildSettingsRow(
+                    Icons.privacy_tip_outlined,
+                    'Privacy Policy',
                     onTap: () {
                       // Navigate to privacy policy
                     },
                   ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.info_outline),
-                    title:
-                        Text('About Lumi', style: LumiTextStyles.bodyMedium()),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      _showAboutDialog();
-                    },
+                  _buildSettingsRow(
+                    Icons.info_outline,
+                    'About Lumi',
+                    onTap: _showAboutDialog,
+                    showDivider: false,
                   ),
                 ],
               ),
             ),
-
-            LumiGap.s,
-
-            // Actions
-            Container(
-              color: AppColors.white,
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.qr_code_scanner,
-                        color: AppColors.rosePink),
-                    title: Text(
-                      'Enter Invite Code',
-                      style:
-                          LumiTextStyles.bodyMedium(color: AppColors.rosePink),
-                    ),
-                    trailing: const Icon(Icons.chevron_right,
-                        color: AppColors.rosePink),
-                    onTap: () {
-                      // Navigate to enter invite code
-                    },
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.logout, color: AppColors.error),
-                    title: Text(
-                      'Sign Out',
-                      style: LumiTextStyles.bodyMedium(color: AppColors.error),
-                    ),
-                    onTap: _handleSignOut,
-                  ),
-                ],
-              ),
-            ),
-
-            LumiGap.l,
-
-            // Version info
-            Text(
-              'Version 1.0.0',
-              style: LumiTextStyles.caption(),
-            ),
-
-            LumiGap.s,
-          ],
-        ),
+            crossFadeState: _settingsExpanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 250),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildSectionTitle(BuildContext context, String title, IconData icon) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        LumiSpacing.s,
-        LumiSpacing.s,
-        LumiSpacing.s,
-        LumiSpacing.xs,
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: AppColors.charcoal.withOpacity(0.7)),
-          LumiGap.horizontalXS,
-          Text(
-            title,
-            style: LumiTextStyles.h3(),
+  Widget _buildSettingsRow(
+    IconData icon,
+    String title, {
+    String? subtitle,
+    Color? color,
+    VoidCallback? onTap,
+    bool showDivider = true,
+  }) {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: LumiSpacing.xs + 2),
+            child: Row(
+              children: [
+                Icon(icon, size: 20, color: color ?? AppColors.charcoal.withValues(alpha: 0.7)),
+                LumiGap.horizontalS,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: LumiTextStyles.bodyMedium(color: color),
+                      ),
+                      if (subtitle != null)
+                        Text(
+                          subtitle,
+                          style: LumiTextStyles.bodySmall(
+                            color: AppColors.charcoal.withValues(alpha: 0.5),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right,
+                  size: 20,
+                  color: color ?? AppColors.charcoal.withValues(alpha: 0.4),
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
+        ),
+        if (showDivider)
+          Divider(
+            height: 1,
+            color: AppColors.charcoal.withValues(alpha: 0.06),
+          ),
+      ],
     );
   }
 
@@ -514,7 +887,7 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
               Text(
                 'Version 1.0.0',
                 style: LumiTextStyles.bodySmall(
-                  color: AppColors.charcoal.withOpacity(0.7),
+                  color: AppColors.charcoal.withValues(alpha: 0.7),
                 ),
               ),
               LumiGap.s,

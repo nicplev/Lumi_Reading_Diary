@@ -12,7 +12,6 @@ import 'package:go_router/go_router.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/school_model.dart';
 import '../../services/firebase_service.dart';
-import '../auth/login_screen.dart';
 import 'user_management_screen.dart';
 import 'class_management_screen.dart';
 import 'database_migration_screen.dart';
@@ -163,11 +162,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     if (confirm == true) {
       await _firebaseService.signOut();
       if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-          (route) => false,
-        );
+        context.go('/auth/login');
       }
     }
   }
@@ -213,21 +208,26 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   children: [
                     Row(
                       children: const [
-                        Expanded(child: LumiSkeleton(height: 120, borderRadius: 16)),
+                        Expanded(
+                            child: LumiSkeleton(height: 120, borderRadius: 16)),
                         SizedBox(width: 12),
-                        Expanded(child: LumiSkeleton(height: 120, borderRadius: 16)),
+                        Expanded(
+                            child: LumiSkeleton(height: 120, borderRadius: 16)),
                       ],
                     ),
                     const SizedBox(height: 12),
                     Row(
                       children: const [
-                        Expanded(child: LumiSkeleton(height: 120, borderRadius: 16)),
+                        Expanded(
+                            child: LumiSkeleton(height: 120, borderRadius: 16)),
                         SizedBox(width: 12),
-                        Expanded(child: LumiSkeleton(height: 120, borderRadius: 16)),
+                        Expanded(
+                            child: LumiSkeleton(height: 120, borderRadius: 16)),
                       ],
                     ),
                     const SizedBox(height: 24),
-                    const LumiSkeleton(height: 250, borderRadius: 16, width: double.infinity),
+                    const LumiSkeleton(
+                        height: 250, borderRadius: 16, width: double.infinity),
                   ],
                 ),
               ),
@@ -353,7 +353,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         height: 60,
                         decoration: BoxDecoration(
                           color: AppColors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                          borderRadius:
+                              BorderRadius.circular(TeacherDimensions.radiusM),
                         ),
                         child: const Icon(
                           Icons.school,
@@ -438,7 +439,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       child: TeacherStatCard(
                         icon: Icons.groups,
                         iconColor: AppColors.warmOrange,
-                        iconBgColor: AppColors.warmOrange.withValues(alpha: 0.15),
+                        iconBgColor:
+                            AppColors.warmOrange.withValues(alpha: 0.15),
                         value: _totalClasses.toString(),
                         label: 'Active Classes',
                       ),
@@ -448,7 +450,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       child: TeacherStatCard(
                         icon: Icons.people,
                         iconColor: AppColors.mintGreen,
-                        iconBgColor: AppColors.mintGreen.withValues(alpha: 0.15),
+                        iconBgColor:
+                            AppColors.mintGreen.withValues(alpha: 0.15),
                         value: _activeUsers.toString(),
                         label: 'Active Users',
                       ),
@@ -609,8 +612,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 }
               }
 
-              final maxValue =
-                  logsByDay.values.isEmpty ? 0 : logsByDay.values.reduce((a, b) => a > b ? a : b);
+              final maxValue = logsByDay.values.isEmpty
+                  ? 0
+                  : logsByDay.values.reduce((a, b) => a > b ? a : b);
+              const minBarHeight = 14.0;
+              const maxBarHeight = 120.0;
 
               return SizedBox(
                 height: 180,
@@ -620,36 +626,46 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   children: List.generate(7, (index) {
                     final value = logsByDay[index] ?? 0;
                     final height = maxValue == 0
-                        ? 20.0
-                        : (value / maxValue * 140).clamp(20.0, 140.0);
-                    final date = DateTime.now()
-                        .subtract(Duration(days: 6 - index));
-                    final dayLabel = DateFormat('E').format(date).substring(0, 1);
+                        ? minBarHeight
+                        : (value / maxValue * maxBarHeight)
+                            .clamp(minBarHeight, maxBarHeight);
+                    final date =
+                        DateTime.now().subtract(Duration(days: 6 - index));
+                    final dayLabel =
+                        DateFormat('E').format(date).substring(0, 1);
 
-                    return Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Text(
-                          value.toString(),
-                          style: TeacherTypography.caption,
-                        ),
-                        const SizedBox(height: 4),
-                        Container(
-                          width: 32,
-                          height: height,
-                          decoration: BoxDecoration(
-                            color: AppColors.teacherPrimary,
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(8),
+                    return SizedBox(
+                      width: 32,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Text(
+                            value.toString(),
+                            style: TeacherTypography.caption,
+                          ),
+                          const SizedBox(height: 4),
+                          Expanded(
+                            child: Align(
+                              alignment: Alignment.bottomCenter,
+                              child: Container(
+                                width: 24,
+                                height: height,
+                                decoration: BoxDecoration(
+                                  color: AppColors.teacherPrimary,
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(8),
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          dayLabel,
-                          style: TeacherTypography.caption,
-                        ),
-                      ],
+                          const SizedBox(height: 6),
+                          Text(
+                            dayLabel,
+                            style: TeacherTypography.caption,
+                          ),
+                        ],
+                      ),
                     );
                   }),
                 ),
@@ -759,7 +775,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     height: 40,
                     decoration: BoxDecoration(
                       color: AppColors.teacherPrimary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                      borderRadius:
+                          BorderRadius.circular(TeacherDimensions.radiusM),
                     ),
                     child: const Icon(
                       Icons.book,
@@ -831,7 +848,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   label: 'Notifications',
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Notifications coming soon')),
+                      const SnackBar(
+                          content: Text('Notifications coming soon')),
                     );
                   },
                 ),
@@ -855,7 +873,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     ),
                     decoration: BoxDecoration(
                       color: AppColors.skyBlue.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
+                      borderRadius:
+                          BorderRadius.circular(TeacherDimensions.radiusRound),
                     ),
                     child: Text(
                       'RECOMMENDED',
@@ -882,7 +901,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   label: 'Backup & Export',
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Backup feature coming soon')),
+                      const SnackBar(
+                          content: Text('Backup feature coming soon')),
                     );
                   },
                 ),
@@ -962,7 +982,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   foregroundColor: AppColors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                    borderRadius:
+                        BorderRadius.circular(TeacherDimensions.radiusM),
                   ),
                 ),
               ),
@@ -1014,7 +1035,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
                 color: AppColors.teacherPrimary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
+                borderRadius:
+                    BorderRadius.circular(TeacherDimensions.radiusRound),
               ),
               child: Text(
                 'School Administrator',
@@ -1105,10 +1127,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       side: const BorderSide(color: AppColors.teacherPrimary),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                        borderRadius:
+                            BorderRadius.circular(TeacherDimensions.radiusM),
                       ),
                     ),
-                    child: const Text('Refresh', style: TextStyle(fontWeight: FontWeight.w700)),
+                    child: const Text('Refresh',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -1116,7 +1140,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   child: ElevatedButton(
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Support dialog coming soon')),
+                        const SnackBar(
+                            content: Text('Support dialog coming soon')),
                       );
                     },
                     style: ElevatedButton.styleFrom(
@@ -1124,10 +1149,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       foregroundColor: AppColors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                        borderRadius:
+                            BorderRadius.circular(TeacherDimensions.radiusM),
                       ),
                     ),
-                    child: const Text('Contact Support', style: TextStyle(fontWeight: FontWeight.w700)),
+                    child: const Text('Contact Support',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
                   ),
                 ),
               ],
@@ -1136,7 +1163,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             TextButton.icon(
               onPressed: _handleSignOut,
               icon: const Icon(Icons.logout, color: AppColors.warmOrange),
-              label: const Text('Sign Out', style: TextStyle(color: AppColors.warmOrange, fontWeight: FontWeight.w600)),
+              label: const Text('Sign Out',
+                  style: TextStyle(
+                      color: AppColors.warmOrange,
+                      fontWeight: FontWeight.w600)),
             ),
           ],
         ),

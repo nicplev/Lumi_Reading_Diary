@@ -35,6 +35,7 @@ import '../../screens/teacher/reading_groups_screen.dart';
 import '../../screens/teacher/class_report_screen.dart';
 import '../../screens/teacher/teacher_profile_screen.dart';
 import '../../screens/teacher/student_detail_screen.dart';
+import '../../screens/teacher/isbn_scanner_screen.dart';
 import '../../screens/admin/admin_home_screen.dart';
 import '../../screens/admin/user_management_screen.dart';
 import '../../screens/admin/student_management_screen.dart';
@@ -99,9 +100,14 @@ class AppRouter {
         return '/auth/login';
       }
 
-      // Always verify the user's role from the server-side provider
-      // Never trust client-side state.extra for authorization decisions
-      UserModel? userModel = await _ref.read(userProvider.future);
+      // Verify user role server-side. Try the cached provider first,
+      // fall back to a direct Firestore read to avoid StreamProvider hang.
+      UserModel? userModel = _ref.read(userProvider).value;
+      if (userModel == null) {
+        final uid = firebaseService.auth.currentUser!.uid;
+        final userRepository = _ref.read(userRepositoryProvider);
+        userModel = await userRepository.getUser(uid);
+      }
 
       if (userModel == null) {
         return '/auth/login';
@@ -110,7 +116,9 @@ class AppRouter {
       final userRole = userModel.role;
 
       // Web platform check: parent app is mobile-only
-      if (kIsWeb && userRole == UserRole.parent && location.startsWith('/parent')) {
+      if (kIsWeb &&
+          userRole == UserRole.parent &&
+          location.startsWith('/parent')) {
         return '/auth/web-not-available';
       }
 
@@ -184,7 +192,8 @@ class AppRouter {
         path: '/onboarding/school-registration',
         name: 'school-registration',
         builder: (context, state) {
-          final onboardingId = state.uri.queryParameters['onboardingId'] ?? 'default';
+          final onboardingId =
+              state.uri.queryParameters['onboardingId'] ?? 'default';
           return SchoolRegistrationWizard(onboardingId: onboardingId);
         },
       ),
@@ -208,7 +217,8 @@ class AppRouter {
         path: '/parent/home',
         name: 'parent-home',
         builder: (context, state) {
-          final user = state.extra as UserModel?;
+          final user =
+              state.extra as UserModel? ?? _ref.read(userProvider).value;
           if (user == null) return const LoginScreen();
           return ParentHomeScreen(user: user);
         },
@@ -244,7 +254,8 @@ class AppRouter {
           if (student == null) return const LoginScreen();
           return ReadingHistoryScreen(
             studentId: student.id,
-            parentId: student.parentIds.isNotEmpty ? student.parentIds.first : '',
+            parentId:
+                student.parentIds.isNotEmpty ? student.parentIds.first : '',
             schoolId: student.schoolId,
           );
         },
@@ -359,7 +370,8 @@ class AppRouter {
         path: '/teacher/home',
         name: 'teacher-home',
         builder: (context, state) {
-          final user = state.extra as UserModel?;
+          final user =
+              state.extra as UserModel? ?? _ref.read(userProvider).value;
           if (user == null) return const LoginScreen();
           return TeacherHomeScreen(user: user);
         },
@@ -375,6 +387,7 @@ class AppRouter {
           return AllocationScreen(
             teacher: teacher,
             selectedClass: params?['selectedClass'] as ClassModel?,
+            preselectedStudentId: params?['preselectedStudentId'] as String?,
           );
         },
       ),
@@ -437,10 +450,40 @@ class AppRouter {
           final params = state.extra as Map<String, dynamic>?;
           final teacher = params?['teacher'] as UserModel?;
           final student = params?['student'] as StudentModel?;
+          final classModel = params?['classModel'] as ClassModel?;
           if (teacher == null || student == null) return const LoginScreen();
           return StudentDetailScreen(
             teacher: teacher,
             student: student,
+            classModel: classModel,
+          );
+        },
+      ),
+
+      GoRoute(
+        path: '/teacher/isbn-scanner',
+        name: 'teacher-isbn-scanner',
+        builder: (context, state) {
+          final params = state.extra as Map<String, dynamic>?;
+          final teacher = params?['teacher'] as UserModel?;
+          final student = params?['student'] as StudentModel?;
+          final studentQueue =
+              params?['studentQueue'] as List<StudentModel>?;
+          final classModel = params?['classModel'] as ClassModel?;
+          final initialTargetDate =
+              params?['initialTargetDate'] as DateTime?;
+          if (teacher == null || classModel == null) {
+            return const LoginScreen();
+          }
+          if (student == null && (studentQueue == null || studentQueue.isEmpty)) {
+            return const LoginScreen();
+          }
+          return IsbnScannerScreen(
+            teacher: teacher,
+            student: student,
+            studentQueue: studentQueue,
+            classModel: classModel,
+            initialTargetDate: initialTargetDate,
           );
         },
       ),
@@ -452,7 +495,8 @@ class AppRouter {
         path: '/admin/home',
         name: 'admin-home',
         builder: (context, state) {
-          final user = state.extra as UserModel?;
+          final user =
+              state.extra as UserModel? ?? _ref.read(userProvider).value;
           if (user == null) return const LoginScreen();
           return AdminHomeScreen(user: user);
         },
@@ -475,7 +519,9 @@ class AppRouter {
           final params = state.extra as Map<String, dynamic>?;
           final adminUser = params?['adminUser'] as UserModel?;
           final classModel = params?['classModel'] as ClassModel?;
-          if (adminUser == null || classModel == null) return const LoginScreen();
+          if (adminUser == null || classModel == null) {
+            return const LoginScreen();
+          }
           return StudentManagementScreen(
             adminUser: adminUser,
             classModel: classModel,

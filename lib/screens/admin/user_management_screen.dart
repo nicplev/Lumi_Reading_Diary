@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
+import '../../core/widgets/lumi/lumi_skeleton.dart';
 import '../../data/models/user_model.dart';
 import '../../services/firebase_service.dart';
 
@@ -86,6 +88,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_user_management',
         onPressed: () {
           if (_tabController.index == 3) {
             _showAddStudentDialog();
@@ -102,26 +105,34 @@ class _UserManagementScreenState extends State<UserManagementScreen>
         children: [
           // Search Bar
           Padding(
-            padding: const EdgeInsets.all(8),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search users...',
-                hintStyle: TeacherTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
-                prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
-                filled: true,
-                fillColor: AppColors.background,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.charcoal.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              style: TeacherTypography.bodyMedium,
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value.toLowerCase();
-                });
-              },
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: 'Search users...',
+                  hintStyle: TeacherTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
+                  prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                ),
+                style: TeacherTypography.bodyMedium,
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value.toLowerCase();
+                  });
+                },
+              ),
             ),
           ),
 
@@ -173,7 +184,39 @@ class _UserManagementScreenState extends State<UserManagementScreen>
         }
 
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator(color: AppColors.teacherPrimary));
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: 5,
+            itemBuilder: (context, index) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Container(
+                height: 80,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+                  boxShadow: TeacherDimensions.cardShadow,
+                ),
+                child: Row(
+                  children: [
+                    const LumiSkeleton(width: 48, height: 48, isCircular: true),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          LumiSkeleton(height: 16, width: 120),
+                          SizedBox(height: 8),
+                          LumiSkeleton(height: 12, width: 200),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
         }
 
         final docs = snapshot.data!.docs;
@@ -200,7 +243,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.only(top: 8, bottom: 80),
           itemCount: filteredDocs.length,
           itemBuilder: (context, index) {
             final user = UserModel.fromFirestore(filteredDocs[index]);
@@ -242,7 +285,39 @@ class _UserManagementScreenState extends State<UserManagementScreen>
         }
 
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator(color: AppColors.teacherPrimary));
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: 5,
+            itemBuilder: (context, index) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Container(
+                height: 80,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+                  boxShadow: TeacherDimensions.cardShadow,
+                ),
+                child: Row(
+                  children: [
+                    const LumiSkeleton(width: 48, height: 48, isCircular: true),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          LumiSkeleton(height: 16, width: 120),
+                          SizedBox(height: 8),
+                          LumiSkeleton(height: 12, width: 200),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
         }
 
         final docs = snapshot.data!.docs;
@@ -273,7 +348,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.only(top: 8, bottom: 80),
           itemCount: filteredDocs.length,
           itemBuilder: (context, index) {
             final doc = filteredDocs[index];
@@ -289,9 +364,8 @@ class _UserManagementScreenState extends State<UserManagementScreen>
     final roleString = user.role.toString().split('.').last;
     final roleColor = _getRoleColor(roleString);
     final roleIcon = _getRoleIcon(roleString);
-
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
+      padding: const EdgeInsets.only(bottom: 12.0, left: 16, right: 16),
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.white,
@@ -299,6 +373,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
           boxShadow: TeacherDimensions.cardShadow,
         ),
         child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
           backgroundColor: roleColor.withValues(alpha: 0.2),
           child: Icon(roleIcon, color: roleColor),
@@ -404,7 +479,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
         ),
         ),
       ),
-    );
+    ).animate().fadeIn(duration: 300.ms, curve: Curves.easeOut);
   }
 
   Widget _buildStudentCard(String studentId, Map<String, dynamic> data) {
@@ -415,7 +490,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
     final isActive = data['isActive'] ?? true;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
+      padding: const EdgeInsets.only(bottom: 12.0, left: 16, right: 16),
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.white,
@@ -423,6 +498,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
           boxShadow: TeacherDimensions.cardShadow,
         ),
         child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
           backgroundColor: AppColors.teacherPrimary.withValues(alpha: 0.2),
           child: Text(
@@ -546,7 +622,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
         ),
         ),
       ),
-    );
+    ).animate().fadeIn(duration: 300.ms, curve: Curves.easeOut);
   }
 
   Color _getRoleColor(String role) {
@@ -806,7 +882,8 @@ class _UserManagementScreenState extends State<UserManagementScreen>
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('Add New User'),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusL)),
+          title: Text('Add New User', style: TeacherTypography.h3),
           content: SingleChildScrollView(
             child: Form(
               key: formKey,
@@ -816,9 +893,10 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                   // Role Selection
                   DropdownButtonFormField<String>(
                     initialValue: selectedRole,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Role',
-                      border: OutlineInputBorder(),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
                     ),
                     items: const [
                       DropdownMenuItem(
@@ -840,13 +918,14 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       });
                     },
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   // First Name
                   TextFormField(
                     controller: firstNameController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'First Name',
-                      border: OutlineInputBorder(),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -855,13 +934,14 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       return null;
                     },
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   // Last Name
                   TextFormField(
                     controller: lastNameController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Last Name',
-                      border: OutlineInputBorder(),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -870,13 +950,14 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       return null;
                     },
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   // Email
                   TextFormField(
                     controller: emailController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Email',
-                      border: OutlineInputBorder(),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
                     ),
                     keyboardType: TextInputType.emailAddress,
                     validator: (value) {
@@ -889,13 +970,14 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       return null;
                     },
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   // Password
                   TextFormField(
                     controller: passwordController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Password',
-                      border: OutlineInputBorder(),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
                       helperText: 'Min 6 characters',
                     ),
                     obscureText: true,
@@ -1063,7 +1145,8 @@ class _UserManagementScreenState extends State<UserManagementScreen>
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Add New Student'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusL)),
+        title: Text('Add New Student', style: TeacherTypography.h3),
         content: SingleChildScrollView(
           child: Form(
             key: formKey,
@@ -1073,9 +1156,10 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                 // Student ID
                 TextFormField(
                   controller: studentIdController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Student ID',
-                    border: OutlineInputBorder(),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -1084,13 +1168,14 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 // First Name
                 TextFormField(
                   controller: firstNameController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'First Name',
-                    border: OutlineInputBorder(),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -1099,13 +1184,14 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 // Last Name
                 TextFormField(
                   controller: lastNameController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Last Name',
-                    border: OutlineInputBorder(),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -1114,14 +1200,15 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 // Year Level
                 TextFormField(
                   controller: yearLevelController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Year Level',
                     hintText: 'e.g., Year 3',
-                    border: OutlineInputBorder(),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -1224,7 +1311,8 @@ class _UserManagementScreenState extends State<UserManagementScreen>
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('Edit User'),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusL)),
+          title: Text('Edit User', style: TeacherTypography.h3),
           content: SingleChildScrollView(
             child: Form(
               key: formKey,
@@ -1234,9 +1322,10 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                   // Role Selection
                   DropdownButtonFormField<String>(
                     initialValue: selectedRole,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Role',
-                      border: OutlineInputBorder(),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
                     ),
                     items: const [
                       DropdownMenuItem(
@@ -1258,13 +1347,14 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       });
                     },
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   // First Name
                   TextFormField(
                     controller: firstNameController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'First Name',
-                      border: OutlineInputBorder(),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -1273,13 +1363,14 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       return null;
                     },
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   // Last Name
                   TextFormField(
                     controller: lastNameController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Last Name',
-                      border: OutlineInputBorder(),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -1288,13 +1379,13 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       return null;
                     },
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   // Email (read-only)
                   TextFormField(
                     controller: emailController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Email',
-                      border: OutlineInputBorder(),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
                       enabled: false,
                     ),
                     readOnly: true,
@@ -1385,7 +1476,8 @@ class _UserManagementScreenState extends State<UserManagementScreen>
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Edit Student'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusL)),
+        title: Text('Edit Student', style: TeacherTypography.h3),
         content: SingleChildScrollView(
           child: Form(
             key: formKey,
@@ -1395,9 +1487,10 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                 // Student ID
                 TextFormField(
                   controller: studentIdController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Student ID',
-                    border: OutlineInputBorder(),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -1406,13 +1499,14 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 // First Name
                 TextFormField(
                   controller: firstNameController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'First Name',
-                    border: OutlineInputBorder(),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -1421,13 +1515,14 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 // Last Name
                 TextFormField(
                   controller: lastNameController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Last Name',
-                    border: OutlineInputBorder(),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -1436,14 +1531,15 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 // Year Level
                 TextFormField(
                   controller: yearLevelController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Year Level',
                     hintText: 'e.g., Year 3',
-                    border: OutlineInputBorder(),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {

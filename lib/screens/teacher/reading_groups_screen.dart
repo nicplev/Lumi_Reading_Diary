@@ -82,6 +82,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
               ),
             ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_reading_groups',
         onPressed: _createNewGroup,
         icon: const Icon(Icons.add),
         label: Text('New Group', style: TeacherTypography.buttonText),

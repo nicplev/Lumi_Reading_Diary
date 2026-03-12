@@ -110,8 +110,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
           .doc(widget.teacher.schoolId)
           .collection('readingLogs')
           .where('classId', isEqualTo: widget.classModel.id)
-          .where('date',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
           .where('date', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
           .get();
 
@@ -142,8 +141,8 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
             studentLogs.fold<int>(0, (sum, log) => sum + log.minutesRead);
         final averageMinutes =
             studentLogs.isEmpty ? 0 : totalMinutes ~/ studentLogs.length;
-        final booksRead = studentLogs.fold<int>(
-            0, (sum, log) => sum + log.bookTitles.length);
+        final booksRead =
+            studentLogs.fold<int>(0, (sum, log) => sum + log.bookTitles.length);
 
         csvData.add([
           student.fullName,
@@ -319,14 +318,13 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                       selectedForegroundColor: AppColors.white,
                       backgroundColor: AppColors.white,
                       foregroundColor: AppColors.charcoal,
-                      side:
-                          const BorderSide(color: AppColors.teacherPrimary),
+                      side: const BorderSide(color: AppColors.teacherPrimary),
                     ),
                     segments: [
                       ButtonSegment(
                         value: 'week',
-                        label: Text('This Week',
-                            style: TeacherTypography.caption),
+                        label:
+                            Text('This Week', style: TeacherTypography.caption),
                       ),
                       ButtonSegment(
                         value: 'month',
@@ -427,6 +425,7 @@ class _StudentCard extends StatelessWidget {
             extra: {
               'teacher': teacher,
               'student': student,
+              'classModel': classModel,
             },
           );
         },
@@ -434,8 +433,7 @@ class _StudentCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: AppColors.white,
-            borderRadius:
-                BorderRadius.circular(TeacherDimensions.radiusL),
+            borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
             boxShadow: TeacherDimensions.cardShadow,
           ),
           child: Column(
@@ -445,8 +443,7 @@ class _StudentCard extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 25,
-                    backgroundColor:
-                        AppColors.teacherPrimaryLight,
+                    backgroundColor: AppColors.teacherPrimaryLight,
                     child: Text(
                       student.firstName[0].toUpperCase(),
                       style: TeacherTypography.h3
@@ -507,8 +504,7 @@ class _StudentCard extends StatelessWidget {
                                     const SizedBox(width: 2),
                                     Text(
                                       '${student.stats?.currentStreak}',
-                                      style:
-                                          TeacherTypography.caption.copyWith(
+                                      style: TeacherTypography.caption.copyWith(
                                         color: AppColors.warmOrange,
                                       ),
                                     ),
@@ -532,22 +528,19 @@ class _StudentCard extends StatelessWidget {
                     .collection('readingLogs')
                     .where('studentId', isEqualTo: student.id)
                     .where('date',
-                        isGreaterThanOrEqualTo:
-                            Timestamp.fromDate(periodStart))
+                        isGreaterThanOrEqualTo: Timestamp.fromDate(periodStart))
                     .where('date',
-                        isLessThanOrEqualTo:
-                            Timestamp.fromDate(periodEnd))
+                        isLessThanOrEqualTo: Timestamp.fromDate(periodEnd))
                     .snapshots(),
                 builder: (context, snapshot) {
                   final logs = snapshot.data?.docs
-                          .map((doc) =>
-                              ReadingLogModel.fromFirestore(doc))
+                          .map((doc) => ReadingLogModel.fromFirestore(doc))
                           .toList() ??
                       [];
 
                   final daysCompleted = logs.length;
-                  final totalMinutes = logs.fold<int>(
-                      0, (sum, log) => sum + log.minutesRead);
+                  final totalMinutes =
+                      logs.fold<int>(0, (sum, log) => sum + log.minutesRead);
                   final averageMinutes =
                       logs.isEmpty ? 0 : totalMinutes ~/ logs.length;
 
