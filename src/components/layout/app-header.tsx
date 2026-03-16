@@ -23,7 +23,15 @@ const routeLabels: Record<string, string> = {
   students: "Students",
   "reading-logs": "Reading Logs",
   reports: "Reports",
+  new: "New",
 };
+
+function getSegmentLabel(segment: string): string {
+  if (routeLabels[segment]) return routeLabels[segment];
+  // Treat long segments as dynamic IDs (Firebase doc IDs are 20+ chars)
+  if (segment.length > 8) return "Details";
+  return segment;
+}
 
 export function AppHeader() {
   const pathname = usePathname();
@@ -45,7 +53,7 @@ export function AppHeader() {
           {segments.map((segment, i) => {
             const href = "/" + segments.slice(0, i + 1).join("/");
             const isLast = i === segments.length - 1;
-            const label = routeLabels[segment] || segment;
+            const label = getSegmentLabel(segment);
             return (
               <BreadcrumbItem key={href}>
                 <BreadcrumbSeparator />
