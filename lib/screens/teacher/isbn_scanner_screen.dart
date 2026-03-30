@@ -4,6 +4,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
+import '../../core/widgets/lumi/persistent_cached_image.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/user_model.dart';
@@ -90,14 +91,12 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
   }
 
   bool get _canGoBack {
-    final currentWeekStart =
-        IsbnAssignmentService.startOfWeek(DateTime.now());
+    final currentWeekStart = IsbnAssignmentService.startOfWeek(DateTime.now());
     return _weekStart.isAfter(currentWeekStart);
   }
 
   bool get _canGoForward {
-    final currentWeekStart =
-        IsbnAssignmentService.startOfWeek(DateTime.now());
+    final currentWeekStart = IsbnAssignmentService.startOfWeek(DateTime.now());
     final maxWeekStart = currentWeekStart.add(const Duration(days: 14));
     return _weekStart.isBefore(maxWeekStart);
   }
@@ -218,11 +217,21 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
       _totalAssignedBooks = result.totalAssignedBooks;
 
       final successCount = result.newlyAssignedBooks.length;
+      final newToLibrary =
+          result.newlyAssignedBooks.where((b) => b.isNewToLibrary).length;
       if (!mounted) return;
       setState(() {
-        _statusMessage = successCount > 0
-            ? 'Assigned $successCount new book${successCount == 1 ? '' : 's'} for this week.'
-            : 'No new books added. ISBNs already assigned this week.';
+        if (successCount > 0) {
+          final bookWord = 'book${successCount == 1 ? '' : 's'}';
+          final libNote = newToLibrary > 0
+              ? ' · $newToLibrary new to school library'
+              : '';
+          _statusMessage =
+              'Assigned $successCount $bookWord for this week.$libNote';
+        } else {
+          _statusMessage =
+              'No new books added. ISBNs already assigned this week.';
+        }
       });
     } catch (e) {
       if (!mounted) return;
@@ -348,8 +357,7 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
               child: Text(
                 'Skip',
                 style: TextStyle(
-                  color:
-                      _isProcessing ? Colors.white38 : Colors.white70,
+                  color: _isProcessing ? Colors.white38 : Colors.white70,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -382,8 +390,8 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
             LinearProgressIndicator(
               value: (_currentQueueIndex + 1) / _queue.length,
               backgroundColor: Colors.white12,
-              valueColor: const AlwaysStoppedAnimation<Color>(
-                  AppColors.teacherPrimary),
+              valueColor:
+                  const AlwaysStoppedAnimation<Color>(AppColors.teacherPrimary),
               minHeight: 3,
             ),
 
@@ -575,12 +583,12 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
           if (book.coverImageUrl != null && book.coverImageUrl!.isNotEmpty)
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
-              child: Image.network(
-                book.coverImageUrl!,
+              child: PersistentCachedImage(
+                imageUrl: book.coverImageUrl!,
                 width: 36,
                 height: 48,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Icon(
+                fallback: Icon(
                   book.resolvedFromCatalog
                       ? Icons.check_circle
                       : Icons.info_outline,

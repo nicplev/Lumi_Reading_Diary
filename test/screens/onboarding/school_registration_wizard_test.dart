@@ -29,6 +29,7 @@ class _FakeOnboardingService extends OnboardingService {
     required String adminFullName,
     required ReadingLevelSchema levelSchema,
     List<String>? customLevels,
+    Map<String, String>? levelColors,
     String? address,
     String? contactEmail,
     String? contactPhone,
@@ -49,6 +50,7 @@ class _FakeOnboardingService extends OnboardingService {
     required String onboardingId,
     required ReadingLevelSchema levelSchema,
     List<String>? customLevels,
+    Map<String, String>? levelColors,
   }) async {
     configuredSchema = levelSchema;
     configuredCustomLevels = customLevels;

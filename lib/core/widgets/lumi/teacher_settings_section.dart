@@ -18,35 +18,41 @@ class TeacherSettingsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
-        boxShadow: TeacherDimensions.cardShadow,
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Section header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: const BoxDecoration(
-              color: AppColors.background,
-            ),
-            child: Text(
-              title.toUpperCase(),
-              style: TeacherTypography.sectionHeader,
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 10),
+          child: Text(
+            title.toUpperCase(),
+            style: TeacherTypography.sectionHeader,
           ),
-          // Items with dividers
-          for (int i = 0; i < items.length; i++) ...[
-            items[i],
-            if (i < items.length - 1)
-              const Divider(height: 1, indent: 16, endIndent: 16),
-          ],
-        ],
-      ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
+            border: Border.all(color: AppColors.teacherBorder),
+            boxShadow: TeacherDimensions.cardShadow,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (int i = 0; i < items.length; i++) ...[
+                items[i],
+                if (i < items.length - 1)
+                  Divider(
+                    height: 1,
+                    indent: 20,
+                    endIndent: 20,
+                    color: AppColors.teacherBorder.withValues(alpha: 0.9),
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

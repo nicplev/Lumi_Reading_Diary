@@ -8,6 +8,10 @@ class StudentModel {
   final String schoolId;
   final String classId;
   final String? currentReadingLevel;
+  final int? currentReadingLevelIndex;
+  final DateTime? readingLevelUpdatedAt;
+  final String? readingLevelUpdatedBy;
+  final String? readingLevelSource;
   final List<String> parentIds;
   final DateTime? dateOfBirth;
   final String? profileImageUrl;
@@ -26,6 +30,10 @@ class StudentModel {
     required this.schoolId,
     required this.classId,
     this.currentReadingLevel,
+    this.currentReadingLevelIndex,
+    this.readingLevelUpdatedAt,
+    this.readingLevelUpdatedBy,
+    this.readingLevelSource,
     this.parentIds = const [],
     this.dateOfBirth,
     this.profileImageUrl,
@@ -49,6 +57,13 @@ class StudentModel {
       schoolId: data['schoolId'] ?? '',
       classId: data['classId'] ?? '',
       currentReadingLevel: data['currentReadingLevel'],
+      currentReadingLevelIndex:
+          (data['currentReadingLevelIndex'] as num?)?.toInt(),
+      readingLevelUpdatedAt: data['readingLevelUpdatedAt'] != null
+          ? (data['readingLevelUpdatedAt'] as Timestamp).toDate()
+          : null,
+      readingLevelUpdatedBy: data['readingLevelUpdatedBy'],
+      readingLevelSource: data['readingLevelSource'],
       parentIds: List<String>.from(data['parentIds'] ?? []),
       dateOfBirth: data['dateOfBirth'] != null
           ? (data['dateOfBirth'] as Timestamp).toDate()
@@ -66,9 +81,7 @@ class StudentModel {
               ?.map((item) => ReadingLevelHistory.fromMap(item))
               .toList() ??
           [],
-      stats: data['stats'] != null
-          ? StudentStats.fromMap(data['stats'])
-          : null,
+      stats: data['stats'] != null ? StudentStats.fromMap(data['stats']) : null,
     );
   }
 
@@ -80,16 +93,19 @@ class StudentModel {
       'schoolId': schoolId,
       'classId': classId,
       'currentReadingLevel': currentReadingLevel,
-      'parentIds': parentIds,
-      'dateOfBirth': dateOfBirth != null
-          ? Timestamp.fromDate(dateOfBirth!)
+      'currentReadingLevelIndex': currentReadingLevelIndex,
+      'readingLevelUpdatedAt': readingLevelUpdatedAt != null
+          ? Timestamp.fromDate(readingLevelUpdatedAt!)
           : null,
+      'readingLevelUpdatedBy': readingLevelUpdatedBy,
+      'readingLevelSource': readingLevelSource,
+      'parentIds': parentIds,
+      'dateOfBirth':
+          dateOfBirth != null ? Timestamp.fromDate(dateOfBirth!) : null,
       'profileImageUrl': profileImageUrl,
       'isActive': isActive,
       'createdAt': Timestamp.fromDate(createdAt),
-      'enrolledAt': enrolledAt != null
-          ? Timestamp.fromDate(enrolledAt!)
-          : null,
+      'enrolledAt': enrolledAt != null ? Timestamp.fromDate(enrolledAt!) : null,
       'additionalInfo': additionalInfo,
       'levelHistory': levelHistory.map((e) => e.toMap()).toList(),
       'stats': stats?.toMap(),
@@ -104,6 +120,10 @@ class StudentModel {
     String? schoolId,
     String? classId,
     String? currentReadingLevel,
+    int? currentReadingLevelIndex,
+    DateTime? readingLevelUpdatedAt,
+    String? readingLevelUpdatedBy,
+    String? readingLevelSource,
     List<String>? parentIds,
     DateTime? dateOfBirth,
     String? profileImageUrl,
@@ -122,6 +142,13 @@ class StudentModel {
       schoolId: schoolId ?? this.schoolId,
       classId: classId ?? this.classId,
       currentReadingLevel: currentReadingLevel ?? this.currentReadingLevel,
+      currentReadingLevelIndex:
+          currentReadingLevelIndex ?? this.currentReadingLevelIndex,
+      readingLevelUpdatedAt:
+          readingLevelUpdatedAt ?? this.readingLevelUpdatedAt,
+      readingLevelUpdatedBy:
+          readingLevelUpdatedBy ?? this.readingLevelUpdatedBy,
+      readingLevelSource: readingLevelSource ?? this.readingLevelSource,
       parentIds: parentIds ?? this.parentIds,
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
@@ -151,7 +178,7 @@ class ReadingLevelHistory {
   factory ReadingLevelHistory.fromMap(Map<String, dynamic> map) {
     return ReadingLevelHistory(
       level: map['level'] ?? '',
-      changedAt: (map['changedAt'] as Timestamp).toDate(),
+      changedAt: (map['changedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       changedBy: map['changedBy'] ?? '',
       reason: map['reason'],
     );
@@ -206,9 +233,8 @@ class StudentStats {
       'totalBooksRead': totalBooksRead,
       'currentStreak': currentStreak,
       'longestStreak': longestStreak,
-      'lastReadingDate': lastReadingDate != null
-          ? Timestamp.fromDate(lastReadingDate!)
-          : null,
+      'lastReadingDate':
+          lastReadingDate != null ? Timestamp.fromDate(lastReadingDate!) : null,
       'averageMinutesPerDay': averageMinutesPerDay,
       'totalReadingDays': totalReadingDays,
     };

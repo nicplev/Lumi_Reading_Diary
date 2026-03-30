@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/teacher_stat_card.dart';
 import '../../core/widgets/lumi/teacher_class_card.dart';
 import '../../core/widgets/lumi/teacher_alert_banner.dart';
@@ -42,7 +43,8 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
   void initState() {
     super.initState();
     // Role guard: redirect if user is not a teacher or admin
-    if (widget.user.role != UserRole.teacher && widget.user.role != UserRole.schoolAdmin) {
+    if (widget.user.role != UserRole.teacher &&
+        widget.user.role != UserRole.schoolAdmin) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) context.go('/auth/login');
       });
@@ -82,74 +84,58 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
     }
   }
 
+  Future<void> _handleSignOut() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
+        ),
+        title: const Text('Sign Out', style: TeacherTypography.h3),
+        content: const Text(
+          'Are you sure you want to sign out?',
+          style: TeacherTypography.bodyLarge,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Sign Out',
+              style: TextStyle(color: AppColors.error),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await _firebaseService.signOut();
+      if (mounted) context.go('/auth/login');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: AppColors.background,
-        body: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                height: 120,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.teacherPrimary.withValues(alpha: 0.1),
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(20),
-                    bottomRight: Radius.circular(20),
-                  ),
-                ),
-                child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    LumiSkeleton(width: 200, height: 28),
-                    SizedBox(height: 8),
-                    LumiSkeleton(width: 150, height: 16),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    Row(
-                      children: const [
-                        Expanded(child: LumiSkeleton(height: 120, borderRadius: 16)),
-                        SizedBox(width: 12),
-                        Expanded(child: LumiSkeleton(height: 120, borderRadius: 16)),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: const [
-                        Expanded(child: LumiSkeleton(height: 120, borderRadius: 16)),
-                        SizedBox(width: 12),
-                        Expanded(child: LumiSkeleton(height: 120, borderRadius: 16)),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    const LumiSkeleton(height: 200, borderRadius: 16, width: double.infinity),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+        backgroundColor: AppColors.teacherBackground,
+        body: _buildLoadingView(),
       );
     }
 
     if (_classes.isEmpty) {
       return Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: AppColors.teacherBackground,
         body: _buildNoClassesView(),
       );
     }
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.teacherBackground,
       body: IndexedStack(
         index: _selectedIndex,
         children: [
@@ -160,50 +146,11 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
             classes: _classes,
             onClassChanged: (c) => setState(() => _selectedClass = c),
           ),
-          const TeacherLibraryScreen(),
+          TeacherLibraryScreen(schoolId: widget.user.schoolId ?? ''),
           TeacherSettingsScreen(user: widget.user),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (index) => setState(() => _selectedIndex = index),
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: AppColors.white,
-        selectedItemColor: AppColors.teacherPrimary,
-        unselectedItemColor: AppColors.textSecondary,
-        selectedLabelStyle: const TextStyle(
-          fontFamily: 'Nunito',
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-        ),
-        unselectedLabelStyle: const TextStyle(
-          fontFamily: 'Nunito',
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-        ),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard_outlined),
-            activeIcon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.people_outlined),
-            activeIcon: Icon(Icons.people),
-            label: 'Class',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.menu_book_outlined),
-            activeIcon: Icon(Icons.menu_book),
-            label: 'Library',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings_outlined),
-            activeIcon: Icon(Icons.settings),
-            label: 'Settings',
-          ),
-        ],
-      ),
+      bottomNavigationBar: _buildBottomNavigationBar(),
     );
   }
 
@@ -217,30 +164,41 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
     }
 
     return SafeArea(
+      bottom: false,
       child: CustomScrollView(
         slivers: [
-          // Gradient header
-          SliverToBoxAdapter(child: _buildGradientHeader()),
-
-          // Content
+          const SliverToBoxAdapter(child: SizedBox(height: 12)),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _buildDashboardHero(),
+            ),
+          ),
           SliverPadding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                // 2x2 Stats Grid
+                _buildSectionIntro(
+                  eyebrow: 'Today',
+                  title: 'Snapshot for ${_selectedClass!.name}',
+                  subtitle:
+                      'A quick view of reading momentum across your class.',
+                ),
                 _DashboardStatsGrid(
                   classModel: _selectedClass!,
                   schoolId: widget.user.schoolId!,
                 ),
-                const SizedBox(height: 16),
-
-                // Class Cards (only if multiple classes)
+                const SizedBox(height: 24),
                 if (_classes.length > 1) ...[
-                  Text('My Classes', style: TeacherTypography.h3),
-                  const SizedBox(height: 8),
+                  _buildSectionIntro(
+                    eyebrow: 'Classes',
+                    title: 'Jump between your groups',
+                    subtitle:
+                        'Open a class detail page or switch your dashboard focus.',
+                  ),
                   ..._classes.map((classModel) {
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.only(bottom: 12),
                       child: TeacherClassCard(
                         className: classModel.name,
                         studentCount: classModel.studentIds.length,
@@ -257,21 +215,24 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                       ),
                     );
                   }),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                 ],
-
-                // Weekly Engagement Chart
+                _buildSectionIntro(
+                  eyebrow: 'This Week',
+                  title: 'Reading activity',
+                  subtitle:
+                      'See how consistently students are logging across the week.',
+                ),
                 _WeeklyEngagementChart(
                   classModel: _selectedClass!,
                   schoolId: widget.user.schoolId!,
                 ),
                 const SizedBox(height: 16),
-
-                // Alert Banner
                 _InactivityAlertBanner(
                   classModel: _selectedClass!,
                   schoolId: widget.user.schoolId!,
                 ),
+                const SizedBox(height: 16),
               ]),
             ),
           ),
@@ -280,69 +241,235 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
     );
   }
 
-  Widget _buildGradientHeader() {
+  Widget _buildLoadingView() {
+    return SafeArea(
+      bottom: false,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        child: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.teacherPrimary,
+                    AppColors.teacherAccent,
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(28),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  LumiSkeleton(width: 120, height: 14),
+                  SizedBox(height: 14),
+                  LumiSkeleton(width: 230, height: 32),
+                  SizedBox(height: 10),
+                  LumiSkeleton(width: 180, height: 16),
+                  SizedBox(height: 24),
+                  Row(
+                    children: [
+                      LumiSkeleton(width: 120, height: 38, borderRadius: 20),
+                      SizedBox(width: 10),
+                      LumiSkeleton(width: 96, height: 38, borderRadius: 20),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: const [
+                Expanded(child: LumiSkeleton(height: 152, borderRadius: 24)),
+                SizedBox(width: 12),
+                Expanded(child: LumiSkeleton(height: 152, borderRadius: 24)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: const [
+                Expanded(child: LumiSkeleton(height: 152, borderRadius: 24)),
+                SizedBox(width: 12),
+                Expanded(child: LumiSkeleton(height: 152, borderRadius: 24)),
+              ],
+            ),
+            const SizedBox(height: 24),
+            const LumiSkeleton(
+              height: 280,
+              borderRadius: 24,
+              width: double.infinity,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomNavigationBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.teacherPrimary.withValues(alpha: 0.12),
+            blurRadius: 24,
+            spreadRadius: -10,
+            offset: const Offset(0, -6),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        child: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: (index) => setState(() => _selectedIndex = index),
+          type: BottomNavigationBarType.fixed,
+          elevation: 0,
+          backgroundColor: AppColors.white,
+          selectedItemColor: AppColors.teacherPrimary,
+          unselectedItemColor: AppColors.textSecondary,
+          selectedLabelStyle: TeacherTypography.caption.copyWith(
+            color: AppColors.teacherPrimary,
+          ),
+          unselectedLabelStyle: TeacherTypography.caption,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard_outlined),
+              activeIcon: Icon(Icons.dashboard_rounded),
+              label: 'Dashboard',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.groups_outlined),
+              activeIcon: Icon(Icons.groups_rounded),
+              label: 'Class',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.menu_book_outlined),
+              activeIcon: Icon(Icons.menu_book_rounded),
+              label: 'Library',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.settings_outlined),
+              activeIcon: Icon(Icons.settings_rounded),
+              label: 'Settings',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDashboardHero() {
     final hour = DateTime.now().hour;
     final greeting = hour < 12
         ? 'Good Morning'
         : hour < 17
             ? 'Good Afternoon'
             : 'Good Evening';
+    final firstName = widget.user.fullName.isNotEmpty
+        ? widget.user.fullName.split(' ').first
+        : 'Teacher';
 
     return Container(
-      decoration: const BoxDecoration(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
         gradient: AppColors.teacherGradient,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: TeacherDimensions.cardShadow,
       ),
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$greeting, ${widget.user.fullName.isNotEmpty ? widget.user.fullName.split(' ').first : 'Teacher'}!',
-                  style: TeacherTypography.h2.copyWith(color: AppColors.white),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  DateFormat('EEEE, MMMM d, yyyy').format(DateTime.now()),
-                  style: TeacherTypography.bodyMedium.copyWith(
-                    color: AppColors.white.withValues(alpha: 0.8),
-                  ),
-                ),
-              ],
+          Positioned(
+            top: -54,
+            right: -14,
+            child: Container(
+              width: 148,
+              height: 148,
+              decoration: BoxDecoration(
+                color: AppColors.white.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
+              ),
             ),
           ),
-          Row(
+          Positioned(
+            bottom: -60,
+            left: -22,
+            child: Container(
+              width: 134,
+              height: 134,
+              decoration: BoxDecoration(
+                color: AppColors.white.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (_classes.length > 1)
-                Material(
-                  color: AppColors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(20),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(20),
-                    onTap: () => _showClassSelectorBottomSheet(context),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      child: Row(
-                        children: [
-                          Text(
-                            _selectedClass?.name ?? 'Select Class',
-                            style: TeacherTypography.bodyMedium.copyWith(color: AppColors.white, fontWeight: FontWeight.w600),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Teacher Dashboard',
+                          style: TeacherTypography.caption.copyWith(
+                            color: AppColors.white.withValues(alpha: 0.78),
+                            letterSpacing: 0.9,
                           ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.keyboard_arrow_down, color: AppColors.white, size: 18),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          '$greeting, $firstName',
+                          style: TeacherTypography.h1.copyWith(
+                            color: AppColors.white,
+                            height: 1.05,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          DateFormat('EEEE, MMMM d').format(DateTime.now()),
+                          style: TeacherTypography.bodyLarge.copyWith(
+                            color: AppColors.white.withValues(alpha: 0.84),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.notifications_outlined),
-                color: AppColors.white,
-                onPressed: () {},
+                  const SizedBox(width: 12),
+                  _buildHeroIconButton(
+                    icon: Icons.notifications_outlined,
+                    onTap: () {
+                      context.push('/teacher/notifications',
+                          extra: widget.user);
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _buildClassHeroChip(),
+                  _buildHeroPill(
+                    icon: Icons.people_alt_outlined,
+                    label: '${_selectedClass?.studentIds.length ?? 0} students',
+                  ),
+                  _buildHeroPill(
+                    icon: Icons.grid_view_rounded,
+                    label:
+                        '${_classes.length} class${_classes.length == 1 ? '' : 'es'} active',
+                  ),
+                ],
               ),
             ],
           ),
@@ -351,77 +478,214 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
     );
   }
 
-  Widget _buildNoClassesView() {
-    return SafeArea(
-      child: Stack(
-        children: [
-          Positioned(
-            top: 8,
-            left: 8,
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () async {
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('Sign Out'),
-                    content: const Text('Are you sure you want to sign out?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text('Cancel'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, true),
-                        child: const Text('Sign Out'),
-                      ),
-                    ],
-                  ),
-                );
-                if (confirm == true) {
-                  await _firebaseService.signOut();
-                  if (mounted) context.go('/auth/login');
-                }
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const LumiMascot(mood: LumiMood.thinking, size: 150),
-                const SizedBox(height: 24),
-                Text(
-                  'No Classes Assigned',
-                  style: TeacherTypography.h1,
-                  textAlign: TextAlign.center,
+  Widget _buildClassHeroChip() {
+    final label = _selectedClass?.name ?? 'Select Class';
+
+    return Material(
+      color: AppColors.white.withValues(alpha: 0.18),
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        onTap: _classes.length > 1
+            ? () => _showClassSelectorBottomSheet(context)
+            : null,
+        borderRadius: BorderRadius.circular(999),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.class_outlined,
+                size: 18,
+                color: AppColors.white,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TeacherTypography.bodyMedium.copyWith(
+                  color: AppColors.white,
+                  fontWeight: FontWeight.w700,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Please contact your school administrator to be assigned to a class.',
-                  style: TeacherTypography.bodyLarge.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 32),
-                ElevatedButton(
-                  onPressed: () => _loadClasses(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.teacherPrimary,
-                    foregroundColor: AppColors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: const Text('Refresh', style: TeacherTypography.buttonText),
+              ),
+              if (_classes.length > 1) ...[
+                const SizedBox(width: 6),
+                const Icon(
+                  Icons.keyboard_arrow_down,
+                  size: 18,
+                  color: AppColors.white,
                 ),
               ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeroPill({
+    required IconData icon,
+    required String label,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.white.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: AppColors.white),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TeacherTypography.bodyMedium.copyWith(
+              color: AppColors.white,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildHeroIconButton({
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: AppColors.white.withValues(alpha: 0.16),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child: Icon(icon, color: AppColors.white),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionIntro({
+    required String eyebrow,
+    required String title,
+    required String subtitle,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            eyebrow.toUpperCase(),
+            style: TeacherTypography.caption.copyWith(
+              color: AppColors.teacherPrimary,
+              letterSpacing: 0.9,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(title, style: TeacherTypography.h3),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: TeacherTypography.bodyMedium.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoClassesView() {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: Column(
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Material(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(16),
+                child: InkWell(
+                  onTap: _handleSignOut,
+                  borderRadius: BorderRadius.circular(16),
+                  child: const SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: Icon(Icons.arrow_back, color: AppColors.charcoal),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Center(
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(28),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: AppColors.teacherBorder),
+                    boxShadow: TeacherDimensions.cardShadow,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 92,
+                        height: 92,
+                        decoration: BoxDecoration(
+                          color: AppColors.teacherSurfaceTint,
+                          borderRadius: BorderRadius.circular(28),
+                        ),
+                        child: const Center(
+                          child: LumiMascot(
+                            mood: LumiMood.thinking,
+                            size: 66,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'No Classes Assigned',
+                        style: TeacherTypography.h1,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Your dashboard is ready, but you need an active class before classroom and library workflows become useful.',
+                        style: TeacherTypography.bodyLarge.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Ask your school administrator to assign you to a class, then refresh here.',
+                        style: TeacherTypography.bodyMedium.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 28),
+                      LumiPrimaryButton(
+                        onPressed: _loadClasses,
+                        text: 'Refresh Classes',
+                        color: AppColors.teacherPrimary,
+                        isFullWidth: true,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -433,39 +697,78 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
       builder: (context) => Container(
         decoration: const BoxDecoration(
           color: AppColors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 40,
-              height: 4,
+              width: 44,
+              height: 5,
               decoration: BoxDecoration(
-                color: AppColors.divider,
-                borderRadius: BorderRadius.circular(2),
+                color: AppColors.teacherBorder,
+                borderRadius: BorderRadius.circular(999),
               ),
             ),
             const SizedBox(height: 20),
             Text('Select Class', style: TeacherTypography.h3),
-            const SizedBox(height: 16),
-            ..._classes.map((c) => ListTile(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  tileColor: _selectedClass?.id == c.id ? AppColors.teacherPrimaryLight.withValues(alpha: 0.3) : null,
-                  title: Text(
-                    c.name,
-                    style: TeacherTypography.bodyLarge.copyWith(
-                      fontWeight: _selectedClass?.id == c.id ? FontWeight.w700 : FontWeight.w500,
-                      color: _selectedClass?.id == c.id ? AppColors.teacherPrimary : AppColors.charcoal,
+            const SizedBox(height: 18),
+            ..._classes.map(
+              (c) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Material(
+                  color: _selectedClass?.id == c.id
+                      ? AppColors.teacherSurfaceTint
+                      : AppColors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  child: ListTile(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                      side: BorderSide(
+                        color: _selectedClass?.id == c.id
+                            ? AppColors.teacherPrimary.withValues(alpha: 0.18)
+                            : AppColors.teacherBorder,
+                      ),
                     ),
+                    title: Text(
+                      c.name,
+                      style: TeacherTypography.bodyLarge.copyWith(
+                        fontWeight: _selectedClass?.id == c.id
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: _selectedClass?.id == c.id
+                            ? AppColors.teacherPrimary
+                            : AppColors.charcoal,
+                      ),
+                    ),
+                    subtitle: Text(
+                      '${c.studentIds.length} students',
+                      style: TeacherTypography.bodySmall,
+                    ),
+                    trailing: _selectedClass?.id == c.id
+                        ? Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: AppColors.teacherPrimary,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.check,
+                              size: 18,
+                              color: AppColors.white,
+                            ),
+                          )
+                        : null,
+                    onTap: () {
+                      setState(() => _selectedClass = c);
+                      Navigator.pop(context);
+                    },
                   ),
-                  trailing: _selectedClass?.id == c.id ? const Icon(Icons.check_circle, color: AppColors.teacherPrimary) : null,
-                  onTap: () {
-                    setState(() => _selectedClass = c);
-                    Navigator.pop(context);
-                  },
-                )),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -552,7 +855,8 @@ class _DashboardStatsGridState extends State<_DashboardStatsGrid> {
 
         final uniqueStudentsToday = logs.map((l) => l.studentId).toSet();
         final readCount = uniqueStudentsToday.length;
-        final totalBooks = logs.fold<int>(0, (total, log) => total + log.bookTitles.length);
+        final totalBooks =
+            logs.fold<int>(0, (total, log) => total + log.bookTitles.length);
 
         return StreamBuilder<QuerySnapshot>(
           stream: _studentsStream,
@@ -604,7 +908,8 @@ class _DashboardStatsGridState extends State<_DashboardStatsGrid> {
                       child: TeacherStatCard(
                         icon: Icons.local_fire_department,
                         iconColor: AppColors.warmOrange,
-                        iconBgColor: AppColors.warmOrange.withValues(alpha: 0.15),
+                        iconBgColor:
+                            AppColors.warmOrange.withValues(alpha: 0.15),
                         value: '$onStreakCount',
                         label: 'On Streak',
                       ),
@@ -675,8 +980,7 @@ class _WeeklyEngagementChartState extends State<_WeeklyEngagementChart> {
         .doc(widget.schoolId)
         .collection('readingLogs')
         .where('classId', isEqualTo: widget.classModel.id)
-        .where('date',
-            isGreaterThanOrEqualTo: Timestamp.fromDate(_startOfWeek))
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(_startOfWeek))
         .snapshots();
   }
 
@@ -687,6 +991,7 @@ class _WeeklyEngagementChartState extends State<_WeeklyEngagementChart> {
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
+        border: Border.all(color: AppColors.teacherBorder),
         boxShadow: TeacherDimensions.cardShadow,
       ),
       child: Column(
@@ -698,7 +1003,7 @@ class _WeeklyEngagementChartState extends State<_WeeklyEngagementChart> {
               Text('Weekly Reading Activity', style: TeacherTypography.h3),
               Text(
                 'This Week',
-                style: TeacherTypography.bodySmall.copyWith(
+                style: TeacherTypography.caption.copyWith(
                   color: AppColors.teacherPrimary,
                 ),
               ),
@@ -731,13 +1036,42 @@ class _WeeklyEngagementChartState extends State<_WeeklyEngagementChart> {
               }
 
               final todayIndex = DateTime.now().weekday - 1;
-              final totalWeek = completionByDay.values.fold<int>(0, (a, b) => a + b);
+              final totalWeek =
+                  completionByDay.values.fold<int>(0, (a, b) => a + b);
               final avgPerDay = todayIndex > 0
                   ? (totalWeek / (todayIndex + 1)).round()
                   : totalWeek;
 
               return Column(
                 children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.teacherSurfaceTint,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.bar_chart_rounded,
+                          size: 18,
+                          color: AppColors.teacherPrimary,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '$totalWeek total student reading logs this week',
+                          style: TeacherTypography.bodySmall.copyWith(
+                            color: AppColors.charcoal,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   SizedBox(
                     height: 150,
                     child: BarChart(
@@ -766,13 +1100,23 @@ class _WeeklyEngagementChartState extends State<_WeeklyEngagementChart> {
                             ],
                           );
                         }),
-                        maxY: widget.classModel.studentIds.length.toDouble(),
+                        maxY: widget.classModel.studentIds.isEmpty
+                            ? 1
+                            : widget.classModel.studentIds.length.toDouble(),
                         titlesData: FlTitlesData(
                           bottomTitles: AxisTitles(
                             sideTitles: SideTitles(
                               showTitles: true,
                               getTitlesWidget: (value, meta) {
-                                const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                                const days = [
+                                  'Mon',
+                                  'Tue',
+                                  'Wed',
+                                  'Thu',
+                                  'Fri',
+                                  'Sat',
+                                  'Sun'
+                                ];
                                 return Padding(
                                   padding: const EdgeInsets.only(top: 8),
                                   child: Text(
@@ -794,14 +1138,35 @@ class _WeeklyEngagementChartState extends State<_WeeklyEngagementChart> {
                           ),
                         ),
                         borderData: FlBorderData(show: false),
-                        gridData: const FlGridData(show: false),
+                        gridData: FlGridData(
+                          show: true,
+                          drawVerticalLine: false,
+                          getDrawingHorizontalLine: (_) => FlLine(
+                            color:
+                                AppColors.teacherBorder.withValues(alpha: 0.8),
+                            strokeWidth: 1,
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Average: $avgPerDay/${widget.classModel.studentIds.length} students per night',
-                    style: TeacherTypography.bodySmall,
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.teacherBackground,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      'Average: $avgPerDay/${widget.classModel.studentIds.length} students per night',
+                      style: TeacherTypography.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ),
                 ],
               );
@@ -850,15 +1215,15 @@ class _InactivityAlertBannerState extends State<_InactivityAlertBanner> {
 
   void _initStream() {
     final now = DateTime.now();
-    final startOfWeek = DateTime(now.year, now.month, now.day - (now.weekday - 1));
+    final startOfWeek =
+        DateTime(now.year, now.month, now.day - (now.weekday - 1));
 
     _weeklyStream = FirebaseService.instance.firestore
         .collection('schools')
         .doc(widget.schoolId)
         .collection('readingLogs')
         .where('classId', isEqualTo: widget.classModel.id)
-        .where('date',
-            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeek))
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeek))
         .snapshots();
   }
 
@@ -877,7 +1242,8 @@ class _InactivityAlertBannerState extends State<_InactivityAlertBanner> {
             [];
 
         final studentsWhoRead = logs.map((l) => l.studentId).toSet();
-        final inactiveCount = widget.classModel.studentIds.length - studentsWhoRead.length;
+        final inactiveCount =
+            widget.classModel.studentIds.length - studentsWhoRead.length;
 
         if (inactiveCount <= 0) {
           return const TeacherAlertBanner(

@@ -23,30 +23,30 @@ class TeacherAlertBanner extends StatelessWidget {
     this.emoji,
   });
 
-  Color get _borderColor {
+  Color get _accentColor {
     switch (type) {
       case AlertBannerType.warning:
-        return const Color(0xFFFFCC80);
+        return AppColors.warmOrange;
       case AlertBannerType.success:
-        return const Color(0xFFA5D6A7);
+        return AppColors.success;
     }
   }
 
   Color get _backgroundColor {
     switch (type) {
       case AlertBannerType.warning:
-        return const Color(0xFFFFF3E0);
+        return const Color(0xFFFFF7EC);
       case AlertBannerType.success:
-        return const Color(0xFFE8F5E9);
+        return const Color(0xFFE9F7EF);
     }
   }
 
-  String get _defaultEmoji {
+  IconData get _icon {
     switch (type) {
       case AlertBannerType.warning:
-        return '\u26A0\uFE0F';
+        return Icons.warning_amber_rounded;
       case AlertBannerType.success:
-        return '\u2705';
+        return Icons.check_circle_rounded;
     }
   }
 
@@ -55,29 +55,51 @@ class TeacherAlertBanner extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: _backgroundColor,
-        border: Border(
-          left: BorderSide(color: _borderColor, width: 4),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: _accentColor.withValues(alpha: 0.18),
         ),
-        borderRadius: const BorderRadius.only(
-          topRight: Radius.circular(12),
-          bottomRight: Radius.circular(12),
-        ),
+        boxShadow: [
+          BoxShadow(
+            color: _accentColor.withValues(alpha: 0.08),
+            blurRadius: 18,
+            spreadRadius: -8,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            emoji ?? _defaultEmoji,
-            style: const TextStyle(fontSize: 20),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: _accentColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Center(
+              child: emoji != null
+                  ? Text(
+                      emoji!,
+                      style: const TextStyle(fontSize: 18),
+                    )
+                  : Icon(
+                      _icon,
+                      size: 22,
+                      color: _accentColor,
+                    ),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               message,
-              style: TextStyle(
+              style: const TextStyle(
                 fontFamily: 'Nunito',
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
                 color: AppColors.charcoal,
               ),
             ),

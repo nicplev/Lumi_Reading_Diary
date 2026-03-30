@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/lumi_text_styles.dart';
 import '../../core/theme/lumi_spacing.dart';
 import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/lumi/persistent_cached_image.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_card.dart';
 import '../../data/models/reading_log_model.dart';
@@ -74,7 +75,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final FirebaseService _firebaseService = FirebaseService.instance;
-  late final BookMetadataResolver _metadataResolver;
+  BookMetadataResolver? _metadataResolverInstance;
   DateTime _selectedMonth = DateTime.now();
   String _selectedView = 'list'; // 'list' or 'chart'
 
@@ -85,16 +86,36 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
   final TextEditingController _searchController = TextEditingController();
   bool _isSearchVisible = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-    _metadataResolver = BookMetadataResolver(
+  BookMetadataResolver get _metadataResolver {
+    final existing = _metadataResolverInstance;
+    if (existing != null) return existing;
+
+    final resolver = BookMetadataResolver(
       lookupService: BookLookupService(),
       schoolId: widget.schoolId,
       actorId: widget.parentId,
     );
-    _metadataResolver.addListener(_onMetadataUpdated);
+    resolver.addListener(_onMetadataUpdated);
+    _metadataResolverInstance = resolver;
+    return resolver;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+    _ensureMetadataResolver();
+  }
+
+  @override
+  void didUpdateWidget(covariant ReadingHistoryScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final metadataScopeChanged = oldWidget.schoolId != widget.schoolId ||
+        oldWidget.parentId != widget.parentId;
+    if (!metadataScopeChanged) return;
+
+    _disposeMetadataResolver();
+    _ensureMetadataResolver();
   }
 
   void _onMetadataUpdated() {
@@ -103,11 +124,22 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
 
   @override
   void dispose() {
-    _metadataResolver.removeListener(_onMetadataUpdated);
-    _metadataResolver.dispose();
+    _disposeMetadataResolver();
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _disposeMetadataResolver() {
+    final resolver = _metadataResolverInstance;
+    if (resolver == null) return;
+    resolver.removeListener(_onMetadataUpdated);
+    resolver.dispose();
+    _metadataResolverInstance = null;
+  }
+
+  void _ensureMetadataResolver() {
+    _metadataResolver;
   }
 
   @override
@@ -116,21 +148,30 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
       backgroundColor: AppColors.offWhite,
       appBar: AppBar(
         title: Text('Bookshelf', style: LumiTextStyles.h3()),
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.offWhite,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         bottom: TabBar(
           controller: _tabController,
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
-          tabs: [
-            Tab(child: Text('This Week', style: LumiTextStyles.label())),
-            Tab(child: Text('This Month', style: LumiTextStyles.label())),
-            Tab(child: Text('All Time', style: LumiTextStyles.label())),
-            Tab(child: Text('My Books', style: LumiTextStyles.label())),
+          isScrollable: false,
+          dividerColor: Colors.transparent,
+          tabs: const [
+            Tab(text: 'This Week'),
+            Tab(text: 'This Month'),
+            Tab(text: 'All Time'),
+            Tab(text: 'My Books'),
           ],
           labelColor: AppColors.rosePink,
-          unselectedLabelColor: AppColors.charcoal.withValues(alpha: 0.7),
-          indicatorColor: AppColors.rosePink,
+          labelStyle: LumiTextStyles.label().copyWith(fontWeight: FontWeight.bold),
+          unselectedLabelColor: AppColors.charcoal.withValues(alpha: 0.5),
+          unselectedLabelStyle: LumiTextStyles.label(),
+          indicatorSize: TabBarIndicatorSize.tab,
+          indicator: BoxDecoration(
+            color: AppColors.rosePink.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          splashFactory: NoSplash.splashFactory,
+          overlayColor: WidgetStateProperty.all(Colors.transparent),
         ),
         actions: [
           LumiIconButton(
@@ -214,8 +255,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
     return Column(
       children: [
         // Month selector
-        Container(
-          color: AppColors.white,
+        Padding(
           padding: EdgeInsets.symmetric(
               horizontal: LumiSpacing.s, vertical: LumiSpacing.xs),
           child: Row(
@@ -331,10 +371,14 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
         }
 
         // Calculate statistics
-        final totalMinutes =
-            logs.fold<int>(0, (sum, log) => sum + log.minutesRead);
-        final totalBooks =
-            logs.fold<int>(0, (sum, log) => sum + log.bookTitles.length);
+        final totalMinutes = logs.fold<int>(
+          0,
+          (total, log) => total + log.minutesRead,
+        );
+        final totalBooks = logs.fold<int>(
+          0,
+          (total, log) => total + log.bookTitles.length,
+        );
         final uniqueDates = logs
             .map((log) => ReadingHistoryDateRange.startOfDay(log.date))
             .toSet();
@@ -351,10 +395,10 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
         }
         String? mostReadBook;
         int mostReadCount = 0;
-        bookFrequency.forEach((title, count) {
-          if (count > mostReadCount) {
+        bookFrequency.forEach((title, occurrences) {
+          if (occurrences > mostReadCount) {
             mostReadBook = title;
-            mostReadCount = count;
+            mostReadCount = occurrences;
           }
         });
 
@@ -365,8 +409,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
         if (sortedDates.isNotEmpty) {
           int streak = 1;
           for (int i = 1; i < sortedDates.length; i++) {
-            final diff =
-                sortedDates[i].difference(sortedDates[i - 1]).inDays;
+            final diff = sortedDates[i].difference(sortedDates[i - 1]).inDays;
             if (diff == 1) {
               streak++;
             } else {
@@ -382,8 +425,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
           if (sortedDates.last == today || sortedDates.last == yesterday) {
             currentStreak = 1;
             for (int i = sortedDates.length - 2; i >= 0; i--) {
-              final diff =
-                  sortedDates[i + 1].difference(sortedDates[i]).inDays;
+              final diff = sortedDates[i + 1].difference(sortedDates[i]).inDays;
               if (diff == 1) {
                 currentStreak++;
               } else {
@@ -463,8 +505,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                       icon: Icons.calendar_today_rounded,
                       value: readingDays.toString(),
                       label: 'Reading Days',
-                      backgroundColor:
-                          AppColors.skyBlue.withValues(alpha: 0.3),
+                      backgroundColor: AppColors.skyBlue.withValues(alpha: 0.3),
                       iconColor: AppColors.info,
                     ),
                   ),
@@ -478,8 +519,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                 value: ReadingHistoryDateRange.formatDurationMinutes(
                     averageMinutes),
                 label: 'Average per Reading Day',
-                backgroundColor:
-                    AppColors.mintGreen.withValues(alpha: 0.2),
+                backgroundColor: AppColors.mintGreen.withValues(alpha: 0.2),
                 iconColor: AppColors.secondaryGreen,
               ),
               LumiGap.s,
@@ -511,8 +551,8 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                             Text(
                               'Favourite Book',
                               style: LumiTextStyles.bodySmall().copyWith(
-                                color: AppColors.charcoal
-                                    .withValues(alpha: 0.5),
+                                color:
+                                    AppColors.charcoal.withValues(alpha: 0.5),
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -526,8 +566,8 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                             Text(
                               'Read $mostReadCount times',
                               style: LumiTextStyles.bodySmall().copyWith(
-                                color: AppColors.charcoal
-                                    .withValues(alpha: 0.6),
+                                color:
+                                    AppColors.charcoal.withValues(alpha: 0.6),
                               ),
                             ),
                           ],
@@ -573,8 +613,8 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                             Text(
                               'Day Streak',
                               style: LumiTextStyles.bodySmall().copyWith(
-                                color: AppColors.charcoal
-                                    .withValues(alpha: 0.6),
+                                color:
+                                    AppColors.charcoal.withValues(alpha: 0.6),
                               ),
                             ),
                           ],
@@ -612,8 +652,8 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                             Text(
                               'Best Streak',
                               style: LumiTextStyles.bodySmall().copyWith(
-                                color: AppColors.charcoal
-                                    .withValues(alpha: 0.6),
+                                color:
+                                    AppColors.charcoal.withValues(alpha: 0.6),
                               ),
                             ),
                           ],
@@ -698,8 +738,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
           final query = _myBooksSearchQuery.toLowerCase();
           filteredBooks = filteredBooks.where((book) {
             final metadata = _metadataResolver.getCached(book.title);
-            final displayTitle =
-                (metadata?.title ?? book.title).toLowerCase();
+            final displayTitle = (metadata?.title ?? book.title).toLowerCase();
             final author = (metadata?.author ?? '').toLowerCase();
             return displayTitle.contains(query) || author.contains(query);
           }).toList();
@@ -708,8 +747,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
         // Apply sort
         switch (_myBooksSortMode) {
           case _MyBooksSortMode.lastRead:
-            filteredBooks
-                .sort((a, b) => b.lastReadAt.compareTo(a.lastReadAt));
+            filteredBooks.sort((a, b) => b.lastReadAt.compareTo(a.lastReadAt));
           case _MyBooksSortMode.mostRead:
             filteredBooks.sort((a, b) => b.sessions.compareTo(a.sessions));
           case _MyBooksSortMode.alphabetical:
@@ -773,7 +811,10 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
             child: _isSearchVisible
                 ? Padding(
                     padding: EdgeInsets.fromLTRB(
-                      LumiSpacing.s, LumiSpacing.xs, LumiSpacing.s, 0,
+                      LumiSpacing.s,
+                      LumiSpacing.xs,
+                      LumiSpacing.s,
+                      0,
                     ),
                     child: TextField(
                       controller: _searchController,
@@ -843,11 +884,9 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                       children: [
                         _buildSortChip('Recent', _MyBooksSortMode.lastRead),
                         SizedBox(width: LumiSpacing.xxs),
-                        _buildSortChip(
-                            'Most Read', _MyBooksSortMode.mostRead),
+                        _buildSortChip('Most Read', _MyBooksSortMode.mostRead),
                         SizedBox(width: LumiSpacing.xxs),
-                        _buildSortChip(
-                            'A-Z', _MyBooksSortMode.alphabetical),
+                        _buildSortChip('A-Z', _MyBooksSortMode.alphabetical),
                         SizedBox(width: LumiSpacing.xxs),
                         _buildSortChip(
                             'Total Time', _MyBooksSortMode.totalTime),
@@ -863,8 +902,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                   isActive: false,
                   onTap: () {
                     setState(() {
-                      _myBooksView =
-                          _myBooksView == 'list' ? 'grid' : 'list';
+                      _myBooksView = _myBooksView == 'list' ? 'grid' : 'list';
                     });
                   },
                 ),
@@ -987,11 +1025,10 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                   width: 70,
                   height: 90,
                   child: coverUrl != null && coverUrl.startsWith('http')
-                      ? Image.network(
-                          coverUrl,
+                      ? PersistentCachedImage(
+                          imageUrl: coverUrl,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
-                              _buildBookPlaceholder(book.title),
+                          fallback: _buildBookPlaceholder(book.title),
                         )
                       : _buildBookPlaceholder(
                           book.title,
@@ -1073,11 +1110,10 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                   child: SizedBox(
                     width: double.infinity,
                     child: coverUrl != null && coverUrl.startsWith('http')
-                        ? Image.network(
-                            coverUrl,
+                        ? PersistentCachedImage(
+                            imageUrl: coverUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                _buildBookPlaceholder(book.title),
+                            fallback: _buildBookPlaceholder(book.title),
                           )
                         : _buildBookPlaceholder(
                             book.title,
@@ -1207,7 +1243,10 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
               // Header: cover + title
               Padding(
                 padding: EdgeInsets.fromLTRB(
-                  LumiSpacing.m, LumiSpacing.s, LumiSpacing.m, 0,
+                  LumiSpacing.m,
+                  LumiSpacing.s,
+                  LumiSpacing.m,
+                  0,
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1218,11 +1257,10 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                         width: 90,
                         height: 120,
                         child: coverUrl != null && coverUrl.startsWith('http')
-                            ? Image.network(
-                                coverUrl,
+                            ? PersistentCachedImage(
+                                imageUrl: coverUrl,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) =>
-                                    _buildBookPlaceholder(book.title),
+                                fallback: _buildBookPlaceholder(book.title),
                               )
                             : _buildBookPlaceholder(book.title),
                       ),
@@ -1243,8 +1281,8 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                             Text(
                               author,
                               style: LumiTextStyles.body().copyWith(
-                                color: AppColors.charcoal
-                                    .withValues(alpha: 0.6),
+                                color:
+                                    AppColors.charcoal.withValues(alpha: 0.6),
                               ),
                             ),
                           ],
@@ -1253,8 +1291,8 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                             Text(
                               publisher,
                               style: LumiTextStyles.caption().copyWith(
-                                color: AppColors.charcoal
-                                    .withValues(alpha: 0.4),
+                                color:
+                                    AppColors.charcoal.withValues(alpha: 0.4),
                               ),
                             ),
                           ],
@@ -1337,13 +1375,32 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                         ],
                       ),
                     ],
-                    if (pageCount != null) ...[
+                    if (pageCount != null || metadata?.isbn != null) ...[
                       LumiGap.s,
-                      Text(
-                        '$pageCount pages',
-                        style: LumiTextStyles.caption().copyWith(
-                          color: AppColors.charcoal.withValues(alpha: 0.5),
-                        ),
+                      Row(
+                        children: [
+                          if (pageCount != null)
+                            Text(
+                              '$pageCount pages',
+                              style: LumiTextStyles.caption().copyWith(
+                                color: AppColors.charcoal.withValues(alpha: 0.5),
+                              ),
+                            ),
+                          if (pageCount != null && metadata?.isbn != null)
+                            Text(
+                              '  ·  ',
+                              style: LumiTextStyles.caption().copyWith(
+                                color: AppColors.charcoal.withValues(alpha: 0.3),
+                              ),
+                            ),
+                          if (metadata?.isbn != null)
+                            Text(
+                              'ISBN ${metadata!.isbn}',
+                              style: LumiTextStyles.caption().copyWith(
+                                color: AppColors.charcoal.withValues(alpha: 0.5),
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                     if (description != null && description.isNotEmpty) ...[
@@ -1387,8 +1444,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
             const SizedBox(height: 4),
             Text(
               value,
-              style: LumiTextStyles.h3()
-                  .copyWith(fontWeight: FontWeight.w700),
+              style: LumiTextStyles.h3().copyWith(fontWeight: FontWeight.w700),
             ),
             Text(
               label,
@@ -1456,9 +1512,10 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
       return _buildEmptyState(emptyMessage);
     }
 
-    return ListView.builder(
+    return ListView.separated(
       padding: LumiPadding.allS,
       itemCount: logs.length,
+      separatorBuilder: (context, index) => SizedBox(height: LumiSpacing.xs),
       itemBuilder: (context, index) {
         final log = logs[index];
         return _LogCard(log: log);
@@ -1755,18 +1812,26 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
   }
 
   Widget _buildRangeHeader(String label) {
-    return Container(
-      width: double.infinity,
-      color: AppColors.white,
+    return Padding(
       padding: EdgeInsets.symmetric(
         horizontal: LumiSpacing.s,
         vertical: LumiSpacing.xs,
       ),
-      child: Text(
-        label,
-        style: LumiTextStyles.caption().copyWith(
-          color: AppColors.charcoal.withValues(alpha: 0.7),
-        ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.calendar_today,
+            size: 14,
+            color: AppColors.charcoal.withValues(alpha: 0.5),
+          ),
+          LumiGap.horizontalXXS,
+          Text(
+            label,
+            style: LumiTextStyles.caption().copyWith(
+              color: AppColors.charcoal.withValues(alpha: 0.5),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1865,16 +1930,16 @@ class _LogCard extends StatelessWidget {
     final hasMultipleBooks = log.bookTitles.length > 1;
     final extraCount = log.bookTitles.length - 1;
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: LumiSpacing.xs),
-      child: GestureDetector(
-        onTap: () => _showSessionDetail(context),
-        child: LumiCard(
-          padding: EdgeInsets.zero,
-          child: ListTile(
-            leading: Container(
-              width: 48,
-              height: 50,
+    return GestureDetector(
+      onTap: () => _showSessionDetail(context),
+      child: LumiCard(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Date badge
+            Container(
+              width: 52,
+              height: 52,
               decoration: BoxDecoration(
                 color: AppColors.rosePink.withValues(alpha: 0.1),
                 borderRadius: LumiBorders.medium,
@@ -1890,140 +1955,116 @@ class _LogCard extends StatelessWidget {
                   ),
                   Text(
                     DateFormat('MMM').format(log.date),
-                    style: LumiTextStyles.bodySmall().copyWith(
+                    style: LumiTextStyles.caption().copyWith(
                       color: AppColors.rosePink,
+                      fontSize: 11,
                     ),
                   ),
                 ],
               ),
             ),
-            title: Row(
-              children: [
-                Flexible(
-                  child: Text(
-                    hasMultipleBooks
-                        ? log.bookTitles.first
-                        : log.bookTitles.join(', '),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: LumiTextStyles.h3(),
-                  ),
-                ),
-                if (hasMultipleBooks) ...[
-                  LumiGap.horizontalXXS,
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: LumiSpacing.xxs + 2,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.rosePink.withValues(alpha: 0.12),
-                      borderRadius: LumiBorders.circular,
-                    ),
-                    child: Text(
-                      '+$extraCount more',
-                      style: LumiTextStyles.label().copyWith(
-                        color: AppColors.rosePink,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              LumiGap.xxs,
-              Row(
+            SizedBox(width: LumiSpacing.s),
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.timer,
-                    size: 16,
-                    color: log.hasMetTarget
-                        ? AppColors.mintGreen
-                        : AppColors.charcoal.withValues(alpha: 0.7),
-                  ),
-                  LumiGap.horizontalXXS,
-                  Text(
-                    '${log.minutesRead} minutes',
-                    style: LumiTextStyles.bodySmall().copyWith(
-                      color: log.hasMetTarget
-                          ? AppColors.mintGreen
-                          : AppColors.charcoal.withValues(alpha: 0.7),
-                    ),
-                  ),
-                  if (log.hasMetTarget) ...[
-                    LumiGap.horizontalXS,
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: LumiSpacing.xxs, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.mintGreen.withValues(alpha: 0.1),
-                        borderRadius: LumiBorders.circular,
-                      ),
-                      child: Text(
-                        'Goal Met',
-                        style: LumiTextStyles.label().copyWith(
-                          color: AppColors.mintGreen,
-                          fontWeight: FontWeight.bold,
+                  // Title row
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          hasMultipleBooks
+                              ? log.bookTitles.first
+                              : log.bookTitles.join(', '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: LumiTextStyles.h3(),
                         ),
+                      ),
+                      if (hasMultipleBooks) ...[
+                        LumiGap.horizontalXXS,
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: LumiSpacing.xxs + 2,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.rosePink.withValues(alpha: 0.12),
+                            borderRadius: LumiBorders.circular,
+                          ),
+                          child: Text(
+                            '+$extraCount more',
+                            style: LumiTextStyles.label().copyWith(
+                              color: AppColors.rosePink,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  LumiGap.xxs,
+                  // Duration + goal met
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.timer,
+                        size: 14,
+                        color: AppColors.charcoal.withValues(alpha: 0.5),
+                      ),
+                      LumiGap.horizontalXXS,
+                      Text(
+                        '${log.minutesRead} min',
+                        style: LumiTextStyles.caption().copyWith(
+                          color: AppColors.charcoal.withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (log.notes != null && log.notes!.isNotEmpty) ...[
+                    LumiGap.xxs,
+                    Text(
+                      log.notes!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: LumiTextStyles.bodySmall().copyWith(
+                        color: AppColors.charcoal.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ],
+                  if (log.teacherComment != null) ...[
+                    LumiGap.xxs,
+                    Container(
+                      padding: LumiPadding.allXS,
+                      decoration: BoxDecoration(
+                        color: AppColors.info.withValues(alpha: 0.08),
+                        borderRadius: LumiBorders.small,
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.comment,
+                            size: 14,
+                            color: AppColors.info,
+                          ),
+                          LumiGap.horizontalXXS,
+                          Expanded(
+                            child: Text(
+                              'Teacher: ${log.teacherComment}',
+                              style: LumiTextStyles.caption().copyWith(
+                                color: AppColors.info,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ],
               ),
-              if (log.notes != null && log.notes!.isNotEmpty) ...[
-                LumiGap.xxs,
-                Text(
-                  log.notes!,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: LumiTextStyles.bodySmall().copyWith(
-                    color: AppColors.charcoal.withValues(alpha: 0.7),
-                  ),
-                ),
-              ],
-              if (log.teacherComment != null) ...[
-                LumiGap.xxs,
-                Container(
-                  padding: LumiPadding.allXS,
-                  decoration: BoxDecoration(
-                    color: AppColors.info.withValues(alpha: 0.1),
-                    borderRadius: LumiBorders.small,
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.comment,
-                        size: 16,
-                        color: AppColors.info,
-                      ),
-                      LumiGap.horizontalXXS,
-                      Expanded(
-                        child: Text(
-                          'Teacher: ${log.teacherComment}',
-                          style: LumiTextStyles.bodySmall().copyWith(
-                            color: AppColors.info,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ],
-          ),
-          trailing: log.isCompleted
-              ? const Icon(
-                  Icons.check_circle,
-                  color: AppColors.mintGreen,
-                )
-              : Icon(
-                  Icons.circle_outlined,
-                  color: AppColors.charcoal.withValues(alpha: 0.7),
-                ),
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -2176,7 +2217,10 @@ class _SessionDetailSheet extends StatelessWidget {
             // Header
             Padding(
               padding: EdgeInsets.fromLTRB(
-                LumiSpacing.m, LumiSpacing.s, LumiSpacing.m, 0,
+                LumiSpacing.m,
+                LumiSpacing.s,
+                LumiSpacing.m,
+                0,
               ),
               child: Row(
                 children: [
@@ -2220,41 +2264,15 @@ class _SessionDetailSheet extends StatelessWidget {
                             Icon(
                               Icons.timer,
                               size: 16,
-                              color: log.hasMetTarget
-                                  ? AppColors.mintGreen
-                                  : AppColors.charcoal.withValues(alpha: 0.7),
+                              color: AppColors.charcoal.withValues(alpha: 0.7),
                             ),
                             LumiGap.horizontalXXS,
                             Text(
                               '${log.minutesRead} minutes',
                               style: LumiTextStyles.bodySmall().copyWith(
-                                color: log.hasMetTarget
-                                    ? AppColors.mintGreen
-                                    : AppColors.charcoal
-                                        .withValues(alpha: 0.7),
+                                color: AppColors.charcoal.withValues(alpha: 0.7),
                               ),
                             ),
-                            if (log.hasMetTarget) ...[
-                              LumiGap.horizontalXS,
-                              Container(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: LumiSpacing.xxs,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.mintGreen
-                                      .withValues(alpha: 0.1),
-                                  borderRadius: LumiBorders.circular,
-                                ),
-                                child: Text(
-                                  'Goal Met',
-                                  style: LumiTextStyles.label().copyWith(
-                                    color: AppColors.mintGreen,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
                           ],
                         ),
                       ],
@@ -2362,8 +2380,8 @@ class _SessionDetailSheet extends StatelessWidget {
                                 vertical: LumiSpacing.xxs,
                               ),
                               decoration: BoxDecoration(
-                                color: AppColors.rosePink
-                                    .withValues(alpha: 0.08),
+                                color:
+                                    AppColors.rosePink.withValues(alpha: 0.08),
                                 borderRadius: LumiBorders.circular,
                               ),
                               child: Text(

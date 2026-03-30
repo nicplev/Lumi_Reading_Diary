@@ -4,7 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/reading_group_model.dart';
+import '../../data/models/reading_level_option.dart';
 import '../../services/firebase_service.dart';
+import '../../services/reading_level_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
 
@@ -23,15 +25,44 @@ class ReadingGroupsScreen extends StatefulWidget {
 }
 
 class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
+  final ReadingLevelService _readingLevelService = ReadingLevelService();
   bool _isLoading = true;
   List<ReadingGroupModel> _groups = [];
   List<StudentModel> _allStudents = [];
   List<StudentModel> _ungroupedStudents = [];
+  List<ReadingLevelOption> _readingLevelOptions = const [];
+  bool _levelsEnabled = true;
 
   @override
   void initState() {
     super.initState();
+    _loadReadingLevelOptions();
     _loadData();
+  }
+
+  Future<void> _loadReadingLevelOptions({bool forceRefresh = false}) async {
+    try {
+      final options = await _readingLevelService.loadSchoolLevels(
+        widget.classModel.schoolId,
+        forceRefresh: forceRefresh,
+      );
+      if (!mounted) return;
+      setState(() {
+        _readingLevelOptions = options;
+        _levelsEnabled = options.isNotEmpty;
+      });
+    } catch (error) {
+      debugPrint('Error loading reading group level options: $error');
+    }
+  }
+
+  String _formatReadingLevel(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Not set';
+    if (_readingLevelOptions.isEmpty) return value.trim();
+    return _readingLevelService.formatLevelLabel(
+      value,
+      options: _readingLevelOptions,
+    );
   }
 
   @override
@@ -56,7 +87,34 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
           ),
         ],
       ),
-      body: _isLoading
+      body: !_levelsEnabled
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.info_outline,
+                        size: 48, color: AppColors.textSecondary),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Reading levels are not enabled for your school',
+                      style: TeacherTypography.bodyLarge,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Contact your school admin to enable reading levels in school settings.',
+                      style: TeacherTypography.bodyMedium.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : _isLoading
           ? const Center(
               child: CircularProgressIndicator(
                 color: AppColors.teacherPrimary,
@@ -188,8 +246,8 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
                         .copyWith(color: AppColors.charcoal),
                   ),
                 ),
-                label: Text(student.fullName,
-                    style: TeacherTypography.bodySmall),
+                label:
+                    Text(student.fullName, style: TeacherTypography.bodySmall),
                 onDeleted: () => _assignStudentToGroup(student),
                 deleteIcon: const Icon(Icons.arrow_forward, size: 18),
                 shape: RoundedRectangleBorder(
@@ -229,8 +287,8 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
             const SizedBox(height: 12),
             Text(
               'No Reading Groups Yet',
-              style: TeacherTypography.h2
-                  .copyWith(color: AppColors.textSecondary),
+              style:
+                  TeacherTypography.h2.copyWith(color: AppColors.textSecondary),
             ),
             const SizedBox(height: 4),
             Text(
@@ -311,8 +369,8 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
                         Row(
                           children: [
                             Expanded(
-                              child: Text(group.name,
-                                  style: TeacherTypography.h3),
+                              child:
+                                  Text(group.name, style: TeacherTypography.h3),
                             ),
                             if (group.readingLevel != null)
                               Container(
@@ -329,7 +387,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
                                   ),
                                 ),
                                 child: Text(
-                                  'Level ${group.readingLevel}',
+                                  _formatReadingLevel(group.readingLevel),
                                   style: TeacherTypography.caption
                                       .copyWith(color: color),
                                 ),
@@ -440,8 +498,8 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
                       label: Text(student.fullName),
                       labelStyle: TeacherTypography.bodySmall,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(
-                            TeacherDimensions.radiusM),
+                        borderRadius:
+                            BorderRadius.circular(TeacherDimensions.radiusM),
                       ),
                     );
                   }).toList(),
@@ -515,8 +573,11 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
       context: context,
       builder: (context) => _GroupFormDialog(
         classModel: widget.classModel,
+        levelOptions: _readingLevelOptions,
+        readingLevelService: _readingLevelService,
       ),
     );
+    if (!mounted) return;
 
     if (result != null) {
       try {
@@ -556,8 +617,11 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
       builder: (context) => _GroupFormDialog(
         classModel: widget.classModel,
         existingGroup: group,
+        levelOptions: _readingLevelOptions,
+        readingLevelService: _readingLevelService,
       ),
     );
+    if (!mounted) return;
 
     if (result != null) {
       try {
@@ -621,6 +685,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
         ],
       ),
     );
+    if (!mounted) return;
 
     if (confirmed == true) {
       try {
@@ -655,8 +720,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
     }
   }
 
-  void _viewGroupDetails(
-      ReadingGroupModel group, List<StudentModel> students) {
+  void _viewGroupDetails(ReadingGroupModel group, List<StudentModel> students) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('View details for ${group.name}'),
@@ -672,8 +736,10 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
         group: group,
         allStudents: _allStudents,
         currentStudentIds: group.studentIds,
+        readingLevelLabelBuilder: _formatReadingLevel,
       ),
     );
+    if (!mounted) return;
 
     if (result != null) {
       try {
@@ -737,8 +803,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
             const SizedBox(height: 12),
             ..._groups.map((group) {
               return ListTile(
-                title:
-                    Text(group.name, style: TeacherTypography.bodyMedium),
+                title: Text(group.name, style: TeacherTypography.bodyMedium),
                 subtitle: Text('${group.studentIds.length} students',
                     style: TeacherTypography.bodySmall),
                 onTap: () => Navigator.of(context).pop(group),
@@ -756,6 +821,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
         ],
       ),
     );
+    if (!mounted) return;
 
     if (selectedGroup != null) {
       try {
@@ -779,8 +845,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content:
-                Text('${student.fullName} added to ${selectedGroup.name}'),
+            content: Text('${student.fullName} added to ${selectedGroup.name}'),
             backgroundColor: AppColors.success,
           ),
         );
@@ -812,8 +877,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('What are Reading Groups?',
-                  style: TeacherTypography.h3),
+              Text('What are Reading Groups?', style: TeacherTypography.h3),
               const SizedBox(height: 8),
               Text(
                 'Reading groups help you organize students by ability level, interest, or any other criteria. This makes it easier to:',
@@ -869,9 +933,13 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
 class _GroupFormDialog extends StatefulWidget {
   final ClassModel classModel;
   final ReadingGroupModel? existingGroup;
+  final List<ReadingLevelOption> levelOptions;
+  final ReadingLevelService readingLevelService;
 
   const _GroupFormDialog({
     required this.classModel,
+    required this.levelOptions,
+    required this.readingLevelService,
     this.existingGroup,
   });
 
@@ -883,10 +951,10 @@ class _GroupFormDialogState extends State<_GroupFormDialog> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _descriptionController;
-  late TextEditingController _readingLevelController;
   late TextEditingController _targetMinutesController;
 
   String? _selectedColor;
+  String? _selectedReadingLevel;
 
   final _colors = [
     '#2196F3', // Blue
@@ -906,18 +974,19 @@ class _GroupFormDialogState extends State<_GroupFormDialog> {
         TextEditingController(text: widget.existingGroup?.name ?? '');
     _descriptionController =
         TextEditingController(text: widget.existingGroup?.description ?? '');
-    _readingLevelController =
-        TextEditingController(text: widget.existingGroup?.readingLevel ?? '');
     _targetMinutesController = TextEditingController(
         text: widget.existingGroup?.targetMinutes.toString() ?? '20');
     _selectedColor = widget.existingGroup?.color ?? _colors[0];
+    _selectedReadingLevel = widget.readingLevelService.normalizeLevel(
+      widget.existingGroup?.readingLevel,
+      options: widget.levelOptions,
+    );
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _descriptionController.dispose();
-    _readingLevelController.dispose();
     _targetMinutesController.dispose();
     super.dispose();
   }
@@ -951,8 +1020,7 @@ class _GroupFormDialogState extends State<_GroupFormDialog> {
                   focusedBorder: OutlineInputBorder(
                     borderRadius:
                         BorderRadius.circular(TeacherDimensions.radiusM),
-                    borderSide:
-                        BorderSide(color: AppColors.teacherPrimary),
+                    borderSide: BorderSide(color: AppColors.teacherPrimary),
                   ),
                 ),
                 style: TeacherTypography.bodyMedium,
@@ -976,19 +1044,17 @@ class _GroupFormDialogState extends State<_GroupFormDialog> {
                   focusedBorder: OutlineInputBorder(
                     borderRadius:
                         BorderRadius.circular(TeacherDimensions.radiusM),
-                    borderSide:
-                        BorderSide(color: AppColors.teacherPrimary),
+                    borderSide: BorderSide(color: AppColors.teacherPrimary),
                   ),
                 ),
                 style: TeacherTypography.bodyMedium,
                 maxLines: 2,
               ),
               const SizedBox(height: 12),
-              TextFormField(
-                controller: _readingLevelController,
+              DropdownButtonFormField<String>(
+                initialValue: _selectedReadingLevel,
                 decoration: InputDecoration(
                   labelText: 'Reading Level (optional)',
-                  hintText: 'e.g., A, B, C or 1, 2, 3',
                   border: OutlineInputBorder(
                     borderRadius:
                         BorderRadius.circular(TeacherDimensions.radiusM),
@@ -996,12 +1062,33 @@ class _GroupFormDialogState extends State<_GroupFormDialog> {
                   focusedBorder: OutlineInputBorder(
                     borderRadius:
                         BorderRadius.circular(TeacherDimensions.radiusM),
-                    borderSide:
-                        BorderSide(color: AppColors.teacherPrimary),
+                    borderSide: BorderSide(color: AppColors.teacherPrimary),
                   ),
                 ),
-                style: TeacherTypography.bodyMedium,
+                items: widget.levelOptions
+                    .map(
+                      (option) => DropdownMenuItem<String>(
+                        value: option.value,
+                        child: Text(option.displayLabel),
+                      ),
+                    )
+                    .toList(growable: false),
+                onChanged: (value) {
+                  setState(() => _selectedReadingLevel = value);
+                },
               ),
+              if (_selectedReadingLevel != null) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {
+                      setState(() => _selectedReadingLevel = null);
+                    },
+                    child: const Text('Clear level'),
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               TextFormField(
                 controller: _targetMinutesController,
@@ -1014,8 +1101,7 @@ class _GroupFormDialogState extends State<_GroupFormDialog> {
                   focusedBorder: OutlineInputBorder(
                     borderRadius:
                         BorderRadius.circular(TeacherDimensions.radiusM),
-                    borderSide:
-                        BorderSide(color: AppColors.teacherPrimary),
+                    borderSide: BorderSide(color: AppColors.teacherPrimary),
                   ),
                 ),
                 style: TeacherTypography.bodyMedium,
@@ -1044,13 +1130,11 @@ class _GroupFormDialogState extends State<_GroupFormDialog> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: Color(
-                            int.parse(color.replaceFirst('#', '0xFF'))),
+                        color:
+                            Color(int.parse(color.replaceFirst('#', '0xFF'))),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isSelected
-                              ? Colors.black
-                              : Colors.transparent,
+                          color: isSelected ? Colors.black : Colors.transparent,
                           width: 3,
                         ),
                       ),
@@ -1078,8 +1162,7 @@ class _GroupFormDialogState extends State<_GroupFormDialog> {
             backgroundColor: AppColors.teacherPrimary,
             foregroundColor: AppColors.white,
             shape: RoundedRectangleBorder(
-              borderRadius:
-                  BorderRadius.circular(TeacherDimensions.radiusM),
+              borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
             ),
             elevation: 0,
           ),
@@ -1099,9 +1182,7 @@ class _GroupFormDialogState extends State<_GroupFormDialog> {
         description: _descriptionController.text.trim().isEmpty
             ? null
             : _descriptionController.text.trim(),
-        readingLevel: _readingLevelController.text.trim().isEmpty
-            ? null
-            : _readingLevelController.text.trim(),
+        readingLevel: _selectedReadingLevel,
         studentIds: widget.existingGroup?.studentIds ?? [],
         color: _selectedColor,
         targetMinutes: int.parse(_targetMinutesController.text),
@@ -1120,11 +1201,13 @@ class _ManageStudentsDialog extends StatefulWidget {
   final ReadingGroupModel group;
   final List<StudentModel> allStudents;
   final List<String> currentStudentIds;
+  final String Function(String?)? readingLevelLabelBuilder;
 
   const _ManageStudentsDialog({
     required this.group,
     required this.allStudents,
     required this.currentStudentIds,
+    this.readingLevelLabelBuilder,
   });
 
   @override
@@ -1158,10 +1241,10 @@ class _ManageStudentsDialogState extends State<_ManageStudentsDialog> {
             final isSelected = _selectedStudentIds.contains(student.id);
 
             return CheckboxListTile(
-              title: Text(student.fullName,
-                  style: TeacherTypography.bodyMedium),
+              title:
+                  Text(student.fullName, style: TeacherTypography.bodyMedium),
               subtitle: Text(
-                  'Level: ${student.currentReadingLevel ?? "Not set"}',
+                  'Level: ${widget.readingLevelLabelBuilder?.call(student.currentReadingLevel) ?? (student.currentReadingLevel ?? "Not set")}',
                   style: TeacherTypography.bodySmall),
               value: isSelected,
               activeColor: AppColors.teacherPrimary,
@@ -1191,8 +1274,7 @@ class _ManageStudentsDialogState extends State<_ManageStudentsDialog> {
             backgroundColor: AppColors.teacherPrimary,
             foregroundColor: AppColors.white,
             shape: RoundedRectangleBorder(
-              borderRadius:
-                  BorderRadius.circular(TeacherDimensions.radiusM),
+              borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
             ),
             elevation: 0,
           ),

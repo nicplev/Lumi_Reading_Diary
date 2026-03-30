@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -6,7 +7,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/lumi_text_styles.dart';
-import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/reading_log_model.dart';
@@ -35,6 +35,7 @@ class ReadingSuccessScreen extends StatefulWidget {
 class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
     with TickerProviderStateMixin {
   late final AnimationController _confettiController;
+  Timer? _autoNavigateTimer;
 
   int get _totalNights =>
       widget.updatedStats?['totalReadingDays'] ??
@@ -73,6 +74,15 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
       duration: const Duration(seconds: 3),
     )..forward();
     _logAnalytics();
+    _autoNavigateTimer = Timer(const Duration(seconds: 3), _goHome);
+  }
+
+  void _goHome() {
+    _autoNavigateTimer?.cancel();
+    _autoNavigateTimer = null;
+    if (mounted) {
+      context.go('/parent/home', extra: widget.parent);
+    }
   }
 
   void _logAnalytics() {
@@ -96,6 +106,7 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
 
   @override
   void dispose() {
+    _autoNavigateTimer?.cancel();
     _confettiController.dispose();
     super.dispose();
   }
@@ -186,7 +197,7 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Text('🔥', style: TextStyle(fontSize: 24)),
+                            const Icon(Icons.local_fire_department, color: AppColors.rosePink, size: 28),
                             const SizedBox(width: 8),
                             Text(
                               '$_currentStreak Day Streak',
@@ -280,14 +291,29 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
 
                     const SizedBox(height: 40),
 
-                    // Done button
-                    LumiPrimaryButton(
-                      onPressed: () {
-                        context.go('/parent/home', extra: widget.parent);
-                      },
-                      text: 'Done',
-                      icon: Icons.home,
-                      isFullWidth: true,
+                    // Auto-returning indicator (tappable to skip)
+                    GestureDetector(
+                      onTap: _goHome,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.charcoal.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Returning home...',
+                            style: LumiTextStyles.bodySmall(
+                              color: AppColors.charcoal.withValues(alpha: 0.5),
+                            ),
+                          ),
+                        ],
+                      ),
                     ).animate().fadeIn(delay: 1200.ms),
                   ],
                 ),

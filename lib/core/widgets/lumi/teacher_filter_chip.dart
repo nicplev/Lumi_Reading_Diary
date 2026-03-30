@@ -20,26 +20,41 @@ class TeacherFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isActive ? AppColors.teacherPrimary : AppColors.white,
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
-          border: Border.all(
-            color: isActive ? AppColors.teacherPrimary : AppColors.divider,
-            width: 1.5,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          decoration: BoxDecoration(
+            color: isActive ? AppColors.teacherPrimary : AppColors.white,
+            borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
+            border: Border.all(
+              color:
+                  isActive ? AppColors.teacherPrimary : AppColors.teacherBorder,
+              width: 1.2,
+            ),
+            boxShadow: isActive
+                ? [
+                    BoxShadow(
+                      color: AppColors.teacherPrimary.withValues(alpha: 0.18),
+                      blurRadius: 18,
+                      spreadRadius: -8,
+                      offset: const Offset(0, 10),
+                    ),
+                  ]
+                : null,
           ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontFamily: 'Nunito',
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: isActive ? AppColors.white : AppColors.textSecondary,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Nunito',
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: isActive ? AppColors.white : AppColors.textSecondary,
+            ),
           ),
         ),
       ),

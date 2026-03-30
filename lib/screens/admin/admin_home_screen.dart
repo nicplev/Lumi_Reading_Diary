@@ -16,6 +16,7 @@ import 'user_management_screen.dart';
 import 'class_management_screen.dart';
 import 'database_migration_screen.dart';
 import 'parent_linking_management_screen.dart';
+import 'reading_level_settings_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   final UserModel user;
@@ -389,11 +390,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           color: AppColors.white,
                         ),
                         onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Notifications coming soon'),
-                            ),
-                          );
+                          context.push('/admin/notifications',
+                              extra: widget.user);
                         },
                       ),
                     ],
@@ -843,14 +841,26 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   },
                 ),
                 TeacherSettingsItem(
+                  icon: Icons.format_list_numbered,
+                  iconBgColor: AppColors.mintGreen,
+                  label: 'Reading Level Settings',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ReadingLevelSettingsScreen(
+                          adminUser: widget.user,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                TeacherSettingsItem(
                   icon: Icons.notifications,
                   iconBgColor: AppColors.warmOrange,
                   label: 'Notifications',
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('Notifications coming soon')),
-                    );
+                    context.push('/admin/notifications', extra: widget.user);
                   },
                 ),
               ],

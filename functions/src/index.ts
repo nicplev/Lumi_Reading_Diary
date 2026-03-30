@@ -1,5 +1,13 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import {
+  isDueAt,
+  isWithinQuietHours,
+  mergeRecipientsByParent,
+  NotificationAudienceType,
+  normalizeNotificationPermissions,
+  validateNotificationAudience,
+} from "./notification_helpers";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -153,6 +161,62 @@ const SCHOOL_CONCURRENCY = 10;
 /** Firestore `in` query limit */
 const FIRESTORE_IN_LIMIT = 30;
 
+type CampaignStatus = "queued" | "scheduled" | "processing" | "sent" | "partial" | "failed";
+
+interface NotificationCampaignPayload {
+  schoolId?: unknown;
+  title?: unknown;
+  body?: unknown;
+  messageType?: unknown;
+  audienceType?: unknown;
+  classIds?: unknown;
+  studentIds?: unknown;
+  scheduledFor?: unknown;
+}
+
+interface NotificationCampaignData {
+  schoolId: string;
+  title: string;
+  body: string;
+  messageType: string;
+  audienceType: NotificationAudienceType;
+  targetClassIds: string[];
+  targetStudentIds: string[];
+  status: CampaignStatus;
+  scheduledFor?: admin.firestore.Timestamp | null;
+  createdAt?: admin.firestore.Timestamp | admin.firestore.FieldValue;
+  sentAt?: admin.firestore.Timestamp | admin.firestore.FieldValue;
+  createdBy: string;
+  createdByRole: string;
+  createdByName: string;
+  recipientCounts?: {
+    parents: number;
+    students: number;
+  };
+  deliveryCounts?: {
+    inboxWritten: number;
+    pushSent: number;
+    pushFailed: number;
+  };
+  errorSummary?: string | null;
+}
+
+interface CampaignStudentRecord {
+  id: string;
+  firstName: string;
+  classId: string;
+  parentIds: string[];
+}
+
+interface CampaignParentDelivery {
+  parentId: string;
+  parentRef: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>;
+  token?: string;
+  studentIds: string[];
+  studentNames: string[];
+  classIds: string[];
+}
+
 /**
  * Helper: resolve local hour & ISO weekday for a timezone.
  */
@@ -201,6 +265,541 @@ async function mapConcurrent<T, R>(
   return results;
 }
 
+function asNonEmptyString(value: unknown, fieldName: string): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new functions.https.HttpsError("invalid-argument", `${fieldName} is required.`);
+  }
+
+  return value.trim();
+}
+
+function asOptionalTimestamp(value: unknown): admin.firestore.Timestamp | null {
+  if (value == null) return null;
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return admin.firestore.Timestamp.fromMillis(value);
+  }
+
+  if (typeof value === "string") {
+    const millis = Date.parse(value);
+    if (!Number.isNaN(millis)) {
+      return admin.firestore.Timestamp.fromMillis(millis);
+    }
+  }
+
+  if (typeof value === "object" && value !== null) {
+    const maybeSeconds = (value as {seconds?: unknown}).seconds;
+    if (typeof maybeSeconds === "number") {
+      const nanoseconds = (value as {nanoseconds?: unknown}).nanoseconds;
+      return new admin.firestore.Timestamp(
+        maybeSeconds,
+        typeof nanoseconds === "number" ? nanoseconds : 0,
+      );
+    }
+  }
+
+  throw new functions.https.HttpsError("invalid-argument", "scheduledFor must be a timestamp.");
+}
+
+function asStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(
+    value
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0),
+  )];
+}
+
+function schoolRef(schoolId: string) {
+  return db.collection("schools").doc(schoolId);
+}
+
+async function getTeacherAllowedClassIds(
+  schoolId: string,
+  userId: string,
+): Promise<string[]> {
+  const classesRef = schoolRef(schoolId).collection("classes");
+
+  const [teacherIdsSnap, teacherIdSnap] = await Promise.all([
+    classesRef.where("teacherIds", "array-contains", userId).get(),
+    classesRef.where("teacherId", "==", userId).get(),
+  ]);
+
+  return [...new Set([
+    ...teacherIdsSnap.docs.map((doc) => doc.id),
+    ...teacherIdSnap.docs.map((doc) => doc.id),
+  ])];
+}
+
+async function getStudentsByIds(
+  schoolId: string,
+  studentIds: string[],
+): Promise<CampaignStudentRecord[]> {
+  if (studentIds.length === 0) return [];
+
+  const refs = studentIds.map((studentId) => schoolRef(schoolId).collection("students").doc(studentId));
+  const docs = await db.getAll(...refs);
+  return docs
+    .filter((doc) => doc.exists)
+    .map((doc) => {
+      const data = doc.data() ?? {};
+      return {
+        id: doc.id,
+        firstName: String(data.firstName ?? "Student"),
+        classId: String(data.classId ?? ""),
+        parentIds: Array.isArray(data.parentIds) ? data.parentIds.filter((id): id is string => typeof id === "string") : [],
+        isActive: data.isActive !== false,
+      };
+    })
+    .filter((student) => student.isActive)
+    .map(({isActive: _isActive, ...student}) => student);
+}
+
+async function resolveCampaignStudents(
+  schoolId: string,
+  campaign: NotificationCampaignData,
+): Promise<CampaignStudentRecord[]> {
+  if (campaign.audienceType === "school") {
+    const snap = await schoolRef(schoolId)
+      .collection("students")
+      .where("isActive", "==", true)
+      .get();
+
+    return snap.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        firstName: String(data.firstName ?? "Student"),
+        classId: String(data.classId ?? ""),
+        parentIds: Array.isArray(data.parentIds) ? data.parentIds.filter((id): id is string => typeof id === "string") : [],
+      };
+    });
+  }
+
+  if (campaign.audienceType === "students") {
+    return getStudentsByIds(schoolId, campaign.targetStudentIds);
+  }
+
+  const classRefs = campaign.targetClassIds.map((classId) => schoolRef(schoolId).collection("classes").doc(classId));
+  const classDocs = classRefs.length > 0 ? await db.getAll(...classRefs) : [];
+  const studentIds = new Set<string>();
+
+  for (const classDoc of classDocs) {
+    if (!classDoc.exists) continue;
+    const data = classDoc.data() ?? {};
+    if (data.isActive === false) continue;
+    const classStudentIds = Array.isArray(data.studentIds)
+      ? data.studentIds.filter((id): id is string => typeof id === "string")
+      : [];
+    classStudentIds.forEach((studentId) => studentIds.add(studentId));
+  }
+
+  return getStudentsByIds(schoolId, [...studentIds]);
+}
+
+async function buildParentDeliveries(
+  schoolId: string,
+  students: CampaignStudentRecord[],
+): Promise<CampaignParentDelivery[]> {
+  const mergedRecipients = mergeRecipientsByParent(students);
+  if (mergedRecipients.length === 0) return [];
+
+  const parentRefs = mergedRecipients.map((recipient) => schoolRef(schoolId).collection("parents").doc(recipient.parentId));
+  const parentDocs = await db.getAll(...parentRefs);
+  const parentDocMap = new Map(parentDocs.map((doc) => [doc.id, doc]));
+
+  const deliveries: CampaignParentDelivery[] = [];
+
+  for (const recipient of mergedRecipients) {
+    const parentDoc = parentDocMap.get(recipient.parentId);
+    if (!parentDoc?.exists) continue;
+
+    const parentData = parentDoc.data() ?? {};
+    if (parentData.isActive === false) continue;
+
+    deliveries.push({
+      parentId: recipient.parentId,
+      parentRef: parentDoc.ref,
+      token: typeof parentData.fcmToken === "string" ? parentData.fcmToken : undefined,
+      studentIds: recipient.studentIds,
+      studentNames: recipient.studentNames,
+      classIds: recipient.classIds,
+    });
+  }
+
+  return deliveries;
+}
+
+async function createParentInboxItems(
+  deliveries: CampaignParentDelivery[],
+  campaignId: string,
+  campaign: NotificationCampaignData,
+): Promise<void> {
+  for (const batchDeliveries of chunk(deliveries, 400)) {
+    const batch = db.batch();
+
+    for (const delivery of batchDeliveries) {
+      const notificationRef = delivery.parentRef.collection("notifications").doc(campaignId);
+      batch.set(notificationRef, {
+        campaignId,
+        schoolId: campaign.schoolId,
+        title: campaign.title,
+        body: campaign.body,
+        messageType: campaign.messageType,
+        studentIds: delivery.studentIds,
+        classIds: delivery.classIds,
+        senderName: campaign.createdByName,
+        senderRole: campaign.createdByRole,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        deliveredAt: admin.firestore.FieldValue.serverTimestamp(),
+        pushStatus: delivery.token ? "pending" : "skipped_no_token",
+        isRead: false,
+        readAt: null,
+      }, {merge: true});
+    }
+
+    await batch.commit();
+  }
+}
+
+async function updateParentInboxStatuses(
+  deliveries: CampaignParentDelivery[],
+  campaignId: string,
+  statusMap: Map<string, string>,
+): Promise<void> {
+  for (const batchDeliveries of chunk(deliveries, 400)) {
+    const batch = db.batch();
+
+    for (const delivery of batchDeliveries) {
+      const status = statusMap.get(delivery.parentId);
+      if (status == null) continue;
+      const notificationRef = delivery.parentRef.collection("notifications").doc(campaignId);
+      batch.update(notificationRef, {
+        pushStatus: status,
+      });
+    }
+
+    await batch.commit();
+  }
+}
+
+async function dispatchNotificationCampaign(
+  schoolId: string,
+  campaignRef: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>,
+): Promise<void> {
+  const claimed = await db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(campaignRef);
+    if (!snap.exists) return false;
+
+    const data = snap.data() as NotificationCampaignData;
+    if (data.status !== "queued" && data.status !== "scheduled") {
+      return false;
+    }
+
+    if (data.status === "scheduled" && !isDueAt(data.scheduledFor?.toMillis(), Date.now())) {
+      return false;
+    }
+
+    transaction.update(campaignRef, {
+      status: "processing",
+      errorSummary: admin.firestore.FieldValue.delete(),
+    });
+    return true;
+  });
+
+  if (!claimed) return;
+
+  const campaignSnap = await campaignRef.get();
+  if (!campaignSnap.exists) return;
+
+  try {
+    const campaign = campaignSnap.data() as NotificationCampaignData;
+    const students = await resolveCampaignStudents(schoolId, campaign);
+    const deliveries = await buildParentDeliveries(schoolId, students);
+
+    if (deliveries.length === 0) {
+      await campaignRef.update({
+        status: "failed",
+        errorSummary: "No linked parents matched the selected audience.",
+        recipientCounts: {
+          parents: 0,
+          students: students.length,
+        },
+        deliveryCounts: {
+          inboxWritten: 0,
+          pushSent: 0,
+          pushFailed: 0,
+        },
+      });
+      return;
+    }
+
+    await createParentInboxItems(deliveries, campaignRef.id, campaign);
+
+    const statusByParentId = new Map<string, string>();
+    const tokenMessages: admin.messaging.TokenMessage[] = [];
+    const tokenOwners: string[] = [];
+    const inboxWritten = deliveries.length;
+
+    for (const delivery of deliveries) {
+      if (!delivery.token) {
+        statusByParentId.set(delivery.parentId, "skipped_no_token");
+        continue;
+      }
+
+      tokenOwners.push(delivery.parentId);
+      tokenMessages.push({
+        token: delivery.token,
+        notification: {
+          title: campaign.title,
+          body: campaign.body,
+        },
+        data: {
+          type: "staff_message",
+          campaignId: campaignRef.id,
+          schoolId,
+          messageType: campaign.messageType,
+        },
+        apns: {payload: {aps: {sound: "default"}}},
+        android: {
+          priority: "high" as const,
+          notification: {sound: "default", clickAction: "FLUTTER_NOTIFICATION_CLICK"},
+        },
+      });
+    }
+
+    let pushSent = 0;
+    let pushFailed = 0;
+    const staleParentIds = new Set<string>();
+
+    for (let i = 0; i < tokenMessages.length; i += FCM_BATCH_LIMIT) {
+      const messageBatch = tokenMessages.slice(i, i + FCM_BATCH_LIMIT);
+      const ownerBatch = tokenOwners.slice(i, i + FCM_BATCH_LIMIT);
+      const result = await admin.messaging().sendEach(messageBatch);
+
+      pushSent += result.successCount;
+      pushFailed += result.failureCount;
+
+      result.responses.forEach((response, index) => {
+        const parentId = ownerBatch[index];
+        if (response.success) {
+          statusByParentId.set(parentId, "sent");
+          return;
+        }
+
+        statusByParentId.set(parentId, "failed");
+        const code = response.error?.code;
+        if (
+          code === "messaging/registration-token-not-registered" ||
+          code === "messaging/invalid-registration-token"
+        ) {
+          staleParentIds.add(parentId);
+        }
+      });
+    }
+
+    await updateParentInboxStatuses(deliveries, campaignRef.id, statusByParentId);
+
+    if (staleParentIds.size > 0) {
+      for (const batchParentIds of chunk([...staleParentIds], 400)) {
+        const batch = db.batch();
+        for (const parentId of batchParentIds) {
+          batch.update(schoolRef(schoolId).collection("parents").doc(parentId), {
+            fcmToken: admin.firestore.FieldValue.delete(),
+            fcmTokenUpdatedAt: admin.firestore.FieldValue.delete(),
+          });
+        }
+        await batch.commit();
+      }
+    }
+
+    const skippedCount = [...statusByParentId.values()].filter((status) => status === "skipped_no_token").length;
+    const finalStatus: CampaignStatus = pushFailed > 0 || skippedCount > 0 ? "partial" : "sent";
+    await campaignRef.update({
+      status: finalStatus,
+      sentAt: admin.firestore.FieldValue.serverTimestamp(),
+      recipientCounts: {
+        parents: deliveries.length,
+        students: students.length,
+      },
+      deliveryCounts: {
+        inboxWritten,
+        pushSent,
+        pushFailed: pushFailed + skippedCount,
+      },
+      errorSummary: finalStatus === "partial" ? "Some pushes could not be delivered." : null,
+    });
+  } catch (error) {
+    await campaignRef.update({
+      status: "failed",
+      errorSummary: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+}
+
+export const createNotificationCampaign = functions
+  .runWith({timeoutSeconds: 60, memory: "256MB"})
+  .https.onCall(async (rawData: NotificationCampaignPayload, context) => {
+    const senderId = context.auth?.uid;
+    if (!senderId) {
+      throw new functions.https.HttpsError("unauthenticated", "You must be signed in.");
+    }
+
+    const schoolId = asNonEmptyString(rawData.schoolId, "schoolId");
+    const title = asNonEmptyString(rawData.title, "title");
+    const body = asNonEmptyString(rawData.body, "body");
+    const messageType = asNonEmptyString(rawData.messageType ?? "general", "messageType");
+    const audienceType = asNonEmptyString(rawData.audienceType, "audienceType") as NotificationAudienceType;
+    const requestedClassIds = asStringArray(rawData.classIds);
+    const requestedStudentIds = asStringArray(rawData.studentIds);
+    const scheduledFor = asOptionalTimestamp(rawData.scheduledFor);
+
+    if (!["students", "classes", "school"].includes(audienceType)) {
+      throw new functions.https.HttpsError("invalid-argument", "Invalid audienceType.");
+    }
+
+    const targetClassIds = audienceType === "classes" ? requestedClassIds : [];
+    const targetStudentIds = audienceType === "students" ? requestedStudentIds : [];
+
+    if (title.length > 120) {
+      throw new functions.https.HttpsError("invalid-argument", "title must be 120 characters or fewer.");
+    }
+
+    if (body.length > 1000) {
+      throw new functions.https.HttpsError("invalid-argument", "body must be 1000 characters or fewer.");
+    }
+
+    if (scheduledFor && scheduledFor.toMillis() <= Date.now()) {
+      throw new functions.https.HttpsError("invalid-argument", "scheduledFor must be in the future.");
+    }
+
+    const senderSnap = await schoolRef(schoolId).collection("users").doc(senderId).get();
+    if (!senderSnap.exists) {
+      throw new functions.https.HttpsError("permission-denied", "Only staff can create notification campaigns.");
+    }
+
+    const senderData = senderSnap.data() ?? {};
+    const senderRole = String(senderData.role ?? "");
+    const senderName = String(senderData.fullName ?? "Staff");
+
+    let allowedClassIds: string[] = [];
+    if (senderRole === "teacher") {
+      allowedClassIds = await getTeacherAllowedClassIds(schoolId, senderId);
+    }
+
+    const studentDocs = audienceType === "students"
+      ? await getStudentsByIds(schoolId, targetStudentIds)
+      : [];
+
+    const validation = validateNotificationAudience({
+      role: senderRole,
+      permissions: senderData.permissions,
+      audienceType,
+      allowedClassIds,
+      targetClassIds,
+      studentClassIds: studentDocs.map((student) => student.classId),
+      scheduledForMs: scheduledFor?.toMillis() ?? null,
+    });
+
+    if (!validation.ok) {
+      throw new functions.https.HttpsError("permission-denied", validation.reason ?? "Notification not allowed.");
+    }
+
+    if (audienceType === "classes") {
+      const classDocs = targetClassIds.length > 0
+        ? await db.getAll(...targetClassIds.map((classId) => schoolRef(schoolId).collection("classes").doc(classId)))
+        : [];
+      const validClassCount = classDocs.filter((doc) => doc.exists && doc.data()?.isActive !== false).length;
+      if (validClassCount === 0) {
+        throw new functions.https.HttpsError("invalid-argument", "Select at least one active class.");
+      }
+    }
+
+    if (audienceType === "students" && studentDocs.length === 0) {
+      throw new functions.https.HttpsError("invalid-argument", "Select at least one active student.");
+    }
+
+    const permissions = normalizeNotificationPermissions(senderRole, senderData.permissions);
+    const campaignRef = schoolRef(schoolId).collection("notificationCampaigns").doc();
+    const campaignStatus: CampaignStatus = scheduledFor ? "scheduled" : "queued";
+
+    await campaignRef.set({
+      schoolId,
+      title,
+      body,
+      messageType,
+      audienceType,
+      targetClassIds,
+      targetStudentIds,
+      status: campaignStatus,
+      scheduledFor: scheduledFor ?? null,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdBy: senderId,
+      createdByRole: senderRole,
+      createdByName: senderName,
+      recipientCounts: {
+        parents: 0,
+        students: audienceType === "students" ? studentDocs.length : 0,
+      },
+      deliveryCounts: {
+        inboxWritten: 0,
+        pushSent: 0,
+        pushFailed: 0,
+      },
+      errorSummary: null,
+      permissionsSnapshot: permissions,
+    });
+
+    return {
+      campaignId: campaignRef.id,
+      status: campaignStatus,
+    };
+  });
+
+export const processQueuedNotificationCampaign = functions.firestore
+  .document("schools/{schoolId}/notificationCampaigns/{campaignId}")
+  .onCreate(async (snapshot, context) => {
+    const campaign = snapshot.data() as NotificationCampaignData;
+    if (campaign.status !== "queued") {
+      return null;
+    }
+
+    await dispatchNotificationCampaign(context.params.schoolId, snapshot.ref);
+    return null;
+  });
+
+export const dispatchScheduledNotificationCampaigns = functions
+  .runWith({timeoutSeconds: 300, memory: "512MB"})
+  .pubsub.schedule("every 1 minutes")
+  .timeZone("UTC")
+  .onRun(async () => {
+    const now = admin.firestore.Timestamp.now();
+    const dueCampaigns = await db
+      .collectionGroup("notificationCampaigns")
+      .where("status", "==", "scheduled")
+      .where("scheduledFor", "<=", now)
+      .get();
+
+    await mapConcurrent(dueCampaigns.docs, 10, async (doc) => {
+      const schoolDocRef = doc.ref.parent.parent;
+      const schoolId = schoolDocRef?.id;
+      if (!schoolId) return;
+
+      const schoolSnap = await schoolDocRef.get();
+      const schoolData = schoolSnap.data() ?? {};
+      const timezone = String(schoolData.timezone ?? "UTC");
+      if (isWithinQuietHours(new Date(), timezone, schoolData.quietHours)) {
+        return;
+      }
+
+      await dispatchNotificationCampaign(schoolId, doc.ref);
+    });
+
+    return null;
+  });
+
 /**
  * Process reminders for a single school.
  *
@@ -222,8 +821,7 @@ async function processSchool(
   const {hour: localHour, weekday: localWeekday} = getLocalTime(utcNow, schoolTz);
 
   // Quiet hours check
-  const qh = schoolData.quietHours;
-  if (qh?.enabled && (localHour >= qh.start || localHour < qh.end)) {
+  if (isWithinQuietHours(utcNow, schoolTz, schoolData.quietHours)) {
     return {sent: 0, failed: 0, stale: 0};
   }
 

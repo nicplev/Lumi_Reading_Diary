@@ -1,9 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum ReadingLevelSchema {
+  none,
   aToZ,
   pmBenchmark,
   lexile,
+  numbered,
+  namedLevels,
+  colouredLevels,
   custom,
 }
 
@@ -15,6 +19,7 @@ class SchoolModel {
   final String? secondaryColor;
   final ReadingLevelSchema levelSchema;
   final List<String>? customLevels;
+  final Map<String, String>? levelColors; // hex color keyed by level name (for colouredLevels)
   final Map<String, DateTime> termDates; // term1Start, term1End, etc.
   final Map<String, String> quietHours; // start: "19:00", end: "07:00"
   final String timezone;
@@ -38,6 +43,7 @@ class SchoolModel {
     this.secondaryColor,
     required this.levelSchema,
     this.customLevels,
+    this.levelColors,
     required this.termDates,
     required this.quietHours,
     required this.timezone,
@@ -68,6 +74,9 @@ class SchoolModel {
       ),
       customLevels: data['customLevels'] != null
           ? List<String>.from(data['customLevels'])
+          : null,
+      levelColors: data['levelColors'] != null
+          ? Map<String, String>.from(data['levelColors'])
           : null,
       termDates: Map<String, DateTime>.from(
         (data['termDates'] ?? {}).map(
@@ -100,6 +109,7 @@ class SchoolModel {
       'secondaryColor': secondaryColor,
       'levelSchema': levelSchema.toString().split('.').last,
       'customLevels': customLevels,
+      'levelColors': levelColors,
       'termDates': termDates.map(
         (key, value) => MapEntry(key, Timestamp.fromDate(value)),
       ),
@@ -121,8 +131,12 @@ class SchoolModel {
     };
   }
 
+  bool get hasReadingLevels => levelSchema != ReadingLevelSchema.none;
+
   List<String> get readingLevels {
     switch (levelSchema) {
+      case ReadingLevelSchema.none:
+        return [];
       case ReadingLevelSchema.aToZ:
         return [
           'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
@@ -137,6 +151,11 @@ class SchoolModel {
           '600L', '700L', '800L', '900L', '1000L', '1100L',
           '1200L', '1300L', '1400L'
         ];
+      case ReadingLevelSchema.numbered:
+        return List.generate(100, (i) => '${i + 1}');
+      case ReadingLevelSchema.namedLevels:
+      case ReadingLevelSchema.colouredLevels:
+        return customLevels ?? [];
       case ReadingLevelSchema.custom:
         return customLevels ?? [];
     }

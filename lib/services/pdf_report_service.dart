@@ -7,10 +7,14 @@ import 'package:path_provider/path_provider.dart';
 import '../data/models/student_model.dart';
 import '../data/models/reading_log_model.dart';
 import '../data/models/class_model.dart';
+import '../data/models/reading_level_option.dart';
+import 'reading_level_service.dart';
 
 /// Service for generating professional PDF reports
 /// Supports student progress reports and class summary reports
 class PdfReportService {
+  final ReadingLevelService _readingLevelService = ReadingLevelService();
+
   /// Generate a comprehensive student progress report
   ///
   /// [student] - Student to generate report for
@@ -26,6 +30,8 @@ class PdfReportService {
     double? classAverage,
   }) async {
     final pdf = pw.Document();
+    final readingLevelOptions =
+        await _readingLevelService.loadSchoolLevels(student.schoolId);
 
     // Calculate report metrics
     final metrics = _calculateStudentMetrics(readingLogs, startDate, endDate);
@@ -38,7 +44,7 @@ class PdfReportService {
         build: (context) => [
           _buildReportHeader(student, startDate, endDate),
           pw.SizedBox(height: 20),
-          _buildStudentInfo(student),
+          _buildStudentInfo(student, readingLevelOptions),
           pw.SizedBox(height: 20),
           _buildMetricsSummary(metrics, classAverage),
           pw.SizedBox(height: 20),
@@ -79,6 +85,8 @@ class PdfReportService {
     required DateTime endDate,
   }) async {
     final pdf = pw.Document();
+    final readingLevelOptions =
+        await _readingLevelService.loadSchoolLevels(classModel.schoolId);
 
     // Calculate class metrics
     final classMetrics = _calculateClassMetrics(
@@ -86,7 +94,15 @@ class PdfReportService {
       allReadingLogs,
       startDate,
       endDate,
+      readingLevelOptions: readingLevelOptions,
     );
+    final popularLevel = classMetrics['popularLevel'] as String?;
+    if (popularLevel != null && popularLevel.isNotEmpty) {
+      classMetrics['popularLevel'] = _readingLevelService.formatLevelLabel(
+        popularLevel,
+        options: readingLevelOptions,
+      );
+    }
 
     pdf.addPage(
       pw.MultiPage(
@@ -163,7 +179,17 @@ class PdfReportService {
     );
   }
 
-  pw.Widget _buildStudentInfo(StudentModel student) {
+  pw.Widget _buildStudentInfo(
+    StudentModel student,
+    List<ReadingLevelOption> readingLevelOptions,
+  ) {
+    final readingLevel = student.currentReadingLevel == null ||
+            student.currentReadingLevel!.trim().isEmpty
+        ? 'Not set'
+        : _readingLevelService.formatLevelLabel(
+            student.currentReadingLevel,
+            options: readingLevelOptions,
+          );
     return pw.Container(
       padding: const pw.EdgeInsets.all(16),
       decoration: pw.BoxDecoration(
@@ -189,7 +215,7 @@ class PdfReportService {
               pw.Expanded(
                 child: _buildInfoRow(
                   'Reading Level:',
-                  student.currentReadingLevel ?? 'Not set',
+                  readingLevel,
                 ),
               ),
             ],
@@ -1104,8 +1130,9 @@ class PdfReportService {
     List<StudentModel> students,
     Map<String, List<ReadingLogModel>> allReadingLogs,
     DateTime startDate,
-    DateTime endDate,
-  ) {
+    DateTime endDate, {
+    List<ReadingLevelOption>? readingLevelOptions,
+  }) {
     int totalMinutes = 0;
     int totalBooks = 0;
     int activeReaders = 0;
@@ -1139,8 +1166,14 @@ class PdfReportService {
 
       // Track reading levels
       if (student.currentReadingLevel != null) {
-        levelCount[student.currentReadingLevel!] =
-            (levelCount[student.currentReadingLevel!] ?? 0) + 1;
+        final levelKey = readingLevelOptions == null
+            ? student.currentReadingLevel!
+            : _readingLevelService.normalizeLevel(
+                  student.currentReadingLevel,
+                  options: readingLevelOptions,
+                ) ??
+                student.currentReadingLevel!;
+        levelCount[levelKey] = (levelCount[levelKey] ?? 0) + 1;
       }
 
       // Check if student met target most of the time

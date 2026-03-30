@@ -109,24 +109,36 @@ class AppColors {
 
   // Role-based colors
   static const Color parentColor = rosePink;
-  static const Color teacherColor = Color(0xFF5C6BC0);
-  static const Color adminColor = Color(0xFF5C6BC0);
+  static const Color teacherColor = teacherPrimary;
+  static const Color adminColor = teacherPrimary;
 
   // ============================================
-  // TEACHER/ADMIN THEME COLORS (Indigo Purple)
+  // TEACHER/ADMIN THEME COLORS (Soft Blue)
   // ============================================
 
-  /// Teacher/Admin primary - Indigo purple
-  /// Usage: AppBar backgrounds, primary buttons, active nav items for staff screens
-  static const Color teacherPrimary = Color(0xFF5C6BC0);
+  /// Teacher/Admin primary - Azure blue
+  /// Usage: Staff CTAs, active navigation, emphasis states
+  static const Color teacherPrimary = Color(0xFF4F7CF7);
 
-  /// Teacher/Admin accent - Lighter indigo
-  /// Usage: Gradient endpoints, hover states, secondary accents
-  static const Color teacherAccent = Color(0xFF7986CB);
+  /// Teacher/Admin accent - Sky blue
+  /// Usage: Gradients, supporting accents, highlighted data
+  static const Color teacherAccent = Color(0xFF8CB9FF);
 
-  /// Teacher/Admin primary light - Very light indigo
-  /// Usage: Chip backgrounds, hover backgrounds, subtle tints
-  static const Color teacherPrimaryLight = Color(0xFFC5CAE9);
+  /// Teacher/Admin primary light - Pale blue tint
+  /// Usage: Pills, chips, icon backgrounds, selected surfaces
+  static const Color teacherPrimaryLight = Color(0xFFDCE8FF);
+
+  /// Teacher/Admin background - Cool off-white
+  /// Usage: Staff page backgrounds
+  static const Color teacherBackground = Color(0xFFF4F7FC);
+
+  /// Teacher/Admin surface tint - Soft blue wash
+  /// Usage: Secondary cards and hero embellishments
+  static const Color teacherSurfaceTint = Color(0xFFEAF1FF);
+
+  /// Teacher/Admin border - Muted blue-gray border
+  /// Usage: Card outlines, dividers, inactive chips
+  static const Color teacherBorder = Color(0xFFD7E3F7);
 
   // Book Level/Tier Colors (for reading allocation levels)
   static const Color levelCVC = Color(0xFFEF9A9A);
@@ -158,13 +170,13 @@ class AppColors {
   /// Returns a semi-transparent version of the rose pink color
   /// Useful for overlays, hover states, and backgrounds
   static Color rosePinkWithOpacity(double opacity) {
-    return rosePink.withOpacity(opacity);
+    return rosePink.withValues(alpha: opacity);
   }
 
   /// Returns a semi-transparent version of the charcoal color
   /// Useful for secondary text, disabled states, and borders
   static Color charcoalWithOpacity(double opacity) {
-    return charcoal.withOpacity(opacity);
+    return charcoal.withValues(alpha: opacity);
   }
 
   // ============================================
@@ -187,7 +199,7 @@ class AppColors {
     colors: [Color(0xFF4CAF50), Color(0xFF66BB6A)],
   );
 
-  /// Teacher/Admin gradient - Indigo to lighter indigo (135deg)
+  /// Teacher/Admin gradient - Azure blue to sky blue (135deg)
   /// Usage: Dashboard headers, scanner cards, staff hero sections
   static const LinearGradient teacherGradient = LinearGradient(
     begin: Alignment.topLeft,
@@ -221,5 +233,5 @@ extension LumiSemanticColors on AppColors {
   static Color get border => AppColors.divider;
 
   /// Disabled state color
-  static Color get disabled => AppColors.charcoal.withOpacity(0.4);
+  static Color get disabled => AppColors.charcoal.withValues(alpha: 0.4);
 }

@@ -28,29 +28,28 @@ class TeacherSettingsItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: TeacherDimensions.paddingL,
-          vertical: TeacherDimensions.paddingM,
+          vertical: TeacherDimensions.paddingL,
         ),
         child: Row(
           children: [
-            // Icon box
             Container(
-              width: 36,
-              height: 36,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                color: iconBgColor,
-                borderRadius: BorderRadius.circular(10),
+                color: iconBgColor.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(
                 icon,
-                size: TeacherDimensions.iconS,
-                color: iconColor ?? AppColors.white,
+                size: TeacherDimensions.iconM,
+                color: iconColor ?? iconBgColor,
               ),
             ),
-            const SizedBox(width: 12),
-            // Label
+            const SizedBox(width: 14),
             Expanded(
               child: Text(
                 label,
@@ -62,12 +61,19 @@ class TeacherSettingsItem extends StatelessWidget {
                 ),
               ),
             ),
-            // Trailing
             trailing ??
-                Icon(
-                  Icons.chevron_right,
-                  size: 20,
-                  color: AppColors.textSecondary,
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: AppColors.teacherSurfaceTint,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.chevron_right,
+                    size: 18,
+                    color: AppColors.teacherPrimary,
+                  ),
                 ),
           ],
         ),

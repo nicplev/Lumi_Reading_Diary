@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -27,6 +28,10 @@ class BookLookupService {
   final LlllBookDatabase _llllDatabase;
 
   static const _httpTimeout = Duration(seconds: 5);
+  bool _firestoreCacheReadEnabled = true;
+  bool _firestoreCacheWriteEnabled = true;
+  bool _didLogReadPermissionDenial = false;
+  bool _didLogWritePermissionDenial = false;
 
   /// Access the local LLLL book database for direct queries.
   LlllBookDatabase get llllDatabase => _llllDatabase;
@@ -41,44 +46,86 @@ class BookLookupService {
     required String isbn,
     required String schoolId,
     required String actorId,
+    bool useFirestoreCache = true,
+    bool persistToFirestoreCache = true,
   }) async {
+    final normalizedIsbn = _normalizeIsbnForLookup(isbn);
+    if (normalizedIsbn.isEmpty) return null;
+    final scopedSchoolId = schoolId.trim();
+
     // 0. Local LLLL database (instant, no network)
     if (_llllDatabase.isLoaded) {
-      final llllResult = _llllDatabase.lookupByIsbn(isbn);
+      final llllResult = _llllDatabase.lookupByIsbn(normalizedIsbn);
       if (llllResult != null) {
         return _llllDatabase.toBookModel(llllResult);
       }
     }
 
     // 1. Firestore cache
-    final cached = await _lookupInFirestore(isbn);
+    BookModel? cached;
+    if (scopedSchoolId.isNotEmpty &&
+        useFirestoreCache &&
+        _firestoreCacheReadEnabled) {
+      cached = await _lookupInFirestore(
+        normalizedIsbn,
+        schoolId: scopedSchoolId,
+      );
+    }
     if (cached != null && cached.metadata?['placeholder'] != true) {
       return cached;
     }
 
     // 2. Google Books API
-    final googleResult = await _fetchFromGoogleBooks(isbn);
+    final googleResult = await _fetchFromGoogleBooks(normalizedIsbn);
     if (googleResult != null) {
-      await _cacheBookInFirestore(
-        isbn: isbn,
-        book: googleResult,
-        source: 'google_books',
-        schoolId: schoolId,
-        actorId: actorId,
-      );
-      return googleResult;
+      var resolvedResult = googleResult;
+
+      // Google sometimes returns metadata without a thumbnail for valid ISBNs.
+      // If so, try Open Library for a deterministic ISBN cover URL.
+      if (!_hasUsableCoverUrl(googleResult.coverImageUrl)) {
+        final openLibraryFallback = await _fetchFromOpenLibrary(normalizedIsbn);
+        if (_hasUsableCoverUrl(openLibraryFallback?.coverImageUrl)) {
+          resolvedResult = googleResult.copyWith(
+            coverImageUrl: openLibraryFallback!.coverImageUrl,
+            metadata: {
+              ...?googleResult.metadata,
+              'coverSource': 'open_library',
+              'resolvedAt': Timestamp.fromDate(DateTime.now()),
+            },
+          );
+        }
+      }
+
+      if (scopedSchoolId.isNotEmpty &&
+          persistToFirestoreCache &&
+          _firestoreCacheWriteEnabled) {
+        await _cacheBookInFirestore(
+          isbn: normalizedIsbn,
+          book: resolvedResult,
+          source: resolvedResult.metadata?['coverSource'] == 'open_library'
+              ? 'google_books+open_library_cover'
+              : 'google_books',
+          schoolId: scopedSchoolId,
+          actorId: actorId,
+        );
+      }
+      return resolvedResult;
     }
 
     // 3. Open Library API
-    final openLibResult = await _fetchFromOpenLibrary(isbn);
+    final openLibResult = await _fetchFromOpenLibrary(normalizedIsbn);
     if (openLibResult != null) {
-      await _cacheBookInFirestore(
-        isbn: isbn,
-        book: openLibResult,
-        source: 'open_library',
-        schoolId: schoolId,
-        actorId: actorId,
-      );
+      if (scopedSchoolId.isNotEmpty &&
+          persistToFirestoreCache &&
+          _firestoreCacheWriteEnabled) {
+        await _cacheBookInFirestore(
+          isbn: normalizedIsbn,
+          book: openLibResult,
+          source: 'open_library',
+          schoolId: scopedSchoolId,
+          actorId: actorId,
+        );
+      }
       return openLibResult;
     }
 
@@ -93,9 +140,12 @@ class BookLookupService {
     required String title,
     required String schoolId,
     required String actorId,
+    bool useFirestoreCache = true,
+    bool persistToFirestoreCache = true,
   }) async {
     final normalized = normalizeTitle(title);
     if (normalized.isEmpty) return null;
+    final scopedSchoolId = schoolId.trim();
 
     // 0. Local LLLL database title search
     if (_llllDatabase.isLoaded) {
@@ -106,11 +156,21 @@ class BookLookupService {
     }
 
     // 1. Firestore cache by normalized title
-    final cached = await _lookupByTitleInFirestore(normalized);
+    BookModel? cached;
+    if (scopedSchoolId.isNotEmpty &&
+        useFirestoreCache &&
+        _firestoreCacheReadEnabled) {
+      cached = await _lookupByTitleInFirestore(
+        normalized,
+        schoolId: scopedSchoolId,
+        originalTitle: title,
+      );
+    }
     if (cached != null) {
       // If it's a "not found" placeholder, check TTL (re-search after 7 days)
       final searchedAt = cached.metadata?['lastSearchedAt'];
-      if (cached.metadata?['titleNotFound'] == true && searchedAt is Timestamp) {
+      if (cached.metadata?['titleNotFound'] == true &&
+          searchedAt is Timestamp) {
         final daysSinceSearch =
             DateTime.now().difference(searchedAt.toDate()).inDays;
         if (daysSinceSearch < 7) return null; // Still within TTL
@@ -123,36 +183,48 @@ class BookLookupService {
     // 2. Google Books title search
     final googleResult = await _fetchFromGoogleBooksByTitle(title);
     if (googleResult != null) {
-      await _cacheBookByTitle(
-        normalizedTitle: normalized,
-        book: googleResult,
-        source: 'google_books',
-        schoolId: schoolId,
-        actorId: actorId,
-      );
+      if (scopedSchoolId.isNotEmpty &&
+          persistToFirestoreCache &&
+          _firestoreCacheWriteEnabled) {
+        await _cacheBookByTitle(
+          normalizedTitle: normalized,
+          book: googleResult,
+          source: 'google_books',
+          schoolId: scopedSchoolId,
+          actorId: actorId,
+        );
+      }
       return googleResult;
     }
 
     // 3. Open Library title search
     final openLibResult = await _fetchFromOpenLibraryByTitle(title);
     if (openLibResult != null) {
-      await _cacheBookByTitle(
-        normalizedTitle: normalized,
-        book: openLibResult,
-        source: 'open_library',
-        schoolId: schoolId,
-        actorId: actorId,
-      );
+      if (scopedSchoolId.isNotEmpty &&
+          persistToFirestoreCache &&
+          _firestoreCacheWriteEnabled) {
+        await _cacheBookByTitle(
+          normalizedTitle: normalized,
+          book: openLibResult,
+          source: 'open_library',
+          schoolId: scopedSchoolId,
+          actorId: actorId,
+        );
+      }
       return openLibResult;
     }
 
     // 4. Cache a "not found" marker so we don't re-search immediately
-    await _cacheNotFoundByTitle(
-      normalizedTitle: normalized,
-      originalTitle: title,
-      schoolId: schoolId,
-      actorId: actorId,
-    );
+    if (scopedSchoolId.isNotEmpty &&
+        persistToFirestoreCache &&
+        _firestoreCacheWriteEnabled) {
+      await _cacheNotFoundByTitle(
+        normalizedTitle: normalized,
+        originalTitle: title,
+        schoolId: scopedSchoolId,
+        actorId: actorId,
+      );
+    }
     return null;
   }
 
@@ -161,13 +233,37 @@ class BookLookupService {
     return title.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
   }
 
+  CollectionReference<Map<String, dynamic>> _schoolBooks(String schoolId) {
+    return _firestore.collection('schools').doc(schoolId).collection('books');
+  }
+
+  CollectionReference<Map<String, dynamic>> get _legacyBooks {
+    return _firestore.collection('books');
+  }
+
   /// Resolve all placeholder books in Firestore that were created before
   /// API integration was available.
   Future<int> resolveAllPlaceholders({required String schoolId}) async {
-    final query = await _firestore
-        .collection('books')
-        .where('metadata.placeholder', isEqualTo: true)
-        .get();
+    if (!_firestoreCacheReadEnabled) return 0;
+    final scopedSchoolId = schoolId.trim();
+    if (scopedSchoolId.isEmpty) return 0;
+
+    QuerySnapshot<Map<String, dynamic>> query;
+    try {
+      query = await _schoolBooks(scopedSchoolId)
+          .where('metadata.placeholder', isEqualTo: true)
+          .get();
+
+      if (query.docs.isEmpty) {
+        query = await _legacyBooks
+            .where('schoolId', isEqualTo: scopedSchoolId)
+            .where('metadata.placeholder', isEqualTo: true)
+            .get();
+      }
+    } catch (e) {
+      _handleFirestoreReadFailure(e, operation: 'Placeholder query');
+      return 0;
+    }
 
     var resolved = 0;
     for (final doc in query.docs) {
@@ -184,7 +280,7 @@ class BookLookupService {
             isbn: isbn,
             book: book,
             source: 'llll_local_db',
-            schoolId: schoolId,
+            schoolId: scopedSchoolId,
             actorId: 'system',
           );
           resolved++;
@@ -199,7 +295,7 @@ class BookLookupService {
           isbn: isbn,
           book: book,
           source: book.metadata?['source'] as String? ?? 'api',
-          schoolId: schoolId,
+          schoolId: scopedSchoolId,
           actorId: 'system',
         );
         resolved++;
@@ -210,10 +306,13 @@ class BookLookupService {
 
   // ─── Firestore lookup ────────────────────────────────────
 
-  Future<BookModel?> _lookupInFirestore(String isbn) async {
+  Future<BookModel?> _lookupInFirestore(
+    String isbn, {
+    required String schoolId,
+  }) async {
+    if (!_firestoreCacheReadEnabled) return null;
     try {
-      final byNormalized = await _firestore
-          .collection('books')
+      final byNormalized = await _schoolBooks(schoolId)
           .where('isbnNormalized', isEqualTo: isbn)
           .limit(1)
           .get();
@@ -222,8 +321,7 @@ class BookLookupService {
         return BookModel.fromFirestore(byNormalized.docs.first);
       }
 
-      final byRaw = await _firestore
-          .collection('books')
+      final byRaw = await _schoolBooks(schoolId)
           .where('isbn', isEqualTo: isbn)
           .limit(1)
           .get();
@@ -231,8 +329,11 @@ class BookLookupService {
       if (byRaw.docs.isNotEmpty) {
         return BookModel.fromFirestore(byRaw.docs.first);
       }
+
+      final legacy = await _lookupLegacyByIsbn(isbn, schoolId: schoolId);
+      if (legacy != null) return legacy;
     } catch (e) {
-      debugPrint('BookLookupService: Firestore lookup failed: $e');
+      _handleFirestoreReadFailure(e, operation: 'Firestore lookup');
     }
     return null;
   }
@@ -257,8 +358,8 @@ class BookLookupService {
       final items = json['items'] as List<dynamic>?;
       if (items == null || items.isEmpty) return null;
 
-      final volumeInfo =
-          (items[0] as Map<String, dynamic>)['volumeInfo'] as Map<String, dynamic>?;
+      final volumeInfo = (items[0] as Map<String, dynamic>)['volumeInfo']
+          as Map<String, dynamic>?;
       if (volumeInfo == null) return null;
 
       final googleId = (items[0] as Map<String, dynamic>)['id'] as String?;
@@ -287,8 +388,8 @@ class BookLookupService {
         genres: categories?.map((c) => c.toString()).toList() ?? const [],
         pageCount: volumeInfo['pageCount'] as int?,
         publisher: volumeInfo['publisher'] as String?,
-        publishedDate: _parsePublishedDate(
-            volumeInfo['publishedDate'] as String?),
+        publishedDate:
+            _parsePublishedDate(volumeInfo['publishedDate'] as String?),
         createdAt: DateTime.now(),
         metadata: {
           'source': 'google_books',
@@ -347,11 +448,7 @@ class BookLookupService {
             : null,
         isbn: isbn,
         coverImageUrl: coverUrl,
-        genres: subjects
-                ?.take(5)
-                .map((s) => s.toString())
-                .toList() ??
-            const [],
+        genres: subjects?.take(5).map((s) => s.toString()).toList() ?? const [],
         pageCount: pageCount,
         publisher: publishers?.isNotEmpty == true
             ? publishers!.first.toString()
@@ -378,13 +475,15 @@ class BookLookupService {
     required String schoolId,
     required String actorId,
   }) async {
+    if (!_firestoreCacheWriteEnabled) return;
     try {
-      final ref = _firestore.collection('books').doc('isbn_$isbn');
+      final ref = _schoolBooks(schoolId).doc('isbn_$isbn');
       final now = DateTime.now();
 
       await ref.set(
         {
           'title': book.title,
+          'titleNormalized': normalizeTitle(book.title),
           'author': book.author,
           'isbn': isbn,
           'isbnNormalized': isbn,
@@ -400,6 +499,9 @@ class BookLookupService {
           'schoolId': schoolId,
           'addedBy': actorId,
           'createdAt': Timestamp.fromDate(now),
+          // Append teacher to school library provenance (arrayUnion is a no-op for 'system')
+          if (actorId.isNotEmpty && actorId != 'system')
+            'scannedByTeacherIds': FieldValue.arrayUnion([actorId]),
           'metadata': {
             'source': source,
             'placeholder': false,
@@ -411,16 +513,20 @@ class BookLookupService {
         SetOptions(merge: true),
       );
     } catch (e) {
-      debugPrint('BookLookupService: Cache write failed: $e');
+      _handleFirestoreWriteFailure(e, operation: 'Cache write');
     }
   }
 
   // ─── Title-based Firestore lookup ───────────────────────
 
-  Future<BookModel?> _lookupByTitleInFirestore(String normalizedTitle) async {
+  Future<BookModel?> _lookupByTitleInFirestore(
+    String normalizedTitle, {
+    required String schoolId,
+    String? originalTitle,
+  }) async {
+    if (!_firestoreCacheReadEnabled) return null;
     try {
-      final query = await _firestore
-          .collection('books')
+      final query = await _schoolBooks(schoolId)
           .where('titleNormalized', isEqualTo: normalizedTitle)
           .limit(1)
           .get();
@@ -428,8 +534,37 @@ class BookLookupService {
       if (query.docs.isNotEmpty) {
         return BookModel.fromFirestore(query.docs.first);
       }
+
+      final title = originalTitle?.trim();
+      if (title != null && title.isNotEmpty) {
+        final exactTitleQuery = await _schoolBooks(schoolId)
+            .where('title', isEqualTo: title)
+            .limit(1)
+            .get();
+
+        if (exactTitleQuery.docs.isNotEmpty) {
+          final doc = exactTitleQuery.docs.first;
+          final data = doc.data();
+          if ((data['titleNormalized'] as String?)?.isNotEmpty != true) {
+            unawaited(
+              doc.reference.set(
+                {'titleNormalized': normalizedTitle},
+                SetOptions(merge: true),
+              ).catchError((_) {}),
+            );
+          }
+          return BookModel.fromFirestore(doc);
+        }
+      }
+
+      final legacy = await _lookupLegacyByTitle(
+        normalizedTitle: normalizedTitle,
+        schoolId: schoolId,
+        originalTitle: title,
+      );
+      if (legacy != null) return legacy;
     } catch (e) {
-      debugPrint('BookLookupService: Title Firestore lookup failed: $e');
+      _handleFirestoreReadFailure(e, operation: 'Title Firestore lookup');
     }
     return null;
   }
@@ -455,8 +590,8 @@ class BookLookupService {
       final items = json['items'] as List<dynamic>?;
       if (items == null || items.isEmpty) return null;
 
-      final volumeInfo =
-          (items[0] as Map<String, dynamic>)['volumeInfo'] as Map<String, dynamic>?;
+      final volumeInfo = (items[0] as Map<String, dynamic>)['volumeInfo']
+          as Map<String, dynamic>?;
       if (volumeInfo == null) return null;
 
       final googleId = (items[0] as Map<String, dynamic>)['id'] as String?;
@@ -476,8 +611,7 @@ class BookLookupService {
 
       // Extract ISBN if available
       String? isbn;
-      final identifiers =
-          volumeInfo['industryIdentifiers'] as List<dynamic>?;
+      final identifiers = volumeInfo['industryIdentifiers'] as List<dynamic>?;
       if (identifiers != null) {
         for (final id in identifiers) {
           final idMap = id as Map<String, dynamic>;
@@ -552,10 +686,12 @@ class BookLookupService {
       final isbns = doc['isbn'] as List<dynamic>?;
       if (isbns != null && isbns.isNotEmpty) {
         // Prefer ISBN-13
-        isbn = isbns.firstWhere(
-          (i) => i.toString().length == 13,
-          orElse: () => isbns.first,
-        ).toString();
+        isbn = isbns
+            .firstWhere(
+              (i) => i.toString().length == 13,
+              orElse: () => isbns.first,
+            )
+            .toString();
       }
 
       // Build cover URL: prefer ISBN-based, fallback to cover ID
@@ -580,8 +716,7 @@ class BookLookupService {
             : null,
         isbn: isbn,
         coverImageUrl: coverUrl,
-        genres:
-            subjects?.take(5).map((s) => s.toString()).toList() ?? const [],
+        genres: subjects?.take(5).map((s) => s.toString()).toList() ?? const [],
         pageCount: pageCount,
         publisher: publishers?.isNotEmpty == true
             ? publishers!.first.toString()
@@ -608,8 +743,9 @@ class BookLookupService {
     required String schoolId,
     required String actorId,
   }) async {
+    if (!_firestoreCacheWriteEnabled) return;
     try {
-      final ref = _firestore.collection('books').doc(book.id);
+      final ref = _schoolBooks(schoolId).doc(book.id);
       final now = DateTime.now();
 
       await ref.set(
@@ -642,7 +778,7 @@ class BookLookupService {
         SetOptions(merge: true),
       );
     } catch (e) {
-      debugPrint('BookLookupService: Title cache write failed: $e');
+      _handleFirestoreWriteFailure(e, operation: 'Title cache write');
     }
   }
 
@@ -652,9 +788,9 @@ class BookLookupService {
     required String schoolId,
     required String actorId,
   }) async {
+    if (!_firestoreCacheWriteEnabled) return;
     try {
-      final ref =
-          _firestore.collection('books').doc('title_$normalizedTitle');
+      final ref = _schoolBooks(schoolId).doc('title_$normalizedTitle');
       final now = DateTime.now();
 
       await ref.set(
@@ -673,11 +809,176 @@ class BookLookupService {
         SetOptions(merge: true),
       );
     } catch (e) {
-      debugPrint('BookLookupService: Not-found cache write failed: $e');
+      _handleFirestoreWriteFailure(e, operation: 'Not-found cache write');
     }
   }
 
   // ─── Helpers ─────────────────────────────────────────────
+
+  bool _isFirestorePermissionDenied(Object error) {
+    if (error is FirebaseException) {
+      return error.plugin == 'cloud_firestore' &&
+          error.code == 'permission-denied';
+    }
+
+    final text = error.toString();
+    return text.contains('[cloud_firestore/permission-denied]') ||
+        text.contains('permission-denied');
+  }
+
+  Future<BookModel?> _lookupLegacyByIsbn(
+    String isbn, {
+    required String schoolId,
+  }) async {
+    final byNormalized = await _legacyBooks
+        .where('isbnNormalized', isEqualTo: isbn)
+        .where('schoolId', isEqualTo: schoolId)
+        .limit(1)
+        .get();
+    if (byNormalized.docs.isNotEmpty) {
+      return BookModel.fromFirestore(byNormalized.docs.first);
+    }
+
+    final byRaw = await _legacyBooks
+        .where('isbn', isEqualTo: isbn)
+        .where('schoolId', isEqualTo: schoolId)
+        .limit(1)
+        .get();
+    if (byRaw.docs.isNotEmpty) {
+      return BookModel.fromFirestore(byRaw.docs.first);
+    }
+
+    return null;
+  }
+
+  Future<BookModel?> _lookupLegacyByTitle({
+    required String normalizedTitle,
+    required String schoolId,
+    String? originalTitle,
+  }) async {
+    final byNormalized = await _legacyBooks
+        .where('titleNormalized', isEqualTo: normalizedTitle)
+        .where('schoolId', isEqualTo: schoolId)
+        .limit(1)
+        .get();
+    if (byNormalized.docs.isNotEmpty) {
+      return BookModel.fromFirestore(byNormalized.docs.first);
+    }
+
+    if (originalTitle != null && originalTitle.isNotEmpty) {
+      final exactTitle = await _legacyBooks
+          .where('title', isEqualTo: originalTitle)
+          .where('schoolId', isEqualTo: schoolId)
+          .limit(1)
+          .get();
+      if (exactTitle.docs.isNotEmpty) {
+        return BookModel.fromFirestore(exactTitle.docs.first);
+      }
+    }
+
+    return null;
+  }
+
+  void _handleFirestoreReadFailure(
+    Object error, {
+    required String operation,
+  }) {
+    if (_isFirestorePermissionDenied(error)) {
+      _firestoreCacheReadEnabled = false;
+      if (!_didLogReadPermissionDenial) {
+        _didLogReadPermissionDenial = true;
+        debugPrint(
+          'BookLookupService: Firestore cache reads disabled '
+          '(permission-denied).',
+        );
+      }
+      return;
+    }
+    debugPrint('BookLookupService: $operation failed: $error');
+  }
+
+  void _handleFirestoreWriteFailure(
+    Object error, {
+    required String operation,
+  }) {
+    if (_isFirestorePermissionDenied(error)) {
+      _firestoreCacheWriteEnabled = false;
+      if (!_didLogWritePermissionDenial) {
+        _didLogWritePermissionDenial = true;
+        debugPrint(
+          'BookLookupService: Firestore cache writes disabled '
+          '(permission-denied).',
+        );
+      }
+      return;
+    }
+    debugPrint('BookLookupService: $operation failed: $error');
+  }
+
+  static String _normalizeIsbnForLookup(String rawValue) {
+    final trimmed = rawValue.trim();
+    if (trimmed.isEmpty) return '';
+
+    final cleaned = trimmed.toUpperCase().replaceAll(RegExp(r'[^0-9X]'), '');
+    if (cleaned.length == 10 && _isValidIsbn10(cleaned)) {
+      return _convertIsbn10To13(cleaned);
+    }
+
+    if (cleaned.length == 13 && _isValidIsbn13(cleaned)) {
+      return cleaned;
+    }
+
+    return cleaned.isEmpty ? trimmed : cleaned;
+  }
+
+  static bool _isValidIsbn10(String isbn10) {
+    if (isbn10.length != 10) return false;
+
+    var sum = 0;
+    for (var i = 0; i < 10; i++) {
+      final char = isbn10[i];
+      final value = (i == 9 && char == 'X') ? 10 : int.tryParse(char);
+      if (value == null) return false;
+      sum += value * (10 - i);
+    }
+
+    return sum % 11 == 0;
+  }
+
+  static bool _isValidIsbn13(String isbn13) {
+    if (isbn13.length != 13 || !RegExp(r'^\d{13}$').hasMatch(isbn13)) {
+      return false;
+    }
+
+    var sum = 0;
+    for (var i = 0; i < 12; i++) {
+      final digit = int.parse(isbn13[i]);
+      sum += i.isEven ? digit : digit * 3;
+    }
+    final checkDigit = (10 - (sum % 10)) % 10;
+    return checkDigit == int.parse(isbn13[12]);
+  }
+
+  static String _convertIsbn10To13(String isbn10) {
+    final stem = '978${isbn10.substring(0, 9)}';
+    final checkDigit = _calculateIsbn13CheckDigit(stem);
+    return '$stem$checkDigit';
+  }
+
+  static int _calculateIsbn13CheckDigit(String stem12) {
+    var sum = 0;
+    for (var i = 0; i < 12; i++) {
+      final digit = int.parse(stem12[i]);
+      sum += i.isEven ? digit : digit * 3;
+    }
+    return (10 - (sum % 10)) % 10;
+  }
+
+  static bool _hasUsableCoverUrl(String? coverUrl) {
+    if (coverUrl == null) return false;
+    final trimmed = coverUrl.trim();
+    return trimmed.isNotEmpty && trimmed.startsWith('http');
+  }
 
   static DateTime? _parsePublishedDate(String? dateStr) {
     if (dateStr == null || dateStr.isEmpty) return null;

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../data/models/allocation_model.dart';
 import '../data/models/book_model.dart';
 import 'book_lookup_service.dart';
 
@@ -8,8 +9,8 @@ class IsbnAssignmentService {
     FirebaseFirestore? firestore,
     BookLookupService? bookLookupService,
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _bookLookupService = bookLookupService ??
-            BookLookupService(firestore: firestore);
+        _bookLookupService =
+            bookLookupService ?? BookLookupService(firestore: firestore);
 
   final FirebaseFirestore _firestore;
   final BookLookupService _bookLookupService;
@@ -184,10 +185,9 @@ class IsbnAssignmentService {
     for (final doc in snapshot.docs) {
       final data = doc.data();
       final metadata = data['metadata'] as Map<String, dynamic>?;
-      final isbns = (metadata?['scannedIsbns'] as List?)
-              ?.whereType<String>()
-              .toList() ??
-          <String>[];
+      final isbns =
+          (metadata?['scannedIsbns'] as List?)?.whereType<String>().toList() ??
+              <String>[];
       for (final isbn in isbns) {
         isbnCounts[isbn] = (isbnCounts[isbn] ?? 0) + 1;
       }
@@ -231,34 +231,87 @@ class IsbnAssignmentService {
         (existingData?['metadata'] as Map<String, dynamic>?) ??
             const <String, dynamic>{},
       );
-      final existingScannedIsbns = (existingMetadata['scannedIsbns'] as List?)
-              ?.whereType<String>()
-              .toSet() ??
-          <String>{};
-
-      final mergedTitles = <String>{...existingTitles};
-      final mergedBookIds = <String>{...existingBookIds};
+      final existingAssignmentItems = AllocationModel.parseAssignmentItems(
+        existingData?['assignmentItems'],
+        legacyBookTitles: existingTitles,
+        legacyBookIds: existingBookIds,
+      );
+      final mergedAssignmentItems =
+          List<AllocationBookItem>.from(existingAssignmentItems);
+      final existingItemIds = mergedAssignmentItems
+          .map((item) => item.id.trim())
+          .where((id) => id.isNotEmpty)
+          .toSet();
+      final existingActiveItemIsbns = mergedAssignmentItems
+          .where((item) => !item.isDeleted)
+          .map((item) => item.resolvedIsbn)
+          .whereType<String>()
+          .map((isbn) => isbn.trim())
+          .where((isbn) => isbn.isNotEmpty)
+          .toSet();
       final newBooks = <ScannedIsbnBook>[];
       final duplicateIsbns = <String>[];
 
       for (final isbn in byIsbn.keys) {
-        if (existingScannedIsbns.contains(isbn)) {
+        // Only treat as duplicate if the ISBN is in an ACTIVE (non-deleted)
+        // assignment item. Previously this also checked metadata.scannedIsbns,
+        // which never gets cleaned up on deletion — causing deleted books to
+        // be permanently un-reassignable.
+        if (existingActiveItemIsbns.contains(isbn)) {
           duplicateIsbns.add(isbn);
           continue;
         }
 
         final book = byIsbn[isbn]!;
         newBooks.add(book);
-        mergedTitles.add(book.title);
-        if (book.bookId != null && book.bookId!.isNotEmpty) {
-          mergedBookIds.add(book.bookId!);
+        var itemId = 'isbn_$isbn';
+        if (existingItemIds.contains(itemId)) {
+          itemId =
+              'isbn_${isbn}_${now.millisecondsSinceEpoch}_${newBooks.length}';
         }
+        existingItemIds.add(itemId);
+
+        mergedAssignmentItems.add(
+          AllocationBookItem(
+            id: itemId,
+            title: book.title,
+            bookId: (book.bookId != null && book.bookId!.trim().isNotEmpty)
+                ? book.bookId!.trim()
+                : 'isbn_$isbn',
+            isbn: isbn,
+            addedAt: now,
+            addedBy: teacherId,
+            metadata: {
+              'source': 'isbn_scan',
+              'resolvedFromCatalog': book.resolvedFromCatalog,
+            },
+          ),
+        );
+        existingActiveItemIsbns.add(isbn);
       }
 
+      final activeItems = mergedAssignmentItems
+          .where((item) => !item.isDeleted && item.title.trim().isNotEmpty)
+          .toList(growable: false);
+      // Rebuild scannedIsbns from active items only, so deleted book ISBNs
+      // are cleared and can be re-scanned later.
       final mergedIsbns = <String>{
-        ...existingScannedIsbns,
+        ...activeItems
+            .map((item) => item.resolvedIsbn)
+            .whereType<String>()
+            .map((isbn) => isbn.trim())
+            .where((isbn) => isbn.isNotEmpty),
         ...byIsbn.keys,
       };
+      final mergedTitles = activeItems
+          .map((item) => item.title.trim())
+          .where((title) => title.isNotEmpty)
+          .toSet();
+      final mergedBookIds = activeItems
+          .map((item) => item.bookId?.trim())
+          .whereType<String>()
+          .where((bookId) => bookId.isNotEmpty)
+          .toSet();
 
       final updatedMetadata = <String, dynamic>{
         ...existingMetadata,
@@ -288,6 +341,9 @@ class IsbnAssignmentService {
           'endDate': Timestamp.fromDate(weekEnd),
           'bookIds': mergedBookIds.toList(),
           'bookTitles': mergedTitles.toList(),
+          'assignmentItems':
+              mergedAssignmentItems.map((item) => item.toMap()).toList(),
+          'schemaVersion': 2,
           'isRecurring': false,
           'isActive': true,
           'createdAt': createdAt ?? Timestamp.fromDate(now),
@@ -300,7 +356,7 @@ class IsbnAssignmentService {
       return _AllocationUpsertSummary(
         newlyAssignedBooks: newBooks,
         duplicateIsbns: duplicateIsbns,
-        totalAssignedBooks: mergedTitles.length,
+        totalAssignedBooks: activeItems.length,
       );
     });
   }
@@ -310,6 +366,21 @@ class IsbnAssignmentService {
     required String schoolId,
     required String actorId,
   }) async {
+    // Check if this book is already in the school library before resolving
+    bool isNewToLibrary = false;
+    try {
+      final existingDoc = await _firestore
+          .collection('schools')
+          .doc(schoolId)
+          .collection('books')
+          .doc('isbn_$isbn')
+          .get();
+      isNewToLibrary = !existingDoc.exists ||
+          existingDoc.data()?['metadata']?['placeholder'] == true;
+    } catch (_) {
+      // Non-critical — default to false
+    }
+
     // Try the full lookup chain: Firestore cache → Google Books → Open Library
     BookModel? resolved;
     try {
@@ -330,6 +401,7 @@ class IsbnAssignmentService {
         coverImageUrl: resolved.coverImageUrl,
         bookId: resolved.id,
         resolvedFromCatalog: true,
+        isNewToLibrary: isNewToLibrary,
       );
     }
 
@@ -347,10 +419,22 @@ class IsbnAssignmentService {
 
     return ScannedIsbnBook(
       isbn: isbn,
-      title: 'Unknown Book (ISBN $isbn)',
+      title: placeholderTitle,
       bookId: createdBookId,
       resolvedFromCatalog: false,
+      isNewToLibrary: isNewToLibrary,
     );
+  }
+
+  /// Human-readable label used for ISBN-scanned books whose metadata could
+  /// not be resolved from any source.
+  static const String placeholderTitle = 'Unrecognised Book';
+
+  /// Returns a clean display title, converting any legacy
+  /// "Unknown Book (ISBN ...)" entries to [placeholderTitle].
+  static String sanitizeDisplayTitle(String title) {
+    if (title.startsWith('Unknown Book (ISBN ')) return placeholderTitle;
+    return title;
   }
 
   Future<String> _createPlaceholderBook({
@@ -358,12 +442,17 @@ class IsbnAssignmentService {
     required String schoolId,
     required String actorId,
   }) async {
-    final ref = _firestore.collection('books').doc('isbn_$isbn');
+    final ref = _firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('books')
+        .doc('isbn_$isbn');
     final now = DateTime.now();
 
     await ref.set(
       {
-        'title': 'Unknown Book (ISBN $isbn)',
+        'title': placeholderTitle,
+        'titleNormalized': BookLookupService.normalizeTitle(placeholderTitle),
         'isbn': isbn,
         'isbnNormalized': isbn,
         'author': null,
@@ -384,6 +473,67 @@ class IsbnAssignmentService {
     );
 
     return ref.id;
+  }
+
+  /// Reassigns existing books into a future week's allocation.
+  ///
+  /// Used when a teacher wants a student to keep reading the same book(s)
+  /// for another cycle. Maps each [AllocationBookItem] to a
+  /// [ScannedIsbnBook] and delegates to [_upsertWeeklyAllocation] so that
+  /// deduplication and merge logic is reused.
+  Future<ReassignmentResult> reassignBooksToNextCycle({
+    required String schoolId,
+    required String classId,
+    required String studentId,
+    required String teacherId,
+    required List<AllocationBookItem> itemsToKeep,
+    required String sourceAllocationId,
+    DateTime? targetDate,
+    int targetMinutes = 20,
+  }) async {
+    if (itemsToKeep.isEmpty) {
+      return const ReassignmentResult(
+        allocationId: '',
+        keptCount: 0,
+        alreadyAssignedCount: 0,
+      );
+    }
+
+    final effectiveTarget = targetDate ?? DateTime.now().add(const Duration(days: 7));
+    final weekStart = startOfWeek(effectiveTarget);
+    final weekEnd = endOfWeek(effectiveTarget);
+    final allocationId = buildWeeklyAllocationId(
+      studentId: studentId,
+      weekStart: weekStart,
+    );
+
+    final books = itemsToKeep.map((item) {
+      return ScannedIsbnBook(
+        isbn: item.resolvedIsbn ?? '',
+        title: item.title,
+        bookId: item.bookId,
+        coverImageUrl: null,
+        resolvedFromCatalog: true,
+      );
+    }).toList();
+
+    final summary = await _upsertWeeklyAllocation(
+      schoolId: schoolId,
+      classId: classId,
+      studentId: studentId,
+      teacherId: teacherId,
+      allocationId: allocationId,
+      weekStart: weekStart,
+      weekEnd: weekEnd,
+      targetMinutes: targetMinutes,
+      books: books,
+    );
+
+    return ReassignmentResult(
+      allocationId: allocationId,
+      keptCount: summary.newlyAssignedBooks.length,
+      alreadyAssignedCount: summary.duplicateIsbns.length,
+    );
   }
 
   static bool _isValidIsbn10(String isbn10) {
@@ -439,6 +589,7 @@ class ScannedIsbnBook {
     this.coverImageUrl,
     this.bookId,
     required this.resolvedFromCatalog,
+    this.isNewToLibrary = false,
   });
 
   final String isbn;
@@ -447,6 +598,9 @@ class ScannedIsbnBook {
   final String? coverImageUrl;
   final String? bookId;
   final bool resolvedFromCatalog;
+
+  /// True if this book was first scanned into the school library by this operation.
+  final bool isNewToLibrary;
 }
 
 class IsbnAssignmentResult {
@@ -465,6 +619,18 @@ class IsbnAssignmentResult {
   final List<String> duplicateIsbns;
   final List<String> invalidCodes;
   final int totalAssignedBooks;
+}
+
+class ReassignmentResult {
+  const ReassignmentResult({
+    required this.allocationId,
+    required this.keptCount,
+    required this.alreadyAssignedCount,
+  });
+
+  final String allocationId;
+  final int keptCount;
+  final int alreadyAssignedCount;
 }
 
 class _AllocationUpsertSummary {

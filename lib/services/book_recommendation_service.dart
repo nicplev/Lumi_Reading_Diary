@@ -1,14 +1,23 @@
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../data/models/book_model.dart';
 import '../data/models/student_model.dart';
+import 'reading_level_service.dart';
 
 /// Service for generating personalized book recommendations
 /// Uses reading level, history, and popularity to suggest appropriate books
 class BookRecommendationService {
   final FirebaseFirestore _firestore;
+  final ReadingLevelService _readingLevelService;
 
   BookRecommendationService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+      : _firestore = firestore ?? FirebaseFirestore.instance,
+        _readingLevelService = ReadingLevelService(
+            firestore: firestore ?? FirebaseFirestore.instance);
+
+  CollectionReference<Map<String, dynamic>> _schoolBooks(String schoolId) {
+    return _firestore.collection('schools').doc(schoolId).collection('books');
+  }
 
   /// Get personalized recommendations for a student
   ///
@@ -33,12 +42,15 @@ class BookRecommendationService {
           .toSet();
 
       // Build query for recommendations
-      Query query = _firestore.collection('books');
+      Query query = _schoolBooks(student.schoolId);
+      final normalizedStudentLevel = await _normalizeReadingLevel(
+        schoolId: student.schoolId,
+        value: student.currentReadingLevel,
+      );
 
       // Filter by reading level if available
-      if (student.currentReadingLevel != null) {
-        query = query.where('readingLevel',
-            isEqualTo: student.currentReadingLevel);
+      if (normalizedStudentLevel != null) {
+        query = query.where('readingLevel', isEqualTo: normalizedStudentLevel);
       }
 
       // Get popular books first
@@ -59,7 +71,7 @@ class BookRecommendationService {
 
       return recommendations;
     } catch (e) {
-      print('Error getting recommendations: $e');
+      debugPrint('Error getting recommendations: $e');
       return [];
     }
   }
@@ -67,19 +79,25 @@ class BookRecommendationService {
   /// Get popular books by reading level
   Future<List<BookModel>> getPopularBooksByLevel(
     String readingLevel, {
+    required String schoolId,
     int limit = 20,
   }) async {
     try {
-      final snapshot = await _firestore
-          .collection('books')
-          .where('readingLevel', isEqualTo: readingLevel)
+      final normalizedReadingLevel = await _normalizeReadingLevel(
+        schoolId: schoolId,
+        value: readingLevel,
+      );
+      if (normalizedReadingLevel == null) return [];
+
+      final snapshot = await _schoolBooks(schoolId)
+          .where('readingLevel', isEqualTo: normalizedReadingLevel)
           .orderBy('timesRead', descending: true)
           .limit(limit)
           .get();
 
       return snapshot.docs.map((doc) => BookModel.fromFirestore(doc)).toList();
     } catch (e) {
-      print('Error getting popular books: $e');
+      debugPrint('Error getting popular books: $e');
       return [];
     }
   }
@@ -87,16 +105,20 @@ class BookRecommendationService {
   /// Get books by genre
   Future<List<BookModel>> getBooksByGenre(
     String genre, {
+    required String schoolId,
     int limit = 20,
     String? readingLevel,
   }) async {
     try {
-      Query query = _firestore
-          .collection('books')
-          .where('genres', arrayContains: genre);
+      final normalizedReadingLevel = await _normalizeReadingLevel(
+        schoolId: schoolId,
+        value: readingLevel,
+      );
+      Query query =
+          _schoolBooks(schoolId).where('genres', arrayContains: genre);
 
-      if (readingLevel != null) {
-        query = query.where('readingLevel', isEqualTo: readingLevel);
+      if (normalizedReadingLevel != null) {
+        query = query.where('readingLevel', isEqualTo: normalizedReadingLevel);
       }
 
       query = query.orderBy('timesRead', descending: true).limit(limit);
@@ -105,7 +127,7 @@ class BookRecommendationService {
 
       return snapshot.docs.map((doc) => BookModel.fromFirestore(doc)).toList();
     } catch (e) {
-      print('Error getting books by genre: $e');
+      debugPrint('Error getting books by genre: $e');
       return [];
     }
   }
@@ -113,22 +135,25 @@ class BookRecommendationService {
   /// Search books by title or author
   Future<List<BookModel>> searchBooks(
     String searchTerm, {
+    required String schoolId,
     String? readingLevel,
     int limit = 20,
   }) async {
     try {
+      final normalizedReadingLevel = await _normalizeReadingLevel(
+        schoolId: schoolId,
+        value: readingLevel,
+      );
       // This is a simple implementation
       // For production, consider using Algolia or ElasticSearch
-      final titleSnapshot = await _firestore
-          .collection('books')
+      final titleSnapshot = await _schoolBooks(schoolId)
           .orderBy('title')
           .startAt([searchTerm])
           .endAt(['$searchTerm\uf8ff'])
           .limit(limit)
           .get();
 
-      final authorSnapshot = await _firestore
-          .collection('books')
+      final authorSnapshot = await _schoolBooks(schoolId)
           .orderBy('author')
           .startAt([searchTerm])
           .endAt(['$searchTerm\uf8ff'])
@@ -140,22 +165,21 @@ class BookRecommendationService {
         ...authorSnapshot.docs,
       };
 
-      var books =
-          allDocs.map((doc) => BookModel.fromFirestore(doc)).toList();
+      var books = allDocs.map((doc) => BookModel.fromFirestore(doc)).toList();
 
       // Filter by reading level if specified
-      if (readingLevel != null) {
+      if (normalizedReadingLevel != null) {
         books = books
-            .where((book) => book.readingLevel == readingLevel)
+            .where((book) => book.readingLevel == normalizedReadingLevel)
             .toList();
       }
 
       // Sort by relevance (simple: exact matches first, then by popularity)
       books.sort((a, b) {
         final aExact = a.title.toLowerCase() == searchTerm.toLowerCase() ||
-            (a.author?.toLowerCase() == searchTerm.toLowerCase() ?? false);
+            a.author?.toLowerCase() == searchTerm.toLowerCase();
         final bExact = b.title.toLowerCase() == searchTerm.toLowerCase() ||
-            (b.author?.toLowerCase() == searchTerm.toLowerCase() ?? false);
+            b.author?.toLowerCase() == searchTerm.toLowerCase();
 
         if (aExact && !bExact) return -1;
         if (!aExact && bExact) return 1;
@@ -165,7 +189,7 @@ class BookRecommendationService {
 
       return books.take(limit).toList();
     } catch (e) {
-      print('Error searching books: $e');
+      debugPrint('Error searching books: $e');
       return [];
     }
   }
@@ -173,6 +197,7 @@ class BookRecommendationService {
   /// Get similar books based on a book
   Future<List<BookModel>> getSimilarBooks(
     BookModel book, {
+    required String schoolId,
     int limit = 10,
   }) async {
     try {
@@ -181,13 +206,13 @@ class BookRecommendationService {
         // If no genres, just get books at same level
         return getPopularBooksByLevel(
           book.readingLevel ?? '',
+          schoolId: schoolId,
           limit: limit,
         );
       }
 
       // Get books sharing at least one genre
-      final snapshot = await _firestore
-          .collection('books')
+      final snapshot = await _schoolBooks(schoolId)
           .where('genres', arrayContainsAny: book.genres.take(10).toList())
           .where('readingLevel', isEqualTo: book.readingLevel)
           .orderBy('timesRead', descending: true)
@@ -202,21 +227,27 @@ class BookRecommendationService {
 
       return books;
     } catch (e) {
-      print('Error getting similar books: $e');
+      debugPrint('Error getting similar books: $e');
       return [];
     }
   }
 
   /// Get new/recently added books
   Future<List<BookModel>> getRecentlyAddedBooks({
+    required String schoolId,
     String? readingLevel,
     int limit = 20,
   }) async {
     try {
-      Query query = _firestore.collection('books').orderBy('createdAt', descending: true);
+      final normalizedReadingLevel = await _normalizeReadingLevel(
+        schoolId: schoolId,
+        value: readingLevel,
+      );
+      Query query =
+          _schoolBooks(schoolId).orderBy('createdAt', descending: true);
 
-      if (readingLevel != null) {
-        query = query.where('readingLevel', isEqualTo: readingLevel);
+      if (normalizedReadingLevel != null) {
+        query = query.where('readingLevel', isEqualTo: normalizedReadingLevel);
       }
 
       query = query.limit(limit);
@@ -225,13 +256,16 @@ class BookRecommendationService {
 
       return snapshot.docs.map((doc) => BookModel.fromFirestore(doc)).toList();
     } catch (e) {
-      print('Error getting recently added books: $e');
+      debugPrint('Error getting recently added books: $e');
       return [];
     }
   }
 
   /// Get books a student is currently reading
-  Future<List<BookModel>> getCurrentlyReading(String studentId) async {
+  Future<List<BookModel>> getCurrentlyReading(
+    String studentId, {
+    required String schoolId,
+  }) async {
     try {
       // Get reading history where book is not completed
       final historySnapshot = await _firestore
@@ -249,7 +283,7 @@ class BookRecommendationService {
       // Firestore 'in' queries limited to 10 items
       final books = <BookModel>[];
       for (final bookId in bookIds.take(10)) {
-        final doc = await _firestore.collection('books').doc(bookId).get();
+        final doc = await _schoolBooks(schoolId).doc(bookId).get();
         if (doc.exists) {
           books.add(BookModel.fromFirestore(doc));
         }
@@ -257,13 +291,16 @@ class BookRecommendationService {
 
       return books;
     } catch (e) {
-      print('Error getting currently reading books: $e');
+      debugPrint('Error getting currently reading books: $e');
       return [];
     }
   }
 
   /// Get books a student has completed
-  Future<List<BookModel>> getCompletedBooks(String studentId) async {
+  Future<List<BookModel>> getCompletedBooks(
+    String studentId, {
+    required String schoolId,
+  }) async {
     try {
       final historySnapshot = await _firestore
           .collection('bookReadingHistory')
@@ -280,7 +317,7 @@ class BookRecommendationService {
 
       final books = <BookModel>[];
       for (final bookId in bookIds.take(20)) {
-        final doc = await _firestore.collection('books').doc(bookId).get();
+        final doc = await _schoolBooks(schoolId).doc(bookId).get();
         if (doc.exists) {
           books.add(BookModel.fromFirestore(doc));
         }
@@ -288,13 +325,17 @@ class BookRecommendationService {
 
       return books;
     } catch (e) {
-      print('Error getting completed books: $e');
+      debugPrint('Error getting completed books: $e');
       return [];
     }
   }
 
   /// Record that a student started reading a book
-  Future<void> recordBookStart(String studentId, String bookId) async {
+  Future<void> recordBookStart(
+    String studentId,
+    String bookId, {
+    required String schoolId,
+  }) async {
     try {
       // Check if already started
       final existing = await _firestore
@@ -319,11 +360,11 @@ class BookRecommendationService {
       });
 
       // Increment timesRead for the book
-      await _firestore.collection('books').doc(bookId).update({
+      await _schoolBooks(schoolId).doc(bookId).update({
         'timesRead': FieldValue.increment(1),
       });
     } catch (e) {
-      print('Error recording book start: $e');
+      debugPrint('Error recording book start: $e');
       rethrow;
     }
   }
@@ -332,6 +373,7 @@ class BookRecommendationService {
   Future<void> recordBookCompletion(
     String studentId,
     String bookId, {
+    required String schoolId,
     double? rating,
     String? review,
   }) async {
@@ -370,18 +412,26 @@ class BookRecommendationService {
 
       // Update book's average rating if rating provided
       if (rating != null) {
-        await _updateBookRating(bookId, rating);
+        await _updateBookRating(
+          bookId,
+          rating,
+          schoolId: schoolId,
+        );
       }
     } catch (e) {
-      print('Error recording book completion: $e');
+      debugPrint('Error recording book completion: $e');
       rethrow;
     }
   }
 
   /// Update a book's average rating
-  Future<void> _updateBookRating(String bookId, double newRating) async {
+  Future<void> _updateBookRating(
+    String bookId,
+    double newRating, {
+    required String schoolId,
+  }) async {
     try {
-      final bookDoc = await _firestore.collection('books').doc(bookId).get();
+      final bookDoc = await _schoolBooks(schoolId).doc(bookId).get();
       if (!bookDoc.exists) return;
 
       final data = bookDoc.data()!;
@@ -392,12 +442,12 @@ class BookRecommendationService {
       final newAverage =
           ((currentRating * currentCount) + newRating) / newCount;
 
-      await _firestore.collection('books').doc(bookId).update({
+      await _schoolBooks(schoolId).doc(bookId).update({
         'averageRating': newAverage,
         'ratingCount': newCount,
       });
     } catch (e) {
-      print('Error updating book rating: $e');
+      debugPrint('Error updating book rating: $e');
     }
   }
 
@@ -435,14 +485,11 @@ class BookRecommendationService {
   }
 
   /// Get all available genres
-  Future<List<String>> getAllGenres() async {
+  Future<List<String>> getAllGenres({required String schoolId}) async {
     try {
       // This is a simplified version
       // In production, you might want to maintain a separate genres collection
-      final snapshot = await _firestore
-          .collection('books')
-          .limit(100) // Sample books
-          .get();
+      final snapshot = await _schoolBooks(schoolId).limit(100).get();
 
       final genresSet = <String>{};
       for (final doc in snapshot.docs) {
@@ -453,33 +500,28 @@ class BookRecommendationService {
       final genresList = genresSet.toList()..sort();
       return genresList;
     } catch (e) {
-      print('Error getting genres: $e');
+      debugPrint('Error getting genres: $e');
       return [];
     }
   }
 
   /// Get reading levels available in the system
-  Future<List<String>> getAllReadingLevels() async {
+  Future<List<String>> getAllReadingLevels({required String schoolId}) async {
     try {
-      // Sample books to find levels
-      final snapshot = await _firestore
-          .collection('books')
-          .limit(100)
-          .get();
-
-      final levelsSet = <String>{};
-      for (final doc in snapshot.docs) {
-        final level = doc.data()['readingLevel'] as String?;
-        if (level != null && level.isNotEmpty) {
-          levelsSet.add(level);
-        }
-      }
-
-      final levelsList = levelsSet.toList()..sort();
-      return levelsList;
+      final options = await _readingLevelService.loadSchoolLevels(schoolId);
+      return options.map((option) => option.value).toList(growable: false);
     } catch (e) {
-      print('Error getting reading levels: $e');
+      debugPrint('Error getting reading levels: $e');
       return [];
     }
+  }
+
+  Future<String?> _normalizeReadingLevel({
+    required String schoolId,
+    required String? value,
+  }) async {
+    if (value == null || value.trim().isEmpty) return null;
+    final options = await _readingLevelService.loadSchoolLevels(schoolId);
+    return _readingLevelService.normalizeLevel(value, options: options);
   }
 }

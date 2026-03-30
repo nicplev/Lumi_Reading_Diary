@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../data/models/student_model.dart';
 import '../data/models/class_model.dart';
 import 'firebase_service.dart';
+import 'reading_level_service.dart';
 
 class CSVImportResult {
   final int successCount;
@@ -80,6 +81,7 @@ class CSVRow {
 
 class CSVImportService {
   final FirebaseService _firebaseService = FirebaseService.instance;
+  final ReadingLevelService _readingLevelService = ReadingLevelService();
 
   /// Parse CSV content into rows
   Future<List<CSVRow>> parseCSV(String csvContent) async {
@@ -98,23 +100,37 @@ class CSVImportService {
     }
 
     // Check header row
-    final headers = rows.first.map((e) => e.toString().trim().toLowerCase()).toList();
+    final headers =
+        rows.first.map((e) => e.toString().trim().toLowerCase()).toList();
 
     // Find column indices
     final studentIdIndex = headers.indexWhere((h) =>
-      h.contains('studentid') || h.contains('student id') || h.replaceAll(' ', '').contains('studentid'));
+        h.contains('studentid') ||
+        h.contains('student id') ||
+        h.replaceAll(' ', '').contains('studentid'));
     final firstNameIndex = headers.indexWhere((h) =>
-      h.contains('firstname') || h.contains('first name') || h.replaceAll(' ', '').contains('firstname'));
+        h.contains('firstname') ||
+        h.contains('first name') ||
+        h.replaceAll(' ', '').contains('firstname'));
     final lastNameIndex = headers.indexWhere((h) =>
-      h.contains('lastname') || h.contains('last name') || h.replaceAll(' ', '').contains('lastname'));
+        h.contains('lastname') ||
+        h.contains('last name') ||
+        h.replaceAll(' ', '').contains('lastname'));
     final dobIndex = headers.indexWhere((h) =>
-      h.contains('dateofbirth') || h.contains('date of birth') || h == 'dob');
+        h.contains('dateofbirth') || h.contains('date of birth') || h == 'dob');
     final classNameIndex = headers.indexWhere((h) =>
-      h.contains('classname') || h.contains('class name') || h == 'class' || h.replaceAll(' ', '').contains('classname'));
+        h.contains('classname') ||
+        h.contains('class name') ||
+        h == 'class' ||
+        h.replaceAll(' ', '').contains('classname'));
     final parentEmailIndex = headers.indexWhere((h) =>
-      h.contains('parentemail') || h.contains('parent email') || h.contains('email'));
+        h.contains('parentemail') ||
+        h.contains('parent email') ||
+        h.contains('email'));
     final readingLevelIndex = headers.indexWhere((h) =>
-      h.contains('readinglevel') || h.contains('reading level') || h == 'level');
+        h.contains('readinglevel') ||
+        h.contains('reading level') ||
+        h == 'level');
 
     // Validate required columns are present
     if (studentIdIndex == -1) {
@@ -145,10 +161,16 @@ class CSVImportService {
         studentId: row[studentIdIndex].toString().trim(),
         firstName: row[firstNameIndex].toString().trim(),
         lastName: row[lastNameIndex].toString().trim(),
-        dateOfBirth: dobIndex >= 0 && dobIndex < row.length ? row[dobIndex].toString().trim() : null,
+        dateOfBirth: dobIndex >= 0 && dobIndex < row.length
+            ? row[dobIndex].toString().trim()
+            : null,
         className: row[classNameIndex].toString().trim(),
-        parentEmail: parentEmailIndex >= 0 && parentEmailIndex < row.length ? row[parentEmailIndex].toString().trim() : null,
-        readingLevel: readingLevelIndex >= 0 && readingLevelIndex < row.length ? row[readingLevelIndex].toString().trim() : null,
+        parentEmail: parentEmailIndex >= 0 && parentEmailIndex < row.length
+            ? row[parentEmailIndex].toString().trim()
+            : null,
+        readingLevel: readingLevelIndex >= 0 && readingLevelIndex < row.length
+            ? row[readingLevelIndex].toString().trim()
+            : null,
       ));
     }
 
@@ -166,7 +188,8 @@ class CSVImportService {
 
       // Check for duplicate student IDs
       if (seenStudentIds.contains(row.studentId)) {
-        errors.add('Row ${row.rowNumber}: Duplicate student ID: ${row.studentId}');
+        errors.add(
+            'Row ${row.rowNumber}: Duplicate student ID: ${row.studentId}');
       }
       seenStudentIds.add(row.studentId);
     }
@@ -185,6 +208,9 @@ class CSVImportService {
     int errorCount = 0;
 
     try {
+      final readingLevelOptions =
+          await _readingLevelService.loadSchoolLevels(schoolId);
+
       // Get or create classes
       final classMap = await _getOrCreateClasses(schoolId, rows);
 
@@ -201,7 +227,8 @@ class CSVImportService {
           try {
             // Skip if student ID already exists
             if (existingStudentIds.contains(row.studentId)) {
-              errors.add('Row ${row.rowNumber}: Student ID already exists: ${row.studentId}');
+              errors.add(
+                  'Row ${row.rowNumber}: Student ID already exists: ${row.studentId}');
               errorCount++;
               continue;
             }
@@ -209,7 +236,8 @@ class CSVImportService {
             // Get class ID
             final classId = classMap[row.className];
             if (classId == null) {
-              errors.add('Row ${row.rowNumber}: Failed to find/create class: ${row.className}');
+              errors.add(
+                  'Row ${row.rowNumber}: Failed to find/create class: ${row.className}');
               errorCount++;
               continue;
             }
@@ -233,6 +261,14 @@ class CSVImportService {
             }
 
             // Create student data
+            final normalizedReadingLevel = _readingLevelService.normalizeLevel(
+              row.readingLevel,
+              options: readingLevelOptions,
+            );
+            final readingLevelIndex = _readingLevelService.sortIndexForLevel(
+              normalizedReadingLevel,
+              options: readingLevelOptions,
+            );
             final studentData = {
               'studentId': row.studentId,
               'firstName': row.firstName,
@@ -240,15 +276,24 @@ class CSVImportService {
               'schoolId': schoolId,
               'classId': classId,
               'dateOfBirth': dob != null ? Timestamp.fromDate(dob) : null,
-              'currentReadingLevel': row.readingLevel ?? '',
+              'currentReadingLevel': normalizedReadingLevel,
+              'currentReadingLevelIndex': readingLevelIndex,
+              'readingLevelUpdatedAt': normalizedReadingLevel != null
+                  ? FieldValue.serverTimestamp()
+                  : null,
+              'readingLevelUpdatedBy':
+                  normalizedReadingLevel != null ? 'csv_import' : null,
+              'readingLevelSource':
+                  normalizedReadingLevel != null ? 'csvImport' : null,
               'parentIds': <String>[],
               'isActive': true,
               'createdAt': FieldValue.serverTimestamp(),
               'enrolledAt': FieldValue.serverTimestamp(),
               'profileImageUrl': null,
-              'additionalInfo': row.parentEmail != null && row.parentEmail!.isNotEmpty
-                  ? {'pendingParentEmail': row.parentEmail}
-                  : {},
+              'additionalInfo':
+                  row.parentEmail != null && row.parentEmail!.isNotEmpty
+                      ? {'pendingParentEmail': row.parentEmail}
+                      : {},
               'levelHistory': [],
               'stats': {
                 'totalMinutesRead': 0,
@@ -273,9 +318,8 @@ class CSVImportService {
             });
 
             // Increment school studentCount
-            final schoolRef = _firebaseService.firestore
-                .collection('schools')
-                .doc(schoolId);
+            final schoolRef =
+                _firebaseService.firestore.collection('schools').doc(schoolId);
 
             batch.update(schoolRef, {
               'studentCount': FieldValue.increment(1),
@@ -290,13 +334,21 @@ class CSVImportService {
               schoolId: schoolId,
               classId: classId,
               dateOfBirth: dob,
-              currentReadingLevel: row.readingLevel ?? '',
+              currentReadingLevel: normalizedReadingLevel,
+              currentReadingLevelIndex: readingLevelIndex,
+              readingLevelUpdatedAt:
+                  normalizedReadingLevel != null ? DateTime.now() : null,
+              readingLevelUpdatedBy:
+                  normalizedReadingLevel != null ? 'csv_import' : null,
+              readingLevelSource:
+                  normalizedReadingLevel != null ? 'csvImport' : null,
               parentIds: [],
               isActive: true,
               createdAt: DateTime.now(),
               enrolledAt: DateTime.now(),
               profileImageUrl: null,
-              additionalInfo: studentData['additionalInfo'] as Map<String, dynamic>,
+              additionalInfo:
+                  studentData['additionalInfo'] as Map<String, dynamic>,
               levelHistory: [],
               stats: StudentStats(
                 totalMinutesRead: 0,
@@ -385,7 +437,8 @@ class CSVImportService {
 
   /// Extract year level from class name (e.g., "Year 3" -> "Year 3", "3A" -> "Year 3")
   String? _extractYearLevel(String className) {
-    final yearMatch = RegExp(r'Year\s*(\d+)', caseSensitive: false).firstMatch(className);
+    final yearMatch =
+        RegExp(r'Year\s*(\d+)', caseSensitive: false).firstMatch(className);
     if (yearMatch != null) {
       return 'Year ${yearMatch.group(1)}';
     }
@@ -395,7 +448,8 @@ class CSVImportService {
       return 'Year ${numberMatch.group(0)}';
     }
 
-    if (className.toLowerCase().contains('prep') || className.toLowerCase().contains('foundation')) {
+    if (className.toLowerCase().contains('prep') ||
+        className.toLowerCase().contains('foundation')) {
       return 'Prep';
     }
 

@@ -53,7 +53,7 @@ class TeacherTypography {
 
   static const TextStyle bodySmall = TextStyle(
     fontFamily: _fontFamily,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: FontWeight.w500,
     color: AppColors.textSecondary,
   );
@@ -75,7 +75,7 @@ class TeacherTypography {
 
   static const TextStyle caption = TextStyle(
     fontFamily: _fontFamily,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: FontWeight.w600,
     color: AppColors.textSecondary,
   );
@@ -84,8 +84,8 @@ class TeacherTypography {
     fontFamily: _fontFamily,
     fontSize: 13,
     fontWeight: FontWeight.w700,
-    color: AppColors.textSecondary,
-    letterSpacing: 0.5,
+    color: AppColors.teacherPrimary,
+    letterSpacing: 0.8,
   );
 }
 
@@ -105,8 +105,8 @@ class TeacherDimensions {
   // Border Radius
   static const double radiusS = 8.0;
   static const double radiusM = 12.0;
-  static const double radiusL = 16.0;
-  static const double radiusXL = 20.0;
+  static const double radiusL = 18.0;
+  static const double radiusXL = 24.0;
   static const double radiusRound = 50.0;
 
   // Avatar Sizes
@@ -122,9 +122,16 @@ class TeacherDimensions {
   // Card Shadow
   static List<BoxShadow> get cardShadow => [
         BoxShadow(
-          color: Colors.black.withValues(alpha: 0.04),
-          blurRadius: 8,
-          offset: const Offset(0, 2),
+          color: AppColors.teacherPrimary.withValues(alpha: 0.10),
+          blurRadius: 28,
+          spreadRadius: -8,
+          offset: const Offset(0, 14),
+        ),
+        BoxShadow(
+          color: AppColors.charcoal.withValues(alpha: 0.05),
+          blurRadius: 10,
+          spreadRadius: -6,
+          offset: const Offset(0, 4),
         ),
       ];
 }

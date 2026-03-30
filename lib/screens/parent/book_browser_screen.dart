@@ -9,6 +9,7 @@ import '../../core/theme/lumi_borders.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_card.dart';
 import '../../core/widgets/lumi/lumi_book_card.dart';
+import '../../core/widgets/lumi/persistent_cached_image.dart';
 
 /// Screen for browsing and discovering books
 /// Shows personalized recommendations and popular books
@@ -111,7 +112,8 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
               LumiGap.m,
             ],
             if (_genres.isNotEmpty) ...[
-              _buildSectionHeader('Browse by Genre', 'Explore different categories'),
+              _buildSectionHeader(
+                  'Browse by Genre', 'Explore different categories'),
               LumiGap.s,
               _buildGenreChips(),
             ],
@@ -308,12 +310,10 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
                           topLeft: LumiBorders.medium.topLeft,
                           topRight: LumiBorders.medium.topRight,
                         ),
-                        child: Image.network(
-                          book.coverImageUrl!,
+                        child: PersistentCachedImage(
+                          imageUrl: book.coverImageUrl!,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return _buildBookPlaceholder(book);
-                          },
+                          fallback: _buildBookPlaceholder(book),
                         ),
                       )
                     : _buildBookPlaceholder(book),
@@ -470,12 +470,19 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
     try {
       final results = await Future.wait([
         _bookService.getRecommendationsForStudent(widget.student),
-        _bookService.getCurrentlyReading(widget.student.id),
-        _bookService.getCompletedBooks(widget.student.id),
+        _bookService.getCurrentlyReading(
+          widget.student.id,
+          schoolId: widget.student.schoolId,
+        ),
+        _bookService.getCompletedBooks(
+          widget.student.id,
+          schoolId: widget.student.schoolId,
+        ),
         _bookService.getPopularBooksByLevel(
           widget.student.currentReadingLevel ?? '',
+          schoolId: widget.student.schoolId,
         ),
-        _bookService.getAllGenres(),
+        _bookService.getAllGenres(schoolId: widget.student.schoolId),
       ]);
 
       setState(() {
@@ -552,8 +559,10 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
                           style: LumiTextStyles.label(),
                         ),
                         avatar: const Icon(Icons.school, size: 16),
-                        backgroundColor: AppColors.skyBlue.withValues(alpha: 0.3),
-                        shape: RoundedRectangleBorder(borderRadius: LumiBorders.medium),
+                        backgroundColor:
+                            AppColors.skyBlue.withValues(alpha: 0.3),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: LumiBorders.medium),
                       ),
                     if (book.averageRating != null)
                       Chip(
@@ -562,8 +571,10 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
                           style: LumiTextStyles.label(),
                         ),
                         avatar: const Icon(Icons.star, size: 16),
-                        backgroundColor: AppColors.skyBlue.withValues(alpha: 0.3),
-                        shape: RoundedRectangleBorder(borderRadius: LumiBorders.medium),
+                        backgroundColor:
+                            AppColors.skyBlue.withValues(alpha: 0.3),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: LumiBorders.medium),
                       ),
                     if (book.pageCount != null)
                       Chip(
@@ -572,8 +583,10 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
                           style: LumiTextStyles.label(),
                         ),
                         avatar: const Icon(Icons.chrome_reader_mode, size: 16),
-                        backgroundColor: AppColors.skyBlue.withValues(alpha: 0.3),
-                        shape: RoundedRectangleBorder(borderRadius: LumiBorders.medium),
+                        backgroundColor:
+                            AppColors.skyBlue.withValues(alpha: 0.3),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: LumiBorders.medium),
                       ),
                   ],
                 ),
@@ -602,8 +615,10 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
                     children: book.genres.map((genre) {
                       return Chip(
                         label: Text(genre, style: LumiTextStyles.label()),
-                        backgroundColor: AppColors.skyBlue.withValues(alpha: 0.3),
-                        shape: RoundedRectangleBorder(borderRadius: LumiBorders.medium),
+                        backgroundColor:
+                            AppColors.skyBlue.withValues(alpha: 0.3),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: LumiBorders.medium),
                       );
                     }).toList(),
                   ),
@@ -642,7 +657,11 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
 
   Future<void> _startReading(BookModel book) async {
     try {
-      await _bookService.recordBookStart(widget.student.id, book.id);
+      await _bookService.recordBookStart(
+        widget.student.id,
+        book.id,
+        schoolId: widget.student.schoolId,
+      );
 
       if (!mounted) return;
 
@@ -669,7 +688,10 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
   Future<void> _showSimilarBooks(BookModel book) async {
     // Show similar books (simplified - would navigate to a new screen in production)
     try {
-      final similar = await _bookService.getSimilarBooks(book);
+      final similar = await _bookService.getSimilarBooks(
+        book,
+        schoolId: widget.student.schoolId,
+      );
 
       if (!mounted) return;
 
@@ -736,6 +758,7 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
     try {
       final books = await _bookService.getBooksByGenre(
         genre,
+        schoolId: widget.student.schoolId,
         readingLevel: widget.student.currentReadingLevel,
       );
 

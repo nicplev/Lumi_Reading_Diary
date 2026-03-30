@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-primary: #FF8698;
+  --color-brand-primary-dark: #E5687A;
+  --color-brand-secondary: #FF8B5A;
+
+  --color-rose-pink: #FF8698;
+  --color-rose-pink-light: #FFB8C4;
+  --color-rose-pink-dark: #E5687A;
+  --color-mint-green: #D2EBBF;
+  --color-mint-green-dark: #A8D48F;
+  --color-warm-orange: #FF8B5A;
+  --color-warm-orange-light: #FFB08A;
+  --color-sky-blue: #BCE7F0;
+  --color-sky-blue-dark: #8ED4E2;
+  --color-soft-yellow: #FFF6A4;
+  --color-charcoal: #121211;
+  --color-text-secondary: #6B7280;
+  --color-divider: #E5E7EB;
+  --color-background: #F5F5F7;
+  --color-surface: #FFFFFF;
+  --color-lumi-peach: #FFAB91;
+  --color-success: #22C55E;
+  --color-error: #EF4444;
+  --color-warning: #F59E0B;
+
+  --font-family-nunito: 'Nunito', sans-serif;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-pill: 9999px;
+
+  --shadow-card: 0 14px 28px -8px rgba(255, 134, 152, 0.10), 0 4px 10px -6px rgba(18, 18, 17, 0.05);
+  --shadow-card-hover: 0 18px 36px -8px rgba(255, 134, 152, 0.15), 0 6px 14px -6px rgba(18, 18, 17, 0.08);
+}
+
+body {
+  font-family: var(--font-family-nunito);
+  background-color: var(--color-background);
+  color: var(--color-charcoal);
+}

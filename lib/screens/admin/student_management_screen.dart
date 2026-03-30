@@ -4,10 +4,15 @@ import 'package:intl/intl.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
+import '../../core/widgets/lumi/reading_level_picker_sheet.dart';
+import '../../core/widgets/lumi/teacher_reading_level_pill.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/class_model.dart';
+import '../../data/models/reading_level_option.dart';
 import '../../data/models/user_model.dart';
 import '../../services/firebase_service.dart';
+import '../../services/reading_level_service.dart';
+import '../../services/student_reading_level_service.dart';
 import 'csv_import_dialog.dart';
 
 class StudentManagementScreen extends StatefulWidget {
@@ -21,13 +26,71 @@ class StudentManagementScreen extends StatefulWidget {
   });
 
   @override
-  State<StudentManagementScreen> createState() => _StudentManagementScreenState();
+  State<StudentManagementScreen> createState() =>
+      _StudentManagementScreenState();
 }
 
 class _StudentManagementScreenState extends State<StudentManagementScreen> {
   final FirebaseService _firebaseService = FirebaseService.instance;
+  final ReadingLevelService _readingLevelService = ReadingLevelService();
+  final StudentReadingLevelService _studentReadingLevelService =
+      StudentReadingLevelService();
   String _searchQuery = '';
   String _sortBy = 'name'; // 'name', 'level', 'id'
+  List<ReadingLevelOption> _readingLevelOptions = const [];
+  bool _levelsEnabled = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReadingLevelOptions();
+  }
+
+  @override
+  void didUpdateWidget(covariant StudentManagementScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.adminUser.schoolId != widget.adminUser.schoolId) {
+      _loadReadingLevelOptions(forceRefresh: true);
+    }
+  }
+
+  Future<void> _loadReadingLevelOptions({bool forceRefresh = false}) async {
+    final schoolId = widget.adminUser.schoolId;
+    if (schoolId == null || schoolId.isEmpty) return;
+
+    try {
+      final options = await _readingLevelService.loadSchoolLevels(
+        schoolId,
+        forceRefresh: forceRefresh,
+      );
+      if (!mounted) return;
+      setState(() {
+        _readingLevelOptions = options;
+        _levelsEnabled = options.isNotEmpty;
+      });
+    } catch (error) {
+      debugPrint('Error loading admin reading level options: $error');
+    }
+  }
+
+  Future<List<ReadingLevelOption>> _ensureReadingLevelOptionsLoaded() async {
+    if (_readingLevelOptions.isNotEmpty) {
+      return _readingLevelOptions;
+    }
+
+    final schoolId = widget.adminUser.schoolId;
+    if (schoolId == null || schoolId.isEmpty) {
+      throw StateError('School ID not available');
+    }
+
+    final options = await _readingLevelService.loadSchoolLevels(schoolId);
+    if (mounted) {
+      setState(() => _readingLevelOptions = options);
+    } else {
+      _readingLevelOptions = options;
+    }
+    return options;
+  }
 
   Stream<QuerySnapshot> _getStudentsStream() {
     return _firebaseService.firestore
@@ -45,11 +108,21 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
         students.sort((a, b) => a.fullName.compareTo(b.fullName));
         break;
       case 'level':
-        students.sort((a, b) {
-          final aLevel = a.currentReadingLevel ?? '';
-          final bLevel = b.currentReadingLevel ?? '';
-          return aLevel.compareTo(bLevel);
-        });
+        if (_readingLevelOptions.isNotEmpty) {
+          students.sort(
+            (a, b) => _readingLevelService.compareLevels(
+              a.currentReadingLevel,
+              b.currentReadingLevel,
+              options: _readingLevelOptions,
+            ),
+          );
+        } else {
+          students.sort((a, b) {
+            final aLevel = a.currentReadingLevel ?? '';
+            final bLevel = b.currentReadingLevel ?? '';
+            return aLevel.compareTo(bLevel);
+          });
+        }
         break;
       case 'id':
         students.sort((a, b) {
@@ -72,6 +145,30 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     }).toList();
   }
 
+  bool _isLevelUnset(StudentModel student) {
+    final raw = student.currentReadingLevel?.trim();
+    return raw == null || raw.isEmpty;
+  }
+
+  bool _isLevelUnresolved(StudentModel student) {
+    if (_readingLevelOptions.isEmpty) return false;
+    return _readingLevelService.hasUnresolvedLevel(
+      student.currentReadingLevel,
+      options: _readingLevelOptions,
+    );
+  }
+
+  String _readingLevelCompactLabel(StudentModel student) {
+    if (_readingLevelOptions.isEmpty) {
+      final raw = student.currentReadingLevel?.trim();
+      return (raw == null || raw.isEmpty) ? 'Needs level' : raw;
+    }
+    return _readingLevelService.formatCompactLabel(
+      student.currentReadingLevel,
+      options: _readingLevelOptions,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -82,7 +179,8 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
         elevation: 0,
         title: Text(
           '${widget.classModel.name} - Students',
-          style: const TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.w700),
+          style: const TextStyle(
+              fontFamily: 'Nunito', fontWeight: FontWeight.w700),
         ),
         actions: [
           IconButton(
@@ -125,19 +223,20 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                   ],
                 ),
               ),
-              PopupMenuItem(
-                value: 'level',
-                child: Row(
-                  children: [
-                    Icon(
-                      _sortBy == 'level' ? Icons.check : Icons.bar_chart,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    const Text('Sort by Reading Level'),
-                  ],
+              if (_levelsEnabled)
+                PopupMenuItem(
+                  value: 'level',
+                  child: Row(
+                    children: [
+                      Icon(
+                        _sortBy == 'level' ? Icons.check : Icons.bar_chart,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text('Sort by Reading Level'),
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         ],
@@ -151,15 +250,19 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
             child: TextField(
               decoration: InputDecoration(
                 hintText: 'Search by name or student ID...',
-                hintStyle: TeacherTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
-                prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+                hintStyle: TeacherTypography.bodyMedium
+                    .copyWith(color: AppColors.textSecondary),
+                prefixIcon:
+                    const Icon(Icons.search, color: AppColors.textSecondary),
                 filled: true,
                 fillColor: AppColors.background,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                  borderRadius:
+                      BorderRadius.circular(TeacherDimensions.radiusM),
                   borderSide: BorderSide.none,
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
               style: TeacherTypography.bodyMedium,
               onChanged: (value) {
@@ -205,7 +308,8 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                             backgroundColor: AppColors.teacherPrimary,
                             foregroundColor: AppColors.white,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                              borderRadius: BorderRadius.circular(
+                                  TeacherDimensions.radiusM),
                             ),
                           ),
                         ),
@@ -216,7 +320,8 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
 
                 if (!snapshot.hasData) {
                   return const Center(
-                    child: CircularProgressIndicator(color: AppColors.teacherPrimary),
+                    child: CircularProgressIndicator(
+                        color: AppColors.teacherPrimary),
                   );
                 }
 
@@ -285,7 +390,8 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                             backgroundColor: AppColors.teacherPrimary,
                             foregroundColor: AppColors.white,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                              borderRadius: BorderRadius.circular(
+                                  TeacherDimensions.radiusM),
                             ),
                           ),
                         ),
@@ -310,7 +416,8 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                           const SizedBox(width: 4),
                           Text(
                             '${students.length} ${students.length == 1 ? 'Student' : 'Students'}',
-                            style: TeacherTypography.bodyLarge.copyWith(color: AppColors.charcoal),
+                            style: TeacherTypography.bodyLarge
+                                .copyWith(color: AppColors.charcoal),
                           ),
                         ],
                       ),
@@ -389,7 +496,8 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                     style: TeacherTypography.bodyLarge,
                   ),
                   const SizedBox(height: 2),
-                  if (student.studentId != null && student.studentId!.isNotEmpty)
+                  if (student.studentId != null &&
+                      student.studentId!.isNotEmpty)
                     Text(
                       'ID: ${student.studentId}',
                       style: TeacherTypography.bodyMedium.copyWith(
@@ -399,37 +507,12 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      if (student.currentReadingLevel != null &&
-                          student.currentReadingLevel!.isNotEmpty)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 4.0,
-                            vertical: 2.0,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.skyBlue.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(TeacherDimensions.radiusS),
-                            border: Border.all(
-                              color: AppColors.skyBlue.withValues(alpha: 0.5),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.book,
-                                size: 14,
-                                color: AppColors.skyBlue,
-                              ),
-                              const SizedBox(width: 2.0),
-                              Text(
-                                student.currentReadingLevel!,
-                                style: TeacherTypography.bodySmall.copyWith(
-                                  color: AppColors.skyBlue,
-                                ),
-                              ),
-                            ],
-                          ),
+                      if (_levelsEnabled)
+                        TeacherReadingLevelPill(
+                          label: _readingLevelCompactLabel(student),
+                          isUnset: _isLevelUnset(student),
+                          isUnresolved: _isLevelUnresolved(student),
+                          onTap: () => _showChangeReadingLevelDialog(student),
                         ),
                       if (student.dateOfBirth != null) ...[
                         const SizedBox(width: 4),
@@ -448,7 +531,8 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
 
             // Actions Menu
             PopupMenuButton<String>(
-              icon: Icon(Icons.more_vert, color: AppColors.charcoal.withValues(alpha: 0.6)),
+              icon: Icon(Icons.more_vert,
+                  color: AppColors.charcoal.withValues(alpha: 0.6)),
               onSelected: (value) async {
                 switch (value) {
                   case 'edit':
@@ -487,11 +571,13 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                   value: 'remove',
                   child: Row(
                     children: [
-                      const Icon(Icons.remove_circle_outline, size: 20, color: AppColors.error),
+                      const Icon(Icons.remove_circle_outline,
+                          size: 20, color: AppColors.error),
                       const SizedBox(width: 4.0),
                       Text(
                         'Remove from Class',
-                        style: TeacherTypography.bodyMedium.copyWith(color: AppColors.error),
+                        style: TeacherTypography.bodyMedium
+                            .copyWith(color: AppColors.error),
                       ),
                     ],
                   ),
@@ -535,11 +621,13 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
   }
 
   Future<void> _showAddStudentDialog() async {
+    final options = await _ensureReadingLevelOptionsLoaded();
+    if (!mounted) return;
     final studentIdController = TextEditingController();
     final firstNameController = TextEditingController();
     final lastNameController = TextEditingController();
-    final readingLevelController = TextEditingController();
     DateTime? selectedDate;
+    String? selectedReadingLevel;
 
     final result = await showDialog<bool>(
       context: context,
@@ -585,7 +673,8 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                     onTap: () async {
                       final date = await showDatePicker(
                         context: context,
-                        initialDate: DateTime.now().subtract(const Duration(days: 365 * 8)),
+                        initialDate: DateTime.now()
+                            .subtract(const Duration(days: 365 * 8)),
                         firstDate: DateTime(2000),
                         lastDate: DateTime.now(),
                       );
@@ -612,14 +701,36 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  TextField(
-                    controller: readingLevelController,
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedReadingLevel,
                     decoration: const InputDecoration(
                       labelText: 'Reading Level (Optional)',
-                      hintText: 'e.g., Level 5, A, etc.',
                       border: OutlineInputBorder(),
                     ),
+                    items: options
+                        .map(
+                          (option) => DropdownMenuItem<String>(
+                            value: option.value,
+                            child: Text(option.displayLabel),
+                          ),
+                        )
+                        .toList(growable: false),
+                    onChanged: (value) {
+                      setDialogState(() => selectedReadingLevel = value);
+                    },
                   ),
+                  if (selectedReadingLevel != null) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () {
+                          setDialogState(() => selectedReadingLevel = null);
+                        },
+                        child: const Text('Clear level'),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -662,7 +773,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
         firstName: firstNameController.text.trim(),
         lastName: lastNameController.text.trim(),
         dateOfBirth: selectedDate,
-        readingLevel: readingLevelController.text.trim(),
+        readingLevel: selectedReadingLevel,
       );
     }
   }
@@ -675,6 +786,16 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     String? readingLevel,
   }) async {
     try {
+      final options = await _ensureReadingLevelOptionsLoaded();
+      final normalizedReadingLevel = _readingLevelService.normalizeLevel(
+        readingLevel,
+        options: options,
+      );
+      final readingLevelIndex = _readingLevelService.sortIndexForLevel(
+        normalizedReadingLevel,
+        options: options,
+      );
+
       // Check for duplicate student ID
       final existingStudent = await _firebaseService.firestore
           .collection('schools')
@@ -710,8 +831,18 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
         'lastName': lastName,
         'schoolId': widget.adminUser.schoolId,
         'classId': widget.classModel.id,
-        'dateOfBirth': dateOfBirth != null ? Timestamp.fromDate(dateOfBirth) : null,
-        'currentReadingLevel': readingLevel ?? '',
+        'dateOfBirth':
+            dateOfBirth != null ? Timestamp.fromDate(dateOfBirth) : null,
+        'currentReadingLevel': normalizedReadingLevel,
+        'currentReadingLevelIndex': readingLevelIndex,
+        'readingLevelUpdatedAt': normalizedReadingLevel != null
+            ? FieldValue.serverTimestamp()
+            : null,
+        'readingLevelUpdatedBy':
+            normalizedReadingLevel != null ? widget.adminUser.id : null,
+        'readingLevelSource': normalizedReadingLevel != null
+            ? StudentReadingLevelService.sourceSchoolAdmin
+            : null,
         'parentIds': [],
         'isActive': true,
         'createdAt': FieldValue.serverTimestamp(),
@@ -761,11 +892,16 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
   }
 
   Future<void> _showEditStudentDialog(StudentModel student) async {
+    final options = await _ensureReadingLevelOptionsLoaded();
+    if (!mounted) return;
     final studentIdController = TextEditingController(text: student.studentId);
     final firstNameController = TextEditingController(text: student.firstName);
     final lastNameController = TextEditingController(text: student.lastName);
-    final readingLevelController = TextEditingController(text: student.currentReadingLevel);
     DateTime? selectedDate = student.dateOfBirth;
+    String? selectedReadingLevel = _readingLevelService.normalizeLevel(
+      student.currentReadingLevel,
+      options: options,
+    );
 
     final result = await showDialog<bool>(
       context: context,
@@ -810,7 +946,9 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                     onTap: () async {
                       final date = await showDatePicker(
                         context: context,
-                        initialDate: selectedDate ?? DateTime.now().subtract(const Duration(days: 365 * 8)),
+                        initialDate: selectedDate ??
+                            DateTime.now()
+                                .subtract(const Duration(days: 365 * 8)),
                         firstDate: DateTime(2000),
                         lastDate: DateTime.now(),
                       );
@@ -837,13 +975,36 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  TextField(
-                    controller: readingLevelController,
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedReadingLevel,
                     decoration: const InputDecoration(
                       labelText: 'Reading Level (Optional)',
                       border: OutlineInputBorder(),
                     ),
+                    items: options
+                        .map(
+                          (option) => DropdownMenuItem<String>(
+                            value: option.value,
+                            child: Text(option.displayLabel),
+                          ),
+                        )
+                        .toList(growable: false),
+                    onChanged: (value) {
+                      setDialogState(() => selectedReadingLevel = value);
+                    },
                   ),
+                  if (selectedReadingLevel != null) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () {
+                          setDialogState(() => selectedReadingLevel = null);
+                        },
+                        child: const Text('Clear level'),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -887,7 +1048,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
         firstName: firstNameController.text.trim(),
         lastName: lastNameController.text.trim(),
         dateOfBirth: selectedDate,
-        readingLevel: readingLevelController.text.trim(),
+        readingLevel: selectedReadingLevel,
       );
     }
   }
@@ -901,6 +1062,12 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     String? readingLevel,
   }) async {
     try {
+      final options = await _ensureReadingLevelOptionsLoaded();
+      final normalizedReadingLevel = _readingLevelService.normalizeLevel(
+        readingLevel,
+        options: options,
+      );
+
       // Check for duplicate student ID (if changed)
       if (studentId != student.studentId) {
         final existingStudent = await _firebaseService.firestore
@@ -934,9 +1101,17 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
         'studentId': studentId,
         'firstName': firstName,
         'lastName': lastName,
-        'dateOfBirth': dateOfBirth != null ? Timestamp.fromDate(dateOfBirth) : null,
-        'currentReadingLevel': readingLevel ?? '',
+        'dateOfBirth':
+            dateOfBirth != null ? Timestamp.fromDate(dateOfBirth) : null,
       });
+
+      await _studentReadingLevelService.updateStudentLevel(
+        actor: widget.adminUser,
+        student: student,
+        options: options,
+        newLevel: normalizedReadingLevel,
+        source: StudentReadingLevelService.sourceSchoolAdmin,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -961,118 +1136,78 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
   }
 
   Future<void> _showChangeReadingLevelDialog(StudentModel student) async {
-    final levelController = TextEditingController(
-      text: student.currentReadingLevel ?? '',
-    );
-    final reasonController = TextEditingController();
+    try {
+      final options = await _ensureReadingLevelOptionsLoaded();
+      if (!mounted) return;
 
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Change Reading Level - ${student.fullName}'),
-        content: SizedBox(
-          width: 400,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: levelController,
-                decoration: const InputDecoration(
-                  labelText: 'New Reading Level',
-                  hintText: 'e.g., Level 6, B, etc.',
-                  border: OutlineInputBorder(),
-                ),
-                autofocus: true,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: reasonController,
-                decoration: const InputDecoration(
-                  labelText: 'Reason (Optional)',
-                  hintText: 'Why the level changed...',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (levelController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please enter a reading level'),
-                    backgroundColor: AppColors.error,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-                return;
-              }
-              Navigator.pop(context, true);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.teacherPrimary,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Update Level'),
-          ),
-        ],
-      ),
-    );
+      final normalizedCurrent = _readingLevelService.normalizeLevel(
+        student.currentReadingLevel,
+        options: options,
+      );
+      final currentDisplayLabel = normalizedCurrent == null
+          ? null
+          : _readingLevelService.formatLevelLabel(
+              normalizedCurrent,
+              options: options,
+            );
 
-    if (result == true) {
+      final result = await ReadingLevelPickerSheet.show(
+        context,
+        studentName: student.fullName,
+        levelSystemLabel: _readingLevelService.schemaDisplayName(options),
+        options: options,
+        currentLevelValue: normalizedCurrent,
+        currentDisplayLabel: currentDisplayLabel,
+        rawStoredLevel: student.currentReadingLevel,
+      );
+
+      if (!mounted || result == null) return;
+
       await _updateReadingLevel(
         student: student,
-        newLevel: levelController.text.trim(),
-        reason: reasonController.text.trim(),
+        newLevel: result.levelValue,
+        reason: result.reason,
+        options: options,
       );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening reading level picker: $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
   Future<void> _updateReadingLevel({
     required StudentModel student,
-    required String newLevel,
+    required String? newLevel,
+    required List<ReadingLevelOption> options,
     String? reason,
   }) async {
     try {
-      // Create level history entry
-      final levelHistory = List<Map<String, dynamic>>.from(
-        student.levelHistory.map((h) => {
-          'level': h.level,
-          'changedAt': Timestamp.fromDate(h.changedAt),
-          'changedBy': h.changedBy,
-          'reason': h.reason,
-        }),
+      final didUpdate = await _studentReadingLevelService.updateStudentLevel(
+        actor: widget.adminUser,
+        student: student,
+        options: options,
+        newLevel: newLevel,
+        reason: reason,
+        source: StudentReadingLevelService.sourceSchoolAdmin,
       );
-
-      levelHistory.add({
-        'level': newLevel,
-        'changedAt': FieldValue.serverTimestamp(),
-        'changedBy': widget.adminUser.id,
-        'reason': reason?.isNotEmpty == true ? reason : null,
-      });
-
-      await _firebaseService.firestore
-          .collection('schools')
-          .doc(widget.adminUser.schoolId)
-          .collection('students')
-          .doc(student.id)
-          .update({
-        'currentReadingLevel': newLevel,
-        'levelHistory': levelHistory,
-      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Reading level updated to $newLevel'),
-            backgroundColor: AppColors.success,
+            content: Text(
+              didUpdate
+                  ? 'Reading level updated'
+                  : 'No reading level change saved',
+            ),
+            backgroundColor:
+                didUpdate ? AppColors.success : AppColors.textSecondary,
             behavior: SnackBarBehavior.floating,
           ),
         );

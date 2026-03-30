@@ -6,11 +6,16 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
 import '../../core/widgets/lumi/lumi_skeleton.dart';
+import '../../core/widgets/lumi/reading_level_picker_sheet.dart';
+import '../../core/widgets/lumi/teacher_reading_level_pill.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/class_model.dart';
+import '../../data/models/reading_level_option.dart';
 import '../../data/models/student_model.dart';
 import '../../services/firebase_service.dart';
 import '../../services/isbn_assignment_service.dart';
+import '../../services/reading_level_service.dart';
+import '../../services/student_reading_level_service.dart';
 
 /// Teacher Classroom Screen (Tab 2)
 ///
@@ -35,14 +40,71 @@ class TeacherClassroomScreen extends StatefulWidget {
 }
 
 class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
+  final ReadingLevelService _readingLevelService = ReadingLevelService();
+  final StudentReadingLevelService _studentReadingLevelService =
+      StudentReadingLevelService();
   String _sortBy = 'name';
   String _searchQuery = '';
   final _searchController = TextEditingController();
+  List<ReadingLevelOption> _readingLevelOptions = const [];
+  bool _levelsEnabled = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReadingLevelOptions();
+  }
+
+  @override
+  void didUpdateWidget(covariant TeacherClassroomScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.teacher.schoolId != widget.teacher.schoolId) {
+      _loadReadingLevelOptions(forceRefresh: true);
+    }
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadReadingLevelOptions({bool forceRefresh = false}) async {
+    final schoolId = widget.teacher.schoolId;
+    if (schoolId == null || schoolId.isEmpty) return;
+
+    try {
+      final options = await _readingLevelService.loadSchoolLevels(
+        schoolId,
+        forceRefresh: forceRefresh,
+      );
+      if (!mounted) return;
+      setState(() {
+        _readingLevelOptions = options;
+        _levelsEnabled = options.isNotEmpty;
+      });
+    } catch (error) {
+      debugPrint('Error loading reading level options: $error');
+    }
+  }
+
+  Future<List<ReadingLevelOption>> _ensureReadingLevelOptionsLoaded() async {
+    if (_readingLevelOptions.isNotEmpty) {
+      return _readingLevelOptions;
+    }
+
+    final schoolId = widget.teacher.schoolId;
+    if (schoolId == null || schoolId.isEmpty) {
+      throw StateError('School ID not available');
+    }
+
+    final options = await _readingLevelService.loadSchoolLevels(schoolId);
+    if (mounted) {
+      setState(() => _readingLevelOptions = options);
+    } else {
+      _readingLevelOptions = options;
+    }
+    return options;
   }
 
   List<StudentModel> _sortStudents(List<StudentModel> students) {
@@ -52,8 +114,20 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
         sorted.sort((a, b) => a.firstName.compareTo(b.firstName));
         break;
       case 'level':
-        sorted.sort((a, b) => (a.currentReadingLevel ?? '')
-            .compareTo(b.currentReadingLevel ?? ''));
+        if (_readingLevelOptions.isNotEmpty) {
+          sorted.sort(
+            (a, b) => _readingLevelService.compareLevels(
+              a.currentReadingLevel,
+              b.currentReadingLevel,
+              options: _readingLevelOptions,
+            ),
+          );
+        } else {
+          sorted.sort(
+            (a, b) => (a.currentReadingLevel ?? '')
+                .compareTo(b.currentReadingLevel ?? ''),
+          );
+        }
         break;
       case 'streak':
         sorted.sort((a, b) => (b.stats?.currentStreak ?? 0)
@@ -70,6 +144,31 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
       final fullName = '${s.firstName} ${s.lastName}'.toLowerCase();
       return fullName.contains(query);
     }).toList();
+  }
+
+  String _readingLevelLabel(StudentModel student) {
+    if (_readingLevelOptions.isEmpty) {
+      final raw = student.currentReadingLevel?.trim();
+      return raw == null || raw.isEmpty ? 'Needs level' : raw;
+    }
+
+    return _readingLevelService.formatCompactLabel(
+      student.currentReadingLevel,
+      options: _readingLevelOptions,
+    );
+  }
+
+  bool _isLevelUnset(StudentModel student) {
+    final raw = student.currentReadingLevel?.trim();
+    return raw == null || raw.isEmpty;
+  }
+
+  bool _isLevelUnresolved(StudentModel student) {
+    if (_readingLevelOptions.isEmpty) return false;
+    return _readingLevelService.hasUnresolvedLevel(
+      student.currentReadingLevel,
+      options: _readingLevelOptions,
+    );
   }
 
   @override
@@ -113,6 +212,10 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
               children: [
                 Text('Students', style: TeacherTypography.h3),
                 const Spacer(),
+                if (_levelsEnabled) ...[
+                  _buildManageLevelsChip(selectedClass),
+                  const SizedBox(width: 8),
+                ],
                 _buildSortChip(),
               ],
             ),
@@ -332,6 +435,37 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     );
   }
 
+  Widget _buildManageLevelsChip(ClassModel classModel) {
+    return Material(
+      color: AppColors.teacherPrimaryLight.withValues(alpha: 0.2),
+      borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+        onTap: () => _openLevelManagement(classModel),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.tune_rounded,
+                size: 16,
+                color: AppColors.teacherPrimary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Manage Levels',
+                style: TeacherTypography.bodySmall.copyWith(
+                  color: AppColors.teacherPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildStudentList(ClassModel classModel) {
     if (classModel.studentIds.isEmpty) {
       return SliverToBoxAdapter(
@@ -541,13 +675,15 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      student.currentReadingLevel != null
-                          ? student.currentReadingLevel!
-                          : 'No level assigned',
-                      style: TeacherTypography.bodySmall,
-                    ),
+                    if (_levelsEnabled) ...[
+                      const SizedBox(height: 6),
+                      TeacherReadingLevelPill(
+                        label: _readingLevelLabel(student),
+                        isUnset: _isLevelUnset(student),
+                        isUnresolved: _isLevelUnresolved(student),
+                        onTap: () => _showReadingLevelPicker(student),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -606,6 +742,78 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     );
   }
 
+  Future<void> _showReadingLevelPicker(StudentModel student) async {
+    try {
+      final options = await _ensureReadingLevelOptionsLoaded();
+      if (!mounted) return;
+
+      final currentLevelValue = _readingLevelService.normalizeLevel(
+        student.currentReadingLevel,
+        options: options,
+      );
+      final currentDisplayLabel = currentLevelValue == null
+          ? null
+          : _readingLevelService.formatLevelLabel(
+              currentLevelValue,
+              options: options,
+            );
+
+      final result = await ReadingLevelPickerSheet.show(
+        context,
+        studentName: student.fullName,
+        levelSystemLabel: _readingLevelService.schemaDisplayName(options),
+        options: options,
+        currentLevelValue: currentLevelValue,
+        currentDisplayLabel: currentDisplayLabel,
+        rawStoredLevel: student.currentReadingLevel,
+      );
+
+      if (!mounted || result == null) return;
+
+      final didUpdate = await _studentReadingLevelService.updateStudentLevel(
+        actor: widget.teacher,
+        student: student,
+        options: options,
+        newLevel: result.levelValue,
+        reason: result.reason,
+        source: StudentReadingLevelService.sourceTeacher,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            didUpdate
+                ? 'Reading level updated for ${student.firstName}'
+                : 'No reading level change saved',
+          ),
+          backgroundColor:
+              didUpdate ? AppColors.success : AppColors.textSecondary,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not update reading level: $error'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _openLevelManagement(ClassModel classModel) {
+    context.push(
+      '/teacher/level-management',
+      extra: {
+        'teacher': widget.teacher,
+        'classModel': classModel,
+      },
+    );
+  }
+
   Future<void> _openScannerForStudent(StudentModel student) async {
     final classModel = widget.selectedClass;
     if (classModel == null) return;
@@ -653,8 +861,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
               height: MediaQuery.of(sheetContext).size.height * 0.78,
               decoration: const BoxDecoration(
                 color: AppColors.white,
-                borderRadius:
-                    BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
               child: Column(
@@ -669,31 +876,27 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Text('Select Student to Scan',
-                      style: TeacherTypography.h3),
+                  Text('Select Student to Scan', style: TeacherTypography.h3),
                   const SizedBox(height: 12),
 
                   // Search bar
                   Container(
                     decoration: BoxDecoration(
                       color: AppColors.background,
-                      borderRadius: BorderRadius.circular(
-                          TeacherDimensions.radiusM),
+                      borderRadius:
+                          BorderRadius.circular(TeacherDimensions.radiusM),
                     ),
                     child: TextField(
-                      onChanged: (v) =>
-                          setSheetState(() => pickerSearch = v),
+                      onChanged: (v) => setSheetState(() => pickerSearch = v),
                       style: TeacherTypography.bodyMedium,
                       decoration: InputDecoration(
                         hintText: 'Search students...',
                         hintStyle: TeacherTypography.bodyMedium.copyWith(
-                          color: AppColors.textSecondary
-                              .withValues(alpha: 0.6),
+                          color: AppColors.textSecondary.withValues(alpha: 0.6),
                         ),
                         prefixIcon: Icon(
                           Icons.search,
-                          color: AppColors.textSecondary
-                              .withValues(alpha: 0.5),
+                          color: AppColors.textSecondary.withValues(alpha: 0.5),
                           size: 20,
                         ),
                         border: InputBorder.none,
@@ -710,29 +913,25 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                       _PickerFilterChip(
                         label: 'All',
                         selected: pickerFilter == 'all',
-                        onTap: () =>
-                            setSheetState(() => pickerFilter = 'all'),
+                        onTap: () => setSheetState(() => pickerFilter = 'all'),
                       ),
                       const SizedBox(width: 8),
                       _PickerFilterChip(
                         label: 'Needs books',
                         selected: pickerFilter == 'unassigned',
                         onTap: () {
-                          setSheetState(
-                              () => pickerFilter = 'unassigned');
-                          if (assignedStudentIds == null &&
-                              !loadingAssigned) {
+                          setSheetState(() => pickerFilter = 'unassigned');
+                          if (assignedStudentIds == null && !loadingAssigned) {
                             loadingAssigned = true;
                             final service = IsbnAssignmentService();
                             final schoolId = widget.teacher.schoolId;
-                            if (schoolId != null &&
-                                schoolId.isNotEmpty) {
+                            if (schoolId != null && schoolId.isNotEmpty) {
                               service
                                   .getAssignedStudentIdsForWeek(
-                                    schoolId: schoolId,
-                                    classId: classModel.id,
-                                    referenceDate: DateTime.now(),
-                                  )
+                                schoolId: schoolId,
+                                classId: classModel.id,
+                                referenceDate: DateTime.now(),
+                              )
                                   .then((ids) {
                                 setSheetState(() {
                                   assignedStudentIds = ids;
@@ -753,8 +952,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                         const SizedBox(
                           width: 14,
                           height: 14,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2),
+                          child: CircularProgressIndicator(strokeWidth: 2),
                         ),
                     ],
                   ),
@@ -776,8 +974,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                         }
 
                         var students = snapshot.data!.docs
-                            .map((doc) =>
-                                StudentModel.fromFirestore(doc))
+                            .map((doc) => StudentModel.fromFirestore(doc))
                             .where((student) => student.isActive)
                             .toList();
 
@@ -785,8 +982,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                           return Center(
                             child: Text(
                               'No active students in this class.',
-                              style:
-                                  TeacherTypography.bodyMedium.copyWith(
+                              style: TeacherTypography.bodyMedium.copyWith(
                                 color: AppColors.textSecondary,
                               ),
                             ),
@@ -797,15 +993,13 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                         if (pickerSearch.isNotEmpty) {
                           final q = pickerSearch.toLowerCase();
                           students = students.where((s) {
-                            return s.fullName
-                                .toLowerCase()
-                                .contains(q);
+                            return s.fullName.toLowerCase().contains(q);
                           }).toList();
                         }
 
                         // Sort: unassigned first when filter active
-                        students.sort(
-                            (a, b) => a.firstName.compareTo(b.firstName));
+                        students
+                            .sort((a, b) => a.firstName.compareTo(b.firstName));
                         if (pickerFilter == 'unassigned' &&
                             assignedStudentIds != null) {
                           students = students.where((s) {
@@ -826,17 +1020,13 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                 borderRadius: BorderRadius.circular(
                                     TeacherDimensions.radiusM),
                                 onTap: () {
-                                  final allStudents = snapshot
-                                      .data!.docs
+                                  final allStudents = snapshot.data!.docs
                                       .map((doc) =>
-                                          StudentModel.fromFirestore(
-                                              doc))
-                                      .where(
-                                          (student) => student.isActive)
+                                          StudentModel.fromFirestore(doc))
+                                      .where((student) => student.isActive)
                                       .toList();
                                   Navigator.pop(sheetContext);
-                                  _openBatchScanner(
-                                      classModel, allStudents);
+                                  _openBatchScanner(classModel, allStudents);
                                 },
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(
@@ -844,25 +1034,21 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                   child: Row(
                                     children: [
                                       Icon(Icons.people,
-                                          color:
-                                              AppColors.teacherPrimary,
+                                          color: AppColors.teacherPrimary,
                                           size: 20),
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: Text(
                                           'Scan All Students (Batch Mode)',
-                                          style: TeacherTypography
-                                              .bodyMedium
+                                          style: TeacherTypography.bodyMedium
                                               .copyWith(
-                                            color: AppColors
-                                                .teacherPrimary,
+                                            color: AppColors.teacherPrimary,
                                             fontWeight: FontWeight.w700,
                                           ),
                                         ),
                                       ),
                                       Icon(Icons.arrow_forward_ios,
-                                          color:
-                                              AppColors.teacherPrimary,
+                                          color: AppColors.teacherPrimary,
                                           size: 14),
                                     ],
                                   ),
@@ -879,25 +1065,20 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                     const SizedBox(height: 8),
                                 itemBuilder: (context, index) {
                                   final student = students[index];
-                                  final isAssigned =
-                                      assignedStudentIds
-                                              ?.contains(student.id) ??
-                                          false;
+                                  final isAssigned = assignedStudentIds
+                                          ?.contains(student.id) ??
+                                      false;
                                   return ListTile(
                                     shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(
-                                              TeacherDimensions
-                                                  .radiusM),
+                                      borderRadius: BorderRadius.circular(
+                                          TeacherDimensions.radiusM),
                                     ),
                                     tileColor: AppColors.background,
                                     leading: CircleAvatar(
                                       backgroundColor:
-                                          _avatarColorForName(
-                                              student.fullName),
+                                          _avatarColorForName(student.fullName),
                                       child: Text(
-                                        student.firstName[0]
-                                            .toUpperCase(),
+                                        student.firstName[0].toUpperCase(),
                                         style: const TextStyle(
                                           color: Colors.white,
                                           fontWeight: FontWeight.w700,
@@ -905,39 +1086,33 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                       ),
                                     ),
                                     title: Text(student.fullName,
-                                        style: TeacherTypography
-                                            .bodyMedium
+                                        style: TeacherTypography.bodyMedium
                                             .copyWith(
                                           fontWeight: FontWeight.w600,
                                         )),
                                     subtitle: Row(
                                       children: [
-                                        if (student.currentReadingLevel !=
-                                            null) ...[
+                                        if (_levelsEnabled &&
+                                            student.currentReadingLevel !=
+                                                null) ...[
                                           Container(
-                                            padding: const EdgeInsets
-                                                .symmetric(
-                                                horizontal: 6,
-                                                vertical: 1),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 6, vertical: 1),
                                             decoration: BoxDecoration(
                                               color: AppColors
                                                   .teacherPrimaryLight
-                                                  .withValues(
-                                                      alpha: 0.3),
+                                                  .withValues(alpha: 0.3),
                                               borderRadius:
                                                   BorderRadius.circular(
                                                       TeacherDimensions
                                                           .radiusS),
                                             ),
                                             child: Text(
-                                              student.currentReadingLevel!,
-                                              style: TeacherTypography
-                                                  .caption
+                                              _readingLevelLabel(student),
+                                              style: TeacherTypography.caption
                                                   .copyWith(
-                                                color: AppColors
-                                                    .teacherPrimary,
-                                                fontWeight:
-                                                    FontWeight.w600,
+                                                color: AppColors.teacherPrimary,
+                                                fontWeight: FontWeight.w600,
                                               ),
                                             ),
                                           ),
@@ -946,25 +1121,19 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                         if (isAssigned)
                                           Text(
                                             'Has books',
-                                            style: TeacherTypography
-                                                .caption
+                                            style: TeacherTypography.caption
                                                 .copyWith(
                                               color: Colors.green,
-                                              fontWeight:
-                                                  FontWeight.w600,
+                                              fontWeight: FontWeight.w600,
                                             ),
                                           )
-                                        else if (assignedStudentIds !=
-                                            null)
+                                        else if (assignedStudentIds != null)
                                           Text(
                                             'Needs books',
-                                            style: TeacherTypography
-                                                .caption
+                                            style: TeacherTypography.caption
                                                 .copyWith(
-                                              color:
-                                                  AppColors.warmOrange,
-                                              fontWeight:
-                                                  FontWeight.w600,
+                                              color: AppColors.warmOrange,
+                                              fontWeight: FontWeight.w600,
                                             ),
                                           ),
                                       ],
@@ -1009,8 +1178,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     if (!mounted || result == null) return;
     if (result is! Map<String, dynamic>) return;
 
-    final studentsAssigned =
-        (result['studentsAssigned'] as num?)?.toInt() ?? 0;
+    final studentsAssigned = (result['studentsAssigned'] as num?)?.toInt() ?? 0;
     final skippedCount = (result['skippedCount'] as num?)?.toInt() ?? 0;
     final totalStudents = (result['totalStudents'] as num?)?.toInt() ?? 0;
 
@@ -1127,9 +1295,11 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
             Text('Sort Students by', style: TeacherTypography.h3),
             const SizedBox(height: 16),
             _buildSortOption('name', 'First Name', Icons.sort_by_alpha),
-            const SizedBox(height: 8),
-            _buildSortOption(
-                'level', 'Reading Level', Icons.signal_cellular_alt),
+            if (_levelsEnabled) ...[
+              const SizedBox(height: 8),
+              _buildSortOption(
+                  'level', 'Reading Level', Icons.signal_cellular_alt),
+            ],
             const SizedBox(height: 8),
             _buildSortOption(
                 'streak', 'Current Streak', Icons.local_fire_department),
@@ -1184,16 +1354,13 @@ class _PickerFilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected
-          ? AppColors.teacherPrimary
-          : AppColors.background,
+      color: selected ? AppColors.teacherPrimary : AppColors.background,
       borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
       child: InkWell(
         borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
         onTap: onTap,
         child: Padding(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
           child: Text(
             label,
             style: TeacherTypography.bodySmall.copyWith(

@@ -69,7 +69,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         if (_selectedRole == UserRole.teacher) {
           // For teachers: Validate school code
           final schoolCode = values['schoolCode'] as String?;
-          debugPrint('[REGISTER] Teacher registration - validating school code');
+          debugPrint(
+              '[REGISTER] Teacher registration - validating school code');
 
           if (schoolCode == null || schoolCode.isEmpty) {
             debugPrint('[REGISTER] School code is empty');
@@ -81,7 +82,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
           try {
             debugPrint('[REGISTER] Validating school code...');
-            final codeDetails = await _schoolCodeService.validateSchoolCode(schoolCode);
+            final codeDetails =
+                await _schoolCodeService.validateSchoolCode(schoolCode);
             schoolId = codeDetails['schoolId']!;
             schoolCodeId = codeDetails['codeId'];
             debugPrint('[REGISTER] School code validated');
@@ -100,7 +102,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           if (widgetSchoolId == null || widgetSchoolId.isEmpty) {
             debugPrint('[REGISTER] SchoolId is empty for parent');
             setState(() {
-              _errorMessage = 'School ID is required. Please use the registration link provided by your school.';
+              _errorMessage =
+                  'School ID is required. Please use the registration link provided by your school.';
             });
             return;
           }
@@ -110,8 +113,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
         // Create user with email and password
         debugPrint('[REGISTER] Creating Firebase Auth user...');
-        final UserCredential userCredential = await _firebaseService.auth
-            .createUserWithEmailAndPassword(
+        final UserCredential userCredential =
+            await _firebaseService.auth.createUserWithEmailAndPassword(
           email: email,
           password: password,
         );
@@ -135,7 +138,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           );
 
           // Determine the correct collection based on role
-          final String collectionName = _selectedRole == UserRole.parent ? 'parents' : 'users';
+          final String collectionName =
+              _selectedRole == UserRole.parent ? 'parents' : 'users';
 
           // Write to nested school structure
           debugPrint('[REGISTER] Creating Firestore document...');
@@ -144,11 +148,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
               .doc(schoolId)
               .collection(collectionName)
               .doc(userCredential.user!.uid)
-              .set(user.toFirestore());
+              .set({
+            ...user.toFirestore(),
+            if (_selectedRole == UserRole.teacher)
+              'permissions': {
+                'notifications': {
+                  'assignedClasses': true,
+                  'assignedStudents': true,
+                  'schedule': true,
+                  'wholeSchool': false,
+                },
+              },
+          });
           debugPrint('[REGISTER] Firestore document created');
 
           // Increment appropriate counter on school document
-          final counterField = _selectedRole == UserRole.parent ? 'parentCount' : 'teacherCount';
+          final counterField =
+              _selectedRole == UserRole.parent ? 'parentCount' : 'teacherCount';
           debugPrint('[REGISTER] Incrementing $counterField...');
           await _firebaseService.firestore
               .collection('schools')
@@ -216,7 +232,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  Future<void> _linkParentWithInviteCode(String parentId, String inviteCode) async {
+  Future<void> _linkParentWithInviteCode(
+      String parentId, String inviteCode) async {
     try {
       if (widget.schoolId == null) return;
 
@@ -367,7 +384,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: LumiTextStyles.bodySmall(color: AppColors.error),
+                          style:
+                              LumiTextStyles.bodySmall(color: AppColors.error),
                         ),
                       ),
                     ],
@@ -441,7 +459,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           labelStyle: LumiTextStyles.body(
                             color: AppColors.charcoal.withValues(alpha: 0.7),
                           ),
-                          prefixIcon: Icon(Icons.vpn_key_outlined, color: AppColors.charcoal),
+                          prefixIcon: Icon(Icons.vpn_key_outlined,
+                              color: AppColors.charcoal),
                           hintText: 'Enter code from your school admin',
                           hintStyle: LumiTextStyles.body(
                             color: AppColors.charcoal.withValues(alpha: 0.5),
@@ -450,12 +469,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           helperStyle: LumiTextStyles.bodySmall(
                             color: AppColors.charcoal.withValues(alpha: 0.7),
                           ),
-                          border: OutlineInputBorder(borderRadius: LumiBorders.medium),
+                          border: OutlineInputBorder(
+                              borderRadius: LumiBorders.medium),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: LumiBorders.medium,
-                            borderSide: BorderSide(color: AppColors.rosePink, width: 2),
+                            borderSide:
+                                BorderSide(color: AppColors.rosePink, width: 2),
                           ),
-                          errorStyle: LumiTextStyles.bodySmall(color: AppColors.error),
+                          errorStyle:
+                              LumiTextStyles.bodySmall(color: AppColors.error),
                         ),
                         textCapitalization: TextCapitalization.characters,
                         textInputAction: TextInputAction.next,
@@ -480,13 +502,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         labelStyle: LumiTextStyles.body(
                           color: AppColors.charcoal.withValues(alpha: 0.7),
                         ),
-                        prefixIcon: Icon(Icons.person_outline, color: AppColors.charcoal),
-                        border: OutlineInputBorder(borderRadius: LumiBorders.medium),
+                        prefixIcon: Icon(Icons.person_outline,
+                            color: AppColors.charcoal),
+                        border: OutlineInputBorder(
+                            borderRadius: LumiBorders.medium),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: LumiBorders.medium,
-                          borderSide: BorderSide(color: AppColors.rosePink, width: 2),
+                          borderSide:
+                              BorderSide(color: AppColors.rosePink, width: 2),
                         ),
-                        errorStyle: LumiTextStyles.bodySmall(color: AppColors.error),
+                        errorStyle:
+                            LumiTextStyles.bodySmall(color: AppColors.error),
                       ),
                       textInputAction: TextInputAction.next,
                       validator: FormBuilderValidators.compose([
@@ -510,13 +536,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         labelStyle: LumiTextStyles.body(
                           color: AppColors.charcoal.withValues(alpha: 0.7),
                         ),
-                        prefixIcon: Icon(Icons.email_outlined, color: AppColors.charcoal),
-                        border: OutlineInputBorder(borderRadius: LumiBorders.medium),
+                        prefixIcon: Icon(Icons.email_outlined,
+                            color: AppColors.charcoal),
+                        border: OutlineInputBorder(
+                            borderRadius: LumiBorders.medium),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: LumiBorders.medium,
-                          borderSide: BorderSide(color: AppColors.rosePink, width: 2),
+                          borderSide:
+                              BorderSide(color: AppColors.rosePink, width: 2),
                         ),
-                        errorStyle: LumiTextStyles.bodySmall(color: AppColors.error),
+                        errorStyle:
+                            LumiTextStyles.bodySmall(color: AppColors.error),
                       ),
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
@@ -540,7 +570,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         labelStyle: LumiTextStyles.body(
                           color: AppColors.charcoal.withValues(alpha: 0.7),
                         ),
-                        prefixIcon: Icon(Icons.lock_outline, color: AppColors.charcoal),
+                        prefixIcon:
+                            Icon(Icons.lock_outline, color: AppColors.charcoal),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscurePassword
@@ -554,12 +585,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             });
                           },
                         ),
-                        border: OutlineInputBorder(borderRadius: LumiBorders.medium),
+                        border: OutlineInputBorder(
+                            borderRadius: LumiBorders.medium),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: LumiBorders.medium,
-                          borderSide: BorderSide(color: AppColors.rosePink, width: 2),
+                          borderSide:
+                              BorderSide(color: AppColors.rosePink, width: 2),
                         ),
-                        errorStyle: LumiTextStyles.bodySmall(color: AppColors.error),
+                        errorStyle:
+                            LumiTextStyles.bodySmall(color: AppColors.error),
                       ),
                       obscureText: _obscurePassword,
                       textInputAction: TextInputAction.next,
@@ -597,7 +631,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         labelStyle: LumiTextStyles.body(
                           color: AppColors.charcoal.withValues(alpha: 0.7),
                         ),
-                        prefixIcon: Icon(Icons.lock_outline, color: AppColors.charcoal),
+                        prefixIcon:
+                            Icon(Icons.lock_outline, color: AppColors.charcoal),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscureConfirmPassword
@@ -607,16 +642,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                           onPressed: () {
                             setState(() {
-                              _obscureConfirmPassword = !_obscureConfirmPassword;
+                              _obscureConfirmPassword =
+                                  !_obscureConfirmPassword;
                             });
                           },
                         ),
-                        border: OutlineInputBorder(borderRadius: LumiBorders.medium),
+                        border: OutlineInputBorder(
+                            borderRadius: LumiBorders.medium),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: LumiBorders.medium,
-                          borderSide: BorderSide(color: AppColors.rosePink, width: 2),
+                          borderSide:
+                              BorderSide(color: AppColors.rosePink, width: 2),
                         ),
-                        errorStyle: LumiTextStyles.bodySmall(color: AppColors.error),
+                        errorStyle:
+                            LumiTextStyles.bodySmall(color: AppColors.error),
                       ),
                       obscureText: _obscureConfirmPassword,
                       textInputAction: TextInputAction.done,
@@ -624,7 +663,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         if (value == null || value.isEmpty) {
                           return 'Please confirm your password';
                         }
-                        if (_formKey.currentState?.fields['password']?.value != value) {
+                        if (_formKey.currentState?.fields['password']?.value !=
+                            value) {
                           return 'Passwords do not match';
                         }
                         return null;
@@ -655,7 +695,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             Expanded(
                               child: Text(
                                 'Invite code: ${widget.inviteCode}',
-                                style: LumiTextStyles.bodySmall(color: AppColors.mintGreen),
+                                style: LumiTextStyles.bodySmall(
+                                    color: AppColors.mintGreen),
                               ),
                             ),
                           ],
@@ -723,10 +764,14 @@ class _RoleCard extends StatelessWidget {
       child: Container(
         padding: LumiPadding.allS,
         decoration: BoxDecoration(
-          color: isSelected ? roleInfo['color'].withValues(alpha: 0.1) : AppColors.white,
+          color: isSelected
+              ? roleInfo['color'].withValues(alpha: 0.1)
+              : AppColors.white,
           borderRadius: LumiBorders.large,
           border: Border.all(
-            color: isSelected ? roleInfo['color'] : AppColors.charcoal.withValues(alpha: 0.2),
+            color: isSelected
+                ? roleInfo['color']
+                : AppColors.charcoal.withValues(alpha: 0.2),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -734,7 +779,9 @@ class _RoleCard extends StatelessWidget {
           children: [
             Icon(
               roleInfo['icon'],
-              color: isSelected ? roleInfo['color'] : AppColors.charcoal.withValues(alpha: 0.7),
+              color: isSelected
+                  ? roleInfo['color']
+                  : AppColors.charcoal.withValues(alpha: 0.7),
               size: 32,
             ),
             LumiGap.xs,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/lumi_text_styles.dart';
+import 'persistent_cached_image.dart';
 
 /// Book type for badge coloring
 enum BookType {
@@ -79,10 +80,10 @@ class LumiBookCard extends StatelessWidget {
                 width: 50,
                 height: 65,
                 child: coverUrl != null && coverUrl!.startsWith('http')
-                    ? Image.network(
-                        coverUrl!,
+                    ? PersistentCachedImage(
+                        imageUrl: coverUrl!,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _buildPlaceholder(),
+                        fallback: _buildPlaceholder(),
                       )
                     : _buildPlaceholder(),
               ),

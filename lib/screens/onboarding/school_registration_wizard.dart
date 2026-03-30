@@ -87,6 +87,13 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
         }
         break;
       case 2:
+        if (_selectedLevelSchema == 'none') {
+          // No validation needed for "none" — skip custom levels
+          _readingLevelData = {'levelSchema': 'none'};
+          isValid = true;
+          await _createSchoolAndCompleteOnboarding();
+          return;
+        }
         isValid =
             _readingLevelsFormKey.currentState?.saveAndValidate() ?? false;
         if (isValid) {
@@ -113,10 +120,18 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
 
   ReadingLevelSchema _schemaFromValue(String? value) {
     switch (value) {
+      case 'none':
+        return ReadingLevelSchema.none;
       case 'pmBenchmark':
         return ReadingLevelSchema.pmBenchmark;
       case 'lexile':
         return ReadingLevelSchema.lexile;
+      case 'numbered':
+        return ReadingLevelSchema.numbered;
+      case 'namedLevels':
+        return ReadingLevelSchema.namedLevels;
+      case 'colouredLevels':
+        return ReadingLevelSchema.colouredLevels;
       case 'custom':
         return ReadingLevelSchema.custom;
       case 'aToZ':
@@ -548,6 +563,15 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
                   },
                   options: [
                     const FormBuilderFieldOption(
+                      value: 'none',
+                      child: ListTile(
+                        title: Text('No reading levels'),
+                        subtitle: Text(
+                          "Students won't be assigned reading levels. You can enable levels later in school settings.",
+                        ),
+                      ),
+                    ),
+                    const FormBuilderFieldOption(
                       value: 'aToZ',
                       child: ListTile(
                         title: Text('A-Z Levels'),
@@ -569,6 +593,27 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
                       ),
                     ),
                     const FormBuilderFieldOption(
+                      value: 'numbered',
+                      child: ListTile(
+                        title: Text('Numbered 1-100'),
+                        subtitle: Text('Simple numbered levels from 1 to 100'),
+                      ),
+                    ),
+                    const FormBuilderFieldOption(
+                      value: 'namedLevels',
+                      child: ListTile(
+                        title: Text('Named Levels'),
+                        subtitle: Text('Define your own named levels'),
+                      ),
+                    ),
+                    const FormBuilderFieldOption(
+                      value: 'colouredLevels',
+                      child: ListTile(
+                        title: Text('Colour Levels'),
+                        subtitle: Text('Named levels with custom colours'),
+                      ),
+                    ),
+                    const FormBuilderFieldOption(
                       value: 'custom',
                       child: ListTile(
                         title: Text('Custom'),
@@ -577,20 +622,28 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
                     ),
                   ],
                 ),
-                if (_selectedLevelSchema == 'custom') ...[
+                if (_selectedLevelSchema == 'custom' ||
+                    _selectedLevelSchema == 'namedLevels' ||
+                    _selectedLevelSchema == 'colouredLevels') ...[
                   LumiGap.s,
                   FormBuilderTextField(
                     name: 'customLevels',
-                    decoration: const InputDecoration(
-                      labelText: 'Custom Levels (comma separated) *',
+                    decoration: InputDecoration(
+                      labelText: _selectedLevelSchema == 'colouredLevels'
+                          ? 'Level Names (comma separated) *'
+                          : 'Custom Levels (comma separated) *',
                       hintText: 'e.g. Blue, Green, Orange, Purple',
-                      prefixIcon: Icon(Icons.tune),
+                      prefixIcon: const Icon(Icons.tune),
                     ),
                     validator: (valueCandidate) {
-                      if (_selectedLevelSchema != 'custom') return null;
+                      if (_selectedLevelSchema != 'custom' &&
+                          _selectedLevelSchema != 'namedLevels' &&
+                          _selectedLevelSchema != 'colouredLevels') {
+                        return null;
+                      }
                       final raw = valueCandidate?.trim() ?? '';
                       if (raw.isEmpty) {
-                        return 'Please enter at least one custom reading level';
+                        return 'Please enter at least one level name';
                       }
                       final parsed = _parseCustomLevels(raw) ?? [];
                       if (parsed.isEmpty) {

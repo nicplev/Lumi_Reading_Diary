@@ -27,6 +27,7 @@ import '../../screens/parent/offline_management_screen.dart';
 import '../../screens/parent/student_report_screen.dart';
 import '../../screens/parent/parent_profile_screen.dart';
 import '../../screens/parent/book_browser_screen.dart';
+import '../../screens/parent/parent_notifications_screen.dart';
 import '../../screens/parent/reading_success_screen.dart';
 import '../../screens/teacher/teacher_home_screen.dart';
 import '../../screens/teacher/allocation_screen.dart';
@@ -36,6 +37,7 @@ import '../../screens/teacher/class_report_screen.dart';
 import '../../screens/teacher/teacher_profile_screen.dart';
 import '../../screens/teacher/student_detail_screen.dart';
 import '../../screens/teacher/isbn_scanner_screen.dart';
+import '../../screens/teacher/teacher_level_management_screen.dart';
 import '../../screens/admin/admin_home_screen.dart';
 import '../../screens/admin/user_management_screen.dart';
 import '../../screens/admin/student_management_screen.dart';
@@ -43,6 +45,8 @@ import '../../screens/admin/class_management_screen.dart';
 import '../../screens/admin/school_analytics_dashboard.dart';
 import '../../screens/admin/parent_linking_management_screen.dart';
 import '../../screens/admin/database_migration_screen.dart';
+import '../../screens/shared/staff_notifications_screen.dart';
+import '../../screens/admin/reading_level_settings_screen.dart';
 import '../../screens/onboarding/school_registration_wizard.dart';
 import '../../screens/onboarding/school_demo_screen.dart';
 import '../../screens/onboarding/demo_request_screen.dart';
@@ -231,7 +235,10 @@ class AppRouter {
           final tempData = NavigationStateService().getTempData();
           final parent = tempData?['parent'] as UserModel?;
           final student = tempData?['student'] as StudentModel?;
-          final allocation = tempData?['allocation'] as AllocationModel?;
+          final rawAllocations = tempData?['allocations'];
+          final allocations = rawAllocations is List
+              ? rawAllocations.whereType<AllocationModel>().toList()
+              : const <AllocationModel>[];
 
           if (parent == null || student == null) {
             return const LoginScreen();
@@ -240,7 +247,7 @@ class AppRouter {
           return LogReadingScreen(
             parent: parent,
             student: student,
-            allocation: allocation,
+            allocations: allocations,
           );
         },
       ),
@@ -323,9 +330,21 @@ class AppRouter {
         path: '/parent/profile',
         name: 'parent-profile',
         builder: (context, state) {
-          final user = state.extra as UserModel?;
+          final user =
+              state.extra as UserModel? ?? _ref.read(userProvider).value;
           if (user == null) return const LoginScreen();
           return ParentProfileScreen(user: user);
+        },
+      ),
+
+      GoRoute(
+        path: '/parent/notifications',
+        name: 'parent-notifications',
+        builder: (context, state) {
+          final user =
+              state.extra as UserModel? ?? _ref.read(userProvider).value;
+          if (user == null) return const LoginScreen();
+          return ParentNotificationsScreen(user: user);
         },
       ),
 
@@ -437,9 +456,21 @@ class AppRouter {
         path: '/teacher/profile',
         name: 'teacher-profile',
         builder: (context, state) {
-          final user = state.extra as UserModel?;
+          final user =
+              state.extra as UserModel? ?? _ref.read(userProvider).value;
           if (user == null) return const LoginScreen();
           return TeacherProfileScreen(user: user);
+        },
+      ),
+
+      GoRoute(
+        path: '/teacher/notifications',
+        name: 'teacher-notifications',
+        builder: (context, state) {
+          final user =
+              state.extra as UserModel? ?? _ref.read(userProvider).value;
+          if (user == null) return const LoginScreen();
+          return StaffNotificationsScreen(user: user);
         },
       ),
 
@@ -461,21 +492,37 @@ class AppRouter {
       ),
 
       GoRoute(
+        path: '/teacher/level-management',
+        name: 'teacher-level-management',
+        builder: (context, state) {
+          final params = state.extra as Map<String, dynamic>?;
+          final teacher = params?['teacher'] as UserModel?;
+          final classModel = params?['classModel'] as ClassModel?;
+          if (teacher == null || classModel == null) {
+            return const LoginScreen();
+          }
+          return TeacherLevelManagementScreen(
+            teacher: teacher,
+            classModel: classModel,
+          );
+        },
+      ),
+
+      GoRoute(
         path: '/teacher/isbn-scanner',
         name: 'teacher-isbn-scanner',
         builder: (context, state) {
           final params = state.extra as Map<String, dynamic>?;
           final teacher = params?['teacher'] as UserModel?;
           final student = params?['student'] as StudentModel?;
-          final studentQueue =
-              params?['studentQueue'] as List<StudentModel>?;
+          final studentQueue = params?['studentQueue'] as List<StudentModel>?;
           final classModel = params?['classModel'] as ClassModel?;
-          final initialTargetDate =
-              params?['initialTargetDate'] as DateTime?;
+          final initialTargetDate = params?['initialTargetDate'] as DateTime?;
           if (teacher == null || classModel == null) {
             return const LoginScreen();
           }
-          if (student == null && (studentQueue == null || studentQueue.isEmpty)) {
+          if (student == null &&
+              (studentQueue == null || studentQueue.isEmpty)) {
             return const LoginScreen();
           }
           return IsbnScannerScreen(
@@ -560,12 +607,33 @@ class AppRouter {
       ),
 
       GoRoute(
+        path: '/admin/reading-level-settings',
+        name: 'reading-level-settings',
+        builder: (context, state) {
+          final user = state.extra as UserModel?;
+          if (user == null) return const LoginScreen();
+          return ReadingLevelSettingsScreen(adminUser: user);
+        },
+      ),
+
+      GoRoute(
         path: '/admin/database-migration',
         name: 'database-migration',
         builder: (context, state) {
           final user = state.extra as UserModel?;
           if (user == null) return const LoginScreen();
           return DatabaseMigrationScreen(adminUser: user);
+        },
+      ),
+
+      GoRoute(
+        path: '/admin/notifications',
+        name: 'admin-notifications',
+        builder: (context, state) {
+          final user =
+              state.extra as UserModel? ?? _ref.read(userProvider).value;
+          if (user == null) return const LoginScreen();
+          return StaffNotificationsScreen(user: user);
         },
       ),
 

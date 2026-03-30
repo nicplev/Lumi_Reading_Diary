@@ -23,6 +23,12 @@ class BookModel {
   final String? addedBy; // User ID who added this book
   final Map<String, dynamic>? metadata;
 
+  // School library provenance
+  final List<String>
+      scannedByTeacherIds; // Teachers who scanned this into the school library
+  final int
+      timesAssignedSchoolWide; // Total times assigned to students across the school
+
   BookModel({
     required this.id,
     required this.title,
@@ -43,33 +49,86 @@ class BookModel {
     required this.createdAt,
     this.addedBy,
     this.metadata,
+    this.scannedByTeacherIds = const [],
+    this.timesAssignedSchoolWide = 0,
   });
 
   factory BookModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+    final rawData = doc.data();
+    final data = rawData is Map<String, dynamic>
+        ? rawData
+        : rawData is Map
+            ? Map<String, dynamic>.from(rawData)
+            : <String, dynamic>{};
+
     return BookModel(
       id: doc.id,
-      title: data['title'] ?? '',
-      author: data['author'],
-      isbn: data['isbn'],
-      coverImageUrl: data['coverImageUrl'],
-      description: data['description'],
-      genres: List<String>.from(data['genres'] ?? []),
-      readingLevel: data['readingLevel'],
-      pageCount: data['pageCount'],
-      publisher: data['publisher'],
-      publishedDate: data['publishedDate'] != null
-          ? (data['publishedDate'] as Timestamp).toDate()
-          : null,
-      tags: List<String>.from(data['tags'] ?? []),
-      averageRating: data['averageRating']?.toDouble(),
-      ratingCount: data['ratingCount'] ?? 0,
-      isPopular: data['isPopular'] ?? false,
-      timesRead: data['timesRead'] ?? 0,
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
-      addedBy: data['addedBy'],
-      metadata: data['metadata'],
+      title: _asString(data['title']),
+      author: _asNullableString(data['author']),
+      isbn: _asNullableString(data['isbn']),
+      coverImageUrl: _asNullableString(data['coverImageUrl']),
+      description: _asNullableString(data['description']),
+      genres: _asStringList(data['genres']),
+      readingLevel: _asNullableString(data['readingLevel']),
+      pageCount: _asInt(data['pageCount']),
+      publisher: _asNullableString(data['publisher']),
+      publishedDate: _asDateTime(data['publishedDate']),
+      tags: _asStringList(data['tags']),
+      averageRating: _asDouble(data['averageRating']),
+      ratingCount: _asInt(data['ratingCount']) ?? 0,
+      isPopular: data['isPopular'] == true,
+      timesRead: _asInt(data['timesRead']) ?? 0,
+      createdAt: _asDateTime(data['createdAt']) ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+      addedBy: _asNullableString(data['addedBy']),
+      metadata: _asStringMap(data['metadata']),
+      scannedByTeacherIds: _asStringList(data['scannedByTeacherIds']),
+      timesAssignedSchoolWide: _asInt(data['timesAssignedSchoolWide']) ?? 0,
     );
+  }
+
+  static String _asString(dynamic value) => value?.toString() ?? '';
+
+  static String? _asNullableString(dynamic value) {
+    final normalized = value?.toString().trim();
+    if (normalized == null || normalized.isEmpty) return null;
+    return normalized;
+  }
+
+  static List<String> _asStringList(dynamic value) {
+    if (value is! Iterable) return const [];
+    return value
+        .map((item) => item?.toString().trim() ?? '')
+        .where((item) => item.isNotEmpty)
+        .toList();
+  }
+
+  static int? _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  static double? _asDouble(dynamic value) {
+    if (value is double) return value;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
+  static DateTime? _asDateTime(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
+    if (value is String) return DateTime.tryParse(value);
+    return null;
+  }
+
+  static Map<String, dynamic>? _asStringMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return null;
   }
 
   Map<String, dynamic> toFirestore() {
@@ -93,6 +152,8 @@ class BookModel {
       'createdAt': Timestamp.fromDate(createdAt),
       'addedBy': addedBy,
       'metadata': metadata,
+      'scannedByTeacherIds': scannedByTeacherIds,
+      'timesAssignedSchoolWide': timesAssignedSchoolWide,
     };
   }
 
@@ -116,6 +177,8 @@ class BookModel {
     DateTime? createdAt,
     String? addedBy,
     Map<String, dynamic>? metadata,
+    List<String>? scannedByTeacherIds,
+    int? timesAssignedSchoolWide,
   }) {
     return BookModel(
       id: id ?? this.id,
@@ -137,6 +200,9 @@ class BookModel {
       createdAt: createdAt ?? this.createdAt,
       addedBy: addedBy ?? this.addedBy,
       metadata: metadata ?? this.metadata,
+      scannedByTeacherIds: scannedByTeacherIds ?? this.scannedByTeacherIds,
+      timesAssignedSchoolWide:
+          timesAssignedSchoolWide ?? this.timesAssignedSchoolWide,
     );
   }
 }

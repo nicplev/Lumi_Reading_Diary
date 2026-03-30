@@ -14,7 +14,9 @@ import '../../data/models/user_model.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/reading_log_model.dart';
+import '../../data/models/reading_level_option.dart';
 import '../../services/firebase_service.dart';
+import '../../services/reading_level_service.dart';
 
 class ClassDetailScreen extends StatefulWidget {
   final ClassModel classModel;
@@ -32,7 +34,10 @@ class ClassDetailScreen extends StatefulWidget {
 
 class _ClassDetailScreenState extends State<ClassDetailScreen> {
   final FirebaseService _firebaseService = FirebaseService.instance;
+  final ReadingLevelService _readingLevelService = ReadingLevelService();
   List<StudentModel> _students = [];
+  List<ReadingLevelOption> _readingLevelOptions = const [];
+  bool _levelsEnabled = true;
   bool _isLoading = true;
   String _sortBy = 'name';
   final DateTime _selectedPeriod = DateTime.now();
@@ -41,7 +46,36 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _loadReadingLevelOptions();
     _loadStudents();
+  }
+
+  Future<void> _loadReadingLevelOptions({bool forceRefresh = false}) async {
+    final schoolId = widget.teacher.schoolId;
+    if (schoolId == null || schoolId.isEmpty) return;
+
+    try {
+      final options = await _readingLevelService.loadSchoolLevels(
+        schoolId,
+        forceRefresh: forceRefresh,
+      );
+      if (!mounted) return;
+      setState(() {
+        _readingLevelOptions = options;
+        _levelsEnabled = options.isNotEmpty;
+      });
+    } catch (error) {
+      debugPrint('Error loading class detail reading level options: $error');
+    }
+  }
+
+  String _formatReadingLevel(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Not set';
+    if (_readingLevelOptions.isEmpty) return value.trim();
+    return _readingLevelService.formatLevelLabel(
+      value,
+      options: _readingLevelOptions,
+    );
   }
 
   Future<void> _loadStudents() async {
@@ -79,11 +113,21 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
         students.sort((a, b) => a.fullName.compareTo(b.fullName));
         break;
       case 'level':
-        students.sort((a, b) {
-          final levelA = a.currentReadingLevel ?? 'ZZ';
-          final levelB = b.currentReadingLevel ?? 'ZZ';
-          return levelA.compareTo(levelB);
-        });
+        if (_readingLevelOptions.isNotEmpty) {
+          students.sort(
+            (a, b) => _readingLevelService.compareLevels(
+              a.currentReadingLevel,
+              b.currentReadingLevel,
+              options: _readingLevelOptions,
+            ),
+          );
+        } else {
+          students.sort((a, b) {
+            final levelA = a.currentReadingLevel ?? 'ZZ';
+            final levelB = b.currentReadingLevel ?? 'ZZ';
+            return levelA.compareTo(levelB);
+          });
+        }
         break;
       case 'streak':
         students.sort((a, b) {
@@ -137,16 +181,16 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
       for (final student in _students) {
         final studentLogs =
             logs.where((log) => log.studentId == student.id).toList();
-        final totalMinutes =
-            studentLogs.fold<int>(0, (sum, log) => sum + log.minutesRead);
+        final totalMinutes = studentLogs.fold<int>(
+            0, (minutes, log) => minutes + log.minutesRead);
         final averageMinutes =
             studentLogs.isEmpty ? 0 : totalMinutes ~/ studentLogs.length;
-        final booksRead =
-            studentLogs.fold<int>(0, (sum, log) => sum + log.bookTitles.length);
+        final booksRead = studentLogs.fold<int>(
+            0, (bookCount, log) => bookCount + log.bookTitles.length);
 
         csvData.add([
           student.fullName,
-          student.currentReadingLevel ?? 'Not set',
+          _formatReadingLevel(student.currentReadingLevel),
           _getTotalDaysInPeriod().toString(),
           studentLogs.length.toString(),
           totalMinutes.toString(),
@@ -168,9 +212,11 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
       await file.writeAsString(csvString);
 
       // Share the file
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text: 'Class Report - ${widget.classModel.name}',
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path)],
+          text: 'Class Report - ${widget.classModel.name}',
+        ),
       );
     } catch (e) {
       debugPrint('Error exporting to CSV: $e');
@@ -351,11 +397,12 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                       child: Text('Sort by Name',
                           style: TeacherTypography.bodySmall),
                     ),
-                    DropdownMenuItem(
-                      value: 'level',
-                      child: Text('Sort by Level',
-                          style: TeacherTypography.bodySmall),
-                    ),
+                    if (_levelsEnabled)
+                      DropdownMenuItem(
+                        value: 'level',
+                        child: Text('Sort by Level',
+                            style: TeacherTypography.bodySmall),
+                      ),
                     DropdownMenuItem(
                       value: 'streak',
                       child: Text('Sort by Streak',
@@ -389,6 +436,8 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                   teacher: widget.teacher,
                   periodStart: _getStartDate(),
                   periodEnd: _getEndDate(),
+                  readingLevelFormatter: _formatReadingLevel,
+                  levelsEnabled: _levelsEnabled,
                 );
               },
             ),
@@ -405,6 +454,8 @@ class _StudentCard extends StatelessWidget {
   final UserModel teacher;
   final DateTime periodStart;
   final DateTime periodEnd;
+  final String Function(String?) readingLevelFormatter;
+  final bool levelsEnabled;
 
   const _StudentCard({
     required this.student,
@@ -412,6 +463,8 @@ class _StudentCard extends StatelessWidget {
     required this.teacher,
     required this.periodStart,
     required this.periodEnd,
+    required this.readingLevelFormatter,
+    this.levelsEnabled = true,
   });
 
   @override
@@ -463,24 +516,26 @@ class _StudentCard extends StatelessWidget {
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.teacherPrimaryLight,
-                                borderRadius: BorderRadius.circular(
-                                    TeacherDimensions.radiusRound),
-                              ),
-                              child: Text(
-                                'Level: ${student.currentReadingLevel ?? "Not set"}',
-                                style: TeacherTypography.caption.copyWith(
-                                  color: AppColors.teacherPrimary,
+                            if (levelsEnabled) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.teacherPrimaryLight,
+                                  borderRadius: BorderRadius.circular(
+                                      TeacherDimensions.radiusRound),
+                                ),
+                                child: Text(
+                                  'Level: ${readingLevelFormatter(student.currentReadingLevel)}',
+                                  style: TeacherTypography.caption.copyWith(
+                                    color: AppColors.teacherPrimary,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
+                              const SizedBox(width: 8),
+                            ],
                             if ((student.stats?.currentStreak ?? 0) > 0)
                               Container(
                                 padding: const EdgeInsets.symmetric(
@@ -539,8 +594,8 @@ class _StudentCard extends StatelessWidget {
                       [];
 
                   final daysCompleted = logs.length;
-                  final totalMinutes =
-                      logs.fold<int>(0, (sum, log) => sum + log.minutesRead);
+                  final totalMinutes = logs.fold<int>(
+                      0, (minutes, log) => minutes + log.minutesRead);
                   final averageMinutes =
                       logs.isEmpty ? 0 : totalMinutes ~/ logs.length;
 

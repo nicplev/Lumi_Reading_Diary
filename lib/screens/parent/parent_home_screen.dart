@@ -23,7 +23,10 @@ import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../data/models/allocation_model.dart';
+import '../../services/book_cover_cache_service.dart';
 import '../../services/firebase_service.dart';
+import '../../services/isbn_assignment_service.dart';
+import '../../services/staff_notification_service.dart';
 import 'reading_history_screen.dart';
 import 'parent_profile_screen.dart';
 
@@ -45,10 +48,21 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
   List<StudentModel> _children = [];
   bool _isLoading = true;
 
+  void _onCoversUpdated() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
+    BookCoverCacheService.instance.addListener(_onCoversUpdated);
     _loadChildren();
+  }
+
+  @override
+  void dispose() {
+    BookCoverCacheService.instance.removeListener(_onCoversUpdated);
+    super.dispose();
   }
 
   Future<void> _loadChildren() async {
@@ -186,8 +200,9 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
             unselectedItemColor: AppColors.textSecondary,
             elevation: 0,
             type: BottomNavigationBarType.fixed,
-            selectedLabelStyle: LumiTextStyles.caption(color: AppColors.rosePink)
-                .copyWith(fontWeight: FontWeight.w600),
+            selectedLabelStyle:
+                LumiTextStyles.caption(color: AppColors.rosePink)
+                    .copyWith(fontWeight: FontWeight.w600),
             unselectedLabelStyle: LumiTextStyles.caption(),
             items: const [
               BottomNavigationBarItem(
@@ -261,10 +276,46 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
               ],
             ),
             actions: [
-              LumiIconButton(
-                icon: Icons.notifications_outlined,
-                onPressed: () {
-                  // Navigate to notifications
+              StreamBuilder<int>(
+                stream: StaffNotificationService.instance
+                    .watchUnreadParentNotificationCount(widget.user),
+                builder: (context, snapshot) {
+                  final unreadCount = snapshot.data ?? 0;
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      LumiIconButton(
+                        icon: Icons.notifications_outlined,
+                        onPressed: () {
+                          context.push(
+                            '/parent/notifications',
+                            extra: widget.user,
+                          );
+                        },
+                      ),
+                      if (unreadCount > 0)
+                        Positioned(
+                          right: 2,
+                          top: 2,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.rosePink,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              unreadCount > 99 ? '99+' : '$unreadCount',
+                              style: LumiTextStyles.caption(
+                                color: AppColors.white,
+                              ).copyWith(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
                 },
               ),
             ],
@@ -286,7 +337,8 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
                         .collection('readingLogs')
                         .where('studentId', isEqualTo: selectedChild.id)
                         .where('date',
-                            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+                            isGreaterThanOrEqualTo:
+                                Timestamp.fromDate(startOfDay))
                         .orderBy('date', descending: true)
                         .snapshots();
                   }(),
@@ -323,26 +375,34 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
                         classAllocationsStream,
                       ),
                       builder: (context, allocationSnapshot) {
-                        AllocationModel? allocation;
+                        final activeAllocations = <AllocationModel>[];
                         if (allocationSnapshot.hasData) {
                           final now = DateTime.now();
+                          final seen = <String>{};
                           final allDocs = allocationSnapshot.data!
                               .expand((qs) => qs.docs)
                               .toList();
                           for (final doc in allDocs) {
+                            if (seen.contains(doc.id)) continue;
+                            seen.add(doc.id);
                             final candidate =
                                 AllocationModel.fromFirestore(doc);
                             if (candidate.startDate.isBefore(now) &&
                                 candidate.endDate.isAfter(now)) {
-                              allocation = candidate;
-                              break;
+                              activeAllocations.add(candidate);
                             }
                           }
                         }
+                        BookCoverCacheService.instance.primeFromAllocations(
+                          activeAllocations,
+                          ref.read(firebaseServiceProvider).firestore,
+                        );
 
                         return _TodayCard(
                           student: selectedChild,
-                          allocation: allocation,
+                          activeAllocations: activeAllocations,
+                          coverUrlResolver:
+                              BookCoverCacheService.instance.resolveCoverUrl,
                           hasLoggedToday: hasLoggedToday,
                           todayLogs: todayLogs,
                           onTap: () async {
@@ -350,10 +410,11 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
                             NavigationStateService().setTempData({
                               'parent': widget.user,
                               'student': selectedChild,
-                              'allocation': allocation,
+                              'allocations': activeAllocations,
                             });
 
-                            final result = await context.push('/parent/log-reading');
+                            final result =
+                                await context.push('/parent/log-reading');
                             if (result == true) {
                               // Refresh after logging
                               setState(() {});
@@ -451,17 +512,18 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
   }
 }
 
-
 class _TodayCard extends StatelessWidget {
   final StudentModel student;
-  final AllocationModel? allocation;
+  final List<AllocationModel> activeAllocations;
+  final String? Function(String title)? coverUrlResolver;
   final bool hasLoggedToday;
   final List<ReadingLogModel> todayLogs;
   final VoidCallback? onTap;
 
   const _TodayCard({
     required this.student,
-    this.allocation,
+    this.activeAllocations = const [],
+    this.coverUrlResolver,
     required this.hasLoggedToday,
     this.todayLogs = const [],
     this.onTap,
@@ -525,44 +587,69 @@ class _TodayCard extends StatelessWidget {
                   '${todayLogs.length} sessions logged',
                 ),
               ],
-            ] else if (allocation != null) ...[
+            ] else if (activeAllocations.isNotEmpty) ...[
               _buildRequirement(
                 context,
                 Icons.timer_outlined,
-                '${allocation!.targetMinutes} minutes',
+                '${activeAllocations.first.targetMinutes} minutes',
               ),
               LumiGap.xs,
-              if (allocation!.type == AllocationType.byLevel) ...[
-                Text(
-                  "Tonight's Books",
-                  style: LumiTextStyles.bodyMedium(
-                    color: AppColors.charcoal.withValues(alpha: 0.7),
-                  ),
-                ),
-                LumiGap.xs,
-                LumiBookCard(
-                  title: 'Level ${allocation!.levelStart}${allocation!.levelEnd != null ? ' - ${allocation!.levelEnd}' : ''}',
-                  bookType: BookType.decodable,
-                  statusText: 'Assigned',
-                ),
-              ],
-              if (allocation!.type == AllocationType.byTitle &&
-                  allocation!.bookTitles != null) ...[
-                Text(
-                  "Tonight's Books",
-                  style: LumiTextStyles.bodyMedium(
-                    color: AppColors.charcoal.withValues(alpha: 0.7),
-                  ),
-                ),
-                LumiGap.xs,
-                ...allocation!.bookTitles!.map((title) => Padding(
-                      padding: EdgeInsets.only(bottom: LumiSpacing.xs),
-                      child: LumiBookCard(
-                        title: title,
-                        statusText: 'Assigned',
+              // Collect all book titles from byTitle allocations (deduped)
+              Builder(builder: (context) {
+                final levelAllocation = activeAllocations
+                    .where((a) => a.type == AllocationType.byLevel)
+                    .firstOrNull;
+                final seen = <String>{};
+                final allTitles = activeAllocations
+                    .where((a) => a.type == AllocationType.byTitle)
+                    .expand(
+                      (a) => a
+                          .effectiveAssignmentItemsForStudent(student.id)
+                          .map((item) => item.title),
+                    )
+                    .where((t) => t.trim().isNotEmpty)
+                    .where((t) => seen.add(t.trim().toLowerCase()))
+                    .toList();
+
+                if (levelAllocation == null && allTitles.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Tonight's Books",
+                      style: LumiTextStyles.bodyMedium(
+                        color: AppColors.charcoal.withValues(alpha: 0.7),
                       ),
-                    )),
-              ],
+                    ),
+                    LumiGap.xs,
+                    if (levelAllocation != null)
+                      Padding(
+                        padding: EdgeInsets.only(bottom: LumiSpacing.xs),
+                        child: LumiBookCard(
+                          title:
+                              'Level ${levelAllocation.levelStart}${levelAllocation.levelEnd != null ? ' - ${levelAllocation.levelEnd}' : ''}',
+                          bookType: BookType.decodable,
+                          statusText: 'Assigned',
+                        ),
+                      ),
+                    ...allTitles.map((title) {
+                      final displayTitle =
+                          IsbnAssignmentService.sanitizeDisplayTitle(title);
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: LumiSpacing.xs),
+                        child: LumiBookCard(
+                          title: displayTitle,
+                          bookType: BookType.library,
+                          statusText: 'Assigned',
+                          coverUrl: coverUrlResolver?.call(title),
+                        ),
+                      );
+                    }),
+                  ],
+                );
+              }),
             ] else ...[
               _buildRequirement(
                 context,
@@ -581,8 +668,12 @@ class _TodayCard extends StatelessWidget {
               width: double.infinity,
               child: LumiPrimaryButton(
                 onPressed: onTap,
-                text: hasLoggedToday ? 'Log Another Session' : 'Tap to Mark as Done',
-                icon: hasLoggedToday ? Icons.add_circle_outline : Icons.check_circle_outline,
+                text: hasLoggedToday
+                    ? 'Log Another Session'
+                    : 'Tap to Mark as Done',
+                icon: hasLoggedToday
+                    ? Icons.add_circle_outline
+                    : Icons.check_circle_outline,
               ),
             ),
           ],
@@ -667,7 +758,8 @@ class _ProgressAndWeekSection extends ConsumerWidget {
                 int totalNights = 0;
                 int currentStreak = 0;
                 if (studentSnapshot.hasData && studentSnapshot.data!.exists) {
-                  final student = StudentModel.fromFirestore(studentSnapshot.data!);
+                  final student =
+                      StudentModel.fromFirestore(studentSnapshot.data!);
                   totalNights = student.stats?.totalReadingDays ?? 0;
                   currentStreak = student.stats?.currentStreak ?? 0;
                 }

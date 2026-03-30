@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/teacher_constants.dart';
 
 /// Lumi Design System - Teacher Stat Card
 ///
@@ -26,36 +27,31 @@ class TeacherStatCard extends StatelessWidget {
     final intValue = int.tryParse(value);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.charcoal.withValues(alpha: 0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
+        border: Border.all(color: AppColors.teacherBorder),
+        boxShadow: TeacherDimensions.cardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
-              color: iconBgColor,
-              borderRadius: BorderRadius.circular(12),
+              color: iconBgColor.withValues(alpha: 0.22),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(
               icon,
-              size: 22,
+              size: 24,
               color: iconColor,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           if (intValue != null)
             TweenAnimationBuilder<int>(
               tween: IntTween(begin: 0, end: intValue),
@@ -66,9 +62,10 @@ class TeacherStatCard extends StatelessWidget {
                   val.toString(),
                   style: const TextStyle(
                     fontFamily: 'Nunito',
-                    fontSize: 28,
+                    fontSize: 30,
                     fontWeight: FontWeight.w800,
                     color: AppColors.charcoal,
+                    height: 1,
                   ),
                 );
               },
@@ -78,18 +75,19 @@ class TeacherStatCard extends StatelessWidget {
               value,
               style: const TextStyle(
                 fontFamily: 'Nunito',
-                fontSize: 28,
+                fontSize: 30,
                 fontWeight: FontWeight.w800,
                 color: AppColors.charcoal,
+                height: 1,
               ),
             ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 6),
           Text(
             label,
-            style: TextStyle(
+            style: const TextStyle(
               fontFamily: 'Nunito',
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
               color: AppColors.textSecondary,
             ),
           ),
@@ -98,4 +96,3 @@ class TeacherStatCard extends StatelessWidget {
     );
   }
 }
-

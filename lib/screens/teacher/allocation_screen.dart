@@ -8,7 +8,12 @@ import '../../data/models/user_model.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/allocation_model.dart';
+import '../../data/models/book_model.dart';
+import '../../data/models/reading_level_option.dart';
+import '../../services/allocation_crud_service.dart';
 import '../../services/firebase_service.dart';
+import '../../services/reading_level_service.dart';
+import '../../services/school_library_service.dart';
 
 class AllocationScreen extends StatefulWidget {
   final UserModel teacher;
@@ -30,11 +35,14 @@ class _AllocationScreenState extends State<AllocationScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final FirebaseService _firebaseService = FirebaseService.instance;
+  final AllocationCrudService _allocationCrudService = AllocationCrudService();
+  final ReadingLevelService _readingLevelService = ReadingLevelService();
 
   // Form controllers
   final _minutesController = TextEditingController(text: '20');
   final _bookTitlesController = TextEditingController();
   final List<String> _bookTitles = [];
+  final Map<String, BookModel> _selectedLibraryBooksByTitle = {};
 
   // Selection state
   AllocationType _allocationType = AllocationType.freeChoice;
@@ -49,14 +57,25 @@ class _AllocationScreenState extends State<AllocationScreen>
   String? _templateName;
 
   List<StudentModel> _students = [];
+  List<ReadingLevelOption> _readingLevelOptions = const [];
+  bool _levelsEnabled = true;
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _loadReadingLevelOptions();
     if (widget.selectedClass != null) {
       _loadStudents();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant AllocationScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.teacher.schoolId != widget.teacher.schoolId) {
+      _loadReadingLevelOptions(forceRefresh: true);
     }
   }
 
@@ -109,6 +128,44 @@ class _AllocationScreenState extends State<AllocationScreen>
     }
   }
 
+  Future<void> _loadReadingLevelOptions({bool forceRefresh = false}) async {
+    final schoolId = widget.teacher.schoolId;
+    if (schoolId == null || schoolId.isEmpty) return;
+
+    try {
+      final options = await _readingLevelService.loadSchoolLevels(
+        schoolId,
+        forceRefresh: forceRefresh,
+      );
+      if (!mounted) return;
+      setState(() {
+        _readingLevelOptions = options;
+        _levelsEnabled = options.isNotEmpty;
+      });
+    } catch (error) {
+      debugPrint('Error loading allocation reading level options: $error');
+    }
+  }
+
+  String _formatLevelLabel(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Not set';
+    if (_readingLevelOptions.isEmpty) return value.trim();
+    return _readingLevelService.formatLevelLabel(
+      value,
+      options: _readingLevelOptions,
+    );
+  }
+
+  String _formatLevelRangeLabel(String? start, String? end) {
+    if (start == null || start.trim().isEmpty) return 'Level not set';
+    final startLabel = _formatLevelLabel(start);
+    if (end == null || end.trim().isEmpty) {
+      return startLabel;
+    }
+    final endLabel = _formatLevelLabel(end);
+    return '$startLabel - $endLabel';
+  }
+
   Future<void> _saveAllocation() async {
     if (widget.selectedClass == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -125,6 +182,32 @@ class _AllocationScreenState extends State<AllocationScreen>
       return;
     }
 
+    if (_allocationType == AllocationType.byLevel &&
+        (_levelRangeStart == null || _levelRangeStart!.trim().isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please choose a starting reading level')),
+      );
+      return;
+    }
+
+    if (_allocationType == AllocationType.byLevel &&
+        _readingLevelOptions.isNotEmpty &&
+        _levelRangeStart != null &&
+        _levelRangeEnd != null &&
+        _readingLevelService.compareLevels(
+              _levelRangeStart,
+              _levelRangeEnd,
+              options: _readingLevelOptions,
+            ) >
+            0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('End level must be at or above the start level'),
+        ),
+      );
+      return;
+    }
+
     if (!_selectAllStudents && _selectedStudentIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select at least one student')),
@@ -137,6 +220,17 @@ class _AllocationScreenState extends State<AllocationScreen>
     });
 
     try {
+      final sanitizedTitles = _bookTitles
+          .map((title) => title.trim())
+          .where((title) => title.isNotEmpty)
+          .toList(growable: false);
+      final assignmentItems = _allocationType == AllocationType.byTitle
+          ? _buildInitialAssignmentItems(
+              titles: sanitizedTitles,
+              teacherId: widget.teacher.id,
+            )
+          : null;
+
       final allocation = AllocationModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         schoolId: widget.selectedClass!.schoolId,
@@ -150,7 +244,9 @@ class _AllocationScreenState extends State<AllocationScreen>
         endDate: _endDate,
         levelStart: _levelRangeStart,
         levelEnd: _levelRangeEnd,
-        bookTitles: _bookTitles.isEmpty ? null : _bookTitles,
+        bookTitles: sanitizedTitles.isEmpty ? null : sanitizedTitles,
+        assignmentItems: assignmentItems,
+        schemaVersion: assignmentItems == null ? 1 : 2,
         isRecurring: _isRecurring,
         templateName: _templateName,
         createdAt: DateTime.now(),
@@ -188,6 +284,52 @@ class _AllocationScreenState extends State<AllocationScreen>
     }
   }
 
+  List<AllocationBookItem> _buildInitialAssignmentItems({
+    required List<String> titles,
+    required String teacherId,
+  }) {
+    final now = DateTime.now();
+    return titles.asMap().entries.map((entry) {
+      final selectedBook = _selectedLibraryBooksByTitle[entry.value];
+      return AllocationBookItem(
+        id: 'manual_${now.millisecondsSinceEpoch}_${entry.key}',
+        title: entry.value,
+        bookId: selectedBook?.id,
+        isbn: selectedBook?.isbn?.trim(),
+        addedAt: now,
+        addedBy: teacherId,
+        metadata: {
+          'source': selectedBook != null
+              ? 'school_library_picker'
+              : 'manual_allocation',
+        },
+      );
+    }).toList(growable: false);
+  }
+
+  Future<void> _browseLibrary() async {
+    final schoolId = widget.teacher.schoolId;
+    if (schoolId == null || schoolId.isEmpty) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _LibraryPickerSheet(
+        schoolId: schoolId,
+        alreadyAdded: List<String>.from(_bookTitles),
+        onBookSelected: (book) {
+          if (!_bookTitles.contains(book.title)) {
+            setState(() {
+              _bookTitles.add(book.title);
+              _selectedLibraryBooksByTitle[book.title] = book;
+            });
+          }
+        },
+      ),
+    );
+  }
+
   void _resetForm() {
     setState(() {
       _allocationType = AllocationType.freeChoice;
@@ -206,6 +348,7 @@ class _AllocationScreenState extends State<AllocationScreen>
       _levelRangeStart = null;
       _levelRangeEnd = null;
       _bookTitles.clear();
+      _selectedLibraryBooksByTitle.clear();
       _bookTitlesController.clear();
       _isRecurring = false;
       _templateName = null;
@@ -316,14 +459,15 @@ class _AllocationScreenState extends State<AllocationScreen>
                   onChanged: (value) =>
                       setState(() => _allocationType = value!),
                 ),
-                _buildRadioOption(
-                  title: 'By Reading Level',
-                  subtitle: 'Specify a range of reading levels',
-                  value: AllocationType.byLevel,
-                  groupValue: _allocationType,
-                  onChanged: (value) =>
-                      setState(() => _allocationType = value!),
-                ),
+                if (_levelsEnabled)
+                  _buildRadioOption(
+                    title: 'By Reading Level',
+                    subtitle: 'Specify a range of reading levels',
+                    value: AllocationType.byLevel,
+                    groupValue: _allocationType,
+                    onChanged: (value) =>
+                        setState(() => _allocationType = value!),
+                  ),
                 _buildRadioOption(
                   title: 'Specific Books',
                   subtitle: 'List specific titles or materials',
@@ -339,10 +483,10 @@ class _AllocationScreenState extends State<AllocationScreen>
                   Row(
                     children: [
                       Expanded(
-                        child: TextField(
+                        child: DropdownButtonFormField<String>(
+                          initialValue: _levelRangeStart,
                           decoration: InputDecoration(
                             labelText: 'Start Level',
-                            hintText: 'e.g., A, 1, or custom',
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(
                                   TeacherDimensions.radiusM),
@@ -354,17 +498,38 @@ class _AllocationScreenState extends State<AllocationScreen>
                                   BorderSide(color: AppColors.teacherPrimary),
                             ),
                           ),
-                          style: TeacherTypography.bodyMedium,
-                          onChanged: (value) =>
-                              setState(() => _levelRangeStart = value),
+                          items: _readingLevelOptions
+                              .map(
+                                (option) => DropdownMenuItem<String>(
+                                  value: option.value,
+                                  child: Text(option.displayLabel),
+                                ),
+                              )
+                              .toList(growable: false),
+                          onChanged: (value) {
+                            setState(() {
+                              _levelRangeStart = value;
+                              if (_levelRangeEnd != null &&
+                                  value != null &&
+                                  _readingLevelOptions.isNotEmpty &&
+                                  _readingLevelService.compareLevels(
+                                        value,
+                                        _levelRangeEnd,
+                                        options: _readingLevelOptions,
+                                      ) >
+                                      0) {
+                                _levelRangeEnd = value;
+                              }
+                            });
+                          },
                         ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: TextField(
+                        child: DropdownButtonFormField<String>(
+                          initialValue: _levelRangeEnd,
                           decoration: InputDecoration(
                             labelText: 'End Level (optional)',
-                            hintText: 'e.g., C, 5, or custom',
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(
                                   TeacherDimensions.radiusM),
@@ -376,7 +541,18 @@ class _AllocationScreenState extends State<AllocationScreen>
                                   BorderSide(color: AppColors.teacherPrimary),
                             ),
                           ),
-                          style: TeacherTypography.bodyMedium,
+                          items: [
+                            const DropdownMenuItem<String>(
+                              value: null,
+                              child: Text('No end level'),
+                            ),
+                            ..._readingLevelOptions.map(
+                              (option) => DropdownMenuItem<String>(
+                                value: option.value,
+                                child: Text(option.displayLabel),
+                              ),
+                            ),
+                          ],
                           onChanged: (value) =>
                               setState(() => _levelRangeEnd = value),
                         ),
@@ -408,12 +584,30 @@ class _AllocationScreenState extends State<AllocationScreen>
                             IconButton(
                               icon: Icon(Icons.close,
                                   color: AppColors.textSecondary, size: 18),
-                              onPressed: () =>
-                                  setState(() => _bookTitles.remove(title)),
+                              onPressed: () => setState(() {
+                                _bookTitles.remove(title);
+                                _selectedLibraryBooksByTitle.remove(title);
+                              }),
                             ),
                           ],
                         ),
                       )),
+                  const SizedBox(height: 8),
+                  // Browse Library button
+                  OutlinedButton.icon(
+                    onPressed: _browseLibrary,
+                    icon: const Icon(Icons.search, size: 18),
+                    label: const Text('Browse School Library'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.teacherPrimary,
+                      side: BorderSide(color: AppColors.teacherPrimary),
+                      shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(TeacherDimensions.radiusM),
+                      ),
+                      minimumSize: const Size.fromHeight(44),
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -421,7 +615,7 @@ class _AllocationScreenState extends State<AllocationScreen>
                         child: TextField(
                           controller: _bookTitlesController,
                           decoration: InputDecoration(
-                            hintText: 'Enter book or material title',
+                            hintText: 'Or type a title manually',
                             prefixIcon: const Icon(Icons.add),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(
@@ -440,6 +634,7 @@ class _AllocationScreenState extends State<AllocationScreen>
                             if (value.isNotEmpty) {
                               setState(() {
                                 _bookTitles.add(value);
+                                _selectedLibraryBooksByTitle.remove(value);
                                 _bookTitlesController.clear();
                               });
                             }
@@ -452,6 +647,8 @@ class _AllocationScreenState extends State<AllocationScreen>
                           if (_bookTitlesController.text.isNotEmpty) {
                             setState(() {
                               _bookTitles.add(_bookTitlesController.text);
+                              _selectedLibraryBooksByTitle
+                                  .remove(_bookTitlesController.text);
                               _bookTitlesController.clear();
                             });
                           }
@@ -663,9 +860,11 @@ class _AllocationScreenState extends State<AllocationScreen>
                         return CheckboxListTile(
                           title: Text(student.fullName,
                               style: TeacherTypography.bodyMedium),
-                          subtitle: Text(
-                              'Level: ${student.currentReadingLevel ?? "Not set"}',
-                              style: TeacherTypography.bodySmall),
+                          subtitle: _levelsEnabled
+                              ? Text(
+                                  'Level: ${_formatLevelLabel(student.currentReadingLevel)}',
+                                  style: TeacherTypography.bodySmall)
+                              : null,
                           value: _selectedStudentIds.contains(student.id),
                           activeColor: AppColors.teacherPrimary,
                           onChanged: (value) {
@@ -849,6 +1048,7 @@ class _AllocationScreenState extends State<AllocationScreen>
             final allocation = allocations[index];
             return _AllocationCard(
               allocation: allocation,
+              levelRangeFormatter: _formatLevelRangeLabel,
               onEdit: () {
                 // Handle edit
               },
@@ -884,12 +1084,12 @@ class _AllocationScreenState extends State<AllocationScreen>
                 );
 
                 if (confirm == true) {
-                  await _firebaseService.firestore
-                      .collection('schools')
-                      .doc(widget.teacher.schoolId!)
-                      .collection('allocations')
-                      .doc(allocation.id)
-                      .update({'isActive': false});
+                  await _allocationCrudService.updateAllocation(
+                    schoolId: widget.teacher.schoolId!,
+                    allocationId: allocation.id,
+                    actorId: widget.teacher.id,
+                    isActive: false,
+                  );
                 }
               },
             );
@@ -937,16 +1137,39 @@ class _AllocationScreenState extends State<AllocationScreen>
     required T groupValue,
     required ValueChanged<T?> onChanged,
   }) {
-    return RadioListTile<T>(
-      title: Text(title, style: TeacherTypography.bodyMedium),
-      subtitle: subtitle != null
-          ? Text(subtitle, style: TeacherTypography.bodySmall)
-          : null,
-      value: value,
-      groupValue: groupValue,
-      activeColor: AppColors.teacherPrimary,
-      contentPadding: EdgeInsets.zero,
-      onChanged: onChanged,
+    final isSelected = value == groupValue;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+        onTap: () => onChanged(value),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          child: Row(
+            children: [
+              Icon(
+                isSelected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_off,
+                color: isSelected
+                    ? AppColors.teacherPrimary
+                    : AppColors.textSecondary,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: TeacherTypography.bodyMedium),
+                    if (subtitle != null)
+                      Text(subtitle, style: TeacherTypography.bodySmall),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1021,11 +1244,13 @@ class _AllocationCard extends StatelessWidget {
   final AllocationModel allocation;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final String Function(String?, String?) levelRangeFormatter;
 
   const _AllocationCard({
     required this.allocation,
     required this.onEdit,
     required this.onDelete,
+    required this.levelRangeFormatter,
   });
 
   @override
@@ -1179,11 +1404,17 @@ class _AllocationCard extends StatelessWidget {
   String _getAllocationTitle(AllocationModel allocation) {
     switch (allocation.type) {
       case AllocationType.byLevel:
-        final levelText = allocation.levelEnd != null
-            ? 'Level ${allocation.levelStart} - ${allocation.levelEnd}'
-            : 'Level ${allocation.levelStart}';
-        return levelText;
+        return levelRangeFormatter(
+          allocation.levelStart,
+          allocation.levelEnd,
+        );
       case AllocationType.byTitle:
+        final items = allocation.activeAssignmentItems;
+        if (items.isNotEmpty) {
+          return items.length == 1
+              ? items.first.title
+              : '${items.first.title} +${items.length - 1} more';
+        }
         if (allocation.bookTitles != null &&
             allocation.bookTitles!.isNotEmpty) {
           return allocation.bookTitles!.length == 1
@@ -1207,5 +1438,195 @@ class _AllocationCard extends StatelessWidget {
       case AllocationCadence.custom:
         return 'Custom';
     }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Library Picker Sheet — browse school library to add books to an allocation
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _LibraryPickerSheet extends StatefulWidget {
+  const _LibraryPickerSheet({
+    required this.schoolId,
+    required this.alreadyAdded,
+    required this.onBookSelected,
+  });
+
+  final String schoolId;
+  final List<String> alreadyAdded;
+  final ValueChanged<BookModel> onBookSelected;
+
+  @override
+  State<_LibraryPickerSheet> createState() => _LibraryPickerSheetState();
+}
+
+class _LibraryPickerSheetState extends State<_LibraryPickerSheet> {
+  final _searchController = TextEditingController();
+  final _libraryService = SchoolLibraryService();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.only(top: 10, bottom: 8),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.textSecondary.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Browse School Library', style: TeacherTypography.h2),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _searchController,
+                      autofocus: true,
+                      onChanged: (v) => setState(() => _query = v),
+                      decoration: InputDecoration(
+                        hintText: 'Search by title, author or ISBN...',
+                        prefixIcon: const Icon(Icons.search,
+                            color: AppColors.textSecondary),
+                        filled: true,
+                        fillColor: AppColors.background,
+                        border: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(TeacherDimensions.radiusM),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: StreamBuilder<List<BookModel>>(
+                  stream: _libraryService.booksStream(widget.schoolId),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final books = SchoolLibraryService.applyFilter(
+                      books: snapshot.data!,
+                      filter: 'All',
+                      searchQuery: _query,
+                    );
+                    if (books.isEmpty) {
+                      return Center(
+                        child: Text(
+                          _query.isEmpty
+                              ? 'No books in library yet.\nScan ISBNs to add books.'
+                              : 'No books match "$_query".',
+                          style: TeacherTypography.bodyMedium
+                              .copyWith(color: AppColors.textSecondary),
+                          textAlign: TextAlign.center,
+                        ),
+                      );
+                    }
+                    return ListView.separated(
+                      controller: scrollController,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      itemCount: books.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, i) {
+                        final book = books[i];
+                        final alreadyAdded =
+                            widget.alreadyAdded.contains(book.title);
+                        return ListTile(
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 4),
+                          leading: SizedBox(
+                            width: 36,
+                            height: 50,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child:
+                                  book.coverImageUrl?.startsWith('http') == true
+                                      ? Image.network(
+                                          book.coverImageUrl!,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) =>
+                                              _bookIcon(book),
+                                        )
+                                      : _bookIcon(book),
+                            ),
+                          ),
+                          title: Text(
+                            book.title,
+                            style: TeacherTypography.bodyMedium.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: book.author?.isNotEmpty == true
+                              ? Text(
+                                  book.author!,
+                                  style: TeacherTypography.caption
+                                      .copyWith(color: AppColors.textSecondary),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                )
+                              : null,
+                          trailing: alreadyAdded
+                              ? const Icon(Icons.check_circle,
+                                  color: AppColors.teacherPrimary, size: 20)
+                              : TextButton(
+                                  onPressed: () {
+                                    widget.onBookSelected(book);
+                                    Navigator.of(context).pop();
+                                  },
+                                  child: const Text('Add'),
+                                ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _bookIcon(BookModel book) {
+    final color = SchoolLibraryService.isDecodable(book)
+        ? Color(SchoolLibraryService.stageColor(book.readingLevel ?? ''))
+        : AppColors.libraryGreen;
+    return Container(
+      color: color.withValues(alpha: 0.15),
+      child: Icon(Icons.menu_book, color: color, size: 18),
+    );
   }
 }

@@ -300,21 +300,6 @@ class ParentLinkingService {
           'usedAt': FieldValue.serverTimestamp(),
         });
 
-        // 7. Create notification for teacher (outside transaction)
-        // Notifications are non-critical and can be done after transaction commits
-        // Using Future.delayed to ensure it runs after transaction completes
-        Future.delayed(Duration.zero, () {
-          _createLinkNotification(
-            schoolId: schoolId,
-            studentId: studentId,
-            parentUserId: parentUserId,
-            parentEmail: parentEmail,
-          ).catchError((error) {
-            // Log error but don't fail the linking operation
-            print('Warning: Failed to create link notification: $error');
-          });
-        });
-
         return true;
       } on LinkingException {
         // Re-throw custom linking exceptions
@@ -324,27 +309,6 @@ class ParentLinkingService {
         throw TransactionFailedException(e.toString());
       }
     });
-  }
-
-  // Create notification for teacher when parent links
-  Future<void> _createLinkNotification({
-    required String schoolId,
-    required String studentId,
-    required String parentUserId,
-    required String parentEmail,
-  }) async {
-    final notification = {
-      'type': 'parent_linked',
-      'schoolId': schoolId,
-      'studentId': studentId,
-      'parentUserId': parentUserId,
-      'parentEmail': parentEmail,
-      'message': 'A parent has linked to a student',
-      'createdAt': FieldValue.serverTimestamp(),
-      'read': false,
-    };
-
-    await _firestore.collection('notifications').add(notification);
   }
 
   // Get active code for a student

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../theme/minimal_theme.dart';
+import '../lumi/persistent_cached_image.dart';
 
 /// Book card with cover image and reading progress
 class BookCard extends StatelessWidget {
@@ -46,11 +47,10 @@ class BookCard extends StatelessWidget {
               child: AspectRatio(
                 aspectRatio: 2 / 3,
                 child: imageUrl.startsWith('http')
-                    ? Image.network(
-                        imageUrl,
+                    ? PersistentCachedImage(
+                        imageUrl: imageUrl,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            _buildPlaceholder(),
+                        fallback: _buildPlaceholder(),
                       )
                     : _buildPlaceholder(),
               ),
@@ -184,11 +184,10 @@ class BookListItem extends StatelessWidget {
                     width: 60,
                     height: 90,
                     child: imageUrl.startsWith('http')
-                        ? Image.network(
-                            imageUrl,
+                        ? PersistentCachedImage(
+                            imageUrl: imageUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                _buildPlaceholder(),
+                            fallback: _buildPlaceholder(),
                           )
                         : _buildPlaceholder(),
                   ),
@@ -246,9 +245,7 @@ class BookListItem extends StatelessWidget {
                         Row(
                           children: List.generate(5, (index) {
                             return Icon(
-                              index < rating!
-                                  ? Icons.star
-                                  : Icons.star_border,
+                              index < rating! ? Icons.star : Icons.star_border,
                               size: 16,
                               color: MinimalTheme.orange,
                             );

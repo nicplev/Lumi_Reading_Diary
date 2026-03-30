@@ -14,17 +14,18 @@ import '../../data/models/student_model.dart';
 import '../../data/models/allocation_model.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../services/firebase_service.dart';
+import '../../services/isbn_assignment_service.dart';
 
 class LogReadingScreen extends StatefulWidget {
   final StudentModel student;
   final UserModel parent;
-  final AllocationModel? allocation;
+  final List<AllocationModel> allocations;
 
   const LogReadingScreen({
     super.key,
     required this.student,
     required this.parent,
-    this.allocation,
+    this.allocations = const [],
   });
 
   @override
@@ -59,12 +60,19 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedMinutes = widget.allocation?.targetMinutes ?? 20;
+    _selectedMinutes =
+        widget.allocations.isNotEmpty ? widget.allocations.first.targetMinutes : 20;
 
-    if (widget.allocation != null &&
-        widget.allocation!.bookTitles != null &&
-        widget.allocation!.bookTitles!.isNotEmpty) {
-      _assignedBookTitles.addAll(widget.allocation!.bookTitles!);
+    final seen = <String>{};
+    for (final allocation in widget.allocations) {
+      for (final item in allocation
+          .effectiveAssignmentItemsForStudent(widget.student.id)) {
+        final title = item.title.trim();
+        if (title.isNotEmpty && seen.add(title.toLowerCase())) {
+          _assignedBookTitles
+              .add(IsbnAssignmentService.sanitizeDisplayTitle(title));
+        }
+      }
     }
   }
 
@@ -138,7 +146,8 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
         classId: widget.student.classId,
         date: now,
         minutesRead: _selectedMinutes,
-        targetMinutes: widget.allocation?.targetMinutes ?? 20,
+        targetMinutes:
+            widget.allocations.isNotEmpty ? widget.allocations.first.targetMinutes : 20,
         status: LogStatus.completed,
         bookTitles: _finalBookTitles,
         notes: _notesController.text.isNotEmpty ? _notesController.text : null,
@@ -150,7 +159,7 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
             ? _notesController.text.trim()
             : null,
         createdAt: now,
-        allocationId: widget.allocation?.id,
+        allocationId: widget.allocations.isNotEmpty ? widget.allocations.first.id : null,
       );
 
       final logData = log.toFirestore();
@@ -492,14 +501,40 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                Center(
-                  child: Text(
-                    '$_selectedMinutes min',
-                    style: LumiTextStyles.display(color: AppColors.rosePink),
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      onPressed: _selectedMinutes > 5
+                          ? () => setState(() => _selectedMinutes -= 5)
+                          : null,
+                      icon: const Icon(Icons.remove_circle_outline),
+                      color: AppColors.rosePink,
+                      iconSize: 28,
+                    ),
+                    SizedBox(
+                      width: 140,
+                      child: Center(
+                        child: Text(
+                          '$_selectedMinutes min',
+                          style: LumiTextStyles.displayMedium(color: AppColors.rosePink),
+                          maxLines: 1,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _selectedMinutes < 120
+                          ? () => setState(() => _selectedMinutes += 5)
+                          : null,
+                      icon: const Icon(Icons.add_circle_outline),
+                      color: AppColors.rosePink,
+                      iconSize: 28,
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
-                Wrap(
+                Center(
+                  child: Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   alignment: WrapAlignment.center,
@@ -523,6 +558,7 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
                       ),
                     );
                   }).toList(),
+                ),
                 ),
               ],
             ),

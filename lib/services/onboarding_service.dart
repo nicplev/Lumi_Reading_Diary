@@ -120,6 +120,7 @@ class OnboardingService {
     required String adminFullName,
     required ReadingLevelSchema levelSchema,
     List<String>? customLevels,
+    Map<String, String>? levelColors,
     String? address,
     String? contactEmail,
     String? contactPhone,
@@ -147,7 +148,10 @@ class OnboardingService {
         primaryColor: primaryColor,
         secondaryColor: secondaryColor,
         levelSchema: levelSchema,
-        customLevels: customLevels,
+        customLevels:
+            levelSchema == ReadingLevelSchema.none ? null : customLevels,
+        levelColors:
+            levelSchema == ReadingLevelSchema.none ? null : levelColors,
         termDates: {},
         quietHours: {'start': '19:00', 'end': '07:00'},
         timezone: 'UTC',
@@ -179,7 +183,17 @@ class OnboardingService {
           .doc(schoolId)
           .collection('users')
           .doc(adminUserId)
-          .set(adminUser.toFirestore());
+          .set({
+        ...adminUser.toFirestore(),
+        'permissions': {
+          'notifications': {
+            'assignedClasses': true,
+            'assignedStudents': true,
+            'schedule': true,
+            'wholeSchool': true,
+          },
+        },
+      });
 
       // 4. Update onboarding record
       await _firestore.collection('schoolOnboarding').doc(onboardingId).update({
@@ -228,6 +242,7 @@ class OnboardingService {
     required String onboardingId,
     required ReadingLevelSchema levelSchema,
     List<String>? customLevels,
+    Map<String, String>? levelColors,
   }) async {
     final doc =
         await _firestore.collection('schoolOnboarding').doc(onboardingId).get();
@@ -240,11 +255,14 @@ class OnboardingService {
       throw Exception('School not created yet for onboarding');
     }
 
+    final needsCustomLevels = levelSchema == ReadingLevelSchema.custom ||
+        levelSchema == ReadingLevelSchema.namedLevels ||
+        levelSchema == ReadingLevelSchema.colouredLevels;
     await _firestore.collection('schools').doc(onboarding.schoolId).update({
       'levelSchema': levelSchema.toString().split('.').last,
-      'customLevels': levelSchema == ReadingLevelSchema.custom
-          ? (customLevels ?? [])
-          : null,
+      'customLevels': needsCustomLevels ? (customLevels ?? []) : null,
+      'levelColors':
+          levelSchema == ReadingLevelSchema.colouredLevels ? levelColors : null,
       'updatedAt': FieldValue.serverTimestamp(),
     });
 
