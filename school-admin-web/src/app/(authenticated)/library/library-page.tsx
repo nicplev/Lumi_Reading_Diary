@@ -104,7 +104,7 @@ export function LibraryPage({ levelOptions }: LibraryPageProps) {
           { value: 'all', label: 'All', count: filterCounts.all },
           { value: 'decodable', label: 'Decodable', count: filterCounts.decodable },
           { value: 'library', label: 'Library', count: filterCounts.library },
-          { value: 'recent', label: 'Recently Added', count: filterCounts.recent },
+          { value: 'recent', label: 'Recently Added (7 days)', count: filterCounts.recent },
         ] as const).map((opt) => (
           <FilterChip
             key={opt.value}

@@ -141,7 +141,10 @@ export function UsersPage() {
       header: '',
       accessorFn: (row) => row.id,
       cell: (_, row) => {
-        if (!isAdmin || row.id === currentUser?.uid) return null;
+        if (row.id === currentUser?.uid) {
+          return <Badge variant="default">You</Badge>;
+        }
+        if (!isAdmin) return null;
         return (
           <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
             {row.role !== 'parent' && (

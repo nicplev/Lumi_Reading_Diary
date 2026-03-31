@@ -205,8 +205,8 @@ export function SettingsPage() {
             />
             <Input label="Address" value={address} onChange={(e) => setAddress(e.target.value)} disabled={!isAdmin} />
             <div className="grid grid-cols-2 gap-4">
-              <Input label="Contact Email" type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} disabled={!isAdmin} />
-              <Input label="Contact Phone" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} disabled={!isAdmin} />
+              <Input label="Contact Email" type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} disabled={!isAdmin} placeholder="Shown to parents in the app" />
+              <Input label="Contact Phone" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} disabled={!isAdmin} placeholder="Shown to parents in the app" />
             </div>
             <Select
               label="Timezone"
@@ -285,7 +285,8 @@ export function SettingsPage() {
 
         {/* Term Dates */}
         <Card>
-          <h2 className="text-lg font-bold text-charcoal mb-4">Term Dates</h2>
+          <h2 className="text-lg font-bold text-charcoal mb-1">Term Dates</h2>
+          <p className="text-sm text-text-secondary mb-4">Used for analytics, reporting periods, and term-based comparisons.</p>
           <div className="space-y-4">
             {[1, 2, 3, 4].map((term) => (
               <div key={term} className="grid grid-cols-2 gap-4">

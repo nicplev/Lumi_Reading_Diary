@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useBreadcrumbs } from '@/components/layout/breadcrumb-context';
 import { PageHeader } from '@/components/lumi/page-header';
 import { Tabs } from '@/components/lumi/tabs';
 import { Badge } from '@/components/lumi/badge';
@@ -19,6 +20,11 @@ interface ClassDetailProps {
 
 export function ClassDetail({ schoolClass, levelOptions }: ClassDetailProps) {
   const [activeTab, setActiveTab] = useState('roster');
+  const { setOverride } = useBreadcrumbs();
+
+  useEffect(() => {
+    setOverride(schoolClass.id, schoolClass.name || schoolClass.yearLevel || 'Unnamed Class');
+  }, [schoolClass.id, schoolClass.name, schoolClass.yearLevel, setOverride]);
 
   const tabs = [
     { id: 'roster', label: 'Roster', count: schoolClass.studentIds.length, icon: <Icon name="group" size={18} /> },

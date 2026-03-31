@@ -84,12 +84,14 @@ export function AnalyticsPage({ metrics, trend, levels, classes, atRisk, topRead
           value={`${metrics.completionRate}%`}
           icon={<Icon name="check_circle" />}
           color="blue"
+          subtitle={`${metrics.totalLogs} reading logs total`}
         />
         <StatCard
-          title="Avg Min/Student"
-          value={metrics.avgMinPerStudent}
+          title="Unique Readers"
+          value={metrics.uniqueReaders}
           icon={<Icon name="person" />}
           color="orange"
+          subtitle="students who logged reading"
         />
       </div>
 
@@ -408,17 +410,17 @@ function LevelsTab({ levels }: { levels: LevelBucket[] }) {
                 nameKey="level"
                 cx="50%"
                 cy="50%"
-                innerRadius={60}
-                outerRadius={120}
+                innerRadius={55}
+                outerRadius={100}
                 paddingAngle={2}
-                label={({ level, count }) => `${level} (${count})`}
-                labelLine={false}
+                label={({ name, value }) => `${name} (${value})`}
               >
                 {levels.map((_, i) => (
                   <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                 ))}
               </Pie>
               <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value: number, name: string) => [`${value} students (${Math.round((value / total) * 100)}%)`, name]} />
+              <Legend />
             </PieChart>
           </ResponsiveContainer>
         </div>

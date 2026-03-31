@@ -1,9 +1,13 @@
+import Link from 'next/link';
+
 interface StatCardProps {
   title: string;
   value: string | number;
   icon?: React.ReactNode;
   trend?: { value: number; label: string };
   color?: 'pink' | 'green' | 'orange' | 'blue';
+  href?: string;
+  subtitle?: string;
 }
 
 const colorClasses = {
@@ -13,9 +17,9 @@ const colorClasses = {
   blue: 'bg-sky-blue/40 text-sky-blue-dark',
 };
 
-export function StatCard({ title, value, icon, trend, color = 'pink' }: StatCardProps) {
-  return (
-    <div className="bg-surface rounded-[var(--radius-lg)] shadow-card p-5">
+export function StatCard({ title, value, icon, trend, color = 'pink', href, subtitle }: StatCardProps) {
+  const content = (
+    <>
       <div className="flex items-start justify-between mb-3">
         <span className="text-sm font-semibold text-text-secondary">{title}</span>
         {icon && (
@@ -25,6 +29,9 @@ export function StatCard({ title, value, icon, trend, color = 'pink' }: StatCard
         )}
       </div>
       <div className="text-[28px] font-extrabold text-charcoal leading-tight">{value}</div>
+      {subtitle && (
+        <p className="text-xs text-text-secondary mt-1">{subtitle}</p>
+      )}
       {trend && (
         <div className="flex items-center gap-1 mt-2">
           <span className={`text-xs font-semibold ${trend.value >= 0 ? 'text-success' : 'text-error'}`}>
@@ -33,6 +40,18 @@ export function StatCard({ title, value, icon, trend, color = 'pink' }: StatCard
           <span className="text-xs text-text-secondary">{trend.label}</span>
         </div>
       )}
-    </div>
+    </>
   );
+
+  const className = `bg-surface rounded-[var(--radius-lg)] shadow-card p-5 ${href ? 'hover:shadow-card-hover transition-shadow' : ''}`;
+
+  if (href) {
+    return (
+      <Link href={href} className={`block ${className}`}>
+        {content}
+      </Link>
+    );
+  }
+
+  return <div className={className}>{content}</div>;
 }

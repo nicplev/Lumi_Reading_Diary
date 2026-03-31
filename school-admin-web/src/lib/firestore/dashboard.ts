@@ -17,6 +17,7 @@ export interface RecentActivity {
   studentName: string;
   action: string;
   time: Date;
+  bookTitle?: string;
 }
 
 export async function getDashboardStats(schoolId: string): Promise<DashboardStats> {
@@ -28,6 +29,20 @@ export async function getDashboardStats(schoolId: string): Promise<DashboardStat
     .where('isActive', '==', true)
     .get();
 
+  // Get student count — use denormalized counter, but self-heal if it's 0
+  let totalStudents = schoolData?.studentCount ?? 0;
+  if (totalStudents === 0) {
+    const studentsSnap = await adminDb
+      .collection('schools').doc(schoolId).collection('students')
+      .where('isActive', '==', true)
+      .get();
+    totalStudents = studentsSnap.size;
+    // Self-heal: update the school doc if count was wrong
+    if (totalStudents > 0) {
+      await adminDb.collection('schools').doc(schoolId).update({ studentCount: totalStudents });
+    }
+  }
+
   // Count active students today
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -38,14 +53,25 @@ export async function getDashboardStats(schoolId: string): Promise<DashboardStat
       .collection('schools').doc(schoolId).collection('readingLogs')
       .where('date', '>=', today)
       .get();
-    const uniqueStudents = new Set(logsSnap.docs.map(d => d.data().studentId));
-    activeStudentsToday = uniqueStudents.size;
+
+    // If date-based query returns nothing, try createdAt as fallback
+    if (logsSnap.empty) {
+      const fallbackSnap = await adminDb
+        .collection('schools').doc(schoolId).collection('readingLogs')
+        .where('createdAt', '>=', today)
+        .get();
+      const uniqueStudents = new Set(fallbackSnap.docs.map(d => d.data().studentId));
+      activeStudentsToday = uniqueStudents.size;
+    } else {
+      const uniqueStudents = new Set(logsSnap.docs.map(d => d.data().studentId));
+      activeStudentsToday = uniqueStudents.size;
+    }
   } catch {
     // readingLogs collection may not exist yet
   }
 
   return {
-    totalStudents: schoolData?.studentCount ?? 0,
+    totalStudents,
     totalTeachers: schoolData?.teacherCount ?? 0,
     totalClasses: classesSnap.size,
     activeStudentsToday,
@@ -56,18 +82,41 @@ export async function getWeeklyEngagement(schoolId: string): Promise<WeeklyEngag
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const today = new Date();
   const startOfWeek = new Date(today);
-  startOfWeek.setDate(today.getDate() - today.getDay() + 1); // Monday
+  // Fix Sunday edge case: getDay() returns 0 for Sunday
+  const dayOfWeek = today.getDay();
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  startOfWeek.setDate(today.getDate() + mondayOffset);
   startOfWeek.setHours(0, 0, 0, 0);
 
   try {
-    const logsSnap = await adminDb
+    // Try date field first
+    let logsSnap = await adminDb
       .collection('schools').doc(schoolId).collection('readingLogs')
       .where('date', '>=', startOfWeek)
       .get();
 
+    // Fallback to createdAt if date field yields no results
+    if (logsSnap.empty) {
+      logsSnap = await adminDb
+        .collection('schools').doc(schoolId).collection('readingLogs')
+        .where('createdAt', '>=', startOfWeek)
+        .get();
+    }
+
     const countByDay = new Map<number, number>();
     logsSnap.docs.forEach(doc => {
-      const date = doc.data().date?.toDate?.() ?? new Date();
+      const data = doc.data();
+      // Handle both Timestamp and string date fields
+      let date: Date;
+      if (data.date?.toDate) {
+        date = data.date.toDate();
+      } else if (data.createdAt?.toDate) {
+        date = data.createdAt.toDate();
+      } else if (typeof data.date === 'string') {
+        date = new Date(data.date);
+      } else {
+        date = new Date();
+      }
       const dayIndex = (date.getDay() + 6) % 7; // Mon=0
       countByDay.set(dayIndex, (countByDay.get(dayIndex) ?? 0) + 1);
     });
@@ -86,30 +135,41 @@ export async function getRecentActivity(schoolId: string, limit = 5): Promise<Re
       .limit(limit)
       .get();
 
-    const activities: RecentActivity[] = [];
-    for (const doc of logsSnap.docs) {
-      const data = doc.data();
-      // Try to get student name
-      let studentName = 'Unknown Student';
+    // Batch fetch all student IDs at once instead of N+1 queries
+    const studentIds = [...new Set(logsSnap.docs.map(d => d.data().studentId).filter(Boolean))];
+    const studentNames = new Map<string, string>();
+
+    // Firestore 'in' queries support max 30 items
+    for (let i = 0; i < studentIds.length; i += 30) {
+      const chunk = studentIds.slice(i, i + 30);
       try {
-        const studentDoc = await adminDb
-          .collection('schools').doc(schoolId).collection('students').doc(data.studentId)
+        const studentsSnap = await adminDb
+          .collection('schools').doc(schoolId).collection('students')
+          .where('__name__', 'in', chunk)
           .get();
-        if (studentDoc.exists) {
-          const s = studentDoc.data()!;
-          studentName = `${s.firstName} ${s.lastName}`;
+        for (const doc of studentsSnap.docs) {
+          const s = doc.data();
+          studentNames.set(doc.id, `${s.firstName} ${s.lastName}`);
         }
       } catch { /* ignore */ }
-
-      activities.push({
-        id: doc.id,
-        studentName,
-        action: `Logged ${data.minutesRead ?? 0} min reading`,
-        time: data.createdAt?.toDate?.() ?? new Date(),
-      });
     }
 
-    return activities;
+    return logsSnap.docs.map(doc => {
+      const data = doc.data();
+      const bookTitles = Array.isArray(data.bookTitles) ? data.bookTitles : [];
+      const bookTitle = bookTitles[0]; // First book title for display
+      const action = bookTitle
+        ? `Read "${bookTitle}" — ${data.minutesRead ?? 0} min`
+        : `Logged ${data.minutesRead ?? 0} min reading`;
+
+      return {
+        id: doc.id,
+        studentName: studentNames.get(data.studentId) ?? 'Unknown Student',
+        action,
+        time: data.createdAt?.toDate?.() ?? new Date(),
+        bookTitle,
+      };
+    });
   } catch {
     return [];
   }

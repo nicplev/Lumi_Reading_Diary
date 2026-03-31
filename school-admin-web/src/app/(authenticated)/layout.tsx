@@ -2,10 +2,12 @@ import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
 import { MobileNav } from '@/components/layout/mobile-nav';
 import { SchoolThemeProvider } from '@/components/providers/school-theme-provider';
+import { BreadcrumbProvider } from '@/components/layout/breadcrumb-context';
 
 export default function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   return (
     <SchoolThemeProvider>
+    <BreadcrumbProvider>
       <div className="min-h-screen bg-background">
         {/* Desktop sidebar */}
         <div className="hidden lg:block">
@@ -23,6 +25,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
         {/* Mobile bottom nav */}
         <MobileNav />
       </div>
+    </BreadcrumbProvider>
     </SchoolThemeProvider>
   );
 }

@@ -18,7 +18,7 @@ export async function GET() {
 }
 
 const createClassSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
+  name: z.string().trim().min(1, 'Class name is required'),
   yearLevel: z.string().optional(),
   teacherIds: z.array(z.string()).default([]),
   defaultMinutesTarget: z.number().min(1).default(15),

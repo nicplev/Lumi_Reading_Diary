@@ -153,7 +153,7 @@ export function StudentsPage({ classes, levelOptions }: StudentsPageProps) {
           {classes.map((c) => (
             <FilterChip
               key={c.id}
-              label={c.name}
+              label={c.name || c.yearLevel || 'Unnamed Class'}
               selected={classFilter.includes(c.id)}
               count={students?.filter((s) => s.classId === c.id).length}
               onClick={() =>

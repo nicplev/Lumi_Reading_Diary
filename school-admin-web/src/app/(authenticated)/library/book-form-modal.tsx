@@ -5,6 +5,8 @@ import { Modal } from '@/components/lumi/modal';
 import { Input } from '@/components/lumi/input';
 import { Select } from '@/components/lumi/select';
 import { Button } from '@/components/lumi/button';
+import { Badge } from '@/components/lumi/badge';
+import { ReadingLevelPill } from '@/components/lumi/reading-level-pill';
 import { useToast } from '@/components/lumi/toast';
 import { useCreateBook, useUpdateBook, useLookupIsbn } from '@/lib/hooks/use-books';
 import type { ReadingLevelOption } from '@/lib/types';
@@ -23,6 +25,7 @@ export function BookFormModal({ open, onClose, book, levelOptions }: BookFormMod
   const lookupIsbn = useLookupIsbn();
   const isEdit = !!book;
 
+  const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [isbn, setIsbn] = useState('');
@@ -36,8 +39,9 @@ export function BookFormModal({ open, onClose, book, levelOptions }: BookFormMod
       setIsbn(book?.isbn ?? '');
       setReadingLevel(book?.readingLevel ?? '');
       setCoverImageUrl(book?.coverImageUrl ?? '');
+      setEditing(!isEdit); // View mode for existing books, edit mode for new
     }
-  }, [open, book]);
+  }, [open, book, isEdit]);
 
   const handleLookup = async () => {
     if (!isbn.trim()) return;
@@ -82,6 +86,57 @@ export function BookFormModal({ open, onClose, book, levelOptions }: BookFormMod
 
   const isPending = createBook.isPending || updateBook.isPending;
 
+  // View mode for existing books
+  if (isEdit && !editing) {
+    return (
+      <Modal
+        open={open}
+        onClose={onClose}
+        title={book.title}
+        size="md"
+        footer={
+          <>
+            <Button variant="outline" onClick={onClose}>Close</Button>
+            <Button onClick={() => setEditing(true)}>Edit</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {coverImageUrl && (
+            <div className="flex justify-center">
+              <div className="w-28 h-36 rounded-[var(--radius-md)] bg-background overflow-hidden shadow-card">
+                <img src={coverImageUrl} alt={book.title} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+              </div>
+            </div>
+          )}
+          <div className="space-y-3">
+            {author && (
+              <div>
+                <p className="text-xs font-semibold text-text-secondary">Author</p>
+                <p className="text-sm text-charcoal">{author}</p>
+              </div>
+            )}
+            {isbn && (
+              <div>
+                <p className="text-xs font-semibold text-text-secondary">ISBN</p>
+                <p className="text-sm text-charcoal font-mono">{isbn}</p>
+              </div>
+            )}
+            <div>
+              <p className="text-xs font-semibold text-text-secondary">Reading Level</p>
+              {readingLevel ? (
+                <ReadingLevelPill level={readingLevel} size="sm" />
+              ) : (
+                <Badge variant="default">Not set</Badge>
+              )}
+            </div>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
+  // Edit / Create mode
   return (
     <Modal
       open={open}
@@ -91,8 +146,8 @@ export function BookFormModal({ open, onClose, book, levelOptions }: BookFormMod
       size="md"
       footer={
         <>
-          <Button variant="outline" onClick={onClose} disabled={isPending}>
-            Cancel
+          <Button variant="outline" onClick={isEdit ? () => setEditing(false) : onClose} disabled={isPending}>
+            {isEdit ? 'Cancel Edit' : 'Cancel'}
           </Button>
           <Button onClick={handleSubmit} loading={isPending} disabled={!title.trim()}>
             {isEdit ? 'Save Changes' : 'Add Book'}

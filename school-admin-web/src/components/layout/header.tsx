@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { useBreadcrumbs } from './breadcrumb-context';
 
 const breadcrumbLabels: Record<string, string> = {
   dashboard: 'Dashboard',
@@ -21,6 +22,7 @@ const breadcrumbLabels: Record<string, string> = {
 
 export function Header() {
   const pathname = usePathname();
+  const { overrides } = useBreadcrumbs();
   const segments = pathname.split('/').filter(Boolean);
 
   return (
@@ -29,7 +31,7 @@ export function Header() {
         {segments.map((segment, index) => {
           const href = '/' + segments.slice(0, index + 1).join('/');
           const isLast = index === segments.length - 1;
-          const label = breadcrumbLabels[segment] || segment;
+          const label = overrides[segment] || breadcrumbLabels[segment] || segment;
 
           return (
             <span key={href} className="flex items-center gap-1.5">

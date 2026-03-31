@@ -126,7 +126,12 @@ export function ClassFormModal({ open, onClose, onSubmit, loading, initialData, 
                     onChange={() => toggleTeacher(teacher.id)}
                     className="w-4 h-4 rounded border-divider text-rose-pink focus:ring-rose-pink/30"
                   />
-                  <span className="text-sm text-charcoal">{teacher.fullName}</span>
+                  <span className="text-sm text-charcoal">
+                    {teacher.fullName.includes('@')
+                      ? <><span className="text-text-secondary">{teacher.fullName}</span> <span className="text-xs text-text-secondary/60">(no name set)</span></>
+                      : teacher.fullName
+                    }
+                  </span>
                 </label>
               ))}
             </div>

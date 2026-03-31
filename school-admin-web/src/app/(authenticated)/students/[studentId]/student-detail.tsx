@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useBreadcrumbs } from '@/components/layout/breadcrumb-context';
 import { Avatar } from '@/components/lumi/avatar';
 import { Badge } from '@/components/lumi/badge';
 import { Button } from '@/components/lumi/button';
@@ -14,6 +15,7 @@ import { ReadingLevelPicker } from '@/components/features/reading-level-picker';
 import { useStudent, useUpdateStudentLevel, useReadingLevelHistory } from '@/lib/hooks/use-students';
 import { useStudentAllocations } from '@/lib/hooks/use-allocations';
 import { BookCard } from '@/components/lumi/book-card';
+import Link from 'next/link';
 import type { ReadingLevelOption } from '@/lib/types';
 
 interface StudentDetailProps {
@@ -25,7 +27,15 @@ interface StudentDetailProps {
 
 export function StudentDetail({ studentId, classId, levelOptions, className }: StudentDetailProps) {
   const { toast } = useToast();
+  const { setOverride } = useBreadcrumbs();
   const { data: student, isLoading } = useStudent(studentId);
+
+  // Set breadcrumb to show student name instead of Firestore ID
+  useEffect(() => {
+    if (student) {
+      setOverride(studentId, `${student.firstName} ${student.lastName}`);
+    }
+  }, [student, studentId, setOverride]);
   const { data: levelHistory } = useReadingLevelHistory(studentId);
   const updateLevel = useUpdateStudentLevel(studentId);
 
@@ -204,6 +214,12 @@ export function StudentDetail({ studentId, classId, levelOptions, className }: S
               icon={<Icon name="auto_stories" size={40} />}
               title="No books assigned"
               description="This student has no active book allocations."
+              action={
+                <Link href="/library" className="inline-flex items-center gap-1.5 text-sm font-semibold text-rose-pink hover:text-rose-pink-dark transition-colors mt-2">
+                  <Icon name="library_books" size={16} />
+                  Browse Library
+                </Link>
+              }
             />
           ) : (
             <div className="space-y-4">

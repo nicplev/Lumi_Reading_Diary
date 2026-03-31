@@ -19,10 +19,11 @@ interface AdminDashboardProps {
     studentName: string;
     action: string;
     time: string;
+    bookTitle?: string;
   }>;
 }
 
-const quickActions = [
+const shortcuts = [
   { label: 'Add User', href: '/users', icon: <Icon name="person_add" size={22} /> },
   { label: 'Add Class', href: '/classes', icon: <Icon name="school" size={22} /> },
   { label: 'Reports', href: '/analytics', icon: <Icon name="bar_chart" size={22} /> },
@@ -39,10 +40,10 @@ export function AdminDashboard({ schoolName, stats, weeklyEngagement, recentActi
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard title="Students" value={stats.totalStudents} icon={<Icon name="person" />} color="pink" />
-        <StatCard title="Teachers" value={stats.totalTeachers} icon={<Icon name="person" />} color="blue" />
-        <StatCard title="Classes" value={stats.totalClasses} icon={<Icon name="school" />} color="green" />
-        <StatCard title="Active Today" value={stats.activeStudentsToday} icon={<Icon name="auto_stories" />} color="orange" />
+        <StatCard title="Students" value={stats.totalStudents} icon={<Icon name="person" />} color="pink" href="/students" />
+        <StatCard title="Teachers" value={stats.totalTeachers} icon={<Icon name="person" />} color="blue" href="/users" />
+        <StatCard title="Classes" value={stats.totalClasses} icon={<Icon name="school" />} color="green" href="/classes" />
+        <StatCard title="Active Today" value={stats.activeStudentsToday} icon={<Icon name="auto_stories" />} color="orange" href="/analytics" subtitle="as of today" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -54,12 +55,12 @@ export function AdminDashboard({ schoolName, stats, weeklyEngagement, recentActi
           </Card>
         </div>
 
-        {/* Quick Actions + Recent Activity */}
+        {/* Shortcuts + Recent Activity */}
         <div className="space-y-6">
           <Card>
-            <h2 className="text-lg font-bold text-charcoal mb-3">Quick Actions</h2>
+            <h2 className="text-lg font-bold text-charcoal mb-3">Shortcuts</h2>
             <div className="grid grid-cols-2 gap-2">
-              {quickActions.map((action) => (
+              {shortcuts.map((action) => (
                 <Link
                   key={action.href}
                   href={action.href}
@@ -85,7 +86,7 @@ export function AdminDashboard({ schoolName, stats, weeklyEngagement, recentActi
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-charcoal truncate">{activity.studentName}</p>
-                      <p className="text-xs text-text-secondary">{activity.action}</p>
+                      <p className="text-xs text-text-secondary truncate">{activity.action}</p>
                     </div>
                     <Badge variant="default">{formatRelativeTime(activity.time)}</Badge>
                   </li>

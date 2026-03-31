@@ -15,7 +15,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 }
 
 const updateClassSchema = z.object({
-  name: z.string().min(1).optional(),
+  name: z.string().trim().min(1, 'Class name is required').optional(),
   yearLevel: z.string().optional(),
   teacherIds: z.array(z.string()).optional(),
   defaultMinutesTarget: z.number().min(1).optional(),
