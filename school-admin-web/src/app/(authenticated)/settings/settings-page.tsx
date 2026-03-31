@@ -8,6 +8,7 @@ import { Select } from '@/components/lumi/select';
 import { Button } from '@/components/lumi/button';
 import { Badge } from '@/components/lumi/badge';
 import { Skeleton } from '@/components/lumi/skeleton';
+import { ConfirmDialog } from '@/components/lumi/confirm-dialog';
 import { useToast } from '@/components/lumi/toast';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useSchool, useUpdateSchool } from '@/lib/hooks/use-school';
@@ -42,6 +43,7 @@ export function SettingsPage() {
 
   // School info
   const [name, setName] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [address, setAddress] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
@@ -50,6 +52,7 @@ export function SettingsPage() {
   // Reading levels
   const [levelSchema, setLevelSchema] = useState<ReadingLevelSchema>('aToZ');
   const [customLevels, setCustomLevels] = useState('');
+  const [showSchemaConfirm, setShowSchemaConfirm] = useState(false);
 
   // Term dates
   const [termDates, setTermDates] = useState<Record<string, string>>({});
@@ -58,9 +61,16 @@ export function SettingsPage() {
   const [quietStart, setQuietStart] = useState('');
   const [quietEnd, setQuietEnd] = useState('');
 
+  // Per-section saving states
+  const [savingInfo, setSavingInfo] = useState(false);
+  const [savingLevels, setSavingLevels] = useState(false);
+  const [savingTerms, setSavingTerms] = useState(false);
+  const [savingQuiet, setSavingQuiet] = useState(false);
+
   useEffect(() => {
     if (school) {
       setName(school.name);
+      setDisplayName(school.displayName ?? '');
       setAddress(school.address ?? '');
       setContactEmail(school.contactEmail ?? '');
       setContactPhone(school.contactPhone ?? '');
@@ -74,9 +84,11 @@ export function SettingsPage() {
   }, [school]);
 
   const handleSaveInfo = async () => {
+    setSavingInfo(true);
     try {
       await updateSchool.mutateAsync({
         name: name.trim(),
+        displayName: displayName.trim() || undefined,
         address: address.trim(),
         contactEmail: contactEmail.trim(),
         contactPhone: contactPhone.trim(),
@@ -85,36 +97,60 @@ export function SettingsPage() {
       toast('School info updated', 'success');
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Failed to save', 'error');
+    } finally {
+      setSavingInfo(false);
     }
   };
 
-  const handleSaveLevels = async () => {
-    try {
-      const needsCustom = ['namedLevels', 'colouredLevels', 'custom'].includes(levelSchema);
-      const levels = needsCustom
-        ? customLevels.split(',').map((l) => l.trim()).filter(Boolean)
-        : undefined;
+  const needsCustomLevels = ['namedLevels', 'colouredLevels', 'custom'].includes(levelSchema);
+  const parsedCustomLevels = customLevels.split(',').map((l) => l.trim()).filter(Boolean);
 
+  const handleSaveLevels = async () => {
+    // Validate custom levels when a custom schema is selected
+    if (needsCustomLevels && parsedCustomLevels.length === 0) {
+      toast('Please enter at least one custom level', 'error');
+      return;
+    }
+
+    // Check if schema changed from what's saved — warn about existing student data
+    if (school && levelSchema !== school.levelSchema) {
+      setShowSchemaConfirm(true);
+      return;
+    }
+
+    await doSaveLevels();
+  };
+
+  const doSaveLevels = async () => {
+    setSavingLevels(true);
+    setShowSchemaConfirm(false);
+    try {
       await updateSchool.mutateAsync({
         levelSchema,
-        customLevels: levels,
+        customLevels: needsCustomLevels ? parsedCustomLevels : undefined,
       });
       toast('Reading level schema updated', 'success');
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Failed to save', 'error');
+    } finally {
+      setSavingLevels(false);
     }
   };
 
   const handleSaveTermDates = async () => {
+    setSavingTerms(true);
     try {
       await updateSchool.mutateAsync({ termDates });
       toast('Term dates updated', 'success');
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Failed to save', 'error');
+    } finally {
+      setSavingTerms(false);
     }
   };
 
   const handleSaveQuietHours = async () => {
+    setSavingQuiet(true);
     try {
       await updateSchool.mutateAsync({
         quietHours: { start: quietStart, end: quietEnd },
@@ -122,6 +158,8 @@ export function SettingsPage() {
       toast('Quiet hours updated', 'success');
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Failed to save', 'error');
+    } finally {
+      setSavingQuiet(false);
     }
   };
 
@@ -129,10 +167,7 @@ export function SettingsPage() {
     setTermDates((prev) => ({ ...prev, [key]: value }));
   };
 
-  const previewLevels = getReadingLevels(
-    levelSchema,
-    customLevels.split(',').map((l) => l.trim()).filter(Boolean)
-  );
+  const previewLevels = getReadingLevels(levelSchema, parsedCustomLevels);
 
   if (isLoading) {
     return (
@@ -161,6 +196,13 @@ export function SettingsPage() {
           <h2 className="text-lg font-bold text-charcoal mb-4">School Information</h2>
           <div className="space-y-4">
             <Input label="School Name" value={name} onChange={(e) => setName(e.target.value)} disabled={!isAdmin} />
+            <Input
+              label="Display Name"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              disabled={!isAdmin}
+              placeholder="Optional — shown in sidebar and headers"
+            />
             <Input label="Address" value={address} onChange={(e) => setAddress(e.target.value)} disabled={!isAdmin} />
             <div className="grid grid-cols-2 gap-4">
               <Input label="Contact Email" type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} disabled={!isAdmin} />
@@ -175,7 +217,7 @@ export function SettingsPage() {
             />
             {isAdmin && (
               <div className="flex justify-end">
-                <Button onClick={handleSaveInfo} loading={updateSchool.isPending} disabled={!name.trim()}>
+                <Button onClick={handleSaveInfo} loading={savingInfo} disabled={!name.trim()}>
                   Save Info
                 </Button>
               </div>
@@ -195,7 +237,7 @@ export function SettingsPage() {
               disabled={!isAdmin}
             />
 
-            {['namedLevels', 'colouredLevels', 'custom'].includes(levelSchema) && (
+            {needsCustomLevels && (
               <Input
                 label="Custom Levels (comma-separated)"
                 value={customLevels}
@@ -221,13 +263,25 @@ export function SettingsPage() {
 
             {isAdmin && (
               <div className="flex justify-end">
-                <Button onClick={handleSaveLevels} loading={updateSchool.isPending}>
+                <Button onClick={handleSaveLevels} loading={savingLevels}>
                   Save Schema
                 </Button>
               </div>
             )}
           </div>
         </Card>
+
+        {/* Schema Change Confirmation Dialog */}
+        <ConfirmDialog
+          open={showSchemaConfirm}
+          onClose={() => setShowSchemaConfirm(false)}
+          onConfirm={doSaveLevels}
+          title="Change Reading Level Schema?"
+          description="Changing the reading level schema may make existing student levels invalid. Students currently assigned levels under the old schema will keep their values, but they may not match the new level options. Are you sure you want to continue?"
+          confirmLabel="Change Schema"
+          variant="warning"
+          loading={savingLevels}
+        />
 
         {/* Term Dates */}
         <Card>
@@ -253,7 +307,7 @@ export function SettingsPage() {
             ))}
             {isAdmin && (
               <div className="flex justify-end">
-                <Button onClick={handleSaveTermDates} loading={updateSchool.isPending}>
+                <Button onClick={handleSaveTermDates} loading={savingTerms}>
                   Save Term Dates
                 </Button>
               </div>
@@ -285,7 +339,7 @@ export function SettingsPage() {
           </div>
           {isAdmin && (
             <div className="flex justify-end mt-4">
-              <Button onClick={handleSaveQuietHours} loading={updateSchool.isPending}>
+              <Button onClick={handleSaveQuietHours} loading={savingQuiet}>
                 Save Quiet Hours
               </Button>
             </div>

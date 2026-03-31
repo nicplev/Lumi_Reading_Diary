@@ -3,12 +3,13 @@ import type { School, ReadingLevelSchema } from '@/lib/types';
 
 export async function updateSchool(
   schoolId: string,
-  data: Partial<Pick<School, 'name' | 'logoUrl' | 'primaryColor' | 'secondaryColor' | 'levelSchema' | 'customLevels' | 'levelColors' | 'timezone' | 'address' | 'contactEmail' | 'contactPhone' | 'quietHours'>> & {
+  data: Partial<Pick<School, 'name' | 'displayName' | 'logoUrl' | 'primaryColor' | 'secondaryColor' | 'levelSchema' | 'customLevels' | 'levelColors' | 'timezone' | 'address' | 'contactEmail' | 'contactPhone' | 'quietHours'>> & {
     termDates?: Record<string, string>;
   }
 ): Promise<void> {
   const update: Record<string, unknown> = {};
   if (data.name !== undefined) update.name = data.name;
+  if (data.displayName !== undefined) update.displayName = data.displayName;
   if (data.logoUrl !== undefined) update.logoUrl = data.logoUrl;
   if (data.primaryColor !== undefined) update.primaryColor = data.primaryColor;
   if (data.secondaryColor !== undefined) update.secondaryColor = data.secondaryColor;
