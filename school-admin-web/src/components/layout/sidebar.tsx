@@ -24,6 +24,16 @@ const navItems: NavItem[] = [
   { label: 'Settings', href: '/settings', icon: <Icon name="settings" size={18} />, adminOnly: true },
 ];
 
+function getInitials(fullName?: string, email?: string): string {
+  if (fullName) {
+    return fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  }
+  if (email) {
+    return email[0].toUpperCase();
+  }
+  return '??';
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
@@ -87,10 +97,10 @@ export function Sidebar() {
           className="flex items-center gap-3 px-3 py-2 rounded-[var(--radius-md)] hover:bg-background transition-colors"
         >
           <div className="w-8 h-8 rounded-full bg-brand-primary/10 flex items-center justify-center text-xs font-bold text-brand-primary">
-            {user?.fullName?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '??'}
+            {getInitials(user?.fullName, user?.email)}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-charcoal truncate">{user?.fullName || 'Loading...'}</p>
+            <p className="text-sm font-semibold text-charcoal truncate">{user?.fullName || user?.email || 'Loading...'}</p>
             <p className="text-[11px] text-text-secondary capitalize">{user?.role === 'schoolAdmin' ? 'Admin' : 'Teacher'}</p>
           </div>
         </Link>

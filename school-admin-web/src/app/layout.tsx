@@ -16,14 +16,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={nunito.variable}>
+    <html lang="en" className={nunito.variable} suppressHydrationWarning>
       <head>
         <link
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
         />
       </head>
-      <body className="font-[family-name:var(--font-family-nunito)] antialiased">
+      <body className="font-[family-name:var(--font-family-nunito)] antialiased" suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>
     </html>
