@@ -1,9 +1,35 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { jwtVerify } from 'jose';
 
-const publicPaths = ['/login', '/api/auth/session', '/api/auth/logout'];
+const publicPaths = ['/api/auth/session', '/api/auth/logout'];
 
-export function middleware(request: NextRequest) {
+function getSecret() {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) throw new Error('SESSION_SECRET environment variable is required');
+  return new TextEncoder().encode(secret);
+}
+
+async function getSessionData(sessionValue: string): Promise<Record<string, unknown> | null> {
+  // Try JWT first
+  try {
+    const { payload } = await jwtVerify(sessionValue, getSecret());
+    return payload as Record<string, unknown>;
+  } catch {
+    // Backward compat: try plain JSON (for existing sessions during rollout)
+    try {
+      const data = JSON.parse(sessionValue);
+      if (data.uid && data.schoolId && data.role) {
+        return data;
+      }
+    } catch {
+      // Not valid JSON either
+    }
+    return null;
+  }
+}
+
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Allow public paths
@@ -16,6 +42,18 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // If on /login, redirect authenticated users to /dashboard
+  if (pathname === '/login') {
+    const session = request.cookies.get('lumi_session');
+    if (session?.value) {
+      const data = await getSessionData(session.value);
+      if (data) {
+        return NextResponse.redirect(new URL('/dashboard', request.url));
+      }
+    }
+    return NextResponse.next();
+  }
+
   // Check for session cookie
   const session = request.cookies.get('lumi_session');
   if (!session?.value) {
@@ -24,21 +62,17 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Verify session is valid JSON with required fields
-  try {
-    const data = JSON.parse(session.value);
-    if (!data.uid || !data.schoolId || !data.role) {
-      throw new Error('Invalid session');
-    }
-
-    // Admin-only routes
-    const adminOnlyPaths = ['/users', '/parent-links', '/analytics', '/settings'];
-    if (adminOnlyPaths.some((path) => pathname.startsWith(path)) && data.role !== 'schoolAdmin') {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
-    }
-  } catch {
+  // Verify session
+  const data = await getSessionData(session.value);
+  if (!data) {
     const loginUrl = new URL('/login', request.url);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // Admin-only routes
+  const adminOnlyPaths = ['/users', '/parent-links', '/analytics', '/settings'];
+  if (adminOnlyPaths.some((path) => pathname.startsWith(path)) && data.role !== 'schoolAdmin') {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
   return NextResponse.next();
