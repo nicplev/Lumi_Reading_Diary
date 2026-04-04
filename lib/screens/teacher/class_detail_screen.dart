@@ -304,7 +304,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
           // Class info header
           Container(
             color: AppColors.white,
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(TeacherDimensions.paddingL),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -329,7 +329,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                     if (widget.classModel.room != null)
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
+                          horizontal: TeacherDimensions.paddingM,
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
@@ -354,7 +354,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
           Container(
             color: AppColors.white,
             margin: const EdgeInsets.only(top: 1),
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(TeacherDimensions.paddingL),
             child: Row(
               children: [
                 Expanded(
@@ -386,7 +386,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                     },
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: TeacherDimensions.paddingM),
                 DropdownButton<String>(
                   value: _sortBy,
                   style: TeacherTypography.bodyMedium
@@ -426,7 +426,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
           // Student list
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(TeacherDimensions.paddingL),
               itemCount: _students.length,
               itemBuilder: (context, index) {
                 final student = _students[index];
@@ -470,7 +470,7 @@ class _StudentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: TeacherDimensions.paddingM),
       child: GestureDetector(
         onTap: () {
           context.push(
@@ -483,10 +483,11 @@ class _StudentCard extends StatelessWidget {
           );
         },
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(TeacherDimensions.paddingL),
           decoration: BoxDecoration(
             color: AppColors.white,
             borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+            border: Border.all(color: AppColors.teacherBorder, width: 1),
             boxShadow: TeacherDimensions.cardShadow,
           ),
           child: Column(
@@ -503,7 +504,7 @@ class _StudentCard extends StatelessWidget {
                           .copyWith(color: AppColors.teacherPrimary),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: TeacherDimensions.paddingM),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -519,7 +520,7 @@ class _StudentCard extends StatelessWidget {
                             if (levelsEnabled) ...[
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
+                                  horizontal: TeacherDimensions.paddingS,
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
@@ -534,12 +535,12 @@ class _StudentCard extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: TeacherDimensions.paddingS),
                             ],
                             if ((student.stats?.currentStreak ?? 0) > 0)
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
+                                  horizontal: TeacherDimensions.paddingS,
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
@@ -576,7 +577,7 @@ class _StudentCard extends StatelessWidget {
                 ],
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: TeacherDimensions.paddingM),
               // Period stats
               StreamBuilder<QuerySnapshot>(
                 stream: FirebaseService.instance.firestore

@@ -34,6 +34,18 @@ export interface School {
   subscriptionExpiry?: Date;
 }
 
+export interface CommentPresetCategory {
+  id: string;
+  name: string;
+  chips: string[];
+}
+
+export interface ParentCommentSettings {
+  enabled: boolean;
+  freeTextEnabled: boolean;
+  customPresets: CommentPresetCategory[];
+}
+
 export function getReadingLevels(schema: ReadingLevelSchema, customLevels?: string[]): string[] {
   switch (schema) {
     case 'none':

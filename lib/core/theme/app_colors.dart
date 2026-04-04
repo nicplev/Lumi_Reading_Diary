@@ -116,29 +116,29 @@ class AppColors {
   // TEACHER/ADMIN THEME COLORS (Soft Blue)
   // ============================================
 
-  /// Teacher/Admin primary - Azure blue
+  /// Teacher/Admin primary - Soft blue
   /// Usage: Staff CTAs, active navigation, emphasis states
-  static const Color teacherPrimary = Color(0xFF4F7CF7);
+  static const Color teacherPrimary = Color(0xFF64B5F6);
 
-  /// Teacher/Admin accent - Sky blue
-  /// Usage: Gradients, supporting accents, highlighted data
-  static const Color teacherAccent = Color(0xFF8CB9FF);
+  /// Teacher/Admin accent - Light sky blue
+  /// Usage: Supporting accents, highlighted data
+  static const Color teacherAccent = Color(0xFF90CAF9);
 
   /// Teacher/Admin primary light - Pale blue tint
   /// Usage: Pills, chips, icon backgrounds, selected surfaces
-  static const Color teacherPrimaryLight = Color(0xFFDCE8FF);
+  static const Color teacherPrimaryLight = Color(0xFFE3F2FD);
 
   /// Teacher/Admin background - Cool off-white
   /// Usage: Staff page backgrounds
-  static const Color teacherBackground = Color(0xFFF4F7FC);
+  static const Color teacherBackground = Color(0xFFF5F8FC);
 
   /// Teacher/Admin surface tint - Soft blue wash
   /// Usage: Secondary cards and hero embellishments
-  static const Color teacherSurfaceTint = Color(0xFFEAF1FF);
+  static const Color teacherSurfaceTint = Color(0xFFE8F1FB);
 
   /// Teacher/Admin border - Muted blue-gray border
   /// Usage: Card outlines, dividers, inactive chips
-  static const Color teacherBorder = Color(0xFFD7E3F7);
+  static const Color teacherBorder = Color(0xFFD4E4F4);
 
   // Book Level/Tier Colors (for reading allocation levels)
   static const Color levelCVC = Color(0xFFEF9A9A);

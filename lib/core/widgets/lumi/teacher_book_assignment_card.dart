@@ -177,11 +177,9 @@ class TeacherBookAssignmentCard extends StatelessWidget {
         width: 50,
         height: 70,
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: coverGradient,
-          ),
+          color: coverGradient.isNotEmpty
+              ? coverGradient.first
+              : AppColors.teacherPrimaryLight,
         ),
         child: hasCover
             ? PersistentCachedImage(

@@ -13,6 +13,8 @@ import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/allocation_model.dart';
 import '../../data/models/reading_log_model.dart';
+import '../../data/models/school_model.dart';
+import '../../data/models/parent_comment_settings.dart';
 import '../../services/firebase_service.dart';
 import '../../services/isbn_assignment_service.dart';
 
@@ -39,7 +41,12 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
   final TextEditingController _notesController = TextEditingController();
 
   int _currentStep = 0;
-  static const _totalSteps = 4;
+
+  // Parent comment settings (loaded from school doc)
+  ParentCommentSettings _commentSettings = ParentCommentSettings.defaults();
+
+  bool get _commentsEnabled => _commentSettings.enabled;
+  int get _totalSteps => _commentsEnabled ? 4 : 3;
 
   // Step 1: Book selection
   final List<String> _assignedBookTitles = [];
@@ -50,10 +57,10 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
   // Step 2: Child feeling
   ReadingFeeling? _selectedFeeling;
 
-  // Step 3: Parent comment
+  // Step 3: Parent comment (skipped when comments disabled)
   List<String> _selectedComments = [];
 
-  // Step 4: Confirmation
+  // Step 4 (or 3): Confirmation
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -73,6 +80,25 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
               .add(IsbnAssignmentService.sanitizeDisplayTitle(title));
         }
       }
+    }
+
+    _loadCommentSettings();
+  }
+
+  Future<void> _loadCommentSettings() async {
+    try {
+      final doc = await _firebaseService.firestore
+          .collection('schools')
+          .doc(widget.parent.schoolId)
+          .get();
+      if (doc.exists && mounted) {
+        final school = SchoolModel.fromFirestore(doc);
+        setState(() {
+          _commentSettings = school.parentCommentSettings;
+        });
+      }
+    } catch (_) {
+      // Defaults are already set; safe to proceed with them.
     }
   }
 
@@ -295,7 +321,7 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
                 children: [
                   _buildStep1BookSelection(),
                   _buildStep2ChildAssessment(),
-                  _buildStep3ParentComment(),
+                  if (_commentsEnabled) _buildStep3ParentComment(),
                   _buildStep4Confirmation(),
                 ],
               ),
@@ -587,6 +613,7 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
   // ─── Step 3: Parent Comment ──────────────────────────────
 
   Widget _buildStep3ParentComment() {
+    final customPresets = _commentSettings.effectivePresets;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -597,18 +624,21 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
             onCommentsChanged: (comments) {
               setState(() => _selectedComments = comments);
             },
+            categories: customPresets.isNotEmpty ? customPresets : null,
           ),
-          const SizedBox(height: 24),
-          Text('Additional notes', style: LumiTextStyles.label()),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _notesController,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              hintText: 'Anything else to add? (optional)',
-              border: OutlineInputBorder(),
+          if (_commentSettings.freeTextEnabled) ...[
+            const SizedBox(height: 24),
+            Text('Additional notes', style: LumiTextStyles.label()),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _notesController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: 'Anything else to add? (optional)',
+                border: OutlineInputBorder(),
+              ),
             ),
-          ),
+          ],
         ],
       ),
     ).animate().fadeIn();
@@ -775,11 +805,11 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
             Expanded(
               child: LumiPrimaryButton(
                 onPressed: _nextStep,
-                text: _currentStep == 0
-                    ? 'Next'
+                text: _currentStep == _totalSteps - 2
+                    ? 'Review'
                     : _currentStep == 1
                         ? (_selectedFeeling != null ? 'Next' : 'Skip')
-                        : 'Review',
+                        : 'Next',
                 isFullWidth: true,
               ),
             ),

@@ -47,6 +47,15 @@ const updateSchema = z.object({
   contactPhone: z.string().optional(),
   quietHours: z.record(z.string()).optional(),
   termDates: z.record(z.string()).optional(),
+  parentCommentSettings: z.object({
+    enabled: z.boolean(),
+    freeTextEnabled: z.boolean(),
+    customPresets: z.array(z.object({
+      id: z.string().min(1),
+      name: z.string().min(1).max(50),
+      chips: z.array(z.string().min(1).max(100)).max(20),
+    })).max(10),
+  }).optional(),
 });
 
 export async function PATCH(request: NextRequest) {

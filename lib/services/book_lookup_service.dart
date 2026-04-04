@@ -6,26 +6,23 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../data/models/book_model.dart';
-import 'llll_book_database.dart';
+import 'teacher_device_book_cache_service.dart';
 
 /// Resolves ISBN codes to full book metadata using a fallback chain:
-/// Local LLLL database → Firestore cache → Google Books API → Open Library API → null
+/// Community Books (global) → Firestore cache → Google Books API → Open Library API → null
 class BookLookupService {
   BookLookupService({
     FirebaseFirestore? firestore,
     http.Client? httpClient,
     String? googleBooksApiKey,
-    LlllBookDatabase? llllDatabase,
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
         _httpClient = httpClient ?? http.Client(),
         _googleBooksApiKey = googleBooksApiKey ??
-            const String.fromEnvironment('GOOGLE_BOOKS_API_KEY'),
-        _llllDatabase = llllDatabase ?? LlllBookDatabase();
+            const String.fromEnvironment('GOOGLE_BOOKS_API_KEY');
 
   final FirebaseFirestore _firestore;
   final http.Client _httpClient;
   final String _googleBooksApiKey;
-  final LlllBookDatabase _llllDatabase;
 
   static const _httpTimeout = Duration(seconds: 5);
   bool _firestoreCacheReadEnabled = true;
@@ -33,32 +30,69 @@ class BookLookupService {
   bool _didLogReadPermissionDenial = false;
   bool _didLogWritePermissionDenial = false;
 
-  /// Access the local LLLL book database for direct queries.
-  LlllBookDatabase get llllDatabase => _llllDatabase;
-
-  /// Ensure the local LLLL database is loaded. Call at app startup.
-  Future<void> loadLocalDatabase() => _llllDatabase.load();
-
   /// Look up a book by ISBN. Returns a [BookModel] if found, null otherwise.
-  /// Checks local LLLL database first, then Firestore cache, then external APIs.
-  /// Results from APIs are cached to Firestore for future lookups.
+  /// Checks community books first, then Firestore school cache, then external
+  /// APIs. Results from APIs are cached for future lookups.
   Future<BookModel?> lookupByIsbn({
     required String isbn,
     required String schoolId,
     required String actorId,
     bool useFirestoreCache = true,
     bool persistToFirestoreCache = true,
+    bool useDeviceScanCache = false,
+    bool persistToDeviceScanCache = false,
   }) async {
     final normalizedIsbn = _normalizeIsbnForLookup(isbn);
     if (normalizedIsbn.isEmpty) return null;
     final scopedSchoolId = schoolId.trim();
 
-    // 0. Local LLLL database (instant, no network)
-    if (_llllDatabase.isLoaded) {
-      final llllResult = _llllDatabase.lookupByIsbn(normalizedIsbn);
-      if (llllResult != null) {
-        return _llllDatabase.toBookModel(llllResult);
+    // -1. Teacher device cache (instant, no network)
+    if (useDeviceScanCache) {
+      final deviceCached =
+          TeacherDeviceBookCacheService.instance.lookupByIsbn(
+        teacherId: actorId,
+        schoolId: scopedSchoolId,
+        isbn: normalizedIsbn,
+      );
+      if (deviceCached != null) return deviceCached;
+    }
+
+    // 0. Community book database (global, single-document lookup)
+    try {
+      final communityDoc = await _firestore
+          .collection('community_books')
+          .doc(normalizedIsbn)
+          .get();
+      if (communityDoc.exists) {
+        final data = communityDoc.data();
+        if (data != null &&
+            data['title'] != null &&
+            (data['title'] as String).isNotEmpty) {
+          final result = BookModel.fromFirestore(communityDoc);
+          // Write to school library so teachers can browse/search this book
+          if (scopedSchoolId.isNotEmpty &&
+              persistToFirestoreCache &&
+              _firestoreCacheWriteEnabled) {
+            await _cacheBookInFirestore(
+              isbn: normalizedIsbn,
+              book: result,
+              source: 'community_books',
+              schoolId: scopedSchoolId,
+              actorId: actorId,
+            );
+          }
+          if (persistToDeviceScanCache) {
+            try {
+              await TeacherDeviceBookCacheService.instance.cacheBook(
+                teacherId: actorId, schoolId: scopedSchoolId, book: result,
+              );
+            } catch (_) {}
+          }
+          return result;
+        }
       }
+    } catch (e) {
+      debugPrint('BookLookupService: Community books lookup failed: $e');
     }
 
     // 1. Firestore cache
@@ -72,6 +106,13 @@ class BookLookupService {
       );
     }
     if (cached != null && cached.metadata?['placeholder'] != true) {
+      if (persistToDeviceScanCache) {
+        try {
+          await TeacherDeviceBookCacheService.instance.cacheBook(
+            teacherId: actorId, schoolId: scopedSchoolId, book: cached,
+          );
+        } catch (_) {}
+      }
       return cached;
     }
 
@@ -109,6 +150,13 @@ class BookLookupService {
           actorId: actorId,
         );
       }
+      if (persistToDeviceScanCache) {
+        try {
+          await TeacherDeviceBookCacheService.instance.cacheBook(
+            teacherId: actorId, schoolId: scopedSchoolId, book: resolvedResult,
+          );
+        } catch (_) {}
+      }
       return resolvedResult;
     }
 
@@ -125,6 +173,13 @@ class BookLookupService {
           schoolId: scopedSchoolId,
           actorId: actorId,
         );
+      }
+      if (persistToDeviceScanCache) {
+        try {
+          await TeacherDeviceBookCacheService.instance.cacheBook(
+            teacherId: actorId, schoolId: scopedSchoolId, book: openLibResult,
+          );
+        } catch (_) {}
       }
       return openLibResult;
     }
@@ -146,14 +201,6 @@ class BookLookupService {
     final normalized = normalizeTitle(title);
     if (normalized.isEmpty) return null;
     final scopedSchoolId = schoolId.trim();
-
-    // 0. Local LLLL database title search
-    if (_llllDatabase.isLoaded) {
-      final llllResults = _llllDatabase.searchByTitle(title, limit: 1);
-      if (llllResults.isNotEmpty) {
-        return _llllDatabase.toBookModel(llllResults.first);
-      }
-    }
 
     // 1. Firestore cache by normalized title
     BookModel? cached;
@@ -270,23 +317,6 @@ class BookLookupService {
       final data = doc.data();
       final isbn = data['isbnNormalized'] as String? ?? data['isbn'] as String?;
       if (isbn == null || isbn.isEmpty) continue;
-
-      // Try local LLLL database first
-      if (_llllDatabase.isLoaded) {
-        final llllResult = _llllDatabase.lookupByIsbn(isbn);
-        if (llllResult != null) {
-          final book = _llllDatabase.toBookModel(llllResult);
-          await _cacheBookInFirestore(
-            isbn: isbn,
-            book: book,
-            source: 'llll_local_db',
-            schoolId: scopedSchoolId,
-            actorId: 'system',
-          );
-          resolved++;
-          continue;
-        }
-      }
 
       final book = await _fetchFromGoogleBooks(isbn) ??
           await _fetchFromOpenLibrary(isbn);
@@ -514,6 +544,55 @@ class BookLookupService {
       );
     } catch (e) {
       _handleFirestoreWriteFailure(e, operation: 'Cache write');
+    }
+  }
+
+  /// Public API to materialize a book into a school's library collection.
+  /// Used after inline community book creation to make the book immediately
+  /// browsable/searchable in the teacher library without a second lookup pass.
+  Future<void> materializeToSchoolLibrary({
+    required String isbn,
+    required BookModel book,
+    required String source,
+    required String schoolId,
+    required String actorId,
+  }) async {
+    // Bypass the _firestoreCacheWriteEnabled flag — this is an explicit write
+    try {
+      final ref = _schoolBooks(schoolId).doc('isbn_$isbn');
+      final now = DateTime.now();
+
+      await ref.set(
+        {
+          'title': book.title,
+          'titleNormalized': normalizeTitle(book.title),
+          'author': book.author,
+          'isbn': isbn,
+          'isbnNormalized': isbn,
+          'coverImageUrl': book.coverImageUrl,
+          'description': book.description,
+          'genres': book.genres,
+          'pageCount': book.pageCount,
+          'publisher': book.publisher,
+          'publishedDate': book.publishedDate != null
+              ? Timestamp.fromDate(book.publishedDate!)
+              : null,
+          'tags': <String>[],
+          'schoolId': schoolId,
+          'addedBy': actorId,
+          'createdAt': Timestamp.fromDate(now),
+          if (actorId.isNotEmpty && actorId != 'system')
+            'scannedByTeacherIds': FieldValue.arrayUnion([actorId]),
+          'metadata': {
+            'source': source,
+            'placeholder': false,
+            'resolvedAt': Timestamp.fromDate(now),
+          },
+        },
+        SetOptions(merge: true),
+      );
+    } catch (e) {
+      debugPrint('BookLookupService: materializeToSchoolLibrary failed: $e');
     }
   }
 

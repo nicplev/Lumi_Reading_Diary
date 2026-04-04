@@ -5,6 +5,7 @@ import '../../theme/app_colors.dart';
 enum AlertBannerType {
   warning,
   success,
+  info,
 }
 
 /// Lumi Design System - Teacher Alert Banner
@@ -29,6 +30,8 @@ class TeacherAlertBanner extends StatelessWidget {
         return AppColors.warmOrange;
       case AlertBannerType.success:
         return AppColors.success;
+      case AlertBannerType.info:
+        return AppColors.teacherPrimary;
     }
   }
 
@@ -38,6 +41,8 @@ class TeacherAlertBanner extends StatelessWidget {
         return const Color(0xFFFFF7EC);
       case AlertBannerType.success:
         return const Color(0xFFE9F7EF);
+      case AlertBannerType.info:
+        return AppColors.teacherPrimaryLight;
     }
   }
 
@@ -47,6 +52,8 @@ class TeacherAlertBanner extends StatelessWidget {
         return Icons.warning_amber_rounded;
       case AlertBannerType.success:
         return Icons.check_circle_rounded;
+      case AlertBannerType.info:
+        return Icons.info_outline_rounded;
     }
   }
 
@@ -55,7 +62,7 @@ class TeacherAlertBanner extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: _backgroundColor,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: _accentColor.withValues(alpha: 0.18),
         ),
@@ -68,31 +75,31 @@ class TeacherAlertBanner extends StatelessWidget {
           ),
         ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 28,
+            height: 28,
             decoration: BoxDecoration(
               color: _accentColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Center(
               child: emoji != null
                   ? Text(
                       emoji!,
-                      style: const TextStyle(fontSize: 18),
+                      style: const TextStyle(fontSize: 14),
                     )
                   : Icon(
                       _icon,
-                      size: 22,
+                      size: 16,
                       color: _accentColor,
                     ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,

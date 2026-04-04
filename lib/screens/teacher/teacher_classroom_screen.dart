@@ -286,72 +286,63 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     );
   }
 
-  /// Per spec: gradient card with icon, title, description, white pill button
+  /// Compact scanner prompt card — horizontal layout
   Widget _buildScannerCard(ClassModel classModel) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: AppColors.teacherGradient,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
-      ),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          // Circular icon
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.qr_code_scanner,
-                size: 28, color: Colors.white),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Scan ISBN to Assign Books',
-            style: TeacherTypography.h3.copyWith(color: Colors.white),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Quickly assign books to students by scanning the ISBN barcode',
-            style: TeacherTypography.bodyMedium.copyWith(
-              color: Colors.white.withValues(alpha: 0.8),
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          // White pill button
-          Material(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
-            child: InkWell(
-              onTap: () => _showStudentScannerPicker(classModel),
-              borderRadius:
-                  BorderRadius.circular(TeacherDimensions.radiusRound),
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                child: Text(
-                  'Open Scanner',
-                  style: TeacherTypography.bodyMedium.copyWith(
-                    color: AppColors.teacherPrimary,
-                    fontWeight: FontWeight.w700,
-                  ),
+    return Material(
+      color: AppColors.teacherPrimary,
+      borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+      child: InkWell(
+        onTap: () => _showStudentScannerPicker(classModel),
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.white.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(
+                      TeacherDimensions.radiusM),
+                ),
+                child: const Icon(
+                  Icons.qr_code_scanner_rounded,
+                  size: 22,
+                  color: AppColors.white,
                 ),
               ),
-            ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Scan ISBN to Assign Books',
+                      style: TeacherTypography.bodyMedium.copyWith(
+                        color: AppColors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Select a student, then scan barcodes',
+                      style: TeacherTypography.bodySmall.copyWith(
+                        color: AppColors.white.withValues(alpha: 0.75),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 16,
+                color: AppColors.white.withValues(alpha: 0.6),
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            'Select a student, then scan multiple books in one view.',
-            style: TeacherTypography.bodySmall.copyWith(
-              color: Colors.white.withValues(alpha: 0.85),
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -615,11 +606,30 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     );
   }
 
+  /// Returns the current streak only if the student read today or yesterday.
+  /// If the last reading was 2+ days ago the streak is broken — return 0.
+  int _activeStreak(StudentStats? stats) {
+    if (stats == null) return 0;
+    final stored = stats.currentStreak;
+    if (stored <= 0) return 0;
+    final lastRead = stats.lastReadingDate;
+    if (lastRead == null) return 0;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final lastDay = DateTime(lastRead.year, lastRead.month, lastRead.day);
+    if (lastDay.isAtSameMomentAs(today) ||
+        lastDay.isAtSameMomentAs(yesterday)) {
+      return stored;
+    }
+    return 0;
+  }
+
   /// Per spec: 40px avatar + name + books assigned + streak indicator
   Widget _buildStudentCard(StudentModel student) {
     final fullName = '${student.firstName} ${student.lastName}';
     final avatarColor = _avatarColorForName(fullName);
-    final streak = student.stats?.currentStreak ?? 0;
+    final streak = _activeStreak(student.stats);
 
     return Material(
       color: AppColors.white,

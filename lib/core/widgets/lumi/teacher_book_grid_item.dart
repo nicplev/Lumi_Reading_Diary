@@ -36,11 +36,9 @@ class TeacherBookGridItem extends StatelessWidget {
             Container(
               height: 80,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: coverGradient,
-                ),
+                color: coverGradient.isNotEmpty
+                    ? coverGradient.first
+                    : AppColors.teacherPrimaryLight,
               ),
               child: const Center(
                 child: Icon(

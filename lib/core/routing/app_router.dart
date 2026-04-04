@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -37,6 +37,7 @@ import '../../screens/teacher/class_report_screen.dart';
 import '../../screens/teacher/teacher_profile_screen.dart';
 import '../../screens/teacher/student_detail_screen.dart';
 import '../../screens/teacher/isbn_scanner_screen.dart';
+import '../../screens/teacher/cover_scanner_screen.dart';
 import '../../screens/teacher/teacher_level_management_screen.dart';
 import '../../screens/admin/admin_home_screen.dart';
 import '../../screens/admin/user_management_screen.dart';
@@ -535,6 +536,19 @@ class AppRouter {
         },
       ),
 
+      GoRoute(
+        path: '/teacher/community-scanner',
+        name: 'teacher-community-scanner',
+        builder: (context, state) {
+          final teacher = AppRouter.resolveUserFromRoute(
+            extra: state.extra,
+            fallback: _ref.read(userProvider).value,
+          );
+          if (teacher == null) return const LoginScreen();
+          return CoverScannerScreen(teacher: teacher);
+        },
+      ),
+
       // ============================================
       // ADMIN ROUTES
       // ============================================
@@ -688,5 +702,13 @@ class AppRouter {
       return '/auth/web-not-available';
     }
     return null;
+  }
+
+  @visibleForTesting
+  static UserModel? resolveUserFromRoute({
+    required Object? extra,
+    required UserModel? fallback,
+  }) {
+    return extra is UserModel ? extra : fallback;
   }
 }

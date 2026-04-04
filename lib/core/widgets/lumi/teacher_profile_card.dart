@@ -44,7 +44,7 @@ class TeacherProfileCard extends StatelessWidget {
             width: TeacherDimensions.avatarL,
             height: TeacherDimensions.avatarL,
             decoration: const BoxDecoration(
-              gradient: AppColors.teacherGradient,
+              color: AppColors.teacherPrimary,
               shape: BoxShape.circle,
             ),
             child: Center(

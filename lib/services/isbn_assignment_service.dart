@@ -139,6 +139,96 @@ class IsbnAssignmentService {
     );
   }
 
+  /// Resolve a single ISBN without creating placeholders.
+  /// Returns [IsbnResolved], [IsbnNotFound], or [IsbnInvalid].
+  Future<IsbnResolutionResult> resolveIsbn({
+    required String rawCode,
+    required String schoolId,
+    required String teacherId,
+  }) async {
+    final isbn = normalizeIsbn(rawCode);
+    if (isbn == null) return IsbnInvalid(rawCode);
+
+    bool isNewToLibrary = false;
+    try {
+      final existingDoc = await _firestore
+          .collection('schools')
+          .doc(schoolId)
+          .collection('books')
+          .doc('isbn_$isbn')
+          .get();
+      isNewToLibrary = !existingDoc.exists ||
+          existingDoc.data()?['metadata']?['placeholder'] == true;
+    } catch (_) {}
+
+    BookModel? resolved;
+    try {
+      resolved = await _bookLookupService.lookupByIsbn(
+        isbn: isbn,
+        schoolId: schoolId,
+        actorId: teacherId,
+        useDeviceScanCache: true,
+        persistToDeviceScanCache: true,
+      );
+    } catch (_) {
+      resolved = null;
+    }
+
+    if (resolved != null && resolved.metadata?['placeholder'] != true) {
+      return IsbnResolved(ScannedIsbnBook(
+        isbn: isbn,
+        title: resolved.title,
+        author: resolved.author,
+        coverImageUrl: resolved.coverImageUrl,
+        bookId: resolved.id,
+        resolvedFromCatalog: true,
+        isNewToLibrary: isNewToLibrary,
+      ));
+    }
+
+    return IsbnNotFound(isbn);
+  }
+
+  /// Assign already-resolved books to a student's weekly allocation.
+  Future<IsbnAssignmentResult> assignResolvedBooks({
+    required String schoolId,
+    required String classId,
+    required String studentId,
+    required String teacherId,
+    required List<ScannedIsbnBook> books,
+    int targetMinutes = 20,
+    String? sessionId,
+    DateTime? targetDate,
+  }) async {
+    final referenceDate = targetDate ?? DateTime.now();
+    final weekStart = startOfWeek(referenceDate);
+    final weekEnd = endOfWeek(referenceDate);
+    final allocationId =
+        buildWeeklyAllocationId(studentId: studentId, weekStart: weekStart);
+
+    final summary = await _upsertWeeklyAllocation(
+      schoolId: schoolId,
+      classId: classId,
+      studentId: studentId,
+      teacherId: teacherId,
+      allocationId: allocationId,
+      weekStart: weekStart,
+      weekEnd: weekEnd,
+      targetMinutes: targetMinutes,
+      books: books,
+      sessionId: sessionId,
+    );
+
+    return IsbnAssignmentResult(
+      allocationId: allocationId,
+      processedBooks: books,
+      newlyAssignedBooks: summary.newlyAssignedBooks,
+      duplicateIsbns: summary.duplicateIsbns,
+      invalidCodes: const [],
+      totalAssignedBooks: summary.totalAssignedBooks,
+    );
+  }
+
   /// Returns the set of student IDs that already have ISBN-scan allocations
   /// for the week containing [referenceDate] in the given class.
   Future<Set<String>> getAssignedStudentIdsForWeek({
@@ -388,6 +478,8 @@ class IsbnAssignmentService {
         isbn: isbn,
         schoolId: schoolId,
         actorId: actorId,
+        useDeviceScanCache: true,
+        persistToDeviceScanCache: true,
       );
     } catch (_) {
       resolved = null;
@@ -601,6 +693,46 @@ class ScannedIsbnBook {
 
   /// True if this book was first scanned into the school library by this operation.
   final bool isNewToLibrary;
+
+  ScannedIsbnBook copyWith({
+    String? isbn,
+    String? title,
+    String? author,
+    String? coverImageUrl,
+    String? bookId,
+    bool? resolvedFromCatalog,
+    bool? isNewToLibrary,
+  }) {
+    return ScannedIsbnBook(
+      isbn: isbn ?? this.isbn,
+      title: title ?? this.title,
+      author: author ?? this.author,
+      coverImageUrl: coverImageUrl ?? this.coverImageUrl,
+      bookId: bookId ?? this.bookId,
+      resolvedFromCatalog: resolvedFromCatalog ?? this.resolvedFromCatalog,
+      isNewToLibrary: isNewToLibrary ?? this.isNewToLibrary,
+    );
+  }
+}
+
+/// Result of resolving a single ISBN without creating placeholders.
+sealed class IsbnResolutionResult {
+  const IsbnResolutionResult();
+}
+
+class IsbnResolved extends IsbnResolutionResult {
+  const IsbnResolved(this.book);
+  final ScannedIsbnBook book;
+}
+
+class IsbnNotFound extends IsbnResolutionResult {
+  const IsbnNotFound(this.isbn);
+  final String isbn;
+}
+
+class IsbnInvalid extends IsbnResolutionResult {
+  const IsbnInvalid(this.rawCode);
+  final String rawCode;
 }
 
 class IsbnAssignmentResult {

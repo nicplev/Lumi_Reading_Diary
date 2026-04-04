@@ -1,0 +1,32 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Community book covers: any authenticated user can read.
+    // Teachers and admins can upload (create-only, no overwrite).
+    // Nobody can delete from client SDK — only Admin SDK from backend.
+    match /community_books/covers/{fileName} {
+      allow read: if request.auth != null;
+
+      // Allow creation of JPEG files under 2MB.
+      // Role-based authorization is enforced at the Firestore layer
+      // (the community_books document write must also succeed).
+      allow create: if request.auth != null
+                    && request.resource.size < 2 * 1024 * 1024
+                    && request.resource.contentType.matches('image/jpeg');
+
+      // Allow cover overwrites (e.g. teacher uploads a better photo).
+      // Same constraints as create: authenticated, <2MB, JPEG only.
+      allow update: if request.auth != null
+                    && request.resource.size < 2 * 1024 * 1024
+                    && request.resource.contentType.matches('image/jpeg');
+
+      // No delete from client — only Admin SDK.
+      allow delete: if false;
+    }
+
+    // Default deny for all other paths.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

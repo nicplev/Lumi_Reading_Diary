@@ -64,12 +64,13 @@ export default function ProfilePage() {
     setDirty(nameChanged || phoneChanged);
   }, [fullName, phone, profile]);
 
-  if (!user) return null;
-
-  const displayName = user.fullName || user.email;
+  const displayName = user?.fullName || user?.email || profile?.fullName || profile?.email || 'User';
   const userClasses = classes?.filter(c =>
     profile?.classIds?.includes(c.id)
   );
+  const roleLabel = (user?.role || profile?.role) === 'schoolAdmin' ? 'School Admin' : 'Teacher';
+  const roleBadgeVariant = (user?.role || profile?.role) === 'schoolAdmin' ? 'info' as const : 'success' as const;
+  const userEmail = user?.email || profile?.email || '';
 
   async function handleSave() {
     setSaving(true);
@@ -103,7 +104,7 @@ export default function ProfilePage() {
       if (!res.ok) {
         throw new Error('Failed to send password reset');
       }
-      toast('Password reset email sent to ' + user!.email, 'success');
+      toast('Password reset email sent to ' + userEmail, 'success');
     } catch {
       toast('Failed to send password reset email', 'error');
     } finally {
@@ -134,9 +135,9 @@ export default function ProfilePage() {
             <h2 className="text-[22px] font-bold text-charcoal">
               {displayName}
             </h2>
-            <p className="text-sm text-text-secondary">{user.email}</p>
-            <Badge variant={user.role === 'schoolAdmin' ? 'info' : 'success'} className="mt-1">
-              {user.role === 'schoolAdmin' ? 'School Admin' : 'Teacher'}
+            <p className="text-sm text-text-secondary">{userEmail}</p>
+            <Badge variant={roleBadgeVariant} className="mt-1">
+              {roleLabel}
             </Badge>
           </div>
         </div>
@@ -196,12 +197,12 @@ export default function ProfilePage() {
         <div className="space-y-3">
           <div className="flex justify-between py-2 border-b border-divider">
             <span className="text-sm text-text-secondary">Email</span>
-            <span className="text-sm font-semibold text-charcoal">{user.email}</span>
+            <span className="text-sm font-semibold text-charcoal">{userEmail}</span>
           </div>
           <div className="flex justify-between py-2 border-b border-divider">
             <span className="text-sm text-text-secondary">Role</span>
-            <Badge variant={user.role === 'schoolAdmin' ? 'info' : 'success'}>
-              {user.role === 'schoolAdmin' ? 'School Admin' : 'Teacher'}
+            <Badge variant={roleBadgeVariant}>
+              {roleLabel}
             </Badge>
           </div>
           <div className="flex justify-between py-2 border-b border-divider">
@@ -226,7 +227,7 @@ export default function ProfilePage() {
       </Card>
 
       {/* Assigned Classes — Teachers only */}
-      {user.role === 'teacher' && userClasses && userClasses.length > 0 && (
+      {(user?.role || profile?.role) === 'teacher' && userClasses && userClasses.length > 0 && (
         <Card>
           <h3 className="text-[17px] font-bold text-charcoal mb-4 flex items-center gap-2">
             <Icon name="school" size={18} />

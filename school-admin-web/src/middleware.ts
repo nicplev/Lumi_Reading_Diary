@@ -66,7 +66,9 @@ export async function middleware(request: NextRequest) {
   const data = await getSessionData(session.value);
   if (!data) {
     const loginUrl = new URL('/login', request.url);
-    return NextResponse.redirect(loginUrl);
+    const response = NextResponse.redirect(loginUrl);
+    response.cookies.delete('lumi_session');
+    return response;
   }
 
   // Admin-only routes

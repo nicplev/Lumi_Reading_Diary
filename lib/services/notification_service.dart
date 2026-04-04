@@ -162,10 +162,16 @@ class NotificationService {
     // Handle background message taps
     FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageTap);
 
-    // Check for message that opened the app
-    final initialMessage = await _messaging!.getInitialMessage();
-    if (initialMessage != null) {
-      _handleMessageTap(initialMessage);
+    // Check for message that opened the app (can hang on iOS 26)
+    try {
+      final initialMessage = await _messaging!
+          .getInitialMessage()
+          .timeout(const Duration(seconds: 3));
+      if (initialMessage != null) {
+        _handleMessageTap(initialMessage);
+      }
+    } catch (e) {
+      debugPrint('getInitialMessage timed out or failed: $e');
     }
 
     // Listen for token refresh and persist to the correct parent document

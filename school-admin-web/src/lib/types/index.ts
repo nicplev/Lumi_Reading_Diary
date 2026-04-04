@@ -1,4 +1,4 @@
-export type { School, ReadingLevelSchema } from './school';
+export type { School, ReadingLevelSchema, CommentPresetCategory, ParentCommentSettings } from './school';
 export { getReadingLevels } from './school';
 export type { SchoolUser, UserRole } from './user';
 export type { Student, StudentStats, ReadingLevelHistory } from './student';

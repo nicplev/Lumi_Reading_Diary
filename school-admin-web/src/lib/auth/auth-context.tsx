@@ -52,7 +52,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const data = await res.json();
             setUser(data);
           } else {
-            setUser(null);
+            // Session cookie is stale/invalid — attempt recovery with fresh Firebase token
+            const idToken = await fbUser.getIdToken(true);
+            const sessionRes = await fetch('/api/auth/session', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ idToken }),
+            });
+            if (sessionRes.ok) {
+              const data = await sessionRes.json();
+              setUser(data);
+            } else {
+              // Recovery failed — full logout
+              await fetch('/api/auth/logout', { method: 'POST' });
+              await signOut(auth);
+              setUser(null);
+            }
           }
         } catch {
           setUser(null);

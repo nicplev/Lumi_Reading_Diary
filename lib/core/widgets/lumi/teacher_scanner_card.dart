@@ -25,7 +25,7 @@ class TeacherScannerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        gradient: AppColors.teacherGradient,
+        color: AppColors.teacherPrimary,
         borderRadius: BorderRadius.circular(20),
       ),
       padding: const EdgeInsets.all(20),

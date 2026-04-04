@@ -276,6 +276,46 @@ service cloud.firestore {
       }
     }
 
+    // ── Community Book Database (global, cross-school) ──────────────
+    // Shared catalog that any teacher/admin can contribute to.
+    // No client-side delete — only Admin SDK from the super-admin backend.
+    match /community_books/{isbn} {
+      // Any authenticated user can read community books.
+      allow get, list: if isSignedIn();
+
+      // Only teachers and school admins can create new entries.
+      // The contributor must declare their schoolId so the role check can verify.
+      allow create: if isSignedIn()
+          && request.resource.data.contributedBySchoolId is string
+          && request.resource.data.contributedBySchoolId.size() > 0
+          && (isTeacher(request.resource.data.contributedBySchoolId)
+              || isSchoolAdmin(request.resource.data.contributedBySchoolId))
+          && request.resource.data.contributedBy == request.auth.uid;
+
+      // Teachers/admins can update (improve metadata, add cover).
+      // The original contributedBy field is immutable.
+      allow update: if isSignedIn()
+          && request.resource.data.contributedBy == resource.data.contributedBy
+          && request.resource.data.contributedBySchoolId is string
+          && (isTeacher(request.resource.data.contributedBySchoolId)
+              || isSchoolAdmin(request.resource.data.contributedBySchoolId));
+
+      // No client-side delete.
+      allow delete: if false;
+
+      // Future: deletion request subcollection.
+      match /deletionRequests/{requestId} {
+        allow create: if isSignedIn()
+            && request.resource.data.requestedBy == request.auth.uid
+            && request.resource.data.schoolId is string
+            && (isTeacher(request.resource.data.schoolId)
+                || isSchoolAdmin(request.resource.data.schoolId));
+
+        // Only readable/manageable via Admin SDK.
+        allow get, list, update, delete: if false;
+      }
+    }
+
     // Legacy top-level books collection (read-only migration fallback).
     match /books/{bookId} {
       allow get, list: if isSignedIn() &&

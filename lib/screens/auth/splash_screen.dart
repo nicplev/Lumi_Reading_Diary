@@ -41,7 +41,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     if (firebaseUser != null) {
       // Reload to get fresh emailVerified status from Firebase server
-      await firebaseUser.reload();
+      try {
+        await firebaseUser.reload().timeout(const Duration(seconds: 5));
+      } catch (e) {
+        debugPrint('Firebase reload timed out or failed: $e');
+        // Continue with cached state rather than hanging
+      }
       final refreshedUser = firebaseService.auth.currentUser;
 
       // Enforce email verification on returning sessions too
@@ -55,7 +60,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       // User is logged in — read user document directly (avoids StreamProvider hang)
       try {
         final userRepository = ref.read(userRepositoryProvider);
-        final user = await userRepository.getUser(firebaseUser.uid);
+        final user = await userRepository
+            .getUser(firebaseUser.uid)
+            .timeout(const Duration(seconds: 10));
 
         if (user != null && mounted) {
           // Set analytics & crash reporting user context

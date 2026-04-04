@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/student_model.dart';
@@ -915,28 +916,13 @@ class _AllocationScreenState extends State<AllocationScreen>
           const SizedBox(height: 24),
 
           // Save Button
-          SizedBox(
-            height: 48,
-            child: ElevatedButton(
-              onPressed: _isLoading ? null : _saveAllocation,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.teacherPrimary,
-                foregroundColor: AppColors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(TeacherDimensions.radiusM),
-                ),
-                elevation: 0,
-              ),
-              child: _isLoading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: AppColors.white))
-                  : Text('Create Allocation',
-                      style: TeacherTypography.buttonText),
-            ),
+          LumiPrimaryButton(
+            onPressed: _isLoading ? null : _saveAllocation,
+            text: 'Create Allocation',
+            isLoading: _isLoading,
+            isFullWidth: true,
+            color: AppColors.teacherPrimary,
+            borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
           ),
 
           const SizedBox(height: 16),
@@ -1108,11 +1094,7 @@ class _AllocationScreenState extends State<AllocationScreen>
   }) {
     return Container(
       padding: const EdgeInsets.all(TeacherDimensions.paddingXL),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
-        boxShadow: TeacherDimensions.cardShadow,
-      ),
+      decoration: TeacherDimensions.cardDecoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1262,11 +1244,7 @@ class _AllocationCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
-          boxShadow: TeacherDimensions.cardShadow,
-        ),
+        decoration: TeacherDimensions.cardDecoration,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1481,7 +1459,7 @@ class _LibraryPickerSheetState extends State<_LibraryPickerSheet> {
         return Container(
           decoration: const BoxDecoration(
             color: AppColors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(TeacherDimensions.radiusXL)),
           ),
           child: Column(
             children: [

@@ -5,9 +5,9 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/theme/teacher_constants.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
-import '../../core/widgets/lumi/teacher_stat_card.dart';
 import '../../core/widgets/lumi/teacher_class_card.dart';
 import '../../core/widgets/lumi/teacher_alert_banner.dart';
 import '../../core/widgets/lumi/lumi_skeleton.dart';
@@ -120,6 +120,13 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return Theme(
+      data: AppTheme.teacherTheme(),
+      child: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
     if (_isLoading) {
       return Scaffold(
         backgroundColor: AppColors.teacherBackground,
@@ -146,7 +153,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
             classes: _classes,
             onClassChanged: (c) => setState(() => _selectedClass = c),
           ),
-          TeacherLibraryScreen(schoolId: widget.user.schoolId ?? ''),
+          TeacherLibraryScreen(teacher: widget.user),
           TeacherSettingsScreen(user: widget.user),
         ],
       ),
@@ -175,30 +182,20 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                _buildSectionIntro(
-                  eyebrow: 'Today',
-                  title: 'Snapshot for ${_selectedClass!.name}',
-                  subtitle:
-                      'A quick view of reading momentum across your class.',
-                ),
                 _DashboardStatsGrid(
                   classModel: _selectedClass!,
                   schoolId: widget.user.schoolId!,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 if (_classes.length > 1) ...[
-                  _buildSectionIntro(
-                    eyebrow: 'Classes',
-                    title: 'Jump between your groups',
-                    subtitle:
-                        'Open a class detail page or switch your dashboard focus.',
-                  ),
+                  Text('Your Classes', style: TeacherTypography.h3),
+                  const SizedBox(height: 12),
                   ..._classes.map((classModel) {
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.only(bottom: 10),
                       child: TeacherClassCard(
                         className: classModel.name,
                         studentCount: classModel.studentIds.length,
@@ -215,19 +212,15 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                       ),
                     );
                   }),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                 ],
-                _buildSectionIntro(
-                  eyebrow: 'This Week',
-                  title: 'Reading activity',
-                  subtitle:
-                      'See how consistently students are logging across the week.',
-                ),
+                Text('Weekly Activity', style: TeacherTypography.h3),
+                const SizedBox(height: 12),
                 _WeeklyEngagementChart(
                   classModel: _selectedClass!,
                   schoolId: widget.user.schoolId!,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 _InactivityAlertBanner(
                   classModel: _selectedClass!,
                   schoolId: widget.user.schoolId!,
@@ -250,32 +243,23 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
           children: [
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    AppColors.teacherPrimary,
-                    AppColors.teacherAccent,
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(28),
+                color: AppColors.teacherPrimary,
+                borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
               ),
               child: const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  LumiSkeleton(width: 120, height: 14),
-                  SizedBox(height: 14),
-                  LumiSkeleton(width: 230, height: 32),
-                  SizedBox(height: 10),
-                  LumiSkeleton(width: 180, height: 16),
-                  SizedBox(height: 24),
+                  LumiSkeleton(width: 200, height: 24),
+                  SizedBox(height: 6),
+                  LumiSkeleton(width: 140, height: 14),
+                  SizedBox(height: 16),
                   Row(
                     children: [
-                      LumiSkeleton(width: 120, height: 38, borderRadius: 20),
-                      SizedBox(width: 10),
-                      LumiSkeleton(width: 96, height: 38, borderRadius: 20),
+                      LumiSkeleton(width: 80, height: 36, borderRadius: 20),
+                      SizedBox(width: 8),
+                      LumiSkeleton(width: 96, height: 36, borderRadius: 20),
                     ],
                   ),
                 ],
@@ -376,100 +360,54 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
         : 'Teacher';
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
       decoration: BoxDecoration(
-        gradient: AppColors.teacherGradient,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: TeacherDimensions.cardShadow,
+        color: AppColors.teacherPrimary,
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
       ),
-      child: Stack(
-        clipBehavior: Clip.none,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Positioned(
-            top: -54,
-            right: -14,
-            child: Container(
-              width: 148,
-              height: 148,
-              decoration: BoxDecoration(
-                color: AppColors.white.withValues(alpha: 0.10),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -60,
-            left: -22,
-            child: Container(
-              width: 134,
-              height: 134,
-              decoration: BoxDecoration(
-                color: AppColors.white.withValues(alpha: 0.08),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-          Column(
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Teacher Dashboard',
-                          style: TeacherTypography.caption.copyWith(
-                            color: AppColors.white.withValues(alpha: 0.78),
-                            letterSpacing: 0.9,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          '$greeting, $firstName',
-                          style: TeacherTypography.h1.copyWith(
-                            color: AppColors.white,
-                            height: 1.05,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          DateFormat('EEEE, MMMM d').format(DateTime.now()),
-                          style: TeacherTypography.bodyLarge.copyWith(
-                            color: AppColors.white.withValues(alpha: 0.84),
-                          ),
-                        ),
-                      ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$greeting, $firstName',
+                      style: TeacherTypography.h2.copyWith(
+                        color: AppColors.white,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  _buildHeroIconButton(
-                    icon: Icons.notifications_outlined,
-                    onTap: () {
-                      context.push('/teacher/notifications',
-                          extra: widget.user);
-                    },
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      DateFormat('EEEE, MMMM d').format(DateTime.now()),
+                      style: TeacherTypography.bodyMedium.copyWith(
+                        color: AppColors.white.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 24),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  _buildClassHeroChip(),
-                  _buildHeroPill(
-                    icon: Icons.people_alt_outlined,
-                    label: '${_selectedClass?.studentIds.length ?? 0} students',
-                  ),
-                  _buildHeroPill(
-                    icon: Icons.grid_view_rounded,
-                    label:
-                        '${_classes.length} class${_classes.length == 1 ? '' : 'es'} active',
-                  ),
-                ],
+              _buildHeroIconButton(
+                icon: Icons.notifications_outlined,
+                onTap: () {
+                  context.push('/teacher/notifications',
+                      extra: widget.user);
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _buildClassHeroChip(),
+              const SizedBox(width: 8),
+              _buildHeroPill(
+                icon: Icons.people_alt_outlined,
+                label: '${_selectedClass?.studentIds.length ?? 0} students',
               ),
             ],
           ),
@@ -568,36 +506,6 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
     );
   }
 
-  Widget _buildSectionIntro({
-    required String eyebrow,
-    required String title,
-    required String subtitle,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            eyebrow.toUpperCase(),
-            style: TeacherTypography.caption.copyWith(
-              color: AppColors.teacherPrimary,
-              letterSpacing: 0.9,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(title, style: TeacherTypography.h3),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: TeacherTypography.bodyMedium.copyWith(
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildNoClassesView() {
     return SafeArea(
@@ -867,70 +775,133 @@ class _DashboardStatsGridState extends State<_DashboardStatsGrid> {
 
             int onStreakCount = 0;
             if (studentsSnapshot.hasData) {
+              final now = DateTime.now();
+              final today = DateTime(now.year, now.month, now.day);
+              final yesterday = today.subtract(const Duration(days: 1));
+
               for (final doc in studentsSnapshot.data!.docs) {
                 final data = doc.data() as Map<String, dynamic>;
                 final stats = data['stats'] as Map<String, dynamic>?;
-                if (stats != null && (stats['currentStreak'] ?? 0) > 0) {
+                if (stats == null || (stats['currentStreak'] ?? 0) <= 0) {
+                  continue;
+                }
+                // Only count if they read today or yesterday
+                final lastReadTs = stats['lastReadingDate'] as Timestamp?;
+                if (lastReadTs == null) continue;
+                final lastDay = DateTime(
+                  lastReadTs.toDate().year,
+                  lastReadTs.toDate().month,
+                  lastReadTs.toDate().day,
+                );
+                if (lastDay.isAtSameMomentAs(today) ||
+                    lastDay.isAtSameMomentAs(yesterday)) {
                   onStreakCount++;
                 }
               }
             }
 
-            return Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: TeacherStatCard(
-                        icon: Icons.people,
-                        iconColor: AppColors.teacherPrimary,
-                        iconBgColor: AppColors.teacherPrimaryLight,
-                        value: '$totalStudents',
-                        label: 'Students',
-                      ),
+            final notReadCount = totalStudents - readCount;
+
+            return Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius:
+                    BorderRadius.circular(TeacherDimensions.radiusL),
+                border: Border.all(color: AppColors.teacherBorder),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Today · ${widget.classModel.name}',
+                    style: TeacherTypography.caption.copyWith(
+                      color: AppColors.textSecondary,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TeacherStatCard(
-                        icon: Icons.check_circle,
-                        iconColor: const Color(0xFF4CAF50),
-                        iconBgColor: const Color(0xFFE8F5E9),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      _CompactStat(
                         value: '$readCount',
-                        label: 'Read Today',
+                        label: 'Read',
+                        color: AppColors.success,
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TeacherStatCard(
-                        icon: Icons.local_fire_department,
-                        iconColor: AppColors.warmOrange,
-                        iconBgColor:
-                            AppColors.warmOrange.withValues(alpha: 0.15),
+                      _statDivider(),
+                      _CompactStat(
+                        value: '$notReadCount',
+                        label: 'Not yet',
+                        color: notReadCount > 0
+                            ? AppColors.warmOrange
+                            : AppColors.textSecondary,
+                      ),
+                      _statDivider(),
+                      _CompactStat(
                         value: '$onStreakCount',
-                        label: 'On Streak',
+                        label: 'On streak',
+                        color: AppColors.teacherPrimary,
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TeacherStatCard(
-                        icon: Icons.menu_book,
-                        iconColor: AppColors.decodableBlue,
-                        iconBgColor: const Color(0xFFE3F2FD),
+                      _statDivider(),
+                      _CompactStat(
                         value: '$totalBooks',
-                        label: 'Books Today',
+                        label: 'Books',
+                        color: AppColors.textSecondary,
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             );
           },
         );
       },
+    );
+  }
+}
+
+Widget _statDivider() {
+  return Container(
+    width: 1,
+    height: 32,
+    margin: const EdgeInsets.symmetric(horizontal: 12),
+    color: AppColors.divider,
+  );
+}
+
+class _CompactStat extends StatelessWidget {
+  final String value;
+  final String label;
+  final Color color;
+
+  const _CompactStat({
+    required this.value,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontFamily: 'Nunito',
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: color,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TeacherTypography.caption,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1042,6 +1013,31 @@ class _WeeklyEngagementChartState extends State<_WeeklyEngagementChart> {
                   ? (totalWeek / (todayIndex + 1)).round()
                   : totalWeek;
 
+              if (totalWeek == 0) {
+                return SizedBox(
+                  height: 100,
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.bar_chart_rounded,
+                          size: 28,
+                          color: AppColors.textSecondary.withValues(alpha: 0.4),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'No reading logs this week yet',
+                          style: TeacherTypography.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
               return Column(
                 children: [
                   Container(
@@ -1061,11 +1057,13 @@ class _WeeklyEngagementChartState extends State<_WeeklyEngagementChart> {
                           color: AppColors.teacherPrimary,
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          '$totalWeek total student reading logs this week',
-                          style: TeacherTypography.bodySmall.copyWith(
-                            color: AppColors.charcoal,
-                            fontWeight: FontWeight.w600,
+                        Expanded(
+                          child: Text(
+                            '$totalWeek reading logs this week',
+                            style: TeacherTypography.bodySmall.copyWith(
+                              color: AppColors.charcoal,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -1254,7 +1252,7 @@ class _InactivityAlertBannerState extends State<_InactivityAlertBanner> {
         }
 
         return TeacherAlertBanner(
-          type: AlertBannerType.warning,
+          type: AlertBannerType.info,
           message: '$inactiveCount students haven\'t logged reading this week',
         );
       },

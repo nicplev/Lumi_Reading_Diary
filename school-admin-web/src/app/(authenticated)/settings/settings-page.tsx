@@ -13,7 +13,8 @@ import { useToast } from '@/components/lumi/toast';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useSchool, useUpdateSchool } from '@/lib/hooks/use-school';
 import { getReadingLevels } from '@/lib/types';
-import type { ReadingLevelSchema } from '@/lib/types';
+import type { ReadingLevelSchema, ParentCommentSettings } from '@/lib/types';
+import { ParentCommentSettingsSection } from './parent-comment-settings';
 
 const LEVEL_SCHEMAS: { value: ReadingLevelSchema; label: string; description: string }[] = [
   { value: 'none', label: 'None', description: 'No reading levels' },
@@ -66,6 +67,7 @@ export function SettingsPage() {
   const [savingLevels, setSavingLevels] = useState(false);
   const [savingTerms, setSavingTerms] = useState(false);
   const [savingQuiet, setSavingQuiet] = useState(false);
+  const [savingComments, setSavingComments] = useState(false);
 
   useEffect(() => {
     if (school) {
@@ -160,6 +162,20 @@ export function SettingsPage() {
       toast(error instanceof Error ? error.message : 'Failed to save', 'error');
     } finally {
       setSavingQuiet(false);
+    }
+  };
+
+  const handleSaveComments = async (commentSettings: ParentCommentSettings) => {
+    setSavingComments(true);
+    try {
+      await updateSchool.mutateAsync({
+        parentCommentSettings: commentSettings,
+      });
+      toast('Parent comment settings updated', 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to save', 'error');
+    } finally {
+      setSavingComments(false);
     }
   };
 
@@ -346,6 +362,14 @@ export function SettingsPage() {
             </div>
           )}
         </Card>
+
+        {/* Parent Comments */}
+        <ParentCommentSettingsSection
+          settings={school?.settings?.parentComments as ParentCommentSettings | undefined}
+          isAdmin={isAdmin}
+          onSave={handleSaveComments}
+          saving={savingComments}
+        />
 
         {/* School Stats (read-only) */}
         {school && (

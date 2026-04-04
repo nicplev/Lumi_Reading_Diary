@@ -574,7 +574,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     return showModalBottomSheet<_AssignmentEditScope>(
       context: context,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(TeacherDimensions.radiusL)),
       ),
       builder: (context) =>
           _buildActionScopeSheetBody(actionLabel: actionLabel),
@@ -631,7 +631,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         side: BorderSide(
           color: AppColors.teacherPrimary.withValues(alpha: 0.3),
         ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         visualDensity: const VisualDensity(horizontal: -1, vertical: -1),
       ),
@@ -714,7 +714,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(TeacherDimensions.radiusL)),
       ),
       builder: (context) => _RenewBooksSheet(items: currentItems),
     );
@@ -1205,17 +1205,17 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   List<Color> _coverGradient(String type, String seed) {
     if (type == 'decodable') {
       const palettes = <List<Color>>[
-        [AppColors.levelCVC, Color(0xFFEF5350)],
-        [AppColors.levelDigraphs, Color(0xFFFF9800)],
-        [AppColors.levelBlends, Color(0xFFFDD835)],
-        [AppColors.levelCVCE, Color(0xFF66BB6A)],
-        [AppColors.levelVowelTeams, Color(0xFF42A5F5)],
-        [AppColors.levelRControlled, Color(0xFFAB47BC)],
+        [AppColors.levelCVC, AppColors.error],
+        [AppColors.levelDigraphs, AppColors.warmOrange],
+        [AppColors.levelBlends, AppColors.secondaryYellow],
+        [AppColors.levelCVCE, AppColors.secondaryGreen],
+        [AppColors.levelVowelTeams, AppColors.decodableBlue],
+        [AppColors.levelRControlled, AppColors.secondaryPurple],
       ];
       final index = seed.hashCode.abs() % palettes.length;
       return palettes[index];
     }
-    return const [Color(0xFF81C784), Color(0xFF388E3C)];
+    return const [AppColors.libraryGreen, Color(0xFF388E3C)];
   }
 
   _LatestParentCommentViewData? _latestParentComment(
@@ -1541,10 +1541,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
           backgroundColor: TeacherStudentListItem.colorForName(fullName),
           child: Text(
             _currentStudent.firstName[0].toUpperCase(),
-            style: const TextStyle(
-              fontFamily: 'Nunito',
-              fontSize: 28,
-              fontWeight: FontWeight.w700,
+            style: TeacherTypography.statValue.copyWith(
               color: AppColors.white,
             ),
           ),
@@ -1672,7 +1669,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                         ),
                         decoration: BoxDecoration(
                           color: AppColors.error.withValues(alpha: 0.07),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
                           border: Border.all(
                             color: AppColors.error.withValues(alpha: 0.18),
                           ),
@@ -1743,7 +1740,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                               fontWeight: FontWeight.w600,
                             ),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
                             ),
                           ),
                           child: const Text('Change Level'),
@@ -1784,7 +1781,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
           fontWeight: FontWeight.w600,
         ),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
         ),
       ),
     );
@@ -1990,7 +1987,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                               ),
                               decoration: BoxDecoration(
                                 color: AppColors.teacherPrimaryLight,
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
                               ),
                               child: Text(
                                 chip,
@@ -2072,11 +2069,11 @@ class _ScopeOptionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
       child: Ink(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
           border: Border.all(color: AppColors.divider),
           color: AppColors.white,
         ),
@@ -2087,7 +2084,7 @@ class _ScopeOptionTile extends StatelessWidget {
               height: 34,
               decoration: BoxDecoration(
                 color: AppColors.teacherPrimaryLight.withValues(alpha: 0.35),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
               ),
               child: Icon(icon, color: AppColors.teacherPrimary, size: 18),
             ),
@@ -2311,10 +2308,10 @@ class _RenewBooksSheetState extends State<_RenewBooksSheet> {
                     : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.teacherPrimary,
-                  foregroundColor: Colors.white,
+                  foregroundColor: AppColors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
                   ),
                 ),
                 child: Text(
@@ -2322,7 +2319,7 @@ class _RenewBooksSheetState extends State<_RenewBooksSheet> {
                       ? 'Keep $selectedCount book(s) for next week'
                       : 'Select books to keep',
                   style: TeacherTypography.bodyMedium.copyWith(
-                    color: Colors.white,
+                    color: AppColors.white,
                     fontWeight: FontWeight.w700,
                   ),
                 ),

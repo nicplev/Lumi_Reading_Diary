@@ -12,6 +12,7 @@ import 'services/firebase_service.dart';
 import 'services/notification_service.dart';
 import 'services/crash_reporting_service.dart';
 import 'services/analytics_service.dart';
+import 'services/teacher_device_book_cache_service.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -31,6 +32,14 @@ void main() async {
 
       // Initialize Hive for local storage
       await Hive.initFlutter();
+
+      // Initialize teacher device book cache (Hive-backed, persists across sessions).
+      // Non-fatal if it fails — lookups fall back to Firestore/API chain.
+      try {
+        await TeacherDeviceBookCacheService.instance.initialize();
+      } catch (e) {
+        debugPrint('Warning: Teacher device book cache init failed: $e');
+      }
 
       // Initialize Firebase with platform-specific options
       await Firebase.initializeApp(

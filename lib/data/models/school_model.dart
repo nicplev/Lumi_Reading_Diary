@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'parent_comment_settings.dart';
+
 enum ReadingLevelSchema {
   none,
   aToZ,
@@ -129,6 +131,12 @@ class SchoolModel {
           ? Timestamp.fromDate(subscriptionExpiry!)
           : null,
     };
+  }
+
+  ParentCommentSettings get parentCommentSettings {
+    return ParentCommentSettings.fromMap(
+      settings?['parentComments'] as Map<String, dynamic>?,
+    );
   }
 
   bool get hasReadingLevels => levelSchema != ReadingLevelSchema.none;

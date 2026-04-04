@@ -5,10 +5,14 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
 import '../../core/widgets/lumi/persistent_cached_image.dart';
+import '../../data/models/book_model.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/user_model.dart';
+import '../../services/book_lookup_service.dart';
 import '../../services/isbn_assignment_service.dart';
+import '../../services/teacher_device_book_cache_service.dart';
+import 'cover_scanner_screen.dart';
 
 class IsbnScannerScreen extends StatefulWidget {
   const IsbnScannerScreen({
@@ -144,7 +148,9 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
     }
   }
 
-  // ---- Barcode detection & assignment ----
+  // ---- Barcode detection & interactive assignment ----
+
+  bool _isProcessingQueue = false;
 
   Future<void> _onDetect(BarcodeCapture capture) async {
     var queuedAny = false;
@@ -162,11 +168,14 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
     }
 
     if (!queuedAny) return;
-    await _flushPendingScans();
+    await _processIsbnQueue();
   }
 
-  Future<void> _flushPendingScans() async {
-    if (_isProcessing || _pendingIsbns.isEmpty) return;
+  /// Process pending ISBNs one at a time. Resolved books are assigned
+  /// immediately. Unresolved ISBNs pause the queue and show a prompt.
+  Future<void> _processIsbnQueue() async {
+    if (_isProcessingQueue || _pendingIsbns.isEmpty) return;
+    _isProcessingQueue = true;
 
     final schoolId = widget.teacher.schoolId;
     if (schoolId == null || schoolId.isEmpty) {
@@ -176,79 +185,275 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
         });
       }
       _pendingIsbns.clear();
+      _isProcessingQueue = false;
       return;
     }
 
-    final batch = List<String>.from(_pendingIsbns);
-    _pendingIsbns.clear();
+    while (_pendingIsbns.isNotEmpty && mounted) {
+      final isbn = _pendingIsbns.first;
+      _pendingIsbns.remove(isbn);
 
-    setState(() {
-      _isProcessing = true;
-      _statusMessage =
-          'Assigning ${batch.length} ISBN${batch.length == 1 ? '' : 's'}...';
-    });
+      setState(() {
+        _isProcessing = true;
+        _statusMessage = 'Looking up ISBN...';
+      });
 
+      final resolution = await _assignmentService.resolveIsbn(
+        rawCode: isbn,
+        schoolId: schoolId,
+        teacherId: widget.teacher.id,
+      );
+
+      if (!mounted) break;
+
+      switch (resolution) {
+        case IsbnResolved(:final book):
+          await _assignAndAddToSession(book, schoolId);
+
+        case IsbnNotFound(:final isbn):
+          setState(() => _isProcessing = false);
+          final result = await _showUnresolvedPrompt(isbn);
+          if (!mounted) break;
+          if (result != null) {
+            await _assignAndAddToSession(result, schoolId);
+          }
+
+        case IsbnInvalid():
+          break;
+      }
+    }
+
+    if (mounted) {
+      setState(() => _isProcessing = false);
+    }
+    _isProcessingQueue = false;
+  }
+
+  /// Assign a resolved book to the current student and update session state.
+  Future<void> _assignAndAddToSession(
+    ScannedIsbnBook book,
+    String schoolId,
+  ) async {
     try {
-      final result = await _assignmentService.assignIsbnsToStudentWeek(
+      final result = await _assignmentService.assignResolvedBooks(
         schoolId: schoolId,
         classId: widget.classModel.id,
         studentId: _currentStudent.id,
         teacherId: widget.teacher.id,
-        rawCodes: batch,
+        books: [book],
         targetMinutes: widget.classModel.defaultMinutesTarget,
         sessionId: _sessionId,
         targetDate: _targetDate,
       );
 
-      final addedBooks = <ScannedIsbnBook>[];
-      for (final book in result.processedBooks) {
-        if (_sessionIsbns.add(book.isbn)) {
-          addedBooks.add(book);
-          // Update cross-student count for this ISBN
-          _isbnStudentCounts[book.isbn] =
-              (_isbnStudentCounts[book.isbn] ?? 0) + 1;
-        }
+      if (_sessionIsbns.add(book.isbn)) {
+        _sessionBooks.insert(0, book);
+        _isbnStudentCounts[book.isbn] =
+            (_isbnStudentCounts[book.isbn] ?? 0) + 1;
       }
-
-      if (addedBooks.isNotEmpty) {
-        _sessionBooks.insertAll(0, addedBooks);
-      }
-
       _totalAssignedBooks = result.totalAssignedBooks;
 
-      final successCount = result.newlyAssignedBooks.length;
-      final newToLibrary =
-          result.newlyAssignedBooks.where((b) => b.isNewToLibrary).length;
+      final isNew = result.newlyAssignedBooks.isNotEmpty;
       if (!mounted) return;
       setState(() {
-        if (successCount > 0) {
-          final bookWord = 'book${successCount == 1 ? '' : 's'}';
-          final libNote = newToLibrary > 0
-              ? ' · $newToLibrary new to school library'
-              : '';
-          _statusMessage =
-              'Assigned $successCount $bookWord for this week.$libNote';
-        } else {
-          _statusMessage =
-              'No new books added. ISBNs already assigned this week.';
-        }
+        _statusMessage = isNew
+            ? 'Assigned "${book.title}" for this week.'
+            : 'Already assigned this week.';
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _statusMessage = 'Could not assign scanned ISBNs. Please try again.';
+        _statusMessage = 'Could not assign "${book.title}". Please try again.';
       });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isProcessing = false;
-        });
-      }
-
-      if (mounted && _pendingIsbns.isNotEmpty) {
-        await _flushPendingScans();
-      }
     }
+  }
+
+  /// Show a blocking prompt for an unresolved ISBN. Returns a [ScannedIsbnBook]
+  /// if the teacher adds the book via the inline flow, or null if discarded.
+  Future<ScannedIsbnBook?> _showUnresolvedPrompt(String isbn) async {
+    // 'add' = launch inline add flow, 'discard' = skip this ISBN
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.textSecondary.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Warning icon
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.warmOrange.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.search_off_rounded,
+                  color: AppColors.warmOrange,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text('Book Not Found', style: TeacherTypography.h3),
+              const SizedBox(height: 8),
+              Text(
+                'ISBN $isbn wasn\'t found in any book database.',
+                style: TeacherTypography.bodySmall
+                    .copyWith(color: AppColors.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'You can add it to the Lumi community library by taking a photo of the front cover.',
+                style: TeacherTypography.bodySmall
+                    .copyWith(color: AppColors.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              // Add Book button (primary)
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => Navigator.pop(sheetContext, 'add'),
+                  icon: const Icon(Icons.add_a_photo_outlined, size: 18),
+                  label: const Text('Add Book'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.teacherPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(TeacherDimensions.radiusM),
+                    ),
+                    textStyle: TeacherTypography.bodyMedium.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              // Discard button (secondary)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(sheetContext, 'discard'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(TeacherDimensions.radiusM),
+                    ),
+                    side: const BorderSide(color: AppColors.teacherBorder),
+                  ),
+                  child: Text(
+                    'Discard This Scan',
+                    style: TeacherTypography.bodyMedium.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (action == 'add' && mounted) {
+      return _launchInlineAddFlow(isbn);
+    }
+
+    return null; // discarded
+  }
+
+  /// Launch the inline cover scanner in ISBN-first mode and handle the result.
+  Future<ScannedIsbnBook?> _launchInlineAddFlow(String isbn) async {
+    final contributionResult =
+        await Navigator.of(context).push<CommunityBookContributionResult>(
+      MaterialPageRoute(
+        builder: (_) => CoverScannerScreen(
+          teacher: widget.teacher,
+          mode: CommunityBookContributionMode.isbnFirstInline,
+          preScannedIsbn: isbn,
+        ),
+      ),
+    );
+
+    if (contributionResult == null || !mounted) return null;
+
+    // Materialize to school library
+    final schoolId = widget.teacher.schoolId ?? '';
+    if (schoolId.isNotEmpty) {
+      final lookupService = BookLookupService();
+      await lookupService.materializeToSchoolLibrary(
+        isbn: isbn,
+        book: BookModel(
+          id: contributionResult.bookId ?? 'isbn_$isbn',
+          title: contributionResult.title,
+          author: contributionResult.author,
+          isbn: isbn,
+          coverImageUrl: contributionResult.coverImageUrl,
+          readingLevel: contributionResult.readingLevel,
+          createdAt: DateTime.now(),
+        ),
+        source: 'community_books',
+        schoolId: schoolId,
+        actorId: widget.teacher.id,
+      );
+
+      // Warm device scan cache
+      try {
+        await TeacherDeviceBookCacheService.instance.cacheBook(
+          teacherId: widget.teacher.id,
+          schoolId: schoolId,
+          book: BookModel(
+            id: contributionResult.bookId ?? 'isbn_$isbn',
+            title: contributionResult.title,
+            author: contributionResult.author,
+            isbn: isbn,
+            coverImageUrl: contributionResult.coverImageUrl,
+            readingLevel: contributionResult.readingLevel,
+            createdAt: DateTime.now(),
+          ),
+        );
+      } catch (_) {}
+    }
+
+    if (mounted) {
+      setState(() {
+        _statusMessage = 'Added to library and assigned.';
+      });
+    }
+
+    return ScannedIsbnBook(
+      isbn: isbn,
+      title: contributionResult.title,
+      author: contributionResult.author,
+      coverImageUrl: contributionResult.coverImageUrl,
+      bookId: contributionResult.bookId ?? 'isbn_$isbn',
+      resolvedFromCatalog: true,
+      isNewToLibrary: true,
+    );
   }
 
   // ---- Batch queue navigation ----

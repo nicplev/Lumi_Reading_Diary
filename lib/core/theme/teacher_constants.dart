@@ -134,6 +134,14 @@ class TeacherDimensions {
           offset: const Offset(0, 4),
         ),
       ];
+
+  /// Standard card decoration: white, 24pt radius, shadow + subtle border.
+  static BoxDecoration get cardDecoration => BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(radiusXL),
+        border: Border.all(color: AppColors.teacherBorder, width: 1),
+        boxShadow: cardShadow,
+      );
 }
 
 // ============================================

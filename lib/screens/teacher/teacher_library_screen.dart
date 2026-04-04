@@ -1,4 +1,10 @@
+import 'dart:io';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
@@ -6,31 +12,79 @@ import '../../core/widgets/lumi/lumi_skeleton.dart';
 import '../../core/widgets/lumi/persistent_cached_image.dart';
 import '../../core/widgets/lumi/teacher_filter_chip.dart';
 import '../../data/models/book_model.dart';
+import '../../data/models/user_model.dart';
+import '../../services/community_book_service.dart';
 import '../../services/school_library_assignment_service.dart';
 import '../../services/school_library_service.dart';
+import '../../services/teacher_device_book_cache_service.dart';
 
 /// Teacher Library Screen — school-wide book library.
 ///
 /// All books are sourced from `schools/{schoolId}/books`, populated
 /// automatically whenever any teacher scans a new ISBN.
 class TeacherLibraryScreen extends StatefulWidget {
-  const TeacherLibraryScreen({super.key, required this.schoolId});
+  const TeacherLibraryScreen({
+    super.key,
+    required this.teacher,
+    SchoolLibraryService? libraryService,
+    SchoolLibraryAssignmentService? assignmentService,
+  })  : _libraryService = libraryService,
+        _assignmentService = assignmentService;
 
-  final String schoolId;
+  final UserModel teacher;
+  final SchoolLibraryService? _libraryService;
+  final SchoolLibraryAssignmentService? _assignmentService;
 
   @override
   State<TeacherLibraryScreen> createState() => _TeacherLibraryScreenState();
 }
 
 class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
-  final _libraryService = SchoolLibraryService();
-  final _assignmentService = SchoolLibraryAssignmentService();
+  late final SchoolLibraryService _libraryService;
+  late final SchoolLibraryAssignmentService _assignmentService;
   final _searchController = TextEditingController();
 
   String _activeFilter = 'All';
   String _searchQuery = '';
+  Set<String> _hiddenBookIds = {};
 
-  static const _filters = ['All', 'Decodable', 'Library', 'Recently Added'];
+  static const _filters = [
+    'All',
+    'Decodable',
+    'Library',
+    'Recently Added',
+    'Hidden',
+  ];
+
+  String get _hiddenPrefsKey =>
+      'hidden_books_${widget.teacher.schoolId ?? ''}';
+
+  @override
+  void initState() {
+    super.initState();
+    _libraryService = widget._libraryService ?? SchoolLibraryService();
+    _assignmentService =
+        widget._assignmentService ?? SchoolLibraryAssignmentService();
+    _loadHiddenBooks();
+  }
+
+  Future<void> _loadHiddenBooks() async {
+    final prefs = await SharedPreferences.getInstance();
+    final ids = prefs.getStringList(_hiddenPrefsKey) ?? [];
+    setState(() => _hiddenBookIds = ids.toSet());
+  }
+
+  Future<void> _toggleHideBook(String bookId) async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      if (_hiddenBookIds.contains(bookId)) {
+        _hiddenBookIds.remove(bookId);
+      } else {
+        _hiddenBookIds.add(bookId);
+      }
+    });
+    await prefs.setStringList(_hiddenPrefsKey, _hiddenBookIds.toList());
+  }
 
   @override
   void dispose() {
@@ -40,13 +94,14 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.schoolId.isEmpty) {
+    final schoolId = widget.teacher.schoolId?.trim() ?? '';
+    if (schoolId.isEmpty) {
       return const _ErrorState(message: 'School ID not available.');
     }
 
     return SafeArea(
       child: StreamBuilder<List<BookModel>>(
-        stream: _libraryService.booksStream(widget.schoolId),
+        stream: _libraryService.booksStream(schoolId),
         builder: (context, librarySnapshot) {
           if (librarySnapshot.hasError) {
             return const _ErrorState(
@@ -55,16 +110,41 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
 
           final isLoading = !librarySnapshot.hasData;
           final allBooks = librarySnapshot.data ?? [];
-          final filtered = SchoolLibraryService.applyFilter(
-            books: allBooks,
-            filter: _activeFilter,
-            searchQuery: _searchQuery,
-          );
+          final hiddenCount =
+              allBooks.where((b) => _hiddenBookIds.contains(b.id)).length;
+
+          // For the Hidden filter, show hidden books; otherwise exclude them
+          List<BookModel> visibleBooks;
+          if (_activeFilter == 'Hidden') {
+            visibleBooks = allBooks
+                .where((b) => _hiddenBookIds.contains(b.id))
+                .toList();
+          } else {
+            visibleBooks = allBooks
+                .where((b) => !_hiddenBookIds.contains(b.id))
+                .toList();
+          }
+
+          final filtered = _activeFilter == 'Hidden'
+              ? _searchQuery.isEmpty
+                  ? visibleBooks
+                  : SchoolLibraryService.applyFilter(
+                      books: visibleBooks,
+                      filter: 'All',
+                      searchQuery: _searchQuery,
+                    )
+              : SchoolLibraryService.applyFilter(
+                  books: visibleBooks,
+                  filter: _activeFilter,
+                  searchQuery: _searchQuery,
+                );
           final decodableCount =
-              allBooks.where(SchoolLibraryService.isDecodable).length;
+              allBooks.where((b) =>
+                  SchoolLibraryService.isDecodable(b) &&
+                  !_hiddenBookIds.contains(b.id)).length;
 
           return StreamBuilder<LibraryAssignmentSnapshot>(
-            stream: _assignmentService.summaryStream(widget.schoolId),
+            stream: _assignmentService.summaryStream(schoolId),
             builder: (context, assignmentSnapshot) {
               final assignmentSummary =
                   assignmentSnapshot.data ?? const LibraryAssignmentSnapshot();
@@ -78,13 +158,44 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Book Library', style: TeacherTypography.h1),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Book Library', style: TeacherTypography.h1),
+                              FilledButton.icon(
+                                onPressed: () => context.push(
+                                  '/teacher/community-scanner',
+                                  extra: widget.teacher,
+                                ),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: AppColors.teacherPrimary,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                        TeacherDimensions.radiusM),
+                                  ),
+                                ),
+                                icon: const Icon(
+                                    Icons.document_scanner_outlined,
+                                    size: 18),
+                                label: const Text(
+                                  'Add Book',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                           const SizedBox(height: 4),
                           isLoading
                               ? const LumiSkeleton(width: 180, height: 16)
                               : Text(
-                                  '${allBooks.length} book${allBooks.length == 1 ? '' : 's'} in your school library'
-                                  '${decodableCount > 0 ? ' · $decodableCount decodable' : ''}',
+                                  '${allBooks.length - hiddenCount} book${(allBooks.length - hiddenCount) == 1 ? '' : 's'} in your school library'
+                                  '${decodableCount > 0 ? ' · $decodableCount decodable' : ''}'
+                                  '${hiddenCount > 0 ? ' · $hiddenCount hidden' : ''}',
                                   style: TeacherTypography.bodyMedium.copyWith(
                                     color: AppColors.textSecondary,
                                   ),
@@ -322,6 +433,12 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
       builder: (_) => BookDetailSheet(
         book: book,
         currentAssignedCount: currentAssignedCount,
+        teacher: widget.teacher,
+        isHidden: _hiddenBookIds.contains(book.id),
+        onToggleHide: () async {
+          await _toggleHideBook(book.id);
+          if (mounted) Navigator.pop(context); // close sheet
+        },
       ),
     );
   }
@@ -590,18 +707,219 @@ class _ErrorState extends StatelessWidget {
 // Book Detail Bottom Sheet
 // ─────────────────────────────────────────────────────────────────────────────
 
-class BookDetailSheet extends StatelessWidget {
+class BookDetailSheet extends StatefulWidget {
   const BookDetailSheet({
     super.key,
     required this.book,
     required this.currentAssignedCount,
+    required this.teacher,
+    required this.isHidden,
+    required this.onToggleHide,
   });
 
   final BookModel book;
   final int currentAssignedCount;
+  final UserModel teacher;
+  final bool isHidden;
+  final VoidCallback onToggleHide;
+
+  @override
+  State<BookDetailSheet> createState() => _BookDetailSheetState();
+}
+
+class _BookDetailSheetState extends State<BookDetailSheet> {
+  bool _isUploadingCover = false;
+  String? _uploadedCoverUrl;
+  bool _isCoverOwner = false;
+
+  bool get _isCommunityBook =>
+      widget.book.metadata?['source'] == 'community_books';
+
+  bool get _hasCover {
+    final url = _uploadedCoverUrl ?? widget.book.coverImageUrl;
+    return url != null && url.startsWith('http');
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _checkCoverOwnership();
+  }
+
+  Future<void> _checkCoverOwnership() async {
+    final isbn = widget.book.isbn;
+    if (isbn == null || isbn.isEmpty || !_hasCover) return;
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('community_books')
+          .doc(isbn)
+          .get();
+      if (!mounted) return;
+
+      final coverUploadedBy = doc.data()?['coverUploadedBy'] as String?;
+      setState(() {
+        _isCoverOwner = coverUploadedBy == widget.teacher.id;
+      });
+    } catch (_) {
+      // Best-effort — if lookup fails, don't show edit button
+    }
+  }
+
+  Future<void> _showAddCoverOptions() async {
+    final picker = ImagePicker();
+
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.textSecondary.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text('Add Cover Photo', style: TeacherTypography.h3),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined,
+                  color: AppColors.teacherPrimary),
+              title: Text('Take Photo', style: TeacherTypography.bodyMedium),
+              shape: RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(TeacherDimensions.radiusM)),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined,
+                  color: AppColors.teacherPrimary),
+              title: Text('Choose from Gallery',
+                  style: TeacherTypography.bodyMedium),
+              shape: RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(TeacherDimensions.radiusM)),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null || !mounted) return;
+
+    final image = await picker.pickImage(source: source, imageQuality: 92);
+    if (image == null || !mounted) return;
+
+    await _uploadCoverImage(File(image.path));
+  }
+
+  Future<void> _uploadCoverImage(File imageFile) async {
+    final book = widget.book;
+    final isbn = book.isbn;
+    if (isbn == null || isbn.isEmpty) return;
+
+    setState(() => _isUploadingCover = true);
+
+    try {
+      final communityService = CommunityBookService();
+      final url = await communityService.uploadCoverImage(
+        isbn: isbn,
+        imageFile: imageFile,
+      );
+
+      if (!mounted) return;
+
+      if (url == null) {
+        setState(() => _isUploadingCover = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to upload cover image')),
+        );
+        return;
+      }
+
+      // Update community_books (global) so all schools benefit
+      await communityService.addBook(
+        isbn: isbn,
+        title: book.title,
+        contributorId: widget.teacher.id,
+        contributorSchoolId: widget.teacher.schoolId ?? '',
+        contributorName: widget.teacher.fullName,
+        author: book.author,
+        coverImageUrl: url,
+        coverStoragePath: 'community_books/covers/$isbn.jpg',
+        source: 'teacher_cover_upload',
+        metadata: {'coverSource': 'camera_scan'},
+      );
+
+      // Track who uploaded the cover so only they can edit it later
+      await FirebaseFirestore.instance
+          .collection('community_books')
+          .doc(isbn)
+          .update({'coverUploadedBy': widget.teacher.id});
+
+      // Update the school's local book document
+      final schoolId = widget.teacher.schoolId;
+      if (schoolId != null) {
+        await FirebaseFirestore.instance
+            .collection('schools')
+            .doc(schoolId)
+            .collection('books')
+            .doc(book.id)
+            .update({'coverImageUrl': url});
+
+        // Update device cache
+        try {
+          final cacheService = TeacherDeviceBookCacheService.instance;
+          await cacheService.cacheBook(
+            teacherId: widget.teacher.id,
+            schoolId: schoolId,
+            book: book.copyWith(coverImageUrl: url),
+          );
+        } catch (_) {
+          // Device cache update is best-effort
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _isUploadingCover = false;
+        _uploadedCoverUrl = url;
+        _isCoverOwner = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cover photo added! It will appear for all teachers.'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isUploadingCover = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error adding cover: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final book = _uploadedCoverUrl != null
+        ? widget.book.copyWith(coverImageUrl: _uploadedCoverUrl)
+        : widget.book;
+    final currentAssignedCount = widget.currentAssignedCount;
     final isDecodable = SchoolLibraryService.isDecodable(book);
     final stageColor = isDecodable
         ? Color(SchoolLibraryService.stageColor(book.readingLevel ?? ''))
@@ -699,6 +1017,58 @@ class BookDetailSheet extends StatelessWidget {
                 ),
               ),
 
+              // Add / Change Cover Photo button
+              // "Add" shown for any teacher when no cover exists
+              // "Change" shown only to the teacher who uploaded the current cover
+              if (book.isbn?.isNotEmpty == true &&
+                  (!_hasCover || (_hasCover && _isCoverOwner)))
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                  child: _isUploadingCover
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: AppColors.teacherPrimary,
+                              ),
+                            ),
+                          ),
+                        )
+                      : OutlinedButton.icon(
+                          onPressed: _showAddCoverOptions,
+                          icon: Icon(
+                            _hasCover
+                                ? Icons.edit_outlined
+                                : Icons.add_a_photo_outlined,
+                            size: 18,
+                            color: AppColors.teacherPrimary,
+                          ),
+                          label: Text(
+                            _hasCover
+                                ? 'Change Cover Photo'
+                                : 'Add Cover Photo',
+                            style: TeacherTypography.bodySmall.copyWith(
+                              color: AppColors.teacherPrimary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(
+                                color: AppColors.teacherPrimary),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                  TeacherDimensions.radiusM),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 10),
+                          ),
+                        ),
+                ),
+
               if (book.isbn?.isNotEmpty == true)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -736,9 +1106,356 @@ class BookDetailSheet extends StatelessWidget {
                 ),
               ],
 
+              // Actions divider
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Divider(height: 32),
+              ),
+
+              // Hide / Unhide button
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: widget.onToggleHide,
+                    icon: Icon(
+                      widget.isHidden
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                      size: 16,
+                      color: AppColors.textSecondary,
+                    ),
+                    label: Text(
+                      widget.isHidden
+                          ? 'Unhide from Library'
+                          : 'Hide from Library',
+                      style: TeacherTypography.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // Request Deletion — only for community-contributed books
+              if (_isCommunityBook && book.isbn?.isNotEmpty == true)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _showDeletionRequestDialog,
+                      icon: Icon(Icons.flag_outlined,
+                          size: 16, color: Colors.red.shade400),
+                      label: Text(
+                        'Request Deletion',
+                        style: TeacherTypography.bodySmall.copyWith(
+                          color: Colors.red.shade400,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
               const SizedBox(height: 40),
             ],
           ),
+        );
+      },
+    );
+  }
+
+  void _showDeletionRequestDialog() {
+    String? selectedReason;
+    final notesController = TextEditingController();
+    bool isSubmitting = false;
+
+    const reasons = [
+      'Inappropriate content',
+      'Duplicate entry',
+      'Incorrect data / wrong book',
+      'Low quality cover or metadata',
+      'Other',
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius:
+                      BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Drag handle
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppColors.textSecondary
+                              .withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Title
+                    Text(
+                      'Request Book Deletion',
+                      style: TeacherTypography.h3,
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Description
+                    Text(
+                      'This will send a request to Lumi to remove this book from the community library.',
+                      style: TeacherTypography.bodySmall
+                          .copyWith(color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Reason dropdown
+                    Text('Reason',
+                        style: TeacherTypography.caption
+                            .copyWith(color: AppColors.charcoal)),
+                    const SizedBox(height: 6),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(
+                            TeacherDimensions.radiusM),
+                        border: Border.all(
+                          color: AppColors.teacherBorder,
+                          width: 1,
+                        ),
+                      ),
+                      child: DropdownButtonFormField<String>(
+                        initialValue: selectedReason,
+                        decoration: const InputDecoration(
+                          hintText: 'Select a reason',
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
+                        ),
+                        style: TeacherTypography.bodyMedium
+                            .copyWith(color: AppColors.charcoal),
+                        dropdownColor: AppColors.white,
+                        borderRadius: BorderRadius.circular(
+                            TeacherDimensions.radiusM),
+                        items: reasons
+                            .map((r) =>
+                                DropdownMenuItem(value: r, child: Text(r)))
+                            .toList(),
+                        onChanged: isSubmitting
+                            ? null
+                            : (value) {
+                                setSheetState(
+                                    () => selectedReason = value);
+                              },
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Notes field
+                    Text('Additional Details',
+                        style: TeacherTypography.caption
+                            .copyWith(color: AppColors.charcoal)),
+                    const SizedBox(height: 6),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(
+                            TeacherDimensions.radiusM),
+                        border: Border.all(
+                          color: AppColors.teacherBorder,
+                          width: 1,
+                        ),
+                      ),
+                      child: TextField(
+                        controller: notesController,
+                        enabled: !isSubmitting,
+                        maxLines: 3,
+                        style: TeacherTypography.bodyMedium,
+                        decoration: const InputDecoration(
+                          hintText: 'Optional',
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Action buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: isSubmitting
+                                ? null
+                                : () => Navigator.pop(sheetContext),
+                            style: OutlinedButton.styleFrom(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                    TeacherDimensions.radiusM),
+                              ),
+                              side: const BorderSide(
+                                  color: AppColors.teacherBorder),
+                            ),
+                            child: Text(
+                              'Cancel',
+                              style: TeacherTypography.bodyMedium.copyWith(
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed:
+                                (selectedReason == null || isSubmitting)
+                                    ? null
+                                    : () async {
+                                        setSheetState(
+                                            () => isSubmitting = true);
+
+                                        final notes =
+                                            notesController.text.trim();
+                                        final reason = notes.isNotEmpty
+                                            ? '$selectedReason: $notes'
+                                            : selectedReason!;
+
+                                        try {
+                                          await CommunityBookService()
+                                              .requestDeletion(
+                                            isbn: widget.book.isbn!,
+                                            reason: reason,
+                                            requestedBy:
+                                                widget.teacher.id,
+                                            requestedByName:
+                                                widget.teacher.fullName,
+                                            schoolId:
+                                                widget.teacher.schoolId!,
+                                            bookTitle:
+                                                widget.book.title,
+                                            bookAuthor:
+                                                widget.book.author,
+                                          );
+
+                                          if (!context.mounted) return;
+                                          Navigator.pop(
+                                              sheetContext); // close form
+                                          Navigator.pop(
+                                              context); // close detail
+
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Deletion request submitted. The Lumi team will review it.',
+                                                style: TeacherTypography
+                                                    .bodySmall
+                                                    .copyWith(
+                                                        color: AppColors
+                                                            .white),
+                                              ),
+                                              behavior:
+                                                  SnackBarBehavior.floating,
+                                              backgroundColor:
+                                                  AppColors.charcoal,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                        TeacherDimensions
+                                                            .radiusM),
+                                              ),
+                                            ),
+                                          );
+                                        } catch (e) {
+                                          setSheetState(() =>
+                                              isSubmitting = false);
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Failed to submit request: $e',
+                                                style: TeacherTypography
+                                                    .bodySmall
+                                                    .copyWith(
+                                                        color: AppColors
+                                                            .white),
+                                              ),
+                                              behavior:
+                                                  SnackBarBehavior.floating,
+                                              backgroundColor: Colors.red,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                        TeacherDimensions
+                                                            .radiusM),
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      },
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Colors.red.shade400,
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                    TeacherDimensions.radiusM),
+                              ),
+                            ),
+                            child: isSubmitting
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Text(
+                                    'Submit Request',
+                                    style: TeacherTypography.bodyMedium
+                                        .copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );

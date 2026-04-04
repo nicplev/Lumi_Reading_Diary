@@ -15,12 +15,17 @@ class AnalyticsService {
   Future<void> initialize() async {
     try {
       _analytics = FirebaseAnalytics.instance;
-      await _analytics.setAnalyticsCollectionEnabled(!kDebugMode);
+      // setAnalyticsCollectionEnabled can hang on iOS 26 — use a timeout
+      await _analytics
+          .setAnalyticsCollectionEnabled(!kDebugMode)
+          .timeout(const Duration(seconds: 5));
       _initialized = true;
       debugPrint('Analytics initialized (enabled: ${!kDebugMode})');
     } catch (e) {
-      debugPrint('Error initializing analytics: $e');
-      _initialized = false;
+      debugPrint('Warning: Analytics init failed or timed out: $e');
+      // Still mark as initialized so the app can function without analytics
+      _analytics = FirebaseAnalytics.instance;
+      _initialized = true;
     }
   }
 

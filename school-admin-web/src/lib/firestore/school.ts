@@ -5,6 +5,7 @@ export async function updateSchool(
   schoolId: string,
   data: Partial<Pick<School, 'name' | 'displayName' | 'logoUrl' | 'primaryColor' | 'secondaryColor' | 'levelSchema' | 'customLevels' | 'levelColors' | 'timezone' | 'address' | 'contactEmail' | 'contactPhone' | 'quietHours'>> & {
     termDates?: Record<string, string>;
+    parentCommentSettings?: { enabled: boolean; freeTextEnabled: boolean; customPresets: { id: string; name: string; chips: string[] }[] };
   }
 ): Promise<void> {
   const update: Record<string, unknown> = {};
@@ -21,6 +22,9 @@ export async function updateSchool(
   if (data.contactEmail !== undefined) update.contactEmail = data.contactEmail;
   if (data.contactPhone !== undefined) update.contactPhone = data.contactPhone;
   if (data.quietHours !== undefined) update.quietHours = data.quietHours;
+  if (data.parentCommentSettings !== undefined) {
+    update['settings.parentComments'] = data.parentCommentSettings;
+  }
   if (data.termDates !== undefined) {
     update.termDates = Object.fromEntries(
       Object.entries(data.termDates).map(([k, v]) => [k, new Date(v)])

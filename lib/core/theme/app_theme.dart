@@ -298,6 +298,83 @@ class AppTheme {
     );
   }
 
+  /// Teacher/Admin theme — same structure as [lightTheme] but with the
+  /// teacher blue palette replacing rose pink. All solid colors, no gradients.
+  static ThemeData teacherTheme() {
+    final base = lightTheme();
+    return base.copyWith(
+      scaffoldBackgroundColor: AppColors.teacherBackground,
+      primaryColor: AppColors.teacherPrimary,
+      colorScheme: base.colorScheme.copyWith(
+        primary: AppColors.teacherPrimary,
+        primaryContainer: AppColors.teacherPrimaryLight,
+        secondary: AppColors.teacherAccent,
+        secondaryContainer: AppColors.teacherSurfaceTint,
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          elevation: 0,
+          backgroundColor: AppColors.teacherPrimary,
+          foregroundColor: AppColors.white,
+          minimumSize: const Size(0, 56),
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
+          shadowColor: AppColors.teacherPrimary.withValues(alpha: 0.3),
+          textStyle: GoogleFonts.nunito(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.teacherPrimary,
+          minimumSize: const Size(0, 56),
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
+          side: const BorderSide(
+            color: AppColors.teacherPrimary,
+            width: 2,
+          ),
+          textStyle: GoogleFonts.nunito(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.teacherPrimary,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          textStyle: GoogleFonts.nunito(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      inputDecorationTheme: base.inputDecorationTheme.copyWith(
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(
+            color: AppColors.teacherPrimary,
+            width: 2,
+          ),
+        ),
+      ),
+      bottomNavigationBarTheme: base.bottomNavigationBarTheme.copyWith(
+        selectedItemColor: AppColors.teacherPrimary,
+      ),
+      chipTheme: base.chipTheme.copyWith(
+        selectedColor: AppColors.teacherPrimaryLight,
+      ),
+    );
+  }
+
   // Add dark theme if needed in the future
   static ThemeData darkTheme() {
     return lightTheme(); // For now, using light theme only

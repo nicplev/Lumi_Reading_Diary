@@ -9,14 +9,16 @@ import '../../theme/lumi_text_styles.dart';
 class CommentChips extends StatelessWidget {
   final List<String> selectedComments;
   final ValueChanged<List<String>> onCommentsChanged;
+  final Map<String, List<String>>? categories;
 
   const CommentChips({
     super.key,
     required this.selectedComments,
     required this.onCommentsChanged,
+    this.categories,
   });
 
-  static const _commentCategories = {
+  static const defaultCommentCategories = {
     'Encouragement': [
       'Great job!',
       'Keep it up!',
@@ -54,7 +56,7 @@ class CommentChips extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-        ..._commentCategories.entries.map((entry) {
+        ...(categories ?? defaultCommentCategories).entries.map((entry) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: Column(
