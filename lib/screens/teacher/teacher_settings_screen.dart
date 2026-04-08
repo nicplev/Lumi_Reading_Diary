@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -9,8 +10,8 @@ import '../../core/widgets/lumi/teacher_settings_item.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/user_model.dart';
 import '../../services/firebase_service.dart';
-import '../../services/notification_service.dart';
 import '../../services/offline_service.dart';
+import '../../services/reading_level_service.dart';
 
 /// Teacher Settings Screen (Tab 4)
 ///
@@ -29,21 +30,28 @@ class TeacherSettingsScreen extends StatefulWidget {
 }
 
 class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
-  // Persisted notification preferences (loaded from Firestore UserModel.preferences)
-  late bool _pushNotificationsEnabled;
-  late bool _inactivityAlerts;
+  final ReadingLevelService _readingLevelService = ReadingLevelService();
 
   // Teacher's classes (for class picker navigation)
   List<ClassModel> _classes = [];
   bool _loadingClasses = true;
+  bool _levelsEnabled = false;
 
   @override
   void initState() {
     super.initState();
-    final prefs = widget.user.preferences ?? {};
-    _pushNotificationsEnabled = prefs['pushNotificationsEnabled'] ?? true;
-    _inactivityAlerts = prefs['inactivityAlerts'] ?? true;
     _loadClasses();
+    _loadReadingLevelOptions();
+  }
+
+  Future<void> _loadReadingLevelOptions() async {
+    final schoolId = widget.user.schoolId;
+    if (schoolId == null || schoolId.isEmpty) return;
+    try {
+      final options = await _readingLevelService.loadSchoolLevels(schoolId);
+      if (!mounted) return;
+      setState(() => _levelsEnabled = options.isNotEmpty);
+    } catch (_) {}
   }
 
   Future<void> _loadClasses() async {
@@ -73,61 +81,6 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
       debugPrint('Error loading classes: $e');
       if (mounted) setState(() => _loadingClasses = false);
     }
-  }
-
-  Future<void> _updatePreferences() async {
-    final schoolId = widget.user.schoolId;
-    if (schoolId == null) return;
-    try {
-      await FirebaseService.instance.firestore
-          .collection('schools')
-          .doc(schoolId)
-          .collection('users')
-          .doc(widget.user.id)
-          .update({
-        'preferences.pushNotificationsEnabled': _pushNotificationsEnabled,
-        'preferences.inactivityAlerts': _inactivityAlerts,
-      });
-    } catch (e) {
-      debugPrint('Error saving preferences: $e');
-    }
-  }
-
-  Future<void> _togglePushNotifications(bool value) async {
-    setState(() => _pushNotificationsEnabled = value);
-
-    if (value) {
-      // Request permission and register FCM token
-      final granted = await NotificationService.instance.requestPermissions();
-      if (!granted) {
-        // Permission denied — revert toggle
-        if (mounted) {
-          setState(() => _pushNotificationsEnabled = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                  'Notification permission denied. Enable in device settings.'),
-            ),
-          );
-        }
-        return;
-      }
-      final schoolId = widget.user.schoolId;
-      if (schoolId != null) {
-        await NotificationService.instance
-            .saveTokenForUser(schoolId, widget.user.id);
-      }
-    } else {
-      // Unregister FCM token
-      await NotificationService.instance.clearTokenForUser();
-    }
-
-    await _updatePreferences();
-  }
-
-  Future<void> _toggleInactivityAlerts(bool value) async {
-    setState(() => _inactivityAlerts = value);
-    await _updatePreferences();
   }
 
   /// Pick a class (or use the only one) and navigate to a route that requires ClassModel.
@@ -345,15 +298,6 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
     }
   }
 
-  Widget _buildToggle(bool value, ValueChanged<bool> onChanged) {
-    return Switch(
-      value: value,
-      onChanged: onChanged,
-      activeTrackColor: AppColors.teacherPrimary.withValues(alpha: 0.4),
-      activeThumbColor: AppColors.teacherPrimary,
-    );
-  }
-
   Widget _buildSyncStatusTrailing() {
     final status = OfflineService.instance.getSyncStatus();
     final pendingCount = OfflineService.instance.pendingSyncs.length;
@@ -397,6 +341,71 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
     );
   }
 
+  // --------------------------------------------------
+  // NEW: Log Out Card
+  // --------------------------------------------------
+  Widget _buildLogOutCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
+        border: Border.all(color: AppColors.teacherBorder),
+        boxShadow: TeacherDimensions.cardShadow,
+      ),
+      child: InkWell(
+        onTap: _handleSignOut,
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: TeacherDimensions.paddingL,
+            vertical: TeacherDimensions.paddingM,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(Icons.logout_rounded,
+                    size: 22, color: AppColors.error),
+              ),
+              const SizedBox(width: 14),
+              Text(
+                'Log Out',
+                style: const TextStyle(
+                  fontFamily: 'Nunito',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.error,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --------------------------------------------------
+  // NEW: Version Footer
+  // --------------------------------------------------
+  Widget _buildVersionFooter() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16, bottom: 20),
+      child: Center(
+        child: Text(
+          'Lumi v1.0.0',
+          style: TeacherTypography.caption.copyWith(
+            color: AppColors.textSecondary.withValues(alpha: 0.5),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -405,19 +414,25 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Settings', style: TeacherTypography.h1),
-            const SizedBox(height: 24),
+            Text('Settings', style: TeacherTypography.h1)
+                .animate()
+                .fadeIn(duration: 400.ms)
+                .slideY(begin: -0.05, end: 0, curve: Curves.easeOutCubic),
+
+            const SizedBox(height: 20),
 
             // CLASSROOM section
             TeacherSettingsSection(
               title: 'Classroom',
               items: [
-                TeacherSettingsItem(
-                  icon: Icons.auto_stories,
-                  iconBgColor: AppColors.decodableBlue,
-                  label: 'Reading Levels',
-                  onTap: () => _navigateWithClass('/teacher/level-management'),
-                ),
+                if (_levelsEnabled)
+                  TeacherSettingsItem(
+                    icon: Icons.auto_stories,
+                    iconBgColor: AppColors.decodableBlue,
+                    label: 'Reading Levels',
+                    onTap: () =>
+                        _navigateWithClass('/teacher/level-management'),
+                  ),
                 TeacherSettingsItem(
                   icon: Icons.groups,
                   iconBgColor: AppColors.teacherAccent,
@@ -431,7 +446,10 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
                   onTap: () => _navigateWithClass('/teacher/class-report'),
                 ),
               ],
-            ),
+            )
+                .animate()
+                .fadeIn(duration: 300.ms, delay: 60.ms)
+                .slideY(begin: 0.03, end: 0, curve: Curves.easeOut),
 
             const SizedBox(height: 16),
 
@@ -440,34 +458,19 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
               title: 'Notifications',
               items: [
                 TeacherSettingsItem(
-                  icon: Icons.notifications,
-                  iconBgColor: AppColors.warmOrange,
-                  label: 'Push Notifications',
-                  trailing: _buildToggle(
-                    _pushNotificationsEnabled,
-                    _togglePushNotifications,
-                  ),
-                ),
-                TeacherSettingsItem(
-                  icon: Icons.warning_amber,
-                  iconBgColor: AppColors.levelDigraphs,
-                  label: 'Inactivity Alerts',
-                  trailing: _buildToggle(
-                    _inactivityAlerts,
-                    _toggleInactivityAlerts,
-                  ),
-                ),
-                TeacherSettingsItem(
                   icon: Icons.campaign,
                   iconBgColor: AppColors.skyBlue,
-                  label: 'Notifications',
+                  label: 'Parent/Guardian Notifications',
                   onTap: () {
                     context.push('/teacher/notifications',
                         extra: widget.user);
                   },
                 ),
               ],
-            ),
+            )
+                .animate()
+                .fadeIn(duration: 300.ms, delay: 120.ms)
+                .slideY(begin: 0.03, end: 0, curve: Curves.easeOut),
 
             const SizedBox(height: 16),
 
@@ -488,7 +491,10 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
                   trailing: _buildSyncStatusTrailing(),
                 ),
               ],
-            ),
+            )
+                .animate()
+                .fadeIn(duration: 300.ms, delay: 180.ms)
+                .slideY(begin: 0.03, end: 0, curve: Curves.easeOut),
 
             const SizedBox(height: 16),
 
@@ -515,55 +521,20 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
                   onTap: _showAboutDialog,
                 ),
               ],
-            ),
+            )
+                .animate()
+                .fadeIn(duration: 300.ms, delay: 240.ms)
+                .slideY(begin: 0.03, end: 0, curve: Curves.easeOut),
 
             const SizedBox(height: 24),
 
-            // View Profile button
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  context.push('/teacher/profile', extra: widget.user);
-                },
-                icon: const Icon(Icons.person),
-                label: const Text('View Profile'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.teacherPrimary,
-                  side: const BorderSide(color: AppColors.teacherPrimary),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(TeacherDimensions.radiusM),
-                  ),
-                  textStyle: TeacherTypography.buttonText,
-                ),
-              ),
-            ),
+            // Log Out card
+            _buildLogOutCard()
+                .animate()
+                .fadeIn(duration: 300.ms, delay: 300.ms),
 
-            const SizedBox(height: 12),
-
-            // Log Out button
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: _handleSignOut,
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.error,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: const Text(
-                  'Log Out',
-                  style: TextStyle(
-                    fontFamily: 'Nunito',
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
+            // Version footer
+            _buildVersionFooter(),
           ],
         ),
       ),

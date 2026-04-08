@@ -30,7 +30,7 @@ import '../../screens/parent/book_browser_screen.dart';
 import '../../screens/parent/parent_notifications_screen.dart';
 import '../../screens/parent/reading_success_screen.dart';
 import '../../screens/teacher/teacher_home_screen.dart';
-import '../../screens/teacher/allocation_screen.dart';
+import '../../screens/teacher/allocation/allocation_screen.dart';
 import '../../screens/teacher/class_detail_screen.dart';
 import '../../screens/teacher/reading_groups_screen.dart';
 import '../../screens/teacher/class_report_screen.dart';
@@ -468,10 +468,34 @@ class AppRouter {
         path: '/teacher/notifications',
         name: 'teacher-notifications',
         builder: (context, state) {
-          final user =
-              state.extra as UserModel? ?? _ref.read(userProvider).value;
+          final extra = state.extra;
+          UserModel? user;
+          String? preFilledTitle;
+          String? preFilledBody;
+          Set<String>? preSelectedStudentIds;
+
+          if (extra is Map<String, dynamic>) {
+            user = extra['user'] as UserModel?;
+            preFilledTitle = extra['preFilledTitle'] as String?;
+            preFilledBody = extra['preFilledBody'] as String?;
+            final ids = extra['preSelectedStudentIds'];
+            if (ids is Set<String>) {
+              preSelectedStudentIds = ids;
+            } else if (ids is List) {
+              preSelectedStudentIds = ids.cast<String>().toSet();
+            }
+          } else if (extra is UserModel) {
+            user = extra;
+          }
+
+          user ??= _ref.read(userProvider).value;
           if (user == null) return const LoginScreen();
-          return StaffNotificationsScreen(user: user);
+          return StaffNotificationsScreen(
+            user: user,
+            preFilledTitle: preFilledTitle,
+            preFilledBody: preFilledBody,
+            preSelectedStudentIds: preSelectedStudentIds,
+          );
         },
       ),
 
@@ -644,8 +668,16 @@ class AppRouter {
         path: '/admin/notifications',
         name: 'admin-notifications',
         builder: (context, state) {
-          final user =
-              state.extra as UserModel? ?? _ref.read(userProvider).value;
+          final extra = state.extra;
+          UserModel? user;
+
+          if (extra is Map<String, dynamic>) {
+            user = extra['user'] as UserModel?;
+          } else if (extra is UserModel) {
+            user = extra;
+          }
+
+          user ??= _ref.read(userProvider).value;
           if (user == null) return const LoginScreen();
           return StaffNotificationsScreen(user: user);
         },

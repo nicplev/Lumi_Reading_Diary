@@ -17,6 +17,7 @@ class ReadingGroupModel {
   final DateTime? updatedAt;
   final bool isActive;
   final Map<String, dynamic>? settings;
+  final int sortOrder; // For custom ordering in the list
 
   ReadingGroupModel({
     required this.id,
@@ -33,6 +34,7 @@ class ReadingGroupModel {
     this.updatedAt,
     this.isActive = true,
     this.settings,
+    this.sortOrder = 0,
   });
 
   factory ReadingGroupModel.fromFirestore(DocumentSnapshot doc) {
@@ -54,6 +56,7 @@ class ReadingGroupModel {
           : null,
       isActive: data['isActive'] ?? true,
       settings: data['settings'],
+      sortOrder: data['sortOrder'] ?? 0,
     );
   }
 
@@ -72,6 +75,7 @@ class ReadingGroupModel {
       'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
       'isActive': isActive,
       'settings': settings,
+      'sortOrder': sortOrder,
     };
   }
 
@@ -90,6 +94,7 @@ class ReadingGroupModel {
     DateTime? updatedAt,
     bool? isActive,
     Map<String, dynamic>? settings,
+    int? sortOrder,
   }) {
     return ReadingGroupModel(
       id: id ?? this.id,
@@ -106,6 +111,7 @@ class ReadingGroupModel {
       updatedAt: updatedAt ?? this.updatedAt,
       isActive: isActive ?? this.isActive,
       settings: settings ?? this.settings,
+      sortOrder: sortOrder ?? this.sortOrder,
     );
   }
 }

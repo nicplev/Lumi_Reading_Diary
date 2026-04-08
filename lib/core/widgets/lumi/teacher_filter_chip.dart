@@ -27,7 +27,7 @@ class TeacherFilterChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: isActive ? AppColors.teacherPrimary : AppColors.white,
             borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
@@ -47,13 +47,16 @@ class TeacherFilterChip extends StatelessWidget {
                   ]
                 : null,
           ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontFamily: 'Nunito',
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: isActive ? AppColors.white : AppColors.textSecondary,
+          child: Center(
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Nunito',
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: isActive ? AppColors.white : AppColors.textSecondary,
+              ),
             ),
           ),
         ),

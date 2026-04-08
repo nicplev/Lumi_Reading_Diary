@@ -154,12 +154,10 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
                   .get();
 
               if (existingParent.exists) {
-                final parentData = existingParent.data()!;
-                final linkedChildren =
-                    List<String>.from(parentData['linkedChildren'] ?? []);
-
-                if (linkedChildren.contains(_verifiedCode!.studentId)) {
-                  // Already fully registered and linked
+                // Check if the link code is already used — that confirms
+                // the full linking transaction completed previously.
+                if (_verifiedCode!.status == LinkCodeStatus.used &&
+                    _verifiedCode!.usedBy == userId) {
                   setState(() {
                     _errorMessage =
                         'You are already registered and linked to this student. Please use the login page.';
@@ -167,7 +165,7 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
                   await _auth.signOut();
                   return;
                 }
-                // Parent exists but not linked to this student - continue with linking
+                // Parent doc exists but linking may not have completed — continue
               }
             } on FirebaseAuthException catch (signInError) {
               debugPrint('[ParentReg] Sign-in error: ${signInError.code}');
@@ -205,7 +203,7 @@ class _ParentRegistrationScreenState extends State<ParentRegistrationScreen> {
             fullName: fullName,
             role: UserRole.parent,
             schoolId: _verifiedCode!.schoolId,
-            linkedChildren: [_verifiedCode!.studentId],
+            linkedChildren: [],
             createdAt: DateTime.now(),
             isActive: true,
           );

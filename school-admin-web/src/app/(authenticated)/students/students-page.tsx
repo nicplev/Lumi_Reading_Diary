@@ -16,18 +16,19 @@ import { useToast } from '@/components/lumi/toast';
 import { StudentFormModal } from './student-form-modal';
 import { CSVImportDialog } from './csv-import-dialog';
 import { useStudents, useCreateStudent } from '@/lib/hooks/use-students';
-import type { SchoolClass, ReadingLevelOption } from '@/lib/types';
+import type { SchoolClass, ReadingLevelOption, ReadingLevelSchema } from '@/lib/types';
 
 type SerializedClass = Omit<SchoolClass, 'createdAt'> & { createdAt: string };
 
 interface StudentsPageProps {
   classes: SerializedClass[];
   levelOptions: ReadingLevelOption[];
+  levelSchema: ReadingLevelSchema;
 }
 
 type QuickFilter = 'all' | 'has-parent' | 'no-parent';
 
-export function StudentsPage({ classes, levelOptions }: StudentsPageProps) {
+export function StudentsPage({ classes, levelOptions, levelSchema }: StudentsPageProps) {
   const router = useRouter();
   const { toast } = useToast();
   const { data: students, isLoading } = useStudents();
@@ -67,7 +68,7 @@ export function StudentsPage({ classes, levelOptions }: StudentsPageProps) {
     return list;
   }, [students, search, classFilter, quickFilter]);
 
-  const columns: DataTableColumn<(typeof filtered)[0]>[] = [
+  const allColumns: DataTableColumn<(typeof filtered)[0]>[] = [
     {
       id: 'name',
       header: 'Name',
@@ -123,6 +124,10 @@ export function StudentsPage({ classes, levelOptions }: StudentsPageProps) {
       sortable: true,
     },
   ];
+
+  const columns = levelSchema === 'none'
+    ? allColumns.filter((col) => col.id !== 'level')
+    : allColumns;
 
   const handleCreate = async (data: { studentId?: string; firstName: string; lastName: string; classId: string; dateOfBirth?: string; currentReadingLevel?: string }) => {
     try {

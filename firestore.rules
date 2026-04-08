@@ -268,6 +268,13 @@ service cloud.firestore {
         allow delete: if isSchoolAdmin(schoolId);
       }
 
+      match /readingGroups/{groupId} {
+        allow get, list: if belongsToSchool(schoolId);
+        allow create: if isTeacher(schoolId) || isSchoolAdmin(schoolId);
+        allow update: if isTeacher(schoolId) || isSchoolAdmin(schoolId);
+        allow delete: if isTeacher(schoolId) || isSchoolAdmin(schoolId);
+      }
+
       match /notificationCampaigns/{campaignId} {
         allow get, list: if isSchoolAdmin(schoolId) ||
             (isTeacher(schoolId) && resource.data.createdBy == request.auth.uid);
@@ -350,9 +357,10 @@ service cloud.firestore {
     }
 
     match /studentLinkCodes/{codeId} {
-      // Parent verification path (unauthenticated): small bounded query only.
-      allow list: if !isSignedIn() &&
-          request.query.limit != null &&
+      // Parent verification path: small bounded query for code lookup.
+      // Allows both unauthenticated (initial verify) and authenticated
+      // (linking transaction re-verify after account creation) access.
+      allow list: if request.query.limit != null &&
           request.query.limit > 0 &&
           request.query.limit <= 10;
 
@@ -360,7 +368,8 @@ service cloud.firestore {
           (
             isSchoolAdmin(resource.data.schoolId) ||
             isTeacher(resource.data.schoolId) ||
-            resource.data.usedBy == request.auth.uid
+            resource.data.usedBy == request.auth.uid ||
+            isParentMember(resource.data.schoolId)
           );
 
       allow list: if isSignedIn() &&
@@ -427,6 +436,16 @@ service cloud.firestore {
           (isSchoolAdmin(resource.data.schoolId) || isTeacher(resource.data.schoolId));
 
       allow delete: if isSignedIn() && isSchoolAdmin(resource.data.schoolId);
+    }
+
+    // ── User Feedback ──────────────────────────────────────────────
+    match /feedback/{feedbackId} {
+      // Any signed-in user can submit feedback.
+      allow create: if isSignedIn() &&
+          request.resource.data.userId == request.auth.uid;
+
+      // Read/update/delete only via Admin SDK (super-admin dashboard).
+      allow get, list, update, delete: if false;
     }
 
     match /userSchoolIndex/{emailHash} {

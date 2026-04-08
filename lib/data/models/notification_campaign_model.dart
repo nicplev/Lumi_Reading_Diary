@@ -21,6 +21,7 @@ class NotificationCampaignModel {
   final int inboxWrittenCount;
   final int pushSentCount;
   final int pushFailedCount;
+  final int pushSkippedCount;
   final String? errorSummary;
 
   const NotificationCampaignModel({
@@ -44,6 +45,7 @@ class NotificationCampaignModel {
     required this.inboxWrittenCount,
     required this.pushSentCount,
     required this.pushFailedCount,
+    required this.pushSkippedCount,
     required this.errorSummary,
   });
 
@@ -76,6 +78,7 @@ class NotificationCampaignModel {
       inboxWrittenCount: (deliveryCounts['inboxWritten'] as num?)?.toInt() ?? 0,
       pushSentCount: (deliveryCounts['pushSent'] as num?)?.toInt() ?? 0,
       pushFailedCount: (deliveryCounts['pushFailed'] as num?)?.toInt() ?? 0,
+      pushSkippedCount: (deliveryCounts['pushSkipped'] as num?)?.toInt() ?? 0,
       errorSummary: data['errorSummary'] as String?,
     );
   }

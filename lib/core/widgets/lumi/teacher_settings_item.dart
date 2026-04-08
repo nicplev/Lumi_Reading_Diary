@@ -32,7 +32,7 @@ class TeacherSettingsItem extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: TeacherDimensions.paddingL,
-          vertical: TeacherDimensions.paddingL,
+          vertical: TeacherDimensions.paddingM,
         ),
         child: Row(
           children: [

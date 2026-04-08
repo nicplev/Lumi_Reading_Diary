@@ -11,6 +11,7 @@ import '../../core/widgets/lumi/teacher_reading_level_pill.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/reading_level_option.dart';
+import '../../data/models/reading_group_model.dart';
 import '../../data/models/student_model.dart';
 import '../../services/firebase_service.dart';
 import '../../services/isbn_assignment_service.dart';
@@ -49,10 +50,15 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
   List<ReadingLevelOption> _readingLevelOptions = const [];
   bool _levelsEnabled = true;
 
+  // Group filtering
+  List<ReadingGroupModel> _groups = [];
+  String? _selectedGroupFilter; // null = all, 'ungrouped' = ungrouped, else groupId
+
   @override
   void initState() {
     super.initState();
     _loadReadingLevelOptions();
+    _loadGroups();
   }
 
   @override
@@ -61,12 +67,58 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     if (oldWidget.teacher.schoolId != widget.teacher.schoolId) {
       _loadReadingLevelOptions(forceRefresh: true);
     }
+    if (oldWidget.selectedClass?.id != widget.selectedClass?.id) {
+      _loadGroups();
+      _selectedGroupFilter = null;
+    }
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadGroups() async {
+    final classModel = widget.selectedClass;
+    if (classModel == null) return;
+
+    try {
+      final snapshot = await FirebaseService.instance.firestore
+          .collection('schools')
+          .doc(widget.teacher.schoolId)
+          .collection('readingGroups')
+          .where('classId', isEqualTo: classModel.id)
+          .where('isActive', isEqualTo: true)
+          .get();
+
+      if (!mounted) return;
+      setState(() {
+        _groups = snapshot.docs
+            .map((doc) => ReadingGroupModel.fromFirestore(doc))
+            .toList()
+          ..sort((a, b) {
+            final orderCmp = a.sortOrder.compareTo(b.sortOrder);
+            return orderCmp != 0 ? orderCmp : a.name.compareTo(b.name);
+          });
+      });
+    } catch (e) {
+      debugPrint('Error loading reading groups: $e');
+    }
+  }
+
+  List<StudentModel> _filterByGroup(List<StudentModel> students) {
+    if (_selectedGroupFilter == null) return students;
+    if (_selectedGroupFilter == 'ungrouped') {
+      final allGroupedIds = <String>{};
+      for (final group in _groups) {
+        allGroupedIds.addAll(group.studentIds);
+      }
+      return students.where((s) => !allGroupedIds.contains(s.id)).toList();
+    }
+    final group = _groups.where((g) => g.id == _selectedGroupFilter).firstOrNull;
+    if (group == null) return students;
+    return students.where((s) => group.studentIds.contains(s.id)).toList();
   }
 
   Future<void> _loadReadingLevelOptions({bool forceRefresh = false}) async {
@@ -203,6 +255,32 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
             child: _buildSearchBar(),
           ),
         ),
+
+        // Group filter chips
+        if (_groups.isNotEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: SizedBox(
+                height: 36,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    _groupFilterChip('All', null),
+                    const SizedBox(width: 6),
+                    ..._groups.map((group) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: _groupFilterChip(group.name, group.id,
+                            color: group.color),
+                      );
+                    }),
+                    _groupFilterChip('Ungrouped', 'ungrouped'),
+                  ],
+                ),
+              ),
+            ),
+          ),
 
         // Students header + sort
         SliverToBoxAdapter(
@@ -347,43 +425,63 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     );
   }
 
-  Widget _buildSearchBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
-        boxShadow: TeacherDimensions.cardShadow,
-      ),
-      child: TextField(
-        controller: _searchController,
-        onChanged: (value) => setState(() => _searchQuery = value),
-        style: TeacherTypography.bodyMedium,
-        decoration: InputDecoration(
-          hintText: 'Find a student...',
-          hintStyle: TeacherTypography.bodyMedium.copyWith(
-            color: AppColors.textSecondary.withValues(alpha: 0.6),
-          ),
-          prefixIcon: Icon(
-            Icons.search,
-            color: _searchQuery.isNotEmpty
+  Widget _groupFilterChip(String label, String? filterValue, {String? color}) {
+    final isSelected = _selectedGroupFilter == filterValue;
+    final groupColor = color != null
+        ? Color(int.parse(color.replaceFirst('#', '0xFF')))
+        : null;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedGroupFilter = filterValue),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.teacherPrimary
+              : AppColors.teacherPrimaryLight,
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
+          border: Border.all(
+            color: isSelected
                 ? AppColors.teacherPrimary
-                : AppColors.textSecondary.withValues(alpha: 0.5),
+                : AppColors.teacherBorder,
+            width: 1,
           ),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.close, size: 20),
-                  color: AppColors.textSecondary,
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() => _searchQuery = '');
-                  },
-                )
-              : null,
-          border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (groupColor != null) ...[
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.white : groupColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: TeacherTypography.caption.copyWith(
+                color: isSelected ? AppColors.white : AppColors.charcoal,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return _ClassroomSearchBar(
+      controller: _searchController,
+      query: _searchQuery,
+      onChanged: (value) => setState(() => _searchQuery = value),
+      onClear: () {
+        _searchController.clear();
+        setState(() => _searchQuery = '');
+      },
     );
   }
 
@@ -558,7 +656,8 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
             .map((doc) => StudentModel.fromFirestore(doc))
             .where((student) => student.isActive)
             .toList();
-        final filtered = _filterStudents(students);
+        final groupFiltered = _filterByGroup(students);
+        final filtered = _filterStudents(groupFiltered);
         final sorted = _sortStudents(filtered);
 
         if (sorted.isEmpty && _searchQuery.isNotEmpty) {
@@ -799,7 +898,6 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
           ),
           backgroundColor:
               didUpdate ? AppColors.success : AppColors.textSecondary,
-          behavior: SnackBarBehavior.floating,
         ),
       );
     } catch (error) {
@@ -808,7 +906,6 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
         SnackBar(
           content: Text('Could not update reading level: $error'),
           backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -1378,6 +1475,164 @@ class _PickerFilterChip extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ClassroomSearchBar extends StatefulWidget {
+  const _ClassroomSearchBar({
+    required this.controller,
+    required this.query,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final String query;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  @override
+  State<_ClassroomSearchBar> createState() => _ClassroomSearchBarState();
+}
+
+class _ClassroomSearchBarState extends State<_ClassroomSearchBar>
+    with SingleTickerProviderStateMixin {
+  late final FocusNode _focusNode;
+  late final AnimationController _fillController;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode();
+    _focusNode.addListener(_handleFocusChange);
+    _fillController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+      reverseDuration: const Duration(milliseconds: 220),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.of(context).disableAnimations) {
+      _fillController.value = _focusNode.hasFocus ? 1.0 : 0.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_handleFocusChange);
+    _focusNode.dispose();
+    _fillController.dispose();
+    super.dispose();
+  }
+
+  void _handleFocusChange() {
+    final targetValue = _focusNode.hasFocus ? 1.0 : 0.0;
+
+    if (MediaQuery.of(context).disableAnimations) {
+      _fillController.value = targetValue;
+    } else if (_focusNode.hasFocus) {
+      _fillController.forward();
+    } else {
+      _fillController.reverse();
+    }
+
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasQuery = widget.query.isNotEmpty;
+    final isActive = _focusNode.hasFocus || hasQuery;
+    const borderRadius = BorderRadius.all(
+      Radius.circular(TeacherDimensions.radiusL),
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: borderRadius,
+        border: Border.all(color: AppColors.teacherBorder, width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.charcoal.withValues(alpha: 0.05),
+            blurRadius: 16,
+            spreadRadius: -8,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: borderRadius,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: AnimatedBuilder(
+                animation: _fillController,
+                builder: (context, child) {
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: FractionallySizedBox(
+                      widthFactor: _fillController.value.clamp(0.0, 1.0),
+                      heightFactor: 1,
+                      child: child,
+                    ),
+                  );
+                },
+                child: ColoredBox(
+                  color:
+                      AppColors.teacherPrimaryLight.withValues(alpha: 0.82),
+                ),
+              ),
+            ),
+            TextField(
+              controller: widget.controller,
+              focusNode: _focusNode,
+              onChanged: widget.onChanged,
+              onTapOutside: (_) => FocusScope.of(context).unfocus(),
+              textInputAction: TextInputAction.search,
+              cursorColor: AppColors.rosePink,
+              style: TeacherTypography.bodyMedium.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Find a student...',
+                hintStyle: TeacherTypography.bodyMedium.copyWith(
+                  color: AppColors.textSecondary.withValues(alpha: 0.65),
+                ),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: isActive
+                      ? AppColors.teacherPrimary
+                      : AppColors.textSecondary.withValues(alpha: 0.58),
+                ),
+                suffixIcon: hasQuery
+                    ? IconButton(
+                        tooltip: 'Clear search',
+                        icon: const Icon(Icons.close_rounded, size: 20),
+                        color: AppColors.textSecondary,
+                        onPressed: widget.onClear,
+                      )
+                    : null,
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                hoverColor: Colors.transparent,
+                focusColor: Colors.transparent,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+              ),
+            ),
+          ],
         ),
       ),
     );

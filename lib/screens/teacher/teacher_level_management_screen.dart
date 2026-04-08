@@ -264,7 +264,6 @@ class _TeacherLevelManagementScreenState
           ),
           backgroundColor:
               updatedCount > 0 ? AppColors.success : AppColors.textSecondary,
-          behavior: SnackBarBehavior.floating,
         ),
       );
     } catch (error) {
@@ -273,7 +272,6 @@ class _TeacherLevelManagementScreenState
         SnackBar(
           content: Text('Could not update reading levels: $error'),
           backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
         ),
       );
     } finally {
@@ -295,7 +293,6 @@ class _TeacherLevelManagementScreenState
         const SnackBar(
           content: Text(
               'Select students with the same current level to move together'),
-          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
@@ -314,7 +311,6 @@ class _TeacherLevelManagementScreenState
                 ? 'Those students are already at the top of the level scale'
                 : 'Those students are already at the lowest level',
           ),
-          behavior: SnackBarBehavior.floating,
         ),
       );
       return;

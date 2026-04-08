@@ -8,7 +8,6 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
 import '../../core/widgets/lumi/reading_level_history_sheet.dart';
 import '../../core/widgets/lumi/reading_level_picker_sheet.dart';
-import '../../core/widgets/lumi/teacher_stat_card.dart';
 import '../../core/widgets/lumi/teacher_book_assignment_card.dart';
 import '../../core/widgets/lumi/teacher_reading_level_pill.dart';
 import '../../core/widgets/lumi/teacher_student_list_item.dart';
@@ -17,9 +16,14 @@ import '../../data/models/reading_level_option.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/allocation_model.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import '../../core/widgets/lumi/persistent_cached_image.dart';
+import '../../data/models/book_model.dart';
 import '../../services/book_cover_cache_service.dart';
 import '../../services/book_lookup_service.dart';
+import '../../services/school_library_service.dart';
 import '../../services/book_metadata_resolver.dart';
+import '../../data/models/reading_group_model.dart';
 import '../../services/allocation_crud_service.dart';
 import '../../services/firebase_service.dart';
 import '../../services/isbn_assignment_service.dart';
@@ -61,9 +65,10 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   final Set<String> _isbnCoverLoadsInFlight = <String>{};
   final Set<String> _isbnCoverLoadsCompleted = <String>{};
   List<ReadingLevelOption> _readingLevelOptions = const [];
-  bool _levelsEnabled = true;
+  bool _levelsEnabled = false;
   StudentModel? _studentOverride;
   bool _readingLevelExpanded = false;
+  Future<List<ReadingGroupModel>>? _studentGroupsFuture;
 
   StudentModel get _currentStudent => _studentOverride ?? widget.student;
 
@@ -87,6 +92,25 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     BookCoverCacheService.instance.addListener(_onCoversUpdated);
     _ensureMetadataResolver();
     _loadReadingLevelOptions();
+    _studentGroupsFuture = _loadStudentGroups();
+  }
+
+  Future<List<ReadingGroupModel>> _loadStudentGroups() async {
+    try {
+      final snapshot = await _firebaseService.firestore
+          .collection('schools')
+          .doc(widget.student.schoolId)
+          .collection('readingGroups')
+          .where('studentIds', arrayContains: widget.student.id)
+          .where('isActive', isEqualTo: true)
+          .get();
+      return snapshot.docs
+          .map((doc) => ReadingGroupModel.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      debugPrint('Error loading student groups: $e');
+      return [];
+    }
   }
 
   @override
@@ -283,6 +307,88 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         book.assignmentItemId!.isNotEmpty;
   }
 
+  void _showBookActionsSheet(_AssignedBookViewData book) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(TeacherDimensions.radiusXL),
+          ),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 44,
+              height: 5,
+              decoration: BoxDecoration(
+                color: AppColors.teacherBorder,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(book.title, style: TeacherTypography.h3),
+            const SizedBox(height: 16),
+            _buildSheetAction(
+              icon: Icons.swap_horiz_rounded,
+              label: 'Swap',
+              onTap: () {
+                Navigator.pop(context);
+                _handleBookAction(book, TeacherBookCardAction.swap);
+              },
+            ),
+            _buildSheetAction(
+              icon: Icons.refresh_rounded,
+              label: 'Keep next week',
+              onTap: () {
+                Navigator.pop(context);
+                _handleBookAction(book, TeacherBookCardAction.keepNextCycle);
+              },
+            ),
+            _buildSheetAction(
+              icon: Icons.delete_outline_rounded,
+              label: 'Remove',
+              isDestructive: true,
+              onTap: () {
+                Navigator.pop(context);
+                _handleBookAction(book, TeacherBookCardAction.remove);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSheetAction({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool isDestructive = false,
+  }) {
+    final color = isDestructive ? AppColors.error : AppColors.charcoal;
+    return ListTile(
+      leading: Icon(icon, color: color, size: 22),
+      title: Text(
+        label,
+        style: TeacherTypography.bodyMedium.copyWith(
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      onTap: onTap,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+      visualDensity: const VisualDensity(vertical: -1),
+    );
+  }
+
   Future<void> _handleBookAction(
     _AssignedBookViewData book,
     TeacherBookCardAction action,
@@ -384,15 +490,23 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     required String itemId,
     required String currentTitle,
   }) async {
-    final nextTitle = await _promptBookTitle(
-      title: 'Swap Book',
-      hintText: 'Replacement book title',
-      initialValue: '',
-    );
-    if (nextTitle == null) return;
+    // Step 1: Pick swap method
+    final selectedBook = await _showSwapMethodPicker();
+    if (selectedBook == null || !mounted) return;
 
+    // Step 2: Pick scope
     final scope = await _pickActionScope(actionLabel: 'Swap');
-    if (scope == null) return;
+    if (scope == null || !mounted) return;
+
+    // Step 3: Execute swap with full book data
+    final nextTitle = selectedBook.title;
+    final nextBookId = selectedBook.id;
+    final nextIsbn = selectedBook.isbn;
+    final nextMetadata = <String, dynamic>{
+      'source': 'library_swap',
+      if (selectedBook.coverImageUrl != null)
+        'coverImageUrl': selectedBook.coverImageUrl,
+    };
 
     if (scope == _AssignmentEditScope.wholeClass) {
       await _allocationCrudService.swapBookGlobally(
@@ -401,6 +515,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         actorId: widget.teacher.id,
         removeItemId: itemId,
         nextTitle: nextTitle,
+        nextBookId: nextBookId,
+        nextIsbn: nextIsbn,
+        nextMetadata: nextMetadata,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -416,13 +533,139 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       removeItemId: itemId,
       studentIds: [widget.student.id],
       nextTitle: nextTitle,
-      nextMetadata: const {'source': 'student_swap'},
+      nextBookId: nextBookId,
+      nextIsbn: nextIsbn,
+      nextMetadata: nextMetadata,
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
           content:
               Text('Swapped "$currentTitle" for ${widget.student.firstName}.')),
+    );
+  }
+
+  /// Shows a bottom sheet letting the teacher choose between library browse
+  /// or ISBN scan to find a replacement book.
+  Future<BookModel?> _showSwapMethodPicker() async {
+    final method = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(TeacherDimensions.radiusXL),
+          ),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 44,
+              height: 5,
+              decoration: BoxDecoration(
+                color: AppColors.teacherBorder,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('Swap Book', style: TeacherTypography.h3),
+            const SizedBox(height: 16),
+            _buildSwapMethodTile(
+              icon: Icons.menu_book_rounded,
+              label: 'Choose from Library',
+              subtitle: 'Browse your school\'s scanned books',
+              onTap: () => Navigator.pop(context, 'library'),
+            ),
+            const SizedBox(height: 8),
+            _buildSwapMethodTile(
+              icon: Icons.qr_code_scanner_rounded,
+              label: 'Scan ISBN Barcode',
+              subtitle: 'Scan the replacement book\'s barcode',
+              onTap: () => Navigator.pop(context, 'scan'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (method == null || !mounted) return null;
+
+    if (method == 'library') {
+      return showModalBottomSheet<BookModel>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _BookPickerSheet(schoolId: widget.student.schoolId),
+      );
+    }
+
+    if (method == 'scan') {
+      return Navigator.push<BookModel>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => _SwapScannerScreen(
+            schoolId: widget.student.schoolId,
+            actorId: widget.teacher.id,
+          ),
+        ),
+      );
+    }
+
+    return null;
+  }
+
+  Widget _buildSwapMethodTile({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: AppColors.teacherBackground,
+      borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.teacherPrimaryLight,
+                  borderRadius:
+                      BorderRadius.circular(TeacherDimensions.radiusS),
+                ),
+                child: Icon(icon, size: 18, color: AppColors.teacherPrimary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TeacherTypography.bodyMedium
+                          .copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    Text(subtitle, style: TeacherTypography.caption),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: AppColors.textSecondary.withValues(alpha: 0.4),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -616,24 +859,28 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     required String label,
     required VoidCallback onPressed,
   }) {
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 16),
-      label: Text(
-        label,
-        style: TeacherTypography.bodyMedium.copyWith(
-          fontWeight: FontWeight.w700,
-          color: AppColors.teacherPrimary,
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: AppColors.teacherPrimaryLight,
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusS),
         ),
-      ),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: AppColors.teacherPrimary,
-        side: BorderSide(
-          color: AppColors.teacherPrimary.withValues(alpha: 0.3),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: AppColors.teacherPrimary),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TeacherTypography.caption.copyWith(
+                color: AppColors.teacherPrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        visualDensity: const VisualDensity(horizontal: -1, vertical: -1),
       ),
     );
   }
@@ -1222,50 +1469,36 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     List<_ReadingLogSnapshot> logs,
   ) {
     for (final log in logs) {
-      final hasComment = (log.parentComment?.isNotEmpty ?? false) ||
-          log.parentCommentSelections.isNotEmpty ||
-          (log.parentCommentFreeText?.isNotEmpty ?? false);
-      if (!hasComment) continue;
-
-      final text = _composeCommentText(log);
-      if (text.isEmpty) continue;
+      final hasChips = log.parentCommentSelections.isNotEmpty;
+      final freeText = _extractFreeText(log);
+      final hasFreeText = freeText.isNotEmpty;
+      if (!hasChips && !hasFreeText) continue;
 
       return _LatestParentCommentViewData(
         parentId: log.parentId,
-        commentText: text,
+        commentText: freeText,
         date: log.date,
         selections: log.parentCommentSelections,
-        starRating: _starRatingFromFeeling(log.childFeeling),
+        feeling: log.childFeeling,
       );
     }
     return null;
   }
 
-  String _composeCommentText(_ReadingLogSnapshot log) {
-    final chips = log.parentCommentSelections.join('. ');
+  /// Returns only the parent's typed free-text comment, excluding chip
+  /// selections. Falls back to the legacy `parentComment` field if no
+  /// structured data exists.
+  String _extractFreeText(_ReadingLogSnapshot log) {
     final freeText = log.parentCommentFreeText?.trim() ?? '';
-    final structured =
-        [chips, freeText].where((value) => value.isNotEmpty).join('. ').trim();
-    if (structured.isNotEmpty) return structured;
-    return log.parentComment?.trim() ?? '';
+    if (freeText.isNotEmpty) return freeText;
+    // Legacy logs stored everything in parentComment. Only use it if there
+    // are no structured selections (otherwise it's a duplicate).
+    if (log.parentCommentSelections.isEmpty) {
+      return log.parentComment?.trim() ?? '';
+    }
+    return '';
   }
 
-  int? _starRatingFromFeeling(String? childFeeling) {
-    switch (childFeeling) {
-      case 'hard':
-        return 1;
-      case 'tricky':
-        return 2;
-      case 'okay':
-        return 3;
-      case 'good':
-        return 4;
-      case 'great':
-        return 5;
-      default:
-        return null;
-    }
-  }
 
   String _formatCommentDate(DateTime date) {
     final now = DateTime.now();
@@ -1351,7 +1584,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         SnackBar(
           content: Text('Could not open reading level picker: $error'),
           backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -1381,7 +1613,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         SnackBar(
           content: Text('Could not update reading level: $error'),
           backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -1420,7 +1651,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         ),
         backgroundColor:
             didUpdate ? AppColors.success : AppColors.textSecondary,
-        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -1478,7 +1708,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         SnackBar(
           content: Text('Could not load reading level history: $error'),
           backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -1487,26 +1716,59 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.teacherBackground,
       appBar: AppBar(
-        backgroundColor: AppColors.teacherPrimary,
-        foregroundColor: AppColors.white,
+        backgroundColor: AppColors.white,
+        foregroundColor: AppColors.charcoal,
         elevation: 0,
-        title: const Text(
-          'Student Detail',
-          style: TextStyle(
-            fontFamily: 'Nunito',
-            fontWeight: FontWeight.w700,
-          ),
+        surfaceTintColor: AppColors.white,
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: TeacherStudentListItem.colorForName(
+                  _currentStudent.fullName),
+              child: Text(
+                _currentStudent.firstName[0].toUpperCase(),
+                style: const TextStyle(
+                  fontFamily: 'Nunito',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.white,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(_currentStudent.fullName, style: TeacherTypography.h3),
+          ],
         ),
+        actions: [
+          if (_levelsEnabled)
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: TeacherReadingLevelPill(
+                label: _readingLevelCompactLabel(_currentStudent),
+                isUnset: _isReadingLevelUnset(_currentStudent),
+                isUnresolved: _isReadingLevelUnresolved(_currentStudent),
+                onTap: _showReadingLevelPicker,
+              ),
+            ),
+        ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Student header
-            _buildStudentHeader(),
+            // Last read indicator
+            _buildLastReadIndicator(),
+            const SizedBox(height: 12),
+
+            // Group badges
+            _buildGroupBadges(),
+
+            // Stats
+            _buildStatsRow(),
             const SizedBox(height: 20),
 
             if (_levelsEnabled) ...[
@@ -1514,13 +1776,13 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               const SizedBox(height: 20),
             ],
 
-            // Stats cards (2-column)
-            _buildStatsRow(),
-            const SizedBox(height: 24),
-
             // Assigned Books section
             _buildAssignedBooksSection(),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
+
+            // Reading History
+            _buildReadingHistorySection(),
+            const SizedBox(height: 20),
 
             // Latest Parent Comment
             _buildParentCommentSection(),
@@ -1531,40 +1793,231 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     );
   }
 
-  Widget _buildStudentHeader() {
-    final fullName = _currentStudent.fullName;
+  Widget _buildGroupBadges() {
+    return FutureBuilder<List<ReadingGroupModel>>(
+      future: _studentGroupsFuture,
+      builder: (context, snapshot) {
+        final groups = snapshot.data;
+        if (groups == null || groups.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: groups.map((group) {
+              final groupColor = group.color != null
+                  ? Color(
+                      int.parse(group.color!.replaceFirst('#', '0xFF')))
+                  : AppColors.teacherPrimary;
+              return Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: groupColor.withValues(alpha: 0.1),
+                  borderRadius:
+                      BorderRadius.circular(TeacherDimensions.radiusRound),
+                  border: Border.all(
+                    color: groupColor.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: groupColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      group.name,
+                      style: TeacherTypography.caption.copyWith(
+                        color: groupColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLastReadIndicator() {
+    final lastRead = _currentStudent.stats?.lastReadingDate;
+    final String label;
+    final Color color;
+
+    if (lastRead == null) {
+      label = 'No reading logged yet';
+      color = AppColors.textSecondary;
+    } else {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final lastDay = DateTime(lastRead.year, lastRead.month, lastRead.day);
+      final diff = today.difference(lastDay).inDays;
+
+      if (diff == 0) {
+        label = 'Last read today';
+        color = AppColors.success;
+      } else if (diff == 1) {
+        label = 'Last read yesterday';
+        color = AppColors.teacherPrimary;
+      } else if (diff < 7) {
+        label = 'Last read $diff days ago';
+        color = AppColors.warmOrange;
+      } else {
+        label = 'Last read ${(diff / 7).floor()} week${diff >= 14 ? 's' : ''} ago';
+        color = AppColors.error;
+      }
+    }
 
     return Row(
       children: [
-        CircleAvatar(
-          radius: TeacherDimensions.avatarM / 2,
-          backgroundColor: TeacherStudentListItem.colorForName(fullName),
-          child: Text(
-            _currentStudent.firstName[0].toUpperCase(),
-            style: TeacherTypography.statValue.copyWith(
-              color: AppColors.white,
-            ),
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
           ),
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(fullName, style: TeacherTypography.h2),
-              if (_levelsEnabled) ...[
-                const SizedBox(height: 6),
-                TeacherReadingLevelPill(
-                  label: _readingLevelCompactLabel(_currentStudent),
-                  isUnset: _isReadingLevelUnset(_currentStudent),
-                  isUnresolved: _isReadingLevelUnresolved(_currentStudent),
-                  onTap: _showReadingLevelPicker,
-                ),
-              ],
-            ],
-          ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: TeacherTypography.bodySmall.copyWith(color: color),
         ),
       ],
+    );
+  }
+
+  Widget _buildReadingHistorySection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Recent Reading', style: TeacherTypography.h3),
+        const SizedBox(height: 10),
+        StreamBuilder<QuerySnapshot>(
+          stream: _firebaseService.firestore
+              .collection('schools')
+              .doc(widget.student.schoolId)
+              .collection('readingLogs')
+              .where('studentId', isEqualTo: widget.student.id)
+              .orderBy('date', descending: true)
+              .limit(5)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            final logs = _toReadingLogs(snapshot.data!);
+            if (logs.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius:
+                      BorderRadius.circular(TeacherDimensions.radiusL),
+                  border: Border.all(color: AppColors.teacherBorder),
+                ),
+                child: Center(
+                  child: Text(
+                    'No reading history yet',
+                    style: TeacherTypography.bodySmall,
+                  ),
+                ),
+              );
+            }
+
+            return Container(
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius:
+                    BorderRadius.circular(TeacherDimensions.radiusL),
+                border: Border.all(color: AppColors.teacherBorder),
+              ),
+              child: Column(
+                children: [
+                  for (int i = 0; i < logs.length; i++) ...[
+                    _buildReadingLogRow(logs[i]),
+                    if (i < logs.length - 1)
+                      Divider(
+                        height: 1,
+                        color: AppColors.teacherBorder,
+                        indent: 14,
+                        endIndent: 14,
+                      ),
+                  ],
+                ],
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReadingLogRow(_ReadingLogSnapshot log) {
+    final dateStr = _formatCommentDate(log.date);
+    final books = log.bookTitles.isNotEmpty
+        ? log.bookTitles.join(', ')
+        : 'Free reading';
+    final minutes = log.minutesRead;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        children: [
+          // Date
+          SizedBox(
+            width: 70,
+            child: Text(
+              dateStr,
+              style: TeacherTypography.caption,
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Book title
+          Expanded(
+            child: Text(
+              books,
+              style: TeacherTypography.bodyMedium,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Minutes
+          Text(
+            '${minutes}m',
+            style: TeacherTypography.caption.copyWith(
+              color: AppColors.teacherPrimary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          // Feeling blob
+          if (log.childFeeling != null) ...[
+            const SizedBox(width: 6),
+            Image.asset(
+              'assets/blobs/blob-${log.childFeeling}.png',
+              width: 18,
+              height: 18,
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -1787,29 +2240,115 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     );
   }
 
+  /// Returns the current streak only if the student read today or yesterday.
+  int _activeStreak(StudentStats? stats) {
+    if (stats == null) return 0;
+    final stored = stats.currentStreak;
+    if (stored <= 0) return 0;
+    final lastRead = stats.lastReadingDate;
+    if (lastRead == null) return 0;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final lastDay = DateTime(lastRead.year, lastRead.month, lastRead.day);
+    if (lastDay.isAtSameMomentAs(today) ||
+        lastDay.isAtSameMomentAs(yesterday)) {
+      return stored;
+    }
+    return 0;
+  }
+
   Widget _buildStatsRow() {
-    return Row(
+    final streak = _activeStreak(_currentStudent.stats);
+    final totalNights = _currentStudent.stats?.totalReadingDays ?? 0;
+    final totalBooks = _currentStudent.stats?.totalBooksRead ?? 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: TeacherStatCard(
-            icon: Icons.local_fire_department,
-            iconColor: AppColors.warmOrange,
-            iconBgColor: AppColors.warmOrange.withValues(alpha: 0.15),
-            value: '${_currentStudent.stats?.currentStreak ?? 0}',
-            label: 'Day Streak',
+        Text('Reading Stats', style: TeacherTypography.h3),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+            border: Border.all(color: AppColors.teacherBorder),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: TeacherStatCard(
-            icon: Icons.nights_stay,
-            iconColor: AppColors.teacherPrimary,
-            iconBgColor: AppColors.teacherPrimaryLight,
-            value: '${_currentStudent.stats?.totalReadingDays ?? 0}',
-            label: 'Total Nights',
+          child: Row(
+            children: [
+              _buildCompactStat(
+                '$streak', 'Day streak',
+                icon: Icons.local_fire_department_outlined,
+                iconSize: 20,
+                iconColor: AppColors.warmOrange,
+                circleColor: AppColors.warmOrange.withValues(alpha: 0.12),
+              ),
+              _compactDivider(),
+              _buildCompactStat(
+                '$totalNights', 'Total nights',
+                icon: Icons.nights_stay_outlined,
+              ),
+              _compactDivider(),
+              _buildCompactStat(
+                '$totalBooks', 'Total books',
+                icon: Icons.menu_book_outlined,
+                iconSize: 16,
+              ),
+            ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildCompactStat(
+    String value,
+    String label, {
+    required IconData icon,
+    double iconSize = 18,
+    Color iconColor = AppColors.teacherPrimary,
+    Color? circleColor,
+  }) {
+    final bg = circleColor ?? AppColors.teacherPrimaryLight;
+    return Expanded(
+      child: Column(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+            child: Icon(icon, size: iconSize, color: iconColor),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: const TextStyle(
+              fontFamily: 'Nunito',
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: AppColors.charcoal,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TeacherTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _compactDivider() {
+    return Container(
+      width: 1,
+      margin: const EdgeInsets.symmetric(horizontal: 12),
+      color: AppColors.divider,
     );
   }
 
@@ -1898,6 +2437,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                         onActionSelected: _canMutateAssignment(book)
                             ? (action) => _handleBookAction(book, action)
                             : null,
+                        onTap: _canMutateAssignment(book)
+                            ? () => _showBookActionsSheet(book)
+                            : null,
                       ),
                     );
                   }).toList(),
@@ -1943,7 +2485,35 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             final logs = _toReadingLogs(snapshot.data!);
             final latest = _latestParentComment(logs);
             if (latest == null) {
-              return _buildSectionInfoCard('No parent comments yet.');
+              return ClipRRect(
+                borderRadius:
+                    BorderRadius.circular(TeacherDimensions.radiusL),
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius:
+                        BorderRadius.circular(TeacherDimensions.radiusL),
+                    border: Border.all(color: AppColors.teacherBorder),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(width: 4, height: 48, color: AppColors.divider),
+                      const SizedBox(width: 12),
+                      Icon(
+                        Icons.chat_bubble_outline_rounded,
+                        size: 16,
+                        color: AppColors.textSecondary.withValues(alpha: 0.5),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'No parent comments yet',
+                        style: TeacherTypography.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              );
             }
 
             return FutureBuilder<String>(
@@ -1952,72 +2522,123 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                 final parentName = parentSnapshot.data ?? 'Parent';
                 return Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                   decoration: BoxDecoration(
                     color: AppColors.white,
                     borderRadius:
                         BorderRadius.circular(TeacherDimensions.radiusL),
-                    boxShadow: TeacherDimensions.cardShadow,
-                    border: const Border(
-                      left: BorderSide(
-                        color: AppColors.teacherPrimary,
-                        width: 4,
-                      ),
-                    ),
+                    border: Border.all(color: AppColors.teacherBorder),
+                    // Left accent via a gradient trick won't work with
+                    // Border.all, so we overlay it below.
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: IntrinsicHeight(
+                    child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        '"${latest.commentText}"',
-                        style: TeacherTypography.bodyMedium.copyWith(
-                          fontStyle: FontStyle.italic,
+                      // Left accent bar — stretches full card height
+                      Container(
+                        width: 4,
+                        decoration: BoxDecoration(
+                          color: AppColors.teacherPrimary,
+                          borderRadius: BorderRadius.circular(2),
                         ),
                       ),
-                      if (latest.selections.isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: latest.selections.map((chip) {
-                            return Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
+                      const SizedBox(width: 10),
+                      // Icon
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: AppColors.teacherPrimaryLight,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.chat_bubble_outline_rounded,
+                          size: 14,
+                          color: AppColors.teacherPrimary,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      // Content
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Chips + blob feeling
+                            if (latest.selections.isNotEmpty ||
+                                latest.feeling != null)
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                crossAxisAlignment:
+                                    WrapCrossAlignment.center,
+                                children: [
+                                  ...latest.selections.map((chip) {
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            AppColors.teacherPrimaryLight,
+                                        borderRadius:
+                                            BorderRadius.circular(
+                                                TeacherDimensions.radiusS),
+                                      ),
+                                      child: Text(
+                                        chip,
+                                        style: TeacherTypography.caption
+                                            .copyWith(
+                                          color: AppColors.teacherPrimary,
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                                  if (latest.feeling != null)
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Image.asset(
+                                          'assets/blobs/blob-${latest.feeling}.png',
+                                          width: 22,
+                                          height: 22,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          latest.feeling![0].toUpperCase() +
+                                              latest.feeling!
+                                                  .substring(1),
+                                          style:
+                                              TeacherTypography.caption,
+                                        ),
+                                      ],
+                                    ),
+                                ],
                               ),
-                              decoration: BoxDecoration(
-                                color: AppColors.teacherPrimaryLight,
-                                borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
-                              ),
-                              child: Text(
-                                chip,
-                                style: TeacherTypography.caption.copyWith(
-                                  color: AppColors.teacherPrimary,
+                            // Free-text comment (if any)
+                            if (latest.commentText.isNotEmpty) ...[
+                              if (latest.selections.isNotEmpty)
+                                const SizedBox(height: 6),
+                              Text(
+                                latest.commentText,
+                                style:
+                                    TeacherTypography.bodyMedium.copyWith(
+                                  fontStyle: FontStyle.italic,
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
-                            );
-                          }).toList(),
+                            ],
+                            const SizedBox(height: 6),
+                            Text(
+                              '— $parentName · ${_formatCommentDate(latest.date)}',
+                              style: TeacherTypography.caption,
+                            ),
+                          ],
                         ),
-                      ],
-                      if (latest.starRating != null) ...[
-                        const SizedBox(height: 10),
-                        Row(
-                          children: List.generate(5, (index) {
-                            final isFilled = index < latest.starRating!;
-                            return Icon(
-                              isFilled ? Icons.star : Icons.star_border,
-                              size: 16,
-                              color: AppColors.warmOrange,
-                            );
-                          }),
-                        ),
-                      ],
-                      const SizedBox(height: 8),
-                      Text(
-                        '— $parentName • ${_formatCommentDate(latest.date)}',
-                        style: TeacherTypography.bodySmall,
                       ),
                     ],
+                  ),
                   ),
                 );
               },
@@ -2191,14 +2812,14 @@ class _LatestParentCommentViewData {
   final String commentText;
   final DateTime date;
   final List<String> selections;
-  final int? starRating;
+  final String? feeling;
 
   const _LatestParentCommentViewData({
     required this.parentId,
     required this.commentText,
     required this.date,
     required this.selections,
-    required this.starRating,
+    this.feeling,
   });
 }
 
@@ -2327,6 +2948,490 @@ class _RenewBooksSheetState extends State<_RenewBooksSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ============================================
+// BOOK PICKER SHEET (Library Browse)
+// ============================================
+
+class _BookPickerSheet extends StatefulWidget {
+  final String schoolId;
+  const _BookPickerSheet({required this.schoolId});
+
+  @override
+  State<_BookPickerSheet> createState() => _BookPickerSheetState();
+}
+
+class _BookPickerSheetState extends State<_BookPickerSheet> {
+  final _searchController = TextEditingController();
+  final _libraryService = SchoolLibraryService();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(TeacherDimensions.radiusXL),
+          ),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: Column(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: AppColors.teacherBorder,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text('Choose a Book', style: TeacherTypography.h3),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _searchController,
+                    onChanged: (v) =>
+                        setState(() => _searchQuery = v.trim().toLowerCase()),
+                    decoration: InputDecoration(
+                      hintText: 'Search by title or author...',
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      filled: true,
+                      fillColor: AppColors.teacherBackground,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(
+                            TeacherDimensions.radiusM),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding:
+                          const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+            Expanded(
+              child: StreamBuilder<List<BookModel>>(
+                stream: _libraryService.booksStream(widget.schoolId),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  var books = snapshot.data!;
+                  if (_searchQuery.isNotEmpty) {
+                    books = books.where((b) {
+                      final title = b.title.toLowerCase();
+                      final author = (b.author ?? '').toLowerCase();
+                      return title.contains(_searchQuery) ||
+                          author.contains(_searchQuery);
+                    }).toList();
+                  }
+
+                  if (books.isEmpty) {
+                    return Center(
+                      child: Text(
+                        _searchQuery.isNotEmpty
+                            ? 'No books match "$_searchQuery"'
+                            : 'No books in library yet',
+                        style: TeacherTypography.bodySmall,
+                      ),
+                    );
+                  }
+
+                  return ListView.separated(
+                    controller: scrollController,
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                    itemCount: books.length,
+                    separatorBuilder: (_, __) => Divider(
+                      height: 1,
+                      color: AppColors.teacherBorder,
+                    ),
+                    itemBuilder: (context, index) {
+                      final book = books[index];
+                      final hasCover = book.coverImageUrl != null &&
+                          book.coverImageUrl!.isNotEmpty &&
+                          book.coverImageUrl!.startsWith('http');
+                      return InkWell(
+                        onTap: () => Navigator.pop(context, book),
+                        child: Padding(
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 10),
+                          child: Row(
+                            children: [
+                              ClipRRect(
+                                borderRadius:
+                                    BorderRadius.circular(4),
+                                child: SizedBox(
+                                  width: 36,
+                                  height: 50,
+                                  child: hasCover
+                                      ? PersistentCachedImage(
+                                          imageUrl:
+                                              book.coverImageUrl!,
+                                          fit: BoxFit.cover,
+                                          fallback: Container(
+                                            color: AppColors
+                                                .teacherPrimaryLight,
+                                            child: const Icon(
+                                                Icons.menu_book,
+                                                size: 16,
+                                                color: AppColors
+                                                    .teacherPrimary),
+                                          ),
+                                        )
+                                      : Container(
+                                          color: AppColors
+                                              .teacherPrimaryLight,
+                                          child: const Icon(
+                                              Icons.menu_book,
+                                              size: 16,
+                                              color: AppColors
+                                                  .teacherPrimary),
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      book.title,
+                                      style: TeacherTypography
+                                          .bodyMedium
+                                          .copyWith(
+                                              fontWeight:
+                                                  FontWeight.w600),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    if (book.author != null)
+                                      Text(
+                                        book.author!,
+                                        style:
+                                            TeacherTypography.caption,
+                                        maxLines: 1,
+                                        overflow:
+                                            TextOverflow.ellipsis,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                size: 18,
+                                color: AppColors.textSecondary
+                                    .withValues(alpha: 0.4),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================
+// SWAP ISBN SCANNER SCREEN
+// ============================================
+
+class _SwapScannerScreen extends StatefulWidget {
+  final String schoolId;
+  final String actorId;
+
+  const _SwapScannerScreen({
+    required this.schoolId,
+    required this.actorId,
+  });
+
+  @override
+  State<_SwapScannerScreen> createState() => _SwapScannerScreenState();
+}
+
+class _SwapScannerScreenState extends State<_SwapScannerScreen> {
+  final _bookLookupService = BookLookupService();
+  MobileScannerController? _scannerController;
+  BookModel? _resolvedBook;
+  bool _isLooking = false;
+  String? _error;
+  final Set<String> _processedCodes = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _scannerController = MobileScannerController(
+      detectionSpeed: DetectionSpeed.normal,
+      facing: CameraFacing.back,
+    );
+  }
+
+  @override
+  void dispose() {
+    _scannerController?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _onBarcodeDetected(BarcodeCapture capture) async {
+    if (_isLooking || _resolvedBook != null) return;
+
+    for (final barcode in capture.barcodes) {
+      final raw = barcode.rawValue;
+      if (raw == null || raw.isEmpty) continue;
+
+      final normalized = IsbnAssignmentService.normalizeIsbn(raw);
+      if (normalized == null) continue;
+      if (_processedCodes.contains(normalized)) continue;
+      _processedCodes.add(normalized);
+
+      setState(() {
+        _isLooking = true;
+        _error = null;
+      });
+
+      try {
+        final book = await _bookLookupService.lookupByIsbn(
+          isbn: normalized,
+          schoolId: widget.schoolId,
+          actorId: widget.actorId,
+          useDeviceScanCache: true,
+          persistToDeviceScanCache: true,
+        );
+
+        if (!mounted) return;
+
+        if (book != null && book.metadata?['placeholder'] != true) {
+          setState(() {
+            _resolvedBook = book;
+            _isLooking = false;
+          });
+          _scannerController?.stop();
+        } else {
+          setState(() {
+            _isLooking = false;
+            _error = 'Book not found for ISBN $normalized';
+          });
+        }
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _isLooking = false;
+          _error = 'Lookup failed. Try again.';
+        });
+      }
+      return;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.charcoal,
+      appBar: AppBar(
+        backgroundColor: AppColors.charcoal,
+        foregroundColor: AppColors.white,
+        elevation: 0,
+        title: const Text(
+          'Scan Replacement Book',
+          style:
+              TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.w700),
+        ),
+      ),
+      body:
+          _resolvedBook != null ? _buildConfirmView() : _buildScannerView(),
+    );
+  }
+
+  Widget _buildScannerView() {
+    return Stack(
+      children: [
+        if (_scannerController != null)
+          MobileScanner(
+            controller: _scannerController!,
+            onDetect: _onBarcodeDetected,
+          ),
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+            color: AppColors.charcoal.withValues(alpha: 0.85),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_isLooking)
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.white,
+                        ),
+                      ),
+                      SizedBox(width: 10),
+                      Text(
+                        'Looking up book...',
+                        style: TextStyle(
+                          fontFamily: 'Nunito',
+                          color: AppColors.white,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  )
+                else if (_error != null)
+                  Text(
+                    _error!,
+                    style: const TextStyle(
+                      fontFamily: 'Nunito',
+                      color: AppColors.warmOrange,
+                      fontSize: 14,
+                    ),
+                    textAlign: TextAlign.center,
+                  )
+                else
+                  const Text(
+                    'Point camera at an ISBN barcode',
+                    style: TextStyle(
+                      fontFamily: 'Nunito',
+                      color: AppColors.white,
+                      fontSize: 14,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildConfirmView() {
+    final book = _resolvedBook!;
+    final hasCover = book.coverImageUrl != null &&
+        book.coverImageUrl!.isNotEmpty &&
+        book.coverImageUrl!.startsWith('http');
+
+    return Container(
+      color: AppColors.teacherBackground,
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          ClipRRect(
+            borderRadius:
+                BorderRadius.circular(TeacherDimensions.radiusM),
+            child: SizedBox(
+              width: 120,
+              height: 170,
+              child: hasCover
+                  ? PersistentCachedImage(
+                      imageUrl: book.coverImageUrl!,
+                      fit: BoxFit.cover,
+                      fallback: Container(
+                        color: AppColors.teacherPrimaryLight,
+                        child: const Icon(Icons.menu_book,
+                            size: 40, color: AppColors.teacherPrimary),
+                      ),
+                    )
+                  : Container(
+                      color: AppColors.teacherPrimaryLight,
+                      child: const Icon(Icons.menu_book,
+                          size: 40, color: AppColors.teacherPrimary),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            book.title,
+            style: TeacherTypography.h2,
+            textAlign: TextAlign.center,
+          ),
+          if (book.author != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              book.author!,
+              style: TeacherTypography.bodySmall,
+              textAlign: TextAlign.center,
+            ),
+          ],
+          if (book.isbn != null) ...[
+            const SizedBox(height: 8),
+            Text('ISBN ${book.isbn}', style: TeacherTypography.caption),
+          ],
+          const SizedBox(height: 32),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context, book),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.teacherPrimary,
+                foregroundColor: AppColors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(
+                      TeacherDimensions.radiusM),
+                ),
+              ),
+              child: const Text(
+                'Use This Book',
+                style: TextStyle(
+                  fontFamily: 'Nunito',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _resolvedBook = null;
+                _error = null;
+              });
+              _scannerController?.start();
+            },
+            child: Text(
+              'Scan a different book',
+              style: TeacherTypography.bodyMedium.copyWith(
+                color: AppColors.teacherPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

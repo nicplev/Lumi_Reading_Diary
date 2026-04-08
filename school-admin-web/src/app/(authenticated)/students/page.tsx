@@ -31,6 +31,7 @@ export default async function StudentsRoute() {
     <StudentsPage
       classes={classes.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() }))}
       levelOptions={levelOptions}
+      levelSchema={school?.levelSchema ?? 'none'}
     />
   );
 }

@@ -23,6 +23,7 @@ class TeacherBookAssignmentCard extends StatelessWidget {
   final String bookType; // 'decodable' or 'library'
   final String status; // 'completed', 'in_progress', 'new'
   final ValueChanged<TeacherBookCardAction>? onActionSelected;
+  final VoidCallback? onTap;
 
   const TeacherBookAssignmentCard({
     super.key,
@@ -33,6 +34,7 @@ class TeacherBookAssignmentCard extends StatelessWidget {
     required this.bookType,
     required this.status,
     this.onActionSelected,
+    this.onTap,
   });
 
   Widget _buildStatusBadge() {
@@ -93,78 +95,6 @@ class TeacherBookAssignmentCard extends StatelessWidget {
     }
   }
 
-  Widget _buildActionMenu() {
-    return PopupMenuButton<TeacherBookCardAction>(
-      tooltip: 'Book actions',
-      onSelected: onActionSelected,
-      position: PopupMenuPosition.under,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      itemBuilder: (context) => [
-        _buildMenuItem(
-          value: TeacherBookCardAction.edit,
-          icon: Icons.edit_outlined,
-          label: 'Edit',
-        ),
-        _buildMenuItem(
-          value: TeacherBookCardAction.swap,
-          icon: Icons.swap_horiz_rounded,
-          label: 'Swap',
-        ),
-        _buildMenuItem(
-          value: TeacherBookCardAction.keepNextCycle,
-          icon: Icons.refresh_rounded,
-          label: 'Keep next week',
-        ),
-        _buildMenuItem(
-          value: TeacherBookCardAction.remove,
-          icon: Icons.delete_outline_rounded,
-          label: 'Remove',
-          destructive: true,
-        ),
-      ],
-      child: Container(
-        width: 32,
-        height: 32,
-        decoration: BoxDecoration(
-          color: AppColors.background,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.divider),
-        ),
-        child: const Icon(
-          Icons.more_horiz_rounded,
-          size: 18,
-          color: AppColors.textSecondary,
-        ),
-      ),
-    );
-  }
-
-  PopupMenuItem<TeacherBookCardAction> _buildMenuItem({
-    required TeacherBookCardAction value,
-    required IconData icon,
-    required String label,
-    bool destructive = false,
-  }) {
-    final color = destructive ? AppColors.error : AppColors.charcoal;
-    return PopupMenuItem<TeacherBookCardAction>(
-      value: value,
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: 10),
-          Text(
-            label,
-            style: TeacherTypography.bodyMedium.copyWith(
-              color: color,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildCover() {
     final hasCover = coverImageUrl != null &&
@@ -203,12 +133,17 @@ class TeacherBookAssignmentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canEdit = onActionSelected != null;
-    return Container(
+    return Material(
+      color: AppColors.white,
+      borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+        child: Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.white,
         borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
-        boxShadow: TeacherDimensions.cardShadow,
+        border: Border.all(color: AppColors.teacherBorder),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -233,10 +168,12 @@ class TeacherBookAssignmentCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (canEdit) ...[
-                      const SizedBox(width: 8),
-                      _buildActionMenu(),
-                    ],
+                    if (canEdit)
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 20,
+                        color: AppColors.textSecondary.withValues(alpha: 0.4),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 4),
@@ -260,6 +197,8 @@ class TeacherBookAssignmentCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    ),
       ),
     );
   }

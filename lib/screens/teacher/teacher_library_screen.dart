@@ -1,12 +1,14 @@
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/theme/app_colors.dart';
+import 'cover_crop_screen.dart';
 import '../../core/theme/teacher_constants.dart';
 import '../../core/widgets/lumi/lumi_skeleton.dart';
 import '../../core/widgets/lumi/persistent_cached_image.dart';
@@ -56,8 +58,7 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
     'Hidden',
   ];
 
-  String get _hiddenPrefsKey =>
-      'hidden_books_${widget.teacher.schoolId ?? ''}';
+  String get _hiddenPrefsKey => 'hidden_books_${widget.teacher.schoolId ?? ''}';
 
   @override
   void initState() {
@@ -92,6 +93,13 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
     super.dispose();
   }
 
+  void _openAddBook() {
+    context.push(
+      '/teacher/community-scanner',
+      extra: widget.teacher,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final schoolId = widget.teacher.schoolId?.trim() ?? '';
@@ -116,13 +124,11 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
           // For the Hidden filter, show hidden books; otherwise exclude them
           List<BookModel> visibleBooks;
           if (_activeFilter == 'Hidden') {
-            visibleBooks = allBooks
-                .where((b) => _hiddenBookIds.contains(b.id))
-                .toList();
+            visibleBooks =
+                allBooks.where((b) => _hiddenBookIds.contains(b.id)).toList();
           } else {
-            visibleBooks = allBooks
-                .where((b) => !_hiddenBookIds.contains(b.id))
-                .toList();
+            visibleBooks =
+                allBooks.where((b) => !_hiddenBookIds.contains(b.id)).toList();
           }
 
           final filtered = _activeFilter == 'Hidden'
@@ -138,10 +144,17 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
                   filter: _activeFilter,
                   searchQuery: _searchQuery,
                 );
-          final decodableCount =
-              allBooks.where((b) =>
+          final decodableCount = allBooks
+              .where((b) =>
                   SchoolLibraryService.isDecodable(b) &&
-                  !_hiddenBookIds.contains(b.id)).length;
+                  !_hiddenBookIds.contains(b.id))
+              .length;
+          final visibleCount = allBooks.length - hiddenCount;
+          final libraryCount = allBooks
+              .where((b) =>
+                  !SchoolLibraryService.isDecodable(b) &&
+                  !_hiddenBookIds.contains(b.id))
+              .length;
 
           return StreamBuilder<LibraryAssignmentSnapshot>(
             stream: _assignmentService.summaryStream(schoolId),
@@ -154,53 +167,13 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
                   // ── Header ────────────────────────────────────────────────
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('Book Library', style: TeacherTypography.h1),
-                              FilledButton.icon(
-                                onPressed: () => context.push(
-                                  '/teacher/community-scanner',
-                                  extra: widget.teacher,
-                                ),
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: AppColors.teacherPrimary,
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 8),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(
-                                        TeacherDimensions.radiusM),
-                                  ),
-                                ),
-                                icon: const Icon(
-                                    Icons.document_scanner_outlined,
-                                    size: 18),
-                                label: const Text(
-                                  'Add Book',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          isLoading
-                              ? const LumiSkeleton(width: 180, height: 16)
-                              : Text(
-                                  '${allBooks.length - hiddenCount} book${(allBooks.length - hiddenCount) == 1 ? '' : 's'} in your school library'
-                                  '${decodableCount > 0 ? ' · $decodableCount decodable' : ''}'
-                                  '${hiddenCount > 0 ? ' · $hiddenCount hidden' : ''}',
-                                  style: TeacherTypography.bodyMedium.copyWith(
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                        ],
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: _LibraryHeader(
+                        isLoading: isLoading,
+                        visibleCount: visibleCount,
+                        decodableCount: decodableCount,
+                        hiddenCount: hiddenCount,
+                        onAddBook: _openAddBook,
                       ),
                     ),
                   ),
@@ -208,27 +181,15 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
                   // ── Search ────────────────────────────────────────────────
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                      child: TextField(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      child: _LibrarySearchBar(
                         controller: _searchController,
+                        query: _searchQuery,
                         onChanged: (v) => setState(() => _searchQuery = v),
-                        decoration: InputDecoration(
-                          hintText: 'Search books...',
-                          hintStyle: TeacherTypography.bodyMedium
-                              .copyWith(color: AppColors.textSecondary),
-                          prefixIcon: const Icon(Icons.search,
-                              color: AppColors.textSecondary),
-                          filled: true,
-                          fillColor: AppColors.background,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(
-                                TeacherDimensions.radiusM),
-                            borderSide: BorderSide.none,
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
-                        ),
-                        style: TeacherTypography.bodyMedium,
+                        onClear: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
                       ),
                     ),
                   ),
@@ -236,18 +197,24 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
                   // ── Filter chips ──────────────────────────────────────────
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 0, 16),
+                      padding: const EdgeInsets.fromLTRB(16, 14, 0, 18),
                       child: SizedBox(
                         height: 40,
                         child: ListView.separated(
                           scrollDirection: Axis.horizontal,
                           itemCount: _filters.length,
                           separatorBuilder: (_, __) => const SizedBox(width: 8),
-                          padding: const EdgeInsets.only(right: 20),
+                          padding: const EdgeInsets.only(right: 16),
                           itemBuilder: (context, i) {
                             final f = _filters[i];
                             return TeacherFilterChip(
-                              label: f,
+                              label: _filterLabel(
+                                f,
+                                visibleCount: visibleCount,
+                                decodableCount: decodableCount,
+                                libraryCount: libraryCount,
+                                hiddenCount: hiddenCount,
+                              ),
                               isActive: _activeFilter == f,
                               onTap: () => setState(() => _activeFilter = f),
                             );
@@ -276,7 +243,7 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
                       assignmentSummary: assignmentSummary,
                     ),
 
-                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                  const SliverToBoxAdapter(child: SizedBox(height: 100)),
                 ],
               );
             },
@@ -284,6 +251,27 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
         },
       ),
     );
+  }
+
+  String _filterLabel(
+    String filter, {
+    required int visibleCount,
+    required int decodableCount,
+    required int libraryCount,
+    required int hiddenCount,
+  }) {
+    switch (filter) {
+      case 'All':
+        return 'All $visibleCount';
+      case 'Decodable':
+        return 'Decodable $decodableCount';
+      case 'Library':
+        return 'Library $libraryCount';
+      case 'Hidden':
+        return hiddenCount > 0 ? 'Hidden $hiddenCount' : 'Hidden';
+      default:
+        return filter;
+    }
   }
 
   // ── Tier sections (LLLL stages + library books) ──────────────────────────
@@ -298,7 +286,7 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
     for (final entry in stageGroups.entries) {
       slivers.add(SliverToBoxAdapter(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
           child:
               _StageSectionHeader(stage: entry.key, count: entry.value.length),
         ),
@@ -312,7 +300,7 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
       if (libBooks.isNotEmpty) {
         slivers.add(SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
             child: _LibrarySectionHeader(count: libBooks.length),
           ),
         ));
@@ -334,25 +322,44 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
     required LibraryAssignmentSnapshot assignmentSummary,
   }) {
     return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
       sliver: SliverGrid(
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 3,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: 0.72,
+          childAspectRatio: 0.68,
         ),
         delegate: SliverChildBuilderDelegate(
-          (context, i) => _LibraryBookCard(
-            book: books[i],
-            currentAssignedCount:
-                assignmentSummary.currentAssignedCountForBook(books[i]),
-            onTap: () => _showBookDetail(
-              books[i],
-              currentAssignedCount:
-                  assignmentSummary.currentAssignedCountForBook(books[i]),
-            ),
-          ),
+          (context, i) {
+            final book = books[i];
+            final assignedCount =
+                assignmentSummary.currentAssignedCountForBook(book);
+            final card = _LibraryBookCard(
+              book: book,
+              currentAssignedCount: assignedCount,
+              onTap: () => _showBookDetail(
+                book,
+                currentAssignedCount: assignedCount,
+              ),
+            );
+
+            if (MediaQuery.of(context).disableAnimations) return card;
+
+            return card
+                .animate()
+                .fadeIn(
+                  delay: Duration(milliseconds: (i % 9) * 30),
+                  duration: 220.ms,
+                  curve: Curves.easeOut,
+                )
+                .move(
+                  begin: const Offset(0, 6),
+                  end: Offset.zero,
+                  duration: 220.ms,
+                  curve: Curves.easeOutCubic,
+                );
+          },
           childCount: books.length,
         ),
       ),
@@ -363,16 +370,16 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
 
   Widget _buildSkeletonSliver() {
     return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       sliver: SliverGrid(
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 3,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: 0.72,
+          childAspectRatio: 0.68,
         ),
         delegate: SliverChildBuilderDelegate(
-          (_, __) => const LumiSkeleton(borderRadius: 12),
+          (_, __) => const LumiSkeleton(borderRadius: 16),
           childCount: 9,
         ),
       ),
@@ -382,27 +389,26 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
   // ── Empty / no-results states ─────────────────────────────────────────────
 
   Widget _buildEmptySliver() {
+    final duration = MediaQuery.of(context).disableAnimations
+        ? Duration.zero
+        : const Duration(milliseconds: 220);
+
     return SliverFillRemaining(
       hasScrollBody: false,
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.menu_book_outlined,
-                  size: 64, color: AppColors.textSecondary),
-              const SizedBox(height: 16),
-              Text('No books yet',
-                  style: TeacherTypography.h2, textAlign: TextAlign.center),
-              const SizedBox(height: 8),
-              Text(
-                'Scan a book ISBN from the student detail screen to start building your school library.',
-                style: TeacherTypography.bodyMedium
-                    .copyWith(color: AppColors.textSecondary),
-                textAlign: TextAlign.center,
-              ),
-            ],
+      child: AnimatedSwitcher(
+        duration: duration,
+        child: Center(
+          key: const ValueKey('empty-library'),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 48),
+            child: _LibraryStateCard(
+              icon: Icons.menu_book_outlined,
+              title: 'No books yet',
+              message:
+                  'Scan a book ISBN to start building a shared school library.',
+              actionText: 'Add Book',
+              onAction: _openAddBook,
+            ),
           ),
         ),
       ),
@@ -410,13 +416,33 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
   }
 
   Widget _buildNoResultsSliver() {
+    final duration = MediaQuery.of(context).disableAnimations
+        ? Duration.zero
+        : const Duration(milliseconds: 220);
+
     return SliverFillRemaining(
       hasScrollBody: false,
-      child: Center(
-        child: Text(
-          'No books match your search.',
-          style: TeacherTypography.bodyMedium
-              .copyWith(color: AppColors.textSecondary),
+      child: AnimatedSwitcher(
+        duration: duration,
+        child: Center(
+          key: ValueKey('no-results-$_activeFilter-$_searchQuery'),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 48),
+            child: _LibraryStateCard(
+              icon: Icons.search_off_rounded,
+              title: 'No matches found',
+              message: _searchQuery.isEmpty
+                  ? 'There are no books in this filter yet.'
+                  : 'No books match "$_searchQuery". Try another title, author, or ISBN.',
+              actionText: _searchQuery.isEmpty ? null : 'Clear Search',
+              onAction: _searchQuery.isEmpty
+                  ? null
+                  : () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    },
+            ),
+          ),
         ),
       ),
     );
@@ -444,6 +470,394 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
   }
 }
 
+class _LibraryHeader extends StatelessWidget {
+  const _LibraryHeader({
+    required this.isLoading,
+    required this.visibleCount,
+    required this.decodableCount,
+    required this.hiddenCount,
+    required this.onAddBook,
+  });
+
+  final bool isLoading;
+  final int visibleCount;
+  final int decodableCount;
+  final int hiddenCount;
+  final VoidCallback onAddBook;
+
+  @override
+  Widget build(BuildContext context) {
+    final bookLabel = visibleCount == 1 ? 'book' : 'books';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
+        border: Border.all(color: AppColors.teacherBorder),
+        boxShadow: TeacherDimensions.cardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Book Library', style: TeacherTypography.h1),
+                    const SizedBox(height: 4),
+                    isLoading
+                        ? const LumiSkeleton(width: 188, height: 16)
+                        : Text(
+                            '$visibleCount $bookLabel in your school library',
+                            style: TeacherTypography.bodyMedium.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                height: 44,
+                child: FilledButton.icon(
+                  onPressed: onAddBook,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.teacherPrimary,
+                    foregroundColor: AppColors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(TeacherDimensions.radiusL),
+                    ),
+                  ),
+                  icon: const Icon(Icons.document_scanner_outlined, size: 18),
+                  label: Text(
+                    'Add Book',
+                    style: TeacherTypography.bodyMedium.copyWith(
+                      color: AppColors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (!isLoading && (decodableCount > 0 || hiddenCount > 0)) ...[
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (decodableCount > 0)
+                  _HeaderMetricPill(
+                    icon: Icons.auto_stories_outlined,
+                    label:
+                        '$decodableCount decodable${decodableCount == 1 ? '' : 's'}',
+                    color: AppColors.teacherPrimary,
+                  ),
+                if (hiddenCount > 0)
+                  _HeaderMetricPill(
+                    icon: Icons.visibility_off_outlined,
+                    label: '$hiddenCount hidden',
+                    color: AppColors.textSecondary,
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderMetricPill extends StatelessWidget {
+  const _HeaderMetricPill({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.16)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TeacherTypography.caption.copyWith(
+              color: color,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LibrarySearchBar extends StatefulWidget {
+  const _LibrarySearchBar({
+    required this.controller,
+    required this.query,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final String query;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  @override
+  State<_LibrarySearchBar> createState() => _LibrarySearchBarState();
+}
+
+class _LibrarySearchBarState extends State<_LibrarySearchBar>
+    with SingleTickerProviderStateMixin {
+  late final FocusNode _focusNode;
+  late final AnimationController _fillController;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode();
+    _focusNode.addListener(_handleFocusChange);
+    _fillController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+      reverseDuration: const Duration(milliseconds: 220),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.of(context).disableAnimations) {
+      _fillController.value = _focusNode.hasFocus ? 1 : 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_handleFocusChange);
+    _focusNode.dispose();
+    _fillController.dispose();
+    super.dispose();
+  }
+
+  void _handleFocusChange() {
+    final targetValue = _focusNode.hasFocus ? 1.0 : 0.0;
+
+    if (MediaQuery.of(context).disableAnimations) {
+      _fillController.value = targetValue;
+    } else if (_focusNode.hasFocus) {
+      _fillController.forward();
+    } else {
+      _fillController.reverse();
+    }
+
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasQuery = widget.query.isNotEmpty;
+    final isActive = hasQuery || _focusNode.hasFocus;
+    final borderRadius = BorderRadius.circular(TeacherDimensions.radiusL);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: borderRadius,
+        border: Border.all(color: AppColors.teacherBorder, width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.charcoal.withValues(alpha: 0.05),
+            blurRadius: 16,
+            spreadRadius: -8,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: borderRadius,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: AnimatedBuilder(
+                animation: _fillController,
+                builder: (context, child) {
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: FractionallySizedBox(
+                      key: const ValueKey('library_search_focus_fill'),
+                      widthFactor: _fillController.value.clamp(0.0, 1.0),
+                      heightFactor: 1,
+                      child: child,
+                    ),
+                  );
+                },
+                child: ColoredBox(
+                  color: AppColors.teacherPrimaryLight.withValues(alpha: 0.82),
+                ),
+              ),
+            ),
+            TextField(
+              controller: widget.controller,
+              focusNode: _focusNode,
+              onChanged: widget.onChanged,
+              onTapOutside: (_) => FocusScope.of(context).unfocus(),
+              textInputAction: TextInputAction.search,
+              cursorColor: AppColors.rosePink,
+              style: TeacherTypography.bodyMedium.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Search by title, author, or ISBN...',
+                hintStyle: TeacherTypography.bodyMedium.copyWith(
+                  color: AppColors.textSecondary.withValues(alpha: 0.65),
+                ),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: isActive
+                      ? AppColors.teacherPrimary
+                      : AppColors.textSecondary.withValues(alpha: 0.58),
+                ),
+                suffixIcon: hasQuery
+                    ? IconButton(
+                        tooltip: 'Clear search',
+                        icon: const Icon(Icons.close_rounded, size: 20),
+                        color: AppColors.textSecondary,
+                        onPressed: widget.onClear,
+                      )
+                    : null,
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                hoverColor: Colors.transparent,
+                focusColor: Colors.transparent,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LibraryStateCard extends StatelessWidget {
+  const _LibraryStateCard({
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.actionText,
+    this.onAction,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final String? actionText;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
+        border: Border.all(color: AppColors.teacherBorder),
+        boxShadow: TeacherDimensions.cardShadow,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: AppColors.teacherSurfaceTint,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Icon(icon, size: 34, color: AppColors.teacherPrimary),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            title,
+            style: TeacherTypography.h2,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: TeacherTypography.bodyMedium.copyWith(
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          if (actionText != null && onAction != null) ...[
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: onAction,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.teacherPrimary,
+                foregroundColor: AppColors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(TeacherDimensions.radiusL),
+                ),
+              ),
+              icon: Icon(
+                actionText == 'Add Book'
+                    ? Icons.document_scanner_outlined
+                    : Icons.close_rounded,
+                size: 18,
+              ),
+              label: Text(
+                actionText!,
+                style: TeacherTypography.bodyMedium.copyWith(
+                  color: AppColors.white,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Section headers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -457,29 +871,11 @@ class _StageSectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = Color(SchoolLibraryService.stageColor(stage));
-    return Row(
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 10),
-        Text(
-          stage,
-          style: const TextStyle(
-            fontFamily: 'Nunito',
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: AppColors.charcoal,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          '($count book${count == 1 ? '' : 's'})',
-          style: TeacherTypography.bodySmall,
-        ),
-      ],
+    return _LibrarySectionTitle(
+      title: stage,
+      count: count,
+      color: color,
+      icon: Icons.auto_stories_outlined,
     );
   }
 }
@@ -491,30 +887,65 @@ class _LibrarySectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return _LibrarySectionTitle(
+      title: 'Library Books',
+      count: count,
+      color: AppColors.libraryGreen,
+      icon: Icons.local_library_outlined,
+    );
+  }
+}
+
+class _LibrarySectionTitle extends StatelessWidget {
+  const _LibrarySectionTitle({
+    required this.title,
+    required this.count,
+    required this.color,
+    required this.icon,
+  });
+
+  final String title;
+  final int count;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
     return Row(
       children: [
         Container(
-          width: 12,
-          height: 12,
-          decoration: const BoxDecoration(
-            color: AppColors.libraryGreen,
-            shape: BoxShape.circle,
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(12),
           ),
+          child: Icon(icon, color: color, size: 18),
         ),
         const SizedBox(width: 10),
-        const Text(
-          'Library Books',
-          style: TextStyle(
-            fontFamily: 'Nunito',
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: AppColors.charcoal,
+        Expanded(
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TeacherTypography.h3.copyWith(fontSize: 17),
           ),
         ),
         const SizedBox(width: 8),
-        Text(
-          '($count book${count == 1 ? '' : 's'})',
-          style: TeacherTypography.bodySmall,
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: AppColors.teacherBorder),
+          ),
+          child: Text(
+            '$count book${count == 1 ? '' : 's'}',
+            style: TeacherTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ),
       ],
     );
@@ -543,46 +974,77 @@ class _LibraryBookCard extends StatelessWidget {
         ? Color(SchoolLibraryService.stageColor(book.readingLevel ?? ''))
         : AppColors.libraryGreen;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: TeacherDimensions.cardShadow,
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.teacherPrimary.withValues(alpha: 0.10),
+            blurRadius: 20,
+            spreadRadius: -10,
+            offset: const Offset(0, 12),
+          ),
+          BoxShadow(
+            color: AppColors.charcoal.withValues(alpha: 0.04),
+            blurRadius: 8,
+            spreadRadius: -4,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: AppColors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: AppColors.teacherBorder.withValues(alpha: 0.7),
+          ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(12)),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
                 child: _BookCoverWidget(
                   book: book,
                   stageColor: stageColor,
                   currentAssignedCount: currentAssignedCount,
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    book.title,
-                    style: TeacherTypography.caption.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.charcoal,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+              SizedBox(
+                height: 54,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(9, 7, 9, 7),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        book.title,
+                        style: TeacherTypography.caption.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.charcoal,
+                          height: 1.18,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const Spacer(),
+                      Container(
+                        width: 24,
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: stageColor.withValues(alpha: 0.75),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -627,9 +1089,32 @@ class _BookCoverWidget extends StatelessWidget {
     );
   }
 
-  Widget _placeholder(Color color) => Center(
-        child: Icon(Icons.menu_book,
-            color: color.withValues(alpha: 0.6), size: 32),
+  Widget _placeholder(Color color) => Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              color.withValues(alpha: 0.22),
+              AppColors.white.withValues(alpha: 0.40),
+            ],
+          ),
+        ),
+        child: Center(
+          child: Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: AppColors.white.withValues(alpha: 0.58),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Icon(
+              Icons.menu_book_rounded,
+              color: color.withValues(alpha: 0.74),
+              size: 30,
+            ),
+          ),
+        ),
       );
 }
 
@@ -642,10 +1127,23 @@ class _AssignedBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 6 : 8,
+        vertical: compact ? 3 : 4,
+      ),
       decoration: BoxDecoration(
-        color: AppColors.teacherPrimaryLight.withValues(alpha: 0.25),
-        borderRadius: BorderRadius.circular(6),
+        color: AppColors.white.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: AppColors.teacherPrimary.withValues(alpha: 0.18),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.charcoal.withValues(alpha: 0.10),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -661,7 +1159,7 @@ class _AssignedBadge extends StatelessWidget {
             style: TeacherTypography.caption.copyWith(
               color: AppColors.teacherPrimary,
               fontWeight: FontWeight.w700,
-              fontSize: compact ? 10 : 9,
+              fontSize: compact ? 10 : 11,
             ),
           ),
         ],
@@ -681,22 +1179,15 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.cloud_off_outlined,
-                size: 48, color: AppColors.textSecondary),
-            const SizedBox(height: 12),
-            Text(
-              message,
-              style: TeacherTypography.bodyMedium
-                  .copyWith(color: AppColors.textSecondary),
-              textAlign: TextAlign.center,
-            ),
-          ],
+    return SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: _LibraryStateCard(
+            icon: Icons.cloud_off_outlined,
+            title: 'Library unavailable',
+            message: message,
+          ),
         ),
       ),
     );
@@ -823,7 +1314,18 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
     final image = await picker.pickImage(source: source, imageQuality: 92);
     if (image == null || !mounted) return;
 
-    await _uploadCoverImage(File(image.path));
+    final bytes = await File(image.path).readAsBytes();
+    if (!mounted) return;
+
+    final croppedFile = await Navigator.push<File>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CoverCropScreen(imageBytes: bytes),
+      ),
+    );
+    if (croppedFile == null || !mounted) return;
+
+    await _uploadCoverImage(croppedFile);
   }
 
   Future<void> _uploadCoverImage(File imageFile) async {
@@ -926,14 +1428,21 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
         : AppColors.libraryGreen;
 
     return DraggableScrollableSheet(
-      initialChildSize: 0.6,
-      minChildSize: 0.4,
-      maxChildSize: 0.92,
+      initialChildSize: 0.64,
+      minChildSize: 0.42,
+      maxChildSize: 0.94,
       builder: (context, scrollController) {
         return Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: AppColors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.charcoal.withValues(alpha: 0.16),
+                blurRadius: 32,
+                offset: const Offset(0, -8),
+              ),
+            ],
           ),
           child: ListView(
             controller: scrollController,
@@ -942,78 +1451,109 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
               // Drag handle
               Center(
                 child: Container(
-                  margin: const EdgeInsets.only(top: 12, bottom: 8),
-                  width: 40,
-                  height: 4,
+                  margin: const EdgeInsets.only(top: 12, bottom: 14),
+                  width: 44,
+                  height: 5,
                   decoration: BoxDecoration(
-                    color: AppColors.textSecondary.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
+                    color: AppColors.teacherBorder,
+                    borderRadius: BorderRadius.circular(999),
                   ),
                 ),
               ),
 
               // Cover + basic info
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: SizedBox(
-                        width: 72,
-                        height: 100,
-                        child: _BookCoverWidget(
-                          book: book,
-                          stageColor: stageColor,
-                          currentAssignedCount: currentAssignedCount,
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.teacherBackground,
+                    borderRadius:
+                        BorderRadius.circular(TeacherDimensions.radiusXL),
+                    border: Border.all(color: AppColors.teacherBorder),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.charcoal.withValues(alpha: 0.10),
+                              blurRadius: 14,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: SizedBox(
+                            width: 82,
+                            height: 116,
+                            child: _BookCoverWidget(
+                              book: book,
+                              stageColor: stageColor,
+                              currentAssignedCount: currentAssignedCount,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(book.title, style: TeacherTypography.h2),
-                          if (book.author?.isNotEmpty == true) ...[
-                            const SizedBox(height: 4),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Text(
-                              book.author!,
-                              style: TeacherTypography.bodyMedium
-                                  .copyWith(color: AppColors.textSecondary),
+                              book.title,
+                              style: TeacherTypography.h2,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ],
-                          const SizedBox(height: 8),
-                          _TypeBadge(
-                            label: isDecodable
-                                ? (book.readingLevel ?? 'Decodable')
-                                : 'Library',
-                            color: stageColor,
-                          ),
-                          if (currentAssignedCount > 0) ...[
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                const Icon(Icons.people_outline,
-                                    size: 14, color: AppColors.teacherPrimary),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    'Currently assigned to $currentAssignedCount student${currentAssignedCount == 1 ? '' : 's'}',
-                                    style: TeacherTypography.caption.copyWith(
-                                      color: AppColors.teacherPrimary,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
+                            if (book.author?.isNotEmpty == true) ...[
+                              const SizedBox(height: 5),
+                              Text(
+                                book.author!,
+                                style: TeacherTypography.bodyMedium.copyWith(
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w600,
                                 ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _TypeBadge(
+                                  label: isDecodable
+                                      ? (book.readingLevel ?? 'Decodable')
+                                      : 'Library',
+                                  color: stageColor,
+                                ),
+                                if (currentAssignedCount > 0)
+                                  _AssignedBadge(
+                                    count: currentAssignedCount,
+                                  ),
                               ],
                             ),
+                            if (currentAssignedCount > 0) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                'Currently assigned to $currentAssignedCount student${currentAssignedCount == 1 ? '' : 's'}',
+                                style: TeacherTypography.caption.copyWith(
+                                  color: AppColors.teacherPrimary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
 
@@ -1082,83 +1622,101 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
                 ),
 
               if (book.description?.isNotEmpty == true) ...[
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(20, 20, 20, 6),
-                  child: Text(
-                    'About',
-                    style: TextStyle(
-                      fontFamily: 'Nunito',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.charcoal,
-                    ),
-                  ),
-                ),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Text(
-                    book.description!,
-                    style: TeacherTypography.bodySmall
-                        .copyWith(color: AppColors.textSecondary, height: 1.5),
-                    maxLines: 6,
-                    overflow: TextOverflow.ellipsis,
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.teacherBackground,
+                      borderRadius:
+                          BorderRadius.circular(TeacherDimensions.radiusL),
+                      border: Border.all(color: AppColors.teacherBorder),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'About',
+                          style: TeacherTypography.bodyMedium.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          book.description!,
+                          style: TeacherTypography.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                            height: 1.5,
+                          ),
+                          maxLines: 6,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
 
-              // Actions divider
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20),
-                child: Divider(height: 32),
-              ),
-
-              // Hide / Unhide button
+              // Library actions
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    onPressed: widget.onToggleHide,
-                    icon: Icon(
-                      widget.isHidden
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                      size: 16,
-                      color: AppColors.textSecondary,
-                    ),
-                    label: Text(
-                      widget.isHidden
-                          ? 'Unhide from Library'
-                          : 'Hide from Library',
-                      style: TeacherTypography.bodySmall.copyWith(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius:
+                        BorderRadius.circular(TeacherDimensions.radiusL),
+                    border: Border.all(color: AppColors.teacherBorder),
                   ),
-                ),
-              ),
-
-              // Request Deletion — only for community-contributed books
-              if (_isCommunityBook && book.isbn?.isNotEmpty == true)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: _showDeletionRequestDialog,
-                      icon: Icon(Icons.flag_outlined,
-                          size: 16, color: Colors.red.shade400),
-                      label: Text(
-                        'Request Deletion',
-                        style: TeacherTypography.bodySmall.copyWith(
-                          color: Colors.red.shade400,
-                          fontWeight: FontWeight.w600,
+                  child: Column(
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: widget.onToggleHide,
+                          icon: Icon(
+                            widget.isHidden
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                            size: 16,
+                            color: AppColors.textSecondary,
+                          ),
+                          label: Text(
+                            widget.isHidden
+                                ? 'Unhide from Library'
+                                : 'Hide from Library',
+                            style: TeacherTypography.bodySmall.copyWith(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      if (_isCommunityBook && book.isbn?.isNotEmpty == true)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: _showDeletionRequestDialog,
+                            icon: Icon(
+                              Icons.flag_outlined,
+                              size: 16,
+                              color: Colors.red.shade400,
+                            ),
+                            label: Text(
+                              'Request Deletion',
+                              style: TeacherTypography.bodySmall.copyWith(
+                                color: Colors.red.shade400,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
+              ),
 
               const SizedBox(height: 40),
             ],
@@ -1195,8 +1753,7 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
               child: Container(
                 decoration: const BoxDecoration(
                   color: AppColors.white,
-                  borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(24)),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                 ),
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
                 child: Column(
@@ -1209,8 +1766,7 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: AppColors.textSecondary
-                              .withValues(alpha: 0.3),
+                          color: AppColors.textSecondary.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -1240,8 +1796,8 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
                     Container(
                       decoration: BoxDecoration(
                         color: AppColors.background,
-                        borderRadius: BorderRadius.circular(
-                            TeacherDimensions.radiusM),
+                        borderRadius:
+                            BorderRadius.circular(TeacherDimensions.radiusM),
                         border: Border.all(
                           color: AppColors.teacherBorder,
                           width: 1,
@@ -1258,8 +1814,8 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
                         style: TeacherTypography.bodyMedium
                             .copyWith(color: AppColors.charcoal),
                         dropdownColor: AppColors.white,
-                        borderRadius: BorderRadius.circular(
-                            TeacherDimensions.radiusM),
+                        borderRadius:
+                            BorderRadius.circular(TeacherDimensions.radiusM),
                         items: reasons
                             .map((r) =>
                                 DropdownMenuItem(value: r, child: Text(r)))
@@ -1267,8 +1823,7 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
                         onChanged: isSubmitting
                             ? null
                             : (value) {
-                                setSheetState(
-                                    () => selectedReason = value);
+                                setSheetState(() => selectedReason = value);
                               },
                       ),
                     ),
@@ -1282,8 +1837,8 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
                     Container(
                       decoration: BoxDecoration(
                         color: AppColors.background,
-                        borderRadius: BorderRadius.circular(
-                            TeacherDimensions.radiusM),
+                        borderRadius:
+                            BorderRadius.circular(TeacherDimensions.radiusM),
                         border: Border.all(
                           color: AppColors.teacherBorder,
                           width: 1,
@@ -1313,8 +1868,7 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
                                 ? null
                                 : () => Navigator.pop(sheetContext),
                             style: OutlinedButton.styleFrom(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 14),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(
                                     TeacherDimensions.radiusM),
@@ -1334,97 +1888,75 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: FilledButton(
-                            onPressed:
-                                (selectedReason == null || isSubmitting)
-                                    ? null
-                                    : () async {
-                                        setSheetState(
-                                            () => isSubmitting = true);
+                            onPressed: (selectedReason == null || isSubmitting)
+                                ? null
+                                : () async {
+                                    setSheetState(() => isSubmitting = true);
 
-                                        final notes =
-                                            notesController.text.trim();
-                                        final reason = notes.isNotEmpty
-                                            ? '$selectedReason: $notes'
-                                            : selectedReason!;
+                                    final notes = notesController.text.trim();
+                                    final reason = notes.isNotEmpty
+                                        ? '$selectedReason: $notes'
+                                        : selectedReason!;
 
-                                        try {
-                                          await CommunityBookService()
-                                              .requestDeletion(
-                                            isbn: widget.book.isbn!,
-                                            reason: reason,
-                                            requestedBy:
-                                                widget.teacher.id,
-                                            requestedByName:
-                                                widget.teacher.fullName,
-                                            schoolId:
-                                                widget.teacher.schoolId!,
-                                            bookTitle:
-                                                widget.book.title,
-                                            bookAuthor:
-                                                widget.book.author,
-                                          );
+                                    try {
+                                      await CommunityBookService()
+                                          .requestDeletion(
+                                        isbn: widget.book.isbn!,
+                                        reason: reason,
+                                        requestedBy: widget.teacher.id,
+                                        requestedByName:
+                                            widget.teacher.fullName,
+                                        schoolId: widget.teacher.schoolId!,
+                                        bookTitle: widget.book.title,
+                                        bookAuthor: widget.book.author,
+                                      );
 
-                                          if (!context.mounted) return;
-                                          Navigator.pop(
-                                              sheetContext); // close form
-                                          Navigator.pop(
-                                              context); // close detail
+                                      if (!context.mounted) return;
+                                      Navigator.pop(sheetContext); // close form
+                                      Navigator.pop(context); // close detail
 
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                'Deletion request submitted. The Lumi team will review it.',
-                                                style: TeacherTypography
-                                                    .bodySmall
-                                                    .copyWith(
-                                                        color: AppColors
-                                                            .white),
-                                              ),
-                                              behavior:
-                                                  SnackBarBehavior.floating,
-                                              backgroundColor:
-                                                  AppColors.charcoal,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(
-                                                        TeacherDimensions
-                                                            .radiusM),
-                                              ),
-                                            ),
-                                          );
-                                        } catch (e) {
-                                          setSheetState(() =>
-                                              isSubmitting = false);
-                                          if (!context.mounted) return;
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                'Failed to submit request: $e',
-                                                style: TeacherTypography
-                                                    .bodySmall
-                                                    .copyWith(
-                                                        color: AppColors
-                                                            .white),
-                                              ),
-                                              behavior:
-                                                  SnackBarBehavior.floating,
-                                              backgroundColor: Colors.red,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(
-                                                        TeacherDimensions
-                                                            .radiusM),
-                                              ),
-                                            ),
-                                          );
-                                        }
-                                      },
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Deletion request submitted. The Lumi team will review it.',
+                                            style: TeacherTypography.bodySmall
+                                                .copyWith(
+                                                    color: AppColors.white),
+                                          ),
+                                          behavior: SnackBarBehavior.floating,
+                                          backgroundColor: AppColors.charcoal,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                                TeacherDimensions.radiusM),
+                                          ),
+                                        ),
+                                      );
+                                    } catch (e) {
+                                      setSheetState(() => isSubmitting = false);
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Failed to submit request: $e',
+                                            style: TeacherTypography.bodySmall
+                                                .copyWith(
+                                                    color: AppColors.white),
+                                          ),
+                                          behavior: SnackBarBehavior.floating,
+                                          backgroundColor: Colors.red,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                                TeacherDimensions.radiusM),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
                             style: FilledButton.styleFrom(
                               backgroundColor: Colors.red.shade400,
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 14),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(
                                     TeacherDimensions.radiusM),
@@ -1441,8 +1973,8 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
                                   )
                                 : Text(
                                     'Submit Request',
-                                    style: TeacherTypography.bodyMedium
-                                        .copyWith(
+                                    style:
+                                        TeacherTypography.bodyMedium.copyWith(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -1471,10 +2003,11 @@ class _TypeBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
       ),
       child: Text(
         label,
@@ -1497,17 +2030,38 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 80,
-          child: Text(label,
-              style: TeacherTypography.bodySmall
-                  .copyWith(color: AppColors.textSecondary)),
-        ),
-        Expanded(child: Text(value, style: TeacherTypography.bodySmall)),
-      ],
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.teacherBackground,
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+        border: Border.all(color: AppColors.teacherBorder),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 82,
+            child: Text(
+              label,
+              style: TeacherTypography.caption.copyWith(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TeacherTypography.bodySmall.copyWith(
+                color: AppColors.charcoal,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

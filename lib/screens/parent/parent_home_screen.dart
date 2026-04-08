@@ -612,7 +612,17 @@ class _TodayCard extends StatelessWidget {
                     .toList();
 
                 if (levelAllocation == null && allTitles.isEmpty) {
-                  return const SizedBox.shrink();
+                  final hasFreeChoice = activeAllocations
+                      .any((a) => a.type == AllocationType.freeChoice);
+                  if (!hasFreeChoice) {
+                    return const SizedBox.shrink();
+                  }
+                  return LumiInfoCard(
+                    type: LumiInfoCardType.info,
+                    icon: Icons.auto_stories_outlined,
+                    title: "This Week's Goal",
+                    message: 'Read any book your child enjoys!',
+                  );
                 }
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

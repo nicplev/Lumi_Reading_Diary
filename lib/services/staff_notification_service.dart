@@ -192,7 +192,10 @@ class StaffNotificationService {
     }
 
     try {
-      final callable = _functions.httpsCallable('createNotificationCampaign');
+      final callable = _functions.httpsCallable(
+        'createNotificationCampaign',
+        options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
+      );
       final result = await callable.call({
         'schoolId': schoolId,
         'title': title.trim(),
@@ -207,8 +210,35 @@ class StaffNotificationService {
       final data = result.data as Map<Object?, Object?>;
       return data['campaignId'] as String;
     } on FirebaseFunctionsException catch (error) {
+      switch (error.code) {
+        case 'not-found':
+          throw StaffNotificationException(
+            'Notification service is not available. Please contact your administrator.',
+          );
+        case 'unauthenticated':
+          throw StaffNotificationException(
+            'You must be signed in to send notifications.',
+          );
+        case 'permission-denied':
+          throw StaffNotificationException(
+            error.message ?? 'You do not have permission to send notifications.',
+          );
+        case 'invalid-argument':
+          throw StaffNotificationException(
+            error.message ?? 'Please check your notification details and try again.',
+          );
+        case 'resource-exhausted':
+          throw StaffNotificationException(
+            error.message ?? 'Too many notifications sent recently. Please wait before sending more.',
+          );
+        default:
+          throw StaffNotificationException(
+            error.message ?? 'Unable to create notification campaign.',
+          );
+      }
+    } catch (error) {
       throw StaffNotificationException(
-        error.message ?? 'Unable to create notification campaign.',
+        'Connection error. Please check your internet and try again.',
       );
     }
   }

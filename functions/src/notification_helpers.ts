@@ -68,11 +68,12 @@ export function normalizeNotificationPermissions(
   rawPermissions?: unknown,
 ): NotificationPermissions {
   const defaults = defaultNotificationPermissions(role);
-  const notifications = typeof rawPermissions === "object" &&
-      rawPermissions !== null &&
-      "notifications" in rawPermissions
-    ? (rawPermissions as {notifications?: Record<string, unknown>}).notifications
-    : undefined;
+  const hasNotifications = typeof rawPermissions === "object" &&
+    rawPermissions !== null &&
+    "notifications" in rawPermissions;
+  const notifications = hasNotifications ?
+    (rawPermissions as {notifications?: Record<string, unknown>}).notifications :
+    undefined;
 
   return {
     assignedClasses: boolOrDefault(notifications?.assignedClasses, defaults.assignedClasses),
@@ -100,38 +101,38 @@ export function validateNotificationAudience(
   }
 
   switch (input.audienceType) {
-    case "school":
-      if (!permissions.wholeSchool) {
-        return {ok: false, reason: "You do not have permission to notify the whole school."};
-      }
-      return {ok: true};
+  case "school":
+    if (!permissions.wholeSchool) {
+      return {ok: false, reason: "You do not have permission to notify the whole school."};
+    }
+    return {ok: true};
 
-    case "classes":
-      if (!permissions.assignedClasses) {
-        return {ok: false, reason: "You do not have permission to notify classes."};
-      }
-      if (targetClassIds.length === 0) {
-        return {ok: false, reason: "Select at least one class."};
-      }
-      if (input.role === "teacher" && targetClassIds.some((classId) => !allowedClassIds.has(classId))) {
-        return {ok: false, reason: "Teachers can only notify their assigned classes."};
-      }
-      return {ok: true};
+  case "classes":
+    if (!permissions.assignedClasses) {
+      return {ok: false, reason: "You do not have permission to notify classes."};
+    }
+    if (targetClassIds.length === 0) {
+      return {ok: false, reason: "Select at least one class."};
+    }
+    if (input.role === "teacher" && targetClassIds.some((classId) => !allowedClassIds.has(classId))) {
+      return {ok: false, reason: "Teachers can only notify their assigned classes."};
+    }
+    return {ok: true};
 
-    case "students":
-      if (!permissions.assignedStudents) {
-        return {ok: false, reason: "You do not have permission to notify students."};
-      }
-      if (studentClassIds.length === 0) {
-        return {ok: false, reason: "Select at least one student."};
-      }
-      if (input.role === "teacher" && studentClassIds.some((classId) => !allowedClassIds.has(classId))) {
-        return {ok: false, reason: "Teachers can only notify students in their assigned classes."};
-      }
-      return {ok: true};
+  case "students":
+    if (!permissions.assignedStudents) {
+      return {ok: false, reason: "You do not have permission to notify students."};
+    }
+    if (studentClassIds.length === 0) {
+      return {ok: false, reason: "Select at least one student."};
+    }
+    if (input.role === "teacher" && studentClassIds.some((classId) => !allowedClassIds.has(classId))) {
+      return {ok: false, reason: "Teachers can only notify students in their assigned classes."};
+    }
+    return {ok: true};
 
-    default:
-      return {ok: false, reason: "Unsupported audience type."};
+  default:
+    return {ok: false, reason: "Unsupported audience type."};
   }
 }
 
@@ -152,6 +153,7 @@ export function mergeRecipientsByParent(students: RecipientStudent[]): ParentRec
         });
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       const bucket = recipients.get(parentId)!;
       bucket.studentIds.add(student.id);
       bucket.studentNames.add(student.firstName);

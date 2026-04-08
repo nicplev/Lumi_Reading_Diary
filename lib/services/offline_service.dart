@@ -25,6 +25,9 @@ class OfflineService {
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _isOnline = true;
 
+  // Initialization flag
+  bool _initialized = false;
+
   // Sync queue
   final List<PendingSync> _syncQueue = [];
   Timer? _syncTimer;
@@ -56,6 +59,7 @@ class OfflineService {
       // Start sync timer
       _startSyncTimer();
 
+      _initialized = true;
       debugPrint('Offline service initialized');
     } catch (e) {
       debugPrint('Error initializing offline service: $e');
@@ -65,6 +69,10 @@ class OfflineService {
 
   // Clear all cached data (call on logout)
   Future<void> clearAllCaches() async {
+    if (!_initialized) {
+      debugPrint('Offline service not initialized, skipping cache clear');
+      return;
+    }
     try {
       await _readingLogsBox.clear();
       await _studentsBox.clear();
@@ -428,6 +436,7 @@ class OfflineService {
 
   // Clear all local data
   Future<void> clearLocalData() async {
+    if (!_initialized) return;
     await _readingLogsBox.clear();
     await _studentsBox.clear();
     await _allocationsBox.clear();

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/student_model.dart';
@@ -37,7 +36,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
   void initState() {
     super.initState();
     _loadReadingLevelOptions();
-    _loadData();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
   }
 
   Future<void> _loadReadingLevelOptions({bool forceRefresh = false}) async {
@@ -68,53 +67,22 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.teacherBackground,
       appBar: AppBar(
-        title: const Text(
-          'Reading Groups',
-          style: TextStyle(
-            fontFamily: 'Nunito',
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        backgroundColor: AppColors.teacherPrimary,
-        foregroundColor: AppColors.white,
+        backgroundColor: AppColors.white,
+        foregroundColor: AppColors.charcoal,
+        surfaceTintColor: AppColors.white,
         elevation: 0,
+        title: Text('Reading Groups', style: TeacherTypography.h3),
         actions: [
           IconButton(
             icon: const Icon(Icons.help_outline),
             onPressed: _showHelp,
+            color: AppColors.textSecondary,
           ),
         ],
       ),
-      body: !_levelsEnabled
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.info_outline,
-                        size: 48, color: AppColors.textSecondary),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Reading levels are not enabled for your school',
-                      style: TeacherTypography.bodyLarge,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Contact your school admin to enable reading levels in school settings.',
-                      style: TeacherTypography.bodyMedium.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-            )
-          : _isLoading
+      body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(
                 color: AppColors.teacherPrimary,
@@ -124,59 +92,57 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
               color: AppColors.teacherPrimary,
               onRefresh: _loadData,
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _buildClassInfo(),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
                     if (_ungroupedStudents.isNotEmpty) ...[
                       _buildUngroupedStudentsCard(),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 24),
                     ],
                     _buildGroupsList(),
                   ],
                 ),
               ),
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'fab_reading_groups',
-        onPressed: _createNewGroup,
-        icon: const Icon(Icons.add),
-        label: Text('New Group', style: TeacherTypography.buttonText),
-        backgroundColor: AppColors.teacherPrimary,
-        foregroundColor: AppColors.white,
-      ),
+      floatingActionButton: _groups.isNotEmpty
+          ? FloatingActionButton.extended(
+              heroTag: 'fab_reading_groups',
+              onPressed: _createNewGroup,
+              icon: const Icon(Icons.add),
+              label: Text('New Group', style: TeacherTypography.buttonText),
+              backgroundColor: AppColors.teacherPrimary,
+              foregroundColor: AppColors.white,
+            )
+          : null,
     );
   }
 
   Widget _buildClassInfo() {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
-        boxShadow: TeacherDimensions.cardShadow,
-      ),
+      padding: const EdgeInsets.all(TeacherDimensions.paddingXL),
+      decoration: TeacherDimensions.cardDecoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(widget.classModel.name, style: TeacherTypography.h2),
-          const SizedBox(height: 8),
-          Row(
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
               _buildInfoChip(
                 Icons.people,
                 '${_allStudents.length} Students',
                 AppColors.teacherPrimary,
               ),
-              const SizedBox(width: 8),
               _buildInfoChip(
                 Icons.group_work,
                 '${_groups.length} Groups',
                 AppColors.skyBlue,
               ),
-              const SizedBox(width: 8),
               _buildInfoChip(
                 Icons.person_outline,
                 '${_ungroupedStudents.length} Ungrouped',
@@ -212,117 +178,186 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
   }
 
   Widget _buildUngroupedStudentsCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.warmOrange.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
-        border: Border.all(color: AppColors.warmOrange.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 10),
+          child: Text(
+            'UNGROUPED STUDENTS',
+            style: TeacherTypography.sectionHeader.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.all(TeacherDimensions.paddingXL),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
+            border:
+                Border.all(color: AppColors.warmOrange.withValues(alpha: 0.3)),
+            boxShadow: TeacherDimensions.cardShadow,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.person_add, color: AppColors.warmOrange, size: 20),
-              const SizedBox(width: 8),
               Text(
-                'Ungrouped Students (${_ungroupedStudents.length})',
-                style: TeacherTypography.h3,
+                '${_ungroupedStudents.length} students not in a group',
+                style: TeacherTypography.bodyMedium.copyWith(
+                  color: AppColors.warmOrange,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _ungroupedStudents.map((student) {
+                  return GestureDetector(
+                    onTap: () => _assignStudentToGroup(student),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.warmOrange.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(
+                            TeacherDimensions.radiusRound),
+                        border: Border.all(
+                          color:
+                              AppColors.warmOrange.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircleAvatar(
+                            radius: 12,
+                            backgroundColor:
+                                AppColors.warmOrange.withValues(alpha: 0.2),
+                            child: Text(
+                              student.firstName[0].toUpperCase(),
+                              style: TeacherTypography.caption.copyWith(
+                                color: AppColors.warmOrange,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            student.fullName,
+                            style: TeacherTypography.bodySmall.copyWith(
+                              color: AppColors.charcoal,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.arrow_forward_ios_rounded,
+                            size: 10,
+                            color:
+                                AppColors.warmOrange.withValues(alpha: 0.6),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Tap a student to assign them to a group',
+                style: TeacherTypography.caption.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _ungroupedStudents.map((student) {
-              return Chip(
-                avatar: CircleAvatar(
-                  backgroundColor: AppColors.warmOrange.withValues(alpha: 0.3),
-                  child: Text(
-                    student.firstName[0].toUpperCase(),
-                    style: TeacherTypography.bodySmall
-                        .copyWith(color: AppColors.charcoal),
-                  ),
-                ),
-                label:
-                    Text(student.fullName, style: TeacherTypography.bodySmall),
-                onDeleted: () => _assignStudentToGroup(student),
-                deleteIcon: const Icon(Icons.arrow_forward, size: 18),
-                shape: RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(TeacherDimensions.radiusM),
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Tap the arrow to assign students to groups',
-            style: TeacherTypography.bodySmall
-                .copyWith(fontStyle: FontStyle.italic),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   Widget _buildGroupsList() {
     if (_groups.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
-          boxShadow: TeacherDimensions.cardShadow,
-        ),
-        child: Column(
-          children: [
-            Icon(
-              Icons.group_work_outlined,
-              size: 64,
-              color: AppColors.textSecondary,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'No Reading Groups Yet',
-              style:
-                  TeacherTypography.h2.copyWith(color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Create groups to organize students by ability level or interest',
-              style: TeacherTypography.bodyMedium
-                  .copyWith(color: AppColors.textSecondary),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _createNewGroup,
-              icon: const Icon(Icons.add),
-              label: Text('Create First Group',
-                  style: TeacherTypography.buttonText),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.teacherPrimary,
-                foregroundColor: AppColors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(TeacherDimensions.radiusM),
-                ),
-                elevation: 0,
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 10),
+            child: Text(
+              'READING GROUPS',
+              style: TeacherTypography.sectionHeader.copyWith(
+                color: AppColors.textSecondary,
               ),
             ),
-          ],
-        ),
+          ),
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 28, vertical: 36),
+            decoration: TeacherDimensions.cardDecoration,
+            child: Column(
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: AppColors.teacherPrimaryLight,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.group_work_outlined,
+                      size: 40,
+                      color: AppColors.teacherPrimary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text('No Reading Groups Yet', style: TeacherTypography.h2),
+                const SizedBox(height: 8),
+                Text(
+                  'Create groups to organize students by ability level or interest',
+                  style: TeacherTypography.bodyMedium
+                      .copyWith(color: AppColors.textSecondary),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: _createNewGroup,
+                  icon: const Icon(Icons.add),
+                  label: Text('Create First Group',
+                      style: TeacherTypography.buttonText),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.teacherPrimary,
+                    foregroundColor: AppColors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                          TeacherDimensions.radiusRound),
+                    ),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       );
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Reading Groups', style: TeacherTypography.h3),
-        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
+            'READING GROUPS',
+            style: TeacherTypography.sectionHeader.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
         ..._groups.map((group) => _buildGroupCard(group)),
       ],
     );
@@ -338,27 +373,27 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
         : AppColors.teacherPrimary;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 16),
       child: GestureDetector(
         onTap: () => _viewGroupDetails(group, studentsInGroup),
         child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
-            boxShadow: TeacherDimensions.cardShadow,
-          ),
+          padding: const EdgeInsets.all(TeacherDimensions.paddingXL),
+          decoration: TeacherDimensions.cardDecoration,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
                   Container(
-                    width: 4,
-                    height: 48,
+                    width: 6,
+                    height: 52,
                     decoration: BoxDecoration(
-                      color: color,
-                      borderRadius: BorderRadius.circular(2),
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [color, color.withValues(alpha: 0.4)],
+                      ),
+                      borderRadius: BorderRadius.circular(3),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -479,37 +514,59 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
                 ),
               ],
               if (studentsInGroup.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Divider(color: AppColors.divider),
-                const SizedBox(height: 4),
+                Divider(
+                  color: AppColors.teacherBorder,
+                  height: 24,
+                ),
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: 6,
+                  runSpacing: 6,
                   children: studentsInGroup.take(5).map((student) {
-                    return Chip(
-                      avatar: CircleAvatar(
-                        backgroundColor: color.withValues(alpha: 0.2),
-                        child: Text(
-                          student.firstName[0].toUpperCase(),
-                          style: TeacherTypography.bodySmall
-                              .copyWith(color: color),
-                        ),
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(
+                            TeacherDimensions.radiusRound),
+                        border: Border.all(
+                            color: color.withValues(alpha: 0.2)),
                       ),
-                      label: Text(student.fullName),
-                      labelStyle: TeacherTypography.bodySmall,
-                      shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(TeacherDimensions.radiusM),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircleAvatar(
+                            radius: 10,
+                            backgroundColor:
+                                color.withValues(alpha: 0.15),
+                            child: Text(
+                              student.firstName[0].toUpperCase(),
+                              style: TeacherTypography.caption.copyWith(
+                                color: color,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            student.firstName,
+                            style: TeacherTypography.caption.copyWith(
+                              color: AppColors.charcoal,
+                            ),
+                          ),
+                        ],
                       ),
                     );
                   }).toList(),
                 ),
                 if (studentsInGroup.length > 5)
                   Padding(
-                    padding: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.only(top: 6),
                     child: Text(
-                      '+${studentsInGroup.length - 5} more students',
-                      style: TeacherTypography.bodySmall,
+                      '+${studentsInGroup.length - 5} more',
+                      style: TeacherTypography.caption.copyWith(
+                        color: color,
+                      ),
                     ),
                   ),
               ],
@@ -525,16 +582,23 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
 
     try {
       final firebaseService =
-          Provider.of<FirebaseService>(context, listen: false);
+          FirebaseService.instance;
 
       // Load students
-      final studentDocs =
-          await firebaseService.getStudentsInClass(widget.classModel.id);
-      _allStudents =
-          studentDocs.map((doc) => StudentModel.fromFirestore(doc)).toList();
+      final studentSnapshot = await firebaseService.firestore
+          .collection('schools')
+          .doc(widget.classModel.schoolId)
+          .collection('students')
+          .where('classId', isEqualTo: widget.classModel.id)
+          .get();
+      _allStudents = studentSnapshot.docs
+          .map((doc) => StudentModel.fromFirestore(doc))
+          .toList();
 
       // Load groups
       final groupsSnapshot = await firebaseService.firestore
+          .collection('schools')
+          .doc(widget.classModel.schoolId)
           .collection('readingGroups')
           .where('classId', isEqualTo: widget.classModel.id)
           .where('isActive', isEqualTo: true)
@@ -542,7 +606,11 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
 
       _groups = groupsSnapshot.docs
           .map((doc) => ReadingGroupModel.fromFirestore(doc))
-          .toList();
+          .toList()
+        ..sort((a, b) {
+          final orderCmp = a.sortOrder.compareTo(b.sortOrder);
+          return orderCmp != 0 ? orderCmp : a.name.compareTo(b.name);
+        });
 
       // Find ungrouped students
       final groupedStudentIds = <String>{};
@@ -573,8 +641,8 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
       context: context,
       builder: (context) => _GroupFormDialog(
         classModel: widget.classModel,
-        levelOptions: _readingLevelOptions,
-        readingLevelService: _readingLevelService,
+        levelOptions: _levelsEnabled ? _readingLevelOptions : const [],
+        readingLevelService: _levelsEnabled ? _readingLevelService : null,
       ),
     );
     if (!mounted) return;
@@ -582,9 +650,11 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
     if (result != null) {
       try {
         final firebaseService =
-            Provider.of<FirebaseService>(context, listen: false);
+            FirebaseService.instance;
 
         await firebaseService.firestore
+            .collection('schools')
+            .doc(widget.classModel.schoolId)
             .collection('readingGroups')
             .add(result.toFirestore());
 
@@ -617,8 +687,8 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
       builder: (context) => _GroupFormDialog(
         classModel: widget.classModel,
         existingGroup: group,
-        levelOptions: _readingLevelOptions,
-        readingLevelService: _readingLevelService,
+        levelOptions: _levelsEnabled ? _readingLevelOptions : const [],
+        readingLevelService: _levelsEnabled ? _readingLevelService : null,
       ),
     );
     if (!mounted) return;
@@ -626,9 +696,11 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
     if (result != null) {
       try {
         final firebaseService =
-            Provider.of<FirebaseService>(context, listen: false);
+            FirebaseService.instance;
 
         await firebaseService.firestore
+            .collection('schools')
+            .doc(widget.classModel.schoolId)
             .collection('readingGroups')
             .doc(group.id)
             .update(result.toFirestore());
@@ -690,9 +762,11 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
     if (confirmed == true) {
       try {
         final firebaseService =
-            Provider.of<FirebaseService>(context, listen: false);
+            FirebaseService.instance;
 
         await firebaseService.firestore
+            .collection('schools')
+            .doc(widget.classModel.schoolId)
             .collection('readingGroups')
             .doc(group.id)
             .delete();
@@ -721,9 +795,243 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
   }
 
   void _viewGroupDetails(ReadingGroupModel group, List<StudentModel> students) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('View details for ${group.name}'),
+    final groupColor = group.color != null
+        ? Color(int.parse(group.color!.replaceFirst('#', '0xFF')))
+        : AppColors.teacherPrimary;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.85,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Drag handle
+              Container(
+                margin: const EdgeInsets.only(top: 10, bottom: 6),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.divider,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Header
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: groupColor,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(group.name,
+                              style: TeacherTypography.h2),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined, size: 20),
+                          color: AppColors.textSecondary,
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _editGroup(group);
+                          },
+                        ),
+                      ],
+                    ),
+                    if (group.description != null &&
+                        group.description!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        group.description!,
+                        style: TeacherTypography.bodySmall
+                            .copyWith(color: AppColors.textSecondary),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    // Info chips row
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        if (group.readingLevel != null &&
+                            group.readingLevel!.isNotEmpty)
+                          _detailChip(
+                            Icons.auto_stories_outlined,
+                            _formatReadingLevel(group.readingLevel),
+                            groupColor,
+                          ),
+                        _detailChip(
+                          Icons.timer_outlined,
+                          '${group.targetMinutes} min/day',
+                          AppColors.teacherPrimary,
+                        ),
+                        _detailChip(
+                          Icons.people_outline,
+                          '${students.length} students',
+                          AppColors.teacherPrimary,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Student list header
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: Row(
+                  children: [
+                    Text('Students',
+                        style: TeacherTypography.bodyMedium.copyWith(
+                            fontWeight: FontWeight.w700)),
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _manageGroupStudents(group, students);
+                      },
+                      icon: const Icon(Icons.edit_outlined, size: 16),
+                      label: const Text('Manage'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.teacherPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Student list
+              Expanded(
+                child: students.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No students in this group yet',
+                          style: TeacherTypography.bodySmall
+                              .copyWith(color: AppColors.textSecondary),
+                        ),
+                      )
+                    : ListView.separated(
+                        controller: scrollController,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: students.length,
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: 8),
+                        itemBuilder: (_, i) {
+                          final student = students[i];
+                          final streak =
+                              student.stats?.currentStreak ?? 0;
+                          return Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 18,
+                                backgroundColor:
+                                    groupColor.withValues(alpha: 0.12),
+                                child: Text(
+                                  student.firstName.isNotEmpty
+                                      ? student.firstName[0].toUpperCase()
+                                      : '?',
+                                  style: TextStyle(
+                                    fontFamily: 'Nunito',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: groupColor,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      student.fullName,
+                                      style: TeacherTypography.bodyMedium,
+                                    ),
+                                    Row(
+                                      children: [
+                                        if (_levelsEnabled &&
+                                            student.currentReadingLevel !=
+                                                null) ...[
+                                          Text(
+                                            'Level: ${_formatReadingLevel(student.currentReadingLevel)}',
+                                            style: TeacherTypography.caption
+                                                .copyWith(
+                                                    color: AppColors
+                                                        .textSecondary),
+                                          ),
+                                          const SizedBox(width: 8),
+                                        ],
+                                        if (streak > 0) ...[
+                                          Icon(
+                                            Icons
+                                                .local_fire_department_outlined,
+                                            size: 14,
+                                            color:
+                                                AppColors.teacherPrimary,
+                                          ),
+                                          const SizedBox(width: 2),
+                                          Text(
+                                            '$streak day streak',
+                                            style: TeacherTypography
+                                                .caption
+                                                .copyWith(
+                                                    color: AppColors
+                                                        .teacherPrimary),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _detailChip(IconData icon, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TeacherTypography.caption.copyWith(color: color),
+          ),
+        ],
       ),
     );
   }
@@ -744,9 +1052,11 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
     if (result != null) {
       try {
         final firebaseService =
-            Provider.of<FirebaseService>(context, listen: false);
+            FirebaseService.instance;
 
         await firebaseService.firestore
+            .collection('schools')
+            .doc(widget.classModel.schoolId)
             .collection('readingGroups')
             .doc(group.id)
             .update({
@@ -826,7 +1136,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
     if (selectedGroup != null) {
       try {
         final firebaseService =
-            Provider.of<FirebaseService>(context, listen: false);
+            FirebaseService.instance;
 
         final updatedStudentIds = [
           ...selectedGroup.studentIds,
@@ -834,6 +1144,8 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
         ];
 
         await firebaseService.firestore
+            .collection('schools')
+            .doc(widget.classModel.schoolId)
             .collection('readingGroups')
             .doc(selectedGroup.id)
             .update({
@@ -934,12 +1246,12 @@ class _GroupFormDialog extends StatefulWidget {
   final ClassModel classModel;
   final ReadingGroupModel? existingGroup;
   final List<ReadingLevelOption> levelOptions;
-  final ReadingLevelService readingLevelService;
+  final ReadingLevelService? readingLevelService;
 
   const _GroupFormDialog({
     required this.classModel,
-    required this.levelOptions,
-    required this.readingLevelService,
+    this.levelOptions = const [],
+    this.readingLevelService,
     this.existingGroup,
   });
 
@@ -977,7 +1289,7 @@ class _GroupFormDialogState extends State<_GroupFormDialog> {
     _targetMinutesController = TextEditingController(
         text: widget.existingGroup?.targetMinutes.toString() ?? '20');
     _selectedColor = widget.existingGroup?.color ?? _colors[0];
-    _selectedReadingLevel = widget.readingLevelService.normalizeLevel(
+    _selectedReadingLevel = widget.readingLevelService?.normalizeLevel(
       widget.existingGroup?.readingLevel,
       options: widget.levelOptions,
     );
@@ -1050,44 +1362,46 @@ class _GroupFormDialogState extends State<_GroupFormDialog> {
                 style: TeacherTypography.bodyMedium,
                 maxLines: 2,
               ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedReadingLevel,
-                decoration: InputDecoration(
-                  labelText: 'Reading Level (optional)',
-                  border: OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.circular(TeacherDimensions.radiusM),
+              if (widget.levelOptions.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedReadingLevel,
+                  decoration: InputDecoration(
+                    labelText: 'Reading Level (optional)',
+                    border: OutlineInputBorder(
+                      borderRadius:
+                          BorderRadius.circular(TeacherDimensions.radiusM),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius:
+                          BorderRadius.circular(TeacherDimensions.radiusM),
+                      borderSide: BorderSide(color: AppColors.teacherPrimary),
+                    ),
                   ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.circular(TeacherDimensions.radiusM),
-                    borderSide: BorderSide(color: AppColors.teacherPrimary),
-                  ),
+                  items: widget.levelOptions
+                      .map(
+                        (option) => DropdownMenuItem<String>(
+                          value: option.value,
+                          child: Text(option.displayLabel),
+                        ),
+                      )
+                      .toList(growable: false),
+                  onChanged: (value) {
+                    setState(() => _selectedReadingLevel = value);
+                  },
                 ),
-                items: widget.levelOptions
-                    .map(
-                      (option) => DropdownMenuItem<String>(
-                        value: option.value,
-                        child: Text(option.displayLabel),
-                      ),
-                    )
-                    .toList(growable: false),
-                onChanged: (value) {
-                  setState(() => _selectedReadingLevel = value);
-                },
-              ),
-              if (_selectedReadingLevel != null) ...[
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () {
-                      setState(() => _selectedReadingLevel = null);
-                    },
-                    child: const Text('Clear level'),
+                if (_selectedReadingLevel != null) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () {
+                        setState(() => _selectedReadingLevel = null);
+                      },
+                      child: const Text('Clear level'),
+                    ),
                   ),
-                ),
+                ],
               ],
               const SizedBox(height: 12),
               TextFormField(
