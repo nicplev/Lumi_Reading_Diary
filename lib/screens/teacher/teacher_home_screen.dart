@@ -31,6 +31,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
     with SingleTickerProviderStateMixin {
   final FirebaseService _firebaseService = FirebaseService.instance;
   int _selectedIndex = 0;
+  int _dashboardResetTrigger = 0;
   List<ClassModel> _classes = [];
   ClassModel? _selectedClass;
   bool _isLoading = true;
@@ -75,7 +76,10 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
   void _onTabTapped(int index) {
     if (index == _selectedIndex) return;
     _tabAnimController.value = 0.0;
-    setState(() => _selectedIndex = index);
+    setState(() {
+      _selectedIndex = index;
+      _dashboardResetTrigger++;
+    });
     _tabAnimController.forward();
   }
 
@@ -208,6 +212,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
       classes: _classes,
       onClassChanged: (c) => setState(() => _selectedClass = c),
       onTabChanged: (index) => setState(() => _selectedIndex = index),
+      resetTrigger: _dashboardResetTrigger,
     );
   }
 

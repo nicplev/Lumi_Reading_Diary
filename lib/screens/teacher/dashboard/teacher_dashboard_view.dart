@@ -26,6 +26,7 @@ class TeacherDashboardView extends StatefulWidget {
   final List<ClassModel> classes;
   final ValueChanged<ClassModel> onClassChanged;
   final ValueChanged<int> onTabChanged;
+  final int resetTrigger;
 
   const TeacherDashboardView({
     super.key,
@@ -34,6 +35,7 @@ class TeacherDashboardView extends StatefulWidget {
     required this.classes,
     required this.onClassChanged,
     required this.onTabChanged,
+    this.resetTrigger = 0,
   });
 
   @override
@@ -47,6 +49,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
   int? _momentumDiff; // positive = up, negative = down
   List<StudentModel> _students = [];
   bool _studentsLoaded = false;
+  final ValueNotifier<int> _engagementResetSignal = ValueNotifier<int>(0);
 
   @override
   void initState() {
@@ -56,11 +59,24 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
   }
 
   @override
+  void dispose() {
+    _engagementResetSignal.dispose();
+    super.dispose();
+  }
+
+  void resetEngagementCard() {
+    _engagementResetSignal.value++;
+  }
+
+  @override
   void didUpdateWidget(TeacherDashboardView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.selectedClass.id != widget.selectedClass.id) {
       _computeHeroIntelligence();
       _fetchStudents();
+    }
+    if (oldWidget.resetTrigger != widget.resetTrigger) {
+      resetEngagementCard();
     }
   }
 
@@ -209,7 +225,10 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).viewPadding.top;
-    return CustomScrollView(
+    return GestureDetector(
+      onTap: resetEngagementCard,
+      behavior: HitTestBehavior.translucent,
+      child: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(child: SizedBox(height: topPadding + 12)),
           SliverToBoxAdapter(
@@ -230,6 +249,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
                   classModel: widget.selectedClass,
                   schoolId: widget.user.schoolId!,
                   students: _students,
+                  resetSignal: _engagementResetSignal,
                 )
                     .animate()
                     .fadeIn(
@@ -285,6 +305,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
             ),
           ),
         ],
+      ),
     );
   }
 

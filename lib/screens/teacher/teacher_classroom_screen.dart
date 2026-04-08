@@ -27,6 +27,9 @@ class TeacherClassroomScreen extends StatefulWidget {
   final ClassModel? selectedClass;
   final List<ClassModel> classes;
   final ValueChanged<ClassModel>? onClassChanged;
+  final FirebaseFirestore? firestore;
+  final ReadingLevelService? readingLevelService;
+  final StudentReadingLevelService? studentReadingLevelService;
 
   const TeacherClassroomScreen({
     super.key,
@@ -34,16 +37,26 @@ class TeacherClassroomScreen extends StatefulWidget {
     this.selectedClass,
     this.classes = const [],
     this.onClassChanged,
+    this.firestore,
+    this.readingLevelService,
+    this.studentReadingLevelService,
   });
 
   @override
   State<TeacherClassroomScreen> createState() => _TeacherClassroomScreenState();
 }
 
+enum _ClassroomQuickFilter {
+  all,
+  needsLevel,
+  onStreak,
+  noReadingThisWeek,
+}
+
 class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
-  final ReadingLevelService _readingLevelService = ReadingLevelService();
-  final StudentReadingLevelService _studentReadingLevelService =
-      StudentReadingLevelService();
+  late final FirebaseFirestore _firestore;
+  late final ReadingLevelService _readingLevelService;
+  late final StudentReadingLevelService _studentReadingLevelService;
   String _sortBy = 'name';
   String _searchQuery = '';
   final _searchController = TextEditingController();
@@ -53,10 +66,19 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
   // Group filtering
   List<ReadingGroupModel> _groups = [];
   String? _selectedGroupFilter; // null = all, 'ungrouped' = ungrouped, else groupId
+  _ClassroomQuickFilter _quickFilter = _ClassroomQuickFilter.all;
 
   @override
   void initState() {
     super.initState();
+    _firestore = widget.firestore ?? FirebaseService.instance.firestore;
+    _readingLevelService = widget.readingLevelService ??
+        ReadingLevelService(firestore: _firestore);
+    _studentReadingLevelService = widget.studentReadingLevelService ??
+        StudentReadingLevelService(
+          firestore: _firestore,
+          readingLevelService: _readingLevelService,
+        );
     _loadReadingLevelOptions();
     _loadGroups();
   }
@@ -70,6 +92,9 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     if (oldWidget.selectedClass?.id != widget.selectedClass?.id) {
       _loadGroups();
       _selectedGroupFilter = null;
+      _quickFilter = _ClassroomQuickFilter.all;
+      _searchQuery = '';
+      _searchController.clear();
     }
   }
 
@@ -84,7 +109,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     if (classModel == null) return;
 
     try {
-      final snapshot = await FirebaseService.instance.firestore
+      final snapshot = await _firestore
           .collection('schools')
           .doc(widget.teacher.schoolId)
           .collection('readingGroups')
@@ -223,6 +248,115 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     );
   }
 
+  bool _needsLevelAttention(StudentModel student) {
+    return _isLevelUnset(student) || _isLevelUnresolved(student);
+  }
+
+  DateTime _startOfWeek([DateTime? reference]) {
+    final now = reference ?? DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return today.subtract(Duration(days: today.weekday - 1));
+  }
+
+  bool _hasReadThisWeek(StudentStats? stats) {
+    final lastRead = stats?.lastReadingDate;
+    if (lastRead == null) return false;
+    return !DateTime(
+      lastRead.year,
+      lastRead.month,
+      lastRead.day,
+    ).isBefore(_startOfWeek());
+  }
+
+  String _lastActivityLabel(StudentModel student) {
+    final lastRead = student.stats?.lastReadingDate;
+    if (lastRead == null) return 'No reading yet';
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final lastDay = DateTime(lastRead.year, lastRead.month, lastRead.day);
+
+    if (lastDay.isAtSameMomentAs(today)) return 'Read today';
+    if (lastDay.isAtSameMomentAs(yesterday)) return 'Read yesterday';
+    if (_hasReadThisWeek(student.stats)) return 'Active this week';
+
+    return 'No reading this week';
+  }
+
+  Color _activityBadgeColor(StudentModel student) {
+    final label = _lastActivityLabel(student);
+    if (label == 'Read today' || label == 'Read yesterday') {
+      return AppColors.teacherPrimary;
+    }
+    if (label == 'Active this week') {
+      return AppColors.success;
+    }
+    return AppColors.warmOrange;
+  }
+
+  List<StudentModel> _applyQuickFilter(List<StudentModel> students) {
+    switch (_quickFilter) {
+      case _ClassroomQuickFilter.all:
+        return students;
+      case _ClassroomQuickFilter.needsLevel:
+        return students.where(_needsLevelAttention).toList();
+      case _ClassroomQuickFilter.onStreak:
+        return students.where((s) => _activeStreak(s.stats) > 0).toList();
+      case _ClassroomQuickFilter.noReadingThisWeek:
+        return students.where((s) => !_hasReadThisWeek(s.stats)).toList();
+    }
+  }
+
+  String _quickFilterLabel(_ClassroomQuickFilter filter) {
+    switch (filter) {
+      case _ClassroomQuickFilter.all:
+        return 'All';
+      case _ClassroomQuickFilter.needsLevel:
+        return 'Needs level';
+      case _ClassroomQuickFilter.onStreak:
+        return 'On streak';
+      case _ClassroomQuickFilter.noReadingThisWeek:
+        return 'No reading';
+    }
+  }
+
+  String? _activeFilterSummary() {
+    if (_quickFilter != _ClassroomQuickFilter.all) {
+      return _quickFilterLabel(_quickFilter);
+    }
+
+    if (_selectedGroupFilter == 'ungrouped') return 'Ungrouped';
+    if (_selectedGroupFilter != null) {
+      final group = _groups.where((g) => g.id == _selectedGroupFilter).firstOrNull;
+      return group?.name;
+    }
+
+    return null;
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> _studentsStream(ClassModel classModel) {
+    return _firestore
+        .collection('schools')
+        .doc(widget.teacher.schoolId)
+        .collection('students')
+        .where('classId', isEqualTo: classModel.id)
+        .snapshots();
+  }
+
+  void _openAllocationScreen() {
+    final classModel = widget.selectedClass;
+    if (classModel == null) return;
+
+    context.push(
+      '/teacher/allocation',
+      extra: {
+        'teacher': widget.teacher,
+        'selectedClass': classModel,
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final selectedClass = widget.selectedClass;
@@ -235,75 +369,40 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
 
     return CustomScrollView(
       slivers: [
-        // Class header
         SliverToBoxAdapter(
-          child: _buildClassHeader(selectedClass),
+          child: _buildClassOverviewCard(selectedClass),
         ),
 
-        // Scanner card
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-            child: _buildScannerCard(selectedClass),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: _buildActionStrip(selectedClass),
           ),
         ),
 
-        // Search bar
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: _buildSearchBar(),
           ),
         ),
 
-        // Group filter chips
-        if (_groups.isNotEmpty)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-              child: SizedBox(
-                height: 36,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: [
-                    _groupFilterChip('All', null),
-                    const SizedBox(width: 6),
-                    ..._groups.map((group) {
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: _groupFilterChip(group.name, group.id,
-                            color: group.color),
-                      );
-                    }),
-                    _groupFilterChip('Ungrouped', 'ungrouped'),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-        // Students header + sort
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-            child: Row(
-              children: [
-                Text('Students', style: TeacherTypography.h3),
-                const Spacer(),
-                if (_levelsEnabled) ...[
-                  _buildManageLevelsChip(selectedClass),
-                  const SizedBox(width: 8),
-                ],
-                _buildSortChip(),
-              ],
-            ),
+            padding: const EdgeInsets.fromLTRB(16, 12, 0, 0),
+            child: _buildToolbelt(selectedClass),
           ),
         ),
 
-        // Student list
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+            child: _buildStudentsHeader(selectedClass),
+          ),
+        ),
+
         _buildStudentList(selectedClass),
 
-        // Bottom padding for nav bar
         const SliverToBoxAdapter(child: SizedBox(height: 100)),
       ],
     );

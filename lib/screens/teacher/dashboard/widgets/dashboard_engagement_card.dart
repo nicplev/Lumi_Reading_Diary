@@ -21,12 +21,14 @@ class DashboardEngagementCard extends StatefulWidget {
   final ClassModel classModel;
   final String schoolId;
   final List<StudentModel> students;
+  final ValueNotifier<int>? resetSignal;
 
   const DashboardEngagementCard({
     super.key,
     required this.classModel,
     required this.schoolId,
     required this.students,
+    this.resetSignal,
   });
 
   @override
@@ -34,21 +36,77 @@ class DashboardEngagementCard extends StatefulWidget {
       _DashboardEngagementCardState();
 }
 
-class _DashboardEngagementCardState extends State<DashboardEngagementCard> {
+class _DashboardEngagementCardState extends State<DashboardEngagementCard>
+    with SingleTickerProviderStateMixin {
   late Stream<QuerySnapshot> _logsStream;
+  late AnimationController _flipController;
+  late Animation<Offset> _statsSlide;
+  late Animation<Offset> _listSlide;
+  late Animation<double> _statsFade;
+  late Animation<double> _listFade;
+  bool _showingPending = false;
+
+  void _onResetSignal() {
+    if (_showingPending) {
+      _showingPending = false;
+      _flipController.reverse();
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _initStream();
+    widget.resetSignal?.addListener(_onResetSignal);
+    _flipController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 450),
+    );
+    _statsSlide = Tween<Offset>(
+      begin: Offset.zero,
+      end: const Offset(-1, 0),
+    ).animate(CurvedAnimation(
+      parent: _flipController,
+      curve: Curves.easeInOut,
+    ));
+    _listSlide = Tween<Offset>(
+      begin: const Offset(1, 0),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _flipController,
+      curve: Curves.easeInOut,
+    ));
+    _statsFade = Tween<double>(begin: 1, end: 0).animate(CurvedAnimation(
+      parent: _flipController,
+      curve: const Interval(0, 0.5),
+    ));
+    _listFade = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
+      parent: _flipController,
+      curve: const Interval(0.3, 1),
+    ));
+  }
+
+  @override
+  void dispose() {
+    widget.resetSignal?.removeListener(_onResetSignal);
+    _flipController.dispose();
+    super.dispose();
   }
 
   @override
   void didUpdateWidget(DashboardEngagementCard oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.resetSignal != widget.resetSignal) {
+      oldWidget.resetSignal?.removeListener(_onResetSignal);
+      widget.resetSignal?.addListener(_onResetSignal);
+    }
     if (oldWidget.classModel.id != widget.classModel.id ||
         oldWidget.schoolId != widget.schoolId) {
       _initStream();
+      if (_showingPending) {
+        _flipController.reverse();
+        _showingPending = false;
+      }
     }
   }
 
@@ -65,6 +123,15 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard> {
         .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
         .where('date', isLessThan: Timestamp.fromDate(endOfDay))
         .snapshots();
+  }
+
+  void _togglePendingView() {
+    setState(() => _showingPending = !_showingPending);
+    if (_showingPending) {
+      _flipController.forward();
+    } else {
+      _flipController.reverse();
+    }
   }
 
   @override
@@ -112,8 +179,14 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard> {
             : 0;
         final isAllRead = totalStudents > 0 && readCount >= totalStudents;
 
+        final pendingStudents = widget.students
+            .where((s) => !uniqueStudentsToday.contains(s.id))
+            .toList()
+          ..sort((a, b) => a.fullName.compareTo(b.fullName));
+
         return Container(
           padding: const EdgeInsets.all(20),
+          clipBehavior: Clip.hardEdge,
           decoration: BoxDecoration(
             color: AppColors.white,
             borderRadius:
@@ -132,106 +205,111 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard> {
               ),
             ],
           ),
-          child: _buildEngagementContent(
-                  readCount: readCount,
-                  totalStudents: totalStudents,
-                  notReadCount: notReadCount,
-                  onStreakCount: onStreakCount,
-                  engagementPercent: engagementPercent,
-                  isAllRead: isAllRead,
-                  totalMinutes: totalMinutes,
-                  readStudentIds: uniqueStudentsToday,
-                ),
+          child: AnimatedBuilder(
+            animation: _flipController,
+            builder: (context, _) {
+              return Stack(
+                children: [
+                  // Stats view (slides out left)
+                  SlideTransition(
+                    position: _statsSlide,
+                    child: FadeTransition(
+                      opacity: _statsFade,
+                      child: _buildEngagementContent(
+                        readCount: readCount,
+                        totalStudents: totalStudents,
+                        notReadCount: notReadCount,
+                        onStreakCount: onStreakCount,
+                        engagementPercent: engagementPercent,
+                        isAllRead: isAllRead,
+                        totalMinutes: totalMinutes,
+                      ),
+                    ),
+                  ),
+                  // Pending list (slides in from right)
+                  if (_flipController.value > 0)
+                    GestureDetector(
+                      onTap: _togglePendingView,
+                      behavior: HitTestBehavior.opaque,
+                      child: SlideTransition(
+                        position: _listSlide,
+                        child: FadeTransition(
+                          opacity: _listFade,
+                          child: _buildPendingList(pendingStudents),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
         );
       },
     );
   }
 
-  void _showPendingStudents(BuildContext context, Set<String> readStudentIds) {
-    final pendingStudents = widget.students
-        .where((s) => !readStudentIds.contains(s.id))
-        .toList()
-      ..sort((a, b) => a.fullName.compareTo(b.fullName));
-
-    if (pendingStudents.isEmpty) return;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+  Widget _buildPendingList(List<StudentModel> pendingStudents) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            Container(
-              width: 44,
-              height: 5,
-              decoration: BoxDecoration(
-                color: AppColors.teacherBorder,
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Icon(Icons.schedule_rounded,
-                    size: 18, color: AppColors.warmOrange),
-                const SizedBox(width: 8),
-                Text(
-                  '${pendingStudents.length} haven\'t read today',
-                  style: TeacherTypography.h3,
+            GestureDetector(
+              onTap: _togglePendingView,
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Icon(
+                  Icons.chevron_left_rounded,
+                  size: 22,
+                  color: AppColors.textSecondary,
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.35,
               ),
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemCount: pendingStudents.length,
-                separatorBuilder: (_, __) =>
-                    Divider(height: 1, color: AppColors.teacherBorder),
-                itemBuilder: (context, index) {
-                  final student = pendingStudents[index];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 16,
-                          backgroundColor: AppColors.teacherSurfaceTint,
-                          child: Text(
-                            student.firstName.isNotEmpty
-                                ? student.firstName[0].toUpperCase()
-                                : '?',
-                            style: TeacherTypography.caption.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.teacherPrimary,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            student.fullName,
-                            style: TeacherTypography.bodyMedium,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+            ),
+            Icon(Icons.schedule_rounded,
+                size: 16, color: AppColors.warmOrange),
+            const SizedBox(width: 6),
+            Text(
+              '${pendingStudents.length} haven\'t read yet',
+              style: TeacherTypography.bodyMedium.copyWith(
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
         ),
-      ),
+        const SizedBox(height: 12),
+        ...pendingStudents.map((student) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 14,
+                    backgroundColor: AppColors.teacherSurfaceTint,
+                    child: Text(
+                      student.firstName.isNotEmpty
+                          ? student.firstName[0].toUpperCase()
+                          : '?',
+                      style: TeacherTypography.caption.copyWith(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.teacherPrimary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      student.fullName,
+                      style: TeacherTypography.bodySmall.copyWith(
+                        color: AppColors.charcoal,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )),
+      ],
     );
   }
 
@@ -243,7 +321,6 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard> {
     required int engagementPercent,
     required bool isAllRead,
     required int totalMinutes,
-    required Set<String> readStudentIds,
   }) {
     final ringColors = isAllRead
         ? [const Color(0xFF28A745), const Color(0xFF66BB6A)]
@@ -314,9 +391,8 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard> {
                   ),
                   const SizedBox(height: 14),
                   GestureDetector(
-                    onLongPress: notReadCount > 0
-                        ? () => _showPendingStudents(context, readStudentIds)
-                        : null,
+                    onTap:
+                        notReadCount > 0 ? _togglePendingView : null,
                     child: notReadCount > 0
                         ? _StatRow(
                             icon: Icons.schedule_rounded,
