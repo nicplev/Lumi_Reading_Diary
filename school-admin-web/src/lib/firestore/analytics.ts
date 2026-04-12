@@ -28,6 +28,7 @@ export interface ClassComparisonRow {
   yearLevel?: string;
   studentCount: number;
   totalMinutes: number;
+  totalLogs: number;
   booksRead: number;
   completionRate: number;
   avgMinPerStudent: number;
@@ -50,7 +51,7 @@ export interface TopReader {
   name: string;
   className: string;
   totalMinutes: number;
-  totalBooks: number;
+  uniqueBooks: number;
   streak: number;
 }
 
@@ -68,34 +69,89 @@ function daysAgo(days: number): Date {
   return d;
 }
 
+function isWeekend(date: Date): boolean {
+  const day = date.getDay();
+  return day === 0 || day === 6;
+}
+
+export function resolvePeriod(
+  period: string,
+  termKey: string | null,
+  termDates: Record<string, Date>,
+  now: Date = new Date(),
+): { startDate: Date; endDate: Date; weekdaysOnly: boolean } {
+  if (period === '5days') {
+    const weekdays: Date[] = [];
+    const d = new Date(now);
+    while (weekdays.length < 5) {
+      d.setDate(d.getDate() - 1);
+      if (!isWeekend(d)) weekdays.push(new Date(d));
+    }
+    const start = new Date(weekdays[weekdays.length - 1]);
+    start.setHours(0, 0, 0, 0);
+    return { startDate: start, endDate: now, weekdaysOnly: true };
+  }
+
+  if (period === 'month') {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { startDate: start, endDate: now, weekdaysOnly: true };
+  }
+
+  if (period === 'term' && termKey) {
+    const start = termDates[`${termKey}Start`];
+    const end = termDates[`${termKey}End`] ?? now;
+    return { startDate: start, endDate: end > now ? now : end, weekdaysOnly: false };
+  }
+
+  // year — derived from earliest term start to latest term end
+  const termStarts = Object.entries(termDates)
+    .filter(([k]) => k.endsWith('Start'))
+    .map(([, v]) => v)
+    .filter(Boolean)
+    .sort((a, b) => a.getTime() - b.getTime());
+  const termEnds = Object.entries(termDates)
+    .filter(([k]) => k.endsWith('End'))
+    .map(([, v]) => v)
+    .filter(Boolean)
+    .sort((a, b) => b.getTime() - a.getTime());
+  const yearStart = termStarts[0] ?? new Date(now.getFullYear(), 0, 1);
+  const yearEnd = termEnds[0] ?? now;
+  return { startDate: yearStart, endDate: yearEnd > now ? now : yearEnd, weekdaysOnly: false };
+}
+
 // --- Query Functions ---
 
-export async function getReadingMetrics(schoolId: string, days: number = 30): Promise<ReadingMetrics> {
-  const since = daysAgo(days);
-
+export async function getReadingMetrics(
+  schoolId: string,
+  startDate: Date,
+  endDate: Date,
+  weekdaysOnly: boolean = false,
+): Promise<ReadingMetrics> {
   try {
     const logsSnap = await adminDb
       .collection('schools').doc(schoolId).collection('readingLogs')
-      .where('date', '>=', since)
+      .where('date', '>=', startDate)
+      .where('date', '<=', endDate)
       .get();
 
     let totalMinutes = 0;
     let totalBooks = 0;
     let completedCount = 0;
+    let totalLogs = 0;
     const readers = new Set<string>();
 
     for (const doc of logsSnap.docs) {
       const d = doc.data();
+      const logDate: Date = d.date?.toDate?.() ?? new Date(0);
+      if (weekdaysOnly && isWeekend(logDate)) continue;
       totalMinutes += d.minutesRead ?? 0;
       if (Array.isArray(d.bookTitles)) totalBooks += d.bookTitles.length;
       if (d.status === 'completed') completedCount++;
       if (d.studentId) readers.add(d.studentId);
+      totalLogs++;
     }
 
-    const totalLogs = logsSnap.size;
     const completionRate = totalLogs > 0 ? Math.round((completedCount / totalLogs) * 100) : 0;
-
-    // Get total student count for avg calculation
     const schoolDoc = await adminDb.collection('schools').doc(schoolId).get();
     const studentCount = schoolDoc.data()?.studentCount ?? 1;
     const avgMinPerStudent = studentCount > 0 ? Math.round(totalMinutes / studentCount) : 0;
@@ -106,37 +162,44 @@ export async function getReadingMetrics(schoolId: string, days: number = 30): Pr
   }
 }
 
-export async function getEngagementTrend(schoolId: string, days: number = 30): Promise<EngagementPoint[]> {
-  const since = daysAgo(days);
-
+export async function getEngagementTrend(
+  schoolId: string,
+  startDate: Date,
+  endDate: Date,
+  weekdaysOnly: boolean = false,
+): Promise<EngagementPoint[]> {
   try {
     const logsSnap = await adminDb
       .collection('schools').doc(schoolId).collection('readingLogs')
-      .where('date', '>=', since)
+      .where('date', '>=', startDate)
+      .where('date', '<=', endDate)
       .get();
 
     const byDate = new Map<string, { minutes: number; logs: number }>();
 
     for (const doc of logsSnap.docs) {
       const d = doc.data();
-      const date = d.date?.toDate?.() ?? new Date();
-      const key = date.toISOString().split('T')[0];
+      const logDate: Date = d.date?.toDate?.() ?? new Date();
+      if (weekdaysOnly && isWeekend(logDate)) continue;
+      const key = logDate.toISOString().split('T')[0];
       const existing = byDate.get(key) ?? { minutes: 0, logs: 0 };
       existing.minutes += d.minutesRead ?? 0;
       existing.logs += 1;
       byDate.set(key, existing);
     }
 
-    // Fill in missing days
+    // Fill in days (skipping weekends when weekdaysOnly)
     const result: EngagementPoint[] = [];
-    const current = new Date(since);
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
+    const current = new Date(startDate);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
 
-    while (current <= today) {
-      const key = current.toISOString().split('T')[0];
-      const data = byDate.get(key) ?? { minutes: 0, logs: 0 };
-      result.push({ date: key, ...data });
+    while (current <= end) {
+      if (!weekdaysOnly || !isWeekend(current)) {
+        const key = current.toISOString().split('T')[0];
+        const data = byDate.get(key) ?? { minutes: 0, logs: 0 };
+        result.push({ date: key, ...data });
+      }
       current.setDate(current.getDate() + 1);
     }
 
@@ -172,7 +235,12 @@ export async function getLevelDistribution(schoolId: string, classId?: string): 
   }
 }
 
-export async function getClassComparison(schoolId: string): Promise<ClassComparisonRow[]> {
+export async function getClassComparison(
+  schoolId: string,
+  startDate: Date,
+  endDate: Date,
+  weekdaysOnly: boolean = false,
+): Promise<ClassComparisonRow[]> {
   try {
     const classesSnap = await adminDb
       .collection('schools').doc(schoolId).collection('classes')
@@ -182,26 +250,30 @@ export async function getClassComparison(schoolId: string): Promise<ClassCompari
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const thirtyDaysAgo = daysAgo(30);
-
-    // Get all logs for last 30 days
     const logsSnap = await adminDb
       .collection('schools').doc(schoolId).collection('readingLogs')
-      .where('date', '>=', thirtyDaysAgo)
+      .where('date', '>=', startDate)
+      .where('date', '<=', endDate)
       .get();
 
-    // Group logs by classId
-    const logsByClass = new Map<string, { minutes: number; books: number; completed: number; total: number; todayReaders: Set<string> }>();
+    const logsByClass = new Map<string, { minutes: number; bookTitles: Set<string>; completed: number; total: number; todayReaders: Set<string> }>();
 
     for (const doc of logsSnap.docs) {
       const d = doc.data();
+      const logDate: Date = d.date?.toDate?.() ?? new Date(0);
+      if (weekdaysOnly && isWeekend(logDate)) continue;
       const cid = d.classId ?? '';
-      const existing = logsByClass.get(cid) ?? { minutes: 0, books: 0, completed: 0, total: 0, todayReaders: new Set() };
+      const existing = logsByClass.get(cid) ?? { minutes: 0, bookTitles: new Set(), completed: 0, total: 0, todayReaders: new Set() };
       existing.minutes += d.minutesRead ?? 0;
-      if (Array.isArray(d.bookTitles)) existing.books += d.bookTitles.length;
+      if (Array.isArray(d.bookTitles)) {
+        for (const title of d.bookTitles) {
+          if (typeof title === 'string' && title.trim()) {
+            existing.bookTitles.add(title.trim().toLowerCase());
+          }
+        }
+      }
       if (d.status === 'completed') existing.completed++;
       existing.total++;
-      const logDate = d.date?.toDate?.() ?? new Date(0);
       if (logDate >= today && d.studentId) {
         existing.todayReaders.add(d.studentId);
       }
@@ -211,7 +283,7 @@ export async function getClassComparison(schoolId: string): Promise<ClassCompari
     return classesSnap.docs.map((doc) => {
       const data = doc.data();
       const studentCount = (data.studentIds ?? []).length;
-      const logs = logsByClass.get(doc.id) ?? { minutes: 0, books: 0, completed: 0, total: 0, todayReaders: new Set() };
+      const logs = logsByClass.get(doc.id) ?? { minutes: 0, bookTitles: new Set(), completed: 0, total: 0, todayReaders: new Set() };
 
       return {
         classId: doc.id,
@@ -219,7 +291,8 @@ export async function getClassComparison(schoolId: string): Promise<ClassCompari
         yearLevel: data.yearLevel,
         studentCount,
         totalMinutes: logs.minutes,
-        booksRead: logs.books,
+        totalLogs: logs.total,
+        booksRead: logs.bookTitles.size,
         completionRate: logs.total > 0 ? Math.round((logs.completed / logs.total) * 100) : 0,
         avgMinPerStudent: studentCount > 0 ? Math.round(logs.minutes / studentCount) : 0,
         readersToday: logs.todayReaders.size,
@@ -237,7 +310,6 @@ export async function getAtRiskStudents(schoolId: string, daysThreshold: number 
       .where('isActive', '==', true)
       .get();
 
-    // Build class name map
     const classesSnap = await adminDb
       .collection('schools').doc(schoolId).collection('classes')
       .get();
@@ -276,20 +348,48 @@ export async function getAtRiskStudents(schoolId: string, daysThreshold: number 
   }
 }
 
-export async function getTopReaders(schoolId: string, limit: number = 10): Promise<TopReader[]> {
+export async function getTopReaders(
+  schoolId: string,
+  startDate: Date,
+  endDate: Date,
+  weekdaysOnly: boolean = false,
+  limit: number = 10,
+): Promise<TopReader[]> {
   try {
-    const studentsSnap = await adminDb
-      .collection('schools').doc(schoolId).collection('students')
-      .where('isActive', '==', true)
-      .get();
+    const [studentsSnap, classesSnap, logsSnap] = await Promise.all([
+      adminDb.collection('schools').doc(schoolId).collection('students')
+        .where('isActive', '==', true)
+        .get(),
+      adminDb.collection('schools').doc(schoolId).collection('classes').get(),
+      adminDb.collection('schools').doc(schoolId).collection('readingLogs')
+        .where('date', '>=', startDate)
+        .where('date', '<=', endDate)
+        .get(),
+    ]);
 
-    // Build class name map
-    const classesSnap = await adminDb
-      .collection('schools').doc(schoolId).collection('classes')
-      .get();
     const classNames = new Map<string, string>();
     for (const doc of classesSnap.docs) {
       classNames.set(doc.id, doc.data().name ?? '');
+    }
+
+    const booksByStudent = new Map<string, Set<string>>();
+    const minutesByStudent = new Map<string, number>();
+
+    for (const doc of logsSnap.docs) {
+      const d = doc.data();
+      const logDate: Date = d.date?.toDate?.() ?? new Date(0);
+      if (weekdaysOnly && isWeekend(logDate)) continue;
+      const sid = d.studentId ?? '';
+      if (!sid) continue;
+      if (!booksByStudent.has(sid)) booksByStudent.set(sid, new Set());
+      minutesByStudent.set(sid, (minutesByStudent.get(sid) ?? 0) + (d.minutesRead ?? 0));
+      if (Array.isArray(d.bookTitles)) {
+        for (const title of d.bookTitles) {
+          if (typeof title === 'string' && title.trim()) {
+            booksByStudent.get(sid)!.add(title.trim().toLowerCase());
+          }
+        }
+      }
     }
 
     const readers: TopReader[] = studentsSnap.docs.map((doc) => {
@@ -298,13 +398,14 @@ export async function getTopReaders(schoolId: string, limit: number = 10): Promi
         id: doc.id,
         name: `${d.firstName ?? ''} ${d.lastName ?? ''}`.trim(),
         className: classNames.get(d.classId ?? '') ?? '',
-        totalMinutes: d.stats?.totalMinutesRead ?? 0,
-        totalBooks: d.stats?.totalBooksRead ?? 0,
+        totalMinutes: minutesByStudent.get(doc.id) ?? 0,
+        uniqueBooks: booksByStudent.get(doc.id)?.size ?? 0,
         streak: d.stats?.currentStreak ?? 0,
       };
     });
 
     return readers
+      .filter((r) => r.totalMinutes > 0)
       .sort((a, b) => b.totalMinutes - a.totalMinutes)
       .slice(0, limit);
   } catch {
@@ -312,19 +413,27 @@ export async function getTopReaders(schoolId: string, limit: number = 10): Promi
   }
 }
 
-export async function getPopularBooks(schoolId: string, days: number = 30, limit: number = 15): Promise<PopularBook[]> {
-  const since = daysAgo(days);
-
+export async function getPopularBooks(
+  schoolId: string,
+  startDate: Date,
+  endDate: Date,
+  weekdaysOnly: boolean = false,
+  limit: number = 15,
+): Promise<PopularBook[]> {
   try {
     const logsSnap = await adminDb
       .collection('schools').doc(schoolId).collection('readingLogs')
-      .where('date', '>=', since)
+      .where('date', '>=', startDate)
+      .where('date', '<=', endDate)
       .get();
 
     const counts = new Map<string, number>();
 
     for (const doc of logsSnap.docs) {
-      const titles = doc.data().bookTitles;
+      const d = doc.data();
+      const logDate: Date = d.date?.toDate?.() ?? new Date(0);
+      if (weekdaysOnly && isWeekend(logDate)) continue;
+      const titles = d.bookTitles;
       if (Array.isArray(titles)) {
         for (const title of titles) {
           if (typeof title === 'string' && title.trim()) {

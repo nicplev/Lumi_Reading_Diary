@@ -230,10 +230,36 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
   }
 
   /// Assign a resolved book to the current student and update session state.
+  Future<bool> _showPreviouslyReadWarning(ScannedIsbnBook book) async {
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _PreviouslyReadWarningSheet(
+        studentName: _currentStudent.firstName,
+        bookTitle: book.title,
+        coverImageUrl: book.coverImageUrl,
+      ),
+    );
+    return result ?? false;
+  }
+
   Future<void> _assignAndAddToSession(
     ScannedIsbnBook book,
     String schoolId,
   ) async {
+    final alreadyRead = await _assignmentService.studentHasPreviouslyReadBook(
+      studentId: _currentStudent.id,
+      bookId: book.bookId,
+      isbn: book.isbn,
+    );
+    if (alreadyRead) {
+      if (!mounted) return;
+      final proceed = await _showPreviouslyReadWarning(book);
+      if (!proceed) return;
+    }
+
     try {
       final result = await _assignmentService.assignResolvedBooks(
         schoolId: schoolId,
@@ -904,6 +930,117 @@ class _InfoChip extends StatelessWidget {
             style: TeacherTypography.caption.copyWith(
               color: AppColors.charcoal,
               fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreviouslyReadWarningSheet extends StatelessWidget {
+  const _PreviouslyReadWarningSheet({
+    required this.studentName,
+    required this.bookTitle,
+    this.coverImageUrl,
+  });
+
+  final String studentName;
+  final String bookTitle;
+  final String? coverImageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.textSecondary.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          // Icon
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF8E1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.history_edu_rounded,
+              color: Color(0xFFFFA000),
+              size: 24,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '$studentName has read this before',
+            style: TeacherTypography.h3,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '"$bookTitle" may already be in $studentName\'s reading history.',
+            style: TeacherTypography.bodySmall
+                .copyWith(color: AppColors.textSecondary),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.teacherPrimary,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(TeacherDimensions.radiusM),
+                ),
+                textStyle: TeacherTypography.bodyMedium
+                    .copyWith(fontWeight: FontWeight.w700),
+              ),
+              child: const Text('Assign Anyway'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () => Navigator.pop(context, false),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                side: BorderSide(
+                  color: AppColors.textSecondary.withValues(alpha: 0.4),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(TeacherDimensions.radiusM),
+                ),
+                textStyle: TeacherTypography.bodyMedium
+                    .copyWith(fontWeight: FontWeight.w600),
+              ),
+              child: Text(
+                'Skip Book',
+                style: TeacherTypography.bodyMedium.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ],

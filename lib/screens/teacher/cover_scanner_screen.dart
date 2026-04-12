@@ -12,6 +12,9 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../../core/models/decodable_grading.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
 import '../../data/models/user_model.dart';
@@ -192,11 +195,20 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
   final _readingLevelController = TextEditingController();
   bool _isLoadingMetadata = false;
   bool _bookAlreadyExists = false;
+  bool _isDecodableBook = false;
+  bool _applyGrade = false;
+  GradingSchemaDefinition? _selectedSchemaDef;
+  GradingLevel? _selectedLevel;
+  final _customLevelController = TextEditingController();
 
   // Save state
   bool _isSaving = false;
   String? _saveError;
   bool _saveSuccess = false;
+
+  // Cached school level schema key (fetched once on first save).
+  // e.g., 'pmBenchmark', 'aToZ', 'none' — null means not yet fetched.
+  String? _schoolLevelSchemaKey;
 
   bool get _isInlineMode =>
       widget.mode == CommunityBookContributionMode.isbnFirstInline;
@@ -220,6 +232,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
     _titleController.dispose();
     _authorController.dispose();
     _readingLevelController.dispose();
+    _customLevelController.dispose();
     super.dispose();
   }
 
@@ -655,6 +668,33 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
         }
       }
 
+      String? resolvedReadingLevel;
+      if (_isDecodableBook && _applyGrade) {
+        if (_selectedSchemaDef?.schema == GradingSchema.custom) {
+          final custom = _customLevelController.text.trim();
+          resolvedReadingLevel = custom.isNotEmpty ? custom : null;
+        } else {
+          resolvedReadingLevel = _selectedLevel?.value;
+        }
+      } else if (!_isDecodableBook) {
+        final raw = _readingLevelController.text.trim();
+        resolvedReadingLevel = raw.isNotEmpty ? raw : null;
+      }
+
+      // Resolve the level schema key for community provenance.
+      // For decodable books, use the grading schema's metadata key.
+      // For library books, use the school's reading level schema.
+      String? resolvedLevelSchema;
+      if (_isDecodableBook && _applyGrade && _selectedSchemaDef != null) {
+        resolvedLevelSchema = _selectedSchemaDef!.metadataKey;
+      } else if (!_isDecodableBook && resolvedReadingLevel != null) {
+        // Lazily fetch and cache the school's level schema key.
+        _schoolLevelSchemaKey ??= await _fetchSchoolLevelSchemaKey();
+        if (_schoolLevelSchemaKey != 'none') {
+          resolvedLevelSchema = _schoolLevelSchemaKey;
+        }
+      }
+
       // Save book to community database.
       await _communityService.addBook(
         isbn: _scannedIsbn!,
@@ -667,15 +707,20 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
             : null,
         coverImageUrl: coverUrl,
         coverStoragePath: coverPath,
-        readingLevel: _readingLevelController.text.trim().isNotEmpty
-            ? _readingLevelController.text.trim()
-            : null,
+        readingLevel: resolvedReadingLevel,
+        levelSchema: resolvedLevelSchema,
         source: 'teacher_scan',
         metadata: {
           'coverSource': coverUrl != null ? 'camera_scan' : null,
           'hasCameraScannedCover': coverUrl != null,
           'coverWasManuallyCropped': _coverWasManuallyCropped,
           'coverWasRotated': _rotationQuarterTurns > 0,
+          if (_isDecodableBook) 'isDecodable': true,
+          if (_isDecodableBook &&
+              _applyGrade &&
+              _selectedSchemaDef != null &&
+              _selectedSchemaDef!.schema != GradingSchema.custom)
+            'gradingSchema': _selectedSchemaDef!.metadataKey,
         },
       );
 
@@ -692,9 +737,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
           coverImageUrl: coverUrl,
           coverStoragePath: coverPath,
           bookId: 'isbn_${_scannedIsbn!}',
-          readingLevel: _readingLevelController.text.trim().isNotEmpty
-              ? _readingLevelController.text.trim()
-              : null,
+          readingLevel: resolvedReadingLevel,
         ));
       } else {
         setState(() {
@@ -709,6 +752,22 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
         _saveError = 'Failed to save book. Please try again.';
         _currentStep = _ScanStep.metadataReview;
       });
+    }
+  }
+
+  /// Fetches the school's reading level schema key from Firestore.
+  /// Returns 'none' if the school has no levels configured or on error.
+  Future<String> _fetchSchoolLevelSchemaKey() async {
+    final schoolId = widget.teacher.schoolId;
+    if (schoolId == null || schoolId.isEmpty) return 'none';
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('schools')
+          .doc(schoolId)
+          .get();
+      return (doc.data()?['levelSchema'] as String?) ?? 'none';
+    } catch (_) {
+      return 'none';
     }
   }
 
@@ -738,6 +797,11 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       _readingLevelController.clear();
       _isLoadingMetadata = false;
       _bookAlreadyExists = false;
+      _isDecodableBook = false;
+      _applyGrade = false;
+      _selectedSchemaDef = null;
+      _selectedLevel = null;
+      _customLevelController.clear();
       _isSaving = false;
       _saveError = null;
       _saveSuccess = false;
@@ -1237,12 +1301,17 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
               icon: Icons.person_outline,
             ),
             const SizedBox(height: 16),
-            _buildTextField(
-              label: 'Reading Level',
-              controller: _readingLevelController,
-              icon: Icons.trending_up_rounded,
-              hint: 'e.g. A, B, 1, 2',
-            ),
+            _buildBookTypeToggle(),
+            const SizedBox(height: 16),
+            if (_isDecodableBook)
+              _buildGradeSection()
+            else
+              _buildTextField(
+                label: 'Reading Level',
+                controller: _readingLevelController,
+                icon: Icons.trending_up_rounded,
+                hint: 'e.g. A, B, 1, 2',
+              ),
 
             if (_saveError != null) ...[
               const SizedBox(height: 16),
@@ -1291,6 +1360,248 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildBookTypeToggle() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Book Type',
+          style: TeacherTypography.bodySmall.copyWith(
+            color: Colors.grey.shade600,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _BookTypeChip(
+                label: 'Library',
+                icon: Icons.local_library_outlined,
+                selected: !_isDecodableBook,
+                onTap: () => setState(() {
+                  _isDecodableBook = false;
+                  _applyGrade = false;
+                  _selectedSchemaDef = null;
+                  _selectedLevel = null;
+                  _customLevelController.clear();
+                }),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _BookTypeChip(
+                label: 'Decodable',
+                icon: Icons.auto_stories_outlined,
+                selected: _isDecodableBook,
+                onTap: () => setState(() {
+                  _isDecodableBook = true;
+                }),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ── Grading section (shown when book is marked Decodable) ─────────────────
+
+  Widget _buildGradeSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildApplyGradeToggle(),
+        if (_applyGrade) ...[
+          const SizedBox(height: 16),
+          _buildSchemaSelector(),
+          if (_selectedSchemaDef != null) ...[
+            const SizedBox(height: 8),
+            // Description banner for selected schema
+            Container(
+              width: double.infinity,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.teacherPrimaryLight,
+                borderRadius:
+                    BorderRadius.circular(TeacherDimensions.radiusS),
+              ),
+              child: Text(
+                _selectedSchemaDef!.description,
+                style: TeacherTypography.bodySmall
+                    .copyWith(color: AppColors.teacherPrimary),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _buildLevelSelector(),
+          ],
+        ],
+      ],
+    );
+  }
+
+  Widget _buildApplyGradeToggle() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Reading grade (optional)',
+          style: TeacherTypography.bodySmall.copyWith(
+            color: Colors.grey.shade600,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _BookTypeChip(
+                label: 'No grade',
+                icon: Icons.remove_circle_outline,
+                selected: !_applyGrade,
+                onTap: () => setState(() {
+                  _applyGrade = false;
+                  _selectedSchemaDef = null;
+                  _selectedLevel = null;
+                  _customLevelController.clear();
+                }),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _BookTypeChip(
+                label: 'Add grade',
+                icon: Icons.grade_outlined,
+                selected: _applyGrade,
+                onTap: () => setState(() => _applyGrade = true),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSchemaSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Grading system',
+          style: TeacherTypography.bodySmall.copyWith(
+            color: Colors.grey.shade600,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: gradingSchemas.map((def) {
+              final isSelected =
+                  _selectedSchemaDef?.schema == def.schema;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: _SchemaChip(
+                  schemaDef: def,
+                  selected: isSelected,
+                  onTap: () => setState(() {
+                    _selectedSchemaDef = def;
+                    _selectedLevel = null;
+                    _customLevelController.clear();
+                  }),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLevelSelector() {
+    final def = _selectedSchemaDef!;
+
+    if (def.schema == GradingSchema.custom) {
+      return _buildCustomLevelField();
+    }
+
+    if (def.schema == GradingSchema.readingDoctor) {
+      return _buildReadingDoctorChips(def);
+    }
+
+    return _buildLevelChipWrap(def.levels);
+  }
+
+  Widget _buildLevelChipWrap(List<GradingLevel> levels) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: levels.map((level) {
+        return _LevelChip(
+          level: level,
+          selected: _selectedLevel?.value == level.value,
+          onTap: () => setState(() => _selectedLevel = level),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildReadingDoctorChips(GradingSchemaDefinition def) {
+    final part1 = def.levels.where((l) => l.sortKey < 20).toList();
+    final part2 = def.levels.where((l) => l.sortKey >= 20).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildGroupLabel('Part I — Basic Code'),
+        const SizedBox(height: 6),
+        _buildLevelChipWrap(part1),
+        const SizedBox(height: 12),
+        _buildGroupLabel('Part II — Intermediate Code'),
+        const SizedBox(height: 6),
+        _buildLevelChipWrap(part2),
+      ],
+    );
+  }
+
+  Widget _buildGroupLabel(String label) {
+    return Text(
+      label,
+      style: TeacherTypography.caption.copyWith(
+        color: Colors.grey.shade500,
+        letterSpacing: 0.3,
+      ),
+    );
+  }
+
+  Widget _buildCustomLevelField() {
+    return TextField(
+      controller: _customLevelController,
+      decoration: InputDecoration(
+        labelText: 'Grade label',
+        hintText: 'e.g. Set 3, Unit 12, Phase 5',
+        prefixIcon: Icon(Icons.edit_outlined,
+            color: AppColors.teacherPrimary, size: 20),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+          borderSide:
+              const BorderSide(color: AppColors.teacherPrimary, width: 2),
+        ),
+        filled: true,
+        fillColor: AppColors.white,
       ),
     );
   }
@@ -1430,6 +1741,170 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                     color: AppColors.teacherPrimary,
                   ),
                 ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Schema chip (horizontal schema selector) ──────────────────────────────────
+
+class _SchemaChip extends StatelessWidget {
+  const _SchemaChip({
+    required this.schemaDef,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final GradingSchemaDefinition schemaDef;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.teacherPrimary : AppColors.white,
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
+          border: Border.all(
+            color:
+                selected ? AppColors.teacherPrimary : Colors.grey.shade300,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Text(
+          schemaDef.displayName,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight:
+                selected ? FontWeight.w600 : FontWeight.w500,
+            color: selected ? Colors.white : Colors.grey.shade700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Level chip (individual level within a schema) ─────────────────────────────
+
+class _LevelChip extends StatelessWidget {
+  const _LevelChip({
+    required this.level,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final GradingLevel level;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasSublabel = level.sublabel != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: hasSublabel ? 8 : 11,
+        ),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.teacherPrimary : AppColors.white,
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusS),
+          border: Border.all(
+            color:
+                selected ? AppColors.teacherPrimary : Colors.grey.shade300,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              level.display,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : Colors.black87,
+                height: 1.1,
+              ),
+            ),
+            if (hasSublabel) ...[
+              const SizedBox(height: 3),
+              Text(
+                level.sublabel!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w400,
+                  color:
+                      selected ? Colors.white70 : Colors.grey.shade500,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Book type chip (Library / Decodable toggle) ───────────────────────────────
+
+class _BookTypeChip extends StatelessWidget {
+  const _BookTypeChip({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.teacherPrimary : AppColors.white,
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+          border: Border.all(
+            color: selected ? AppColors.teacherPrimary : Colors.grey.shade300,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: selected ? AppColors.white : Colors.grey.shade600,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight:
+                    selected ? FontWeight.w600 : FontWeight.w400,
+                color: selected ? AppColors.white : Colors.grey.shade700,
               ),
             ),
           ],

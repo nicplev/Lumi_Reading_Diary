@@ -23,6 +23,8 @@ function toStudent(doc: FirebaseFirestore.DocumentSnapshot): Student {
     createdAt: data.createdAt?.toDate() ?? new Date(),
     enrolledAt: data.enrolledAt?.toDate(),
     additionalInfo: data.additionalInfo,
+    enrollmentStatus: data.enrollmentStatus,
+    parentEmail: data.parentEmail ?? data.additionalInfo?.pendingParentEmail,
     levelHistory: (data.levelHistory ?? []).map((lh: Record<string, unknown>) => ({
       level: lh.level as string,
       changedAt: (lh.changedAt as { toDate: () => Date })?.toDate?.() ?? new Date(),
@@ -183,6 +185,39 @@ export async function deactivateStudent(schoolId: string, studentId: string): Pr
   await batch.commit();
 }
 
+export async function moveStudentToClass(
+  schoolId: string,
+  studentId: string,
+  fromClassId: string | null,
+  toClassId: string | null,
+): Promise<void> {
+  const batch = adminDb.batch();
+
+  const studentRef = adminDb
+    .collection('schools')
+    .doc(schoolId)
+    .collection('students')
+    .doc(studentId);
+
+  batch.update(studentRef, { classId: toClassId ?? '' });
+
+  if (fromClassId) {
+    batch.update(
+      adminDb.collection('schools').doc(schoolId).collection('classes').doc(fromClassId),
+      { studentIds: FieldValue.arrayRemove(studentId) }
+    );
+  }
+
+  if (toClassId) {
+    batch.update(
+      adminDb.collection('schools').doc(schoolId).collection('classes').doc(toClassId),
+      { studentIds: FieldValue.arrayUnion(studentId) }
+    );
+  }
+
+  await batch.commit();
+}
+
 export interface CSVRow {
   studentId?: string;
   firstName: string;
@@ -274,11 +309,14 @@ export async function importStudents(
         schoolId,
         dateOfBirth: row.dateOfBirth ? new Date(row.dateOfBirth) : null,
         currentReadingLevel: row.readingLevel || null,
+        parentEmail: row.parentEmail || null,
+        enrollmentStatus: 'pending',
         parentIds: [],
         isActive: true,
         createdAt: new Date(),
         enrolledAt: new Date(),
         createdBy,
+        additionalInfo: row.parentEmail ? { pendingParentEmail: row.parentEmail } : {},
         levelHistory: [],
         stats: {
           totalMinutesRead: 0,

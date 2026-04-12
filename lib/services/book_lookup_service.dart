@@ -57,7 +57,30 @@ class BookLookupService {
       if (deviceCached != null) return deviceCached;
     }
 
-    // 0. Community book database (global, single-document lookup)
+    // 0. School Firestore library (early return when it has a usable cover).
+    // Checked BEFORE community_books so the school's own curated data (sourced
+    // from Google Books / Open Library) takes precedence over cross-school
+    // community uploads, which can contain teacher-photographed covers for
+    // well-known books.
+    if (scopedSchoolId.isNotEmpty &&
+        useFirestoreCache &&
+        _firestoreCacheReadEnabled) {
+      try {
+        final schoolBook = await _lookupInFirestore(
+          normalizedIsbn,
+          schoolId: scopedSchoolId,
+        );
+        if (schoolBook != null &&
+            schoolBook.metadata?['placeholder'] != true &&
+            _hasUsableCoverUrl(schoolBook.coverImageUrl)) {
+          return schoolBook;
+        }
+      } catch (e) {
+        debugPrint('BookLookupService: School library early-cover lookup failed: $e');
+      }
+    }
+
+    // 1. Community book database (global, single-document lookup)
     try {
       final communityDoc = await _firestore
           .collection('community_books')
@@ -95,7 +118,7 @@ class BookLookupService {
       debugPrint('BookLookupService: Community books lookup failed: $e');
     }
 
-    // 1. Firestore cache
+    // 2. Firestore cache (full — also returns books without covers)
     BookModel? cached;
     if (scopedSchoolId.isNotEmpty &&
         useFirestoreCache &&
@@ -529,6 +552,13 @@ class BookLookupService {
           'schoolId': schoolId,
           'addedBy': actorId,
           'createdAt': Timestamp.fromDate(now),
+          if (book.readingLevel != null) 'readingLevel': book.readingLevel,
+          // Copy schema provenance from the community book so this school
+          // can detect mismatches with their own level schema.
+          // schoolReadingLevel is intentionally excluded — it's only written
+          // by an explicit teacher action, never overwritten by cache refresh.
+          if (book.levelSchema != null)
+            'communityLevelSchema': book.levelSchema,
           // Append teacher to school library provenance (arrayUnion is a no-op for 'system')
           if (actorId.isNotEmpty && actorId != 'system')
             'scannedByTeacherIds': FieldValue.arrayUnion([actorId]),
@@ -538,6 +568,11 @@ class BookLookupService {
             'resolvedAt': Timestamp.fromDate(now),
             if (book.metadata?['googleBooksId'] != null)
               'googleBooksId': book.metadata!['googleBooksId'],
+            if (book.metadata?['llllProductCode'] != null)
+              'llllProductCode': book.metadata!['llllProductCode'],
+            if (book.metadata?['isDecodable'] == true) 'isDecodable': true,
+            if (book.metadata?['gradingSchema'] != null)
+              'gradingSchema': book.metadata!['gradingSchema'],
           },
         },
         SetOptions(merge: true),
@@ -581,12 +616,20 @@ class BookLookupService {
           'schoolId': schoolId,
           'addedBy': actorId,
           'createdAt': Timestamp.fromDate(now),
+          if (book.readingLevel != null) 'readingLevel': book.readingLevel,
+          if (book.levelSchema != null)
+            'communityLevelSchema': book.levelSchema,
           if (actorId.isNotEmpty && actorId != 'system')
             'scannedByTeacherIds': FieldValue.arrayUnion([actorId]),
           'metadata': {
             'source': source,
             'placeholder': false,
             'resolvedAt': Timestamp.fromDate(now),
+            if (book.metadata?['llllProductCode'] != null)
+              'llllProductCode': book.metadata!['llllProductCode'],
+            if (book.metadata?['isDecodable'] == true) 'isDecodable': true,
+            if (book.metadata?['gradingSchema'] != null)
+              'gradingSchema': book.metadata!['gradingSchema'],
           },
         },
         SetOptions(merge: true),

@@ -56,6 +56,61 @@ const updateSchema = z.object({
       chips: z.array(z.string().min(1).max(100)).max(20),
     })).max(10),
   }).optional(),
+  achievementCustomization: z.object({
+    streak: z.tuple([
+      z.object({ name: z.string().max(40).optional(), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional() }),
+      z.object({ name: z.string().max(40).optional(), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional() }),
+      z.object({ name: z.string().max(40).optional(), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional() }),
+      z.object({ name: z.string().max(40).optional(), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional() }),
+      z.object({ name: z.string().max(40).optional(), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional() }),
+    ]).optional(),
+    books: z.tuple([
+      z.object({ name: z.string().max(40).optional(), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional() }),
+      z.object({ name: z.string().max(40).optional(), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional() }),
+      z.object({ name: z.string().max(40).optional(), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional() }),
+      z.object({ name: z.string().max(40).optional(), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional() }),
+      z.object({ name: z.string().max(40).optional(), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional() }),
+    ]).optional(),
+    minutes: z.tuple([
+      z.object({ name: z.string().max(40).optional(), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional() }),
+      z.object({ name: z.string().max(40).optional(), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional() }),
+      z.object({ name: z.string().max(40).optional(), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional() }),
+      z.object({ name: z.string().max(40).optional(), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional() }),
+      z.object({ name: z.string().max(40).optional(), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional() }),
+    ]).optional(),
+    readingDays: z.tuple([
+      z.object({ name: z.string().max(40).optional(), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional() }),
+      z.object({ name: z.string().max(40).optional(), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional() }),
+      z.object({ name: z.string().max(40).optional(), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional() }),
+      z.object({ name: z.string().max(40).optional(), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional() }),
+    ]).optional(),
+  }).optional(),
+  achievementThresholds: z.object({
+    streak:      z.tuple([z.number().int().min(1), z.number().int().min(1), z.number().int().min(1), z.number().int().min(1), z.number().int().min(1)]),
+    books:       z.tuple([z.number().int().min(1), z.number().int().min(1), z.number().int().min(1), z.number().int().min(1), z.number().int().min(1)]),
+    minutes:     z.tuple([z.number().int().min(1), z.number().int().min(1), z.number().int().min(1), z.number().int().min(1), z.number().int().min(1)]),
+    readingDays: z.tuple([z.number().int().min(1), z.number().int().min(1), z.number().int().min(1), z.number().int().min(1)]),
+  }).optional().superRefine((thresholds, ctx) => {
+    if (!thresholds) return;
+    const categories: Array<{ key: keyof typeof thresholds; label: string }> = [
+      { key: 'streak', label: 'Streak' },
+      { key: 'books', label: 'Books' },
+      { key: 'minutes', label: 'Minutes' },
+      { key: 'readingDays', label: 'Reading Days' },
+    ];
+    for (const { key, label } of categories) {
+      const values = thresholds[key] as number[];
+      for (let i = 1; i < values.length; i++) {
+        if (values[i] <= values[i - 1]) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `${label} tier ${i + 1} must be greater than tier ${i}`,
+            path: [key, i],
+          });
+        }
+      }
+    }
+  }),
 });
 
 export async function PATCH(request: NextRequest) {

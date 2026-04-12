@@ -88,3 +88,26 @@ export function useDeleteClass() {
     },
   });
 }
+
+
+export function useMoveStudent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { studentId: string; fromClassId: string | null; toClassId: string | null }) => {
+      const res = await fetch('/api/classes/move-student', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to move student');
+      }
+      return res.json();
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+    },
+  });
+}

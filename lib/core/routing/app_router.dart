@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../services/widget_channel_handler.dart';
+import '../../services/notification_service.dart';
+
 import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/class_model.dart';
@@ -22,7 +25,6 @@ import '../../screens/parent/log_reading_screen.dart';
 import '../../screens/parent/reading_history_screen.dart';
 import '../../screens/parent/student_goals_screen.dart';
 import '../../screens/parent/achievements_screen.dart';
-import '../../screens/parent/reminder_settings_screen.dart';
 import '../../screens/parent/offline_management_screen.dart';
 import '../../screens/parent/student_report_screen.dart';
 import '../../screens/parent/parent_profile_screen.dart';
@@ -36,6 +38,7 @@ import '../../screens/teacher/reading_groups_screen.dart';
 import '../../screens/teacher/class_report_screen.dart';
 import '../../screens/teacher/teacher_profile_screen.dart';
 import '../../screens/teacher/student_detail_screen.dart';
+import '../../screens/teacher/teacher_student_reading_history_screen.dart';
 import '../../screens/teacher/isbn_scanner_screen.dart';
 import '../../screens/teacher/cover_scanner_screen.dart';
 import '../../screens/teacher/teacher_level_management_screen.dart';
@@ -56,6 +59,8 @@ import '../../screens/design_system_demo_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final appRouter = AppRouter(ref);
+  WidgetChannelHandler.initialize(appRouter.router);
+  NotificationService.instance.setRouter(appRouter.router);
   return appRouter.router;
 });
 
@@ -296,15 +301,6 @@ class AppRouter {
         },
       ),
 
-      GoRoute(
-        path: '/parent/reminder-settings',
-        name: 'reminder-settings',
-        builder: (context, state) {
-          final params = state.extra as Map<String, dynamic>?;
-          final studentName = params?['studentName'] as String? ?? 'Student';
-          return ReminderSettingsScreen(studentName: studentName);
-        },
-      ),
 
       GoRoute(
         path: '/parent/offline-management',
@@ -513,6 +509,17 @@ class AppRouter {
             student: student,
             classModel: classModel,
           );
+        },
+      ),
+
+      GoRoute(
+        path: '/teacher/student-reading-history/:studentId',
+        name: 'teacher-student-reading-history',
+        builder: (context, state) {
+          final params = state.extra as Map<String, dynamic>?;
+          final student = params?['student'] as StudentModel?;
+          if (student == null) return const LoginScreen();
+          return TeacherStudentReadingHistoryScreen(student: student);
         },
       ),
 

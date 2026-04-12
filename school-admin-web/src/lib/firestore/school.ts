@@ -1,11 +1,13 @@
 import { adminDb } from '@/lib/firebase/admin';
-import type { School, ReadingLevelSchema } from '@/lib/types';
+import type { School, ReadingLevelSchema, AchievementThresholds, AchievementCustomization } from '@/lib/types';
 
 export async function updateSchool(
   schoolId: string,
   data: Partial<Pick<School, 'name' | 'displayName' | 'logoUrl' | 'primaryColor' | 'secondaryColor' | 'levelSchema' | 'customLevels' | 'levelColors' | 'timezone' | 'address' | 'contactEmail' | 'contactPhone' | 'quietHours'>> & {
     termDates?: Record<string, string>;
     parentCommentSettings?: { enabled: boolean; freeTextEnabled: boolean; customPresets: { id: string; name: string; chips: string[] }[] };
+    achievementThresholds?: AchievementThresholds;
+    achievementCustomization?: AchievementCustomization;
   }
 ): Promise<void> {
   const update: Record<string, unknown> = {};
@@ -24,6 +26,12 @@ export async function updateSchool(
   if (data.quietHours !== undefined) update.quietHours = data.quietHours;
   if (data.parentCommentSettings !== undefined) {
     update['settings.parentComments'] = data.parentCommentSettings;
+  }
+  if (data.achievementThresholds !== undefined) {
+    update['settings.achievementThresholds'] = data.achievementThresholds;
+  }
+  if (data.achievementCustomization !== undefined) {
+    update['settings.achievementCustomization'] = data.achievementCustomization;
   }
   if (data.termDates !== undefined) {
     update.termDates = Object.fromEntries(

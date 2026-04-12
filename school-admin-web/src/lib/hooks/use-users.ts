@@ -3,9 +3,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { SchoolUser, UserRole } from '@/lib/types';
 
-type SerializedUser = Omit<SchoolUser, 'createdAt' | 'lastLoginAt'> & {
+type SerializedUser = Omit<SchoolUser, 'createdAt' | 'lastLoginAt' | 'scheduledDeletionAt'> & {
   createdAt: string;
   lastLoginAt: string | null;
+  scheduledDeletionAt: string | null;
 };
 
 export function useUsers(filters?: { role?: UserRole }) {
@@ -94,6 +95,48 @@ export function useReactivateUser() {
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || 'Failed to reactivate user');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+}
+
+export function useMarkUserForDeletion() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await fetch(`/api/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'markForDeletion' }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to mark user for deletion');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+}
+
+export function useUndoDeleteUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await fetch(`/api/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'undoDelete' }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to undo deletion');
       }
       return res.json();
     },

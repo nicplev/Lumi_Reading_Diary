@@ -19,7 +19,7 @@ export default async function StudentDetailRoute({ params }: { params: Promise<{
 
   if (!student) redirect('/students');
 
-  const schoolClass = await getClass(session.schoolId, student.classId);
+  const schoolClass = student.classId ? await getClass(session.schoolId, student.classId) : null;
 
   const levels = getReadingLevels(school?.levelSchema ?? 'aToZ', school?.customLevels);
   const levelOptions: ReadingLevelOption[] = levels.map((level, i) => ({

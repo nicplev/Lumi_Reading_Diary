@@ -13,6 +13,7 @@ import 'services/notification_service.dart';
 import 'services/crash_reporting_service.dart';
 import 'services/analytics_service.dart';
 import 'services/teacher_device_book_cache_service.dart';
+import 'services/widget_data_service.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -57,6 +58,9 @@ void main() async {
 
       // Initialize analytics
       await AnalyticsService.instance.initialize();
+
+      // Initialize iOS home screen widget data bridge
+      await WidgetDataService.initialize();
 
       // Configure Flutter Animate
       Animate.restartOnHotReload = true;

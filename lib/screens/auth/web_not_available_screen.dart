@@ -80,7 +80,7 @@ class WebNotAvailableScreen extends StatelessWidget {
 
                   // Subtitle
                   Text(
-                    'The Lumi parent experience is optimized for mobile devices. Download the app to log reading sessions and track your child\'s progress!',
+                    'The Lumi parent experience is optimised for mobile devices. Download the app to log reading sessions and track your child\'s progress!',
                     style: LumiTextStyles.bodyLarge(
                       color: AppColors.charcoal.withValues(alpha: 0.7),
                     ),

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
-import { getUser, updateUser, deactivateUser, reactivateUser } from '@/lib/firestore/users';
+import { getUser, updateUser, deactivateUser, reactivateUser, markUserForDeletion, undoMarkUserForDeletion } from '@/lib/firestore/users';
 import { z } from 'zod';
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
@@ -24,6 +24,7 @@ const updateUserSchema = z.object({
   phone: z.string().optional(),
   classIds: z.array(z.string()).optional(),
   reactivate: z.boolean().optional(),
+  action: z.enum(['markForDeletion', 'undoDelete']).optional(),
 });
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
@@ -39,11 +40,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const body = await request.json();
     const data = updateUserSchema.parse(body);
 
-    if (data.reactivate) {
+    if (data.action === 'markForDeletion') {
+      await markUserForDeletion(session.schoolId, userId);
+    } else if (data.action === 'undoDelete') {
+      await undoMarkUserForDeletion(session.schoolId, userId);
+    } else if (data.reactivate) {
       await reactivateUser(session.schoolId, userId);
     }
 
-    const { reactivate: _, ...updateData } = data;
+    const { reactivate: _, action: __, ...updateData } = data;
     if (Object.keys(updateData).length > 0) {
       await updateUser(session.schoolId, userId, updateData);
     }

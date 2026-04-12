@@ -36,9 +36,19 @@ target 'Runner' do
   end
 end
 
+target 'LumiWidgetExtension' do
+  use_frameworks!
+  # No external pods needed — WidgetKit is a system framework.
+  # home_widget data bridge uses App Group UserDefaults (no pod required in extension).
+end
+
 post_install do |installer|
   installer.pods_project.targets.each do |target|
-    flutter_additional_ios_build_settings(target)
+    # Skip Flutter-specific build settings for the widget extension to avoid
+    # build phase cycle errors (Embed Foundation Extensions vs CocoaPods scripts).
+    unless target.name == 'LumiWidgetExtension'
+      flutter_additional_ios_build_settings(target)
+    end
 
     target.build_configurations.each do |config|
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']

@@ -8,6 +8,7 @@ import '../../../core/widgets/lumi/lumi_buttons.dart';
 import '../../../core/widgets/lumi/lumi_card.dart';
 import '../../../core/widgets/lumi/lumi_input.dart';
 import '../../../core/widgets/lumi/teacher_alert_banner.dart';
+import '../../../core/widgets/lumi/teacher_filter_chip.dart';
 import '../../../data/models/user_model.dart';
 import '../../../data/models/class_model.dart';
 import '../../../data/models/student_model.dart';
@@ -17,6 +18,7 @@ import '../../../data/models/reading_group_model.dart';
 import '../../../data/models/reading_level_option.dart';
 import '../../../services/allocation_crud_service.dart';
 import '../../../services/firebase_service.dart';
+import '../../../services/isbn_assignment_service.dart';
 import '../../../services/reading_level_service.dart';
 import '../../../services/staff_notification_service.dart';
 import 'library_picker_sheet.dart';
@@ -382,6 +384,17 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
             )
           : null;
 
+      // Previously-read check for byTitle allocations
+      if (assignmentItems != null) {
+        final conflicts = await _checkPreviouslyReadConflicts(assignmentItems);
+        if (conflicts.isNotEmpty && mounted) {
+          setState(() => _isLoading = false);
+          final proceed = await _showAllocationConflictDialog(conflicts);
+          if (!proceed) return;
+          setState(() => _isLoading = true);
+        }
+      }
+
       if (widget.editingAllocation != null) {
         // Update existing allocation
         await _allocationCrudService.updateAllocation(
@@ -596,11 +609,14 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
       );
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      behavior: HitTestBehavior.opaque,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
           // Edit mode banner
           if (widget.editingAllocation != null) ...[
             TeacherAlertBanner(
@@ -621,6 +637,10 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
           // Students Section
           _buildStudentsCard(),
           const SizedBox(height: 24),
+
+          // Separator
+          const Divider(color: AppColors.teacherBorder, thickness: 1),
+          const SizedBox(height: 8),
 
           // Action Buttons
           LumiPrimaryButton(
@@ -646,7 +666,8 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
           ],
 
           const SizedBox(height: 16),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -665,7 +686,7 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
           TeacherAlertBanner(
             type: AlertBannerType.info,
             message:
-                'Reading levels and book selection will be customized based on your school\'s requirements.',
+                'Reading levels and book selection will be customised based on your school\'s requirements.',
           ),
           const SizedBox(height: 16),
 
@@ -674,10 +695,37 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _typeChip('Free Choice', AllocationType.freeChoice),
+              TeacherFilterChip(
+                label: 'Free Choice',
+                isActive: _allocationType == AllocationType.freeChoice,
+                icon: Icons.menu_book_outlined,
+                onTap: () => setState(() {
+                  _allocationType = AllocationType.freeChoice;
+                  _bookTitleError = null;
+                  _levelError = null;
+                }),
+              ),
               if (_levelsEnabled)
-                _typeChip('By Level', AllocationType.byLevel),
-              _typeChip('Specific Books', AllocationType.byTitle),
+                TeacherFilterChip(
+                  label: 'By Level',
+                  isActive: _allocationType == AllocationType.byLevel,
+                  icon: Icons.bar_chart,
+                  onTap: () => setState(() {
+                    _allocationType = AllocationType.byLevel;
+                    _bookTitleError = null;
+                    _levelError = null;
+                  }),
+                ),
+              TeacherFilterChip(
+                label: 'Specific Books',
+                isActive: _allocationType == AllocationType.byTitle,
+                icon: Icons.library_books_outlined,
+                onTap: () => setState(() {
+                  _allocationType = AllocationType.byTitle;
+                  _bookTitleError = null;
+                  _levelError = null;
+                }),
+              ),
             ],
           ),
 
@@ -870,17 +918,55 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
           Row(
             children: [
               Expanded(
-                child: LumiDropdown<AllocationCadence>(
-                  label: 'Frequency',
-                  value: _cadence,
-                  items: AllocationCadence.values,
-                  itemLabel: _getCadenceLabel,
-                  onChanged: (value) {
-                    setState(() {
-                      _cadence = value!;
-                      _updateEndDate();
-                    });
+                child: GestureDetector(
+                  onTap: () async {
+                    final picked = await _FrequencyPickerSheet.show(
+                      context,
+                      currentCadence: _cadence,
+                      getCadenceLabel: _getCadenceLabel,
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        _cadence = picked;
+                        _updateEndDate();
+                      });
+                    }
                   },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Frequency',
+                        style: TeacherTypography.bodySmall.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.charcoal,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: AppColors.offWhite,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color: AppColors.teacherBorder, width: 1.2),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _getCadenceLabel(_cadence),
+                                style: TeacherTypography.bodyMedium,
+                              ),
+                            ),
+                            const Icon(Icons.keyboard_arrow_down,
+                                size: 16, color: AppColors.teacherPrimary),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -889,11 +975,15 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
                   label: 'Minutes Target',
                   controller: _minutesController,
                   keyboardType: TextInputType.number,
-                  suffixIcon: Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: Text(
-                      'min',
-                      style: TeacherTypography.bodySmall,
+                  suffixIcon: Align(
+                    widthFactor: 1.0,
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: Text(
+                        'min',
+                        style: TeacherTypography.bodySmall,
+                      ),
                     ),
                   ),
                 ),
@@ -906,8 +996,8 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
           Row(
             children: [
               Expanded(child: _buildDateField('Start Date', _startDate, () async {
-                final picked = await showDatePicker(
-                  context: context,
+                final picked = await _DatePickerSheet.show(
+                  context,
                   initialDate: _startDate,
                   firstDate: DateTime.now(),
                   lastDate: DateTime.now().add(const Duration(days: 365)),
@@ -921,8 +1011,8 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
               })),
               const SizedBox(width: 12),
               Expanded(child: _buildDateField('End Date', _endDate, () async {
-                final picked = await showDatePicker(
-                  context: context,
+                final picked = await _DatePickerSheet.show(
+                  context,
                   initialDate: _endDate,
                   firstDate: _startDate,
                   lastDate: DateTime.now().add(const Duration(days: 365)),
@@ -931,6 +1021,24 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
                   setState(() => _endDate = picked);
                 }
               })),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Icon(Icons.info_outline,
+                  size: 14, color: AppColors.teacherPrimary),
+              const SizedBox(width: 4),
+              Text(
+                () {
+                  final days = _endDate.difference(_startDate).inDays;
+                  return days == 1 ? '1-day window' : '$days-day window';
+                }(),
+                style: TeacherTypography.caption.copyWith(
+                  color: AppColors.teacherPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ],
@@ -961,21 +1069,24 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _scopeChip(
-                'Whole Class (${_students.length})',
-                allStudents: true,
-                byGroup: false,
+              TeacherFilterChip(
+                label: 'Whole Class (${_students.length})',
+                isActive: _selectAllStudents && !_selectByGroup,
+                icon: Icons.groups_outlined,
+                onTap: () => _setScopeMode(allStudents: true, byGroup: false),
               ),
-              _scopeChip(
-                'Select Students',
-                allStudents: false,
-                byGroup: false,
+              TeacherFilterChip(
+                label: 'Select Students',
+                isActive: !_selectAllStudents && !_selectByGroup,
+                icon: Icons.person_outline,
+                onTap: () => _setScopeMode(allStudents: false, byGroup: false),
               ),
               if (_readingGroups.isNotEmpty)
-                _scopeChip(
-                  'By Group (${_readingGroups.length})',
-                  allStudents: false,
-                  byGroup: true,
+                TeacherFilterChip(
+                  label: 'By Group (${_readingGroups.length})',
+                  isActive: _selectByGroup,
+                  icon: Icons.workspaces_outlined,
+                  onTap: () => _setScopeMode(allStudents: false, byGroup: true),
                 ),
             ],
           ),
@@ -1244,44 +1355,18 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
   Widget _sectionHeader(IconData icon, String title) {
     return Row(
       children: [
-        Icon(icon, color: AppColors.teacherPrimary, size: 22),
-        const SizedBox(width: 8),
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: AppColors.teacherPrimaryLight,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: AppColors.teacherPrimary, size: 20),
+        ),
+        const SizedBox(width: 12),
         Text(title, style: TeacherTypography.h3),
       ],
-    );
-  }
-
-  Widget _typeChip(String label, AllocationType type) {
-    final isSelected = _allocationType == type;
-    return GestureDetector(
-      onTap: () => setState(() {
-        _allocationType = type;
-        _bookTitleError = null;
-        _levelError = null;
-      }),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.teacherPrimary
-              : AppColors.teacherPrimaryLight,
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
-          border: Border.all(
-            color: isSelected
-                ? AppColors.teacherPrimary
-                : AppColors.teacherBorder,
-            width: 1.5,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TeacherTypography.bodyMedium.copyWith(
-            color: isSelected ? AppColors.white : AppColors.charcoal,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-          ),
-        ),
-      ),
     );
   }
 
@@ -1323,57 +1408,26 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
     });
   }
 
-  Widget _scopeChip(String label, {required bool allStudents, required bool byGroup}) {
-    final isSelected = _selectAllStudents == allStudents &&
-        _selectByGroup == byGroup;
-    return GestureDetector(
-      onTap: () => _setScopeMode(allStudents: allStudents, byGroup: byGroup),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.teacherPrimary
-              : AppColors.teacherPrimaryLight,
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
-          border: Border.all(
-            color: isSelected
-                ? AppColors.teacherPrimary
-                : AppColors.teacherBorder,
-            width: 1.5,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TeacherTypography.bodyMedium.copyWith(
-            color: isSelected ? AppColors.white : AppColors.charcoal,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildDateField(String label, DateTime date, VoidCallback onTap) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TeacherTypography.bodySmall.copyWith(
-          fontWeight: FontWeight.w600,
-          color: AppColors.charcoal,
-        )),
-        const SizedBox(height: 6),
-        GestureDetector(
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TeacherTypography.bodySmall.copyWith(
+              fontWeight: FontWeight.w600,
+              color: AppColors.charcoal,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
-              border: Border.all(
-                color: AppColors.charcoal.withValues(alpha: 0.2),
-                width: 1.5,
-              ),
+              color: AppColors.offWhite,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.teacherBorder, width: 1.2),
             ),
             child: Row(
               children: [
@@ -1383,13 +1437,13 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
                     style: TeacherTypography.bodyMedium,
                   ),
                 ),
-                Icon(Icons.calendar_today,
+                const Icon(Icons.calendar_today_outlined,
                     size: 16, color: AppColors.teacherPrimary),
               ],
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1412,5 +1466,343 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
       return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
     }
     return parts.first.isNotEmpty ? parts.first[0].toUpperCase() : '?';
+  }
+
+  Future<List<_ReadConflict>> _checkPreviouslyReadConflicts(
+    List<AllocationBookItem> items,
+  ) async {
+    final service = IsbnAssignmentService();
+    final conflicts = <_ReadConflict>[];
+    final targetStudentIds = _selectAllStudents
+        ? _students.map((s) => s.id).toList()
+        : List<String>.from(_selectedStudentIds);
+
+    for (final studentId in targetStudentIds) {
+      for (final item in items) {
+        if (item.bookId == null && item.isbn == null) continue;
+        final hasRead = await service.studentHasPreviouslyReadBook(
+          studentId: studentId,
+          bookId: item.bookId,
+          isbn: item.isbn,
+        );
+        if (hasRead) {
+          final matches = _students.where((s) => s.id == studentId);
+          final name = matches.isNotEmpty ? matches.first.firstName : studentId;
+          conflicts.add(_ReadConflict(studentName: name, bookTitle: item.title));
+        }
+      }
+    }
+    return conflicts;
+  }
+
+  Future<bool> _showAllocationConflictDialog(
+    List<_ReadConflict> conflicts,
+  ) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF8E1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.history_edu_rounded,
+                    color: Color(0xFFFFA000),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text('Books Previously Read'),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Some students may have already read these books:',
+                  style: TeacherTypography.bodySmall
+                      .copyWith(color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 12),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 200),
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: conflicts
+                        .map((c) => Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: Text(
+                                '• ${c.studentName} — "${c.bookTitle}"',
+                                style: TeacherTypography.bodySmall,
+                              ),
+                            ))
+                        .toList(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Do you still want to assign these books?',
+                  style: TeacherTypography.bodySmall
+                      .copyWith(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(
+                  'Go Back',
+                  style: TeacherTypography.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.teacherPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text('Assign Anyway'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+}
+
+class _ReadConflict {
+  const _ReadConflict({required this.studentName, required this.bookTitle});
+  final String studentName;
+  final String bookTitle;
+}
+
+// ─── Frequency Picker Sheet ──────────────────────────────────────────────────
+
+class _FrequencyPickerSheet extends StatelessWidget {
+  const _FrequencyPickerSheet({
+    required this.currentCadence,
+    required this.getCadenceLabel,
+  });
+
+  final AllocationCadence currentCadence;
+  final String Function(AllocationCadence) getCadenceLabel;
+
+  static Future<AllocationCadence?> show(
+    BuildContext context, {
+    required AllocationCadence currentCadence,
+    required String Function(AllocationCadence) getCadenceLabel,
+  }) {
+    return showModalBottomSheet<AllocationCadence>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _FrequencyPickerSheet(
+        currentCadence: currentCadence,
+        getCadenceLabel: getCadenceLabel,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Center(
+            child: Container(
+              width: 44,
+              height: 5,
+              decoration: BoxDecoration(
+                color: AppColors.teacherBorder,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text('Select Frequency', style: TeacherTypography.h3),
+          const SizedBox(height: 8),
+          ...AllocationCadence.values.map((cadence) {
+            final isSelected = cadence == currentCadence;
+            return InkWell(
+              onTap: () => Navigator.of(context).pop(cadence),
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 4,
+                  vertical: 14,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        getCadenceLabel(cadence),
+                        style: TeacherTypography.bodyMedium.copyWith(
+                          fontWeight: isSelected
+                              ? FontWeight.w700
+                              : FontWeight.w400,
+                          color: isSelected
+                              ? AppColors.teacherPrimary
+                              : AppColors.charcoal,
+                        ),
+                      ),
+                    ),
+                    if (isSelected)
+                      const Icon(
+                        Icons.check,
+                        size: 18,
+                        color: AppColors.teacherPrimary,
+                      ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Date Picker Sheet ───────────────────────────────────────────────────────
+
+class _DatePickerSheet extends StatefulWidget {
+  const _DatePickerSheet({
+    required this.initialDate,
+    required this.firstDate,
+    required this.lastDate,
+  });
+
+  final DateTime initialDate;
+  final DateTime firstDate;
+  final DateTime lastDate;
+
+  static Future<DateTime?> show(
+    BuildContext context, {
+    required DateTime initialDate,
+    required DateTime firstDate,
+    required DateTime lastDate,
+  }) {
+    final clamped =
+        initialDate.isBefore(firstDate) ? firstDate : initialDate;
+    return showModalBottomSheet<DateTime>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _DatePickerSheet(
+        initialDate: clamped,
+        firstDate: firstDate,
+        lastDate: lastDate,
+      ),
+    );
+  }
+
+  @override
+  State<_DatePickerSheet> createState() => _DatePickerSheetState();
+}
+
+class _DatePickerSheetState extends State<_DatePickerSheet> {
+  late DateTime _selectedDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = widget.initialDate;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Center(
+            child: Container(
+              width: 44,
+              height: 5,
+              decoration: BoxDecoration(
+                color: AppColors.teacherBorder,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text('Select Date', style: TeacherTypography.h3),
+          const SizedBox(height: 8),
+          Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: Theme.of(context).colorScheme.copyWith(
+                    primary: AppColors.teacherPrimary,
+                    onPrimary: AppColors.white,
+                    surface: AppColors.white,
+                  ),
+            ),
+            child: CalendarDatePicker(
+              initialDate: _selectedDate,
+              firstDate: widget.firstDate,
+              lastDate: widget.lastDate,
+              onDateChanged: (date) {
+                setState(() => _selectedDate = date);
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).pop(null),
+                  child: Text(
+                    'Cancel',
+                    style: TeacherTypography.bodyMedium.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => Navigator.of(context).pop(_selectedDate),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.teacherPrimary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('Confirm'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }

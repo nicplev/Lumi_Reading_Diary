@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/teacher_constants.dart';
 import '../../../data/models/user_model.dart';
 import '../../../data/models/class_model.dart';
 import '../../../data/models/allocation_model.dart';
@@ -67,7 +66,7 @@ class _AllocationScreenState extends State<AllocationScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.teacherBackground,
       appBar: AppBar(
         title: const Text(
           'Reading Allocation',
@@ -81,20 +80,13 @@ class _AllocationScreenState extends State<AllocationScreen>
         foregroundColor: AppColors.charcoal,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'New Allocation'),
-            Tab(text: 'Active Allocations'),
-          ],
-          labelColor: AppColors.teacherPrimary,
-          unselectedLabelColor: AppColors.textSecondary,
-          indicatorColor: AppColors.teacherPrimary,
-          indicatorWeight: 3,
-          labelStyle: TeacherTypography.bodyMedium
-              .copyWith(fontWeight: FontWeight.w700),
-          unselectedLabelStyle: TeacherTypography.bodyMedium,
-          dividerColor: AppColors.teacherBorder,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(56),
+          child: Container(
+            color: AppColors.white,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: _buildPillTabBar(),
+          ),
         ),
       ),
       body: TabBarView(
@@ -114,6 +106,68 @@ class _AllocationScreenState extends State<AllocationScreen>
             onEditAllocation: _onEditAllocation,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPillTabBar() {
+    return AnimatedBuilder(
+      animation: _tabController,
+      builder: (context, _) {
+        final currentIndex = _tabController.index;
+        return Container(
+          height: 40,
+          decoration: BoxDecoration(
+            color: AppColors.teacherPrimaryLight,
+            borderRadius: BorderRadius.circular(28),
+          ),
+          child: Row(
+            children: [
+              _buildPillTab('New Allocation', 0, currentIndex),
+              _buildPillTab('Active Allocations', 1, currentIndex),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPillTab(String label, int index, int currentIndex) {
+    final isSelected = index == currentIndex;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => _tabController.animateTo(index),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          margin: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.white : AppColors.teacherPrimaryLight,
+            borderRadius: BorderRadius.circular(25),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: AppColors.charcoal.withValues(alpha: 0.08),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'Nunito',
+                fontSize: 13,
+                fontWeight:
+                    isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected
+                    ? AppColors.teacherPrimary
+                    : AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

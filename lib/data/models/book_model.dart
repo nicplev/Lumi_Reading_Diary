@@ -11,6 +11,17 @@ class BookModel {
   final String? description;
   final List<String> genres;
   final String? readingLevel; // e.g., 'A', 'B', 'C' or '1', '2', '3'
+
+  // Schema provenance — stored in community_books so consumers know which
+  // schema the readingLevel belongs to (e.g., 'pmBenchmark', 'llll_stages').
+  final String? levelSchema;
+
+  // School-specific overlay fields (stored in schools/{schoolId}/books only).
+  // communityLevelSchema is copied from the community book at cache time.
+  // schoolReadingLevel is set explicitly by this school's teacher.
+  final String? communityLevelSchema;
+  final String? schoolReadingLevel;
+
   final int? pageCount;
   final String? publisher;
   final DateTime? publishedDate;
@@ -38,6 +49,9 @@ class BookModel {
     this.description,
     this.genres = const [],
     this.readingLevel,
+    this.levelSchema,
+    this.communityLevelSchema,
+    this.schoolReadingLevel,
     this.pageCount,
     this.publisher,
     this.publishedDate,
@@ -70,6 +84,9 @@ class BookModel {
       description: _asNullableString(data['description']),
       genres: _asStringList(data['genres']),
       readingLevel: _asNullableString(data['readingLevel']),
+      levelSchema: _asNullableString(data['levelSchema']),
+      communityLevelSchema: _asNullableString(data['communityLevelSchema']),
+      schoolReadingLevel: _asNullableString(data['schoolReadingLevel']),
       pageCount: _asInt(data['pageCount']),
       publisher: _asNullableString(data['publisher']),
       publishedDate: _asDateTime(data['publishedDate']),
@@ -140,6 +157,9 @@ class BookModel {
       'description': description,
       'genres': genres,
       'readingLevel': readingLevel,
+      if (levelSchema != null) 'levelSchema': levelSchema,
+      if (communityLevelSchema != null) 'communityLevelSchema': communityLevelSchema,
+      if (schoolReadingLevel != null) 'schoolReadingLevel': schoolReadingLevel,
       'pageCount': pageCount,
       'publisher': publisher,
       'publishedDate':
@@ -166,6 +186,9 @@ class BookModel {
     String? description,
     List<String>? genres,
     String? readingLevel,
+    String? levelSchema,
+    String? communityLevelSchema,
+    String? schoolReadingLevel,
     int? pageCount,
     String? publisher,
     DateTime? publishedDate,
@@ -189,6 +212,9 @@ class BookModel {
       description: description ?? this.description,
       genres: genres ?? this.genres,
       readingLevel: readingLevel ?? this.readingLevel,
+      levelSchema: levelSchema ?? this.levelSchema,
+      communityLevelSchema: communityLevelSchema ?? this.communityLevelSchema,
+      schoolReadingLevel: schoolReadingLevel ?? this.schoolReadingLevel,
       pageCount: pageCount ?? this.pageCount,
       publisher: publisher ?? this.publisher,
       publishedDate: publishedDate ?? this.publishedDate,

@@ -1,6 +1,6 @@
 'use client';
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface WeeklyChartProps {
   data: Array<{ day: string; count: number }>;
@@ -10,9 +10,15 @@ export function WeeklyChart({ data }: WeeklyChartProps) {
   const maxValue = Math.max(...data.map(d => d.count), 1);
 
   return (
-    <div className="h-[240px]">
+    <div className="h-[180px]">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: -15 }}>
+        <AreaChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: -15 }}>
+          <defs>
+            <linearGradient id="readingGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#FF8698" stopOpacity={0.3} />
+              <stop offset="100%" stopColor="#FF8698" stopOpacity={0} />
+            </linearGradient>
+          </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
           <XAxis
             dataKey="day"
@@ -37,15 +43,18 @@ export function WeeklyChart({ data }: WeeklyChartProps) {
               boxShadow: '0 4px 10px -6px rgba(18,18,17,0.1)',
             }}
             formatter={(value: number) => [`${value} logs`, 'Reading']}
-            cursor={{ fill: 'rgba(255, 134, 152, 0.05)' }}
+            cursor={{ stroke: 'rgba(255, 134, 152, 0.2)', strokeWidth: 1 }}
           />
-          <Bar
+          <Area
+            type="monotone"
             dataKey="count"
-            fill="#FF8698"
-            radius={[6, 6, 0, 0]}
-            maxBarSize={40}
+            stroke="#FF8698"
+            strokeWidth={2}
+            fill="url(#readingGradient)"
+            dot={false}
+            activeDot={{ r: 4, fill: '#FF8698', strokeWidth: 0 }}
           />
-        </BarChart>
+        </AreaChart>
       </ResponsiveContainer>
     </div>
   );

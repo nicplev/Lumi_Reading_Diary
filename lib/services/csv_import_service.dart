@@ -290,6 +290,10 @@ class CSVImportService {
               'createdAt': FieldValue.serverTimestamp(),
               'enrolledAt': FieldValue.serverTimestamp(),
               'profileImageUrl': null,
+              'parentEmail': row.parentEmail != null && row.parentEmail!.isNotEmpty
+                  ? row.parentEmail
+                  : null,
+              'enrollmentStatus': 'pending',
               'additionalInfo':
                   row.parentEmail != null && row.parentEmail!.isNotEmpty
                       ? {'pendingParentEmail': row.parentEmail}
@@ -349,6 +353,10 @@ class CSVImportService {
               profileImageUrl: null,
               additionalInfo:
                   studentData['additionalInfo'] as Map<String, dynamic>,
+              parentEmail: row.parentEmail != null && row.parentEmail!.isNotEmpty
+                  ? row.parentEmail
+                  : null,
+              enrollmentStatus: 'pending',
               levelHistory: [],
               stats: StudentStats(
                 totalMinutesRead: 0,

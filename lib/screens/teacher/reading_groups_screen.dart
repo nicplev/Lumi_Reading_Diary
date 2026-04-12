@@ -316,7 +316,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
                 Text('No Reading Groups Yet', style: TeacherTypography.h2),
                 const SizedBox(height: 8),
                 Text(
-                  'Create groups to organize students by ability level or interest',
+                  'Create groups to organise students by ability level or interest',
                   style: TeacherTypography.bodyMedium
                       .copyWith(color: AppColors.textSecondary),
                   textAlign: TextAlign.center,
@@ -1192,7 +1192,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
               Text('What are Reading Groups?', style: TeacherTypography.h3),
               const SizedBox(height: 8),
               Text(
-                'Reading groups help you organize students by ability level, interest, or any other criteria. This makes it easier to:',
+                'Reading groups help you organise students by ability level, interest, or any other criteria. This makes it easier to:',
                 style: TeacherTypography.bodyMedium,
               ),
               const SizedBox(height: 8),

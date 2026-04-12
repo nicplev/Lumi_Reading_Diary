@@ -10,16 +10,22 @@ class TeacherFilterChip extends StatelessWidget {
   final String label;
   final bool isActive;
   final VoidCallback? onTap;
+  final IconData? icon;
+  final Color? activeColor;
 
   const TeacherFilterChip({
     super.key,
     required this.label,
     required this.isActive,
     this.onTap,
+    this.icon,
+    this.activeColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final effectiveColor = activeColor ?? AppColors.teacherPrimary;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -29,17 +35,17 @@ class TeacherFilterChip extends StatelessWidget {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: isActive ? AppColors.teacherPrimary : AppColors.white,
+            color: isActive ? effectiveColor : AppColors.white,
             borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
             border: Border.all(
               color:
-                  isActive ? AppColors.teacherPrimary : AppColors.teacherBorder,
+                  isActive ? effectiveColor : AppColors.teacherBorder,
               width: 1.2,
             ),
             boxShadow: isActive
                 ? [
                     BoxShadow(
-                      color: AppColors.teacherPrimary.withValues(alpha: 0.18),
+                      color: effectiveColor.withValues(alpha: 0.18),
                       blurRadius: 18,
                       spreadRadius: -8,
                       offset: const Offset(0, 10),
@@ -48,15 +54,30 @@ class TeacherFilterChip extends StatelessWidget {
                 : null,
           ),
           child: Center(
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'Nunito',
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: isActive ? AppColors.white : AppColors.textSecondary,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (icon != null) ...[
+                  Icon(
+                    icon,
+                    size: 14,
+                    color: isActive
+                        ? AppColors.white
+                        : AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 5),
+                ],
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'Nunito',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: isActive ? AppColors.white : AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ),
           ),
         ),

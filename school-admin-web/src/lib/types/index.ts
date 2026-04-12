@@ -1,7 +1,7 @@
-export type { School, ReadingLevelSchema, CommentPresetCategory, ParentCommentSettings } from './school';
-export { getReadingLevels } from './school';
+export type { School, ReadingLevelSchema, CommentPresetCategory, ParentCommentSettings, AchievementThresholds, AchievementTierCustomization, AchievementCustomization } from './school';
+export { getReadingLevels, DEFAULT_ACHIEVEMENT_THRESHOLDS } from './school';
 export type { SchoolUser, UserRole } from './user';
-export type { Student, StudentStats, ReadingLevelHistory } from './student';
+export type { Student, StudentStats, ReadingLevelHistory, EnrollmentStatus } from './student';
 export type { SchoolClass } from './class';
 export type { Book } from './book';
 export type { Allocation, AllocationBookItem, AllocationCadence, AllocationType, StudentAllocationOverride } from './allocation';

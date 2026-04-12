@@ -281,6 +281,14 @@ service cloud.firestore {
 
         allow create, update, delete: if false;
       }
+
+      match /parentOnboardingEmails/{emailId} {
+        allow get, list: if isSchoolAdmin(schoolId);
+        allow create: if isSchoolAdmin(schoolId)
+            && request.resource.data.status == 'queued'
+            && request.resource.data.schoolId == schoolId;
+        allow update, delete: if false;
+      }
     }
 
     // ── Community Book Database (global, cross-school) ──────────────
@@ -446,6 +454,12 @@ service cloud.firestore {
 
       // Read/update/delete only via Admin SDK (super-admin dashboard).
       allow get, list, update, delete: if false;
+    }
+
+    // pendingUserDeletions is written/read exclusively via Admin SDK (Cloud Function).
+    // No client access permitted.
+    match /pendingUserDeletions/{userId} {
+      allow read, write: if false;
     }
 
     match /userSchoolIndex/{emailHash} {

@@ -256,7 +256,7 @@ class _DatabaseMigrationScreenState extends State<DatabaseMigrationScreen> {
       await _migration.cleanupOldCollections(confirmDelete: true);
 
       _addLog('✅ Old collections deleted successfully!');
-      _addLog('Your database now uses the optimized nested structure.');
+      _addLog('Your database now uses the optimised nested structure.');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -320,7 +320,7 @@ class _DatabaseMigrationScreenState extends State<DatabaseMigrationScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'This tool migrates your database from a flat structure to an optimized '
+                  'This tool migrates your database from a flat structure to an optimised '
                   'nested structure for better performance and scalability.',
                   style: TeacherTypography.bodySmall,
                 ),

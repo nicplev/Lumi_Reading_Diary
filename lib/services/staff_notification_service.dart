@@ -110,6 +110,22 @@ class StaffNotificationService {
     });
   }
 
+  Future<void> deleteParentNotification({
+    required UserModel user,
+    required String notificationId,
+  }) async {
+    await _parentNotifications(user).doc(notificationId).delete();
+  }
+
+  Future<void> clearAllParentNotifications(UserModel user) async {
+    final snapshot = await _parentNotifications(user).get();
+    final batch = _firestore.batch();
+    for (final doc in snapshot.docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
+  }
+
   Future<List<ClassModel>> loadAvailableClasses(UserModel user) async {
     final schoolId = user.schoolId;
     if (schoolId == null || schoolId.isEmpty) return const [];

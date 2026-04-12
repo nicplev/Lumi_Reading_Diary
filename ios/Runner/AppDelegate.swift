@@ -15,4 +15,13 @@ import UIKit
     }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
+
+  override func application(
+    _ app: UIApplication,
+    open url: URL,
+    options: [UIApplication.OpenURLOptionsKey: Any] = [:]
+  ) -> Bool {
+    // Forward lumi:// deep links from widget taps to Flutter (home_widget plugin handles dispatch)
+    return super.application(app, open: url, options: options)
+  }
 }

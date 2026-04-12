@@ -773,6 +773,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.0"
+  graphs:
+    dependency: transitive
+    description:
+      name: graphs
+      sha256: "741bbf84165310a68ff28fe9e727332eef1407342fca52759cb21ad8177bb8d0"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.3.2"
   hive:
     dependency: "direct main"
     description:
@@ -789,6 +797,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.0"
+  home_widget:
+    dependency: "direct main"
+    description:
+      name: home_widget
+      sha256: "7430f7549d42cef2e729bd3c779de748b93f1eb78b1abfe6bca8fffd1cfce3e9"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.7.0+1"
   http:
     dependency: "direct main"
     description:
@@ -1269,6 +1285,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.2.2"
+  rive:
+    dependency: "direct main"
+    description:
+      name: rive
+      sha256: "61f37d2833730778d258e634d27eb7e447a354790a78287621833808e8c7cb28"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.14.5"
+  rive_native:
+    dependency: transitive
+    description:
+      name: rive_native
+      sha256: bfce5d976e1aa9a8ae53846c913ecc3a20805d918162965d67cad438b0090946
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.5"
   riverpod:
     dependency: transitive
     description:

@@ -59,6 +59,23 @@ export function useRevokeLinkCode() {
   });
 }
 
+export function useDeleteLinkCode() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (codeId: string) => {
+      const res = await fetch(`/api/link-codes/${codeId}?permanent=true`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to delete link code');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['link-codes'] });
+    },
+  });
+}
+
 export function useBulkCreateLinkCodes() {
   const queryClient = useQueryClient();
   return useMutation<{ count: number; codes: SerializedLinkCode[] }, Error, string[]>({

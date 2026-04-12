@@ -192,13 +192,22 @@ export function BookFormModal({ open, onClose, book, levelOptions }: BookFormMod
           placeholder="Author name"
         />
 
-        <Select
-          label="Reading Level"
-          options={levelOptions.map((l) => ({ value: l.value, label: l.displayLabel }))}
-          value={readingLevel}
-          onChange={setReadingLevel}
-          placeholder="Select level (optional)"
-        />
+        {levelOptions.length > 0 ? (
+          <Select
+            label="Reading Level"
+            options={levelOptions.map((l) => ({ value: l.value, label: l.displayLabel }))}
+            value={readingLevel}
+            onChange={setReadingLevel}
+            placeholder="Select level (optional)"
+          />
+        ) : (
+          <Input
+            label="Reading Level"
+            value={readingLevel}
+            onChange={(e) => setReadingLevel(e.target.value)}
+            placeholder="e.g. Level 12, PM 20, Year 2 (optional)"
+          />
+        )}
 
         <Input
           label="Cover Image URL"

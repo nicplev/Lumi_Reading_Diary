@@ -43,7 +43,7 @@ export function AdminDashboard({ schoolName, stats, weeklyEngagement, recentActi
         <StatCard title="Students" value={stats.totalStudents} icon={<Icon name="person" />} color="pink" href="/students" />
         <StatCard title="Teachers" value={stats.totalTeachers} icon={<Icon name="person" />} color="blue" href="/users" />
         <StatCard title="Classes" value={stats.totalClasses} icon={<Icon name="school" />} color="green" href="/classes" />
-        <StatCard title="Active Today" value={stats.activeStudentsToday} icon={<Icon name="auto_stories" />} color="orange" href="/analytics" subtitle="as of today" />
+        <StatCard title="Active Today" value={stats.activeStudentsToday} icon={<Icon name="auto_stories" />} color="orange" href="/analytics" subtitle="as of today" sparklineData={weeklyEngagement.map(d => d.count)} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

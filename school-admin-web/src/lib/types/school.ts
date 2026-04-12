@@ -46,6 +46,32 @@ export interface ParentCommentSettings {
   customPresets: CommentPresetCategory[];
 }
 
+export interface AchievementThresholds {
+  streak:      [number, number, number, number, number];
+  books:       [number, number, number, number, number];
+  minutes:     [number, number, number, number, number];
+  readingDays: [number, number, number, number];
+}
+
+export interface AchievementTierCustomization {
+  name?:  string; // undefined = use default name
+  color?: string; // CSS hex e.g. "#FF1493"; undefined = use default rarity color
+}
+
+export interface AchievementCustomization {
+  streak?:      [AchievementTierCustomization, AchievementTierCustomization, AchievementTierCustomization, AchievementTierCustomization, AchievementTierCustomization];
+  books?:       [AchievementTierCustomization, AchievementTierCustomization, AchievementTierCustomization, AchievementTierCustomization, AchievementTierCustomization];
+  minutes?:     [AchievementTierCustomization, AchievementTierCustomization, AchievementTierCustomization, AchievementTierCustomization, AchievementTierCustomization];
+  readingDays?: [AchievementTierCustomization, AchievementTierCustomization, AchievementTierCustomization, AchievementTierCustomization];
+}
+
+export const DEFAULT_ACHIEVEMENT_THRESHOLDS: AchievementThresholds = {
+  streak:      [5, 10, 20, 50, 100],
+  books:       [5, 10, 25, 50, 100],
+  minutes:     [300, 600, 1500, 3000, 6000],
+  readingDays: [10, 30, 50, 100],
+};
+
 export function getReadingLevels(schema: ReadingLevelSchema, customLevels?: string[]): string[] {
   switch (schema) {
     case 'none':

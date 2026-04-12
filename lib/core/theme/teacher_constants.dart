@@ -171,19 +171,19 @@ const List<DecodableTier> decodableTiers = [
   ),
   DecodableTier(
     level: 2,
-    name: 'Digraphs',
+    name: 'Blends & Digraphs',
     color: AppColors.levelDigraphs,
-    exampleWords: ['ship', 'chip', 'fish'],
+    exampleWords: ['ship', 'frog', 'drum'],
   ),
   DecodableTier(
     level: 3,
-    name: 'Blends',
+    name: 'Complex Digraphs',
     color: AppColors.levelBlends,
-    exampleWords: ['frog', 'drum', 'clap'],
+    exampleWords: ['that', 'when', 'ring'],
   ),
   DecodableTier(
     level: 4,
-    name: 'CVCE (Magic E)',
+    name: 'Magic E',
     color: AppColors.levelCVCE,
     exampleWords: ['cake', 'bike', 'home'],
   ),
@@ -195,8 +195,14 @@ const List<DecodableTier> decodableTiers = [
   ),
   DecodableTier(
     level: 6,
-    name: 'R-Controlled',
+    name: 'Extended Code',
     color: AppColors.levelRControlled,
     exampleWords: ['car', 'her', 'bird'],
+  ),
+  DecodableTier(
+    level: 7,
+    name: 'Complex Code',
+    color: AppColors.levelComplexCode,
+    exampleWords: ['knight', 'though', 'phrase'],
   ),
 ];

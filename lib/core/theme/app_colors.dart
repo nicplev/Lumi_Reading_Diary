@@ -147,6 +147,8 @@ class AppColors {
   static const Color levelCVCE = Color(0xFFA5D6A7);
   static const Color levelVowelTeams = Color(0xFF90CAF9);
   static const Color levelRControlled = Color(0xFFCE93D8);
+  static const Color levelBridge = Color(0xFF80DEEA); // Stage Plus 4 bridge
+  static const Color levelComplexCode = Color(0xFF9575CD); // Stage 7
 
   // Achievement colors
   static const Color gold = Color(0xFFFFD700);

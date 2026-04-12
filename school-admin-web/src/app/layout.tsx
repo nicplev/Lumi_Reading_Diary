@@ -6,7 +6,7 @@ import { Providers } from './providers';
 const nunito = Nunito({
   subsets: ['latin'],
   variable: '--font-family-nunito',
-  display: 'swap',
+  display: 'optional',
 });
 
 export const metadata: Metadata = {

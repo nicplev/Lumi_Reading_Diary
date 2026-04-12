@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
+import 'student_avatar.dart';
 
 /// Lumi Design System - Teacher Student List Item
 ///
@@ -9,6 +10,7 @@ class TeacherStudentListItem extends StatelessWidget {
   final String name;
   final String initial;
   final Color avatarColor;
+  final String? characterId;
   final String subtitle;
   final int? streak;
   final VoidCallback? onTap;
@@ -18,6 +20,7 @@ class TeacherStudentListItem extends StatelessWidget {
     required this.name,
     required this.initial,
     this.avatarColor = const Color(0xFFFFCDD2),
+    this.characterId,
     this.subtitle = '',
     this.streak,
     this.onTap,
@@ -53,18 +56,11 @@ class TeacherStudentListItem extends StatelessWidget {
           child: Row(
             children: [
               // Avatar
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: avatarColor,
-                child: Text(
-                  initial,
-                  style: const TextStyle(
-                    fontFamily: 'Nunito',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.white,
-                  ),
-                ),
+              StudentAvatar(
+                characterId: characterId,
+                initial: initial,
+                avatarColor: avatarColor,
+                size: 40,
               ),
               const SizedBox(width: 12),
               // Name + subtitle

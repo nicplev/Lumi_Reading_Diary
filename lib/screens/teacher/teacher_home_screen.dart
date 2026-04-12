@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:rive/rive.dart' hide Animation;
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
@@ -27,8 +28,7 @@ class TeacherHomeScreen extends StatefulWidget {
   State<TeacherHomeScreen> createState() => _TeacherHomeScreenState();
 }
 
-class _TeacherHomeScreenState extends State<TeacherHomeScreen>
-    with SingleTickerProviderStateMixin {
+class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
   final FirebaseService _firebaseService = FirebaseService.instance;
   int _selectedIndex = 0;
   int _dashboardResetTrigger = 0;
@@ -36,25 +36,13 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
   ClassModel? _selectedClass;
   bool _isLoading = true;
 
-  late final AnimationController _tabAnimController;
-  late final Animation<double> _fadeAnimation;
-  late final Animation<double> _scaleAnimation;
+  late final PageController _pageController;
 
   @override
   void initState() {
     super.initState();
 
-    _tabAnimController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 250),
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _tabAnimController, curve: Curves.easeOut),
-    );
-    _scaleAnimation = Tween<double>(begin: 0.97, end: 1.0).animate(
-      CurvedAnimation(parent: _tabAnimController, curve: Curves.easeOut),
-    );
-    _tabAnimController.value = 1.0;
+    _pageController = PageController();
 
     // Role guard: redirect if user is not a teacher or admin
     if (widget.user.role != UserRole.teacher &&
@@ -69,18 +57,21 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
 
   @override
   void dispose() {
-    _tabAnimController.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
   void _onTabTapped(int index) {
     if (index == _selectedIndex) return;
-    _tabAnimController.value = 0.0;
     setState(() {
       _selectedIndex = index;
       _dashboardResetTrigger++;
     });
-    _tabAnimController.forward();
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
   }
 
   Future<void> _loadClasses() async {
@@ -173,25 +164,25 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
 
     return Scaffold(
       backgroundColor: AppColors.teacherBackground,
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: ScaleTransition(
-          scale: _scaleAnimation,
-          child: IndexedStack(
-            index: _selectedIndex,
-            children: [
-              _buildDashboardView(),
-              TeacherClassroomScreen(
-                teacher: widget.user,
-                selectedClass: _selectedClass,
-                classes: _classes,
-                onClassChanged: (c) => setState(() => _selectedClass = c),
-              ),
-              TeacherLibraryScreen(teacher: widget.user),
-              TeacherSettingsScreen(user: widget.user),
-            ],
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: (index) => setState(() {
+          _selectedIndex = index;
+          _dashboardResetTrigger++;
+        }),
+        children: [
+          _KeepAlivePage(child: _buildDashboardView()),
+          _KeepAlivePage(
+            child: TeacherClassroomScreen(
+              teacher: widget.user,
+              selectedClass: _selectedClass,
+              classes: _classes,
+              onClassChanged: (c) => setState(() => _selectedClass = c),
+            ),
           ),
-        ),
+          _KeepAlivePage(child: TeacherLibraryScreen(teacher: widget.user)),
+          _KeepAlivePage(child: TeacherSettingsScreen(user: widget.user)),
+        ],
       ),
       bottomNavigationBar: _buildBottomNavigationBar(),
     );
@@ -211,7 +202,14 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
       selectedClass: _selectedClass!,
       classes: _classes,
       onClassChanged: (c) => setState(() => _selectedClass = c),
-      onTabChanged: (index) => setState(() => _selectedIndex = index),
+      onTabChanged: (index) {
+        setState(() => _selectedIndex = index);
+        _pageController.animateToPage(
+          index,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      },
       resetTrigger: _dashboardResetTrigger,
     );
   }
@@ -299,6 +297,13 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
   // ============================================
 
   Widget _buildBottomNavigationBar() {
+    const navItems = [
+      ('assets/animations/nav_dashboard.riv', 'Dashboard'),
+      ('assets/animations/nav_class.riv', 'Class'),
+      ('assets/animations/nav_library.riv', 'Library'),
+      ('assets/animations/nav_settings.riv', 'Settings'),
+    ];
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.white,
@@ -312,46 +317,23 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        child: Theme(
-          data: Theme.of(context).copyWith(
-            splashFactory: NoSplash.splashFactory,
-            highlightColor: Colors.transparent,
-          ),
-          child: BottomNavigationBar(
-            currentIndex: _selectedIndex,
-            onTap: _onTabTapped,
-            type: BottomNavigationBarType.fixed,
-            elevation: 0,
-            backgroundColor: AppColors.white,
-            selectedItemColor: AppColors.teacherPrimary,
-            unselectedItemColor: AppColors.textSecondary,
-            selectedLabelStyle: TeacherTypography.caption.copyWith(
-              color: AppColors.teacherPrimary,
-            ),
-            unselectedLabelStyle: TeacherTypography.caption,
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.dashboard_outlined),
-                activeIcon: Icon(Icons.dashboard_rounded),
-                label: 'Dashboard',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.groups_outlined),
-                activeIcon: Icon(Icons.groups_rounded),
-                label: 'Class',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.menu_book_outlined),
-                activeIcon: Icon(Icons.menu_book_rounded),
-                label: 'Library',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.settings_outlined),
-                activeIcon: Icon(Icons.settings_rounded),
-                label: 'Settings',
-              ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(
+            children: [
+              for (int i = 0; i < navItems.length; i++)
+                Expanded(
+                  child: _RiveNavItem(
+                    assetPath: navItems[i].$1,
+                    label: navItems[i].$2,
+                    isSelected: _selectedIndex == i,
+                    onTap: () => _onTabTapped(i),
+                    selectedColor: AppColors.teacherPrimary,
+                    unselectedColor: AppColors.textSecondary,
+                  ),
+                ),
             ],
           ),
         ),
@@ -450,6 +432,150 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _KeepAlivePage extends StatefulWidget {
+  final Widget child;
+  const _KeepAlivePage({required this.child});
+
+  @override
+  State<_KeepAlivePage> createState() => _KeepAlivePageState();
+}
+
+class _KeepAlivePageState extends State<_KeepAlivePage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+}
+
+// Custom controller that directly plays Timeline 1 when triggered.
+// The state machines in these .riv files have 0 inputs, so we bypass
+// the state machine and drive the animation timeline directly.
+base class _NavRiveController extends RiveWidgetController {
+  // Stored as dynamic to avoid the Animation name conflict between
+  // Flutter's Animation<T> and rive_native's Animation class.
+  dynamic _animation;
+  bool _playing = false;
+
+  _NavRiveController(super.file) {
+    _animation = artboard.animationNamed('Timeline 1');
+  }
+
+  void play() {
+    if (_animation == null) return;
+    _animation.time = 0.0;
+    _playing = true;
+    scheduleRepaint();
+  }
+
+  @override
+  bool advance(double elapsedSeconds) {
+    final smNeedsMore = super.advance(elapsedSeconds);
+    if (_playing && _animation != null) {
+      final bool stillGoing = _animation.advanceAndApply(elapsedSeconds);
+      if (!stillGoing) _playing = false;
+      return smNeedsMore || stillGoing;
+    }
+    return smNeedsMore;
+  }
+}
+
+class _RiveNavItem extends StatefulWidget {
+  final String assetPath;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final Color selectedColor;
+  final Color unselectedColor;
+
+  const _RiveNavItem({
+    required this.assetPath,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+    required this.selectedColor,
+    required this.unselectedColor,
+  });
+
+  @override
+  State<_RiveNavItem> createState() => _RiveNavItemState();
+}
+
+class _RiveNavItemState extends State<_RiveNavItem> {
+  late final FileLoader _fileLoader;
+  _NavRiveController? _riveController;
+
+  @override
+  void initState() {
+    super.initState();
+    _fileLoader = FileLoader.fromAsset(
+      widget.assetPath,
+      riveFactory: Factory.flutter,
+    );
+  }
+
+  @override
+  void dispose() {
+    _fileLoader.dispose();
+    super.dispose();
+  }
+
+  void _onLoaded(RiveLoaded state) {
+    _riveController = state.controller as _NavRiveController;
+    if (widget.isSelected) _riveController!.play();
+  }
+
+  @override
+  void didUpdateWidget(_RiveNavItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.isSelected && widget.isSelected) {
+      _riveController?.play();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: widget.onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 32,
+            height: 32,
+            child: RiveWidgetBuilder(
+              fileLoader: _fileLoader,
+              controller: (file) => _NavRiveController(file),
+              onLoaded: _onLoaded,
+              builder: (context, state) => switch (state) {
+                RiveLoaded() => RiveWidget(
+                    controller: state.controller,
+                    fit: Fit.contain,
+                  ),
+                _ => const SizedBox(),
+              },
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            widget.label,
+            style: TeacherTypography.caption.copyWith(
+              color: widget.isSelected
+                  ? widget.selectedColor
+                  : widget.unselectedColor,
+            ),
+          ),
+        ],
       ),
     );
   }

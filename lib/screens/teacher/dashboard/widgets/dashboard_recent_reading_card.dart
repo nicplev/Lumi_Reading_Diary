@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/teacher_constants.dart';
+import '../../../../core/widgets/lumi/student_avatar.dart';
 import '../../../../data/models/class_model.dart';
 import '../../../../data/models/reading_log_model.dart';
 import '../../../../data/models/student_model.dart';
@@ -141,6 +142,7 @@ class _DashboardRecentReadingCardState
                         log: log,
                         studentName: student?.firstName ?? '?',
                         initials: _getInitials(student),
+                        characterId: student?.characterId,
                       ),
                     ],
                   );
@@ -190,11 +192,13 @@ class _RecentLogRow extends StatelessWidget {
   final ReadingLogModel log;
   final String studentName;
   final String initials;
+  final String? characterId;
 
   const _RecentLogRow({
     required this.log,
     required this.studentName,
     required this.initials,
+    this.characterId,
   });
 
   static const _avatarColors = [
@@ -219,23 +223,11 @@ class _RecentLogRow extends StatelessWidget {
       child: Row(
         children: [
           // Avatar
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: avatarBg,
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                initials,
-                style: TeacherTypography.caption.copyWith(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.charcoal.withValues(alpha: 0.6),
-                ),
-              ),
-            ),
+          StudentAvatar(
+            characterId: characterId,
+            initial: initials,
+            avatarColor: avatarBg,
+            size: 30,
           ),
           const SizedBox(width: 10),
           // Name

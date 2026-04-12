@@ -3,6 +3,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:go_router/go_router.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
 import 'dart:io' show Platform;
@@ -37,10 +39,40 @@ class NotificationService {
   String? _currentSchoolId;
   String? _currentUserId;
 
+  // Token that refreshed before user context was available — flushed on next saveTokenForUser call
+  String? _pendingToken;
+
+  // Router reference for in-app navigation on notification tap
+  GoRouter? _router;
+  // Route buffered when a notification tap arrives before the router is ready (cold-start)
+  String? _pendingRoute;
+
   // Notification channels
   static const String _readingReminderChannel = 'reading_reminders';
   static const String _achievementChannel = 'achievements';
   static const String _generalChannel = 'general';
+
+  /// Wire in the GoRouter instance so notification taps can navigate.
+  /// Called from routerProvider after the router is built.
+  void setRouter(GoRouter router) {
+    _router = router;
+    if (_pendingRoute != null) {
+      final route = _pendingRoute!;
+      _pendingRoute = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _router?.go(route);
+      });
+    }
+  }
+
+  void _navigateTo(String route) {
+    if (_router != null) {
+      _router!.go(route);
+    } else {
+      // Router not ready yet (cold-start race) — flush in setRouter()
+      _pendingRoute = route;
+    }
+  }
 
   /// Initialize notification service
   Future<void> initialize() async {
@@ -174,10 +206,13 @@ class NotificationService {
       debugPrint('getInitialMessage timed out or failed: $e');
     }
 
-    // Listen for token refresh and persist to the correct parent document
+    // Listen for token refresh and persist to the correct parent document.
+    // If user context isn't set yet, buffer the token and flush it in saveTokenForUser.
     _messaging!.onTokenRefresh.listen((token) {
       if (_currentSchoolId != null && _currentUserId != null) {
         _persistToken(token, _currentSchoolId!, _currentUserId!);
+      } else {
+        _pendingToken = token;
       }
     });
   }
@@ -203,23 +238,19 @@ class NotificationService {
     );
   }
 
-  /// Handle notification tap (Firebase)
+  /// Handle notification tap (Firebase — background/cold-start)
   void _handleMessageTap(RemoteMessage message) {
     debugPrint('Notification tapped: ${message.data}');
-
     final type = message.data['type'];
-    final studentId = message.data['studentId'];
-
-    // Navigate based on type
-    // This would integrate with go_router or navigation service
-    // For now, just log
-    debugPrint('Navigate to: $type for student $studentId');
+    if (type == 'staff_message') {
+      _navigateTo('/parent/notifications');
+    }
   }
 
-  /// Handle notification tap (local)
+  /// Handle notification tap (local — reading reminders)
   void _handleNotificationTap(NotificationResponse response) {
     debugPrint('Local notification tapped: ${response.payload}');
-    // Handle navigation based on payload
+    _navigateTo('/parent/home');
   }
 
   /// Show a local notification
@@ -513,6 +544,13 @@ class NotificationService {
     _currentSchoolId = schoolId;
     _currentUserId = userId;
 
+    // Flush any token that refreshed before user context was available
+    if (_pendingToken != null) {
+      await _persistToken(_pendingToken!, schoolId, userId);
+      _pendingToken = null;
+      return;
+    }
+
     if (_messaging == null || kIsWeb) return;
 
     try {
@@ -542,6 +580,8 @@ class NotificationService {
           .update({
         'fcmToken': token,
         'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
+        // Dot-notation merges this single key without touching other preference fields
+        'preferences.pushNotificationsEnabled': true,
       });
     } catch (e) {
       debugPrint('Error persisting FCM token: $e');

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
 import '../../data/models/user_model.dart';
@@ -10,6 +11,7 @@ import '../../data/models/student_model.dart';
 import '../../data/models/student_link_code_model.dart';
 import '../../services/parent_linking_service.dart';
 import '../../services/parent_link_export_service.dart';
+import '../../services/parent_onboarding_email_service.dart';
 import '../../services/analytics_service.dart';
 import '../../services/crash_reporting_service.dart';
 import '../../utils/firestore_debug.dart';
@@ -31,6 +33,8 @@ class _ParentLinkingManagementScreenState
     extends State<ParentLinkingManagementScreen> {
   final ParentLinkingService _linkingService = ParentLinkingService();
   final ParentLinkExportService _exportService = ParentLinkExportService();
+  final ParentOnboardingEmailService _onboardingService =
+      ParentOnboardingEmailService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirestoreDebug _firestoreDebug = FirestoreDebug();
 
@@ -40,6 +44,8 @@ class _ParentLinkingManagementScreenState
   bool _isLoading = false;
   bool _isGeneratingAll = false;
   bool _isExporting = false;
+  bool _isSendingEmails = false;
+  String _statusFilter = 'all'; // all, ready, invite_active, linked, blocked
 
   @override
   void initState() {
@@ -241,6 +247,187 @@ class _ParentLinkingManagementScreenState
       setState(() {
         _isGeneratingAll = false;
       });
+    }
+  }
+
+  Color _enrollmentColor(String? status) {
+    switch (status) {
+      case 'book_pack':
+        return AppColors.success;
+      case 'direct_purchase':
+        return AppColors.info;
+      case 'not_enrolled':
+        return AppColors.error;
+      default:
+        return AppColors.warning;
+    }
+  }
+
+  // --- Composite onboarding status helpers ---
+  String _onboardingStatus(StudentModel student, StudentLinkCodeModel? code) {
+    if (student.parentIds.isNotEmpty) return 'linked';
+    if (student.enrollmentStatus == 'not_enrolled') return 'not_enrolled';
+    if (code != null) return 'invite_active';
+    return 'ready';
+  }
+
+  String _onboardingStatusLabel(String status) {
+    switch (status) {
+      case 'linked':
+        return 'Linked';
+      case 'invite_active':
+        return 'Invite Active';
+      case 'ready':
+        return 'Ready';
+      case 'not_enrolled':
+        return 'No Subscription';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  Color _onboardingStatusColor(String status) {
+    switch (status) {
+      case 'linked':
+        return AppColors.success;
+      case 'invite_active':
+        return AppColors.info;
+      case 'ready':
+        return AppColors.warning;
+      case 'not_enrolled':
+        return AppColors.charcoal.withValues(alpha: 0.45);
+      default:
+        return AppColors.charcoal;
+    }
+  }
+
+  Future<void> _updateEnrollmentStatus(
+      String studentId, String status) async {
+    try {
+      await _firestore
+          .collection('schools')
+          .doc(widget.user.schoolId)
+          .collection('students')
+          .doc(studentId)
+          .update({'enrollmentStatus': status});
+
+      setState(() {
+        final index = _students.indexWhere((s) => s.id == studentId);
+        if (index >= 0) {
+          _students[index] =
+              _students[index].copyWith(enrollmentStatus: status);
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _sendOnboardingEmails() async {
+    final eligibleStudents = _students.where((s) =>
+        s.isEnrolled &&
+        s.parentEmail != null &&
+        s.parentEmail!.isNotEmpty &&
+        s.parentIds.isEmpty).toList();
+
+    if (eligibleStudents.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'No eligible students. Students must be enrolled, have a parent email, and not already linked.'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+        ),
+        title: Text('Send Onboarding Emails', style: TeacherTypography.h3),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'This will send onboarding emails to ${eligibleStudents.length} parents with link codes and setup instructions.',
+              style: TeacherTypography.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Eligible: ${eligibleStudents.length} students\n'
+              'Skipped (not enrolled): ${_students.where((s) => s.enrollmentStatus == 'not_enrolled').length}\n'
+              'Skipped (no email): ${_students.where((s) => s.parentEmail == null || s.parentEmail!.isEmpty).length}\n'
+              'Skipped (already linked): ${_students.where((s) => s.parentIds.isNotEmpty).length}',
+              style: TeacherTypography.bodySmall,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel',
+                style: TeacherTypography.bodyMedium
+                    .copyWith(color: AppColors.teacherPrimary)),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.send),
+            label: const Text('Send Emails'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.teacherPrimary,
+              foregroundColor: AppColors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius:
+                    BorderRadius.circular(TeacherDimensions.radiusM),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isSendingEmails = true);
+
+    try {
+      await _onboardingService.sendOnboardingEmails(
+        schoolId: widget.user.schoolId!,
+        studentIds: eligibleStudents.map((s) => s.id).toList(),
+        createdBy: widget.user.id,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Onboarding emails queued for ${eligibleStudents.length} parents'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send emails: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isSendingEmails = false);
     }
   }
 
@@ -959,6 +1146,312 @@ class _ParentLinkingManagementScreenState
     }
   }
 
+  Future<void> _showEditStudentDialog(StudentModel student) async {
+    // Load available classes
+    List<QueryDocumentSnapshot> classDocs = [];
+    try {
+      final snapshot = await _firestore
+          .collection('schools')
+          .doc(widget.user.schoolId)
+          .collection('classes')
+          .orderBy('name')
+          .get();
+      classDocs = snapshot.docs;
+    } catch (_) {}
+
+    if (!mounted) return;
+
+    final formKey = GlobalKey<FormState>();
+    final studentIdController = TextEditingController(text: student.studentId ?? '');
+    final firstNameController = TextEditingController(text: student.firstName);
+    final lastNameController = TextEditingController(text: student.lastName);
+    String? selectedClassId = student.classId.isNotEmpty ? student.classId : null;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(TeacherDimensions.radiusL)),
+          title: Text('Edit Student', style: TeacherTypography.h3),
+          content: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: studentIdController,
+                    decoration: InputDecoration(
+                      labelText: 'Student ID',
+                      border: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(TeacherDimensions.radiusM)),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(TeacherDimensions.radiusM),
+                          borderSide: const BorderSide(
+                              color: AppColors.teacherPrimary, width: 2)),
+                    ),
+                    validator: (v) =>
+                        (v == null || v.isEmpty) ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: firstNameController,
+                    decoration: InputDecoration(
+                      labelText: 'First Name',
+                      border: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(TeacherDimensions.radiusM)),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(TeacherDimensions.radiusM),
+                          borderSide: const BorderSide(
+                              color: AppColors.teacherPrimary, width: 2)),
+                    ),
+                    validator: (v) =>
+                        (v == null || v.isEmpty) ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: lastNameController,
+                    decoration: InputDecoration(
+                      labelText: 'Last Name',
+                      border: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(TeacherDimensions.radiusM)),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(TeacherDimensions.radiusM),
+                          borderSide: const BorderSide(
+                              color: AppColors.teacherPrimary, width: 2)),
+                    ),
+                    validator: (v) =>
+                        (v == null || v.isEmpty) ? 'Required' : null,
+                  ),
+                  if (classDocs.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedClassId,
+                      decoration: InputDecoration(
+                        labelText: 'Class',
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(
+                                TeacherDimensions.radiusM)),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(
+                                TeacherDimensions.radiusM),
+                            borderSide: const BorderSide(
+                                color: AppColors.teacherPrimary, width: 2)),
+                      ),
+                      items: [
+                        const DropdownMenuItem<String>(
+                            value: null, child: Text('No class')),
+                        ...classDocs.map((doc) {
+                          final d = doc.data() as Map<String, dynamic>;
+                          return DropdownMenuItem<String>(
+                            value: doc.id,
+                            child: Text(d['name'] ?? doc.id),
+                          );
+                        }),
+                      ],
+                      onChanged: (v) =>
+                          setDialogState(() => selectedClassId = v),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text('Cancel',
+                  style: TeacherTypography.bodyMedium
+                      .copyWith(color: AppColors.teacherPrimary)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  Navigator.pop(context, true);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.teacherPrimary,
+                foregroundColor: AppColors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(TeacherDimensions.radiusM)),
+              ),
+              child: const Text('Update Student'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result != true) return;
+
+    try {
+      final schoolId = widget.user.schoolId!;
+      final batch = _firestore.batch();
+
+      final studentRef = _firestore
+          .collection('schools')
+          .doc(schoolId)
+          .collection('students')
+          .doc(student.id);
+
+      final oldClassId =
+          student.classId.isNotEmpty ? student.classId : null;
+      final newClassId = selectedClassId;
+
+      batch.update(studentRef, {
+        'studentId': studentIdController.text.trim(),
+        'firstName': firstNameController.text.trim(),
+        'lastName': lastNameController.text.trim(),
+        if (newClassId != oldClassId) 'classId': newClassId,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (newClassId != oldClassId) {
+        if (oldClassId != null && oldClassId.isNotEmpty) {
+          batch.update(
+            _firestore
+                .collection('schools')
+                .doc(schoolId)
+                .collection('classes')
+                .doc(oldClassId),
+            {'studentIds': FieldValue.arrayRemove([student.id])},
+          );
+        }
+        if (newClassId != null && newClassId.isNotEmpty) {
+          batch.update(
+            _firestore
+                .collection('schools')
+                .doc(schoolId)
+                .collection('classes')
+                .doc(newClassId),
+            {'studentIds': FieldValue.arrayUnion([student.id])},
+          );
+        }
+      }
+
+      await batch.commit();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Student updated successfully'),
+          backgroundColor: AppColors.success,
+        ));
+        await _loadStudents();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error updating student: $e'),
+          backgroundColor: AppColors.error,
+        ));
+      }
+    }
+  }
+
+  Future<void> _deleteStudentWithCascade(StudentModel student) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(TeacherDimensions.radiusL)),
+        title: const Text('Delete Student'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Delete ${student.fullName}? This cannot be undone.',
+              style: TeacherTypography.bodyMedium,
+            ),
+            if (student.parentIds.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withValues(alpha: 0.1),
+                  borderRadius:
+                      BorderRadius.circular(TeacherDimensions.radiusM),
+                  border: Border.all(
+                      color: AppColors.warning.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  '${student.parentIds.length} linked parent account(s) will also be deleted if they have no other children.',
+                  style: TeacherTypography.bodySmall
+                      .copyWith(color: AppColors.warning),
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel',
+                style: TeacherTypography.bodyMedium
+                    .copyWith(color: AppColors.teacherPrimary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.error,
+              shape: RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(TeacherDimensions.radiusS)),
+            ),
+            child: Text('Delete',
+                style:
+                    TeacherTypography.buttonText.copyWith(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    try {
+      final callable = FirebaseFunctions.instance
+          .httpsCallable('deleteStudentWithCascade');
+      await callable.call({
+        'schoolId': widget.user.schoolId,
+        'studentId': student.id,
+      });
+
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Student deleted successfully'),
+          backgroundColor: AppColors.success,
+        ));
+        await _loadStudents();
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error deleting student: $e'),
+          backgroundColor: AppColors.error,
+        ));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -972,6 +1465,21 @@ class _ParentLinkingManagementScreenState
         foregroundColor: AppColors.white,
         elevation: 0,
         actions: [
+          if (_students.isNotEmpty)
+            IconButton(
+              icon: _isSendingEmails
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.white,
+                      ),
+                    )
+                  : const Icon(Icons.email),
+              tooltip: 'Send Onboarding Emails',
+              onPressed: _isSendingEmails ? null : _sendOnboardingEmails,
+            ),
           if (kDebugMode)
             IconButton(
               icon: const Icon(Icons.bug_report),
@@ -1055,7 +1563,7 @@ class _ParentLinkingManagementScreenState
                     ),
                   ).animate().fadeIn(duration: 500.ms),
 
-                // Stats card
+                // Progress + stats card
                 Padding(
                   padding: const EdgeInsets.all(8),
                   child: Container(
@@ -1066,91 +1574,231 @@ class _ParentLinkingManagementScreenState
                           BorderRadius.circular(TeacherDimensions.radiusL),
                       boxShadow: TeacherDimensions.cardShadow,
                     ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildStatItem(
-                                'Total Students',
-                                _students.length.toString(),
-                                Icons.people,
-                                AppColors.teacherPrimary,
+                    child: Builder(builder: (context) {
+                      final linked = _students
+                          .where((s) =>
+                              _onboardingStatus(s, _studentCodes[s.id]) ==
+                              'linked')
+                          .length;
+                      final inviteActive = _students
+                          .where((s) =>
+                              _onboardingStatus(s, _studentCodes[s.id]) ==
+                              'invite_active')
+                          .length;
+                      final ready = _students
+                          .where((s) =>
+                              _onboardingStatus(s, _studentCodes[s.id]) ==
+                              'ready')
+                          .length;
+                      final blocked = _students
+                          .where((s) =>
+                              _onboardingStatus(s, _studentCodes[s.id]) ==
+                              'not_enrolled')
+                          .length;
+                      final total = _students.length;
+                      final progress = total > 0 ? linked / total : 0.0;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                '$linked / $total parents linked',
+                                style: TeacherTypography.bodyMedium.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
-                            Container(
-                              width: 1,
-                              height: 40,
-                              color: AppColors.charcoal.withValues(alpha: 0.2),
-                            ),
-                            Expanded(
-                              child: _buildStatItem(
-                                'Codes Generated',
-                                _studentCodes.values
-                                    .where((c) => c != null)
-                                    .length
-                                    .toString(),
-                                Icons.qr_code,
-                                AppColors.success,
+                              const Spacer(),
+                              Text(
+                                '${total > 0 ? (progress * 100).round() : 0}%',
+                                style: TeacherTypography.bodySmall.copyWith(
+                                  color:
+                                      AppColors.charcoal.withValues(alpha: 0.6),
+                                ),
                               ),
-                            ),
-                            Container(
-                              width: 1,
-                              height: 40,
-                              color: AppColors.charcoal.withValues(alpha: 0.2),
-                            ),
-                            Expanded(
-                              child: _buildStatItem(
-                                'Parents Linked',
-                                _students
-                                    .where((s) => s.parentIds.isNotEmpty)
-                                    .length
-                                    .toString(),
-                                Icons.link,
-                                AppColors.info,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed:
-                                _isGeneratingAll ? null : _generateAllCodes,
-                            icon: _isGeneratingAll
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: AppColors.white,
-                                    ),
-                                  )
-                                : const Icon(Icons.auto_awesome),
-                            label: const Text('Generate All Missing Codes'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.teacherPrimary,
-                              foregroundColor: AppColors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(
-                                    TeacherDimensions.radiusM),
-                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: progress,
+                              minHeight: 6,
+                              backgroundColor:
+                                  AppColors.charcoal.withValues(alpha: 0.1),
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                  AppColors.success),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              _buildStatusCountChip(
+                                  'linked', 'Linked', linked, AppColors.success),
+                              const SizedBox(width: 6),
+                              _buildStatusCountChip('invite_active', 'Active',
+                                  inviteActive, AppColors.info),
+                              const SizedBox(width: 6),
+                              _buildStatusCountChip(
+                                  'ready', 'Ready', ready, AppColors.warning),
+                              const SizedBox(width: 6),
+                              _buildStatusCountChip(
+                                  'blocked',
+                                  'No Sub.',
+                                  blocked,
+                                  AppColors.charcoal.withValues(alpha: 0.45)),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: _isSendingEmails
+                                      ? null
+                                      : _sendOnboardingEmails,
+                                  icon: _isSendingEmails
+                                      ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: AppColors.white),
+                                        )
+                                      : const Icon(Icons.email, size: 18),
+                                  label: const Text('Send Invites'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.teacherPrimary,
+                                    foregroundColor: AppColors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(
+                                          TeacherDimensions.radiusM),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _isGeneratingAll
+                                      ? null
+                                      : _generateAllCodes,
+                                  icon: _isGeneratingAll
+                                      ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2),
+                                        )
+                                      : const Icon(Icons.auto_awesome, size: 18),
+                                  label: const Text('Generate Missing Codes'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppColors.teacherPrimary,
+                                    side: const BorderSide(
+                                        color: AppColors.teacherPrimary,
+                                        width: 1.5),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(
+                                          TeacherDimensions.radiusM),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      );
+                    }),
                   ),
                 ).animate().fadeIn(duration: 500.ms),
 
+                // Status filter chips
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Builder(builder: (context) {
+                    final counts = {
+                      'all': _students.length,
+                      'ready': _students
+                          .where((s) =>
+                              _onboardingStatus(s, _studentCodes[s.id]) ==
+                              'ready')
+                          .length,
+                      'invite_active': _students
+                          .where((s) =>
+                              _onboardingStatus(s, _studentCodes[s.id]) ==
+                              'invite_active')
+                          .length,
+                      'linked': _students
+                          .where((s) =>
+                              _onboardingStatus(s, _studentCodes[s.id]) ==
+                              'linked')
+                          .length,
+                      'blocked': _students
+                          .where((s) =>
+                              _onboardingStatus(s, _studentCodes[s.id]) ==
+                              'not_enrolled')
+                          .length,
+                    };
+                    return SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          for (final entry in {
+                            'all': 'All',
+                            'ready': 'Ready',
+                            'invite_active': 'Invite Active',
+                            'linked': 'Linked',
+                            'blocked': 'No Subscription',
+                          }.entries)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: FilterChip(
+                                label: Text(
+                                  '${entry.value} (${counts[entry.key]})',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                                selected: _statusFilter == entry.key,
+                                selectedColor: AppColors.teacherPrimary
+                                    .withValues(alpha: 0.15),
+                                checkmarkColor: AppColors.teacherPrimary,
+                                onSelected: (_) =>
+                                    setState(() => _statusFilter = entry.key),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 4),
+
                 // Student list
                 Expanded(
-                  child: ListView.builder(
+                  child: Builder(builder: (context) {
+                    final filteredStudents = _statusFilter == 'all'
+                        ? _students
+                        : _students.where((s) {
+                            final code = _studentCodes[s.id];
+                            final status = _onboardingStatus(s, code);
+                            switch (_statusFilter) {
+                              case 'ready':
+                                return status == 'ready';
+                              case 'invite_active':
+                                return status == 'invite_active';
+                              case 'linked':
+                                return status == 'linked';
+                              case 'blocked':
+                                return status == 'not_enrolled';
+                              default:
+                                return true;
+                            }
+                          }).toList();
+                    return ListView.builder(
                     padding: const EdgeInsets.all(8),
-                    itemCount: _students.length,
+                    itemCount: filteredStudents.length,
                     itemBuilder: (context, index) {
-                      final student = _students[index];
+                      final student = filteredStudents[index];
                       final code = _studentCodes[student.id];
 
                       return Padding(
@@ -1180,26 +1828,75 @@ class _ParentLinkingManagementScreenState
                               style: TeacherTypography.bodyMedium
                                   .copyWith(fontWeight: FontWeight.bold),
                             ),
-                            subtitle: Text(
-                              code != null
-                                  ? 'Code: ${code.code} • ${student.parentIds.isEmpty ? "Not linked" : "${student.parentIds.length} parent(s) linked"}'
-                                  : 'No code generated',
-                              style: TeacherTypography.bodySmall.copyWith(
-                                color: code != null
-                                    ? AppColors.success
-                                    : AppColors.charcoal.withValues(alpha: 0.6),
-                              ),
+                            subtitle: Builder(builder: (context) {
+                              final status =
+                                  _onboardingStatus(student, code);
+                              final statusColor =
+                                  _onboardingStatusColor(status);
+                              return Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: statusColor.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      _onboardingStatusLabel(status),
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: statusColor,
+                                      ),
+                                    ),
+                                  ),
+                                  if (student.parentEmail != null &&
+                                      student.parentEmail!.isNotEmpty) ...[
+                                    const SizedBox(width: 6),
+                                    Flexible(
+                                      child: Text(
+                                        student.parentEmail!,
+                                        style:
+                                            TeacherTypography.bodySmall.copyWith(
+                                          color: AppColors.charcoal
+                                              .withValues(alpha: 0.5),
+                                          fontSize: 10,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              );
+                            }),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  student.parentIds.isNotEmpty
+                                      ? Icons.check_circle
+                                      : code != null
+                                          ? Icons.pending
+                                          : Icons.radio_button_unchecked,
+                                  color: _onboardingStatusColor(
+                                      _onboardingStatus(student, code)),
+                                  size: 20,
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.edit_outlined, size: 20),
+                                  color: AppColors.teacherPrimary,
+                                  tooltip: 'Edit student',
+                                  onPressed: () => _showEditStudentDialog(student),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, size: 20),
+                                  color: AppColors.error,
+                                  tooltip: 'Delete student',
+                                  onPressed: () => _deleteStudentWithCascade(student),
+                                ),
+                              ],
                             ),
-                            trailing: code != null
-                                ? Icon(
-                                    student.parentIds.isNotEmpty
-                                        ? Icons.check_circle
-                                        : Icons.pending,
-                                    color: student.parentIds.isNotEmpty
-                                        ? AppColors.success
-                                        : AppColors.warning,
-                                  )
-                                : null,
                             children: [
                               Padding(
                                 padding: const EdgeInsets.all(8),
@@ -1401,6 +2098,48 @@ class _ParentLinkingManagementScreenState
                                         ),
                                       ),
                                     ],
+                                    // Enrollment status section
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Subscription Status',
+                                      style: TeacherTypography.bodySmall
+                                          .copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.charcoal
+                                            .withValues(alpha: 0.6),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Wrap(
+                                      spacing: 6,
+                                      children: [
+                                        for (final entry in {
+                                          'book_pack': 'Confirmed',
+                                          'direct_purchase': 'Confirmed (Direct)',
+                                          'not_enrolled': 'No Subscription',
+                                          'pending': 'Pending',
+                                        }.entries)
+                                          ChoiceChip(
+                                            label: Text(
+                                              entry.value,
+                                              style: const TextStyle(
+                                                  fontSize: 11),
+                                            ),
+                                            selected:
+                                                (student.enrollmentStatus ??
+                                                        'pending') ==
+                                                    entry.key,
+                                            selectedColor:
+                                                _enrollmentColor(entry.key)
+                                                    .withValues(alpha: 0.2),
+                                            onSelected: (_) =>
+                                                _updateEnrollmentStatus(
+                                                    student.id, entry.key),
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                          ),
+                                      ],
+                                    ),
                                   ],
                                 ),
                               ),
@@ -1409,34 +2148,49 @@ class _ParentLinkingManagementScreenState
                         ),
                       ).animate().fadeIn(delay: (index * 50).ms);
                     },
-                  ),
+                  );
+                  }),
                 ),
               ],
             ),
     );
   }
 
-  Widget _buildStatItem(
-      String label, String value, IconData icon, Color color) {
-    return Column(
-      children: [
-        Icon(icon, color: color, size: 24),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: TeacherTypography.h1.copyWith(
-            color: color,
-            fontWeight: FontWeight.bold,
+  Widget _buildStatusCountChip(
+      String filterKey, String label, int count, Color color) {
+    final isSelected = _statusFilter == filterKey;
+    return GestureDetector(
+      onTap: () => setState(() => _statusFilter = filterKey),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? color.withValues(alpha: 0.15)
+              : color.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? color : color.withValues(alpha: 0.3),
+            width: isSelected ? 1.5 : 1,
           ),
         ),
-        Text(
-          label,
-          style: TeacherTypography.bodySmall.copyWith(
-            color: AppColors.charcoal.withValues(alpha: 0.6),
-          ),
-          textAlign: TextAlign.center,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              count.toString(),
+              style: TeacherTypography.bodySmall.copyWith(
+                color: color,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TeacherTypography.bodySmall.copyWith(color: color),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 

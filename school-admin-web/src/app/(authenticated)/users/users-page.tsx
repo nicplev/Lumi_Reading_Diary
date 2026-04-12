@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from 'react';
 import { PageHeader } from '@/components/lumi/page-header';
-import { Tabs } from '@/components/lumi/tabs';
 import { Button } from '@/components/lumi/button';
 import { Badge } from '@/components/lumi/badge';
 import { Avatar } from '@/components/lumi/avatar';
@@ -13,7 +12,8 @@ import { DataTable, type DataTableColumn } from '@/components/lumi/data-table';
 import { ConfirmDialog } from '@/components/lumi/confirm-dialog';
 import { useToast } from '@/components/lumi/toast';
 import { useAuth } from '@/lib/auth/auth-context';
-import { useUsers, useDeactivateUser, useReactivateUser, useResetPassword } from '@/lib/hooks/use-users';
+import { useUsers, useDeactivateUser, useReactivateUser, useResetPassword, useMarkUserForDeletion, useUndoDeleteUser } from '@/lib/hooks/use-users';
+import { KebabMenu } from '@/components/lumi/kebab-menu';
 import { CreateUserModal } from './create-user-modal';
 
 type SerializedUser = NonNullable<ReturnType<typeof useUsers>['data']>[number];
@@ -25,39 +25,29 @@ export function UsersPage() {
   const deactivate = useDeactivateUser();
   const reactivate = useReactivateUser();
   const resetPassword = useResetPassword();
+  const markForDeletion = useMarkUserForDeletion();
+  const undoDelete = useUndoDeleteUser();
 
-  const [activeTab, setActiveTab] = useState('staff');
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [deactivateConfirm, setDeactivateConfirm] = useState<string | null>(null);
   const [resetConfirm, setResetConfirm] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<SerializedUser | null>(null);
 
   const staff = useMemo(() => {
     if (!allUsers) return [];
     return allUsers.filter((u) => u.role === 'teacher' || u.role === 'schoolAdmin');
   }, [allUsers]);
 
-  const parents = useMemo(() => {
-    if (!allUsers) return [];
-    return allUsers.filter((u) => u.role === 'parent');
-  }, [allUsers]);
-
-  const currentList = activeTab === 'staff' ? staff : parents;
-
   const filtered = useMemo(() => {
-    if (!search.trim()) return currentList;
+    if (!search.trim()) return staff;
     const q = search.toLowerCase().trim();
-    return currentList.filter(
+    return staff.filter(
       (u) =>
         u.fullName.toLowerCase().includes(q) ||
         u.email.toLowerCase().includes(q)
     );
-  }, [currentList, search]);
-
-  const tabs = [
-    { id: 'staff', label: 'Staff', count: staff.length, icon: <Icon name="group" size={18} /> },
-    { id: 'parents', label: 'Parents', count: parents.length, icon: <Icon name="family_restroom" size={18} /> },
-  ];
+  }, [staff, search]);
 
   const handleDeactivate = async () => {
     if (!deactivateConfirm) return;
@@ -76,6 +66,26 @@ export function UsersPage() {
       toast('User reactivated', 'success');
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Failed to reactivate', 'error');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteConfirm) return;
+    try {
+      await markForDeletion.mutateAsync(deleteConfirm.id);
+      toast(`${deleteConfirm.fullName} scheduled for deletion in 24 hours`, 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to schedule deletion', 'error');
+    }
+    setDeleteConfirm(null);
+  };
+
+  const handleUndoDelete = async (userId: string) => {
+    try {
+      await undoDelete.mutateAsync(userId);
+      toast('Deletion cancelled', 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to cancel deletion', 'error');
     }
   };
 
@@ -145,78 +155,43 @@ export function UsersPage() {
           return <Badge variant="default">You</Badge>;
         }
         if (!isAdmin) return null;
+
+        if (row.pendingDeletion) {
+          const hoursLeft = row.scheduledDeletionAt
+            ? Math.max(0, Math.ceil((new Date(row.scheduledDeletionAt).getTime() - Date.now()) / (1000 * 60 * 60)))
+            : 24;
+          return (
+            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+              <Badge variant="warning">Deleting in {hoursLeft}h</Badge>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleUndoDelete(row.id)}
+                className="text-amber-600 hover:text-amber-700"
+              >
+                Undo Delete
+              </Button>
+            </div>
+          );
+        }
+
         return (
-          <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-            {row.role !== 'parent' && (
-              <Button variant="ghost" size="sm" onClick={() => setResetConfirm(row.id)}>
-                Reset PW
-              </Button>
-            )}
-            {row.isActive ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setDeactivateConfirm(row.id)}
-                className="text-error hover:text-error"
-              >
-                Deactivate
-              </Button>
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleReactivate(row.id)}
-                className="text-mint-green-dark"
-              >
-                Reactivate
-              </Button>
-            )}
-          </div>
+          <KebabMenu
+            items={row.isActive
+              ? [
+                  { label: 'Reset Password', onClick: () => setResetConfirm(row.id) },
+                  { label: 'Deactivate', onClick: () => setDeactivateConfirm(row.id), variant: 'danger' },
+                ]
+              : [
+                  { label: 'Reset Password', onClick: () => setResetConfirm(row.id) },
+                  { label: 'Reactivate', onClick: () => handleReactivate(row.id) },
+                  { label: 'Delete', onClick: () => setDeleteConfirm(row), variant: 'danger' },
+                ]
+            }
+          />
         );
       },
       className: 'text-right',
-    },
-  ];
-
-  const parentColumns: DataTableColumn<SerializedUser>[] = [
-    {
-      id: 'name',
-      header: 'Name',
-      accessorFn: (row) => row.fullName,
-      cell: (value, row) => (
-        <div className="flex items-center gap-3">
-          <Avatar name={value as string} size="sm" />
-          <div>
-            <p className="font-semibold text-charcoal">{value as string}</p>
-            <p className="text-xs text-text-secondary">{row.email}</p>
-          </div>
-        </div>
-      ),
-      sortable: true,
-    },
-    {
-      id: 'status',
-      header: 'Status',
-      accessorFn: (row) => row.isActive,
-      cell: (value) => (
-        <Badge variant={value ? 'success' : 'default'}>
-          {value ? 'Active' : 'Inactive'}
-        </Badge>
-      ),
-    },
-    {
-      id: 'lastLogin',
-      header: 'Last Login',
-      accessorFn: (row) => row.lastLoginAt,
-      cell: (value) => value ? new Date(value as string).toLocaleDateString() : 'Never',
-      sortable: true,
-    },
-    {
-      id: 'created',
-      header: 'Joined',
-      accessorFn: (row) => row.createdAt,
-      cell: (value) => new Date(value as string).toLocaleDateString(),
-      sortable: true,
     },
   ];
 
@@ -224,7 +199,7 @@ export function UsersPage() {
     <div>
       <PageHeader
         title="Users"
-        description="Manage school staff and parents"
+        description="Manage school staff"
         action={
           isAdmin ? (
             <Button onClick={() => setShowCreate(true)}>
@@ -234,28 +209,20 @@ export function UsersPage() {
         }
       />
 
-      <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
-
-      <div className="mt-4 mb-4">
+      <div className="mb-4">
         <SearchInput value={search} onChange={setSearch} placeholder="Search by name or email..." />
       </div>
 
       <DataTable
-        columns={activeTab === 'staff' ? staffColumns : parentColumns}
+        columns={staffColumns}
         data={filtered}
         loading={isLoading}
         emptyState={
           <EmptyState
-            icon={activeTab === 'staff' ? <Icon name="group" size={40} /> : <Icon name="family_restroom" size={40} />}
-            title={search ? 'No users found' : `No ${activeTab === 'staff' ? 'staff members' : 'parents'}`}
-            description={
-              activeTab === 'staff' && isAdmin
-                ? 'Add staff members to get started.'
-                : activeTab === 'parents'
-                ? 'Parents will appear here once they link via codes.'
-                : undefined
-            }
-            action={activeTab === 'staff' && isAdmin ? <Button onClick={() => setShowCreate(true)}>Add Staff Member</Button> : undefined}
+            icon={<Icon name="group" size={40} />}
+            title={search ? 'No users found' : 'No staff members'}
+            description={isAdmin ? 'Add staff members to get started.' : undefined}
+            action={isAdmin ? <Button onClick={() => setShowCreate(true)}>Add Staff Member</Button> : undefined}
           />
         }
       />
@@ -287,6 +254,17 @@ export function UsersPage() {
         confirmLabel="Generate Reset Link"
         variant="warning"
         loading={resetPassword.isPending}
+      />
+
+      <ConfirmDialog
+        open={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={handleDelete}
+        title="Delete User"
+        description={`Permanently delete ${deleteConfirm?.fullName ?? 'this user'}? Their account and data will be removed in 24 hours. You can undo this within that window.`}
+        confirmLabel="Schedule Deletion"
+        variant="danger"
+        loading={markForDeletion.isPending}
       />
     </div>
   );

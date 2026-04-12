@@ -8,6 +8,8 @@ import '../../core/theme/lumi_spacing.dart';
 import '../../core/theme/lumi_borders.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_card.dart';
+import '../../core/widgets/lumi/student_avatar.dart';
+import 'widgets/character_picker_sheet.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
@@ -440,17 +442,36 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                 ),
                 child: Row(
                   children: [
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundColor:
-                          AppColors.rosePink.withValues(alpha: 0.1),
-                      child: Text(
-                        child.firstName.isNotEmpty
-                            ? child.firstName[0].toUpperCase()
-                            : '?',
-                        style: LumiTextStyles.bodyMedium(
-                          color: AppColors.rosePink,
-                        ),
+                    GestureDetector(
+                      onTap: () => showCharacterPicker(
+                        context,
+                        student: child,
+                        schoolId: widget.user.schoolId ?? '',
+                        onChanged: (updated) {
+                          setState(() {
+                            final idx = _linkedChildren.indexWhere((c) => c.id == updated.id);
+                            if (idx != -1) _linkedChildren[idx] = updated;
+                          });
+                        },
+                      ),
+                      child: Stack(
+                        children: [
+                          StudentAvatar.fromStudent(child, size: 40),
+                          Positioned(
+                            right: 0,
+                            bottom: 0,
+                            child: Container(
+                              width: 16,
+                              height: 16,
+                              decoration: BoxDecoration(
+                                color: AppColors.rosePink,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 1.5),
+                              ),
+                              child: const Icon(Icons.edit, size: 9, color: Colors.white),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     LumiGap.horizontalS,
@@ -679,8 +700,83 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                 );
               }),
             ),
+            LumiGap.s,
+            // Reminder preview
+            _buildReminderPreview(),
+            LumiGap.xs,
+            // Test notification button
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => NotificationService.instance.testNotification(),
+                icon: Icon(
+                  Icons.send_outlined,
+                  size: 16,
+                  color: AppColors.charcoal.withValues(alpha: 0.5),
+                ),
+                label: Text(
+                  'Send test',
+                  style: LumiTextStyles.bodySmall(
+                    color: AppColors.charcoal.withValues(alpha: 0.5),
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: LumiSpacing.xs,
+                    vertical: LumiSpacing.xxs,
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildReminderPreview() {
+    final String exampleName;
+    final String suffix;
+    if (_linkedChildren.isEmpty) {
+      exampleName = 'your child';
+      suffix = '';
+    } else if (_linkedChildren.length == 1) {
+      exampleName = _linkedChildren.first.firstName;
+      suffix = '';
+    } else {
+      exampleName = _linkedChildren.first.firstName;
+      suffix = ' (and ${_linkedChildren.length - 1} more)';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: LumiSpacing.s,
+        vertical: LumiSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.charcoal.withValues(alpha: 0.04),
+        borderRadius: LumiBorders.medium,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.notifications_active_outlined,
+            size: 15,
+            color: AppColors.charcoal.withValues(alpha: 0.4),
+          ),
+          LumiGap.horizontalXXS,
+          Expanded(
+            child: Text(
+              '"Don\'t forget to log $exampleName\'s reading today!"$suffix',
+              style: LumiTextStyles.bodySmall(
+                color: AppColors.charcoal.withValues(alpha: 0.55),
+              ).copyWith(fontStyle: FontStyle.italic),
+            ),
+          ),
+        ],
       ),
     );
   }

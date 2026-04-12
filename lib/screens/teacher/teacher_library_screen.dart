@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,6 +15,7 @@ import '../../core/widgets/lumi/lumi_skeleton.dart';
 import '../../core/widgets/lumi/persistent_cached_image.dart';
 import '../../core/widgets/lumi/teacher_filter_chip.dart';
 import '../../data/models/book_model.dart';
+import '../../data/models/school_model.dart';
 import '../../data/models/user_model.dart';
 import '../../services/community_book_service.dart';
 import '../../services/school_library_assignment_service.dart';
@@ -162,7 +164,9 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
               final assignmentSummary =
                   assignmentSnapshot.data ?? const LibraryAssignmentSnapshot();
 
-              return CustomScrollView(
+              return Stack(
+                children: [
+                CustomScrollView(
                 slivers: [
                   // ── Header ────────────────────────────────────────────────
                   SliverToBoxAdapter(
@@ -173,7 +177,6 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
                         visibleCount: visibleCount,
                         decodableCount: decodableCount,
                         hiddenCount: hiddenCount,
-                        onAddBook: _openAddBook,
                       ),
                     ),
                   ),
@@ -217,6 +220,8 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
                               ),
                               isActive: _activeFilter == f,
                               onTap: () => setState(() => _activeFilter = f),
+                              icon: _filterIcon(f),
+                              activeColor: _filterColor(f),
                             );
                           },
                         ),
@@ -245,6 +250,54 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
 
                   const SliverToBoxAdapter(child: SizedBox(height: 100)),
                 ],
+              ),
+                // ── Scan FAB ───────────────────────────────────────────
+                Positioned(
+                  right: 16,
+                  bottom: 20,
+                  child: FloatingActionButton(
+                    heroTag: 'library_add_book_fab',
+                    onPressed: _openAddBook,
+                    backgroundColor: Colors.transparent,
+                    elevation: 0,
+                    highlightElevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Container(
+                      width: 68,
+                      height: 68,
+                      decoration: BoxDecoration(
+                        gradient: AppColors.teacherGradient,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: AppColors.white,
+                          width: 3,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.teacherPrimary.withValues(alpha: 0.45),
+                            blurRadius: 20,
+                            spreadRadius: 0,
+                            offset: const Offset(0, 6),
+                          ),
+                          BoxShadow(
+                            color: AppColors.charcoal.withValues(alpha: 0.18),
+                            blurRadius: 10,
+                            spreadRadius: -2,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.document_scanner_outlined,
+                        color: AppColors.white,
+                        size: 28,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               );
             },
           );
@@ -274,6 +327,34 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
     }
   }
 
+  IconData? _filterIcon(String filter) {
+    switch (filter) {
+      case 'All':
+        return Icons.grid_view_rounded;
+      case 'Decodable':
+        return Icons.auto_stories_outlined;
+      case 'Library':
+        return Icons.local_library_outlined;
+      case 'Recently Added':
+        return Icons.schedule_rounded;
+      case 'Hidden':
+        return Icons.visibility_off_outlined;
+      default:
+        return null;
+    }
+  }
+
+  Color? _filterColor(String filter) {
+    switch (filter) {
+      case 'Library':
+        return AppColors.libraryGreen;
+      case 'Hidden':
+        return AppColors.textSecondary;
+      default:
+        return null; // uses default teacherPrimary
+    }
+  }
+
   // ── Tier sections (LLLL stages + library books) ──────────────────────────
 
   List<Widget> _buildTierSections(
@@ -282,26 +363,87 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
   }) {
     final slivers = <Widget>[];
     final stageGroups = SchoolLibraryService.groupDecodableByStage(books);
+    var sectionIndex = 0;
 
     for (final entry in stageGroups.entries) {
-      slivers.add(SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
-          child:
-              _StageSectionHeader(stage: entry.key, count: entry.value.length),
+      // Colored divider between sections (skip first)
+      if (sectionIndex > 0) {
+        final dividerColor =
+            Color(SchoolLibraryService.stageColor(entry.key));
+        slivers.add(SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 10, 24, 10),
+            child: _SectionDivider(color: dividerColor),
+          ),
+        ));
+      }
+      final headerWidget = Padding(
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+        child: _StageSectionHeader(
+            stage: entry.key, count: entry.value.length),
+      );
+      final animateHeaders =
+          !MediaQuery.of(context).disableAnimations;
+      slivers.add(SliverPersistentHeader(
+        pinned: true,
+        delegate: _StickySectionHeaderDelegate(
+          child: animateHeaders
+              ? headerWidget
+                  .animate()
+                  .fadeIn(
+                    delay: Duration(milliseconds: sectionIndex * 80),
+                    duration: 250.ms,
+                    curve: Curves.easeOut,
+                  )
+                  .move(
+                    begin: const Offset(-16, 0),
+                    end: Offset.zero,
+                    duration: 250.ms,
+                    curve: Curves.easeOutCubic,
+                  )
+              : headerWidget,
         ),
       ));
       slivers.add(_bookGrid(entry.value, assignmentSummary: assignmentSummary));
       slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 8)));
+      sectionIndex++;
     }
 
     if (_activeFilter == 'All') {
       final libBooks = SchoolLibraryService.libraryBooks(books);
       if (libBooks.isNotEmpty) {
-        slivers.add(SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-            child: _LibrarySectionHeader(count: libBooks.length),
+        if (sectionIndex > 0) {
+          slivers.add(SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 10, 24, 10),
+              child: _SectionDivider(color: AppColors.libraryGreen),
+            ),
+          ));
+        }
+        final libHeader = Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+          child: _LibrarySectionHeader(count: libBooks.length),
+        );
+        final animateLib =
+            !MediaQuery.of(context).disableAnimations;
+        slivers.add(SliverPersistentHeader(
+          pinned: true,
+          delegate: _StickySectionHeaderDelegate(
+            child: animateLib
+                ? libHeader
+                    .animate()
+                    .fadeIn(
+                      delay: Duration(milliseconds: sectionIndex * 80),
+                      duration: 250.ms,
+                      curve: Curves.easeOut,
+                    )
+                    .move(
+                      begin: const Offset(-16, 0),
+                      end: Offset.zero,
+                      duration: 250.ms,
+                      curve: Curves.easeOutCubic,
+                    )
+                : libHeader,
           ),
         ));
         slivers.add(_bookGrid(libBooks, assignmentSummary: assignmentSummary));
@@ -335,12 +477,19 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
             final book = books[i];
             final assignedCount =
                 assignmentSummary.currentAssignedCountForBook(book);
-            final card = _LibraryBookCard(
-              book: book,
-              currentAssignedCount: assignedCount,
-              onTap: () => _showBookDetail(
-                book,
+            final card = Builder(
+              builder: (cardContext) => _LibraryBookCard(
+                book: book,
                 currentAssignedCount: assignedCount,
+                onTap: () => _showBookDetail(
+                  book,
+                  currentAssignedCount: assignedCount,
+                ),
+                onLongPress: () => _showBookContextMenu(
+                  cardContext,
+                  book,
+                  currentAssignedCount: assignedCount,
+                ),
               ),
             );
 
@@ -468,6 +617,97 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
       ),
     );
   }
+
+  void _showBookContextMenu(
+    BuildContext cardContext,
+    BookModel book, {
+    required int currentAssignedCount,
+  }) async {
+    HapticFeedback.mediumImpact();
+    final renderBox = cardContext.findRenderObject() as RenderBox;
+    final overlay =
+        Overlay.of(cardContext).context.findRenderObject() as RenderBox;
+    final position = RelativeRect.fromRect(
+      Rect.fromPoints(
+        renderBox.localToGlobal(Offset.zero, ancestor: overlay),
+        renderBox.localToGlobal(renderBox.size.bottomRight(Offset.zero),
+            ancestor: overlay),
+      ),
+      Offset.zero & overlay.size,
+    );
+
+    final isHidden = _hiddenBookIds.contains(book.id);
+
+    final result = await showMenu<String>(
+      context: cardContext,
+      position: position,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+      color: AppColors.white,
+      elevation: 8,
+      items: [
+        const PopupMenuItem(
+          value: 'detail',
+          child: Row(
+            children: [
+              Icon(Icons.info_outline_rounded, size: 18),
+              SizedBox(width: 10),
+              Text('View Details'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'hide',
+          child: Row(
+            children: [
+              Icon(
+                isHidden
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+                size: 18,
+              ),
+              const SizedBox(width: 10),
+              Text(isHidden ? 'Unhide' : 'Hide'),
+            ],
+          ),
+        ),
+        if (book.isbn != null && book.isbn!.isNotEmpty)
+          PopupMenuItem(
+            value: 'isbn',
+            child: Row(
+              children: [
+                const Icon(Icons.copy_rounded, size: 18),
+                const SizedBox(width: 10),
+                Text('Copy ISBN'),
+              ],
+            ),
+          ),
+      ],
+    );
+
+    if (!mounted || result == null) return;
+
+    switch (result) {
+      case 'detail':
+        _showBookDetail(book, currentAssignedCount: currentAssignedCount);
+        break;
+      case 'hide':
+        await _toggleHideBook(book.id);
+        break;
+      case 'isbn':
+        await Clipboard.setData(ClipboardData(text: book.isbn!));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('ISBN copied: ${book.isbn}'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+        break;
+    }
+  }
 }
 
 class _LibraryHeader extends StatelessWidget {
@@ -476,14 +716,12 @@ class _LibraryHeader extends StatelessWidget {
     required this.visibleCount,
     required this.decodableCount,
     required this.hiddenCount,
-    required this.onAddBook,
   });
 
   final bool isLoading;
   final int visibleCount;
   final int decodableCount;
   final int hiddenCount;
-  final VoidCallback onAddBook;
 
   @override
   Widget build(BuildContext context) {
@@ -491,65 +729,44 @@ class _LibraryHeader extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        gradient: AppColors.teacherGradient,
         borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
-        border: Border.all(color: AppColors.teacherBorder),
-        boxShadow: TeacherDimensions.cardShadow,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.teacherPrimary.withValues(alpha: 0.28),
+            blurRadius: 20,
+            spreadRadius: -6,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Book Library', style: TeacherTypography.h1),
-                    const SizedBox(height: 4),
-                    isLoading
-                        ? const LumiSkeleton(width: 188, height: 16)
-                        : Text(
-                            '$visibleCount $bookLabel in your school library',
-                            style: TeacherTypography.bodyMedium.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              SizedBox(
-                height: 44,
-                child: FilledButton.icon(
-                  onPressed: onAddBook,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.teacherPrimary,
-                    foregroundColor: AppColors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(TeacherDimensions.radiusL),
-                    ),
-                  ),
-                  icon: const Icon(Icons.document_scanner_outlined, size: 18),
-                  label: Text(
-                    'Add Book',
-                    style: TeacherTypography.bodyMedium.copyWith(
-                      color: AppColors.white,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          Text(
+            'Library',
+            style: TeacherTypography.h1.copyWith(color: AppColors.white),
           ),
+          const SizedBox(height: 3),
+          isLoading
+              ? Container(
+                  width: 160,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: AppColors.white.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                )
+              : Text(
+                  '$visibleCount $bookLabel in your school library',
+                  style: TeacherTypography.bodyMedium.copyWith(
+                    color: AppColors.white.withValues(alpha: 0.90),
+                  ),
+                ),
           if (!isLoading && (decodableCount > 0 || hiddenCount > 0)) ...[
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -559,13 +776,11 @@ class _LibraryHeader extends StatelessWidget {
                     icon: Icons.auto_stories_outlined,
                     label:
                         '$decodableCount decodable${decodableCount == 1 ? '' : 's'}',
-                    color: AppColors.teacherPrimary,
                   ),
                 if (hiddenCount > 0)
                   _HeaderMetricPill(
                     icon: Icons.visibility_off_outlined,
                     label: '$hiddenCount hidden',
-                    color: AppColors.textSecondary,
                   ),
               ],
             ),
@@ -580,31 +795,31 @@ class _HeaderMetricPill extends StatelessWidget {
   const _HeaderMetricPill({
     required this.icon,
     required this.label,
-    required this.color,
   });
 
   final IconData icon;
   final String label;
-  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
+        color: AppColors.white.withValues(alpha: 0.22),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.16)),
+        border: Border.all(
+          color: AppColors.white.withValues(alpha: 0.30),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: color),
+          Icon(icon, size: 14, color: AppColors.white),
           const SizedBox(width: 6),
           Text(
             label,
             style: TeacherTypography.caption.copyWith(
-              color: color,
+              color: AppColors.white,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -736,11 +951,22 @@ class _LibrarySearchBarState extends State<_LibrarySearchBar>
                 hintStyle: TeacherTypography.bodyMedium.copyWith(
                   color: AppColors.textSecondary.withValues(alpha: 0.65),
                 ),
-                prefixIcon: Icon(
-                  Icons.search_rounded,
-                  color: isActive
-                      ? AppColors.teacherPrimary
-                      : AppColors.textSecondary.withValues(alpha: 0.58),
+                prefixIcon: AnimatedBuilder(
+                  animation: _fillController,
+                  builder: (context, child) {
+                    final t = Curves.elasticOut
+                        .transform(_fillController.value.clamp(0.0, 1.0));
+                    return Transform.scale(
+                      scale: 1.0 + 0.15 * t,
+                      child: child,
+                    );
+                  },
+                  child: Icon(
+                    Icons.search_rounded,
+                    color: isActive
+                        ? AppColors.teacherPrimary
+                        : AppColors.textSecondary.withValues(alpha: 0.58),
+                  ),
                 ),
                 suffixIcon: hasQuery
                     ? IconButton(
@@ -862,6 +1088,69 @@ class _LibraryStateCard extends StatelessWidget {
 // Section headers
 // ─────────────────────────────────────────────────────────────────────────────
 
+class _StickySectionHeaderDelegate extends SliverPersistentHeaderDelegate {
+  _StickySectionHeaderDelegate({required this.child});
+
+  final Widget child;
+
+  @override
+  double get minExtent => 52;
+  @override
+  double get maxExtent => 52;
+
+  @override
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      color: overlapsContent || shrinkOffset > 0
+          ? AppColors.teacherBackground.withValues(alpha: 0.96)
+          : Colors.transparent,
+      child: child,
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _StickySectionHeaderDelegate oldDelegate) =>
+      child != oldDelegate.child;
+}
+
+class _SectionDivider extends StatelessWidget {
+  const _SectionDivider({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 1,
+            color: color.withValues(alpha: 0.18),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.50),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Container(
+            height: 1,
+            color: color.withValues(alpha: 0.18),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _StageSectionHeader extends StatelessWidget {
   const _StageSectionHeader({required this.stage, required this.count});
 
@@ -956,25 +1245,78 @@ class _LibrarySectionTitle extends StatelessWidget {
 // Grid book card
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _LibraryBookCard extends StatelessWidget {
+class _LibraryBookCard extends StatefulWidget {
   const _LibraryBookCard({
     required this.book,
     required this.currentAssignedCount,
     required this.onTap,
+    this.onLongPress,
   });
 
   final BookModel book;
   final int currentAssignedCount;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+
+  @override
+  State<_LibraryBookCard> createState() => _LibraryBookCardState();
+}
+
+class _LibraryBookCardState extends State<_LibraryBookCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _scaleController;
+  late final Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _scaleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 80),
+      reverseDuration: const Duration(milliseconds: 140),
+      lowerBound: 0.0,
+      upperBound: 1.0,
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.96).animate(
+      CurvedAnimation(parent: _scaleController, curve: Curves.easeOutCubic),
+    );
+  }
+
+  @override
+  void dispose() {
+    _scaleController.dispose();
+    super.dispose();
+  }
+
+  void _onTapDown(TapDownDetails _) {
+    _scaleController.forward();
+    HapticFeedback.lightImpact();
+  }
+
+  void _onTapUp(TapUpDetails _) {
+    _scaleController.reverse();
+    widget.onTap();
+  }
+
+  void _onTapCancel() {
+    _scaleController.reverse();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final book = widget.book;
     final isDecodable = SchoolLibraryService.isDecodable(book);
     final stageColor = isDecodable
         ? Color(SchoolLibraryService.stageColor(book.readingLevel ?? ''))
         : AppColors.libraryGreen;
 
-    return Container(
+    return AnimatedBuilder(
+      animation: _scaleAnimation,
+      builder: (context, child) => Transform.scale(
+        scale: _scaleAnimation.value,
+        child: child,
+      ),
+      child: Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
@@ -1001,8 +1343,11 @@ class _LibraryBookCard extends StatelessWidget {
           ),
         ),
         clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
+        child: GestureDetector(
+          onTapDown: _onTapDown,
+          onTapUp: _onTapUp,
+          onTapCancel: _onTapCancel,
+          onLongPress: widget.onLongPress,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1010,13 +1355,13 @@ class _LibraryBookCard extends StatelessWidget {
                 child: _BookCoverWidget(
                   book: book,
                   stageColor: stageColor,
-                  currentAssignedCount: currentAssignedCount,
+                  currentAssignedCount: widget.currentAssignedCount,
                 ),
               ),
               SizedBox(
                 height: 54,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(9, 7, 9, 7),
+                  padding: const EdgeInsets.fromLTRB(9, 7, 9, 5),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1030,22 +1375,25 @@ class _LibraryBookCard extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const Spacer(),
-                      Container(
-                        width: 24,
-                        height: 3,
-                        decoration: BoxDecoration(
-                          color: stageColor.withValues(alpha: 0.75),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ),
                     ],
+                  ),
+                ),
+              ),
+              // Full-width stage color bar
+              Container(
+                height: 4,
+                decoration: BoxDecoration(
+                  color: stageColor.withValues(alpha: 0.80),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(16),
+                    bottomRight: Radius.circular(16),
                   ),
                 ),
               ),
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -1065,6 +1413,8 @@ class _BookCoverWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasCover = book.coverImageUrl?.startsWith('http') == true;
+    final placeholder = _placeholder(stageColor, book.title);
+    final isNew = DateTime.now().difference(book.createdAt).inHours < 24;
     return Stack(
       children: [
         Positioned.fill(
@@ -1074,11 +1424,39 @@ class _BookCoverWidget extends StatelessWidget {
                 ? PersistentCachedImage(
                     imageUrl: book.coverImageUrl!,
                     fit: BoxFit.cover,
-                    fallback: _placeholder(stageColor),
+                    fallback: placeholder,
                   )
-                : _placeholder(stageColor),
+                : placeholder,
           ),
         ),
+        if (isNew)
+          Positioned(
+            top: 6,
+            left: 6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.warmOrange,
+                borderRadius: BorderRadius.circular(6),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.warmOrange.withValues(alpha: 0.35),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Text(
+                'NEW',
+                style: TeacherTypography.caption.copyWith(
+                  color: AppColors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 8,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ),
         if (currentAssignedCount > 0)
           Positioned(
             top: 8,
@@ -1089,33 +1467,47 @@ class _BookCoverWidget extends StatelessWidget {
     );
   }
 
-  Widget _placeholder(Color color) => Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              color.withValues(alpha: 0.22),
-              AppColors.white.withValues(alpha: 0.40),
-            ],
-          ),
+  Widget _placeholder(Color color, String title) {
+    final letter = title.isNotEmpty ? title[0].toUpperCase() : '';
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withValues(alpha: 0.40),
+            AppColors.white.withValues(alpha: 0.55),
+          ],
         ),
-        child: Center(
-          child: Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: AppColors.white.withValues(alpha: 0.58),
-              borderRadius: BorderRadius.circular(18),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Large watermark letter
+          if (letter.isNotEmpty)
+            Text(
+              letter,
+              style: TextStyle(
+                fontFamily: 'Nunito',
+                fontSize: 48,
+                fontWeight: FontWeight.w900,
+                color: AppColors.white.withValues(alpha: 0.45),
+                height: 1,
+              ),
             ),
+          // Small book icon below
+          Positioned(
+            bottom: 10,
             child: Icon(
               Icons.menu_book_rounded,
-              color: color.withValues(alpha: 0.74),
-              size: 30,
+              color: color.withValues(alpha: 0.40),
+              size: 18,
             ),
           ),
-        ),
-      );
+        ],
+      ),
+    );
+  }
 }
 
 class _AssignedBadge extends StatelessWidget {
@@ -1223,6 +1615,11 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
   String? _uploadedCoverUrl;
   bool _isCoverOwner = false;
 
+  // School-level schema data, fetched once on open.
+  String? _schoolLevelSchemaKey; // e.g. 'pmBenchmark', 'aToZ', 'none'
+  List<String> _schoolLevels = [];
+  bool _isSettingLevel = false;
+
   bool get _isCommunityBook =>
       widget.book.metadata?['source'] == 'community_books';
 
@@ -1235,6 +1632,65 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
   void initState() {
     super.initState();
     _checkCoverOwnership();
+    _fetchSchoolLevelData();
+  }
+
+  Future<void> _fetchSchoolLevelData() async {
+    final schoolId = widget.teacher.schoolId;
+    if (schoolId == null || schoolId.isEmpty) return;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('schools')
+          .doc(schoolId)
+          .get();
+      if (!mounted) return;
+      final data = doc.data();
+      if (data == null) return;
+
+      final school = SchoolModel.fromFirestore(doc);
+      if (!mounted) return;
+      setState(() {
+        _schoolLevelSchemaKey = school.levelSchema.name; // e.g. 'pmBenchmark'
+        _schoolLevels = school.readingLevels;
+      });
+    } catch (_) {
+      // Best-effort — level display falls back to community value
+    }
+  }
+
+  Future<void> _saveSchoolLevel(String level) async {
+    final schoolId = widget.teacher.schoolId;
+    final bookId = widget.book.id;
+    if (schoolId == null || schoolId.isEmpty || bookId.isEmpty) return;
+    setState(() => _isSettingLevel = true);
+    try {
+      await FirebaseFirestore.instance
+          .collection('schools')
+          .doc(schoolId)
+          .collection('books')
+          .doc(bookId)
+          .update({'schoolReadingLevel': level});
+    } catch (_) {
+      // Ignore — user will see no change, can retry
+    } finally {
+      if (mounted) setState(() => _isSettingLevel = false);
+    }
+  }
+
+  void _showSetLevelSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _SetSchoolLevelSheet(
+        levels: _schoolLevels,
+        currentLevel: widget.book.schoolReadingLevel,
+        onSelect: (level) {
+          Navigator.pop(context);
+          _saveSchoolLevel(level);
+        },
+      ),
+    );
   }
 
   Future<void> _checkCoverOwnership() async {
@@ -1523,32 +1979,13 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
                               ),
                             ],
                             const SizedBox(height: 10),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                _TypeBadge(
-                                  label: isDecodable
-                                      ? (book.readingLevel ?? 'Decodable')
-                                      : 'Library',
-                                  color: stageColor,
-                                ),
-                                if (currentAssignedCount > 0)
-                                  _AssignedBadge(
-                                    count: currentAssignedCount,
-                                  ),
-                              ],
+                            _BookLevelBadgeRow(
+                              book: book,
+                              isDecodable: isDecodable,
+                              stageColor: stageColor,
+                              currentAssignedCount: currentAssignedCount,
+                              schoolLevelSchemaKey: _schoolLevelSchemaKey,
                             ),
-                            if (currentAssignedCount > 0) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                'Currently assigned to $currentAssignedCount student${currentAssignedCount == 1 ? '' : 's'}',
-                                style: TeacherTypography.caption.copyWith(
-                                  color: AppColors.teacherPrimary,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
                           ],
                         ),
                       ),
@@ -1672,6 +2109,40 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
                   ),
                   child: Column(
                     children: [
+                      // Set school level — always visible so schools without a
+                      // schema can still enter a free-form level.
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: _isSettingLevel
+                            ? const Padding(
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 10),
+                                child: SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2.2,
+                                      color: AppColors.teacherPrimary),
+                                ),
+                              )
+                            : TextButton.icon(
+                                onPressed: _showSetLevelSheet,
+                                icon: const Icon(
+                                  Icons.tune_rounded,
+                                  size: 16,
+                                  color: AppColors.teacherPrimary,
+                                ),
+                                label: Text(
+                                  widget.book.schoolReadingLevel?.isNotEmpty == true
+                                      ? 'Change school level'
+                                      : 'Set level for your school',
+                                  style: TeacherTypography.bodySmall.copyWith(
+                                    color: AppColors.teacherPrimary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                      ),
                       Align(
                         alignment: Alignment.centerLeft,
                         child: TextButton.icon(
@@ -1990,6 +2461,264 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
           },
         );
       },
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Schema-aware level badge row (used in BookDetailSheet header)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _BookLevelBadgeRow extends StatelessWidget {
+  const _BookLevelBadgeRow({
+    required this.book,
+    required this.isDecodable,
+    required this.stageColor,
+    required this.currentAssignedCount,
+    required this.schoolLevelSchemaKey,
+  });
+
+  final BookModel book;
+  final bool isDecodable;
+  final Color stageColor;
+  final int currentAssignedCount;
+  final String? schoolLevelSchemaKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final resolved = SchoolLibraryService.resolveDisplayLevel(
+      book,
+      schoolLevelSchemaKey,
+    );
+
+    final isMismatch =
+        resolved.mode == LevelDisplayMode.communityMismatch;
+
+    // For decodable books: show the resolved level (or 'Decodable' fallback).
+    // For library books: show 'Library' type + a level badge if one exists.
+    Widget typeBadge;
+    if (isDecodable) {
+      typeBadge = _TypeBadge(
+        label: resolved.level ?? 'Decodable',
+        color: isMismatch ? const Color(0xFFF59E0B) : stageColor,
+      );
+    } else {
+      typeBadge = _TypeBadge(label: 'Library', color: stageColor);
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        typeBadge,
+        // For library books with a level, show it alongside the type badge.
+        if (!isDecodable && resolved.level != null)
+          _TypeBadge(
+            label: resolved.level!,
+            color: isMismatch ? const Color(0xFFF59E0B) : stageColor,
+          ),
+        if (currentAssignedCount > 0)
+          _AssignedBadge(count: currentAssignedCount),
+        // Amber "foreign schema" indicator
+        if (isMismatch && schoolLevelSchemaKey != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF3C7),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.40)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.info_outline_rounded,
+                    size: 11, color: Color(0xFFB45309)),
+                const SizedBox(width: 4),
+                Text(
+                  'From another school\'s schema',
+                  style: TextStyle(
+                    fontFamily: 'Nunito',
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFFB45309),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Set School Level bottom sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SetSchoolLevelSheet extends StatefulWidget {
+  const _SetSchoolLevelSheet({
+    required this.levels,
+    required this.onSelect,
+    this.currentLevel,
+  });
+
+  final List<String> levels;
+  final String? currentLevel;
+  final ValueChanged<String> onSelect;
+
+  @override
+  State<_SetSchoolLevelSheet> createState() => _SetSchoolLevelSheetState();
+}
+
+class _SetSchoolLevelSheetState extends State<_SetSchoolLevelSheet> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.currentLevel ?? '');
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: EdgeInsets.fromLTRB(
+            20, 12, 20, MediaQuery.of(context).padding.bottom + 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: AppColors.teacherBorder,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text('Set level for your school', style: TeacherTypography.h3),
+            const SizedBox(height: 4),
+            Text(
+              'This only affects your school\'s library — the community record is unchanged.',
+              style: TeacherTypography.bodySmall
+                  .copyWith(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            if (widget.levels.isEmpty) ...[
+              // No predefined levels — free-text input
+              TextField(
+                controller: _controller,
+                autofocus: true,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: 'e.g. Level 12, PM 20, Year 2',
+                  prefixIcon: Icon(Icons.auto_stories_outlined,
+                      color: AppColors.teacherPrimary, size: 20),
+                  border: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(TeacherDimensions.radiusM),
+                    borderSide: BorderSide(color: AppColors.teacherBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(TeacherDimensions.radiusM),
+                    borderSide: BorderSide(color: AppColors.teacherBorder),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(TeacherDimensions.radiusM),
+                    borderSide: const BorderSide(
+                        color: AppColors.teacherPrimary, width: 2),
+                  ),
+                  filled: true,
+                  fillColor: AppColors.white,
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton(
+                  onPressed: _controller.text.trim().isEmpty
+                      ? null
+                      : () => widget.onSelect(_controller.text.trim()),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.teacherPrimary,
+                    disabledBackgroundColor:
+                        AppColors.teacherPrimary.withValues(alpha: 0.35),
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(TeacherDimensions.radiusM),
+                    ),
+                  ),
+                  child: Text(
+                    'Save',
+                    style: TeacherTypography.bodyMedium.copyWith(
+                      color: AppColors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ] else
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: widget.levels.map((level) {
+                      final isSelected = level == widget.currentLevel;
+                      return GestureDetector(
+                        onTap: () => widget.onSelect(level),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? AppColors.teacherPrimary
+                                : AppColors.teacherBackground,
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: isSelected
+                                  ? AppColors.teacherPrimary
+                                  : AppColors.teacherBorder,
+                            ),
+                          ),
+                          child: Text(
+                            level,
+                            style: TeacherTypography.bodySmall.copyWith(
+                              color: isSelected
+                                  ? AppColors.white
+                                  : AppColors.charcoal,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

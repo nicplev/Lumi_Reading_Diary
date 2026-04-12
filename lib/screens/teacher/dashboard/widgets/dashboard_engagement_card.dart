@@ -44,6 +44,7 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
   late Animation<Offset> _listSlide;
   late Animation<double> _statsFade;
   late Animation<double> _listFade;
+  final ScrollController _pendingScrollController = ScrollController();
   bool _showingPending = false;
 
   void _onResetSignal() {
@@ -90,6 +91,7 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
   void dispose() {
     widget.resetSignal?.removeListener(_onResetSignal);
     _flipController.dispose();
+    _pendingScrollController.dispose();
     super.dispose();
   }
 
@@ -228,14 +230,16 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
                   ),
                   // Pending list (slides in from right)
                   if (_flipController.value > 0)
-                    GestureDetector(
-                      onTap: _togglePendingView,
-                      behavior: HitTestBehavior.opaque,
-                      child: SlideTransition(
-                        position: _listSlide,
-                        child: FadeTransition(
-                          opacity: _listFade,
-                          child: _buildPendingList(pendingStudents),
+                    Positioned.fill(
+                      child: GestureDetector(
+                        onTap: _togglePendingView,
+                        behavior: HitTestBehavior.opaque,
+                        child: SlideTransition(
+                          position: _listSlide,
+                          child: FadeTransition(
+                            opacity: _listFade,
+                            child: _buildPendingList(pendingStudents),
+                          ),
                         ),
                       ),
                     ),
@@ -250,7 +254,7 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
 
   Widget _buildPendingList(List<StudentModel> pendingStudents) {
     return Column(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: MainAxisSize.max,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
@@ -279,36 +283,50 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
           ],
         ),
         const SizedBox(height: 12),
-        ...pendingStudents.map((student) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 14,
-                    backgroundColor: AppColors.teacherSurfaceTint,
-                    child: Text(
-                      student.firstName.isNotEmpty
-                          ? student.firstName[0].toUpperCase()
-                          : '?',
-                      style: TeacherTypography.caption.copyWith(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.teacherPrimary,
+        Expanded(
+          child: Scrollbar(
+            controller: _pendingScrollController,
+            thumbVisibility: true,
+            child: ListView.builder(
+              controller: _pendingScrollController,
+              padding: const EdgeInsets.only(right: 8),
+              itemCount: pendingStudents.length,
+              itemBuilder: (context, index) {
+                final student = pendingStudents[index];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 14,
+                        backgroundColor: AppColors.teacherSurfaceTint,
+                        child: Text(
+                          student.firstName.isNotEmpty
+                              ? student.firstName[0].toUpperCase()
+                              : '?',
+                          style: TeacherTypography.caption.copyWith(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.teacherPrimary,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      student.fullName,
-                      style: TeacherTypography.bodySmall.copyWith(
-                        color: AppColors.charcoal,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          student.fullName,
+                          style: TeacherTypography.bodySmall.copyWith(
+                            color: AppColors.charcoal,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                ],
-              ),
-            )),
+                );
+              },
+            ),
+          ),
+        ),
       ],
     );
   }

@@ -1,6 +1,6 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { adminAuth } from '@/lib/firebase/admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import type { SchoolUser, UserRole } from '@/lib/types';
 
 function toUser(doc: FirebaseFirestore.DocumentSnapshot): SchoolUser {
@@ -17,6 +17,8 @@ function toUser(doc: FirebaseFirestore.DocumentSnapshot): SchoolUser {
     lastLoginAt: data.lastLoginAt?.toDate(),
     profileImageUrl: data.profileImageUrl,
     phone: data.phone,
+    pendingDeletion: data.pendingDeletion ?? false,
+    scheduledDeletionAt: data.scheduledDeletionAt?.toDate(),
   };
 }
 
@@ -139,4 +141,35 @@ export async function resetUserPassword(userId: string): Promise<string> {
   if (!user.email) throw new Error('User has no email address');
   const link = await adminAuth.generatePasswordResetLink(user.email);
   return link;
+}
+
+export async function markUserForDeletion(schoolId: string, userId: string): Promise<void> {
+  const scheduledDeletionAt = Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
+
+  await adminDb
+    .collection('schools')
+    .doc(schoolId)
+    .collection('users')
+    .doc(userId)
+    .update({ pendingDeletion: true, scheduledDeletionAt });
+
+  await adminDb.collection('pendingUserDeletions').doc(userId).set({
+    userId,
+    schoolId,
+    scheduledDeletionAt,
+  });
+}
+
+export async function undoMarkUserForDeletion(schoolId: string, userId: string): Promise<void> {
+  await adminDb
+    .collection('schools')
+    .doc(schoolId)
+    .collection('users')
+    .doc(userId)
+    .update({
+      pendingDeletion: FieldValue.delete(),
+      scheduledDeletionAt: FieldValue.delete(),
+    });
+
+  await adminDb.collection('pendingUserDeletions').doc(userId).delete();
 }

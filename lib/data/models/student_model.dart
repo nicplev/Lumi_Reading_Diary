@@ -15,10 +15,13 @@ class StudentModel {
   final List<String> parentIds;
   final DateTime? dateOfBirth;
   final String? profileImageUrl;
+  final String? characterId;
   final bool isActive;
   final DateTime createdAt;
   final DateTime? enrolledAt;
   final Map<String, dynamic>? additionalInfo;
+  final String? enrollmentStatus;
+  final String? parentEmail;
   final List<ReadingLevelHistory> levelHistory;
   final StudentStats? stats;
 
@@ -37,13 +40,20 @@ class StudentModel {
     this.parentIds = const [],
     this.dateOfBirth,
     this.profileImageUrl,
+    this.characterId,
     this.isActive = true,
     required this.createdAt,
     this.enrolledAt,
     this.additionalInfo,
+    this.enrollmentStatus,
+    this.parentEmail,
     this.levelHistory = const [],
     this.stats,
   });
+
+  bool get isEnrolled =>
+      enrollmentStatus == 'book_pack' ||
+      enrollmentStatus == 'direct_purchase';
 
   String get fullName => '$firstName $lastName';
 
@@ -69,6 +79,7 @@ class StudentModel {
           ? (data['dateOfBirth'] as Timestamp).toDate()
           : null,
       profileImageUrl: data['profileImageUrl'],
+      characterId: data['characterId'] as String?,
       isActive: data['isActive'] ?? true,
       createdAt: data['createdAt'] != null
           ? (data['createdAt'] as Timestamp).toDate()
@@ -77,6 +88,9 @@ class StudentModel {
           ? (data['enrolledAt'] as Timestamp).toDate()
           : null,
       additionalInfo: data['additionalInfo'],
+      enrollmentStatus: data['enrollmentStatus'],
+      parentEmail: data['parentEmail'] ??
+          (data['additionalInfo'] as Map<String, dynamic>?)?['pendingParentEmail'],
       levelHistory: (data['levelHistory'] as List<dynamic>?)
               ?.map((item) => ReadingLevelHistory.fromMap(item))
               .toList() ??
@@ -103,10 +117,13 @@ class StudentModel {
       'dateOfBirth':
           dateOfBirth != null ? Timestamp.fromDate(dateOfBirth!) : null,
       'profileImageUrl': profileImageUrl,
+      if (characterId != null) 'characterId': characterId,
       'isActive': isActive,
       'createdAt': Timestamp.fromDate(createdAt),
       'enrolledAt': enrolledAt != null ? Timestamp.fromDate(enrolledAt!) : null,
       'additionalInfo': additionalInfo,
+      'enrollmentStatus': enrollmentStatus,
+      'parentEmail': parentEmail,
       'levelHistory': levelHistory.map((e) => e.toMap()).toList(),
       'stats': stats?.toMap(),
     };
@@ -127,10 +144,13 @@ class StudentModel {
     List<String>? parentIds,
     DateTime? dateOfBirth,
     String? profileImageUrl,
+    String? characterId,
     bool? isActive,
     DateTime? createdAt,
     DateTime? enrolledAt,
     Map<String, dynamic>? additionalInfo,
+    String? enrollmentStatus,
+    String? parentEmail,
     List<ReadingLevelHistory>? levelHistory,
     StudentStats? stats,
   }) {
@@ -152,10 +172,13 @@ class StudentModel {
       parentIds: parentIds ?? this.parentIds,
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
+      characterId: characterId ?? this.characterId,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       enrolledAt: enrolledAt ?? this.enrolledAt,
       additionalInfo: additionalInfo ?? this.additionalInfo,
+      enrollmentStatus: enrollmentStatus ?? this.enrollmentStatus,
+      parentEmail: parentEmail ?? this.parentEmail,
       levelHistory: levelHistory ?? this.levelHistory,
       stats: stats ?? this.stats,
     );

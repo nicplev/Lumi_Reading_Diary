@@ -401,7 +401,7 @@ class _OfflineManagementScreenState extends State<OfflineManagementScreen> {
               LumiGap.horizontalXS,
               Expanded(
                 child: Text(
-                  'The app automatically optimizes data usage when syncing. Images are compressed and only essential data is downloaded.',
+                  'The app automatically optimises data usage when syncing. Images are compressed and only essential data is downloaded.',
                   style: LumiTextStyles.bodySmall(
                     color: AppColors.charcoal.withValues(alpha: 0.7),
                   ),

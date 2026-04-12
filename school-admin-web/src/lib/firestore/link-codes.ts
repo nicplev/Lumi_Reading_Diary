@@ -138,6 +138,14 @@ export async function revokeLinkCode(codeId: string, revokedBy: string): Promise
   });
 }
 
+export async function deleteLinkCode(codeId: string): Promise<void> {
+  const ref = adminDb.collection('studentLinkCodes').doc(codeId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Code not found');
+  if (snap.data()?.status !== 'revoked') throw new Error('Only revoked codes can be permanently deleted');
+  await ref.delete();
+}
+
 export async function bulkCreateLinkCodes(
   schoolId: string,
   studentIds: string[],

@@ -113,6 +113,7 @@ class CommunityBookService {
     String? description,
     List<String>? genres,
     String? readingLevel,
+    String? levelSchema,
     int? pageCount,
     String? publisher,
     List<String>? tags,
@@ -135,6 +136,7 @@ class CommunityBookService {
       if (author != null) updateData['author'] = author;
       if (description != null) updateData['description'] = description;
       if (readingLevel != null) updateData['readingLevel'] = readingLevel;
+      if (levelSchema != null) updateData['levelSchema'] = levelSchema;
       if (pageCount != null) updateData['pageCount'] = pageCount;
       if (publisher != null) updateData['publisher'] = publisher;
       if (genres != null && genres.isNotEmpty) updateData['genres'] = genres;
@@ -171,6 +173,7 @@ class CommunityBookService {
         'description': description,
         'genres': genres ?? [],
         'readingLevel': readingLevel,
+        if (levelSchema != null) 'levelSchema': levelSchema,
         'pageCount': pageCount,
         'publisher': publisher,
         'tags': tags ?? [],

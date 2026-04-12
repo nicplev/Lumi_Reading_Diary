@@ -12,4 +12,6 @@ export interface SchoolUser {
   lastLoginAt?: Date;
   profileImageUrl?: string;
   phone?: string;
+  pendingDeletion?: boolean;
+  scheduledDeletionAt?: Date;
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:lumi_reading_tracker/data/models/achievement_model.dart';
 import 'package:lumi_reading_tracker/core/theme/app_colors.dart';
 import 'package:lumi_reading_tracker/core/theme/lumi_text_styles.dart';
@@ -8,13 +9,26 @@ import 'package:lumi_reading_tracker/core/widgets/lumi/lumi_buttons.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 /// Celebration popup shown when an achievement is unlocked
-class AchievementUnlockPopup extends StatelessWidget {
+class AchievementUnlockPopup extends StatefulWidget {
   final AchievementModel achievement;
 
   const AchievementUnlockPopup({
     super.key,
     required this.achievement,
   });
+
+  @override
+  State<AchievementUnlockPopup> createState() => _AchievementUnlockPopupState();
+}
+
+class _AchievementUnlockPopupState extends State<AchievementUnlockPopup> {
+  AchievementModel get achievement => widget.achievement;
+
+  @override
+  void initState() {
+    super.initState();
+    HapticFeedback.heavyImpact();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,19 +41,19 @@ class AchievementUnlockPopup extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(achievement.rarity.color).withValues(alpha: 0.3),
+              Color(achievement.effectiveColor).withValues(alpha: 0.3),
               AppColors.white,
-              Color(achievement.rarity.color).withValues(alpha: 0.2),
+              Color(achievement.effectiveColor).withValues(alpha: 0.2),
             ],
           ),
           borderRadius: LumiBorders.large,
           border: Border.all(
-            color: Color(achievement.rarity.color),
+            color: Color(achievement.effectiveColor),
             width: 2,
           ),
           boxShadow: [
             BoxShadow(
-              color: Color(achievement.rarity.color).withValues(alpha: 0.3),
+              color: Color(achievement.effectiveColor).withValues(alpha: 0.3),
               blurRadius: 20,
               spreadRadius: 5,
             ),
@@ -52,7 +66,7 @@ class AchievementUnlockPopup extends StatelessWidget {
             Text(
               'Achievement Unlocked!',
               style: LumiTextStyles.h2(
-                color: Color(achievement.rarity.color),
+                color: Color(achievement.effectiveColor),
               ),
               textAlign: TextAlign.center,
             )
@@ -69,13 +83,13 @@ class AchievementUnlockPopup extends StatelessWidget {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    Color(achievement.rarity.color).withValues(alpha: 0.2),
+                    Color(achievement.effectiveColor).withValues(alpha: 0.2),
                     Colors.transparent,
                   ],
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Color(achievement.rarity.color).withValues(alpha: 0.5),
+                    color: Color(achievement.effectiveColor).withValues(alpha: 0.5),
                     blurRadius: 30,
                     spreadRadius: 10,
                   ),
@@ -123,7 +137,7 @@ class AchievementUnlockPopup extends StatelessWidget {
                 vertical: LumiSpacing.xs,
               ),
               decoration: BoxDecoration(
-                color: Color(achievement.rarity.color),
+                color: Color(achievement.effectiveColor),
                 borderRadius: LumiBorders.medium,
               ),
               child: Text(

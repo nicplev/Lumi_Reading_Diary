@@ -5,6 +5,18 @@ import 'package:flutter/foundation.dart';
 
 import '../data/models/book_model.dart';
 
+/// How a book's reading level should be displayed for a given school.
+enum LevelDisplayMode {
+  /// School has explicitly set their own level for this book.
+  schoolOverride,
+  /// Community level uses the same schema as this school — show normally.
+  communityMatch,
+  /// Community level uses a different schema — show with schema label.
+  communityMismatch,
+  /// No level information available.
+  none,
+}
+
 /// Provides access to the school-wide book library stored at
 /// `schools/{schoolId}/books`.
 ///
@@ -159,9 +171,11 @@ class SchoolLibraryService {
   static const String typeDecodable = 'decodable';
   static const String typeLibrary = 'library';
 
-  /// Returns whether a book came from the LLLL decodable catalog.
+  /// Returns whether a book came from the LLLL decodable catalog or was
+  /// manually tagged as decodable by a teacher.
   static bool isDecodable(BookModel book) =>
-      book.metadata?['source'] == 'llll_local_db';
+      book.metadata?['llllProductCode'] != null ||
+      book.metadata?['isDecodable'] == true;
 
   /// Applies active filter chip + search query to a list of books.
   static List<BookModel> applyFilter({
@@ -195,7 +209,9 @@ class SchoolLibraryService {
     }
   }
 
-  /// Groups LLLL decodable books by reading stage, sorted alphabetically by stage.
+  /// Groups decodable books by reading level, sorted correctly across all
+  /// supported grading schemas (LLLL stages, numbered levels, Reading Doctor,
+  /// phases, and custom labels). "Uncategorised" always appears last.
   static Map<String, List<BookModel>> groupDecodableByStage(
       List<BookModel> books) {
     final decodable = books.where(isDecodable).toList();
@@ -206,43 +222,145 @@ class SchoolLibraryService {
           : 'Uncategorised';
       grouped.putIfAbsent(stage, () => []).add(book);
     }
-    // Sort stages: "Stage 1", "Stage 2", … then "Uncategorised" last
     final sortedKeys = grouped.keys.toList()
       ..sort((a, b) {
         if (a == 'Uncategorised') return 1;
         if (b == 'Uncategorised') return -1;
-        final aNum = _stageNumber(a);
-        final bNum = _stageNumber(b);
-        if (aNum != null && bNum != null) return aNum.compareTo(bNum);
-        return a.compareTo(b);
+        return _levelSortKey(a).compareTo(_levelSortKey(b));
       });
     return {for (final k in sortedKeys) k: grouped[k]!};
   }
 
-  static int? _stageNumber(String stage) {
-    final match = RegExp(r'\d+').firstMatch(stage);
+  /// Numeric sort key for a reading level string, schema-agnostic.
+  ///
+  /// • "Stage Plus 4" → 3.5  (slots between Stage 3 and Stage 4)
+  /// • Reading Doctor "1A"/"2C" → part×10 + letter offset (10, 11, 12, 20…)
+  /// • All other schemas → leading integer × 1.0
+  /// • Unrecognised → 999 (sorted to end before "Uncategorised")
+  static double _levelSortKey(String level) {
+    if (level == 'Stage Plus 4') return 3.5;
+
+    // Reading Doctor alphanumeric (1A, 1B, 1C, 2A, 2B, 2C)
+    final rdMatch = RegExp(r'^(\d)([A-C])$').firstMatch(level);
+    if (rdMatch != null) {
+      final part = double.tryParse(rdMatch.group(1)!) ?? 1;
+      final letter =
+          (rdMatch.group(2)!.codeUnitAt(0) - 'A'.codeUnitAt(0)).toDouble();
+      return part * 10 + letter;
+    }
+
+    final n = _leadingInt(level);
+    return n?.toDouble() ?? 999;
+  }
+
+  static int? _leadingInt(String s) {
+    final match = RegExp(r'\d+').firstMatch(s);
     return match != null ? int.tryParse(match.group(0)!) : null;
   }
 
-  /// Returns all non-LLLL books (library books, picture books, etc.).
+  /// Returns all non-decodable books (library books, picture books, etc.).
   static List<BookModel> libraryBooks(List<BookModel> books) =>
       books.where((b) => !isDecodable(b)).toList();
 
-  // ─── Stage colour helper (mirrors the LLLL stage palette) ─────────────────
+  // ─── Schema-aware level resolution ───────────────────────────────────────
 
+  /// Resolves the reading level to display for [book] in the context of a
+  /// school whose level schema key is [schoolLevelSchemaKey]
+  /// (e.g., 'pmBenchmark', 'aToZ', 'llll_stages').
+  ///
+  /// Priority:
+  /// 1. schoolReadingLevel — the school's own explicit override.
+  /// 2. readingLevel when communityLevelSchema matches schoolLevelSchemaKey.
+  /// 3. readingLevel from a different schema — returned with a short label.
+  /// 4. null when there is no level data.
+  static ({String? level, LevelDisplayMode mode}) resolveDisplayLevel(
+    BookModel book,
+    String? schoolLevelSchemaKey,
+  ) {
+    // 1. School override always wins.
+    if (book.schoolReadingLevel?.isNotEmpty == true) {
+      return (level: book.schoolReadingLevel, mode: LevelDisplayMode.schoolOverride);
+    }
+
+    final communityLevel = book.readingLevel;
+    if (communityLevel == null || communityLevel.isEmpty) {
+      return (level: null, mode: LevelDisplayMode.none);
+    }
+
+    final communitySchema = book.communityLevelSchema;
+
+    // 2. No schema provenance (legacy data) or schemas match — show normally.
+    if (communitySchema == null ||
+        communitySchema.isEmpty ||
+        communitySchema == schoolLevelSchemaKey) {
+      return (level: communityLevel, mode: LevelDisplayMode.communityMatch);
+    }
+
+    // 3. Schema mismatch — show with a short schema label.
+    final label = schemaDisplayName(communitySchema);
+    return (
+      level: '$communityLevel · $label',
+      mode: LevelDisplayMode.communityMismatch,
+    );
+  }
+
+  /// Short display name for a level schema key.
+  static String schemaDisplayName(String schemaKey) {
+    switch (schemaKey) {
+      case 'aToZ':         return 'A–Z';
+      case 'pmBenchmark':  return 'PM';
+      case 'lexile':       return 'Lexile';
+      case 'numbered':     return 'Numbered';
+      case 'namedLevels':  return 'Custom';
+      case 'colouredLevels': return 'Custom';
+      case 'custom':       return 'Custom';
+      case 'llll_stages':  return 'LLLL';
+      case 'levels':       return 'Levels';
+      case 'reading_doctor': return 'RD';
+      case 'phases':       return 'Phases';
+      default:             return 'Other';
+    }
+  }
+
+  // ─── Stage colour helper ──────────────────────────────────────────────────
+
+  /// Colour palette cycled by level index. Covers 12 entries so Dandelion /
+  /// DRA levels 1-12 each get a distinct colour without repetition.
   static const List<int> _stageHues = [
-    0xFFEF5350, // Stage 1 — red
-    0xFFFF9800, // Stage 2 — orange
-    0xFFFDD835, // Stage 3 — yellow
-    0xFF66BB6A, // Stage 4 — green
-    0xFF42A5F5, // Stage 5 — blue
-    0xFFAB47BC, // Stage 6 — purple
-    0xFF26C6DA, // Stage 7 — cyan
-    0xFFFF7043, // Stage 8 — deep orange
+    0xFFEF5350, //  1 — red
+    0xFFFF9800, //  2 — orange
+    0xFFFDD835, //  3 — yellow
+    0xFF66BB6A, //  4 — green
+    0xFF42A5F5, //  5 — blue
+    0xFFAB47BC, //  6 — purple
+    0xFF26C6DA, //  7 — cyan
+    0xFFFF7043, //  8 — deep orange
+    0xFF8D6E63, //  9 — brown
+    0xFF78909C, // 10 — blue-grey
+    0xFF4DB6AC, // 11 — teal
+    0xFF7986CB, // 12 — indigo
   ];
 
-  static int stageColor(String stage) {
-    final n = (_stageNumber(stage) ?? 1) - 1;
-    return _stageHues[n % _stageHues.length];
+  // Distinct colour for the LLLL bridge stage (not a numeric index).
+  static const int _stagePlus4Color = 0xFF80DEEA; // light teal
+
+  /// Returns an ARGB int colour for [level] suitable for use as a [Color].
+  ///
+  /// Handles all supported schemas:
+  /// • "Stage Plus 4" → dedicated bridge teal
+  /// • Reading Doctor "1A"/"2C" → colour by part number (1 or 2)
+  /// • All others → colour by leading integer, cycling through the palette
+  static int stageColor(String level) {
+    if (level == 'Stage Plus 4') return _stagePlus4Color;
+
+    // Reading Doctor: colour by part (1A/1B/1C share one colour, 2A/2B/2C share another)
+    final rdMatch = RegExp(r'^(\d)[A-C]$').firstMatch(level);
+    if (rdMatch != null) {
+      final part = (int.tryParse(rdMatch.group(1)!) ?? 1) - 1;
+      return _stageHues[part % _stageHues.length];
+    }
+
+    final n = (_leadingInt(level) ?? 1) - 1;
+    return _stageHues[n.clamp(0, _stageHues.length - 1)];
   }
 }

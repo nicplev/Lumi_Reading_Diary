@@ -1,5 +1,10 @@
 import * as functions from "firebase-functions";
+import {defineSecret} from "firebase-functions/params";
 import * as admin from "firebase-admin";
+import sgMail from "@sendgrid/mail";
+
+const sendgridApiKey = defineSecret("SENDGRID_API_KEY");
+const sendgridSenderEmail = defineSecret("SENDGRID_SENDER_EMAIL");
 import {
   isDueAt,
   isWithinQuietHours,
@@ -8,6 +13,7 @@ import {
   normalizeNotificationPermissions,
   validateNotificationAudience,
 } from "./notification_helpers";
+import {buildOnboardingEmail} from "./email_templates";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -1112,9 +1118,74 @@ export const sendReadingReminders = functions
     }
   });
 
+// ─── Achievement system constants ────────────────────────────────────────────
+
+const DEFAULT_ACHIEVEMENT_THRESHOLDS = {
+  streak: [5, 10, 20, 50, 100],
+  books: [5, 10, 25, 50, 100],
+  minutes: [300, 600, 1500, 3000, 6000],
+  readingDays: [10, 30, 50, 100],
+};
+
+interface AchievementTierMeta {
+  id: string;
+  name: string;
+  icon: string;
+  category: string;
+  rarity: string;
+  requirementType: string;
+  description: (value: number) => string;
+}
+
+/* eslint-disable max-len */
+const STREAK_TIERS: AchievementTierMeta[] = [
+  {id: "streak_t1", name: "Weekly Winner", icon: "🔥", category: "streak", rarity: "common", requirementType: "streak", description: (v) => `Read for ${v} school days in a row!`},
+  {id: "streak_t2", name: "Fortnight Fan", icon: "🔥", category: "streak", rarity: "uncommon", requirementType: "streak", description: (v) => `Read for ${v} school days in a row!`},
+  {id: "streak_t3", name: "Month Warrior", icon: "🌟", category: "streak", rarity: "rare", requirementType: "streak", description: (v) => `Read for ${v} school days in a row!`},
+  {id: "streak_t4", name: "Season Streak", icon: "⭐", category: "streak", rarity: "epic", requirementType: "streak", description: (v) => `Read for ${v} school days in a row!`},
+  {id: "streak_t5", name: "Century Champion", icon: "💯", category: "streak", rarity: "legendary", requirementType: "streak", description: (v) => `Read for ${v} school days in a row!`},
+];
+
+const BOOKS_TIERS: AchievementTierMeta[] = [
+  {id: "books_t1", name: "Book Beginner", icon: "📖", category: "books", rarity: "common", requirementType: "books", description: (v) => `Read ${v} books!`},
+  {id: "books_t2", name: "Book Collector", icon: "📚", category: "books", rarity: "uncommon", requirementType: "books", description: (v) => `Read ${v} books!`},
+  {id: "books_t3", name: "Avid Reader", icon: "📗", category: "books", rarity: "rare", requirementType: "books", description: (v) => `Read ${v} books!`},
+  {id: "books_t4", name: "Bookworm", icon: "🐛", category: "books", rarity: "epic", requirementType: "books", description: (v) => `Read ${v} books!`},
+  {id: "books_t5", name: "Reading Legend", icon: "🏆", category: "books", rarity: "legendary", requirementType: "books", description: (v) => `Read ${v} books!`},
+];
+
+const MINUTES_TIERS: AchievementTierMeta[] = [
+  {id: "minutes_t1", name: "Hour Hand", icon: "⏰", category: "minutes", rarity: "common", requirementType: "minutes", description: (v) => `Read for ${v / 60} hours total!`},
+  {id: "minutes_t2", name: "Time Traveler", icon: "⌚", category: "minutes", rarity: "uncommon", requirementType: "minutes", description: (v) => `Read for ${v / 60} hours total!`},
+  {id: "minutes_t3", name: "Marathon Reader", icon: "🏃", category: "minutes", rarity: "rare", requirementType: "minutes", description: (v) => `Read for ${v / 60} hours total!`},
+  {id: "minutes_t4", name: "Time Master", icon: "⏳", category: "minutes", rarity: "epic", requirementType: "minutes", description: (v) => `Read for ${v / 60} hours total!`},
+  {id: "minutes_t5", name: "Eternal Reader", icon: "♾️", category: "minutes", rarity: "legendary", requirementType: "minutes", description: (v) => `Read for ${v / 60} hours total!`},
+];
+
+const DAYS_TIERS: AchievementTierMeta[] = [
+  {id: "days_t1", name: "Decade Reader", icon: "📅", category: "readingDays", rarity: "common", requirementType: "days", description: (v) => `Read on ${v} different days!`},
+  {id: "days_t2", name: "Monthly Reader", icon: "🗓️", category: "readingDays", rarity: "uncommon", requirementType: "days", description: (v) => `Read on ${v} different days!`},
+  {id: "days_t3", name: "Consistent Reader", icon: "📆", category: "readingDays", rarity: "rare", requirementType: "days", description: (v) => `Read on ${v} different days!`},
+  {id: "days_t4", name: "Century Reader", icon: "📊", category: "readingDays", rarity: "epic", requirementType: "days", description: (v) => `Read on ${v} different days!`},
+];
+
+/* eslint-enable max-len */
+const FIRST_LOG_ACHIEVEMENT = {
+  id: "first_log",
+  name: "First Chapter",
+  description: "Logged your very first reading session!",
+  icon: "📖",
+  category: "special",
+  rarity: "common",
+  requirementType: "days",
+  requiredValue: 1,
+};
+
 /**
  * Achievement Detector
- * Triggers when student stats are updated to check for new achievements
+ * Triggers when student stats are updated to check for new achievements.
+ * Reads school-level custom thresholds (falls back to defaults if not set).
+ * Awards all 19 tier achievements + the first_log special achievement.
  */
 export const detectAchievements = functions.firestore
   .document("schools/{schoolId}/students/{studentId}")
@@ -1127,105 +1198,109 @@ export const detectAchievements = functions.firestore
     const newStats = newData.stats || {};
     const oldStats = oldData.stats || {};
 
-    const achievements: Array<{id: string; name: string; description: string; icon: string}> = [];
+    // Load school-level custom thresholds, fall back to defaults per category
+    let customThresholds: Record<string, number[]> = {};
+    try {
+      const schoolDoc = await db.collection("schools").doc(schoolId).get();
+      customThresholds = schoolDoc.data()?.settings?.achievementThresholds ?? {};
+    } catch (err) {
+      functions.logger.warn("Could not load school achievement thresholds, using defaults", {schoolId, err});
+    }
 
-    // Check for streak achievements
-    if (newStats.currentStreak >= 7 && oldStats.currentStreak < 7) {
-      achievements.push({
-        id: "week_streak",
-        name: "Week Warrior",
-        description: "Read for 7 days in a row!",
-        icon: "🔥",
+    const thresholds = {
+      streak: (customThresholds.streak ?? DEFAULT_ACHIEVEMENT_THRESHOLDS.streak),
+      books: (customThresholds.books ?? DEFAULT_ACHIEVEMENT_THRESHOLDS.books),
+      minutes: (customThresholds.minutes ?? DEFAULT_ACHIEVEMENT_THRESHOLDS.minutes),
+      readingDays: (customThresholds.readingDays ?? DEFAULT_ACHIEVEMENT_THRESHOLDS.readingDays),
+    };
+
+    // Build set of already-earned IDs to prevent duplicates
+    const existingAchievements: Array<Record<string, unknown>> = newData.achievements || [];
+    const earnedIds = new Set<string>(existingAchievements.map((a) => a.id as string));
+
+    type NewAchievement = {
+      id: string; name: string; description: string; icon: string;
+      category: string; rarity: string; requirementType: string; requiredValue: number;
+      earnedAt: admin.firestore.FieldValue;
+    };
+    const toAward: NewAchievement[] = [];
+
+    // Helper: check a tier list against a stat
+    function checkTiers(
+      tiers: AchievementTierMeta[],
+      tierThresholds: number[],
+      newVal: number,
+      oldVal: number,
+    ) {
+      for (let i = 0; i < tiers.length; i++) {
+        const threshold = tierThresholds[i];
+        if (threshold === undefined) continue;
+        if (earnedIds.has(tiers[i].id)) continue;
+        if (newVal >= threshold && oldVal < threshold) {
+          toAward.push({
+            ...tiers[i],
+            description: tiers[i].description(threshold),
+            requiredValue: threshold,
+            earnedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+      }
+    }
+
+    checkTiers(STREAK_TIERS, thresholds.streak, newStats.currentStreak || 0, oldStats.currentStreak || 0);
+    checkTiers(BOOKS_TIERS, thresholds.books, newStats.totalBooksRead || 0, oldStats.totalBooksRead || 0);
+    checkTiers(MINUTES_TIERS, thresholds.minutes, newStats.totalMinutesRead|| 0, oldStats.totalMinutesRead|| 0);
+    checkTiers(DAYS_TIERS, thresholds.readingDays, newStats.totalReadingDays|| 0, oldStats.totalReadingDays|| 0);
+
+    // First-log special achievement
+    if (
+      !earnedIds.has(FIRST_LOG_ACHIEVEMENT.id) &&
+      (newStats.totalReadingDays || 0) >= 1 &&
+      (oldStats.totalReadingDays || 0) === 0
+    ) {
+      toAward.push({
+        ...FIRST_LOG_ACHIEVEMENT,
+        earnedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     }
 
-    if (newStats.currentStreak >= 30 && oldStats.currentStreak < 30) {
-      achievements.push({
-        id: "month_streak",
-        name: "Monthly Master",
-        description: "Read for 30 days in a row!",
-        icon: "🌟",
-      });
-    }
+    if (toAward.length === 0) return null;
 
-    // Check for book milestones
-    if (newStats.totalBooksRead >= 10 && oldStats.totalBooksRead < 10) {
-      achievements.push({
-        id: "ten_books",
-        name: "Book Collector",
-        description: "Read 10 books!",
-        icon: "📚",
-      });
-    }
+    // Write all new achievements in a single update
+    await change.after.ref.update({
+      achievements: admin.firestore.FieldValue.arrayUnion(...toAward),
+    });
 
-    if (newStats.totalBooksRead >= 50 && oldStats.totalBooksRead < 50) {
-      achievements.push({
-        id: "fifty_books",
-        name: "Bookworm",
-        description: "Read 50 books!",
-        icon: "🐛",
-      });
-    }
+    functions.logger.info("Achievements awarded", {studentId, schoolId, awarded: toAward.map((a) => a.id)});
 
-    // Check for time milestones
-    if (newStats.totalMinutesRead >= 600 && oldStats.totalMinutesRead < 600) {
-      achievements.push({
-        id: "ten_hours",
-        name: "Time Traveler",
-        description: "Read for 10 hours total!",
-        icon: "⏰",
-      });
-    }
+    // Notify parents (single notification listing all new achievements)
+    if (newData.parentIds?.length > 0) {
+      const achievementNames = toAward.map((a) => a.name).join(", ");
+      for (const parentId of newData.parentIds) {
+        try {
+          const parentDoc = await db.doc(`schools/${schoolId}/parents/${parentId}`).get();
+          const fcmToken = parentDoc.data()?.fcmToken;
+          if (!fcmToken) continue;
 
-    if (achievements.length > 0) {
-      // Save achievements to student document
-      const existingAchievements = newData.achievements || [];
-      const newAchievements = [
-        ...existingAchievements,
-        ...achievements.map((a) => ({
-          ...a,
-          earnedAt: admin.firestore.FieldValue.serverTimestamp(),
-        })),
-      ];
-
-      await change.after.ref.update({
-        achievements: newAchievements,
-      });
-
-      // Notify parents
-      if (newData.parentIds?.length > 0) {
-        for (const parentId of newData.parentIds) {
-          const parentDoc = await db
-            .doc(`schools/${schoolId}/parents/${parentId}`)
-            .get();
-
-          const parentData = parentDoc.data();
-          if (parentData?.fcmToken) {
-            const achievementNames = achievements.map((a) => a.name).join(", ");
-            const message = {
-              token: parentData.fcmToken,
-              notification: {
-                title: `${newData.firstName} earned new achievements! 🎉`,
-                body: achievementNames,
-              },
-              data: {
-                type: "achievement_earned",
-                studentId: studentId,
-                schoolId: schoolId,
-                achievements: JSON.stringify(achievements),
-              },
-            };
-
-            try {
-              await admin.messaging().send(message);
-              functions.logger.info("Achievement notification sent", {parentId, studentId, achievements});
-            } catch (error) {
-              functions.logger.error("Failed to send achievement notification", {
-                parentId,
-                error: error instanceof Error ? error.message : String(error),
-              });
-            }
-          }
+          await admin.messaging().send({
+            token: fcmToken,
+            notification: {
+              title: `${newData.firstName} earned new achievements! 🎉`,
+              body: achievementNames,
+            },
+            data: {
+              type: "achievement_earned",
+              studentId,
+              schoolId,
+              achievements: JSON.stringify(toAward.map(({id, name, icon}) => ({id, name, icon}))),
+            },
+          });
+          functions.logger.info("Achievement notification sent", {parentId, studentId});
+        } catch (error) {
+          functions.logger.error("Failed to send achievement notification", {
+            parentId,
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
       }
     }
@@ -1331,6 +1406,301 @@ export const cleanupExpiredLinkCodes = functions.pubsub
 /**
  * Update class statistics when allocations or logs change
  */
+// ─── Parent Onboarding Emails ───────────────────────────────────────────
+
+const LINK_CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const LINK_CODE_LENGTH = 8;
+const LINK_CODE_EXPIRY_DAYS = 365;
+
+function generateLinkCode(): string {
+  let code = "";
+  for (let i = 0; i < LINK_CODE_LENGTH; i++) {
+    code += LINK_CODE_CHARS.charAt(
+      Math.floor(Math.random() * LINK_CODE_CHARS.length)
+    );
+  }
+  return code;
+}
+
+async function getOrCreateLinkCode(
+  studentId: string,
+  schoolId: string,
+  createdBy: string,
+  studentName: string,
+): Promise<string> {
+  // Check for existing active code
+  const existing = await db
+    .collection("studentLinkCodes")
+    .where("studentId", "==", studentId)
+    .where("status", "==", "active")
+    .orderBy("createdAt", "desc")
+    .limit(1)
+    .get();
+
+  if (!existing.empty) {
+    return existing.docs[0].data().code as string;
+  }
+
+  // Generate a unique code
+  let code = generateLinkCode();
+  let attempts = 0;
+  while (attempts < 40) {
+    const dup = await db
+      .collection("studentLinkCodes")
+      .where("code", "==", code)
+      .limit(1)
+      .get();
+    if (dup.empty) break;
+    code = generateLinkCode();
+    attempts++;
+  }
+
+  const now = admin.firestore.Timestamp.now();
+  const expiresAt = admin.firestore.Timestamp.fromDate(
+    new Date(Date.now() + LINK_CODE_EXPIRY_DAYS * 24 * 60 * 60 * 1000)
+  );
+
+  await db.collection("studentLinkCodes").add({
+    code,
+    studentId,
+    schoolId,
+    status: "active",
+    createdAt: now,
+    expiresAt,
+    createdBy,
+    metadata: {studentFullName: studentName},
+  });
+
+  return code;
+}
+
+interface OnboardingEmailRecipient {
+  studentId: string;
+  studentName: string;
+  parentEmail: string;
+  linkCode: string;
+  status: "sent" | "failed" | "skipped";
+  error?: string;
+  skippedReason?: string;
+}
+
+export const processParentOnboardingEmail = functions
+  .runWith({timeoutSeconds: 120, memory: "512MB", secrets: [sendgridApiKey, sendgridSenderEmail]})
+  .firestore.document("schools/{schoolId}/parentOnboardingEmails/{emailId}")
+  .onCreate(async (snapshot, context) => {
+    const data = snapshot.data();
+    if (data.status !== "queued") return null;
+
+    const schoolId = context.params.schoolId;
+    const docRef = snapshot.ref;
+
+    // Claim the document
+    await docRef.update({status: "processing"});
+
+    try {
+      // Initialize SendGrid
+      const sendgridKey = sendgridApiKey.value();
+      if (!sendgridKey) {
+        await docRef.update({
+          status: "failed",
+          errorSummary: "SendGrid API key not configured",
+        });
+        return null;
+      }
+      sgMail.setApiKey(sendgridKey);
+
+      // Fetch school
+      const schoolSnap = await db.doc(`schools/${schoolId}`).get();
+      const schoolName = schoolSnap.data()?.name ?? "Your School";
+
+      const targetStudentIds: string[] = data.targetStudentIds ?? [];
+      const customMessage: string | undefined = data.customMessage;
+      const emailSubject = data.emailSubject ?? `Welcome to Lumi Reading Tracker - ${schoolName}`;
+      const generateMissingCodes = data.generateMissingCodes !== false;
+      const createdBy: string = data.createdBy ?? "";
+
+      // Fetch students in batches
+      const recipients: OnboardingEmailRecipient[] = [];
+
+      for (const studentBatch of chunk(targetStudentIds, FIRESTORE_IN_LIMIT)) {
+        const studentRefs = studentBatch.map((id) =>
+          db.doc(`schools/${schoolId}/students/${id}`)
+        );
+        const studentSnaps = await db.getAll(...studentRefs);
+
+        for (const snap of studentSnaps) {
+          if (!snap.exists) continue;
+          const student = snap.data()!;
+          const studentName = `${student.firstName ?? ""} ${student.lastName ?? ""}`.trim();
+          const parentEmail: string | undefined =
+            student.parentEmail ?? student.additionalInfo?.pendingParentEmail;
+
+          if (!parentEmail) {
+            recipients.push({
+              studentId: snap.id,
+              studentName,
+              parentEmail: "",
+              linkCode: "",
+              status: "skipped",
+              skippedReason: "no_email",
+            });
+            continue;
+          }
+
+          const enrollmentStatus = student.enrollmentStatus ?? "pending";
+          if (enrollmentStatus === "not_enrolled") {
+            recipients.push({
+              studentId: snap.id,
+              studentName,
+              parentEmail,
+              linkCode: "",
+              status: "skipped",
+              skippedReason: "not_enrolled",
+            });
+            continue;
+          }
+
+          if (Array.isArray(student.parentIds) && student.parentIds.length > 0) {
+            recipients.push({
+              studentId: snap.id,
+              studentName,
+              parentEmail,
+              linkCode: "",
+              status: "skipped",
+              skippedReason: "already_linked",
+            });
+            continue;
+          }
+
+          // Get or create link code
+          let linkCode = "";
+          if (generateMissingCodes) {
+            linkCode = await getOrCreateLinkCode(
+              snap.id,
+              schoolId,
+              createdBy,
+              studentName,
+            );
+          } else {
+            const existingCode = await db
+              .collection("studentLinkCodes")
+              .where("studentId", "==", snap.id)
+              .where("status", "==", "active")
+              .limit(1)
+              .get();
+            if (!existingCode.empty) {
+              linkCode = existingCode.docs[0].data().code;
+            }
+          }
+
+          if (!linkCode) {
+            recipients.push({
+              studentId: snap.id,
+              studentName,
+              parentEmail,
+              linkCode: "",
+              status: "skipped",
+              skippedReason: "no_active_code",
+            });
+            continue;
+          }
+
+          recipients.push({
+            studentId: snap.id,
+            studentName,
+            parentEmail,
+            linkCode,
+            status: "sent", // will be updated on failure
+          });
+        }
+      }
+
+      // Group eligible recipients by parent email (multi-child support)
+      const emailGroups = new Map<string, OnboardingEmailRecipient[]>();
+      for (const r of recipients) {
+        if (r.status !== "sent") continue;
+        const existing = emailGroups.get(r.parentEmail) ?? [];
+        existing.push(r);
+        emailGroups.set(r.parentEmail, existing);
+      }
+
+      let sentCount = 0;
+      let failedCount = 0;
+      const skippedCount = recipients.filter((r) => r.status === "skipped").length;
+
+      const senderEmail = sendgridSenderEmail.value() || "noreply@lumi-reading.app";
+
+      // Send emails
+      for (const [email, group] of emailGroups) {
+        const entries = group.map((r) => ({
+          studentName: r.studentName,
+          linkCode: r.linkCode,
+        }));
+
+        const html = buildOnboardingEmail({
+          schoolName,
+          entries,
+          customMessage,
+        });
+
+        try {
+          await sgMail.send({
+            to: email,
+            from: {email: senderEmail, name: `${schoolName} via Lumi`},
+            subject: emailSubject,
+            html,
+          });
+          sentCount++;
+        } catch (err) {
+          failedCount++;
+          const errMsg = err instanceof Error ? err.message : String(err);
+          for (const r of group) {
+            r.status = "failed";
+            r.error = errMsg;
+          }
+        }
+      }
+
+      let finalStatus = "failed";
+      if (failedCount === 0 && sentCount > 0) {
+        finalStatus = "sent";
+      } else if (sentCount > 0 && failedCount > 0) {
+        finalStatus = "partial";
+      } else if (sentCount === 0 && skippedCount > 0) {
+        finalStatus = "sent";
+      }
+
+      await docRef.update({
+        status: finalStatus,
+        sentAt: admin.firestore.FieldValue.serverTimestamp(),
+        recipientCount: recipients.length,
+        deliveryCounts: {sent: sentCount, failed: failedCount, skipped: skippedCount},
+        recipients: recipients.map((r) => ({
+          studentId: r.studentId,
+          studentName: r.studentName,
+          parentEmail: r.parentEmail,
+          linkCode: r.linkCode,
+          status: r.status,
+          ...(r.error && {error: r.error}),
+          ...(r.skippedReason && {skippedReason: r.skippedReason}),
+        })),
+      });
+
+      functions.logger.info(
+        `Onboarding emails for school ${schoolId}: ` +
+        `sent=${sentCount}, failed=${failedCount}, skipped=${skippedCount}`
+      );
+    } catch (error) {
+      functions.logger.error("processParentOnboardingEmail error:", error);
+      await docRef.update({
+        status: "failed",
+        errorSummary: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    return null;
+  });
+
 export const updateClassStats = functions.firestore
   .document("schools/{schoolId}/readingLogs/{logId}")
   .onWrite(async (change, context) => {
@@ -1386,5 +1756,138 @@ export const updateClassStats = functions.firestore
       "stats.lastUpdated": admin.firestore.FieldValue.serverTimestamp(),
     });
 
+    return null;
+  });
+
+/**
+ * Callable: Delete a student with full cascade cleanup.
+ * - Removes student from linked parent's linkedChildren array
+ * - If a parent has no remaining linked children, deletes their Firestore doc + Auth account
+ * - Revokes any active link codes for the student
+ * - Deletes the student document
+ */
+export const deleteStudentWithCascade = functions.https.onCall(
+  async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "Must be signed in."
+      );
+    }
+
+    const {schoolId, studentId} = data as {schoolId: string; studentId: string};
+    if (!schoolId || !studentId) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "schoolId and studentId are required."
+      );
+    }
+
+    const studentRef = db.doc(`schools/${schoolId}/students/${studentId}`);
+    const studentDoc = await studentRef.get();
+    if (!studentDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Student not found.");
+    }
+
+    const studentData = studentDoc.data()!;
+    const parentIds: string[] = studentData.parentIds ?? [];
+
+    // 1. Clean up each linked parent
+    for (const parentId of parentIds) {
+      const parentRef = db.doc(`schools/${schoolId}/users/${parentId}`);
+      const parentDoc = await parentRef.get();
+      if (!parentDoc.exists) continue;
+
+      const linkedChildren: string[] = parentDoc.data()!.linkedChildren ?? [];
+      const remaining = linkedChildren.filter((id) => id !== studentId);
+
+      if (remaining.length === 0) {
+        // Parent has no other children — delete their account entirely
+        await parentRef.delete();
+        try {
+          await admin.auth().deleteUser(parentId);
+        } catch (err) {
+          functions.logger.warn(
+            `Could not delete Auth user ${parentId} — may not exist`,
+            err
+          );
+        }
+      } else {
+        await parentRef.update({linkedChildren: remaining});
+      }
+    }
+
+    // 2. Revoke any active link codes for this student
+    const codesSnap = await db
+      .collection("studentLinkCodes")
+      .where("studentId", "==", studentId)
+      .where("status", "==", "active")
+      .get();
+
+    const batch = db.batch();
+    for (const codeDoc of codesSnap.docs) {
+      batch.update(codeDoc.ref, {
+        status: "revoked",
+        revokedAt: admin.firestore.FieldValue.serverTimestamp(),
+        revokeReason: "student_deleted",
+      });
+    }
+
+    // 3. Delete the student document
+    batch.delete(studentRef);
+    await batch.commit();
+
+    return {success: true, parentsCleaned: parentIds.length};
+  }
+);
+
+/**
+ * Scheduled: Process pending user deletions after the 24-hour cool-off period.
+ * Runs hourly. For each user in pendingUserDeletions whose scheduledDeletionAt has passed,
+ * permanently deletes the Firebase Auth account and Firestore user document.
+ */
+export const processPendingUserDeletions = functions.pubsub
+  .schedule("0 * * * *") // Every hour on the hour
+  .timeZone("UTC")
+  .onRun(async () => {
+    const now = admin.firestore.Timestamp.now();
+
+    const snap = await db
+      .collection("pendingUserDeletions")
+      .where("scheduledDeletionAt", "<=", now)
+      .get();
+
+    if (snap.empty) return null;
+
+    let deleted = 0;
+    for (const doc of snap.docs) {
+      const {userId, schoolId} = doc.data() as {userId: string; schoolId: string};
+      try {
+        // Delete Firebase Auth account
+        try {
+          await admin.auth().deleteUser(userId);
+        } catch (err) {
+          functions.logger.warn(
+            `Could not delete Auth user ${userId} — may not exist`,
+            err
+          );
+        }
+
+        // Delete Firestore user document
+        await db
+          .doc(`schools/${schoolId}/users/${userId}`)
+          .delete();
+
+        // Clean up the pending deletion record
+        await doc.ref.delete();
+
+        deleted++;
+        functions.logger.info(`Permanently deleted user ${userId} from school ${schoolId}`);
+      } catch (err) {
+        functions.logger.error(`Failed to delete user ${userId}`, err);
+      }
+    }
+
+    functions.logger.info(`processPendingUserDeletions: deleted ${deleted} users`);
     return null;
   });

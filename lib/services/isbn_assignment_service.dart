@@ -671,6 +671,39 @@ class IsbnAssignmentService {
     }
     return (10 - (sum % 10)) % 10;
   }
+
+  /// Returns true if the student has a bookReadingHistory entry matching
+  /// the given bookId or isbn. Checks multiple ID variants to handle both
+  /// scanner-sourced ('isbn_{isbn}') and library-sourced (school book ID) formats.
+  /// Always returns false on any error so a check failure never blocks assignment.
+  Future<bool> studentHasPreviouslyReadBook({
+    required String studentId,
+    String? bookId,
+    String? isbn,
+  }) async {
+    try {
+      final variants = <String>{};
+      if (bookId != null && bookId.isNotEmpty) variants.add(bookId);
+      if (isbn != null && isbn.isNotEmpty) {
+        variants.add(isbn);
+        variants.add('isbn_$isbn');
+      }
+      if (variants.isEmpty) return false;
+
+      for (final v in variants) {
+        final snap = await _firestore
+            .collection('bookReadingHistory')
+            .where('studentId', isEqualTo: studentId)
+            .where('bookId', isEqualTo: v)
+            .limit(1)
+            .get();
+        if (snap.docs.isNotEmpty) return true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
 }
 
 class ScannedIsbnBook {

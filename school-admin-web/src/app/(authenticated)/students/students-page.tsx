@@ -15,8 +15,8 @@ import { Icon } from '@/components/lumi/icon';
 import { useToast } from '@/components/lumi/toast';
 import { StudentFormModal } from './student-form-modal';
 import { CSVImportDialog } from './csv-import-dialog';
-import { useStudents, useCreateStudent } from '@/lib/hooks/use-students';
-import type { SchoolClass, ReadingLevelOption, ReadingLevelSchema } from '@/lib/types';
+import { useStudents, useCreateStudent, useBulkUpdateEnrollmentStatus } from '@/lib/hooks/use-students';
+import type { SchoolClass, ReadingLevelOption, ReadingLevelSchema, EnrollmentStatus } from '@/lib/types';
 
 type SerializedClass = Omit<SchoolClass, 'createdAt'> & { createdAt: string };
 
@@ -27,16 +27,27 @@ interface StudentsPageProps {
 }
 
 type QuickFilter = 'all' | 'has-parent' | 'no-parent';
+type EnrollmentFilter = 'all' | 'enrolled' | 'not-enrolled' | 'pending';
+
+const enrollmentBadge: Record<string, { label: string; variant: 'success' | 'info' | 'error' | 'warning' }> = {
+  book_pack: { label: 'Confirmed', variant: 'success' },
+  direct_purchase: { label: 'Confirmed (Direct)', variant: 'info' },
+  not_enrolled: { label: 'Not Confirmed', variant: 'error' },
+  pending: { label: 'Pending', variant: 'warning' },
+};
 
 export function StudentsPage({ classes, levelOptions, levelSchema }: StudentsPageProps) {
   const router = useRouter();
   const { toast } = useToast();
   const { data: students, isLoading } = useStudents();
   const createStudent = useCreateStudent();
+  const bulkUpdateEnrollment = useBulkUpdateEnrollmentStatus();
 
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState<string[]>([]);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
+  const [enrollmentFilter, setEnrollmentFilter] = useState<EnrollmentFilter>('all');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
 
@@ -56,6 +67,14 @@ export function StudentsPage({ classes, levelOptions, levelSchema }: StudentsPag
       list = list.filter((s) => s.parentIds.length === 0);
     }
 
+    if (enrollmentFilter === 'enrolled') {
+      list = list.filter((s) => s.enrollmentStatus === 'book_pack' || s.enrollmentStatus === 'direct_purchase');
+    } else if (enrollmentFilter === 'not-enrolled') {
+      list = list.filter((s) => s.enrollmentStatus === 'not_enrolled');
+    } else if (enrollmentFilter === 'pending') {
+      list = list.filter((s) => !s.enrollmentStatus || s.enrollmentStatus === 'pending');
+    }
+
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -66,7 +85,37 @@ export function StudentsPage({ classes, levelOptions, levelSchema }: StudentsPag
     }
 
     return list;
-  }, [students, search, classFilter, quickFilter]);
+  }, [students, search, classFilter, quickFilter, enrollmentFilter]);
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map((s) => s.id)));
+    }
+  };
+
+  const handleBulkEnrollment = async (status: EnrollmentStatus) => {
+    try {
+      await bulkUpdateEnrollment.mutateAsync({
+        studentIds: Array.from(selectedIds),
+        enrollmentStatus: status,
+      });
+      setSelectedIds(new Set());
+      toast(`Updated ${selectedIds.size} students`, 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to update', 'error');
+    }
+  };
 
   const allColumns: DataTableColumn<(typeof filtered)[0]>[] = [
     {
@@ -104,24 +153,26 @@ export function StudentsPage({ classes, levelOptions, levelSchema }: StudentsPag
     },
     {
       id: 'parent',
-      header: 'Parent',
+      header: 'Parent/Guardian',
       accessorFn: (row) => row.parentIds.length > 0,
       cell: (val) =>
         val ? <Badge variant="success">Linked</Badge> : <Badge variant="default">No parent</Badge>,
     },
     {
-      id: 'streak',
-      header: 'Streak',
-      accessorFn: (row) => row.stats?.currentStreak ?? 0,
+      id: 'enrollment',
+      header: 'Status',
+      accessorFn: (row) => row.enrollmentStatus ?? 'pending',
       cell: (val) => {
-        const streak = val as number;
-        return streak > 0 ? (
-          <span className="text-sm font-semibold text-charcoal">{streak} days</span>
-        ) : (
-          <span className="text-sm text-text-secondary">-</span>
-        );
+        const info = enrollmentBadge[val as string] ?? enrollmentBadge.pending;
+        return <Badge variant={info.variant}>{info.label}</Badge>;
       },
       sortable: true,
+    },
+    {
+      id: 'parentEmail',
+      header: 'Parent Email',
+      accessorFn: (row) => row.parentEmail ?? '',
+      cell: (val) => <span className="text-sm text-text-secondary">{(val as string) || '-'}</span>,
     },
   ];
 
@@ -170,20 +221,68 @@ export function StudentsPage({ classes, levelOptions, levelSchema }: StudentsPag
           ))}
         </div>
         <div className="flex flex-wrap gap-2">
-          {(['all', 'has-parent', 'no-parent'] as const).map((filter) => (
+          {(['all', 'enrolled', 'not-enrolled', 'pending'] as const).map((filter) => (
             <FilterChip
               key={filter}
-              label={filter === 'all' ? 'All' : filter === 'has-parent' ? 'Has Parent' : 'No Parent'}
-              selected={quickFilter === filter}
-              onClick={() => setQuickFilter(filter)}
+              label={
+                filter === 'all' ? 'All Status' :
+                filter === 'enrolled' ? 'Confirmed' :
+                filter === 'not-enrolled' ? 'Not Confirmed' : 'Pending'
+              }
+              selected={enrollmentFilter === filter}
+              onClick={() => setEnrollmentFilter(filter)}
             />
           ))}
         </div>
         <SearchInput value={search} onChange={setSearch} placeholder="Search by name or student ID..." />
       </div>
 
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 mb-4 p-3 bg-rose-pink/5 border border-rose-pink/20 rounded-[var(--radius-lg)]">
+          <input
+            type="checkbox"
+            checked={selectedIds.size === filtered.length}
+            onChange={toggleSelectAll}
+            className="accent-rose-pink"
+          />
+          <span className="text-sm font-semibold text-charcoal">{selectedIds.size} selected</span>
+          <div className="flex gap-2 ml-auto">
+            <Button variant="outline" size="sm" onClick={() => handleBulkEnrollment('book_pack')}>
+              Mark Confirmed
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => handleBulkEnrollment('not_enrolled')}>
+              Mark Not Confirmed
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => handleBulkEnrollment('direct_purchase')}>
+              Mark Confirmed (Direct)
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setSelectedIds(new Set())}>
+              Clear
+            </Button>
+          </div>
+        </div>
+      )}
+
       <DataTable
-        columns={columns}
+        columns={[
+          {
+            id: 'select',
+            header: '',
+            accessorFn: () => null,
+            cell: (_val, row) => (
+              <input
+                type="checkbox"
+                checked={selectedIds.has(row.id)}
+                onChange={(e) => { e.stopPropagation(); toggleSelected(row.id); }}
+                onClick={(e) => e.stopPropagation()}
+                className="accent-rose-pink"
+              />
+            ),
+            className: 'w-10',
+          },
+          ...columns,
+        ]}
         data={filtered}
         loading={isLoading}
         onRowClick={(row) => router.push(`/students/${row.id}`)}

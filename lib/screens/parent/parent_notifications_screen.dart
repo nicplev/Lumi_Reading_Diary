@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -9,7 +11,7 @@ import '../../data/models/parent_notification_model.dart';
 import '../../data/models/user_model.dart';
 import '../../services/staff_notification_service.dart';
 
-class ParentNotificationsScreen extends StatelessWidget {
+class ParentNotificationsScreen extends StatefulWidget {
   const ParentNotificationsScreen({
     super.key,
     required this.user,
@@ -18,9 +20,64 @@ class ParentNotificationsScreen extends StatelessWidget {
   final UserModel user;
 
   @override
-  Widget build(BuildContext context) {
-    final service = StaffNotificationService.instance;
+  State<ParentNotificationsScreen> createState() =>
+      _ParentNotificationsScreenState();
+}
 
+class _ParentNotificationsScreenState
+    extends State<ParentNotificationsScreen> {
+  final _service = StaffNotificationService.instance;
+  late final StreamSubscription<List<ParentNotificationModel>> _sub;
+  List<ParentNotificationModel> _notifications = const [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _sub = _service.watchParentNotifications(widget.user).listen((data) {
+      if (mounted) {
+        setState(() {
+          _notifications = data;
+          _loading = false;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _sub.cancel();
+    super.dispose();
+  }
+
+  Future<void> _confirmClearAll() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear all notifications?'),
+        content: const Text("This can't be undone."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              'Clear all',
+              style: TextStyle(color: AppColors.error),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await _service.clearAllParentNotifications(widget.user);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.offWhite,
       appBar: AppBar(
@@ -30,48 +87,71 @@ class ParentNotificationsScreen extends StatelessWidget {
           'Notifications',
           style: LumiTextStyles.h2(color: AppColors.charcoal),
         ),
-      ),
-      body: StreamBuilder<List<ParentNotificationModel>>(
-        stream: service.watchParentNotifications(user),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final notifications =
-              snapshot.data ?? const <ParentNotificationModel>[];
-          if (notifications.isEmpty) {
-            return Center(
+        actions: [
+          if (_notifications.isNotEmpty)
+            TextButton(
+              onPressed: _confirmClearAll,
               child: Text(
-                'No notifications yet.',
+                'Clear all',
                 style: LumiTextStyles.body(
-                  color: AppColors.charcoal.withValues(alpha: 0.7),
+                  color: AppColors.charcoal.withValues(alpha: 0.5),
                 ),
               ),
-            );
-          }
-
-          return ListView.separated(
-            padding: LumiPadding.allM,
-            itemCount: notifications.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final notification = notifications[index];
-              return _NotificationCard(
-                notification: notification,
-                onTap: () async {
-                  if (!notification.isRead) {
-                    await service.markParentNotificationRead(
-                      user: user,
-                      notificationId: notification.id,
-                    );
-                  }
-                },
-              );
-            },
-          );
-        },
+            ),
+        ],
       ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _notifications.isEmpty
+              ? Center(
+                  child: Text(
+                    'No notifications yet.',
+                    style: LumiTextStyles.body(
+                      color: AppColors.charcoal.withValues(alpha: 0.7),
+                    ),
+                  ),
+                )
+              : ListView.separated(
+                  padding: LumiPadding.allM,
+                  itemCount: _notifications.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final notification = _notifications[index];
+                    return Dismissible(
+                      key: ValueKey(notification.id),
+                      direction: DismissDirection.endToStart,
+                      background: Container(
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 20),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.1),
+                          borderRadius: LumiBorders.large,
+                        ),
+                        child: Icon(
+                          Icons.delete_outline_rounded,
+                          color: AppColors.error,
+                        ),
+                      ),
+                      onDismissed: (_) {
+                        _service.deleteParentNotification(
+                          user: widget.user,
+                          notificationId: notification.id,
+                        );
+                      },
+                      child: _NotificationCard(
+                        notification: notification,
+                        onTap: () async {
+                          if (!notification.isRead) {
+                            await _service.markParentNotificationRead(
+                              user: widget.user,
+                              notificationId: notification.id,
+                            );
+                          }
+                        },
+                      ),
+                    );
+                  },
+                ),
     );
   }
 }

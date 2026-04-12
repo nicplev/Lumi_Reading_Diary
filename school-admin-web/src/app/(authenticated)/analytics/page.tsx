@@ -1,39 +1,23 @@
 import { getSession } from '@/lib/auth/session';
 import { redirect } from 'next/navigation';
-import {
-  getReadingMetrics,
-  getEngagementTrend,
-  getLevelDistribution,
-  getClassComparison,
-  getAtRiskStudents,
-  getTopReaders,
-  getPopularBooks,
-} from '@/lib/firestore/analytics';
+import { getSchool } from '@/lib/firestore/school';
 import { AnalyticsPage } from './analytics-page';
 
 export default async function AnalyticsRoute() {
   const session = await getSession();
   if (!session) redirect('/login');
 
-  const [metrics, trend, levels, classes, atRisk, topReaders, books] = await Promise.all([
-    getReadingMetrics(session.schoolId, 30),
-    getEngagementTrend(session.schoolId, 30),
-    getLevelDistribution(session.schoolId),
-    getClassComparison(session.schoolId),
-    getAtRiskStudents(session.schoolId, 7),
-    getTopReaders(session.schoolId, 10),
-    getPopularBooks(session.schoolId, 30, 15),
-  ]);
+  const school = await getSchool(session.schoolId);
+
+  // Serialize termDates (Dates → ISO strings) for the client component
+  const termDates = Object.fromEntries(
+    Object.entries(school?.termDates ?? {}).map(([k, v]) => [k, v instanceof Date ? v.toISOString() : String(v)])
+  );
 
   return (
     <AnalyticsPage
-      metrics={metrics}
-      trend={trend}
-      levels={levels}
-      classes={classes}
-      atRisk={atRisk}
-      topReaders={topReaders}
-      books={books}
+      levelSchema={school?.levelSchema ?? 'none'}
+      termDates={termDates}
     />
   );
 }

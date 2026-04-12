@@ -358,19 +358,19 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
         child: Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: TeacherDimensions.paddingL,
-            vertical: TeacherDimensions.paddingM,
+            vertical: 9,
           ),
           child: Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
                   color: AppColors.error.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(Icons.logout_rounded,
-                    size: 22, color: AppColors.error),
+                    size: 18, color: AppColors.error),
               ),
               const SizedBox(width: 14),
               Text(

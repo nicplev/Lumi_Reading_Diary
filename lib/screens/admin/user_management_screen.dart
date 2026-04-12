@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
@@ -683,7 +684,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
         await _toggleStudentStatus(studentId, data['isActive'] ?? true);
         break;
       case 'delete':
-        await _deleteStudent(studentId);
+        await _deleteStudent(studentId, data);
         break;
     }
   }
@@ -819,12 +820,40 @@ class _UserManagementScreenState extends State<UserManagementScreen>
     }
   }
 
-  Future<void> _deleteStudent(String studentId) async {
+  Future<void> _deleteStudent(String studentId, Map<String, dynamic> data) async {
+    final parentIds = List<String>.from(data['parentIds'] ?? []);
+    final name = '${data['firstName'] ?? ''} ${data['lastName'] ?? ''}'.trim();
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusL)),
         title: const Text('Delete Student'),
-        content: const Text('Are you sure you want to delete this student? This action cannot be undone.'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Delete ${name.isNotEmpty ? name : 'this student'}? This cannot be undone.',
+              style: TeacherTypography.bodyMedium,
+            ),
+            if (parentIds.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                  border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  '${parentIds.length} linked parent account(s) will also be deleted if they have no other children.',
+                  style: TeacherTypography.bodySmall.copyWith(color: AppColors.warning),
+                ),
+              ),
+            ],
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -834,9 +863,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(
               foregroundColor: AppColors.error,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(TeacherDimensions.radiusS),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusS)),
             ),
             child: Text('Delete', style: TeacherTypography.buttonText.copyWith(color: AppColors.error)),
           ),
@@ -844,28 +871,34 @@ class _UserManagementScreenState extends State<UserManagementScreen>
       ),
     );
 
-    if (confirm == true) {
-      try {
-        await _firebaseService.firestore
-            .collection('schools')
-            .doc(widget.adminUser.schoolId)
-            .collection('students')
-            .doc(studentId)
-            .delete();
+    if (confirm != true) return;
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Student deleted successfully'),
-            backgroundColor: AppColors.success,
-          ));
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Error deleting student: $e'),
-            backgroundColor: AppColors.error,
-          ));
-        }
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    try {
+      final callable = FirebaseFunctions.instance.httpsCallable('deleteStudentWithCascade');
+      await callable.call({'schoolId': widget.adminUser.schoolId, 'studentId': studentId});
+
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Student deleted successfully'),
+          backgroundColor: AppColors.success,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error deleting student: $e'),
+          backgroundColor: AppColors.error,
+        ));
       }
     }
   }
@@ -1467,112 +1500,138 @@ class _UserManagementScreenState extends State<UserManagementScreen>
   }
 
   Future<void> _showEditStudentDialog(String studentId, Map<String, dynamic> data) async {
+    // Load available classes first
+    List<QueryDocumentSnapshot> classDocs = [];
+    try {
+      final snapshot = await _firebaseService.firestore
+          .collection('schools')
+          .doc(widget.adminUser.schoolId)
+          .collection('classes')
+          .orderBy('name')
+          .get();
+      classDocs = snapshot.docs;
+    } catch (_) {}
+
+    if (!mounted) return;
+
     final formKey = GlobalKey<FormState>();
     final studentIdController = TextEditingController(text: data['studentId'] ?? studentId);
     final firstNameController = TextEditingController(text: data['firstName'] ?? '');
     final lastNameController = TextEditingController(text: data['lastName'] ?? '');
     final yearLevelController = TextEditingController(text: data['yearLevel'] ?? '');
+    String? selectedClassId = data['classId'] as String?;
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusL)),
-        title: Text('Edit Student', style: TeacherTypography.h3),
-        content: SingleChildScrollView(
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Student ID
-                TextFormField(
-                  controller: studentIdController,
-                  decoration: InputDecoration(
-                    labelText: 'Student ID',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusL)),
+          title: Text('Edit Student', style: TeacherTypography.h3),
+          content: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Student ID
+                  TextFormField(
+                    controller: studentIdController,
+                    decoration: InputDecoration(
+                      labelText: 'Student ID',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return 'Please enter student ID';
+                      return null;
+                    },
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter student ID';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                // First Name
-                TextFormField(
-                  controller: firstNameController,
-                  decoration: InputDecoration(
-                    labelText: 'First Name',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
+                  const SizedBox(height: 12),
+                  // First Name
+                  TextFormField(
+                    controller: firstNameController,
+                    decoration: InputDecoration(
+                      labelText: 'First Name',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return 'Please enter first name';
+                      return null;
+                    },
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter first name';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                // Last Name
-                TextFormField(
-                  controller: lastNameController,
-                  decoration: InputDecoration(
-                    labelText: 'Last Name',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
+                  const SizedBox(height: 12),
+                  // Last Name
+                  TextFormField(
+                    controller: lastNameController,
+                    decoration: InputDecoration(
+                      labelText: 'Last Name',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return 'Please enter last name';
+                      return null;
+                    },
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter last name';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                // Year Level
-                TextFormField(
-                  controller: yearLevelController,
-                  decoration: InputDecoration(
-                    labelText: 'Year Level',
-                    hintText: 'e.g., Year 3',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
+                  const SizedBox(height: 12),
+                  // Year Level
+                  TextFormField(
+                    controller: yearLevelController,
+                    decoration: InputDecoration(
+                      labelText: 'Year Level',
+                      hintText: 'e.g., Year 3',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
+                    ),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter year level';
-                    }
-                    return null;
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: TeacherTypography.bodyMedium.copyWith(color: AppColors.teacherPrimary)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(context, true);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.teacherPrimary,
-              foregroundColor: AppColors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                  if (classDocs.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    // Class selection
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedClassId,
+                      decoration: InputDecoration(
+                        labelText: 'Class',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM), borderSide: const BorderSide(color: AppColors.teacherPrimary, width: 2)),
+                      ),
+                      items: [
+                        const DropdownMenuItem<String>(value: null, child: Text('No class')),
+                        ...classDocs.map((doc) {
+                          final classData = doc.data() as Map<String, dynamic>;
+                          return DropdownMenuItem<String>(
+                            value: doc.id,
+                            child: Text(classData['name'] ?? doc.id),
+                          );
+                        }),
+                      ],
+                      onChanged: (value) => setDialogState(() => selectedClassId = value),
+                    ),
+                  ],
+                ],
               ),
             ),
-            child: const Text('Update Student'),
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text('Cancel', style: TeacherTypography.bodyMedium.copyWith(color: AppColors.teacherPrimary)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  Navigator.pop(context, true);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.teacherPrimary,
+                foregroundColor: AppColors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TeacherDimensions.radiusM)),
+              ),
+              child: const Text('Update Student'),
+            ),
+          ],
+        ),
       ),
     );
 
@@ -1583,6 +1642,8 @@ class _UserManagementScreenState extends State<UserManagementScreen>
         firstName: firstNameController.text.trim(),
         lastName: lastNameController.text.trim(),
         yearLevel: yearLevelController.text.trim(),
+        oldClassId: data['classId'] as String?,
+        newClassId: selectedClassId,
       );
     }
   }
@@ -1593,20 +1654,43 @@ class _UserManagementScreenState extends State<UserManagementScreen>
     required String firstName,
     required String lastName,
     required String yearLevel,
+    String? oldClassId,
+    String? newClassId,
   }) async {
     try {
-      await _firebaseService.firestore
+      final schoolId = widget.adminUser.schoolId!;
+      final batch = _firebaseService.firestore.batch();
+
+      final studentRef = _firebaseService.firestore
           .collection('schools')
-          .doc(widget.adminUser.schoolId)
+          .doc(schoolId)
           .collection('students')
-          .doc(studentId)
-          .update({
+          .doc(studentId);
+
+      batch.update(studentRef, {
         'studentId': newStudentId,
         'firstName': firstName,
         'lastName': lastName,
         'yearLevel': yearLevel,
+        if (newClassId != oldClassId) 'classId': newClassId,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+
+      // Update class studentIds arrays if class changed
+      if (newClassId != oldClassId) {
+        if (oldClassId != null && oldClassId.isNotEmpty) {
+          final oldClassRef = _firebaseService.firestore
+              .collection('schools').doc(schoolId).collection('classes').doc(oldClassId);
+          batch.update(oldClassRef, {'studentIds': FieldValue.arrayRemove([studentId])});
+        }
+        if (newClassId != null && newClassId.isNotEmpty) {
+          final newClassRef = _firebaseService.firestore
+              .collection('schools').doc(schoolId).collection('classes').doc(newClassId);
+          batch.update(newClassRef, {'studentIds': FieldValue.arrayUnion([studentId])});
+        }
+      }
+
+      await batch.commit();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(

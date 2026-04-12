@@ -10,7 +10,8 @@ import '../../core/widgets/lumi/reading_level_history_sheet.dart';
 import '../../core/widgets/lumi/reading_level_picker_sheet.dart';
 import '../../core/widgets/lumi/teacher_book_assignment_card.dart';
 import '../../core/widgets/lumi/teacher_reading_level_pill.dart';
-import '../../core/widgets/lumi/teacher_student_list_item.dart';
+import '../../core/widgets/lumi/student_avatar.dart';
+import '../../data/models/achievement_model.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/reading_level_option.dart';
 import '../../data/models/student_model.dart';
@@ -69,6 +70,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   StudentModel? _studentOverride;
   bool _readingLevelExpanded = false;
   Future<List<ReadingGroupModel>>? _studentGroupsFuture;
+  Future<List<AchievementModel>>? _achievementsFuture;
 
   StudentModel get _currentStudent => _studentOverride ?? widget.student;
 
@@ -93,6 +95,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     _ensureMetadataResolver();
     _loadReadingLevelOptions();
     _studentGroupsFuture = _loadStudentGroups();
+    _achievementsFuture = _loadStudentAchievements();
   }
 
   Future<List<ReadingGroupModel>> _loadStudentGroups() async {
@@ -109,6 +112,28 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
           .toList();
     } catch (e) {
       debugPrint('Error loading student groups: $e');
+      return [];
+    }
+  }
+
+  Future<List<AchievementModel>> _loadStudentAchievements() async {
+    try {
+      final doc = await _firebaseService.firestore
+          .collection('schools')
+          .doc(widget.student.schoolId)
+          .collection('students')
+          .doc(widget.student.id)
+          .get();
+      final data = doc.data();
+      if (data == null) return [];
+      final raw = data['achievements'] as List<dynamic>? ?? [];
+      final achievements = raw
+          .map((a) => AchievementModel.fromMap(Map<String, dynamic>.from(a)))
+          .toList();
+      achievements.sort((a, b) => b.earnedAt.compareTo(a.earnedAt));
+      return achievements;
+    } catch (e) {
+      debugPrint('Error loading student achievements: $e');
       return [];
     }
   }
@@ -1311,7 +1336,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         isbn: isbn,
         schoolId: widget.student.schoolId,
         actorId: widget.teacher.id,
-        useFirestoreCache: false,
+        useFirestoreCache: true,
         persistToFirestoreCache: false,
       );
       if (resolved == null) return;
@@ -1724,20 +1749,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         surfaceTintColor: AppColors.white,
         title: Row(
           children: [
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: TeacherStudentListItem.colorForName(
-                  _currentStudent.fullName),
-              child: Text(
-                _currentStudent.firstName[0].toUpperCase(),
-                style: const TextStyle(
-                  fontFamily: 'Nunito',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.white,
-                ),
-              ),
-            ),
+            StudentAvatar.fromStudent(_currentStudent, size: 32),
             const SizedBox(width: 10),
             Text(_currentStudent.fullName, style: TeacherTypography.h3),
           ],
@@ -1786,6 +1798,10 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
             // Latest Parent Comment
             _buildParentCommentSection(),
+            const SizedBox(height: 20),
+
+            // Achievements
+            _buildAchievementsSection(),
             const SizedBox(height: 20),
           ],
         ),
@@ -1902,7 +1918,25 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Recent Reading', style: TeacherTypography.h3),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Recent Reading', style: TeacherTypography.h3),
+            GestureDetector(
+              onTap: () => context.push(
+                '/teacher/student-reading-history/${widget.student.id}',
+                extra: {'student': _currentStudent},
+              ),
+              child: Text(
+                'View all',
+                style: TeacherTypography.bodySmall.copyWith(
+                  color: AppColors.teacherPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 10),
         StreamBuilder<QuerySnapshot>(
           stream: _firebaseService.firestore
@@ -1977,29 +2011,33 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     final minutes = log.minutesRead;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
         children: [
-          // Date
-          SizedBox(
-            width: 70,
-            child: Text(
-              dateStr,
-              style: TeacherTypography.caption,
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Book title
+          // Left: title + date stacked
           Expanded(
-            child: Text(
-              books,
-              style: TeacherTypography.bodyMedium,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  books,
+                  style: TeacherTypography.bodyMedium,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  dateStr,
+                  style: TeacherTypography.caption.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 8),
-          // Minutes
+          // Right: minutes + feeling blob
           Text(
             '${minutes}m',
             style: TeacherTypography.caption.copyWith(
@@ -2007,7 +2045,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               fontWeight: FontWeight.w700,
             ),
           ),
-          // Feeling blob
           if (log.childFeeling != null) ...[
             const SizedBox(width: 6),
             Image.asset(
@@ -2449,6 +2486,120 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildAchievementsSection() {
+    return FutureBuilder<List<AchievementModel>>(
+      future: _achievementsFuture,
+      builder: (context, snapshot) {
+        final achievements = snapshot.data ?? [];
+        if (snapshot.connectionState == ConnectionState.waiting && achievements.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Achievements', style: TeacherTypography.h3),
+                if (achievements.isNotEmpty)
+                  GestureDetector(
+                    onTap: () => context.push(
+                      '/parent/achievements',
+                      extra: {'student': _currentStudent},
+                    ),
+                    child: Text(
+                      'View all',
+                      style: TeacherTypography.bodySmall.copyWith(
+                        color: AppColors.teacherPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (achievements.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                  border: Border.all(color: AppColors.divider),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.emoji_events_outlined, size: 24, color: AppColors.textSecondary),
+                    const SizedBox(width: 10),
+                    Text(
+                      'No achievements yet',
+                      style: TeacherTypography.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              SizedBox(
+                height: 88,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: achievements.length > 8 ? 8 : achievements.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final a = achievements[index];
+                    return GestureDetector(
+                      onTap: () => context.push(
+                        '/parent/achievements',
+                        extra: {'student': _currentStudent},
+                      ),
+                      child: Container(
+                        width: 72,
+                        decoration: BoxDecoration(
+                          color: AppColors.white,
+                          borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                          border: Border.all(
+                            color: Color(a.effectiveColor).withValues(alpha: 0.5),
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Color(a.effectiveColor).withValues(alpha: 0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(a.icon, style: const TextStyle(fontSize: 28)),
+                            const SizedBox(height: 4),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: Text(
+                                a.name,
+                                style: TeacherTypography.caption.copyWith(fontSize: 9),
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 

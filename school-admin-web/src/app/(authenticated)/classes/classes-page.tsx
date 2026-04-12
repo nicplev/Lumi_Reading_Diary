@@ -9,12 +9,15 @@ import { Badge } from '@/components/lumi/badge';
 import { EmptyState } from '@/components/lumi/empty-state';
 import { Icon } from '@/components/lumi/icon';
 import { ConfirmDialog } from '@/components/lumi/confirm-dialog';
+import { Tabs } from '@/components/lumi/tabs';
 import { useToast } from '@/components/lumi/toast';
 import { ClassFormModal } from './class-form-modal';
+import { KanbanBoard } from './kanban-board';
 import { useClasses, useCreateClass, useUpdateClass, useDeleteClass } from '@/lib/hooks/use-classes';
 import type { SchoolClass } from '@/lib/types';
 
 type SerializedClass = Omit<SchoolClass, 'createdAt'> & { createdAt: string };
+type ViewMode = 'list' | 'board';
 
 interface ClassesPageProps {
   teachers: { id: string; fullName: string }[];
@@ -28,6 +31,7 @@ export function ClassesPage({ teachers }: ClassesPageProps) {
   const updateClass = useUpdateClass();
   const deleteClass = useDeleteClass();
 
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [showCreate, setShowCreate] = useState(false);
   const [editingClass, setEditingClass] = useState<SerializedClass | null>(null);
   const [deletingClass, setDeletingClass] = useState<SerializedClass | null>(null);
@@ -120,20 +124,33 @@ export function ClassesPage({ teachers }: ClassesPageProps) {
         action={<Button onClick={() => setShowCreate(true)}>Add Class</Button>}
       />
 
-      <DataTable
-        columns={columns}
-        data={classes ?? []}
-        loading={isLoading}
-        onRowClick={(row) => router.push(`/classes/${row.id}`)}
-        emptyState={
-          <EmptyState
-            icon={<Icon name="school" size={40} />}
-            title="No classes yet"
-            description="Create your first class to get started."
-            action={<Button onClick={() => setShowCreate(true)}>Add Class</Button>}
-          />
-        }
+      <Tabs
+        tabs={[
+          { id: 'list', label: 'List' },
+          { id: 'board', label: 'Board' },
+        ]}
+        activeTab={viewMode}
+        onChange={(id) => setViewMode(id as ViewMode)}
       />
+
+      {viewMode === 'list' ? (
+        <DataTable
+          columns={columns}
+          data={classes ?? []}
+          loading={isLoading}
+          onRowClick={(row) => router.push(`/classes/${row.id}`)}
+          emptyState={
+            <EmptyState
+              icon={<Icon name="school" size={40} />}
+              title="No classes yet"
+              description="Create your first class to get started."
+              action={<Button onClick={() => setShowCreate(true)}>Add Class</Button>}
+            />
+          }
+        />
+      ) : (
+        <KanbanBoard teachers={teachers} />
+      )}
 
       <ClassFormModal
         open={showCreate}

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,19 +9,26 @@ import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/teacher_constants.dart';
+import '../../../data/models/achievement_model.dart';
 import '../../../data/models/class_model.dart';
+import '../../../data/models/reading_group_model.dart';
+import '../../../data/models/reading_log_model.dart';
 import '../../../data/models/student_model.dart';
 import '../../../data/models/user_model.dart';
 import '../../../services/firebase_service.dart';
-import 'widgets/dashboard_engagement_card.dart';
-import 'widgets/dashboard_recent_reading_card.dart';
-import 'widgets/dashboard_weekly_chart.dart';
-import 'widgets/dashboard_priority_nudges.dart';
+import 'models/student_achievement.dart';
+import 'models/dashboard_widget_config.dart';
+import 'models/dashboard_widget_context.dart';
+import 'models/widget_registry.dart';
+import 'widgets/edit_mode_wrapper.dart';
+import 'widgets/widget_gallery_sheet.dart';
 
 /// Teacher Dashboard View
 ///
 /// Assembles all dashboard sections: hero, engagement card,
 /// weekly chart, and priority nudges.
+/// Supports Apple-style widget customisation — teachers can enter
+/// edit mode to add, remove, and reorder widgets.
 class TeacherDashboardView extends StatefulWidget {
   final UserModel user;
   final ClassModel selectedClass;
@@ -45,21 +54,33 @@ class TeacherDashboardView extends StatefulWidget {
 class _TeacherDashboardViewState extends State<TeacherDashboardView> {
   int _bellAnimCount = 0;
   String? _dailyInsight;
-  int? _classStreakDays;
   int? _momentumDiff; // positive = up, negative = down
   List<StudentModel> _students = [];
   bool _studentsLoaded = false;
+  List<ReadingLogModel> _weeklyLogs = [];
+  bool _weeklyLogsLoaded = false;
+  List<ReadingGroupModel> _readingGroups = [];
+  bool _readingGroupsLoaded = false;
+  StreamSubscription<QuerySnapshot>? _readingGroupsSubscription;
+  List<StudentAchievement> _recentAchievements = [];
   final ValueNotifier<int> _engagementResetSignal = ValueNotifier<int>(0);
+
+  // Widget customisation
+  late DashboardWidgetConfig _widgetConfig;
+  bool _isEditMode = false;
 
   @override
   void initState() {
     super.initState();
+    _widgetConfig =
+        DashboardWidgetConfig.fromPreferences(widget.user.preferences);
     _computeHeroIntelligence();
-    _fetchStudents();
+    _fetchAllDependencies();
   }
 
   @override
   void dispose() {
+    _readingGroupsSubscription?.cancel();
     _engagementResetSignal.dispose();
     super.dispose();
   }
@@ -73,10 +94,159 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.selectedClass.id != widget.selectedClass.id) {
       _computeHeroIntelligence();
-      _fetchStudents();
+      _fetchAllDependencies();
     }
     if (oldWidget.resetTrigger != widget.resetTrigger) {
       resetEngagementCard();
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Widget config helpers
+  // ------------------------------------------------------------------
+
+  bool _anyWidgetNeeds(WidgetDataDependency dep) =>
+      _widgetConfig.activeWidgetIds
+          .map((id) => DashboardWidgetRegistry.get(id))
+          .whereType<DashboardWidgetDefinition>()
+          .any((w) => w.dataDependencies.contains(dep));
+
+  bool get _anyWidgetNeedsStudents =>
+      _anyWidgetNeeds(WidgetDataDependency.students);
+  bool get _anyWidgetNeedsWeeklyLogs =>
+      _anyWidgetNeeds(WidgetDataDependency.weeklyLogs);
+  bool get _anyWidgetNeedsReadingGroups =>
+      _anyWidgetNeeds(WidgetDataDependency.readingGroups);
+
+  DashboardWidgetContext get _widgetContext => DashboardWidgetContext(
+        classModel: widget.selectedClass,
+        schoolId: widget.user.schoolId!,
+        teacher: widget.user,
+        students: _students,
+        studentsLoaded: _studentsLoaded,
+        engagementResetSignal: _engagementResetSignal,
+        onViewAllReading: () => widget.onTabChanged(1),
+        weeklyLogs: _weeklyLogs,
+        weeklyLogsLoaded: _weeklyLogsLoaded,
+        readingGroups: _readingGroups,
+        readingGroupsLoaded: _readingGroupsLoaded,
+        recentAchievements: _recentAchievements,
+      );
+
+  void _enterEditMode() {
+    HapticFeedback.mediumImpact();
+    setState(() => _isEditMode = true);
+  }
+
+  void _exitEditMode() {
+    setState(() => _isEditMode = false);
+    _saveWidgetConfig();
+  }
+
+  void _removeWidget(String id) {
+    HapticFeedback.lightImpact();
+    setState(() {
+      _widgetConfig = _widgetConfig.removeWidget(id);
+    });
+    if (!_anyWidgetNeedsStudents) _students = [];
+    if (!_anyWidgetNeedsWeeklyLogs) _weeklyLogs = [];
+    if (!_anyWidgetNeedsReadingGroups) {
+      _readingGroupsSubscription?.cancel();
+      _readingGroupsSubscription = null;
+      _readingGroups = [];
+    }
+  }
+
+  void _addWidget(String id) {
+    HapticFeedback.lightImpact();
+    final def = DashboardWidgetRegistry.get(id);
+    final neededBefore = {
+      WidgetDataDependency.students: _anyWidgetNeedsStudents,
+      WidgetDataDependency.weeklyLogs: _anyWidgetNeedsWeeklyLogs,
+      WidgetDataDependency.readingGroups: _anyWidgetNeedsReadingGroups,
+    };
+    setState(() {
+      _widgetConfig = _widgetConfig.addWidget(id);
+    });
+    if (def == null) return;
+    // Fetch any dependencies the new widget introduces
+    if (!neededBefore[WidgetDataDependency.students]! &&
+        def.dataDependencies.contains(WidgetDataDependency.students)) {
+      _studentsLoaded = false;
+      _fetchStudents();
+    }
+    if (!neededBefore[WidgetDataDependency.weeklyLogs]! &&
+        def.dataDependencies.contains(WidgetDataDependency.weeklyLogs)) {
+      _weeklyLogsLoaded = false;
+      _fetchWeeklyLogs();
+    }
+    if (!neededBefore[WidgetDataDependency.readingGroups]! &&
+        def.dataDependencies.contains(WidgetDataDependency.readingGroups)) {
+      _readingGroupsLoaded = false;
+      _fetchReadingGroups();
+    }
+  }
+
+  void _onReorder(int oldIndex, int newIndex) {
+    if (newIndex > oldIndex) newIndex--;
+    setState(() {
+      _widgetConfig = _widgetConfig.reorder(oldIndex, newIndex);
+    });
+  }
+
+  void _showWidgetGallery() {
+    final inactive =
+        DashboardWidgetRegistry.getInactive(_widgetConfig.activeWidgetIds);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => WidgetGallerySheet(
+        availableWidgets: inactive,
+        onAddWidget: (id) {
+          Navigator.pop(context);
+          _addWidget(id);
+        },
+      ),
+    );
+  }
+
+  Future<void> _saveWidgetConfig() async {
+    try {
+      final prefs =
+          Map<String, dynamic>.from(widget.user.preferences ?? {});
+      prefs.addAll(_widgetConfig.toPreferencesMap());
+
+      await FirebaseService.instance.firestore
+          .collection('schools')
+          .doc(widget.user.schoolId)
+          .collection('users')
+          .doc(widget.user.id)
+          .update({'preferences': prefs});
+    } catch (e) {
+      debugPrint('Error saving dashboard widget config: $e');
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Data fetching
+  // ------------------------------------------------------------------
+
+  /// Launches all required fetches in parallel based on active widget deps.
+  void _fetchAllDependencies() {
+    if (_anyWidgetNeedsStudents) {
+      _fetchStudents();
+    } else {
+      _studentsLoaded = true;
+    }
+    if (_anyWidgetNeedsWeeklyLogs) {
+      _fetchWeeklyLogs();
+    } else {
+      _weeklyLogsLoaded = true;
+    }
+    if (_anyWidgetNeedsReadingGroups) {
+      _fetchReadingGroups();
+    } else {
+      _readingGroupsLoaded = true;
     }
   }
 
@@ -84,12 +254,17 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
     final studentIds = widget.selectedClass.studentIds;
     final schoolId = widget.user.schoolId;
     if (studentIds.isEmpty || schoolId == null) {
-      if (mounted) setState(() { _students = []; _studentsLoaded = true; });
+      if (mounted) setState(() {
+        _students = [];
+        _recentAchievements = [];
+        _studentsLoaded = true;
+      });
       return;
     }
 
     try {
       final List<StudentModel> students = [];
+      final List<StudentAchievement> achievements = [];
       // Batch in groups of 30 (Firestore whereIn limit)
       for (var i = 0; i < studentIds.length; i += 30) {
         final batch = studentIds.sublist(
@@ -104,14 +279,116 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
             .get();
         for (final doc in snapshot.docs) {
           students.add(StudentModel.fromFirestore(doc));
+          // Extract achievements from raw doc (piggyback — zero extra reads)
+          final data = doc.data();
+          final achievementsData =
+              data['achievements'] as List<dynamic>? ?? [];
+          final firstName = (data['firstName'] as String?) ?? '';
+          for (final a in achievementsData) {
+            try {
+              achievements.add(StudentAchievement(
+                studentId: doc.id,
+                studentFirstName: firstName,
+                achievement:
+                    AchievementModel.fromMap(Map<String, dynamic>.from(a)),
+              ));
+            } catch (_) {
+              // Skip malformed achievements
+            }
+          }
         }
       }
+      // Sort achievements newest-first
+      achievements.sort(
+          (a, b) => b.achievement.earnedAt.compareTo(a.achievement.earnedAt));
+
       if (!mounted) return;
-      setState(() { _students = students; _studentsLoaded = true; });
+      setState(() {
+        _students = students;
+        _recentAchievements = achievements;
+        _studentsLoaded = true;
+      });
     } catch (e) {
       debugPrint('Error fetching students for dashboard: $e');
       if (mounted) setState(() => _studentsLoaded = true);
     }
+  }
+
+  Future<void> _fetchWeeklyLogs() async {
+    final schoolId = widget.user.schoolId;
+    if (schoolId == null) {
+      if (mounted) setState(() { _weeklyLogs = []; _weeklyLogsLoaded = true; });
+      return;
+    }
+
+    try {
+      final now = DateTime.now();
+      final startOfWeek =
+          DateTime(now.year, now.month, now.day - (now.weekday - 1));
+
+      final snapshot = await FirebaseService.instance.firestore
+          .collection('schools')
+          .doc(schoolId)
+          .collection('readingLogs')
+          .where('classId', isEqualTo: widget.selectedClass.id)
+          .where('date',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeek))
+          .get();
+
+      if (!mounted) return;
+      setState(() {
+        _weeklyLogs = snapshot.docs
+            .map((doc) => ReadingLogModel.fromFirestore(doc))
+            .toList();
+        _weeklyLogsLoaded = true;
+      });
+    } catch (e) {
+      debugPrint('Error fetching weekly logs for dashboard: $e');
+      if (mounted) setState(() => _weeklyLogsLoaded = true);
+    }
+  }
+
+  void _fetchReadingGroups() {
+    _readingGroupsSubscription?.cancel();
+
+    final schoolId = widget.user.schoolId;
+    if (schoolId == null) {
+      if (mounted) {
+        setState(() {
+          _readingGroups = [];
+          _readingGroupsLoaded = true;
+        });
+      }
+      return;
+    }
+
+    _readingGroupsSubscription = FirebaseService.instance.firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('readingGroups')
+        .where('classId', isEqualTo: widget.selectedClass.id)
+        .where('isActive', isEqualTo: true)
+        .snapshots()
+        .listen(
+      (snapshot) {
+        if (!mounted) return;
+        final groups = snapshot.docs
+            .map((doc) => ReadingGroupModel.fromFirestore(doc))
+            .toList()
+          ..sort((a, b) {
+            final orderCmp = a.sortOrder.compareTo(b.sortOrder);
+            return orderCmp != 0 ? orderCmp : a.name.compareTo(b.name);
+          });
+        setState(() {
+          _readingGroups = groups;
+          _readingGroupsLoaded = true;
+        });
+      },
+      onError: (e) {
+        debugPrint('Error fetching reading groups for dashboard: $e');
+        if (mounted) setState(() => _readingGroupsLoaded = true);
+      },
+    );
   }
 
   Future<void> _computeHeroIntelligence() async {
@@ -166,17 +443,13 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
               isGreaterThanOrEqualTo: Timestamp.fromDate(thirtyDaysAgo))
           .get();
 
-      // Build set of dates that had at least one log
-      final Set<String> daysWithLogs = {};
+      // Build set of students per week for momentum
       final Set<String> thisWeekStudents = {};
       final Set<String> lastWeekStudents = {};
 
       for (final doc in recentLogs.docs) {
         final data = doc.data();
         final date = (data['date'] as Timestamp).toDate();
-        final dateKey =
-            '${date.year}-${date.month}-${date.day}';
-        daysWithLogs.add(dateKey);
 
         final studentId = data['studentId'] as String?;
         if (studentId != null) {
@@ -185,19 +458,6 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
           } else if (!date.isBefore(startOfLastWeek)) {
             lastWeekStudents.add(studentId);
           }
-        }
-      }
-
-      // Compute streak: consecutive days going back from yesterday
-      int streakDays = 0;
-      for (int i = 1; i <= 30; i++) {
-        final checkDate = today.subtract(Duration(days: i));
-        final key =
-            '${checkDate.year}-${checkDate.month}-${checkDate.day}';
-        if (daysWithLogs.contains(key)) {
-          streakDays++;
-        } else {
-          break;
         }
       }
 
@@ -214,7 +474,6 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
       if (!mounted) return;
       setState(() {
         _dailyInsight = insight;
-        _classStreakDays = streakDays >= 2 ? streakDays : null;
         _momentumDiff = momentum;
       });
     } catch (e) {
@@ -222,11 +481,22 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
     }
   }
 
+  // ------------------------------------------------------------------
+  // BUILD
+  // ------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).viewPadding.top;
+    final ctx = _widgetContext;
+    final activeDefinitions = _widgetConfig.activeWidgetIds
+        .map((id) => DashboardWidgetRegistry.get(id))
+        .whereType<DashboardWidgetDefinition>()
+        .toList();
+
     return GestureDetector(
-      onTap: resetEngagementCard,
+      onTap: _isEditMode ? null : resetEngagementCard,
+      onLongPress: _isEditMode ? null : _enterEditMode,
       behavior: HitTestBehavior.translucent,
       child: CustomScrollView(
         slivers: [
@@ -240,71 +510,273 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
                 .fadeIn(duration: 400.ms, curve: Curves.easeOut)
                 .slideY(begin: -0.02, end: 0, duration: 400.ms),
           ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                // Engagement Card
-                DashboardEngagementCard(
-                  classModel: widget.selectedClass,
-                  schoolId: widget.user.schoolId!,
-                  students: _students,
-                  resetSignal: _engagementResetSignal,
-                )
-                    .animate()
-                    .fadeIn(
-                        delay: 60.ms,
-                        duration: 300.ms,
-                        curve: Curves.easeOut)
-                    .slideY(begin: 0.02, end: 0, duration: 300.ms),
-                const SizedBox(height: 24),
-                // Recent Reading
-                if (_studentsLoaded)
-                  DashboardRecentReadingCard(
-                    classModel: widget.selectedClass,
-                    schoolId: widget.user.schoolId!,
-                    students: _students,
-                    onViewAll: () => widget.onTabChanged(1),
-                  )
-                      .animate()
-                      .fadeIn(
-                          delay: 90.ms,
-                          duration: 300.ms,
-                          curve: Curves.easeOut)
-                      .slideY(begin: 0.02, end: 0, duration: 300.ms),
-                if (_studentsLoaded) const SizedBox(height: 24),
-                // Weekly Chart
-                DashboardWeeklyChart(
-                  classModel: widget.selectedClass,
-                  schoolId: widget.user.schoolId!,
-                )
-                    .animate()
-                    .fadeIn(
-                        delay: 120.ms,
-                        duration: 300.ms,
-                        curve: Curves.easeOut)
-                    .slideY(begin: 0.02, end: 0, duration: 300.ms),
-                const SizedBox(height: 24),
-                // Priority Nudges
-                if (_studentsLoaded)
-                  DashboardPriorityNudges(
-                    classModel: widget.selectedClass,
-                    schoolId: widget.user.schoolId!,
-                    teacher: widget.user,
-                    students: _students,
-                    onSeeAll: () => widget.onTabChanged(1),
-                  )
-                      .animate()
-                      .fadeIn(
-                          delay: 180.ms,
-                          duration: 300.ms,
-                          curve: Curves.easeOut)
-                      .slideY(begin: 0.02, end: 0, duration: 300.ms),
-                const SizedBox(height: 16),
-              ]),
+
+          // ── Edit-mode banner ──
+          if (_isEditMode)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: _buildEditModeBanner(),
+              ),
+            ),
+
+          // ── Widget cards ──
+          if (_isEditMode)
+            _buildEditableWidgetSliver(activeDefinitions, ctx)
+          else
+            _buildNormalWidgetSliver(activeDefinitions, ctx),
+
+          // ── Customize link (normal mode only) ──
+          if (!_isEditMode)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+                child: GestureDetector(
+                  onTap: _enterEditMode,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.dashboard_customize_rounded,
+                          size: 16, color: AppColors.textSecondary),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Customize dashboard',
+                        style: TeacherTypography.bodySmall.copyWith(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // ── Bottom padding ──
+          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+        ],
+      ),
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // Normal (non-edit) widget list
+  // ------------------------------------------------------------------
+
+  Widget _buildNormalWidgetSliver(
+      List<DashboardWidgetDefinition> defs, DashboardWidgetContext ctx) {
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            // Interleave widgets with spacers: 0=widget, 1=space, 2=widget…
+            if (index.isOdd) return const SizedBox(height: 24);
+            final widgetIndex = index ~/ 2;
+            final def = defs[widgetIndex];
+
+            // Skip widgets whose shared data hasn't loaded yet
+            if ((def.dataDependencies.contains(WidgetDataDependency.students) && !_studentsLoaded) ||
+                (def.dataDependencies.contains(WidgetDataDependency.weeklyLogs) && !_weeklyLogsLoaded) ||
+                (def.dataDependencies.contains(WidgetDataDependency.readingGroups) && !_readingGroupsLoaded)) {
+              return const SizedBox.shrink();
+            }
+
+            return def
+                .builder(ctx)
+                .animate()
+                .fadeIn(
+                    delay: (60 * widgetIndex).ms,
+                    duration: 300.ms,
+                    curve: Curves.easeOut)
+                .slideY(begin: 0.02, end: 0, duration: 300.ms);
+          },
+          childCount: defs.isEmpty ? 0 : defs.length * 2 - 1,
+        ),
+      ),
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // Edit-mode widget list (reorderable)
+  // ------------------------------------------------------------------
+
+  Widget _buildEditableWidgetSliver(
+      List<DashboardWidgetDefinition> defs, DashboardWidgetContext ctx) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        child: Column(
+          children: [
+            ReorderableListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              buildDefaultDragHandles: true,
+              proxyDecorator: (child, index, animation) {
+                return AnimatedBuilder(
+                  animation: animation,
+                  builder: (context, child) {
+                    final scale = Tween<double>(begin: 1.0, end: 1.04)
+                        .animate(CurvedAnimation(
+                            parent: animation, curve: Curves.easeInOut));
+                    return Transform.scale(
+                      scale: scale.value,
+                      child: child,
+                    );
+                  },
+                  child: Material(
+                    color: Colors.transparent,
+                    elevation: 6,
+                    shadowColor: Colors.black.withValues(alpha: 0.15),
+                    borderRadius:
+                        BorderRadius.circular(TeacherDimensions.radiusXL),
+                    child: child,
+                  ),
+                );
+              },
+              onReorder: _onReorder,
+              itemCount: defs.length,
+              itemBuilder: (context, index) {
+                final def = defs[index];
+                final needsStudents = def.dataDependencies
+                    .contains(WidgetDataDependency.students);
+
+                return Padding(
+                  key: ValueKey(def.id),
+                  padding: const EdgeInsets.only(bottom: 20),
+                  child: EditModeWrapper(
+                    onRemove: () => _removeWidget(def.id),
+                    child: (needsStudents && !_studentsLoaded)
+                        ? _buildWidgetPlaceholder(def)
+                        : def.builder(ctx),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 4),
+            _buildAddWidgetButton(),
+            const SizedBox(height: 16),
+            _buildDoneButton(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWidgetPlaceholder(DashboardWidgetDefinition def) {
+    return Container(
+      height: 120,
+      decoration: BoxDecoration(
+        color: AppColors.teacherBackground,
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
+        border: Border.all(color: AppColors.teacherBorder),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(def.icon, size: 24, color: AppColors.textSecondary),
+            const SizedBox(height: 8),
+            Text(def.displayName,
+                style: TeacherTypography.bodySmall
+                    .copyWith(color: AppColors.textSecondary)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // Edit-mode UI elements
+  // ------------------------------------------------------------------
+
+  Widget _buildEditModeBanner() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.teacherSurfaceTint,
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+        border: Border.all(
+            color: AppColors.teacherPrimary.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.widgets_rounded,
+              size: 18, color: AppColors.teacherPrimary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Customise your dashboard',
+              style: TeacherTypography.bodyMedium.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppColors.teacherPrimary,
+              ),
             ),
           ),
+          Text(
+            'Drag to reorder',
+            style: TeacherTypography.caption
+                .copyWith(color: AppColors.teacherPrimary),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAddWidgetButton() {
+    final inactiveCount = DashboardWidgetRegistry.getInactive(
+            _widgetConfig.activeWidgetIds)
+        .length;
+
+    return GestureDetector(
+      onTap: _showWidgetGallery,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: AppColors.teacherPrimary.withValues(alpha: 0.35),
+            width: 1.5,
+          ),
+          borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+          color: AppColors.teacherSurfaceTint.withValues(alpha: 0.5),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add_rounded,
+                size: 20, color: AppColors.teacherPrimary),
+            const SizedBox(width: 8),
+            Text(
+              inactiveCount > 0
+                  ? 'Add Widget ($inactiveCount available)'
+                  : 'All Widgets Active',
+              style: TeacherTypography.bodyMedium.copyWith(
+                fontWeight: FontWeight.w700,
+                color: AppColors.teacherPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDoneButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: _exitEditMode,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.teacherPrimary,
+          foregroundColor: AppColors.white,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+          ),
+          elevation: 0,
+        ),
+        child: Text('Done', style: TeacherTypography.buttonText),
       ),
     );
   }
@@ -325,7 +797,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
         : 'Teacher';
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
       decoration: BoxDecoration(
         gradient: AppColors.teacherGradient,
         borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
@@ -394,10 +866,6 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
                   _buildClassChip()
                       .animate()
                       .fadeIn(delay: 100.ms, duration: 300.ms),
-                  if (_classStreakDays != null) ...[
-                    const SizedBox(width: 8),
-                    _buildStreakPill(),
-                  ],
                 ],
               ),
             ],
@@ -407,84 +875,69 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
     );
   }
 
+
   Widget _buildClassChip() {
     final label = widget.selectedClass.name;
 
+    final labelRow = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.class_outlined, size: 18, color: AppColors.white),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: TeacherTypography.bodyMedium.copyWith(
+            color: AppColors.white,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        if (_momentumDiff != null) ...[
+          const SizedBox(width: 6),
+          Icon(
+            _momentumDiff! > 0
+                ? Icons.trending_up_rounded
+                : Icons.trending_down_rounded,
+            size: 16,
+            color: _momentumDiff! > 0
+                ? const Color(0xFFB9F6CA)
+                : const Color(0xFFFFCDD2),
+          ),
+        ],
+        if (widget.classes.length > 1) ...[
+          const SizedBox(width: 6),
+          const Icon(Icons.keyboard_arrow_down,
+              size: 18, color: AppColors.white),
+        ],
+      ],
+    );
+
+    // Single class: render as plain label (no pill, no tap handler)
+    if (widget.classes.length <= 1) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 10),
+        child: labelRow,
+      );
+    }
+
+    // Multiple classes: interactive pill with dropdown affordance
     return Material(
       color: AppColors.white.withValues(alpha: 0.18),
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
-        onTap: widget.classes.length > 1
-            ? () => _showClassSelectorBottomSheet(context)
-            : null,
+        onTap: () => _showClassSelectorBottomSheet(context),
+        onLongPress: () {
+          HapticFeedback.mediumImpact();
+          _showClassSelectorBottomSheet(context);
+        },
         borderRadius: BorderRadius.circular(999),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.class_outlined,
-                  size: 18, color: AppColors.white),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TeacherTypography.bodyMedium.copyWith(
-                  color: AppColors.white,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              if (_momentumDiff != null) ...[
-                const SizedBox(width: 6),
-                Icon(
-                  _momentumDiff! > 0
-                      ? Icons.trending_up_rounded
-                      : Icons.trending_down_rounded,
-                  size: 16,
-                  color: _momentumDiff! > 0
-                      ? const Color(0xFFB9F6CA)
-                      : const Color(0xFFFFCDD2),
-                ),
-              ],
-              if (widget.classes.length > 1) ...[
-                const SizedBox(width: 6),
-                const Icon(Icons.keyboard_arrow_down,
-                    size: 18, color: AppColors.white),
-              ],
-            ],
-          ),
+          child: labelRow,
         ),
       ),
     );
   }
 
-  Widget _buildStreakPill() {
-    final isGold = _classStreakDays! >= 7;
-    final color = isGold ? const Color(0xFFFFD700) : AppColors.white;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.white.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.local_fire_department_rounded,
-              size: 16, color: color),
-          const SizedBox(width: 6),
-          Text(
-            '$_classStreakDays-day streak',
-            style: TeacherTypography.bodySmall.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildBellButton(BuildContext context) {
     return GestureDetector(

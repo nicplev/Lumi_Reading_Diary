@@ -10,28 +10,37 @@ import { Icon } from '@/components/lumi/icon';
 import { DataTable, type DataTableColumn } from '@/components/lumi/data-table';
 import { ConfirmDialog } from '@/components/lumi/confirm-dialog';
 import { useToast } from '@/components/lumi/toast';
-import { useLinkCodes, useRevokeLinkCode } from '@/lib/hooks/use-link-codes';
+import { useLinkCodes, useRevokeLinkCode, useDeleteLinkCode } from '@/lib/hooks/use-link-codes';
 import { GenerateCodeModal } from './generate-code-modal';
 
 type StatusFilter = 'all' | 'active' | 'used' | 'revoked' | 'expired';
 type SerializedCode = NonNullable<ReturnType<typeof useLinkCodes>['data']>[number];
 
 const statusVariants: Record<string, 'success' | 'info' | 'warning' | 'error' | 'default'> = {
-  active: 'success',
-  used: 'info',
+  active: 'warning',
+  used: 'success',
   revoked: 'error',
-  expired: 'warning',
+  expired: 'default',
+};
+
+const statusLabels: Record<string, string> = {
+  active: 'Pending',
+  used: 'Active',
+  revoked: 'Revoked',
+  expired: 'Expired',
 };
 
 export function LinkCodesTab() {
   const { toast } = useToast();
-  const { data: codes, isLoading } = useLinkCodes();
+  const { data: codes, isLoading, error } = useLinkCodes();
   const revoke = useRevokeLinkCode();
+  const deleteCode = useDeleteLinkCode();
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [showGenerate, setShowGenerate] = useState(false);
   const [revokeConfirm, setRevokeConfirm] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
@@ -74,6 +83,17 @@ export function LinkCodesTab() {
       toast(error instanceof Error ? error.message : 'Failed to revoke', 'error');
     }
     setRevokeConfirm(null);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteConfirm) return;
+    try {
+      await deleteCode.mutateAsync(deleteConfirm);
+      toast('Code removed from list', 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to delete', 'error');
+    }
+    setDeleteConfirm(null);
   };
 
   const handleCopy = (code: string, id: string) => {
@@ -120,7 +140,7 @@ export function LinkCodesTab() {
       accessorFn: (row) => row.status,
       cell: (value) => (
         <Badge variant={statusVariants[value as string] ?? 'default'}>
-          {(value as string).charAt(0).toUpperCase() + (value as string).slice(1)}
+          {statusLabels[value as string] ?? (value as string)}
         </Badge>
       ),
     },
@@ -151,10 +171,30 @@ export function LinkCodesTab() {
           >
             Revoke
           </Button>
+        ) : row.status === 'revoked' ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => { e.stopPropagation(); setDeleteConfirm(row.id); }}
+            className="text-text-secondary hover:text-error"
+            title="Remove from list"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M2 3.5h10M5.5 3.5V2.5a.5.5 0 01.5-.5h2a.5.5 0 01.5.5v1M4 3.5l.5 8h5l.5-8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </Button>
         ) : null,
       className: 'text-right',
     },
   ];
+
+  if (error) {
+    return (
+      <div className="rounded-lg border border-error/30 bg-error/5 p-4 text-error text-sm">
+        Failed to load link codes. Please refresh the page.
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -162,8 +202,8 @@ export function LinkCodesTab() {
         <div className="flex flex-wrap items-center gap-3">
           {([
             { value: 'all', label: 'All', count: statusCounts.all },
-            { value: 'active', label: 'Active', count: statusCounts.active },
-            { value: 'used', label: 'Used', count: statusCounts.used },
+            { value: 'active', label: 'Pending', count: statusCounts.active },
+            { value: 'used', label: 'Active', count: statusCounts.used },
             { value: 'revoked', label: 'Revoked', count: statusCounts.revoked },
             { value: 'expired', label: 'Expired', count: statusCounts.expired },
           ] as const).map((opt) => (
@@ -211,6 +251,17 @@ export function LinkCodesTab() {
         confirmLabel="Revoke"
         variant="danger"
         loading={revoke.isPending}
+      />
+
+      <ConfirmDialog
+        open={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={handleDelete}
+        title="Remove from list"
+        description="This will permanently remove this revoked code from the list. This action cannot be undone."
+        confirmLabel="Remove"
+        variant="danger"
+        loading={deleteCode.isPending}
       />
     </div>
   );

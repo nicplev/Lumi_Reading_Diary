@@ -32,20 +32,20 @@ class TeacherSettingsItem extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: TeacherDimensions.paddingL,
-          vertical: TeacherDimensions.paddingM,
+          vertical: 9,
         ),
         child: Row(
           children: [
             Container(
-              width: 44,
-              height: 44,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 color: iconBgColor.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 icon,
-                size: TeacherDimensions.iconM,
+                size: 22,
                 color: iconColor ?? iconBgColor,
               ),
             ),

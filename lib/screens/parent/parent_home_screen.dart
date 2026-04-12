@@ -19,12 +19,14 @@ import '../../core/widgets/lumi/progress_ring.dart';
 import '../../core/widgets/lumi/lumi_book_card.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../core/services/navigation_state_service.dart';
+import '../../data/models/achievement_model.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../data/models/allocation_model.dart';
 import '../../services/book_cover_cache_service.dart';
 import '../../services/firebase_service.dart';
+import '../../services/widget_data_service.dart';
 import '../../services/isbn_assignment_service.dart';
 import '../../services/staff_notification_service.dart';
 import 'reading_history_screen.dart';
@@ -96,6 +98,16 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
         }
         _isLoading = false;
       });
+
+      // Refresh widget data whenever the parent's children list is (re)loaded.
+      // Pass empty logs map — loggedToday is inferred from stats.lastReadingDate.
+      if (children.isNotEmpty) {
+        WidgetDataService.instance.updateFromChildren(
+          children: children,
+          selectedChildId: children.first.id,
+          todaysLogs: {},
+        );
+      }
     } catch (e) {
       debugPrint('Error loading children: $e');
       setState(() {
@@ -448,6 +460,12 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
                     ).animate().fadeIn(delay: 300.ms);
                   },
                 ),
+
+                // Achievement near-miss nudge
+                _AchievementNearMissCard(
+                  studentId: selectedChild.id,
+                  schoolId: widget.user.schoolId!,
+                ).animate().fadeIn(delay: 400.ms),
               ]),
             ),
           ),
@@ -509,6 +527,210 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
       }
       return null;
     });
+  }
+}
+
+/// Near-miss achievement nudge card.
+/// Shown only when the student is ≥80% toward their next unearned achievement.
+/// Hidden entirely when no near-miss exists.
+class _AchievementNearMissCard extends StatefulWidget {
+  final String studentId;
+  final String schoolId;
+
+  const _AchievementNearMissCard({
+    required this.studentId,
+    required this.schoolId,
+  });
+
+  @override
+  State<_AchievementNearMissCard> createState() => _AchievementNearMissCardState();
+}
+
+class _AchievementNearMissCardState extends State<_AchievementNearMissCard> {
+  AchievementThresholds _thresholds = AchievementThresholds.defaults;
+  AchievementCustomization _customization = AchievementCustomization.empty;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadThresholds();
+  }
+
+  Future<void> _loadThresholds() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('schools')
+          .doc(widget.schoolId)
+          .get();
+      final settings = doc.data()?['settings'] as Map<String, dynamic>?;
+      final rawThresholds    = settings?['achievementThresholds']    as Map<String, dynamic>?;
+      final rawCustomization = settings?['achievementCustomization'] as Map<String, dynamic>?;
+      if (mounted) {
+        setState(() {
+          if (rawThresholds    != null) _thresholds    = AchievementThresholds.fromMap(rawThresholds);
+          if (rawCustomization != null) _customization = AchievementCustomization.fromMap(rawCustomization);
+        });
+      }
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('schools')
+          .doc(widget.schoolId)
+          .collection('students')
+          .doc(widget.studentId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox.shrink();
+
+        final data = snapshot.data!.data() as Map<String, dynamic>?;
+        if (data == null) return const SizedBox.shrink();
+
+        final student = StudentModel.fromFirestore(snapshot.data!);
+        final stats = student.stats;
+        if (stats == null) return const SizedBox.shrink();
+
+        final earnedIds = (data['achievements'] as List<dynamic>? ?? [])
+            .map((a) => a['id'] as String? ?? '')
+            .where((id) => id.isNotEmpty)
+            .toList();
+
+        final result = AchievementTemplates.nearestUnearned(
+          currentStreak: stats.currentStreak,
+          totalBooksRead: stats.totalBooksRead,
+          totalMinutesRead: stats.totalMinutesRead,
+          totalReadingDays: stats.totalReadingDays,
+          earnedAchievementIds: earnedIds,
+          thresholds: _thresholds,
+          customization: _customization,
+          minProgress: 0.8,
+        );
+
+        if (result == null) return const SizedBox.shrink();
+
+        final achievement = result.achievement;
+        final progress = result.progress;
+        final rarityColor = Color(achievement.effectiveColor);
+
+        int current;
+        int remaining;
+        String unit;
+        switch (achievement.requirementType) {
+          case 'streak':
+            current = stats.currentStreak;
+            break;
+          case 'books':
+            current = stats.totalBooksRead;
+            break;
+          case 'minutes':
+            current = stats.totalMinutesRead;
+            break;
+          case 'days':
+          default:
+            current = stats.totalReadingDays;
+            break;
+        }
+        remaining = achievement.requiredValue - current;
+        unit = remaining == 1
+            ? achievement.requirementType == 'books' ? 'book' : 'day'
+            : achievement.requirementType == 'books' ? 'books' : 'days';
+
+        return GestureDetector(
+          onTap: () => context.push(
+            '/parent/achievements',
+            extra: {'student': student},
+          ),
+          child: Container(
+            margin: EdgeInsets.only(top: LumiSpacing.m),
+            padding: LumiPadding.allM,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  rarityColor.withValues(alpha: 0.08),
+                  AppColors.white,
+                ],
+              ),
+              borderRadius: LumiBorders.large,
+              border: Border.all(
+                color: rarityColor.withValues(alpha: 0.3),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: rarityColor.withValues(alpha: 0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(achievement.icon, style: const TextStyle(fontSize: 24)),
+                    LumiGap.horizontalXS,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Almost there!',
+                            style: LumiTextStyles.label(color: rarityColor)
+                                .copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          RichText(
+                            text: TextSpan(
+                              style: LumiTextStyles.bodySmall(
+                                color: AppColors.charcoal.withValues(alpha: 0.8),
+                              ),
+                              children: [
+                                TextSpan(text: '$remaining more $unit to earn '),
+                                TextSpan(
+                                  text: achievement.name,
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: rarityColor.withValues(alpha: 0.6),
+                      size: 20,
+                    ),
+                  ],
+                ),
+                LumiGap.xs,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 6,
+                    backgroundColor: rarityColor.withValues(alpha: 0.15),
+                    valueColor: AlwaysStoppedAnimation<Color>(rarityColor),
+                  ),
+                ),
+                LumiGap.xxs,
+                Text(
+                  '$current / ${achievement.requiredValue} (${(progress * 100).toStringAsFixed(0)}%)',
+                  style: LumiTextStyles.caption(
+                    color: AppColors.charcoal.withValues(alpha: 0.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 

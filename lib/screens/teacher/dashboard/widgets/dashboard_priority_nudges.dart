@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/teacher_constants.dart';
+import '../../../../core/widgets/lumi/student_avatar.dart';
 import '../../../../data/models/class_model.dart';
 import '../../../../data/models/student_model.dart';
 import '../../../../data/models/user_model.dart';
@@ -13,10 +14,9 @@ import '../../../../data/models/user_model.dart';
 /// - Inactivity nudges (students who haven't read in 3+ days)
 /// - Milestone celebrations (streaks, book counts)
 ///
-/// Smart suppression: hidden on Mon/Tue when no activity is normal.
+/// Smart suppression: inactivity nudges hidden on Mon/Tue.
 class DashboardPriorityNudges extends StatelessWidget {
   final ClassModel classModel;
-  final String schoolId;
   final UserModel teacher;
   final List<StudentModel> students;
   final VoidCallback? onSeeAll;
@@ -24,7 +24,6 @@ class DashboardPriorityNudges extends StatelessWidget {
   const DashboardPriorityNudges({
     super.key,
     required this.classModel,
-    required this.schoolId,
     required this.teacher,
     required this.students,
     this.onSeeAll,
@@ -32,8 +31,6 @@ class DashboardPriorityNudges extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
-    // Smart suppression: don't show inactivity nudges Mon-Tue
     final weekday = DateTime.now().weekday;
     final suppressInactivity = weekday <= 2; // Mon = 1, Tue = 2
 
@@ -127,7 +124,7 @@ class DashboardPriorityNudges extends StatelessWidget {
           nudges.add(_NudgeItem(
             student: student,
             type: _NudgeType.milestone,
-            message: '${stats.currentStreak}-day reading streak!',
+            message: '${stats.currentStreak}-day reading streak! 🔥',
             priority: 2,
           ));
         }
@@ -137,7 +134,7 @@ class DashboardPriorityNudges extends StatelessWidget {
           nudges.add(_NudgeItem(
             student: student,
             type: _NudgeType.milestone,
-            message: '${stats.totalBooksRead} books read!',
+            message: '${stats.totalBooksRead} books read! 📚',
             priority: 2,
           ));
         }
@@ -191,17 +188,18 @@ class _NudgeRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final student = nudge.student;
+    final isMilestone = nudge.type == _NudgeType.milestone;
+
+    final avatarColor = isMilestone
+        ? const Color(0xFFFFF8E1)
+        : AppColors.teacherPrimaryLight;
+
+    final messageColor =
+        nudge.isUrgent ? AppColors.warmOrange : AppColors.textSecondary;
+
     final initials =
         '${student.firstName.isNotEmpty ? student.firstName[0] : ''}${student.lastName.isNotEmpty ? student.lastName[0] : ''}'
             .toUpperCase();
-
-    final isMilestone = nudge.type == _NudgeType.milestone;
-    final avatarColor =
-        isMilestone ? const Color(0xFFFFF8E1) : AppColors.teacherPrimaryLight;
-    final avatarTextColor =
-        isMilestone ? const Color(0xFFFF8F00) : AppColors.teacherPrimary;
-    final messageColor =
-        nudge.isUrgent ? AppColors.warmOrange : AppColors.textSecondary;
 
     return InkWell(
       onTap: onTap,
@@ -210,22 +208,11 @@ class _NudgeRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
         child: Row(
           children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: avatarColor,
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(
-                  initials,
-                  style: TeacherTypography.caption.copyWith(
-                    color: avatarTextColor,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
+            StudentAvatar(
+              characterId: student.characterId,
+              initial: initials,
+              avatarColor: avatarColor,
+              size: 36,
             ),
             const SizedBox(width: 12),
             Expanded(

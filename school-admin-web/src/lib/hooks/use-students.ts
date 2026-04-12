@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Student, ReadingLevelEvent } from '@/lib/types';
+import type { Student, ReadingLevelEvent, EnrollmentStatus } from '@/lib/types';
 import type { ImportResult } from '@/lib/firestore/students';
 
 type SerializedStudent = Omit<Student, 'createdAt' | 'dateOfBirth' | 'enrolledAt' | 'readingLevelUpdatedAt' | 'levelHistory' | 'stats'> & {
@@ -179,5 +179,47 @@ export function useReadingLevelHistory(studentId: string) {
       return res.json();
     },
     enabled: !!studentId,
+  });
+}
+
+export function useUpdateEnrollmentStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ studentId, enrollmentStatus }: { studentId: string; enrollmentStatus: EnrollmentStatus }) => {
+      const res = await fetch(`/api/students/${studentId}/enrollment`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enrollmentStatus }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to update enrollment status');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+    },
+  });
+}
+
+export function useBulkUpdateEnrollmentStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ studentIds, enrollmentStatus }: { studentIds: string[]; enrollmentStatus: EnrollmentStatus }) => {
+      const res = await fetch('/api/students/bulk-enrollment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentIds, enrollmentStatus }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to bulk update enrollment');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+    },
   });
 }

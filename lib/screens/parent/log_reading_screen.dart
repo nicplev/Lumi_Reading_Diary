@@ -17,6 +17,7 @@ import '../../data/models/school_model.dart';
 import '../../data/models/parent_comment_settings.dart';
 import '../../services/firebase_service.dart';
 import '../../services/isbn_assignment_service.dart';
+import '../../services/widget_data_service.dart';
 
 class LogReadingScreen extends StatefulWidget {
   final StudentModel student;
@@ -200,6 +201,12 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
           .set(logData);
 
       final updatedStats = await _updateStudentStats();
+
+      // Push fresh data to the home screen widget immediately after a successful log.
+      WidgetDataService.instance.updateAfterLog(
+        student: widget.student,
+        log: log,
+      );
 
       if (mounted) {
         context.go('/parent/reading-success', extra: {

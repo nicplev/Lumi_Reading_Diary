@@ -11,7 +11,12 @@ function darkenHex(hex: string, amount: number = 0.1): string {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
 
-export function SchoolThemeProvider({ children }: { children: React.ReactNode }) {
+interface SchoolThemeProviderProps {
+  children: React.ReactNode;
+  initialColors?: { primary: string; secondary: string };
+}
+
+export function SchoolThemeProvider({ children, initialColors }: SchoolThemeProviderProps) {
   const { data: school } = useSchool();
 
   useEffect(() => {
@@ -31,5 +36,12 @@ export function SchoolThemeProvider({ children }: { children: React.ReactNode })
     };
   }, [school?.primaryColor, school?.secondaryColor]);
 
-  return <>{children}</>;
+  return (
+    <>
+      {initialColors && (
+        <style>{`:root { --color-brand-primary: ${initialColors.primary}; --color-brand-primary-dark: ${darkenHex(initialColors.primary, 0.12)}; --color-brand-secondary: ${initialColors.secondary}; }`}</style>
+      )}
+      {children}
+    </>
+  );
 }

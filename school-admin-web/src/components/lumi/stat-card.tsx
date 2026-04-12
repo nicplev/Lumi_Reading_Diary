@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 
 interface StatCardProps {
   title: string;
@@ -8,6 +11,7 @@ interface StatCardProps {
   color?: 'pink' | 'green' | 'orange' | 'blue';
   href?: string;
   subtitle?: string;
+  sparklineData?: number[];
 }
 
 const colorClasses = {
@@ -17,27 +21,56 @@ const colorClasses = {
   blue: 'bg-sky-blue/40 text-sky-blue-dark',
 };
 
-export function StatCard({ title, value, icon, trend, color = 'pink', href, subtitle }: StatCardProps) {
+export function StatCard({ title, value, icon, trend, color = 'pink', href, subtitle, sparklineData }: StatCardProps) {
   const content = (
     <>
-      <div className="flex items-start justify-between mb-3">
-        <span className="text-sm font-semibold text-text-secondary">{title}</span>
+      {/* Title row: icon grouped with title */}
+      <div className="flex items-center gap-2 mb-3">
         {icon && (
-          <span className={`inline-flex items-center justify-center w-9 h-9 rounded-[var(--radius-md)] text-lg ${colorClasses[color]}`}>
+          <span className={`inline-flex items-center justify-center w-8 h-8 rounded-[var(--radius-md)] text-base flex-shrink-0 ${colorClasses[color]}`}>
             {icon}
           </span>
         )}
+        <span className="text-sm font-semibold text-text-secondary">{title}</span>
       </div>
+
       <div className="text-[28px] font-extrabold text-charcoal leading-tight">{value}</div>
+
       {subtitle && (
         <p className="text-xs text-text-secondary mt-1">{subtitle}</p>
       )}
+
       {trend && (
         <div className="flex items-center gap-1 mt-2">
           <span className={`text-xs font-semibold ${trend.value >= 0 ? 'text-success' : 'text-error'}`}>
             {trend.value >= 0 ? '↑' : '↓'} {Math.abs(trend.value)}%
           </span>
           <span className="text-xs text-text-secondary">{trend.label}</span>
+        </div>
+      )}
+
+      {/* Sparkline */}
+      {sparklineData && sparklineData.length > 1 && (
+        <div className="mt-3 -mx-1 h-12">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={sparklineData.map((v, i) => ({ i, v }))} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
+              <defs>
+                <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#4CAF50" stopOpacity={0.25} />
+                  <stop offset="100%" stopColor="#4CAF50" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <Area
+                type="monotone"
+                dataKey="v"
+                stroke="#4CAF50"
+                strokeWidth={1.5}
+                fill="url(#sparkGrad)"
+                dot={false}
+                isAnimationActive={false}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
       )}
     </>
