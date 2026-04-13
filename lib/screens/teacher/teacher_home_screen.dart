@@ -457,31 +457,51 @@ class _KeepAlivePageState extends State<_KeepAlivePage>
   }
 }
 
-// Custom controller that directly plays Timeline 1 when triggered.
-// The state machines in these .riv files have 0 inputs, so we bypass
-// the state machine and drive the animation timeline directly.
+// Custom controller that plays nav animations when triggered.
+// Files with 'Timeline 1' are driven directly; files using a state machine
+// with an 'isActive' boolean input use that instead.
 base class _NavRiveController extends RiveWidgetController {
   // Stored as dynamic to avoid the Animation name conflict between
   // Flutter's Animation<T> and rive_native's Animation class.
+  static const double _speed = 2.5;
+
   dynamic _animation;
+  dynamic _isActiveInput; // BooleanInput for state-machine-based .riv files
   bool _playing = false;
 
   _NavRiveController(super.file) {
     _animation = artboard.animationNamed('Timeline 1');
+    if (_animation == null) {
+      // Fall back to driving via the state machine's isActive boolean input.
+      // ignore: deprecated_member_use
+      _isActiveInput = stateMachine.boolean('isActive');
+    }
   }
 
   void play() {
-    if (_animation == null) return;
-    _animation.time = 0.0;
-    _playing = true;
-    scheduleRepaint();
+    if (_animation != null) {
+      _animation.time = 0.0;
+      _playing = true;
+      scheduleRepaint();
+    } else if (_isActiveInput != null) {
+      _isActiveInput.value = true;
+      scheduleRepaint();
+    }
+  }
+
+  void deactivate() {
+    if (_isActiveInput != null) {
+      _isActiveInput.value = false;
+      scheduleRepaint();
+    }
   }
 
   @override
   bool advance(double elapsedSeconds) {
-    final smNeedsMore = super.advance(elapsedSeconds);
+    final scaled = elapsedSeconds * _speed;
+    final smNeedsMore = super.advance(scaled);
     if (_playing && _animation != null) {
-      final bool stillGoing = _animation.advanceAndApply(elapsedSeconds);
+      final bool stillGoing = _animation.advanceAndApply(scaled);
       if (!stillGoing) _playing = false;
       return smNeedsMore || stillGoing;
     }
@@ -537,6 +557,9 @@ class _RiveNavItemState extends State<_RiveNavItem> {
   @override
   void didUpdateWidget(_RiveNavItem oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.isSelected && !widget.isSelected) {
+      _riveController?.deactivate();
+    }
     if (!oldWidget.isSelected && widget.isSelected) {
       _riveController?.play();
     }
