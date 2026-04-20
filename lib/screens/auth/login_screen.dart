@@ -395,9 +395,20 @@ class _LoginScreenState extends State<LoginScreen> {
                   effects: const [
                     FadeEffect(duration: Duration(milliseconds: 500)),
                   ],
-                  child: GestureDetector(
+                  child: RawGestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onLongPress: _handleDevAccessGesture,
+                    gestures: <Type, GestureRecognizerFactory>{
+                      LongPressGestureRecognizer:
+                          GestureRecognizerFactoryWithHandlers<
+                              LongPressGestureRecognizer>(
+                        () => LongPressGestureRecognizer(
+                          duration: const Duration(seconds: 5),
+                        ),
+                        (LongPressGestureRecognizer instance) {
+                          instance.onLongPress = _handleDevAccessGesture;
+                        },
+                      ),
+                    },
                     child: const LumiMascot(
                       variant: LumiVariant.login,
                       size: 120,
