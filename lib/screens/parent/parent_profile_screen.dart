@@ -274,7 +274,7 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
             ),
             child: Column(
               children: [
-                const LumiMascot(mood: LumiMood.waving, size: 80),
+                const LumiMascot(variant: LumiVariant.welcome, size: 80),
                 LumiGap.s,
                 Text(
                   widget.user.fullName,
@@ -971,7 +971,7 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const LumiMascot(
-                mood: LumiMood.happy,
+                variant: LumiVariant.parent,
                 size: 100,
               ),
               LumiGap.s,

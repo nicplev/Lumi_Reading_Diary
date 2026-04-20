@@ -62,7 +62,7 @@ class WebNotAvailableScreen extends StatelessWidget {
                       ),
                     ],
                     child: const LumiMascot(
-                      mood: LumiMood.waving,
+                      variant: LumiVariant.welcome,
                       size: 180,
                     ),
                   ),

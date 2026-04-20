@@ -16,6 +16,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../core/models/decodable_grading.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/theme/teacher_constants.dart';
 import '../../data/models/user_model.dart';
 import '../../services/book_lookup_service.dart';
@@ -843,12 +844,15 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
             break;
         }
       },
-      child: Scaffold(
-        backgroundColor: _currentStep == _ScanStep.isbnScan
-            ? Colors.black
-            : AppColors.teacherBackground,
-        appBar: _buildAppBar(),
-        body: _saveSuccess ? _buildSuccessView() : _buildStepView(),
+      child: Theme(
+        data: AppTheme.teacherTheme(),
+        child: Scaffold(
+          backgroundColor: _currentStep == _ScanStep.isbnScan
+              ? Colors.black
+              : AppColors.teacherBackground,
+          appBar: _buildAppBar(),
+          body: _saveSuccess ? _buildSuccessView() : _buildStepView(),
+        ),
       ),
     );
   }

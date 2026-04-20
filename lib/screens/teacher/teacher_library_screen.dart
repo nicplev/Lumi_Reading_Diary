@@ -1883,24 +1883,30 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
         ? Color(SchoolLibraryService.stageColor(book.readingLevel ?? ''))
         : AppColors.libraryGreen;
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.64,
-      minChildSize: 0.42,
-      maxChildSize: 0.94,
-      builder: (context, scrollController) {
-        return Container(
-          decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.charcoal.withValues(alpha: 0.16),
-                blurRadius: 32,
-                offset: const Offset(0, -8),
+    return GestureDetector(
+      onTap: () => Navigator.of(context).pop(),
+      behavior: HitTestBehavior.opaque,
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.64,
+        minChildSize: 0.42,
+        maxChildSize: 0.94,
+        builder: (context, scrollController) {
+          return GestureDetector(
+            onTap: () {},
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(32)),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.charcoal.withValues(alpha: 0.16),
+                    blurRadius: 32,
+                    offset: const Offset(0, -8),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: ListView(
+              child: ListView(
             controller: scrollController,
             padding: EdgeInsets.zero,
             children: [
@@ -2192,8 +2198,10 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
               const SizedBox(height: 40),
             ],
           ),
-        );
-      },
+            ),
+          );
+        },
+      ),
     );
   }
 

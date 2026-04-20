@@ -479,7 +479,7 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
     return Column(
       children: [
         const SizedBox(height: 8),
-        const LumiMascot(mood: LumiMood.encouraging, size: 48),
+        const LumiMascot(variant: LumiVariant.teacherWhy, size: 48),
         const SizedBox(height: 8),
         Text(
           "Your class's reading week starts here",

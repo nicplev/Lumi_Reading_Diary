@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useId } from 'react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 
 interface StatCardProps {
@@ -21,11 +22,21 @@ const colorClasses = {
   blue: 'bg-sky-blue/40 text-sky-blue-dark',
 };
 
+const sparkColors: Record<NonNullable<StatCardProps['color']>, string> = {
+  pink: '#FF8698',
+  green: '#7FB26B',
+  orange: '#F39C4B',
+  blue: '#5FA8D3',
+};
+
 export function StatCard({ title, value, icon, trend, color = 'pink', href, subtitle, sparklineData }: StatCardProps) {
+  const sparkGradId = `sparkGrad-${useId()}`;
+  const sparkColor = sparkColors[color];
+
   const content = (
     <>
       {/* Title row: icon grouped with title */}
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-2">
         {icon && (
           <span className={`inline-flex items-center justify-center w-8 h-8 rounded-[var(--radius-md)] text-base flex-shrink-0 ${colorClasses[color]}`}>
             {icon}
@@ -34,20 +45,22 @@ export function StatCard({ title, value, icon, trend, color = 'pink', href, subt
         <span className="text-sm font-semibold text-text-secondary">{title}</span>
       </div>
 
-      <div className="text-[28px] font-extrabold text-charcoal leading-tight">{value}</div>
+      <div className="mt-auto">
+        <div className="text-[26px] font-extrabold text-charcoal leading-tight">{value}</div>
 
-      {subtitle && (
-        <p className="text-xs text-text-secondary mt-1">{subtitle}</p>
-      )}
+        {subtitle && (
+          <p className="text-xs text-text-secondary mt-1">{subtitle}</p>
+        )}
 
-      {trend && (
-        <div className="flex items-center gap-1 mt-2">
-          <span className={`text-xs font-semibold ${trend.value >= 0 ? 'text-success' : 'text-error'}`}>
-            {trend.value >= 0 ? '↑' : '↓'} {Math.abs(trend.value)}%
-          </span>
-          <span className="text-xs text-text-secondary">{trend.label}</span>
-        </div>
-      )}
+        {trend && (
+          <div className="flex items-center gap-1 mt-1">
+            <span className={`text-xs font-semibold ${trend.value >= 0 ? 'text-success' : 'text-error'}`}>
+              {trend.value >= 0 ? '↑' : '↓'} {Math.abs(trend.value)}%
+            </span>
+            <span className="text-xs text-text-secondary">{trend.label}</span>
+          </div>
+        )}
+      </div>
 
       {/* Sparkline */}
       {sparklineData && sparklineData.length > 1 && (
@@ -55,17 +68,17 @@ export function StatCard({ title, value, icon, trend, color = 'pink', href, subt
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={sparklineData.map((v, i) => ({ i, v }))} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
               <defs>
-                <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#4CAF50" stopOpacity={0.25} />
-                  <stop offset="100%" stopColor="#4CAF50" stopOpacity={0} />
+                <linearGradient id={sparkGradId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={sparkColor} stopOpacity={0.25} />
+                  <stop offset="100%" stopColor={sparkColor} stopOpacity={0} />
                 </linearGradient>
               </defs>
               <Area
                 type="monotone"
                 dataKey="v"
-                stroke="#4CAF50"
+                stroke={sparkColor}
                 strokeWidth={1.5}
-                fill="url(#sparkGrad)"
+                fill={`url(#${sparkGradId})`}
                 dot={false}
                 isAnimationActive={false}
               />
@@ -76,7 +89,7 @@ export function StatCard({ title, value, icon, trend, color = 'pink', href, subt
     </>
   );
 
-  const className = `bg-surface rounded-[var(--radius-lg)] shadow-card p-5 ${href ? 'hover:shadow-card-hover transition-shadow' : ''}`;
+  const className = `bg-surface rounded-[var(--radius-lg)] shadow-card p-4 min-h-[132px] flex flex-col ${href ? 'hover:shadow-card-hover transition-shadow' : ''}`;
 
   if (href) {
     return (

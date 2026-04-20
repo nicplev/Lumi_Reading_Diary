@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,9 +18,7 @@ import '../../services/firebase_service.dart';
 import '../services/navigation_state_service.dart';
 import '../../screens/auth/splash_screen.dart';
 import '../../screens/auth/login_screen.dart';
-import '../../screens/auth/register_screen.dart';
 import '../../screens/auth/forgot_password_screen.dart';
-import '../../screens/auth/parent_registration_screen.dart';
 import '../../screens/auth/web_not_available_screen.dart';
 import '../../screens/parent/parent_home_screen.dart';
 import '../../screens/parent/log_reading_screen.dart';
@@ -168,19 +168,29 @@ class AppRouter {
       GoRoute(
         path: '/auth/login',
         name: 'login',
-        builder: (context, state) => const LoginScreen(),
-      ),
-
-      GoRoute(
-        path: '/auth/register',
-        name: 'register',
-        builder: (context, state) => const RegisterScreen(),
-      ),
-
-      GoRoute(
-        path: '/auth/parent-register',
-        name: 'parent-register',
-        builder: (context, state) => const ParentRegistrationScreen(),
+        pageBuilder: (context, state) {
+          final extra = state.extra;
+          final fromSplash =
+              extra is Map && extra['fromSplash'] == true;
+          if (!fromSplash) {
+            return const MaterialPage<void>(child: LoginScreen());
+          }
+          return CustomTransitionPage<void>(
+            child: const LoginScreen(),
+            transitionDuration: const Duration(milliseconds: 900),
+            reverseTransitionDuration: Duration.zero,
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return Stack(
+                children: [
+                  child,
+                  Positioned.fill(
+                    child: _BookCoverOverlay(animation: animation),
+                  ),
+                ],
+              );
+            },
+          );
+        },
       ),
 
       GoRoute(
@@ -749,5 +759,56 @@ class AppRouter {
     required UserModel? fallback,
   }) {
     return extra is UserModel ? extra : fallback;
+  }
+}
+
+/// Splash PNG rendered as a book cover hinged on the left edge. As [animation]
+/// runs 0 → 1, the right edge rotates away from the viewer, revealing the
+/// login screen beneath.
+class _BookCoverOverlay extends StatelessWidget {
+  const _BookCoverOverlay({required this.animation});
+
+  final Animation<double> animation;
+
+  @override
+  Widget build(BuildContext context) {
+    final curved = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeInOutCubic,
+    );
+
+    return IgnorePointer(
+      child: AnimatedBuilder(
+        animation: curved,
+        builder: (context, _) {
+          final t = curved.value;
+          if (t >= 0.98) {
+            return const SizedBox.shrink();
+          }
+          final angle = t * (math.pi / 2);
+          return Transform(
+            alignment: Alignment.centerLeft,
+            transform: Matrix4.identity()
+              ..setEntry(3, 2, 0.0015)
+              ..rotateY(angle),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.25 * t),
+                    blurRadius: 24 * t,
+                    offset: Offset(8 * t, 0),
+                  ),
+                ],
+              ),
+              child: Image.asset(
+                'assets/lumi/Lumi_Splash_Screem.png',
+                fit: BoxFit.cover,
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 }

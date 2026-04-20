@@ -482,7 +482,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const LumiMascot(
-              mood: LumiMood.thinking,
+              variant: LumiVariant.parent,
               size: 150,
             ),
             LumiGap.m,

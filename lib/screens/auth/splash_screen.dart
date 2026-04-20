@@ -5,9 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/lumi_text_styles.dart';
-import '../../core/theme/lumi_spacing.dart';
-import '../../core/widgets/lumi_mascot.dart';
 import '../../core/routing/app_router.dart';
 import '../../data/providers/user_provider.dart';
 import '../../data/models/user_model.dart';
@@ -109,61 +106,40 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     // Web users see the marketing landing page
     // Mobile users (iOS/Android) go directly to login
-    final route = kIsWeb ? '/landing' : '/auth/login';
-    context.go(route);
+    if (kIsWeb) {
+      context.go('/landing');
+    } else {
+      context.go('/auth/login', extra: const {'fromSplash': true});
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.offWhite,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Lumi Mascot with animation
-            Animate(
-              effects: const [
-                ScaleEffect(
-                  duration: Duration(milliseconds: 600),
-                  begin: Offset(0.5, 0.5),
-                  end: Offset(1.0, 1.0),
-                  curve: Curves.elasticOut,
-                ),
-              ],
-              child: const LumiMascot(
-                mood: LumiMood.happy,
-                size: 200,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/lumi/Lumi_Splash_Screem.png',
+              fit: BoxFit.cover,
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: SafeArea(
+              minimum: const EdgeInsets.only(bottom: 48),
+              child: Center(
+                child: const CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 3,
+                ).animate().fadeIn(delay: 800.ms, duration: 500.ms),
               ),
             ),
-
-            LumiGap.l,
-
-            // App title
-            Text(
-              'Lumi',
-              style: LumiTextStyles.display(color: AppColors.rosePink),
-            ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
-
-            LumiGap.xxs,
-
-            // Tagline
-            Text(
-              'Reading Diary',
-              style: LumiTextStyles.h2(
-                color: AppColors.charcoal.withValues(alpha: 0.7),
-              ),
-            ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
-
-            LumiGap.xl,
-
-            // Loading indicator
-            CircularProgressIndicator(
-              color: AppColors.rosePink,
-              strokeWidth: 3,
-            ).animate().fadeIn(delay: 800.ms, duration: 500.ms),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

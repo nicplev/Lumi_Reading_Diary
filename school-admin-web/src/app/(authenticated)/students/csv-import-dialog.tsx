@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { Modal } from '@/components/lumi/modal';
 import { Button } from '@/components/lumi/button';
 import { Badge } from '@/components/lumi/badge';
+import { Icon } from '@/components/lumi/icon';
 import { useImportStudents } from '@/lib/hooks/use-students';
 import { useToast } from '@/components/lumi/toast';
 
@@ -266,7 +267,15 @@ export function CSVImportDialog({ open, onClose }: CSVImportDialogProps) {
 
       {step === 'done' && result && (
         <div className="text-center py-6">
-          <div className="text-4xl mb-4">{result.errorCount === 0 ? '🎉' : '⚠️'}</div>
+          <div className="mb-4 flex justify-center">
+            {result.errorCount === 0 ? (
+              <span className="inline-flex items-center justify-center text-success animate-success-pop">
+                <Icon name="task_alt" size={56} />
+              </span>
+            ) : (
+              <span className="text-4xl">⚠️</span>
+            )}
+          </div>
           <h3 className="text-lg font-bold text-charcoal mb-2">Import Complete</h3>
           <div className="flex justify-center gap-4 mb-4">
             <Badge variant="success">{result.successCount} imported</Badge>

@@ -306,6 +306,9 @@ class LumiPasswordInput extends StatefulWidget {
   final TextEditingController? controller;
   final ValueChanged<String>? onChanged;
   final FormFieldValidator<String>? validator;
+  final FocusNode? focusNode;
+  final bool autofocus;
+  final TextInputAction? textInputAction;
 
   const LumiPasswordInput({
     super.key,
@@ -316,6 +319,9 @@ class LumiPasswordInput extends StatefulWidget {
     this.controller,
     this.onChanged,
     this.validator,
+    this.focusNode,
+    this.autofocus = false,
+    this.textInputAction,
   });
 
   @override
@@ -342,6 +348,9 @@ class _LumiPasswordInputState extends State<LumiPasswordInput> {
       obscureText: _obscureText,
       onChanged: widget.onChanged,
       validator: widget.validator,
+      focusNode: widget.focusNode,
+      autofocus: widget.autofocus,
+      textInputAction: widget.textInputAction,
       keyboardType: TextInputType.visiblePassword,
       suffixIcon: IconButton(
         icon: Icon(

@@ -1,15 +1,17 @@
+import QRCode from "qrcode";
+
 interface OnboardingEmailEntry {
   studentName: string;
   linkCode: string;
 }
 
-export function buildOnboardingEmailPreview(params: {
+export async function buildOnboardingEmailPreview(params: {
   schoolName: string;
   entries: OnboardingEmailEntry[];
   customMessage?: string;
   appStoreUrl?: string;
   playStoreUrl?: string;
-}): string {
+}): Promise<string> {
   const {
     schoolName,
     entries,
@@ -18,15 +20,21 @@ export function buildOnboardingEmailPreview(params: {
     playStoreUrl = "#",
   } = params;
 
-  const entryCards = entries
-    .map(
-      (entry) => `
+  const entryCards = (
+    await Promise.all(
+      entries.map(async (entry) => {
+        const qrDataUri = await QRCode.toDataURL(entry.linkCode, {
+          width: 400,
+          margin: 2,
+          errorCorrectionLevel: "M",
+        });
+        return `
       <tr>
         <td style="padding: 0 24px 16px 24px;">
           <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #FFFFFF; border-radius: 12px; border: 1px solid #E0E0E0;">
             <tr>
               <td style="padding: 24px; text-align: center;">
-                <p style="margin: 0 0 12px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #2C2C2C;">
+                <p style="margin: 0 0 12px 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #2C2C2C;">
                   Your link code for <strong>${entry.studentName}</strong>:
                 </p>
                 <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto;">
@@ -38,13 +46,18 @@ export function buildOnboardingEmailPreview(params: {
                     </td>
                   </tr>
                 </table>
+                <p style="margin: 16px 0 8px 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: #666666;">
+                  Or scan this QR code with the Lumi app
+                </p>
+                <img src="${qrDataUri}" width="160" height="160" alt="QR code for ${entry.linkCode}" style="display: block; margin: 0 auto; border: 1px solid #E0E0E0; border-radius: 8px;" />
               </td>
             </tr>
           </table>
         </td>
-      </tr>`
+      </tr>`;
+      })
     )
-    .join("\n");
+  ).join("\n");
 
   const customMessageBlock = customMessage
     ? `
@@ -53,7 +66,7 @@ export function buildOnboardingEmailPreview(params: {
           <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #FAFAFA; border-left: 4px solid #E91E63; border-radius: 4px;">
             <tr>
               <td style="padding: 16px 20px;">
-                <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #555555; font-style: italic; line-height: 1.6;">
+                <p style="margin: 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #555555; font-style: italic; line-height: 1.6;">
                   ${customMessage}
                 </p>
               </td>
@@ -70,6 +83,9 @@ export function buildOnboardingEmailPreview(params: {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <title>Welcome to Lumi Reading Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
   <!--[if mso]>
   <noscript>
     <xml>
@@ -89,10 +105,10 @@ export function buildOnboardingEmailPreview(params: {
           <!-- Header -->
           <tr>
             <td style="background-color: #E91E63; padding: 32px 24px; text-align: center;">
-              <h1 style="margin: 0 0 4px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 36px; font-weight: 700; color: #FFFFFF; letter-spacing: 1px;">
+              <h1 style="margin: 0 0 4px 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 36px; font-weight: 700; color: #FFFFFF; letter-spacing: 1px;">
                 Lumi
               </h1>
-              <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: rgba(255,255,255,0.85);">
+              <p style="margin: 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: rgba(255,255,255,0.85);">
                 ${schoolName}
               </p>
             </td>
@@ -101,7 +117,7 @@ export function buildOnboardingEmailPreview(params: {
           <!-- Greeting -->
           <tr>
             <td style="padding: 32px 24px 8px 24px; text-align: center;">
-              <h2 style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 22px; font-weight: 600; color: #2C2C2C;">
+              <h2 style="margin: 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 22px; font-weight: 600; color: #2C2C2C;">
                 Welcome to Lumi Reading Tracker!
               </h2>
             </td>
@@ -113,7 +129,7 @@ export function buildOnboardingEmailPreview(params: {
           <!-- Explanation -->
           <tr>
             <td style="padding: 16px 24px 24px 24px;">
-              <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #2C2C2C; line-height: 1.6; text-align: center;">
+              <p style="margin: 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #2C2C2C; line-height: 1.6; text-align: center;">
                 ${schoolName} uses <strong>Lumi</strong> as their digital reading diary. To get started, download the app and enter the link code below to connect to your child's account.
               </p>
             </td>
@@ -125,18 +141,18 @@ export function buildOnboardingEmailPreview(params: {
           <!-- Setup steps -->
           <tr>
             <td style="padding: 24px 24px 8px 24px;">
-              <h3 style="margin: 0 0 16px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 17px; font-weight: 600; color: #2C2C2C; text-align: center;">
+              <h3 style="margin: 0 0 16px 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 17px; font-weight: 600; color: #2C2C2C; text-align: center;">
                 Getting Started
               </h3>
               <table width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td style="padding: 8px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #2C2C2C; line-height: 1.5;">
+                  <td style="padding: 8px 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #2C2C2C; line-height: 1.5;">
                     <table cellpadding="0" cellspacing="0" border="0">
                       <tr>
                         <td style="vertical-align: top; padding-right: 12px;">
                           <span style="display: inline-block; width: 28px; height: 28px; background-color: #E91E63; color: #FFFFFF; border-radius: 50%; text-align: center; line-height: 28px; font-size: 14px; font-weight: 600;">1</span>
                         </td>
-                        <td style="vertical-align: middle; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #2C2C2C;">
+                        <td style="vertical-align: middle; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #2C2C2C;">
                           Download Lumi from the App Store or Google Play
                         </td>
                       </tr>
@@ -144,13 +160,13 @@ export function buildOnboardingEmailPreview(params: {
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding: 8px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #2C2C2C; line-height: 1.5;">
+                  <td style="padding: 8px 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #2C2C2C; line-height: 1.5;">
                     <table cellpadding="0" cellspacing="0" border="0">
                       <tr>
                         <td style="vertical-align: top; padding-right: 12px;">
                           <span style="display: inline-block; width: 28px; height: 28px; background-color: #E91E63; color: #FFFFFF; border-radius: 50%; text-align: center; line-height: 28px; font-size: 14px; font-weight: 600;">2</span>
                         </td>
-                        <td style="vertical-align: middle; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #2C2C2C;">
+                        <td style="vertical-align: middle; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #2C2C2C;">
                           Create your account
                         </td>
                       </tr>
@@ -158,13 +174,13 @@ export function buildOnboardingEmailPreview(params: {
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding: 8px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #2C2C2C; line-height: 1.5;">
+                  <td style="padding: 8px 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #2C2C2C; line-height: 1.5;">
                     <table cellpadding="0" cellspacing="0" border="0">
                       <tr>
                         <td style="vertical-align: top; padding-right: 12px;">
                           <span style="display: inline-block; width: 28px; height: 28px; background-color: #E91E63; color: #FFFFFF; border-radius: 50%; text-align: center; line-height: 28px; font-size: 14px; font-weight: 600;">3</span>
                         </td>
-                        <td style="vertical-align: middle; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #2C2C2C;">
+                        <td style="vertical-align: middle; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #2C2C2C;">
                           Enter your link code when prompted
                         </td>
                       </tr>
@@ -172,13 +188,13 @@ export function buildOnboardingEmailPreview(params: {
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding: 8px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #2C2C2C; line-height: 1.5;">
+                  <td style="padding: 8px 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #2C2C2C; line-height: 1.5;">
                     <table cellpadding="0" cellspacing="0" border="0">
                       <tr>
                         <td style="vertical-align: top; padding-right: 12px;">
                           <span style="display: inline-block; width: 28px; height: 28px; background-color: #E91E63; color: #FFFFFF; border-radius: 50%; text-align: center; line-height: 28px; font-size: 14px; font-weight: 600;">4</span>
                         </td>
-                        <td style="vertical-align: middle; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #2C2C2C;">
+                        <td style="vertical-align: middle; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #2C2C2C;">
                           Start tracking your child's reading journey!
                         </td>
                       </tr>
@@ -195,12 +211,12 @@ export function buildOnboardingEmailPreview(params: {
               <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto;">
                 <tr>
                   <td style="padding-right: 8px;">
-                    <a href="${appStoreUrl}" target="_blank" style="display: inline-block; background-color: #2C2C2C; color: #FFFFFF; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 8px;">
+                    <a href="${appStoreUrl}" target="_blank" style="display: inline-block; background-color: #2C2C2C; color: #FFFFFF; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 8px;">
                       App Store
                     </a>
                   </td>
                   <td style="padding-left: 8px;">
-                    <a href="${playStoreUrl}" target="_blank" style="display: inline-block; background-color: #2C2C2C; color: #FFFFFF; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 8px;">
+                    <a href="${playStoreUrl}" target="_blank" style="display: inline-block; background-color: #2C2C2C; color: #FFFFFF; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 8px;">
                       Google Play
                     </a>
                   </td>
@@ -212,7 +228,7 @@ export function buildOnboardingEmailPreview(params: {
           <!-- Footer -->
           <tr>
             <td style="background-color: #F5F5F5; padding: 24px; text-align: center; border-top: 1px solid #E0E0E0;">
-              <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 12px; color: #888888; line-height: 1.5;">
+              <p style="margin: 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 12px; color: #888888; line-height: 1.5;">
                 This email was sent by ${schoolName} via Lumi Reading Tracker. If you have questions, please contact your school directly.
               </p>
             </td>

@@ -25,6 +25,11 @@ class AppColors {
   /// Accessibility: NEVER use as text color, background only with dark text
   static const Color softYellow = Color(0xFFFFF6A4);
 
+  /// Dark yellow / goldenrod - readable yellow for text and icon use
+  /// Usage: Accent text, icon foregrounds on light backgrounds
+  /// Accessibility: Meets WCAG AA contrast on white/off-white (~4.6:1)
+  static const Color darkYellow = Color(0xFFB8860B);
+
   /// Accent color - Used for warm CTAs, energy elements
   /// Usage: Secondary CTAs, warm highlights, excitement indicators
   /// Accessibility: Use with white text (verify contrast)
@@ -102,10 +107,10 @@ class AppColors {
   static const Color backgroundPrimary = Color(0xFFFFFBF7);
   static const Color backgroundSecondary = Color(0xFFF5F8FC);
 
-  // Lumi mascot colors
-  static const Color lumiBody = Color(0xFF87CEEB);
-  static const Color lumiAccent = Color(0xFFFFB6C1);
-  static const Color lumiEyes = Color(0xFF2E3440);
+  // Lumi mascot colors (flame palette)
+  static const Color lumiBody = Color(0xFFFF5A1F);
+  static const Color lumiAccent = Color(0xFFFFC83D);
+  static const Color lumiEyes = Color(0xFF1A1A1A);
 
   // Role-based colors
   static const Color parentColor = rosePink;

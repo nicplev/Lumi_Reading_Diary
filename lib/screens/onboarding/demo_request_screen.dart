@@ -146,7 +146,7 @@ class _DemoRequestScreenState extends State<DemoRequestScreen> {
                     FadeEffect(duration: Duration(milliseconds: 500)),
                   ],
                   child: const LumiMascot(
-                    mood: LumiMood.happy,
+                    variant: LumiVariant.parent,
                     size: 100,
                     message: 'Let\'s get started!',
                   ),

@@ -98,7 +98,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     FadeEffect(duration: Duration(milliseconds: 500)),
                   ],
                   child: LumiMascot(
-                    mood: _emailSent ? LumiMood.celebrating : LumiMood.thinking,
+                    variant: _emailSent ? LumiVariant.promo : LumiVariant.forgot,
                     size: 120,
                     message: _emailSent ? 'Check your email!' : "Let's help you!",
                   ),

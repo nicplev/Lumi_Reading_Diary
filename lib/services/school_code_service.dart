@@ -48,12 +48,27 @@ class SchoolCodeService {
       );
     }
 
-    // Query for the code
-    final querySnapshot = await _firestore
-        .collection(_collectionName)
-        .where('code', isEqualTo: normalizedCode)
-        .limit(1)
-        .get();
+    // Source.server: bypass the offline cache. A freshly-rotated code won't
+    // be in the local cache, and a stale "no match" cache entry from a prior
+    // attempt would otherwise permanently block a valid code.
+    // Retry once on transient `unavailable` — the first server hit after a
+    // cold-start often errors; the immediate retry succeeds.
+    QuerySnapshot<Map<String, dynamic>> querySnapshot;
+    try {
+      querySnapshot = await _firestore
+          .collection(_collectionName)
+          .where('code', isEqualTo: normalizedCode)
+          .limit(1)
+          .get(const GetOptions(source: Source.server));
+    } on FirebaseException catch (e) {
+      if (e.code != 'unavailable') rethrow;
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      querySnapshot = await _firestore
+          .collection(_collectionName)
+          .where('code', isEqualTo: normalizedCode)
+          .limit(1)
+          .get(const GetOptions(source: Source.server));
+    }
 
     if (querySnapshot.docs.isEmpty) {
       throw SchoolCodeException(

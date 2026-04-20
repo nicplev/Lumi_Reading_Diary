@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../data/models/student_link_code_model.dart';
 import '../data/models/student_model.dart';
 import '../data/models/user_model.dart';
@@ -138,13 +139,46 @@ class ParentLinkingService {
 
   // Verify and retrieve link code
   Future<StudentLinkCodeModel> verifyCode(String code) async {
-    final query = await _firestore
+    final normalizedCode = code.toUpperCase().trim();
+
+    // Prefer server reads to avoid stale empty-cache false negatives on the
+    // parent's first verify. Firestore's gRPC channel can be transiently
+    // 'unavailable' (e.g. right after a dismissed modal) — Firestore itself
+    // recommends retry with backoff. If all server attempts fail, fall back
+    // to cache so an earlier successful verify in this app session can still
+    // resolve the code even while the network stays flaky.
+    final codesRef = _firestore
         .collection('studentLinkCodes')
-        .where('code', isEqualTo: code.toUpperCase())
-        .limit(10)
-        .get();
+        .where('code', isEqualTo: normalizedCode)
+        .limit(10);
+
+    QuerySnapshot<Map<String, dynamic>>? query;
+    var serverUnavailable = false;
+
+    for (var attempt = 1; attempt <= 2; attempt++) {
+      try {
+        query = await codesRef.get(const GetOptions(source: Source.server));
+        break;
+      } on FirebaseException catch (e) {
+        if (e.code == 'unavailable') {
+          serverUnavailable = true;
+          if (attempt < 2) {
+            await Future.delayed(Duration(milliseconds: 400 * attempt));
+            continue;
+          }
+        } else {
+          rethrow;
+        }
+      }
+    }
+
+    // Server stayed unreachable across retries — fall back to local cache.
+    query ??= await codesRef.get(const GetOptions(source: Source.cache));
 
     if (query.docs.isEmpty) {
+      if (serverUnavailable) {
+        throw NetworkUnavailableException();
+      }
       throw InvalidCodeException();
     }
 
@@ -249,34 +283,34 @@ class ParentLinkingService {
           throw InvalidCodeException();
         }
 
-        // 2. Get student document reference and read within transaction.
+        // 2. Get refs.
+        final parentRef = _firestore
+            .collection('schools')
+            .doc(schoolId)
+            .collection('parents')
+            .doc(parentUserId);
         final studentRef = _firestore
             .collection('schools')
             .doc(schoolId)
             .collection('students')
             .doc(studentId);
 
-        final studentSnapshot = await transaction.get(studentRef);
-
-        if (!studentSnapshot.exists) {
-          throw StudentNotFoundException();
-        }
-
-        final student = StudentModel.fromFirestore(studentSnapshot);
-
-        // 3. Check if parent already linked
-        if (student.parentIds.contains(parentUserId)) {
+        // 3. Read parent doc (allowed: user is reading their own parent record).
+        // Derive already-linked state from linkedChildren (bidirectional invariant).
+        // We can't read the student doc here because firestore.rules only grants
+        // parents `get` access to students already in their linkedChildren —
+        // which is exactly the state we're about to create.
+        final parentSnapshot = await transaction.get(parentRef);
+        final existingLinked = parentSnapshot.exists
+            ? List<String>.from(
+                (parentSnapshot.data()?['linkedChildren'] as List?) ??
+                    const [])
+            : <String>[];
+        if (existingLinked.contains(studentId)) {
           throw AlreadyLinkedException();
         }
 
-        // 4. Get parent document reference
-        final parentRef = _firestore
-            .collection('schools')
-            .doc(schoolId)
-            .collection('parents')
-            .doc(parentUserId);
-
-        // 6. ATOMIC UPDATES - All operations succeed or all fail
+        // 4. ATOMIC WRITES - All operations succeed or all fail.
 
         // Update student with parent ID
         transaction.update(studentRef, {
@@ -302,10 +336,17 @@ class ParentLinkingService {
 
         return true;
       } on LinkingException {
-        // Re-throw custom linking exceptions
         rethrow;
-      } catch (e) {
-        // Wrap any other errors in a TransactionFailedException
+      } on FirebaseException catch (e) {
+        debugPrint('[ParentLinkingService] Firestore error during link '
+            'transaction: code=${e.code} message=${e.message}');
+        if (e.code == 'not-found') {
+          throw StudentNotFoundException();
+        }
+        throw TransactionFailedException('${e.code}: ${e.message}');
+      } catch (e, st) {
+        debugPrint('[ParentLinkingService] Unexpected error during link '
+            'transaction: $e\n$st');
         throw TransactionFailedException(e.toString());
       }
     });

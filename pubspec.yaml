@@ -145,6 +145,7 @@ flutter:
     - assets/blobs/
     - assets/data/
     - assets/characters/
+    - assets/lumi/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

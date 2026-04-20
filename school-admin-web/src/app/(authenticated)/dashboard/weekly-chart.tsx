@@ -30,7 +30,7 @@ export function WeeklyChart({ data }: WeeklyChartProps) {
             tick={{ fill: '#6B7280', fontSize: 12 }}
             tickLine={false}
             axisLine={false}
-            domain={[0, Math.ceil(maxValue * 1.2)]}
+            domain={[0, Math.max(5, Math.ceil(maxValue * 1.2))]}
             allowDecimals={false}
           />
           <Tooltip

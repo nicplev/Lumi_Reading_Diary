@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lumi Firefly — Mascot Concept Sheet</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --rose-pink: #FF8698;
+    --mint-green: #D2EBBF;
+    --soft-yellow: #FFF6A4;
+    --warm-orange: #FF8B5A;
+    --sky-blue: #BCE7F0;
+    --lumi-peach: #FFAB91;
+    --charcoal: #121211;
+    --text-secondary: #6B7280;
+    --background: #F5F5F7;
+    --white: #FFFFFF;
+    --firefly-body: #2D3A4A;
+    --firefly-body-light: #3E4F63;
+    --glow-amber: #FFD54F;
+    --glow-warm: #FFAB40;
+    --glow-soft: #FFF8E1;
+    --glow-celebrate: #FF8698;
+    --glow-encourage: #A5D6A7;
+    --glow-think: #90CAF9;
+    --wing-tint: rgba(255, 213, 79, 0.15);
+  }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: var(--background);
+    color: var(--charcoal);
+    padding: 40px 20px;
+    min-height: 100vh;
+  }
+
+  .page-header {
+    text-align: center;
+    margin-bottom: 60px;
+  }
+  .page-header h1 {
+    font-size: 42px;
+    font-weight: 800;
+    color: var(--charcoal);
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+  }
+  .page-header h1 span { color: var(--warm-orange); }
+  .page-header p {
+    font-size: 18px;
+    color: var(--text-secondary);
+    font-weight: 400;
+    max-width: 600px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+  .page-header .subtitle {
+    font-size: 14px;
+    color: var(--rose-pink);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    margin-bottom: 12px;
+  }
+
+  /* ─── Section titles ─── */
+  .section-title {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  .section-title h2 {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--charcoal);
+    margin-bottom: 6px;
+  }
+  .section-title p {
+    font-size: 15px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  /* ─── Hero Mascot ─── */
+  .hero-section {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 80px;
+    gap: 60px;
+    flex-wrap: wrap;
+  }
+  .hero-mascot {
+    position: relative;
+    width: 300px;
+    height: 360px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .hero-glow {
+    position: absolute;
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,213,79,0.35) 0%, rgba(255,213,79,0.08) 50%, transparent 70%);
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    animation: pulseGlow 3s ease-in-out infinite;
+  }
+  @keyframes pulseGlow {
+    0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.8; }
+    50% { transform: translateX(-50%) scale(1.15); opacity: 1; }
+  }
+
+  .hero-info {
+    max-width: 380px;
+  }
+  .hero-info h3 {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    color: var(--charcoal);
+  }
+  .hero-info p {
+    font-size: 15px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    margin-bottom: 12px;
+  }
+  .trait-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .trait-tag {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .trait-tag.warm { background: #FFF3E0; color: #E65100; }
+  .trait-tag.calm { background: #E3F2FD; color: #1565C0; }
+  .trait-tag.glow { background: #FFF8E1; color: #F57F17; }
+  .trait-tag.soft { background: #FCE4EC; color: #C62828; }
+  .trait-tag.wise { background: #F3E5F5; color: #6A1B9A; }
+
+  /* ─── Mood Grid ─── */
+  .mood-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 24px;
+    max-width: 1100px;
+    margin: 0 auto 80px;
+  }
+  .mood-card {
+    background: var(--white);
+    border-radius: 24px;
+    padding: 32px 24px;
+    text-align: center;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .mood-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  }
+  .mood-card .mood-icon {
+    width: 140px;
+    height: 160px;
+    margin: 0 auto 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .mood-card h4 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    color: var(--charcoal);
+  }
+  .mood-card .mood-context {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 8px;
+  }
+  .mood-card p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  /* ─── Colour Palette Section ─── */
+  .palette-section {
+    max-width: 900px;
+    margin: 0 auto 80px;
+  }
+  .palette-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 24px;
+  }
+  .palette-swatch {
+    width: 100px;
+    text-align: center;
+  }
+  .swatch-circle {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    margin: 0 auto 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  .swatch-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--charcoal);
+  }
+  .swatch-hex {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 400;
+  }
+
+  /* ─── Logo Concepts ─── */
+  .logo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 32px;
+    max-width: 1000px;
+    margin: 0 auto 80px;
+  }
+  .logo-card {
+    background: var(--white);
+    border-radius: 24px;
+    padding: 40px;
+    text-align: center;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  }
+  .logo-card.dark {
+    background: var(--charcoal);
+    color: var(--white);
+  }
+  .logo-card.dark p { color: rgba(255,255,255,0.6); }
+  .logo-card .logo-preview {
+    margin: 0 auto 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
+  }
+  .logo-card h4 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .logo-card p {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  /* ─── Usage Context ─── */
+  .usage-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 24px;
+    max-width: 1000px;
+    margin: 0 auto 80px;
+  }
+  .usage-card {
+    background: var(--white);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  }
+  .usage-card .usage-preview {
+    height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .usage-card .usage-text {
+    padding: 20px;
+  }
+  .usage-card .usage-text h4 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .usage-card .usage-text p {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  /* ─── Footer ─── */
+  .footer {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+    font-size: 13px;
+  }
+
+  /* ─── SVG Animations ─── */
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  @keyframes wingFlutter {
+    0%, 100% { transform: rotate(-5deg) scaleX(1); }
+    50% { transform: rotate(5deg) scaleX(0.9); }
+  }
+  @keyframes glowPulse {
+    0%, 100% { opacity: 0.6; r: 18; }
+    50% { opacity: 1; r: 22; }
+  }
+  @keyframes sleepFloat {
+    0% { opacity: 0; transform: translateY(0) scale(0.6); }
+    50% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-30px) scale(1); }
+  }
+  .firefly-hero { animation: float 4s ease-in-out infinite; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- PAGE HEADER                                 -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="page-header">
+  <div class="subtitle">Mascot Concept Sheet</div>
+  <h1>Meet <span>Lumi</span> the Firefly</h1>
+  <p>A warm, minimal mascot that embodies the spirit of reading — a small creature that creates its own light in the dark, just like every reader finding illumination in a book.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- HERO SECTION                                -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="hero-section">
+  <div class="hero-mascot">
+    <div class="hero-glow"></div>
+    <svg class="firefly-hero" width="220" height="280" viewBox="0 0 220 280" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Wings (behind body) -->
+      <g opacity="0.3">
+        <ellipse cx="62" cy="95" rx="38" ry="52" transform="rotate(-20 62 95)" fill="url(#wingGradL)" />
+        <ellipse cx="158" cy="95" rx="38" ry="52" transform="rotate(20 158 95)" fill="url(#wingGradR)" />
+      </g>
+      <!-- Lower wings -->
+      <g opacity="0.2">
+        <ellipse cx="72" cy="130" rx="28" ry="36" transform="rotate(-10 72 130)" fill="url(#wingGradL)" />
+        <ellipse cx="148" cy="130" rx="28" ry="36" transform="rotate(10 148 130)" fill="url(#wingGradR)" />
+      </g>
+      <!-- Body -->
+      <ellipse cx="110" cy="120" rx="48" ry="56" fill="#2D3A4A" />
+      <!-- Belly stripe -->
+      <ellipse cx="110" cy="135" rx="32" ry="38" fill="#3E4F63" />
+      <!-- Glow abdomen -->
+      <ellipse cx="110" cy="195" rx="34" ry="40" fill="url(#glowGrad)">
+        <animate attributeName="opacity" values="0.85;1;0.85" dur="3s" repeatCount="indefinite" />
+      </ellipse>
+      <!-- Glow halo -->
+      <circle cx="110" cy="200" r="50" fill="url(#haloGrad)" opacity="0.4">
+        <animate attributeName="r" values="48;56;48" dur="3s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.3;0.5;0.3" dur="3s" repeatCount="indefinite" />
+      </circle>
+      <!-- Eyes -->
+      <ellipse cx="94" cy="108" rx="10" ry="11" fill="#FFFFFF" />
+      <ellipse cx="126" cy="108" rx="10" ry="11" fill="#FFFFFF" />
+      <circle cx="96" cy="107" r="6" fill="#2E3440" />
+      <circle cx="128" cy="107" r="6" fill="#2E3440" />
+      <!-- Eye shine -->
+      <circle cx="98" cy="105" r="2.5" fill="#FFFFFF" />
+      <circle cx="130" cy="105" r="2.5" fill="#FFFFFF" />
+      <!-- Gentle smile -->
+      <path d="M100 122 Q110 130 120 122" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" fill="none" />
+      <!-- Antennae -->
+      <path d="M96 82 Q88 58 78 50" stroke="#3E4F63" stroke-width="2.5" stroke-linecap="round" fill="none" />
+      <path d="M124 82 Q132 58 142 50" stroke="#3E4F63" stroke-width="2.5" stroke-linecap="round" fill="none" />
+      <circle cx="78" cy="50" r="4" fill="#FFD54F" opacity="0.8">
+        <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite" />
+      </circle>
+      <circle cx="142" cy="50" r="4" fill="#FFD54F" opacity="0.8">
+        <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" begin="0.5s" repeatCount="indefinite" />
+      </circle>
+      <!-- Small arms -->
+      <ellipse cx="65" cy="135" rx="8" ry="6" fill="#2D3A4A" />
+      <ellipse cx="155" cy="135" rx="8" ry="6" fill="#2D3A4A" />
+      <!-- Tiny feet -->
+      <ellipse cx="95" cy="230" rx="10" ry="6" fill="#2D3A4A" />
+      <ellipse cx="125" cy="230" rx="10" ry="6" fill="#2D3A4A" />
+
+      <defs>
+        <radialGradient id="glowGrad" cx="50%" cy="40%" r="60%">
+          <stop offset="0%" stop-color="#FFF8E1" />
+          <stop offset="40%" stop-color="#FFD54F" />
+          <stop offset="100%" stop-color="#FFAB40" />
+        </radialGradient>
+        <radialGradient id="haloGrad" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#FFD54F" stop-opacity="0.5" />
+          <stop offset="100%" stop-color="#FFD54F" stop-opacity="0" />
+        </radialGradient>
+        <linearGradient id="wingGradL" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#FFD54F" stop-opacity="0.6" />
+          <stop offset="100%" stop-color="#FFAB91" stop-opacity="0.2" />
+        </linearGradient>
+        <linearGradient id="wingGradR" x1="100%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#FFD54F" stop-opacity="0.6" />
+          <stop offset="100%" stop-color="#FFAB91" stop-opacity="0.2" />
+        </linearGradient>
+      </defs>
+    </svg>
+  </div>
+
+  <div class="hero-info">
+    <h3>Character Identity</h3>
+    <p>Lumi is a small firefly who's a little sleepy (nocturnal, after all) but perks up the moment you open a book. Warm, encouraging, never pushy — Lumi's glow brightens with every page you read.</p>
+    <p>The design is grounded in your existing palette: the dark body (#2D3A4A) grounds the character with sophistication, while the amber glow connects to warmth and light. Translucent wings pick up your rose-pink and peach gradients.</p>
+    <p><strong>Core quirk:</strong> Lumi is naturally drowsy — a nod to bedtime reading. The glow intensifies when engaged, dims when sleepy. Parents will relate.</p>
+    <div class="trait-tags">
+      <span class="trait-tag warm">Warm</span>
+      <span class="trait-tag calm">Calm</span>
+      <span class="trait-tag glow">Luminous</span>
+      <span class="trait-tag soft">Gentle</span>
+      <span class="trait-tag wise">Curious</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- MOOD STATES                                 -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="section-title">
+  <h2>Mood States</h2>
+  <p>Lumi adapts emotionally across the app — each state maps to your existing mascot mood system</p>
+</div>
+
+<div class="mood-grid">
+
+  <!-- HAPPY -->
+  <div class="mood-card">
+    <div class="mood-icon">
+      <svg width="120" height="140" viewBox="0 0 120 140" fill="none">
+        <circle cx="60" cy="100" r="28" fill="url(#gH)" opacity="0.3">
+          <animate attributeName="r" values="26;30;26" dur="3s" repeatCount="indefinite" />
+        </circle>
+        <ellipse cx="60" cy="58" rx="28" ry="32" fill="#2D3A4A" />
+        <ellipse cx="60" cy="67" rx="18" ry="22" fill="#3E4F63" />
+        <ellipse cx="60" cy="98" rx="20" ry="24" fill="url(#gH)">
+          <animate attributeName="opacity" values="0.85;1;0.85" dur="2.5s" repeatCount="indefinite" />
+        </ellipse>
+        <ellipse cx="51" cy="52" rx="6" ry="6.5" fill="#FFF" />
+        <ellipse cx="69" cy="52" rx="6" ry="6.5" fill="#FFF" />
+        <circle cx="52" cy="51.5" r="3.5" fill="#2E3440" />
+        <circle cx="70" cy="51.5" r="3.5" fill="#2E3440" />
+        <circle cx="53.5" cy="50" r="1.5" fill="#FFF" />
+        <circle cx="71.5" cy="50" r="1.5" fill="#FFF" />
+        <path d="M53 62 Q60 68 67 62" stroke="#FFF" stroke-width="2" stroke-linecap="round" fill="none" />
+        <path d="M52 40 Q47 25 40 20" stroke="#3E4F63" stroke-width="2" stroke-linecap="round" fill="none" />
+        <path d="M68 40 Q73 25 80 20" stroke="#3E4F63" stroke-width="2" stroke-linecap="round" fill="none" />
+        <circle cx="40" cy="20" r="2.5" fill="#FFD54F" opacity="0.7" />
+        <circle cx="80" cy="20" r="2.5" fill="#FFD54F" opacity="0.7" />
+        <g opacity="0.25">
+          <ellipse cx="32" cy="42" rx="20" ry="28" transform="rotate(-20 32 42)" fill="#FFD54F" />
+          <ellipse cx="88" cy="42" rx="20" ry="28" transform="rotate(20 88 42)" fill="#FFD54F" />
+        </g>
+        <defs><radialGradient id="gH" cx="50%" cy="40%" r="60%"><stop offset="0%" stop-color="#FFF8E1"/><stop offset="40%" stop-color="#FFD54F"/><stop offset="100%" stop-color="#FFAB40"/></radialGradient></defs>
+      </svg>
+    </div>
+    <div class="mood-context" style="color: var(--glow-amber);">Default State</div>
+    <h4>Happy</h4>
+    <p>Resting glow, gentle smile, relaxed wings. The default state for navigation and idle screens.</p>
+  </div>
+
+  <!-- CELEBRATING -->
+  <div class="mood-card">
+    <div class="mood-icon">
+      <svg width="120" height="140" viewBox="0 0 120 140" fill="none">
+        <circle cx="60" cy="100" r="34" fill="url(#gC)" opacity="0.4">
+          <animate attributeName="r" values="30;38;30" dur="1.5s" repeatCount="indefinite" />
+          <animate attributeName="opacity" values="0.3;0.6;0.3" dur="1.5s" repeatCount="indefinite" />
+        </circle>
+        <ellipse cx="60" cy="58" rx="28" ry="32" fill="#2D3A4A">
+          <animateTransform attributeName="transform" type="rotate" values="-3 60 58;3 60 58;-3 60 58" dur="0.4s" repeatCount="indefinite" />
+        </ellipse>
+        <ellipse cx="60" cy="67" rx="18" ry="22" fill="#3E4F63" />
+        <ellipse cx="60" cy="98" rx="20" ry="24" fill="url(#gC)">
+          <animate attributeName="opacity" values="0.9;1;0.9" dur="1s" repeatCount="indefinite" />
+        </ellipse>
+        <!-- Star eyes -->
+        <polygon points="51,49 52.5,53 56.5,53.5 53.5,56 54.5,60 51,57.5 47.5,60 48.5,56 45.5,53.5 49.5,53" fill="#FFD54F" />
+        <polygon points="69,49 70.5,53 74.5,53.5 71.5,56 72.5,60 69,57.5 65.5,60 66.5,56 63.5,53.5 67.5,53" fill="#FFD54F" />
+        <path d="M52 64 Q60 72 68 64" stroke="#FFF" stroke-width="2.5" stroke-linecap="round" fill="none" />
+        <!-- Confetti sparkles -->
+        <circle cx="30" cy="30" r="2" fill="#FF8698"><animate attributeName="opacity" values="0;1;0" dur="1.2s" repeatCount="indefinite" /></circle>
+        <circle cx="90" cy="25" r="2" fill="#FFD54F"><animate attributeName="opacity" values="0;1;0" dur="1s" begin="0.3s" repeatCount="indefinite" /></circle>
+        <circle cx="20" cy="60" r="1.5" fill="#D2EBBF"><animate attributeName="opacity" values="0;1;0" dur="1.4s" begin="0.5s" repeatCount="indefinite" /></circle>
+        <circle cx="100" cy="55" r="1.5" fill="#BCE7F0"><animate attributeName="opacity" values="0;1;0" dur="0.9s" begin="0.2s" repeatCount="indefinite" /></circle>
+        <circle cx="45" cy="15" r="1.5" fill="#FFAB91"><animate attributeName="opacity" values="0;1;0" dur="1.1s" begin="0.7s" repeatCount="indefinite" /></circle>
+        <circle cx="78" cy="12" r="2" fill="#FF8698"><animate attributeName="opacity" values="0;1;0" dur="1.3s" begin="0.1s" repeatCount="indefinite" /></circle>
+        <g opacity="0.25">
+          <ellipse cx="32" cy="42" rx="20" ry="28" transform="rotate(-25 32 42)" fill="#FFD54F" />
+          <ellipse cx="88" cy="42" rx="20" ry="28" transform="rotate(25 88 42)" fill="#FFD54F" />
+        </g>
+        <path d="M52 40 Q47 25 40 20" stroke="#3E4F63" stroke-width="2" stroke-linecap="round" fill="none" />
+        <path d="M68 40 Q73 25 80 20" stroke="#3E4F63" stroke-width="2" stroke-linecap="round" fill="none" />
+        <circle cx="40" cy="20" r="3" fill="#FFD54F"><animate attributeName="opacity" values="0.5;1;0.5" dur="0.6s" repeatCount="indefinite" /></circle>
+        <circle cx="80" cy="20" r="3" fill="#FFD54F"><animate attributeName="opacity" values="0.5;1;0.5" dur="0.6s" begin="0.3s" repeatCount="indefinite" /></circle>
+        <defs><radialGradient id="gC" cx="50%" cy="40%" r="60%"><stop offset="0%" stop-color="#FFF8E1"/><stop offset="30%" stop-color="#FFD54F"/><stop offset="100%" stop-color="#FF8698"/></radialGradient></defs>
+      </svg>
+    </div>
+    <div class="mood-context" style="color: var(--rose-pink);">Milestone / Streak</div>
+    <h4>Celebrating</h4>
+    <p>Glow bursts to rose-pink, star-sparkle eyes, body wiggles, confetti particles orbit. Used on success screens and milestones.</p>
+  </div>
+
+  <!-- ENCOURAGING -->
+  <div class="mood-card">
+    <div class="mood-icon">
+      <svg width="120" height="140" viewBox="0 0 120 140" fill="none">
+        <circle cx="60" cy="100" r="28" fill="url(#gE)" opacity="0.35" />
+        <g>
+          <animateTransform attributeName="transform" type="translate" values="0 0;0 -5;0 0" dur="1.5s" repeatCount="indefinite" />
+          <ellipse cx="60" cy="58" rx="28" ry="32" fill="#2D3A4A" />
+          <ellipse cx="60" cy="67" rx="18" ry="22" fill="#3E4F63" />
+          <ellipse cx="60" cy="98" rx="20" ry="24" fill="url(#gE)" />
+          <ellipse cx="51" cy="50" rx="6" ry="7.5" fill="#FFF" />
+          <ellipse cx="69" cy="50" rx="6" ry="7.5" fill="#FFF" />
+          <circle cx="52" cy="49" r="3.5" fill="#2E3440" />
+          <circle cx="70" cy="49" r="3.5" fill="#2E3440" />
+          <circle cx="53.5" cy="47.5" r="1.5" fill="#FFF" />
+          <circle cx="71.5" cy="47.5" r="1.5" fill="#FFF" />
+          <path d="M51 63 Q60 70 69 63" stroke="#FFF" stroke-width="2" stroke-linecap="round" fill="none" />
+          <!-- Raised arm -->
+          <ellipse cx="37" cy="60" rx="8" ry="6" fill="#2D3A4A" transform="rotate(-30 37 60)" />
+          <ellipse cx="83" cy="50" rx="8" ry="6" fill="#2D3A4A" transform="rotate(30 83 50)" />
+          <g opacity="0.25">
+            <ellipse cx="32" cy="42" rx="20" ry="28" transform="rotate(-15 32 42)" fill="#A5D6A7" />
+            <ellipse cx="88" cy="42" rx="20" ry="28" transform="rotate(15 88 42)" fill="#A5D6A7" />
+          </g>
+          <path d="M52 38 Q47 23 40 18" stroke="#3E4F63" stroke-width="2" stroke-linecap="round" fill="none" />
+          <path d="M68 38 Q73 23 80 18" stroke="#3E4F63" stroke-width="2" stroke-linecap="round" fill="none" />
+          <circle cx="40" cy="18" r="2.5" fill="#A5D6A7" opacity="0.8" />
+          <circle cx="80" cy="18" r="2.5" fill="#A5D6A7" opacity="0.8" />
+        </g>
+        <defs><radialGradient id="gE" cx="50%" cy="40%" r="60%"><stop offset="0%" stop-color="#E8F5E9"/><stop offset="40%" stop-color="#A5D6A7"/><stop offset="100%" stop-color="#66BB6A"/></radialGradient></defs>
+      </svg>
+    </div>
+    <div class="mood-context" style="color: var(--glow-encourage);">Nudge / Motivation</div>
+    <h4>Encouraging</h4>
+    <p>Bouncy motion, glow shifts to soft green, wide bright eyes, one arm raised. Appears when motivating continued reading.</p>
+  </div>
+
+  <!-- READING -->
+  <div class="mood-card">
+    <div class="mood-icon">
+      <svg width="120" height="140" viewBox="0 0 120 140" fill="none">
+        <circle cx="60" cy="100" r="26" fill="url(#gR)" opacity="0.3" />
+        <g opacity="0.2">
+          <ellipse cx="32" cy="45" rx="18" ry="26" transform="rotate(-15 32 45)" fill="#FFD54F" />
+          <ellipse cx="88" cy="45" rx="18" ry="26" transform="rotate(15 88 45)" fill="#FFD54F" />
+        </g>
+        <ellipse cx="60" cy="58" rx="28" ry="32" fill="#2D3A4A" />
+        <ellipse cx="60" cy="67" rx="18" ry="22" fill="#3E4F63" />
+        <ellipse cx="60" cy="98" rx="20" ry="24" fill="url(#gR)">
+          <animate attributeName="opacity" values="0.7;0.9;0.7" dur="4s" repeatCount="indefinite" />
+        </ellipse>
+        <!-- Downcast reading eyes -->
+        <ellipse cx="51" cy="54" rx="6" ry="5" fill="#FFF" />
+        <ellipse cx="69" cy="54" rx="6" ry="5" fill="#FFF" />
+        <circle cx="52" cy="55" r="3" fill="#2E3440" />
+        <circle cx="70" cy="55" r="3" fill="#2E3440" />
+        <circle cx="53" cy="54" r="1.2" fill="#FFF" />
+        <circle cx="71" cy="54" r="1.2" fill="#FFF" />
+        <path d="M54 63 Q60 66 66 63" stroke="#FFF" stroke-width="1.5" stroke-linecap="round" fill="none" />
+        <!-- Book held in arms -->
+        <rect x="42" y="72" rx="2" ry="2" width="36" height="26" fill="#FFAB91" />
+        <line x1="60" y1="72" x2="60" y2="98" stroke="#E8856E" stroke-width="1.5" />
+        <line x1="48" y1="80" x2="56" y2="80" stroke="#FFF" stroke-width="1" opacity="0.5" />
+        <line x1="48" y1="84" x2="55" y2="84" stroke="#FFF" stroke-width="1" opacity="0.4" />
+        <line x1="64" y1="80" x2="72" y2="80" stroke="#FFF" stroke-width="1" opacity="0.5" />
+        <line x1="64" y1="84" x2="70" y2="84" stroke="#FFF" stroke-width="1" opacity="0.4" />
+        <!-- Arms holding book -->
+        <ellipse cx="40" cy="80" rx="7" ry="5" fill="#2D3A4A" />
+        <ellipse cx="80" cy="80" rx="7" ry="5" fill="#2D3A4A" />
+        <path d="M52 40 Q47 25 40 20" stroke="#3E4F63" stroke-width="2" stroke-linecap="round" fill="none" />
+        <path d="M68 40 Q73 25 80 20" stroke="#3E4F63" stroke-width="2" stroke-linecap="round" fill="none" />
+        <circle cx="40" cy="20" r="2.5" fill="#FFD54F" opacity="0.5" />
+        <circle cx="80" cy="20" r="2.5" fill="#FFD54F" opacity="0.5" />
+        <defs><radialGradient id="gR" cx="50%" cy="40%" r="60%"><stop offset="0%" stop-color="#FFF8E1"/><stop offset="40%" stop-color="#FFD54F"/><stop offset="100%" stop-color="#FFAB40"/></radialGradient></defs>
+      </svg>
+    </div>
+    <div class="mood-context" style="color: var(--warm-orange);">Reading Log Flow</div>
+    <h4>Reading</h4>
+    <p>Holding a tiny book (in your lumi-peach), eyes cast down, glow steady and warm. Used during the log-reading flow.</p>
+  </div>
+
+  <!-- THINKING -->
+  <div class="mood-card">
+    <div class="mood-icon">
+      <svg width="120" height="140" viewBox="0 0 120 140" fill="none">
+        <circle cx="60" cy="100" r="26" fill="url(#gT)" opacity="0.3" />
+        <g>
+          <animateTransform attributeName="transform" type="rotate" values="-3 60 70;3 60 70;-3 60 70" dur="3s" repeatCount="indefinite" />
+          <g opacity="0.2">
+            <ellipse cx="32" cy="45" rx="18" ry="26" transform="rotate(-15 32 45)" fill="#90CAF9" />
+            <ellipse cx="88" cy="45" rx="18" ry="26" transform="rotate(15 88 45)" fill="#90CAF9" />
+          </g>
+          <ellipse cx="60" cy="58" rx="28" ry="32" fill="#2D3A4A" />
+          <ellipse cx="60" cy="67" rx="18" ry="22" fill="#3E4F63" />
+          <ellipse cx="60" cy="98" rx="20" ry="24" fill="url(#gT)" />
+          <!-- One eye squinted -->
+          <ellipse cx="51" cy="52" rx="6" ry="6.5" fill="#FFF" />
+          <ellipse cx="69" cy="53" rx="6" ry="4" fill="#FFF" />
+          <circle cx="53" cy="52" r="3.5" fill="#2E3440" />
+          <circle cx="70" cy="53" r="2.5" fill="#2E3440" />
+          <circle cx="54" cy="50.5" r="1.5" fill="#FFF" />
+          <path d="M54 63 Q60 65 66 63" stroke="#FFF" stroke-width="1.5" stroke-linecap="round" fill="none" />
+          <!-- Arm on chin -->
+          <ellipse cx="38" cy="65" rx="7" ry="5" fill="#2D3A4A" transform="rotate(-15 38 65)" />
+          <path d="M52 38 Q47 23 40 18" stroke="#3E4F63" stroke-width="2" stroke-linecap="round" fill="none" />
+          <path d="M68 38 Q73 23 80 18" stroke="#3E4F63" stroke-width="2" stroke-linecap="round" fill="none" />
+          <circle cx="40" cy="18" r="2.5" fill="#90CAF9" opacity="0.6" />
+          <circle cx="80" cy="18" r="2.5" fill="#90CAF9" opacity="0.6" />
+        </g>
+        <!-- Thought dots -->
+        <circle cx="90" cy="35" r="3" fill="#90CAF9" opacity="0.5"><animate attributeName="opacity" values="0.3;0.7;0.3" dur="2s" repeatCount="indefinite" /></circle>
+        <circle cx="97" cy="25" r="4" fill="#90CAF9" opacity="0.4"><animate attributeName="opacity" values="0.2;0.6;0.2" dur="2s" begin="0.3s" repeatCount="indefinite" /></circle>
+        <circle cx="102" cy="14" r="5" fill="#90CAF9" opacity="0.3"><animate attributeName="opacity" values="0.1;0.5;0.1" dur="2s" begin="0.6s" repeatCount="indefinite" /></circle>
+        <defs><radialGradient id="gT" cx="50%" cy="40%" r="60%"><stop offset="0%" stop-color="#E3F2FD"/><stop offset="40%" stop-color="#90CAF9"/><stop offset="100%" stop-color="#64B5F6"/></radialGradient></defs>
+      </svg>
+    </div>
+    <div class="mood-context" style="color: var(--glow-think);">Loading / Processing</div>
+    <h4>Thinking</h4>
+    <p>Gentle head tilt, one eye squinted, glow shifts to sky-blue, thought bubbles float up. Used for loading states.</p>
+  </div>
+
+  <!-- SLEEPING -->
+  <div class="mood-card">
+    <div class="mood-icon">
+      <svg width="120" height="140" viewBox="0 0 120 140" fill="none">
+        <circle cx="60" cy="100" r="24" fill="url(#gS)" opacity="0.15" />
+        <g opacity="0.15">
+          <ellipse cx="34" cy="48" rx="16" ry="24" transform="rotate(-10 34 48)" fill="#B0BEC5" />
+          <ellipse cx="86" cy="48" rx="16" ry="24" transform="rotate(10 86 48)" fill="#B0BEC5" />
+        </g>
+        <ellipse cx="60" cy="60" rx="28" ry="32" fill="#2D3A4A" />
+        <ellipse cx="60" cy="69" rx="18" ry="22" fill="#3E4F63" />
+        <ellipse cx="60" cy="100" rx="20" ry="24" fill="url(#gS)">
+          <animate attributeName="opacity" values="0.3;0.5;0.3" dur="4s" repeatCount="indefinite" />
+        </ellipse>
+        <!-- Closed eyes (curved lines) -->
+        <path d="M45 54 Q51 58 57 54" stroke="#FFF" stroke-width="2" stroke-linecap="round" fill="none" />
+        <path d="M63 54 Q69 58 75 54" stroke="#FFF" stroke-width="2" stroke-linecap="round" fill="none" />
+        <!-- Tiny peaceful mouth -->
+        <circle cx="60" cy="65" rx="2" ry="2" fill="#FFF" opacity="0.5" />
+        <path d="M52 40 Q47 25 42 22" stroke="#3E4F63" stroke-width="2" stroke-linecap="round" fill="none" />
+        <path d="M68 40 Q73 25 78 22" stroke="#3E4F63" stroke-width="2" stroke-linecap="round" fill="none" />
+        <circle cx="42" cy="22" r="2" fill="#B0BEC5" opacity="0.3" />
+        <circle cx="78" cy="22" r="2" fill="#B0BEC5" opacity="0.3" />
+        <!-- Z's floating up -->
+        <text font-family="Nunito, sans-serif" font-weight="700" fill="#B0BEC5" font-size="14" opacity="0.6">
+          <tspan x="78" y="40">z</tspan>
+          <animate attributeName="opacity" values="0;0.6;0" dur="3s" repeatCount="indefinite" />
+          <animateTransform attributeName="transform" type="translate" values="0 0;5 -15" dur="3s" repeatCount="indefinite" />
+        </text>
+        <text font-family="Nunito, sans-serif" font-weight="700" fill="#B0BEC5" font-size="18" opacity="0.4">
+          <tspan x="86" y="30">z</tspan>
+          <animate attributeName="opacity" values="0;0.4;0" dur="3s" begin="0.8s" repeatCount="indefinite" />
+          <animateTransform attributeName="transform" type="translate" values="0 0;8 -20" dur="3s" begin="0.8s" repeatCount="indefinite" />
+        </text>
+        <text font-family="Nunito, sans-serif" font-weight="700" fill="#B0BEC5" font-size="10" opacity="0.3">
+          <tspan x="74" y="48">z</tspan>
+          <animate attributeName="opacity" values="0;0.5;0" dur="3s" begin="1.5s" repeatCount="indefinite" />
+          <animateTransform attributeName="transform" type="translate" values="0 0;3 -12" dur="3s" begin="1.5s" repeatCount="indefinite" />
+        </text>
+        <defs><radialGradient id="gS" cx="50%" cy="40%" r="60%"><stop offset="0%" stop-color="#ECEFF1"/><stop offset="40%" stop-color="#B0BEC5"/><stop offset="100%" stop-color="#78909C"/></radialGradient></defs>
+      </svg>
+    </div>
+    <div class="mood-context" style="color: #78909C;">Inactive / Empty State</div>
+    <h4>Sleeping</h4>
+    <p>Glow dims to cool grey, eyes closed, floating Z's, wings folded flat. Appears when no reading has been logged recently.</p>
+  </div>
+
+  <!-- WAVING -->
+  <div class="mood-card">
+    <div class="mood-icon">
+      <svg width="120" height="140" viewBox="0 0 120 140" fill="none">
+        <circle cx="60" cy="100" r="28" fill="url(#gW)" opacity="0.3" />
+        <g opacity="0.25">
+          <ellipse cx="32" cy="42" rx="20" ry="28" transform="rotate(-18 32 42)" fill="#FFD54F" />
+          <ellipse cx="88" cy="42" rx="20" ry="28" transform="rotate(18 88 42)" fill="#FFD54F" />
+        </g>
+        <ellipse cx="60" cy="58" rx="28" ry="32" fill="#2D3A4A" />
+        <ellipse cx="60" cy="67" rx="18" ry="22" fill="#3E4F63" />
+        <ellipse cx="60" cy="98" rx="20" ry="24" fill="url(#gW)" />
+        <ellipse cx="51" cy="52" rx="6" ry="6.5" fill="#FFF" />
+        <ellipse cx="69" cy="52" rx="6" ry="6.5" fill="#FFF" />
+        <circle cx="52" cy="51.5" r="3.5" fill="#2E3440" />
+        <circle cx="70" cy="51.5" r="3.5" fill="#2E3440" />
+        <circle cx="53.5" cy="50" r="1.5" fill="#FFF" />
+        <circle cx="71.5" cy="50" r="1.5" fill="#FFF" />
+        <path d="M53 62 Q60 68 67 62" stroke="#FFF" stroke-width="2" stroke-linecap="round" fill="none" />
+        <!-- Waving arm -->
+        <g>
+          <animateTransform attributeName="transform" type="rotate" values="-15 88 48;15 88 48;-15 88 48" dur="0.8s" repeatCount="indefinite" />
+          <ellipse cx="88" cy="48" rx="9" ry="6" fill="#2D3A4A" transform="rotate(30 88 48)" />
+        </g>
+        <ellipse cx="37" cy="68" rx="7" ry="5" fill="#2D3A4A" />
+        <path d="M52 40 Q47 25 40 20" stroke="#3E4F63" stroke-width="2" stroke-linecap="round" fill="none" />
+        <path d="M68 40 Q73 25 80 20" stroke="#3E4F63" stroke-width="2" stroke-linecap="round" fill="none" />
+        <circle cx="40" cy="20" r="2.5" fill="#FFD54F" opacity="0.7" />
+        <circle cx="80" cy="20" r="2.5" fill="#FFD54F" opacity="0.7" />
+        <defs><radialGradient id="gW" cx="50%" cy="40%" r="60%"><stop offset="0%" stop-color="#FFF8E1"/><stop offset="40%" stop-color="#FFD54F"/><stop offset="100%" stop-color="#FFAB40"/></radialGradient></defs>
+      </svg>
+    </div>
+    <div class="mood-context" style="color: var(--glow-amber);">Onboarding / Welcome</div>
+    <h4>Waving</h4>
+    <p>One arm waving, bright eyes, standard amber glow. Used for onboarding, first-time greetings, and welcome-back screens.</p>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- COLOUR PALETTE                              -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="section-title">
+  <h2>Mascot Colour Palette</h2>
+  <p>Colours drawn from your existing Lumi design system with new mascot-specific additions</p>
+</div>
+
+<div class="palette-section">
+  <div class="palette-row">
+    <div class="palette-swatch">
+      <div class="swatch-circle" style="background: #2D3A4A;"></div>
+      <div class="swatch-label">Body</div>
+      <div class="swatch-hex">#2D3A4A</div>
+    </div>
+    <div class="palette-swatch">
+      <div class="swatch-circle" style="background: #3E4F63;"></div>
+      <div class="swatch-label">Belly</div>
+      <div class="swatch-hex">#3E4F63</div>
+    </div>
+    <div class="palette-swatch">
+      <div class="swatch-circle" style="background: #FFD54F;"></div>
+      <div class="swatch-label">Glow Core</div>
+      <div class="swatch-hex">#FFD54F</div>
+    </div>
+    <div class="palette-swatch">
+      <div class="swatch-circle" style="background: #FFAB40;"></div>
+      <div class="swatch-label">Glow Edge</div>
+      <div class="swatch-hex">#FFAB40</div>
+    </div>
+    <div class="palette-swatch">
+      <div class="swatch-circle" style="background: #FFF8E1;"></div>
+      <div class="swatch-label">Glow Halo</div>
+      <div class="swatch-hex">#FFF8E1</div>
+    </div>
+    <div class="palette-swatch">
+      <div class="swatch-circle" style="background: #FF8698;"></div>
+      <div class="swatch-label">Celebrate</div>
+      <div class="swatch-hex">#FF8698</div>
+    </div>
+    <div class="palette-swatch">
+      <div class="swatch-circle" style="background: #A5D6A7;"></div>
+      <div class="swatch-label">Encourage</div>
+      <div class="swatch-hex">#A5D6A7</div>
+    </div>
+    <div class="palette-swatch">
+      <div class="swatch-circle" style="background: #90CAF9;"></div>
+      <div class="swatch-label">Think</div>
+      <div class="swatch-hex">#90CAF9</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- LOGO CONCEPTS                               -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="section-title">
+  <h2>Logo Concepts</h2>
+  <p>Three approaches — from icon-first to wordmark-integrated</p>
+</div>
+
+<div class="logo-grid">
+  <!-- Logo A: Icon Mark -->
+  <div class="logo-card">
+    <div class="logo-preview">
+      <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+        <circle cx="40" cy="48" r="18" fill="url(#logoGlow1)" opacity="0.3" />
+        <ellipse cx="40" cy="30" rx="16" ry="18" fill="#2D3A4A" />
+        <ellipse cx="40" cy="35" rx="10" ry="12" fill="#3E4F63" />
+        <ellipse cx="40" cy="52" rx="12" ry="14" fill="url(#logoGlow1)" />
+        <circle cx="35" cy="27" r="3" fill="#FFF" />
+        <circle cx="45" cy="27" r="3" fill="#FFF" />
+        <circle cx="36" cy="26.5" r="1.8" fill="#2E3440" />
+        <circle cx="46" cy="26.5" r="1.8" fill="#2E3440" />
+        <path d="M36 33 Q40 36.5 44 33" stroke="#FFF" stroke-width="1.5" stroke-linecap="round" fill="none" />
+        <g opacity="0.2">
+          <ellipse cx="24" cy="22" rx="12" ry="16" transform="rotate(-20 24 22)" fill="#FFD54F" />
+          <ellipse cx="56" cy="22" rx="12" ry="16" transform="rotate(20 56 22)" fill="#FFD54F" />
+        </g>
+        <path d="M34 18 Q30 8 25 5" stroke="#3E4F63" stroke-width="1.5" stroke-linecap="round" fill="none" />
+        <path d="M46 18 Q50 8 55 5" stroke="#3E4F63" stroke-width="1.5" stroke-linecap="round" fill="none" />
+        <circle cx="25" cy="5" r="2" fill="#FFD54F" />
+        <circle cx="55" cy="5" r="2" fill="#FFD54F" />
+        <defs><radialGradient id="logoGlow1" cx="50%" cy="35%" r="55%"><stop offset="0%" stop-color="#FFF8E1"/><stop offset="40%" stop-color="#FFD54F"/><stop offset="100%" stop-color="#FFAB40"/></radialGradient></defs>
+      </svg>
+    </div>
+    <h4>A. App Icon Mark</h4>
+    <p>Pure mascot at icon size. Works as your app store icon, notification badge, and favicon. Silhouette reads clearly at 24px.</p>
+  </div>
+
+  <!-- Logo B: Wordmark + Icon -->
+  <div class="logo-card">
+    <div class="logo-preview" style="gap: 12px;">
+      <svg width="44" height="52" viewBox="0 0 44 52" fill="none">
+        <circle cx="22" cy="32" r="10" fill="url(#logoGlow2)" opacity="0.3" />
+        <ellipse cx="22" cy="18" rx="10" ry="12" fill="#2D3A4A" />
+        <ellipse cx="22" cy="21" rx="7" ry="8" fill="#3E4F63" />
+        <ellipse cx="22" cy="34" rx="8" ry="10" fill="url(#logoGlow2)" />
+        <circle cx="19" cy="16" r="2" fill="#FFF" />
+        <circle cx="25" cy="16" r="2" fill="#FFF" />
+        <circle cx="19.5" cy="15.8" r="1.2" fill="#2E3440" />
+        <circle cx="25.5" cy="15.8" r="1.2" fill="#2E3440" />
+        <path d="M19.5 20 Q22 22 24.5 20" stroke="#FFF" stroke-width="1" stroke-linecap="round" fill="none" />
+        <g opacity="0.2">
+          <ellipse cx="13" cy="13" rx="7" ry="10" transform="rotate(-20 13 13)" fill="#FFD54F" />
+          <ellipse cx="31" cy="13" rx="7" ry="10" transform="rotate(20 31 13)" fill="#FFD54F" />
+        </g>
+        <path d="M18 10 Q16 3 13 1" stroke="#3E4F63" stroke-width="1.2" stroke-linecap="round" fill="none" />
+        <path d="M26 10 Q28 3 31 1" stroke="#3E4F63" stroke-width="1.2" stroke-linecap="round" fill="none" />
+        <circle cx="13" cy="1" r="1.5" fill="#FFD54F" />
+        <circle cx="31" cy="1" r="1.5" fill="#FFD54F" />
+        <defs><radialGradient id="logoGlow2" cx="50%" cy="35%" r="55%"><stop offset="0%" stop-color="#FFF8E1"/><stop offset="40%" stop-color="#FFD54F"/><stop offset="100%" stop-color="#FFAB40"/></radialGradient></defs>
+      </svg>
+      <span style="font-family: 'Nunito', sans-serif; font-size: 36px; font-weight: 800; color: #121211; letter-spacing: -1px;">lumi</span>
+    </div>
+    <h4>B. Wordmark + Mascot</h4>
+    <p>The mascot sits alongside the logotype for marketing materials, splash screens, and web presence. Nunito Extra-Bold, lowercase.</p>
+  </div>
+
+  <!-- Logo C: Dark mode -->
+  <div class="logo-card dark">
+    <div class="logo-preview" style="gap: 12px;">
+      <svg width="44" height="52" viewBox="0 0 44 52" fill="none">
+        <circle cx="22" cy="32" r="12" fill="url(#logoGlow3)" opacity="0.25" />
+        <ellipse cx="22" cy="18" rx="10" ry="12" fill="#3E4F63" />
+        <ellipse cx="22" cy="21" rx="7" ry="8" fill="#4A6178" />
+        <ellipse cx="22" cy="34" rx="8" ry="10" fill="url(#logoGlow3)" />
+        <circle cx="19" cy="16" r="2" fill="#FFF" />
+        <circle cx="25" cy="16" r="2" fill="#FFF" />
+        <circle cx="19.5" cy="15.8" r="1.2" fill="#2E3440" />
+        <circle cx="25.5" cy="15.8" r="1.2" fill="#2E3440" />
+        <path d="M19.5 20 Q22 22 24.5 20" stroke="#FFF" stroke-width="1" stroke-linecap="round" fill="none" />
+        <g opacity="0.15">
+          <ellipse cx="13" cy="13" rx="7" ry="10" transform="rotate(-20 13 13)" fill="#FFD54F" />
+          <ellipse cx="31" cy="13" rx="7" ry="10" transform="rotate(20 31 13)" fill="#FFD54F" />
+        </g>
+        <path d="M18 10 Q16 3 13 1" stroke="#4A6178" stroke-width="1.2" stroke-linecap="round" fill="none" />
+        <path d="M26 10 Q28 3 31 1" stroke="#4A6178" stroke-width="1.2" stroke-linecap="round" fill="none" />
+        <circle cx="13" cy="1" r="1.5" fill="#FFD54F" />
+        <circle cx="31" cy="1" r="1.5" fill="#FFD54F" />
+        <defs><radialGradient id="logoGlow3" cx="50%" cy="35%" r="55%"><stop offset="0%" stop-color="#FFF8E1"/><stop offset="40%" stop-color="#FFD54F"/><stop offset="100%" stop-color="#FFAB40"/></radialGradient></defs>
+      </svg>
+      <span style="font-family: 'Nunito', sans-serif; font-size: 36px; font-weight: 800; color: #FFFFFF; letter-spacing: -1px;">lumi</span>
+    </div>
+    <h4>C. Dark Mode Variant</h4>
+    <p>The glow becomes the hero on dark backgrounds — the firefly concept literally shines. Perfect for splash screens and app store assets.</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- UX PLACEMENT GUIDE                          -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="section-title">
+  <h2>Where Lumi Appears</h2>
+  <p>The mascot earns its place by being useful at moments that matter</p>
+</div>
+
+<div class="usage-grid">
+  <div class="usage-card">
+    <div class="usage-preview" style="background: linear-gradient(135deg, #FFF8E1 0%, #FFFDE7 100%);">
+      <svg width="60" height="72" viewBox="0 0 120 140" fill="none" opacity="0.9">
+        <ellipse cx="60" cy="58" rx="28" ry="32" fill="#2D3A4A" />
+        <ellipse cx="60" cy="98" rx="20" ry="24" fill="#FFD54F" opacity="0.3" />
+        <ellipse cx="51" cy="52" rx="6" ry="6.5" fill="#FFF" />
+        <ellipse cx="69" cy="52" rx="6" ry="6.5" fill="#FFF" />
+        <circle cx="52" cy="51.5" r="3.5" fill="#2E3440" />
+        <circle cx="70" cy="51.5" r="3.5" fill="#2E3440" />
+        <path d="M53 62 Q60 68 67 62" stroke="#FFF" stroke-width="2" stroke-linecap="round" fill="none" />
+        <g><animateTransform attributeName="transform" type="rotate" values="-15 88 48;15 88 48;-15 88 48" dur="0.8s" repeatCount="indefinite" /><ellipse cx="88" cy="48" rx="9" ry="6" fill="#2D3A4A" transform="rotate(30 88 48)" /></g>
+      </svg>
+    </div>
+    <div class="usage-text">
+      <h4>Onboarding</h4>
+      <p>Waving Lumi guides new families through setup with warmth, not instruction manuals.</p>
+    </div>
+  </div>
+
+  <div class="usage-card">
+    <div class="usage-preview" style="background: linear-gradient(135deg, #F5F5F7 0%, #ECEFF1 100%);">
+      <svg width="60" height="72" viewBox="0 0 120 140" fill="none" opacity="0.8">
+        <ellipse cx="60" cy="60" rx="28" ry="32" fill="#2D3A4A" />
+        <ellipse cx="60" cy="100" rx="20" ry="24" fill="#B0BEC5" opacity="0.2" />
+        <path d="M45 54 Q51 58 57 54" stroke="#FFF" stroke-width="2" stroke-linecap="round" fill="none" />
+        <path d="M63 54 Q69 58 75 54" stroke="#FFF" stroke-width="2" stroke-linecap="round" fill="none" />
+        <text font-family="Nunito" font-weight="700" fill="#B0BEC5" font-size="16" x="82" y="40" opacity="0.5">z</text>
+      </svg>
+    </div>
+    <div class="usage-text">
+      <h4>Empty States</h4>
+      <p>Sleeping Lumi on "no readings yet" screens — inviting, not guilt-tripping.</p>
+    </div>
+  </div>
+
+  <div class="usage-card">
+    <div class="usage-preview" style="background: linear-gradient(135deg, #FCE4EC 0%, #FFF3E0 100%);">
+      <svg width="60" height="72" viewBox="0 0 120 140" fill="none" opacity="0.9">
+        <ellipse cx="60" cy="58" rx="28" ry="32" fill="#2D3A4A">
+          <animateTransform attributeName="transform" type="rotate" values="-3 60 58;3 60 58;-3 60 58" dur="0.5s" repeatCount="indefinite" />
+        </ellipse>
+        <ellipse cx="60" cy="98" rx="20" ry="24" fill="#FF8698" opacity="0.5" />
+        <polygon points="51,49 52.5,53 56.5,53.5 53.5,56 54.5,60 51,57.5 47.5,60 48.5,56 45.5,53.5 49.5,53" fill="#FFD54F" />
+        <polygon points="69,49 70.5,53 74.5,53.5 71.5,56 72.5,60 69,57.5 65.5,60 66.5,56 63.5,53.5 67.5,53" fill="#FFD54F" />
+        <path d="M52 64 Q60 72 68 64" stroke="#FFF" stroke-width="2" stroke-linecap="round" fill="none" />
+        <circle cx="30" cy="30" r="2" fill="#FF8698" opacity="0.7" />
+        <circle cx="90" cy="25" r="2" fill="#FFD54F" opacity="0.7" />
+      </svg>
+    </div>
+    <div class="usage-text">
+      <h4>Success Screens</h4>
+      <p>Celebrating Lumi bursts with confetti on reading completion, streaks, and badge unlocks.</p>
+    </div>
+  </div>
+
+  <div class="usage-card">
+    <div class="usage-preview" style="background: linear-gradient(135deg, #E8F5E9 0%, #F1F8E9 100%);">
+      <svg width="60" height="72" viewBox="0 0 120 140" fill="none" opacity="0.9">
+        <g><animateTransform attributeName="transform" type="translate" values="0 0;0 -4;0 0" dur="1.5s" repeatCount="indefinite" />
+        <ellipse cx="60" cy="58" rx="28" ry="32" fill="#2D3A4A" />
+        <ellipse cx="60" cy="98" rx="20" ry="24" fill="#A5D6A7" opacity="0.4" />
+        <ellipse cx="51" cy="50" rx="6" ry="7.5" fill="#FFF" />
+        <ellipse cx="69" cy="50" rx="6" ry="7.5" fill="#FFF" />
+        <circle cx="52" cy="49" r="3.5" fill="#2E3440" />
+        <circle cx="70" cy="49" r="3.5" fill="#2E3440" />
+        <path d="M51 63 Q60 70 69 63" stroke="#FFF" stroke-width="2" stroke-linecap="round" fill="none" />
+        </g>
+      </svg>
+    </div>
+    <div class="usage-text">
+      <h4>Gentle Nudges</h4>
+      <p>Encouraging Lumi bounces softly when prompting "Time to read tonight?" — motivation without pressure.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- DESIGN NOTES                                -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="section-title" style="margin-bottom: 20px;">
+  <h2>Design Rationale</h2>
+</div>
+
+<div style="max-width: 720px; margin: 0 auto 60px; background: var(--white); border-radius: 24px; padding: 36px; box-shadow: 0 2px 12px rgba(0,0,0,0.04);">
+  <p style="font-size: 15px; line-height: 1.8; color: var(--text-secondary); margin-bottom: 16px;">
+    <strong style="color: var(--charcoal);">Why dark body + warm glow?</strong> A dark-bodied firefly grounds the character with maturity and sophistication — it doesn't read as "cartoon for kids." The warmth comes entirely from the glow, which is the emotional engine of the character. This contrast (dark form, warm light) mirrors the reading metaphor perfectly: illumination emerging from something quiet.
+  </p>
+  <p style="font-size: 15px; line-height: 1.8; color: var(--text-secondary); margin-bottom: 16px;">
+    <strong style="color: var(--charcoal);">Why translucent wings?</strong> They pick up ambient colour from the glow state — amber normally, rose-pink when celebrating, green when encouraging. This connects the mascot to your existing colour system without adding new palette complexity.
+  </p>
+  <p style="font-size: 15px; line-height: 1.8; color: var(--text-secondary); margin-bottom: 16px;">
+    <strong style="color: var(--charcoal);">Why the "sleepy" personality?</strong> Bedtime reading is the primary use case. A naturally drowsy firefly who wakes up for books is relatable for exhausted parents and charming for children. It also gives you a clear narrative arc for engagement: the more you read, the brighter Lumi glows.
+  </p>
+  <p style="font-size: 15px; line-height: 1.8; color: var(--text-secondary);">
+    <strong style="color: var(--charcoal);">Silhouette test:</strong> At 24×24px, the distinctive shape (round body + pointed glow below + antennae above) reads clearly. No other major app mascot shares this silhouette profile.
+  </p>
+</div>
+
+<div class="footer">
+  <p>Lumi Firefly Mascot Concept Sheet — April 2026</p>
+  <p style="margin-top: 4px; font-size: 12px; opacity: 0.6;">Designed for the Lumi Reading Tracker design system</p>
+</div>
+
+</body>
+</html>

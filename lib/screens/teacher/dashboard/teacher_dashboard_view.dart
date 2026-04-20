@@ -212,8 +212,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
 
   Future<void> _saveWidgetConfig() async {
     try {
-      final prefs =
-          Map<String, dynamic>.from(widget.user.preferences ?? {});
+      final prefs = Map<String, dynamic>.from(widget.user.preferences ?? {});
       prefs.addAll(_widgetConfig.toPreferencesMap());
 
       await FirebaseService.instance.firestore
@@ -254,11 +253,13 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
     final studentIds = widget.selectedClass.studentIds;
     final schoolId = widget.user.schoolId;
     if (studentIds.isEmpty || schoolId == null) {
-      if (mounted) setState(() {
-        _students = [];
-        _recentAchievements = [];
-        _studentsLoaded = true;
-      });
+      if (mounted) {
+        setState(() {
+          _students = [];
+          _recentAchievements = [];
+          _studentsLoaded = true;
+        });
+      }
       return;
     }
 
@@ -281,8 +282,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
           students.add(StudentModel.fromFirestore(doc));
           // Extract achievements from raw doc (piggyback — zero extra reads)
           final data = doc.data();
-          final achievementsData =
-              data['achievements'] as List<dynamic>? ?? [];
+          final achievementsData = data['achievements'] as List<dynamic>? ?? [];
           final firstName = (data['firstName'] as String?) ?? '';
           for (final a in achievementsData) {
             try {
@@ -317,7 +317,12 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
   Future<void> _fetchWeeklyLogs() async {
     final schoolId = widget.user.schoolId;
     if (schoolId == null) {
-      if (mounted) setState(() { _weeklyLogs = []; _weeklyLogsLoaded = true; });
+      if (mounted) {
+        setState(() {
+          _weeklyLogs = [];
+          _weeklyLogsLoaded = true;
+        });
+      }
       return;
     }
 
@@ -407,25 +412,24 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
           .doc(schoolId)
           .collection('readingLogs')
           .where('classId', isEqualTo: widget.selectedClass.id)
-          .where('date',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(yesterday))
+          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(yesterday))
           .where('date', isLessThan: Timestamp.fromDate(today))
           .get();
 
-      final yesterdayStudents =
-          yesterdayLogs.docs.map((d) {
+      final yesterdayStudents = yesterdayLogs.docs
+          .map((d) {
             final data = d.data();
             return data['studentId'] as String?;
-          }).whereType<String>().toSet();
+          })
+          .whereType<String>()
+          .toSet();
 
       String? insight;
       if (totalStudents > 0 && yesterdayStudents.length == totalStudents) {
         insight = 'Everyone read yesterday!';
       } else if (totalStudents > 0 && yesterdayStudents.isNotEmpty) {
-        final pct =
-            (yesterdayStudents.length / totalStudents * 100).round();
-        insight =
-            '$pct% of ${widget.selectedClass.name} read yesterday';
+        final pct = (yesterdayStudents.length / totalStudents * 100).round();
+        insight = '$pct% of ${widget.selectedClass.name} read yesterday';
       }
 
       // Compute class streak + momentum with a single 30-day query
@@ -576,9 +580,14 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
             final def = defs[widgetIndex];
 
             // Skip widgets whose shared data hasn't loaded yet
-            if ((def.dataDependencies.contains(WidgetDataDependency.students) && !_studentsLoaded) ||
-                (def.dataDependencies.contains(WidgetDataDependency.weeklyLogs) && !_weeklyLogsLoaded) ||
-                (def.dataDependencies.contains(WidgetDataDependency.readingGroups) && !_readingGroupsLoaded)) {
+            if ((def.dataDependencies.contains(WidgetDataDependency.students) &&
+                    !_studentsLoaded) ||
+                (def.dataDependencies
+                        .contains(WidgetDataDependency.weeklyLogs) &&
+                    !_weeklyLogsLoaded) ||
+                (def.dataDependencies
+                        .contains(WidgetDataDependency.readingGroups) &&
+                    !_readingGroupsLoaded)) {
               return const SizedBox.shrink();
             }
 
@@ -616,8 +625,8 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
                 return AnimatedBuilder(
                   animation: animation,
                   builder: (context, child) {
-                    final scale = Tween<double>(begin: 1.0, end: 1.04)
-                        .animate(CurvedAnimation(
+                    final scale = Tween<double>(begin: 1.0, end: 1.04).animate(
+                        CurvedAnimation(
                             parent: animation, curve: Curves.easeInOut));
                     return Transform.scale(
                       scale: scale.value,
@@ -696,8 +705,8 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
       decoration: BoxDecoration(
         color: AppColors.teacherSurfaceTint,
         borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
-        border: Border.all(
-            color: AppColors.teacherPrimary.withValues(alpha: 0.25)),
+        border:
+            Border.all(color: AppColors.teacherPrimary.withValues(alpha: 0.25)),
       ),
       child: Row(
         children: [
@@ -724,9 +733,9 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
   }
 
   Widget _buildAddWidgetButton() {
-    final inactiveCount = DashboardWidgetRegistry.getInactive(
-            _widgetConfig.activeWidgetIds)
-        .length;
+    final inactiveCount =
+        DashboardWidgetRegistry.getInactive(_widgetConfig.activeWidgetIds)
+            .length;
 
     return GestureDetector(
       onTap: _showWidgetGallery,
@@ -744,8 +753,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.add_rounded,
-                size: 20, color: AppColors.teacherPrimary),
+            Icon(Icons.add_rounded, size: 20, color: AppColors.teacherPrimary),
             const SizedBox(width: 8),
             Text(
               inactiveCount > 0
@@ -846,8 +854,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
                           Text(
                             _dailyInsight!,
                             style: TeacherTypography.bodySmall.copyWith(
-                              color:
-                                  AppColors.white.withValues(alpha: 0.85),
+                              color: AppColors.white.withValues(alpha: 0.85),
                               fontWeight: FontWeight.w500,
                             ),
                             maxLines: 1,
@@ -874,7 +881,6 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
       ),
     );
   }
-
 
   Widget _buildClassChip() {
     final label = widget.selectedClass.name;
@@ -938,7 +944,6 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
     );
   }
 
-
   Widget _buildBellButton(BuildContext context) {
     return GestureDetector(
       onTap: () {
@@ -958,25 +963,24 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
           color: AppColors.white.withValues(alpha: 0.16),
           borderRadius: BorderRadius.circular(12),
         ),
-        child:
-            const Icon(Icons.notifications_outlined, size: 20, color: AppColors.white)
-                .animate(
-                    key: ValueKey(_bellAnimCount),
-                    autoPlay: _bellAnimCount > 0)
-                .scale(
-                  begin: const Offset(1.0, 1.0),
-                  end: const Offset(1.18, 1.18),
-                  duration: 200.ms,
-                  curve: Curves.easeOut,
-                )
-                .then()
-                .scale(
-                  begin: const Offset(1.18, 1.18),
-                  end: const Offset(1.0, 1.0),
-                  duration: 200.ms,
-                  curve: Curves.easeIn,
-                )
-                .shake(duration: 350.ms, hz: 4, rotation: 0.05),
+        child: const Icon(Icons.notifications_outlined,
+                size: 20, color: AppColors.white)
+            .animate(
+                key: ValueKey(_bellAnimCount), autoPlay: _bellAnimCount > 0)
+            .scale(
+              begin: const Offset(1.0, 1.0),
+              end: const Offset(1.18, 1.18),
+              duration: 200.ms,
+              curve: Curves.easeOut,
+            )
+            .then()
+            .scale(
+              begin: const Offset(1.18, 1.18),
+              end: const Offset(1.0, 1.0),
+              duration: 200.ms,
+              curve: Curves.easeIn,
+            )
+            .shake(duration: 350.ms, hz: 4, rotation: 0.05),
       ),
     );
   }
@@ -1018,8 +1022,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
                       borderRadius: BorderRadius.circular(18),
                       side: BorderSide(
                         color: widget.selectedClass.id == c.id
-                            ? AppColors.teacherPrimary
-                                .withValues(alpha: 0.18)
+                            ? AppColors.teacherPrimary.withValues(alpha: 0.18)
                             : AppColors.teacherBorder,
                       ),
                     ),

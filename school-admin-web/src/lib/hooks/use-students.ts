@@ -45,7 +45,7 @@ export function useStudent(studentId: string) {
 export function useCreateStudent() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { studentId?: string; firstName: string; lastName: string; classId: string; dateOfBirth?: string; currentReadingLevel?: string }) => {
+    mutationFn: async (data: { studentId?: string; firstName: string; lastName: string; classId: string; dateOfBirth?: string; currentReadingLevel?: string; parentEmail?: string }) => {
       const res = await fetch('/api/students', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -67,8 +67,8 @@ export function useCreateStudent() {
 export function useUpdateStudent() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ studentId, ...data }: { studentId: string; firstName?: string; lastName?: string; classId?: string; currentReadingLevel?: string }) => {
-      const res = await fetch(`/api/students/${studentId}`, {
+    mutationFn: async ({ id, ...data }: { id: string; firstName?: string; lastName?: string; studentId?: string; classId?: string; currentReadingLevel?: string; parentEmail?: string }) => {
+      const res = await fetch(`/api/students/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -81,21 +81,43 @@ export function useUpdateStudent() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['students'] });
-      queryClient.invalidateQueries({ queryKey: ['students', variables.studentId] });
+      queryClient.invalidateQueries({ queryKey: ['students', variables.id] });
     },
   });
 }
 
-export function useDeactivateStudent() {
+export function useDeleteStudent() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (studentId: string) => {
       const res = await fetch(`/api/students/${studentId}`, { method: 'DELETE' });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Failed to deactivate student');
+        throw new Error(err.error || 'Failed to delete student');
       }
       return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
+    },
+  });
+}
+
+export function useBulkDeleteStudents() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ studentIds }: { studentIds: string[] }) => {
+      const res = await fetch('/api/students/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentIds }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to bulk delete students');
+      }
+      return res.json() as Promise<{ count: number }>;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['students'] });

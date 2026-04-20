@@ -50,6 +50,10 @@ const createStudentSchema = z.object({
   classId: z.string().min(1, 'Class is required'),
   dateOfBirth: z.string().optional(),
   currentReadingLevel: z.string().optional(),
+  parentEmail: z
+    .string()
+    .optional()
+    .refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), 'Invalid parent email'),
 });
 
 export async function POST(request: NextRequest) {

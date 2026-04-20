@@ -1,4 +1,6 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -6,6 +8,8 @@ import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/config/dev_access.dart';
+import '../../core/services/dev_access_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/lumi_text_styles.dart';
 import '../../core/theme/lumi_spacing.dart';
@@ -18,6 +22,9 @@ import '../../services/firebase_service.dart';
 import '../../services/notification_service.dart';
 import '../../core/services/user_school_index_service.dart';
 import '../../utils/setup_test_data.dart';
+import 'widgets/dev_access_modal.dart';
+import 'widgets/parent_registration_modal.dart';
+import 'widgets/teacher_registration_modal.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -29,9 +36,38 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormBuilderState>();
   final FirebaseService _firebaseService = FirebaseService.instance;
+  final DevAccessService _devAccess = DevAccessService.instance;
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    // Rebuild whenever dev-access flips (e.g. Firestore lookup completes
+    // after a session-resume, or after the long-press auth modal unlocks it).
+    _devAccess.addListener(_onDevAccessChanged);
+  }
+
+  @override
+  void dispose() {
+    _devAccess.removeListener(_onDevAccessChanged);
+    super.dispose();
+  }
+
+  void _onDevAccessChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  Future<void> _handleDevAccessGesture() async {
+    // If the current user already has dev access, the section is already
+    // visible — no modal needed.
+    if (_devAccess.hasAccess) return;
+    HapticFeedback.mediumImpact();
+    await showDevAccessModal(context);
+    // The DevAccessService listener will rebuild us if access was granted.
+  }
 
   Future<void> _handleLogin() async {
     if (_formKey.currentState?.saveAndValidate() ?? false) {
@@ -342,23 +378,31 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: AppColors.offWhite,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: LumiPadding.allM,
-          child: Column(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: SingleChildScrollView(
+            padding: LumiPadding.allM,
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               LumiGap.l,
 
-              // Lumi Mascot
+              // Lumi Mascot (long-press reveals DEV-only surface)
               Center(
                 child: Animate(
                   effects: const [
                     FadeEffect(duration: Duration(milliseconds: 500)),
                   ],
-                  child: const LumiMascot(
-                    mood: LumiMood.waving,
-                    size: 120,
-                    message: 'Welcome back!',
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onLongPress: _handleDevAccessGesture,
+                    child: const LumiMascot(
+                      variant: LumiVariant.login,
+                      size: 120,
+                      message: 'Welcome back!',
+                    ),
                   ),
                 ),
               ),
@@ -475,17 +519,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
-              LumiGap.s,
-
-              // Forgot password link
-              Align(
-                alignment: Alignment.centerRight,
-                child: LumiTextButton(
-                  onPressed: () => context.push('/auth/forgot-password'),
-                  text: 'Forgot Password?',
-                ).animate().fadeIn(delay: 600.ms, duration: 500.ms),
-              ),
-
               LumiGap.m,
 
               // Login button
@@ -493,78 +526,196 @@ class _LoginScreenState extends State<LoginScreen> {
                 onPressed: _isLoading ? null : _handleLogin,
                 text: 'Log In',
                 isLoading: _isLoading,
-              ).animate().fadeIn(delay: 700.ms, duration: 500.ms),
+              ).animate().fadeIn(delay: 600.ms, duration: 500.ms),
 
-              LumiGap.m,
+              LumiGap.xs,
 
-              // Register link
-              Wrap(
-                alignment: WrapAlignment.center,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 4,
+              // Forgot password link (subdued, below primary action)
+              Center(
+                child: LumiTextButton(
+                  onPressed: () => context.push('/auth/forgot-password'),
+                  text: 'Forgot Password?',
+                ).animate().fadeIn(delay: 700.ms, duration: 500.ms),
+              ),
+
+              LumiGap.l,
+
+              // "New to Lumi?" section divider
+              Row(
                 children: [
-                  Text(
-                    'Teacher account needed?',
-                    style: LumiTextStyles.body().copyWith(
-                      color: AppColors.charcoal.withValues(alpha: 0.7),
+                  Expanded(
+                    child: Container(
+                      height: 1,
+                      color: AppColors.charcoal.withValues(alpha: 0.08),
                     ),
                   ),
-                  LumiTextButton(
-                    onPressed: () => context.push('/auth/register'),
-                    text: 'Register with School Code',
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      'New to Lumi?',
+                      style: LumiTextStyles.bodySmall().copyWith(
+                        color: AppColors.charcoal.withValues(alpha: 0.55),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Container(
+                      height: 1,
+                      color: AppColors.charcoal.withValues(alpha: 0.08),
+                    ),
                   ),
                 ],
               ).animate().fadeIn(delay: 800.ms, duration: 500.ms),
 
               LumiGap.s,
 
-              // Invite code option for parents
-              LumiTextButton(
-                onPressed: () => context.push('/auth/parent-register'),
-                text: 'Parent? Register with Student Code',
-                icon: Icons.qr_code,
-              ).animate().fadeIn(delay: 900.ms, duration: 500.ms),
-
-              LumiGap.xs,
-
-              // School registration option
-              LumiTextButton(
-                onPressed: () => context.push('/onboarding/demo'),
-                text: 'School? Request a Demo',
-                icon: Icons.school,
-              ).animate().fadeIn(delay: 1000.ms, duration: 500.ms),
-
-              LumiGap.l,
-
-              // DEV ONLY: Create admin account button
-              Container(
-                padding: LumiPadding.allS,
-                decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.1),
-                  borderRadius: LumiBorders.small,
-                  border: Border.all(
-                    color: Colors.orange.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Column(
+              // Role picker: three cards in a row, one per audience
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      'DEV ONLY',
-                      style: LumiTextStyles.bodySmall().copyWith(
-                        color: Colors.orange,
-                        fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: _RegisterRoleCard(
+                        icon: Icons.family_restroom,
+                        title: 'Parent',
+                        subtitle: 'Student code',
+                        accent: AppColors.parentColor,
+                        onTap: () => showParentRegistrationModal(context),
                       ),
                     ),
-                    LumiGap.xs,
-                    LumiTextButton(
-                      onPressed: () => _showCreateAdminDialog(),
-                      text: 'Create Admin Account',
-                      icon: Icons.admin_panel_settings,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _RegisterRoleCard(
+                        icon: Icons.school_rounded,
+                        title: 'Teacher',
+                        subtitle: 'School code',
+                        accent: AppColors.teacherColor,
+                        onTap: () => showTeacherRegistrationModal(context),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _RegisterRoleCard(
+                        icon: Icons.apartment_rounded,
+                        title: 'School',
+                        subtitle: 'Request a demo',
+                        accent: AppColors.warmOrange,
+                        onTap: () => context.push('/onboarding/demo'),
+                      ),
                     ),
                   ],
                 ),
-              ),
+              ).animate().fadeIn(delay: 900.ms, duration: 500.ms),
+
+              if (hasDevAccess()) ...[
+                LumiGap.l,
+                // DEV ONLY: Create admin account button
+                Container(
+                  padding: LumiPadding.allS,
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    borderRadius: LumiBorders.small,
+                    border: Border.all(
+                      color: Colors.orange.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        'DEV ONLY',
+                        style: LumiTextStyles.bodySmall().copyWith(
+                          color: Colors.orange,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      LumiGap.xs,
+                      LumiTextButton(
+                        onPressed: () => _showCreateAdminDialog(),
+                        text: 'Create Admin Account',
+                        icon: Icons.admin_panel_settings,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
+          ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RegisterRoleCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color accent;
+  final VoidCallback onTap;
+
+  const _RegisterRoleCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.accent,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.white,
+      borderRadius: LumiBorders.medium,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: LumiBorders.medium,
+        splashColor: accent.withValues(alpha: 0.12),
+        highlightColor: accent.withValues(alpha: 0.06),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: LumiBorders.medium,
+            border: Border.all(
+              color: AppColors.charcoal.withValues(alpha: 0.1),
+              width: 1,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: accent, size: 22),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: LumiTextStyles.label().copyWith(
+                    color: AppColors.charcoal,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  textAlign: TextAlign.center,
+                  style: LumiTextStyles.bodySmall().copyWith(
+                    color: AppColors.charcoal.withValues(alpha: 0.6),
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
         ),
       ),

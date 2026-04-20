@@ -89,6 +89,7 @@ export async function createStudent(
     classId: string;
     dateOfBirth?: string;
     currentReadingLevel?: string;
+    parentEmail?: string;
     createdBy: string;
   }
 ): Promise<string> {
@@ -147,7 +148,7 @@ export async function createStudent(
 export async function updateStudent(
   schoolId: string,
   studentId: string,
-  data: Partial<Pick<Student, 'firstName' | 'lastName' | 'studentId' | 'classId' | 'currentReadingLevel'>>
+  data: Partial<Pick<Student, 'firstName' | 'lastName' | 'studentId' | 'classId' | 'currentReadingLevel' | 'parentEmail'>>
 ): Promise<void> {
   await adminDb
     .collection('schools')
@@ -157,32 +158,131 @@ export async function updateStudent(
     .update(data);
 }
 
-export async function deactivateStudent(schoolId: string, studentId: string): Promise<void> {
-  const studentDoc = await adminDb
-    .collection('schools')
-    .doc(schoolId)
-    .collection('students')
-    .doc(studentId)
-    .get();
+export async function deleteStudent(schoolId: string, studentId: string): Promise<void> {
+  const schoolRef = adminDb.collection('schools').doc(schoolId);
+  const studentDoc = await schoolRef.collection('students').doc(studentId).get();
 
   if (!studentDoc.exists) throw new Error('Student not found');
-  const classId = studentDoc.data()!.classId;
+  const data = studentDoc.data()!;
+  const classId = data.classId as string | undefined;
+  const parentIds = (data.parentIds ?? []) as string[];
 
-  const batch = adminDb.batch();
-  batch.update(studentDoc.ref, { isActive: false });
-
-  if (classId) {
-    batch.update(
-      adminDb.collection('schools').doc(schoolId).collection('classes').doc(classId),
-      { studentIds: FieldValue.arrayRemove(studentId) }
-    );
+  // Decide parent-side action (delete orphan vs arrayRemove) by re-reading each parent.
+  const parentsRef = schoolRef.collection('parents');
+  const parentActions: Array<{ ref: FirebaseFirestore.DocumentReference; action: 'delete' | 'remove' }> = [];
+  if (parentIds.length > 0) {
+    const parentSnaps = await Promise.all(parentIds.map((pid) => parentsRef.doc(pid).get()));
+    for (const snap of parentSnaps) {
+      if (!snap.exists) continue;
+      const linked = (snap.data()!.linkedChildren ?? []) as string[];
+      const remaining = linked.filter((id) => id !== studentId);
+      parentActions.push({ ref: snap.ref, action: remaining.length === 0 ? 'delete' : 'remove' });
+    }
   }
 
-  batch.update(adminDb.collection('schools').doc(schoolId), {
+  const batch = adminDb.batch();
+  batch.delete(studentDoc.ref);
+
+  if (classId) {
+    batch.update(schoolRef.collection('classes').doc(classId), {
+      studentIds: FieldValue.arrayRemove(studentId),
+    });
+  }
+
+  for (const { ref, action } of parentActions) {
+    if (action === 'delete') {
+      batch.delete(ref);
+    } else {
+      batch.update(ref, { linkedChildren: FieldValue.arrayRemove(studentId) });
+    }
+  }
+
+  batch.update(schoolRef, {
     studentCount: FieldValue.increment(-1),
   });
 
   await batch.commit();
+}
+
+export async function deleteStudents(schoolId: string, studentIds: string[]): Promise<number> {
+  if (studentIds.length === 0) return 0;
+
+  const schoolRef = adminDb.collection('schools').doc(schoolId);
+  const studentsRef = schoolRef.collection('students');
+  const classesRef = schoolRef.collection('classes');
+  const parentsRef = schoolRef.collection('parents');
+
+  const snapshots = await Promise.all(studentIds.map((id) => studentsRef.doc(id).get()));
+  const existing = snapshots.filter((s) => s.exists);
+  if (existing.length === 0) return 0;
+
+  const deletedIdSet = new Set(existing.map((s) => s.id));
+
+  const classMembersRemoved = new Map<string, string[]>();
+  const parentChildrenRemoved = new Map<string, string[]>();
+  for (const snap of existing) {
+    const data = snap.data()!;
+    const classId = data.classId as string | undefined;
+    if (classId) {
+      const list = classMembersRemoved.get(classId) ?? [];
+      list.push(snap.id);
+      classMembersRemoved.set(classId, list);
+    }
+    const pIds = (data.parentIds ?? []) as string[];
+    for (const pid of pIds) {
+      const list = parentChildrenRemoved.get(pid) ?? [];
+      if (!list.includes(snap.id)) list.push(snap.id);
+      parentChildrenRemoved.set(pid, list);
+    }
+  }
+
+  // Re-read each affected parent to decide delete vs arrayRemove.
+  const parentActions: Array<{ ref: FirebaseFirestore.DocumentReference; action: 'delete' | 'remove'; ids: string[] }> = [];
+  if (parentChildrenRemoved.size > 0) {
+    const parentSnaps = await Promise.all(
+      Array.from(parentChildrenRemoved.keys()).map((pid) => parentsRef.doc(pid).get())
+    );
+    for (const snap of parentSnaps) {
+      if (!snap.exists) continue;
+      const linked = (snap.data()!.linkedChildren ?? []) as string[];
+      const idsToRemove = parentChildrenRemoved.get(snap.id) ?? [];
+      const remaining = linked.filter((id) => !deletedIdSet.has(id));
+      parentActions.push({
+        ref: snap.ref,
+        action: remaining.length === 0 ? 'delete' : 'remove',
+        ids: idsToRemove,
+      });
+    }
+  }
+
+  const BATCH_SIZE = 400;
+  for (let i = 0; i < existing.length; i += BATCH_SIZE) {
+    const batch = adminDb.batch();
+    for (const snap of existing.slice(i, i + BATCH_SIZE)) {
+      batch.delete(snap.ref);
+    }
+    await batch.commit();
+  }
+
+  const metaBatch = adminDb.batch();
+  for (const [classId, ids] of classMembersRemoved) {
+    metaBatch.update(classesRef.doc(classId), {
+      studentIds: FieldValue.arrayRemove(...ids),
+    });
+  }
+  for (const { ref, action, ids } of parentActions) {
+    if (action === 'delete') {
+      metaBatch.delete(ref);
+    } else {
+      metaBatch.update(ref, { linkedChildren: FieldValue.arrayRemove(...ids) });
+    }
+  }
+  metaBatch.update(schoolRef, {
+    studentCount: FieldValue.increment(-existing.length),
+  });
+  await metaBatch.commit();
+
+  return existing.length;
 }
 
 export async function moveStudentToClass(

@@ -75,12 +75,34 @@ export async function getParentsWithStudents(
 
   const studentMap = await fetchStudentsByIds(schoolId, [...allStudentIds]);
 
-  return parents.map((parent) => ({
-    ...parent,
-    linkedStudents: parent.linkedChildren
+  const result: ParentWithStudents[] = [];
+  const orphanIds: string[] = [];
+  for (const parent of parents) {
+    const linkedStudents = parent.linkedChildren
       .map((id) => studentMap.get(id))
-      .filter((s): s is LinkedStudent => s != null),
-  }));
+      .filter((s): s is LinkedStudent => s != null);
+    if (linkedStudents.length === 0) {
+      orphanIds.push(parent.id);
+    } else {
+      result.push({ ...parent, linkedStudents });
+    }
+  }
+
+  // Clean up orphaned parents (those whose linked students no longer exist).
+  // Policy: auto-delete orphans so the admin view stays consistent with reality.
+  if (orphanIds.length > 0) {
+    const parentsRef = adminDb.collection('schools').doc(schoolId).collection('parents');
+    const BATCH_SIZE = 400;
+    for (let i = 0; i < orphanIds.length; i += BATCH_SIZE) {
+      const batch = adminDb.batch();
+      for (const id of orphanIds.slice(i, i + BATCH_SIZE)) {
+        batch.delete(parentsRef.doc(id));
+      }
+      await batch.commit();
+    }
+  }
+
+  return result;
 }
 
 /**

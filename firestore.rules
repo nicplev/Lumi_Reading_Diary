@@ -475,5 +475,15 @@ service cloud.firestore {
 
       allow list: if false;
     }
+
+    // Dev-access allowlist. Doc ID is sha256(lowercased email). Clients
+    // (Flutter, school-admin-web) can only `get` a specific doc by hash —
+    // typically the hash of their own email — which lets them self-check
+    // without exposing who else is on the list. Listing is denied.
+    // Writes go exclusively through the super-admin portal (Admin SDK).
+    match /devAccessEmails/{emailHash} {
+      allow get: if isSignedIn();
+      allow list, create, update, delete: if false;
+    }
   }
 }

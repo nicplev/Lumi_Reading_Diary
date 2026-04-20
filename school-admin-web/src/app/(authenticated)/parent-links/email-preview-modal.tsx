@@ -1,7 +1,11 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
 import { Modal } from '@/components/lumi/modal';
 import { Button } from '@/components/lumi/button';
+
+const PREVIEW_LINK_CODE = 'ABC12345';
 
 interface EmailPreviewModalProps {
   open: boolean;
@@ -11,6 +15,18 @@ interface EmailPreviewModalProps {
 
 export function EmailPreviewModal({ open, onClose, schoolName }: EmailPreviewModalProps) {
   const displaySchoolName = schoolName || 'Your School';
+  const [qrDataUri, setQrDataUri] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    QRCode.toDataURL(PREVIEW_LINK_CODE, {
+      width: 400,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+    })
+      .then(setQrDataUri)
+      .catch(() => setQrDataUri(null));
+  }, [open]);
 
   return (
     <Modal
@@ -55,13 +71,32 @@ export function EmailPreviewModal({ open, onClose, schoolName }: EmailPreviewMod
               </p>
 
               {/* Link code */}
-              <div className="bg-[#FFF3E0] border border-[#FFE0B2] rounded-lg p-4 text-center mb-5">
+              <div className="bg-[#FFF3E0] border border-[#FFE0B2] rounded-lg p-4 text-center mb-3">
                 <p className="text-xs text-[#999] uppercase tracking-wider font-semibold mb-2">
                   Your Link Code
                 </p>
                 <p className="text-2xl font-mono font-bold text-[#2C2C2C] tracking-[0.2em]">
-                  ABC12345
+                  {PREVIEW_LINK_CODE}
                 </p>
+              </div>
+
+              {/* QR code */}
+              <div className="text-center mb-5">
+                <p className="text-xs text-[#666] mb-2">
+                  Or scan this QR code with the Lumi app
+                </p>
+                {qrDataUri ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={qrDataUri}
+                    alt={`QR code for ${PREVIEW_LINK_CODE}`}
+                    className="mx-auto border border-[#eee] rounded-md"
+                    width={140}
+                    height={140}
+                  />
+                ) : (
+                  <div className="mx-auto w-[140px] h-[140px] bg-[#f5f5f5] rounded-md" />
+                )}
               </div>
 
               {/* Steps */}

@@ -8,6 +8,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 import 'core/theme/app_theme.dart';
 import 'core/routing/app_router.dart';
+import 'core/services/dev_access_service.dart';
 import 'services/firebase_service.dart';
 import 'services/notification_service.dart';
 import 'services/crash_reporting_service.dart';
@@ -52,6 +53,10 @@ void main() async {
 
       // Initialize Firebase services
       await FirebaseService.instance.initialize();
+
+      // Kick off the dev-access listener so the flag is hot by the time
+      // the login screen (or any DEV-gated surface) reads it.
+      DevAccessService.instance;
 
       // Initialize notification service (local notifications, FCM, timezone data)
       await NotificationService.instance.initialize();

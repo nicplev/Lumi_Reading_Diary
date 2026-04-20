@@ -13,6 +13,7 @@ import { ConfirmDialog } from '@/components/lumi/confirm-dialog';
 import { useToast } from '@/components/lumi/toast';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useUsers, useDeactivateUser, useReactivateUser, useResetPassword, useMarkUserForDeletion, useUndoDeleteUser } from '@/lib/hooks/use-users';
+import { useSchoolCode, useRotateSchoolCode } from '@/lib/hooks/use-school-code';
 import { KebabMenu } from '@/components/lumi/kebab-menu';
 import { CreateUserModal } from './create-user-modal';
 
@@ -22,6 +23,8 @@ export function UsersPage() {
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
   const { data: allUsers, isLoading } = useUsers();
+  const { data: schoolCode } = useSchoolCode();
+  const rotateCode = useRotateSchoolCode();
   const deactivate = useDeactivateUser();
   const reactivate = useReactivateUser();
   const resetPassword = useResetPassword();
@@ -33,6 +36,8 @@ export function UsersPage() {
   const [deactivateConfirm, setDeactivateConfirm] = useState<string | null>(null);
   const [resetConfirm, setResetConfirm] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<SerializedUser | null>(null);
+  const [rotateConfirm, setRotateConfirm] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   const staff = useMemo(() => {
     if (!allUsers) return [];
@@ -87,6 +92,28 @@ export function UsersPage() {
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Failed to cancel deletion', 'error');
     }
+  };
+
+  const handleCopyCode = async () => {
+    if (!schoolCode?.code) return;
+    try {
+      await navigator.clipboard.writeText(schoolCode.code);
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 2000);
+      toast('Code copied to clipboard', 'success');
+    } catch {
+      toast('Failed to copy code', 'error');
+    }
+  };
+
+  const handleRotate = async () => {
+    try {
+      const result = await rotateCode.mutateAsync();
+      toast(`New staff code: ${result.code}`, 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to rotate code', 'error');
+    }
+    setRotateConfirm(false);
   };
 
   const handleResetPassword = async () => {
@@ -209,6 +236,34 @@ export function UsersPage() {
         }
       />
 
+      <div className="mb-4 flex items-center gap-3 text-sm" title="New teachers and admins enter this code when creating an account in the Lumi mobile app.">
+        <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Staff code</span>
+        <code className="bg-background border border-border px-2 py-1 rounded font-mono font-bold text-charcoal tracking-wider">
+          {schoolCode?.code ?? '—'}
+        </code>
+        {schoolCode?.code && (
+          <button
+            onClick={handleCopyCode}
+            className="text-text-secondary hover:text-charcoal transition-colors"
+            title="Copy code"
+          >
+            {codeCopied ? (
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="4" y="4" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.2" /><path d="M10 4V3a1.5 1.5 0 00-1.5-1.5H3A1.5 1.5 0 001.5 3v5.5A1.5 1.5 0 003 10h1" stroke="currentColor" strokeWidth="1.2" /></svg>
+            )}
+          </button>
+        )}
+        {isAdmin && (
+          <button
+            onClick={() => setRotateConfirm(true)}
+            className="text-xs text-text-secondary hover:text-charcoal underline underline-offset-2"
+          >
+            {schoolCode?.code ? 'Change' : 'Generate'}
+          </button>
+        )}
+      </div>
+
       <div className="mb-4">
         <SearchInput value={search} onChange={setSearch} placeholder="Search by name or email..." />
       </div>
@@ -265,6 +320,17 @@ export function UsersPage() {
         confirmLabel="Schedule Deletion"
         variant="danger"
         loading={markForDeletion.isPending}
+      />
+
+      <ConfirmDialog
+        open={rotateConfirm}
+        onClose={() => setRotateConfirm(false)}
+        onConfirm={handleRotate}
+        title={schoolCode?.code ? 'Change Staff Linking Code' : 'Generate Staff Linking Code'}
+        description="Generate a new code for staff signups. Existing teachers and admins will NOT be affected — they remain signed in and linked to the school. The current code (if any) will stop working for new registrations immediately."
+        confirmLabel="Generate New Code"
+        variant="warning"
+        loading={rotateCode.isPending}
       />
     </div>
   );

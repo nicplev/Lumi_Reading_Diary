@@ -12,10 +12,20 @@ import { Badge } from '@/components/lumi/badge';
 import { ReadingLevelPill } from '@/components/lumi/reading-level-pill';
 import { EmptyState } from '@/components/lumi/empty-state';
 import { Icon } from '@/components/lumi/icon';
+import { KebabMenu } from '@/components/lumi/kebab-menu';
+import { ConfirmDialog } from '@/components/lumi/confirm-dialog';
 import { useToast } from '@/components/lumi/toast';
 import { StudentFormModal } from './student-form-modal';
 import { CSVImportDialog } from './csv-import-dialog';
-import { useStudents, useCreateStudent, useBulkUpdateEnrollmentStatus } from '@/lib/hooks/use-students';
+import { ResetCodeDevButton } from './reset-code-dev-button';
+import {
+  useStudents,
+  useCreateStudent,
+  useUpdateStudent,
+  useDeleteStudent,
+  useBulkDeleteStudents,
+  useBulkUpdateEnrollmentStatus,
+} from '@/lib/hooks/use-students';
 import type { SchoolClass, ReadingLevelOption, ReadingLevelSchema, EnrollmentStatus } from '@/lib/types';
 
 type SerializedClass = Omit<SchoolClass, 'createdAt'> & { createdAt: string };
@@ -24,6 +34,7 @@ interface StudentsPageProps {
   classes: SerializedClass[];
   levelOptions: ReadingLevelOption[];
   levelSchema: ReadingLevelSchema;
+  devAccess: boolean;
 }
 
 type QuickFilter = 'all' | 'has-parent' | 'no-parent';
@@ -36,11 +47,16 @@ const enrollmentBadge: Record<string, { label: string; variant: 'success' | 'inf
   pending: { label: 'Pending', variant: 'warning' },
 };
 
-export function StudentsPage({ classes, levelOptions, levelSchema }: StudentsPageProps) {
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
+
+export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: StudentsPageProps) {
   const router = useRouter();
   const { toast } = useToast();
   const { data: students, isLoading } = useStudents();
   const createStudent = useCreateStudent();
+  const updateStudent = useUpdateStudent();
+  const deleteStudent = useDeleteStudent();
+  const bulkDeleteStudents = useBulkDeleteStudents();
   const bulkUpdateEnrollment = useBulkUpdateEnrollmentStatus();
 
   const [search, setSearch] = useState('');
@@ -50,6 +66,12 @@ export function StudentsPage({ classes, levelOptions, levelSchema }: StudentsPag
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [pageSize, setPageSize] = useState(20);
+
+  type StudentRow = NonNullable<typeof students>[number];
+  const [editingStudent, setEditingStudent] = useState<StudentRow | null>(null);
+  const [deletingStudent, setDeletingStudent] = useState<StudentRow | null>(null);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
   const classMap = new Map(classes.map((c) => [c.id, c.name]));
 
@@ -96,8 +118,11 @@ export function StudentsPage({ classes, levelOptions, levelSchema }: StudentsPag
     });
   };
 
+  const allFilteredSelected = filtered.length > 0 && selectedIds.size === filtered.length;
+  const someFilteredSelected = selectedIds.size > 0 && !allFilteredSelected;
+
   const toggleSelectAll = () => {
-    if (selectedIds.size === filtered.length) {
+    if (allFilteredSelected) {
       setSelectedIds(new Set());
     } else {
       setSelectedIds(new Set(filtered.map((s) => s.id)));
@@ -110,19 +135,62 @@ export function StudentsPage({ classes, levelOptions, levelSchema }: StudentsPag
         studentIds: Array.from(selectedIds),
         enrollmentStatus: status,
       });
+      const count = selectedIds.size;
       setSelectedIds(new Set());
-      toast(`Updated ${selectedIds.size} students`, 'success');
+      toast(`Updated ${count} students`, 'success');
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Failed to update', 'error');
     }
   };
 
-  const allColumns: DataTableColumn<(typeof filtered)[0]>[] = [
+  const handleBulkDelete = async () => {
+    try {
+      const ids = Array.from(selectedIds);
+      const result = await bulkDeleteStudents.mutateAsync({ studentIds: ids });
+      setSelectedIds(new Set());
+      setShowBulkDeleteConfirm(false);
+      toast(`Deleted ${result.count} students`, 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to delete', 'error');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deletingStudent) return;
+    try {
+      await deleteStudent.mutateAsync(deletingStudent.id);
+      setDeletingStudent(null);
+      toast('Student deleted', 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to delete student', 'error');
+    }
+  };
+
+  const handleEdit = async (data: { studentId?: string; firstName: string; lastName: string; classId: string; dateOfBirth?: string; currentReadingLevel?: string; parentEmail?: string }) => {
+    if (!editingStudent) return;
+    try {
+      await updateStudent.mutateAsync({
+        id: editingStudent.id,
+        studentId: data.studentId,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        classId: data.classId,
+        currentReadingLevel: data.currentReadingLevel,
+        parentEmail: data.parentEmail,
+      });
+      setEditingStudent(null);
+      toast('Student updated', 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to update student', 'error');
+    }
+  };
+
+  const allColumns: DataTableColumn<StudentRow>[] = [
     {
       id: 'name',
       header: 'Name',
       accessorFn: (row) => `${row.firstName} ${row.lastName}`,
-      cell: (val, row) => (
+      cell: (val) => (
         <div className="flex items-center gap-3">
           <Avatar name={val as string} size="sm" />
           <span className="font-semibold">{val as string}</span>
@@ -176,11 +244,58 @@ export function StudentsPage({ classes, levelOptions, levelSchema }: StudentsPag
     },
   ];
 
-  const columns = levelSchema === 'none'
+  const baseColumns = levelSchema === 'none'
     ? allColumns.filter((col) => col.id !== 'level')
     : allColumns;
 
-  const handleCreate = async (data: { studentId?: string; firstName: string; lastName: string; classId: string; dateOfBirth?: string; currentReadingLevel?: string }) => {
+  const columns: DataTableColumn<StudentRow>[] = [
+    {
+      id: 'select',
+      header: (
+        <input
+          type="checkbox"
+          aria-label="Select all students"
+          checked={allFilteredSelected}
+          ref={(el) => {
+            if (el) el.indeterminate = someFilteredSelected;
+          }}
+          onChange={toggleSelectAll}
+          onClick={(e) => e.stopPropagation()}
+          className="accent-rose-pink cursor-pointer"
+        />
+      ),
+      accessorFn: () => null,
+      cell: (_val, row) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.has(row.id)}
+          onChange={(e) => { e.stopPropagation(); toggleSelected(row.id); }}
+          onClick={(e) => e.stopPropagation()}
+          className="accent-rose-pink"
+        />
+      ),
+      className: 'w-10',
+    },
+    ...baseColumns,
+    {
+      id: 'actions',
+      header: '',
+      accessorFn: () => null,
+      cell: (_val, row) => (
+        <div className="flex justify-end">
+          <KebabMenu
+            items={[
+              { label: 'Edit', onClick: () => setEditingStudent(row) },
+              { label: 'Delete', onClick: () => setDeletingStudent(row), variant: 'danger' },
+            ]}
+          />
+        </div>
+      ),
+      className: 'w-12 text-right',
+    },
+  ];
+
+  const handleCreate = async (data: { studentId?: string; firstName: string; lastName: string; classId: string; dateOfBirth?: string; currentReadingLevel?: string; parentEmail?: string }) => {
     try {
       await createStudent.mutateAsync(data);
       setShowCreate(false);
@@ -196,7 +311,8 @@ export function StudentsPage({ classes, levelOptions, levelSchema }: StudentsPag
         title="Students"
         description="Manage students across your school"
         action={
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <ResetCodeDevButton visible={devAccess} />
             <Button variant="outline" onClick={() => setShowImport(true)}>Import CSV</Button>
             <Button onClick={() => setShowCreate(true)}>Add Student</Button>
           </div>
@@ -239,15 +355,15 @@ export function StudentsPage({ classes, levelOptions, levelSchema }: StudentsPag
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 mb-4 p-3 bg-rose-pink/5 border border-rose-pink/20 rounded-[var(--radius-lg)]">
+        <div className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-rose-pink/5 border border-rose-pink/20 rounded-[var(--radius-lg)]">
           <input
             type="checkbox"
-            checked={selectedIds.size === filtered.length}
+            checked={allFilteredSelected}
             onChange={toggleSelectAll}
             className="accent-rose-pink"
           />
           <span className="text-sm font-semibold text-charcoal">{selectedIds.size} selected</span>
-          <div className="flex gap-2 ml-auto">
+          <div className="flex flex-wrap gap-2 ml-auto">
             <Button variant="outline" size="sm" onClick={() => handleBulkEnrollment('book_pack')}>
               Mark Confirmed
             </Button>
@@ -257,6 +373,9 @@ export function StudentsPage({ classes, levelOptions, levelSchema }: StudentsPag
             <Button variant="outline" size="sm" onClick={() => handleBulkEnrollment('direct_purchase')}>
               Mark Confirmed (Direct)
             </Button>
+            <Button variant="danger" size="sm" onClick={() => setShowBulkDeleteConfirm(true)}>
+              Delete
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setSelectedIds(new Set())}>
               Clear
             </Button>
@@ -265,26 +384,12 @@ export function StudentsPage({ classes, levelOptions, levelSchema }: StudentsPag
       )}
 
       <DataTable
-        columns={[
-          {
-            id: 'select',
-            header: '',
-            accessorFn: () => null,
-            cell: (_val, row) => (
-              <input
-                type="checkbox"
-                checked={selectedIds.has(row.id)}
-                onChange={(e) => { e.stopPropagation(); toggleSelected(row.id); }}
-                onClick={(e) => e.stopPropagation()}
-                className="accent-rose-pink"
-              />
-            ),
-            className: 'w-10',
-          },
-          ...columns,
-        ]}
+        columns={columns}
         data={filtered}
         loading={isLoading}
+        pageSize={pageSize}
+        pageSizeOptions={PAGE_SIZE_OPTIONS}
+        onPageSizeChange={setPageSize}
         onRowClick={(row) => router.push(`/students/${row.id}`)}
         emptyState={
           <EmptyState
@@ -303,6 +408,46 @@ export function StudentsPage({ classes, levelOptions, levelSchema }: StudentsPag
         loading={createStudent.isPending}
         classes={classes}
         levelOptions={levelOptions}
+      />
+
+      <StudentFormModal
+        open={!!editingStudent}
+        onClose={() => setEditingStudent(null)}
+        onSubmit={handleEdit}
+        loading={updateStudent.isPending}
+        classes={classes}
+        levelOptions={levelOptions}
+        initialData={editingStudent ? {
+          studentId: editingStudent.studentId ?? '',
+          firstName: editingStudent.firstName,
+          lastName: editingStudent.lastName,
+          classId: editingStudent.classId,
+          dateOfBirth: editingStudent.dateOfBirth ? editingStudent.dateOfBirth.split('T')[0] : '',
+          currentReadingLevel: editingStudent.currentReadingLevel ?? '',
+          parentEmail: editingStudent.parentEmail ?? '',
+        } : undefined}
+      />
+
+      <ConfirmDialog
+        open={!!deletingStudent}
+        onClose={() => setDeletingStudent(null)}
+        onConfirm={handleDelete}
+        title="Delete Student"
+        description={deletingStudent ? `Permanently delete ${deletingStudent.firstName} ${deletingStudent.lastName}? This cannot be undone.` : ''}
+        confirmLabel="Delete"
+        variant="danger"
+        loading={deleteStudent.isPending}
+      />
+
+      <ConfirmDialog
+        open={showBulkDeleteConfirm}
+        onClose={() => setShowBulkDeleteConfirm(false)}
+        onConfirm={handleBulkDelete}
+        title={`Delete ${selectedIds.size} students`}
+        description={`Permanently delete ${selectedIds.size} selected students? This cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        loading={bulkDeleteStudents.isPending}
       />
 
       <CSVImportDialog

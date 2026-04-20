@@ -390,7 +390,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                         ),
                         child: const Center(
                           child: LumiMascot(
-                            mood: LumiMood.thinking,
+                            variant: LumiVariant.teacher,
                             size: 66,
                           ),
                         ),
@@ -574,8 +574,8 @@ class _RiveNavItemState extends State<_RiveNavItem> {
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
-            width: 32,
-            height: 32,
+            width: 48,
+            height: 48,
             child: RiveWidgetBuilder(
               fileLoader: _fileLoader,
               controller: (file) => _NavRiveController(file),

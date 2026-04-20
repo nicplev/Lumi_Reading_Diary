@@ -791,7 +791,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
             }
           },
           icon: const LumiMascot(
-            mood: LumiMood.reading,
+            variant: LumiVariant.teacher,
             size: 76,
             animate: false,
           ),

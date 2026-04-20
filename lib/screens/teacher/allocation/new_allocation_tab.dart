@@ -77,7 +77,7 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
 
   // Group selection
   bool _selectByGroup = false;
-  List<String> _selectedGroupIds = [];
+  final List<String> _selectedGroupIds = [];
 
   // Validation errors
   String? _bookTitleError;
@@ -184,8 +184,8 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
           .get();
 
       // Sort alphabetically
-      students.sort(
-          (a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
+      students.sort((a, b) =>
+          a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
 
       if (!mounted) return;
       setState(() {
@@ -287,8 +287,7 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
               options: _readingLevelOptions,
             ) >
             0) {
-      setState(
-          () => _levelError = 'End level must be at or above start level');
+      setState(() => _levelError = 'End level must be at or above start level');
       valid = false;
     }
 
@@ -595,7 +594,8 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
         child: LumiEmptyCard(
           icon: Icons.class_,
           title: 'No class selected',
-          message: 'Please select a class from the dashboard to create an allocation.',
+          message:
+              'Please select a class from the dashboard to create an allocation.',
           accentColor: AppColors.teacherPrimary,
         ),
       );
@@ -617,55 +617,56 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-          // Edit mode banner
-          if (widget.editingAllocation != null) ...[
-            TeacherAlertBanner(
-              type: AlertBannerType.info,
-              message: 'Editing existing allocation. Changes will update the current allocation.',
-            ),
-            const SizedBox(height: 12),
-          ],
-
-          // Reading Type Section
-          _buildReadingTypeCard(),
-          const SizedBox(height: 16),
-
-          // Schedule Section
-          _buildScheduleCard(),
-          const SizedBox(height: 16),
-
-          // Students Section
-          _buildStudentsCard(),
-          const SizedBox(height: 24),
-
-          // Separator
-          const Divider(color: AppColors.teacherBorder, thickness: 1),
-          const SizedBox(height: 8),
-
-          // Action Buttons
-          LumiPrimaryButton(
-            onPressed: _isLoading ? null : _showPreview,
-            text: widget.editingAllocation != null
-                ? 'Review Changes'
-                : 'Review Allocation',
-            isLoading: _isLoading,
-            isFullWidth: true,
-            icon: Icons.preview,
-            color: AppColors.teacherPrimary,
-          ),
-
-          if (widget.editingAllocation != null) ...[
-            const SizedBox(height: 8),
-            Center(
-              child: LumiTextButton(
-                onPressed: widget.onEditCancelled,
-                text: 'Cancel Edit',
-                color: AppColors.textSecondary,
+            // Edit mode banner
+            if (widget.editingAllocation != null) ...[
+              TeacherAlertBanner(
+                type: AlertBannerType.info,
+                message:
+                    'Editing existing allocation. Changes will update the current allocation.',
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+            ],
 
-          const SizedBox(height: 16),
+            // Reading Type Section
+            _buildReadingTypeCard(),
+            const SizedBox(height: 16),
+
+            // Schedule Section
+            _buildScheduleCard(),
+            const SizedBox(height: 16),
+
+            // Students Section
+            _buildStudentsCard(),
+            const SizedBox(height: 24),
+
+            // Separator
+            const Divider(color: AppColors.teacherBorder, thickness: 1),
+            const SizedBox(height: 8),
+
+            // Action Buttons
+            LumiPrimaryButton(
+              onPressed: _isLoading ? null : _showPreview,
+              text: widget.editingAllocation != null
+                  ? 'Review Changes'
+                  : 'Review Allocation',
+              isLoading: _isLoading,
+              isFullWidth: true,
+              icon: Icons.preview,
+              color: AppColors.teacherPrimary,
+            ),
+
+            if (widget.editingAllocation != null) ...[
+              const SizedBox(height: 8),
+              Center(
+                child: LumiTextButton(
+                  onPressed: widget.onEditCancelled,
+                  text: 'Cancel Edit',
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 16),
           ],
         ),
       ),
@@ -739,9 +740,7 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
                     label: 'Start Level',
                     hintText: 'Select level',
                     value: _levelRangeStart,
-                    items: _readingLevelOptions
-                        .map((o) => o.value)
-                        .toList(),
+                    items: _readingLevelOptions.map((o) => o.value).toList(),
                     itemLabel: (v) {
                       final opt = _readingLevelOptions
                           .where((o) => o.value == v)
@@ -811,8 +810,8 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
                       color: AppColors.teacherPrimaryLight,
                       borderRadius:
                           BorderRadius.circular(TeacherDimensions.radiusM),
-                      border: Border.all(
-                          color: AppColors.teacherBorder, width: 1),
+                      border:
+                          Border.all(color: AppColors.teacherBorder, width: 1),
                     ),
                     child: Row(
                       children: [
@@ -851,8 +850,8 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
             if (_bookTitleError != null) ...[
               Text(
                 _bookTitleError!,
-                style: TeacherTypography.caption
-                    .copyWith(color: AppColors.error),
+                style:
+                    TeacherTypography.caption.copyWith(color: AppColors.error),
               ),
               const SizedBox(height: 8),
             ],
@@ -995,7 +994,8 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
           // Date range row
           Row(
             children: [
-              Expanded(child: _buildDateField('Start Date', _startDate, () async {
+              Expanded(
+                  child: _buildDateField('Start Date', _startDate, () async {
                 final picked = await _DatePickerSheet.show(
                   context,
                   initialDate: _startDate,
@@ -1010,7 +1010,8 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
                 }
               })),
               const SizedBox(width: 12),
-              Expanded(child: _buildDateField('End Date', _endDate, () async {
+              Expanded(
+                  child: _buildDateField('End Date', _endDate, () async {
                 final picked = await _DatePickerSheet.show(
                   context,
                   initialDate: _endDate,
@@ -1095,8 +1096,7 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
             const SizedBox(height: 8),
             Text(
               _studentError!,
-              style: TeacherTypography.caption
-                  .copyWith(color: AppColors.error),
+              style: TeacherTypography.caption.copyWith(color: AppColors.error),
             ),
           ],
 
@@ -1114,19 +1114,17 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
                   : ListView.separated(
                       shrinkWrap: true,
                       itemCount: _readingGroups.length,
-                      separatorBuilder: (_, __) =>
-                          const SizedBox(height: 6),
+                      separatorBuilder: (_, __) => const SizedBox(height: 6),
                       itemBuilder: (context, index) {
                         final group = _readingGroups[index];
-                        final isSelected =
-                            _selectedGroupIds.contains(group.id);
+                        final isSelected = _selectedGroupIds.contains(group.id);
                         final groupColor = group.color != null
                             ? Color(int.parse(
                                 group.color!.replaceFirst('#', '0xFF')))
                             : AppColors.teacherPrimary;
                         return GestureDetector(
-                          onTap: () => _onGroupSelectionChanged(
-                              group.id, !isSelected),
+                          onTap: () =>
+                              _onGroupSelectionChanged(group.id, !isSelected),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 10),
@@ -1164,8 +1162,7 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
                                         group.name,
                                         style: TeacherTypography.bodyMedium
                                             .copyWith(
-                                                fontWeight:
-                                                    FontWeight.w600),
+                                                fontWeight: FontWeight.w600),
                                       ),
                                       Text(
                                         '${group.studentIds.length} students',
@@ -1219,8 +1216,7 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
               children: [
                 LumiTextButton(
                   onPressed: () => setState(() {
-                    _selectedStudentIds =
-                        _students.map((s) => s.id).toList();
+                    _selectedStudentIds = _students.map((s) => s.id).toList();
                     _studentError = null;
                   }),
                   text: 'Select All',
@@ -1252,8 +1248,7 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
                 separatorBuilder: (_, __) => const SizedBox(height: 6),
                 itemBuilder: (context, index) {
                   final student = filteredStudents[index];
-                  final isSelected =
-                      _selectedStudentIds.contains(student.id);
+                  final isSelected = _selectedStudentIds.contains(student.id);
                   return GestureDetector(
                     onTap: () {
                       setState(() {
@@ -1272,12 +1267,11 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
                         color: isSelected
                             ? AppColors.teacherPrimaryLight
                             : AppColors.white,
-                        borderRadius: BorderRadius.circular(
-                            TeacherDimensions.radiusM),
+                        borderRadius:
+                            BorderRadius.circular(TeacherDimensions.radiusM),
                         border: Border.all(
                           color: isSelected
-                              ? AppColors.teacherPrimary
-                                  .withValues(alpha: 0.4)
+                              ? AppColors.teacherPrimary.withValues(alpha: 0.4)
                               : AppColors.teacherBorder,
                           width: 1,
                         ),
@@ -1310,14 +1304,12 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   student.fullName,
                                   style: TeacherTypography.bodyMedium
-                                      .copyWith(
-                                          fontWeight: FontWeight.w600),
+                                      .copyWith(fontWeight: FontWeight.w600),
                                 ),
                                 if (_levelsEnabled &&
                                     student.currentReadingLevel != null)
@@ -1488,7 +1480,8 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
         if (hasRead) {
           final matches = _students.where((s) => s.id == studentId);
           final name = matches.isNotEmpty ? matches.first.firstName : studentId;
-          conflicts.add(_ReadConflict(studentName: name, bookTitle: item.title));
+          conflicts
+              .add(_ReadConflict(studentName: name, bookTitle: item.title));
         }
       }
     }
@@ -1658,9 +1651,8 @@ class _FrequencyPickerSheet extends StatelessWidget {
                       child: Text(
                         getCadenceLabel(cadence),
                         style: TeacherTypography.bodyMedium.copyWith(
-                          fontWeight: isSelected
-                              ? FontWeight.w700
-                              : FontWeight.w400,
+                          fontWeight:
+                              isSelected ? FontWeight.w700 : FontWeight.w400,
                           color: isSelected
                               ? AppColors.teacherPrimary
                               : AppColors.charcoal,
@@ -1703,8 +1695,7 @@ class _DatePickerSheet extends StatefulWidget {
     required DateTime firstDate,
     required DateTime lastDate,
   }) {
-    final clamped =
-        initialDate.isBefore(firstDate) ? firstDate : initialDate;
+    final clamped = initialDate.isBefore(firstDate) ? firstDate : initialDate;
     return showModalBottomSheet<DateTime>(
       context: context,
       isScrollControlled: true,

@@ -3,6 +3,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class MinimalTheme {
   // Colours
@@ -90,7 +91,7 @@ class MinimalTheme {
       error: red,
     ),
     scaffoldBackgroundColor: cream,
-    fontFamily: 'SF Pro Display',
+    fontFamily: GoogleFonts.nunito().fontFamily,
     textTheme: const TextTheme(
       displayLarge: TextStyle(
         fontSize: 32,

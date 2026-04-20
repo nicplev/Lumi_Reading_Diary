@@ -21,10 +21,10 @@ export async function POST(request: NextRequest) {
       ? (schoolDoc.data()?.name as string) ?? 'Your School'
       : 'Your School';
 
-    const html = buildOnboardingEmailPreview({
+    const html = await buildOnboardingEmailPreview({
       schoolName,
       entries: [
-        { studentName: 'Example Student', linkCode: 'ABC123' },
+        { studentName: 'Example Student', linkCode: 'ABC12345' },
       ],
       customMessage: data.customMessage,
     });

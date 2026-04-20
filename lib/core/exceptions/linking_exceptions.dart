@@ -89,3 +89,13 @@ class CodeExpiredException extends LinkingException {
           'This code has expired. Please request a new code from your child\'s teacher.',
         );
 }
+
+/// Thrown when Firestore is transiently unreachable during verification
+/// and no cached copy of the code is available to fall back on.
+class NetworkUnavailableException extends LinkingException {
+  NetworkUnavailableException()
+      : super(
+          'Firestore unavailable',
+          'Can\'t reach the server right now. Please check your internet connection and try again.',
+        );
+}

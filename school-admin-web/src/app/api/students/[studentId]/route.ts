@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
-import { getStudent, updateStudent, deactivateStudent } from '@/lib/firestore/students';
+import { getStudent, updateStudent, deleteStudent } from '@/lib/firestore/students';
 import { z } from 'zod';
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ studentId: string }> }) {
@@ -33,6 +33,10 @@ const updateStudentSchema = z.object({
   studentId: z.string().optional(),
   classId: z.string().optional(),
   currentReadingLevel: z.string().optional(),
+  parentEmail: z
+    .string()
+    .optional()
+    .refine((v) => v === undefined || v === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), 'Invalid parent email'),
 });
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ studentId: string }> }) {
@@ -59,10 +63,10 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
 
   const { studentId } = await params;
   try {
-    await deactivateStudent(session.schoolId, studentId);
+    await deleteStudent(session.schoolId, studentId);
     return NextResponse.json({ success: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to deactivate student';
+    const message = error instanceof Error ? error.message : 'Failed to delete student';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

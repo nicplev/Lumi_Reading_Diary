@@ -15,7 +15,7 @@ import { Button } from './button';
 
 export interface DataTableColumn<T> {
   id: string;
-  header: string;
+  header: React.ReactNode;
   accessorFn: (row: T) => unknown;
   cell?: (value: unknown, row: T) => React.ReactNode;
   sortable?: boolean;
@@ -28,6 +28,8 @@ interface DataTableProps<T> {
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   pageSize?: number;
+  pageSizeOptions?: number[];
+  onPageSizeChange?: (size: number) => void;
   emptyState?: React.ReactNode;
   onRowClick?: (row: T) => void;
   loading?: boolean;
@@ -37,6 +39,8 @@ export function DataTable<T>({
   columns,
   data,
   pageSize = 20,
+  pageSizeOptions,
+  onPageSizeChange,
   emptyState,
   onRowClick,
   loading,
@@ -47,7 +51,7 @@ export function DataTable<T>({
     () =>
       columns.map((col) => ({
         id: col.id,
-        header: col.header,
+        header: typeof col.header === 'string' ? col.header : () => col.header,
         accessorFn: col.accessorFn,
         cell: col.cell
           ? (info: { getValue: () => unknown; row: { original: T } }) =>
@@ -158,28 +162,50 @@ export function DataTable<T>({
         </div>
       </div>
 
-      {table.getPageCount() > 1 && (
-        <div className="flex items-center justify-between mt-4">
+      {(table.getPageCount() > 1 || pageSizeOptions) && (
+        <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
           <p className="text-sm text-text-secondary">
-            Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()} ({data.length} total)
+            Page {table.getState().pagination.pageIndex + 1} of {Math.max(table.getPageCount(), 1)} ({data.length} total)
           </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-            >
-              Next
-            </Button>
+          <div className="flex items-center gap-3">
+            {pageSizeOptions && pageSizeOptions.length > 0 && (
+              <label className="flex items-center gap-2 text-sm text-text-secondary">
+                <span>Rows per page</span>
+                <select
+                  value={table.getState().pagination.pageSize}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    table.setPageSize(next);
+                    onPageSizeChange?.(next);
+                  }}
+                  className="pl-2 pr-7 py-1 rounded-[var(--radius-sm)] border border-divider bg-surface text-charcoal font-semibold appearance-none focus:outline-none focus:ring-2 focus:ring-rose-pink/30"
+                >
+                  {pageSizeOptions.map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => table.previousPage()}
+                disabled={!table.getCanPreviousPage()}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => table.nextPage()}
+                disabled={!table.getCanNextPage()}
+              >
+                Next
+              </Button>
+            </div>
           </div>
         </div>
       )}

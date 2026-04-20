@@ -7,6 +7,7 @@ import '../../core/theme/lumi_text_styles.dart';
 import '../../core/theme/lumi_spacing.dart';
 import '../../core/theme/lumi_borders.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/lumi_step_indicator.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../services/onboarding_service.dart';
 import '../../services/analytics_service.dart';
@@ -265,55 +266,13 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
   }
 
   Widget _buildProgressIndicator() {
-    return Container(
+    return Padding(
       padding: LumiPadding.allM,
-      child: Column(
-        children: [
-          Row(
-            children: List.generate(_steps.length, (index) {
-              final isCompleted = index < _currentStep;
-              final isCurrent = index == _currentStep;
-
-              return Expanded(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: isCompleted || isCurrent
-                              ? AppColors.rosePink
-                              : AppColors.lightGray,
-                          borderRadius: LumiBorders.small,
-                        ),
-                      ),
-                    ),
-                    if (index < _steps.length - 1) const SizedBox(width: 4),
-                  ],
-                ),
-              );
-            }),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(_steps.length, (index) {
-              final isCurrent = index == _currentStep;
-              return Expanded(
-                child: Text(
-                  _steps[index],
-                  style: LumiTextStyles.bodySmall().copyWith(
-                    color: isCurrent
-                        ? AppColors.rosePink
-                        : AppColors.charcoal.withValues(alpha: 0.6),
-                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              );
-            }),
-          ),
-        ],
+      child: Center(
+        child: LumiStepIndicator(
+          stepCount: _steps.length,
+          currentStep: _currentStep,
+        ),
       ),
     );
   }
@@ -326,7 +285,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
         children: [
           const Center(
             child: LumiMascot(
-              mood: LumiMood.reading,
+              variant: LumiVariant.school,
               size: 80,
             ),
           ),
@@ -404,7 +363,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
         children: [
           const Center(
             child: LumiMascot(
-              mood: LumiMood.happy,
+              variant: LumiVariant.teacher,
               size: 80,
             ),
           ),
@@ -509,7 +468,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
         children: [
           const Center(
             child: LumiMascot(
-              mood: LumiMood.reading,
+              variant: LumiVariant.school,
               size: 80,
             ),
           ),
@@ -669,7 +628,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const LumiMascot(
-              mood: LumiMood.celebrating,
+              variant: LumiVariant.promo,
               size: 120,
               message: 'You\'re all set!',
             ),
@@ -720,7 +679,8 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
             flex: 2,
             child: LumiPrimaryButton(
               onPressed: _isLoading ? null : _nextStep,
-              text: _currentStep == 2 ? 'Complete Setup' : 'Continue',
+              text: _currentStep == 2 ? 'Finish' : 'Continue',
+              icon: _currentStep == 2 ? Icons.check_circle : null,
               isLoading: _isLoading,
               isFullWidth: true,
             ),

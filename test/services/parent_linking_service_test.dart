@@ -363,6 +363,18 @@ void main() {
       test('throws AlreadyLinkedException when parent already linked',
           () async {
         await seedStudent(parentIds: ['parent_1']);
+        // The transaction now derives already-linked state from the parent's
+        // own doc (it can't read the student without existing access).
+        await firestore
+            .collection('schools')
+            .doc('school_1')
+            .collection('parents')
+            .doc('parent_1')
+            .set({
+          'linkedChildren': ['student_1'],
+          'schoolId': 'school_1',
+          'role': 'parent',
+        });
         await seedLinkCode();
 
         await expectLater(
@@ -375,6 +387,67 @@ void main() {
         );
       });
 
+      test('links successfully without pre-existing student read access',
+          () async {
+        // Simulates the production flow: parent doc exists (created in Step 2
+        // of registration) with empty linkedChildren. Under real firestore
+        // rules the parent cannot `get` the student at this point, but the
+        // service no longer reads the student, so linking must still succeed.
+        await seedStudent();
+        await seedLinkCode();
+        await firestore
+            .collection('schools')
+            .doc('school_1')
+            .collection('parents')
+            .doc('parent_1')
+            .set({
+          'linkedChildren': <String>[],
+          'schoolId': 'school_1',
+          'role': 'parent',
+        });
+
+        final linked = await service.linkParentToStudent(
+          code: 'QWER5678',
+          parentUserId: 'parent_1',
+          parentEmail: 'parent@test.com',
+        );
+
+        expect(linked, isTrue);
+
+        final studentDoc = await firestore
+            .collection('schools')
+            .doc('school_1')
+            .collection('students')
+            .doc('student_1')
+            .get();
+        expect(
+          List<String>.from(studentDoc.data()!['parentIds']),
+          contains('parent_1'),
+        );
+
+        final parentDoc = await firestore
+            .collection('schools')
+            .doc('school_1')
+            .collection('parents')
+            .doc('parent_1')
+            .get();
+        expect(
+          List<String>.from(parentDoc.data()!['linkedChildren']),
+          contains('student_1'),
+        );
+
+        final codeDoc =
+            await firestore.collection('studentLinkCodes').doc('code_1').get();
+        expect(codeDoc.data()!['status'], equals('used'));
+        expect(codeDoc.data()!['usedBy'], equals('parent_1'));
+      });
+
+      // StudentNotFoundException is surfaced by real Firestore via a
+      // FirebaseException(code: 'not-found') on `transaction.update` at
+      // commit time, which the service's catch maps to StudentNotFoundException.
+      // fake_cloud_firestore's _DummyTransaction does not propagate that
+      // error out of runTransaction, so this scenario can only be covered
+      // by backend integration / emulator tests. Left skipped as a marker.
       test('throws StudentNotFoundException when student missing', () async {
         // Only create school but not the student
         await firestore
@@ -391,7 +464,8 @@ void main() {
           ),
           throwsA(isA<StudentNotFoundException>()),
         );
-      });
+      }, skip: 'fake_cloud_firestore cannot propagate transaction.update '
+          'not-found errors; covered only by backend/emulator tests.');
 
       test('does not create legacy top-level notifications after successful link', () async {
         await seedStudent();

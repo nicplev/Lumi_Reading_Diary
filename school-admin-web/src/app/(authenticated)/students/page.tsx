@@ -1,4 +1,5 @@
 import { getSession } from '@/lib/auth/session';
+import { hasDevAccess } from '@/lib/auth/dev-access';
 import { redirect } from 'next/navigation';
 import { getClasses } from '@/lib/firestore/classes';
 import { getSchool } from '@/lib/firestore/school';
@@ -10,11 +11,12 @@ export default async function StudentsRoute() {
   const session = await getSession();
   if (!session) redirect('/login');
 
-  const [classes, school] = await Promise.all([
+  const [classes, school, devAccess] = await Promise.all([
     getClasses(session.schoolId, {
       teacherId: session.role === 'teacher' ? session.uid : undefined,
     }),
     getSchool(session.schoolId),
+    hasDevAccess(session.email),
   ]);
 
   const levels = getReadingLevels(school?.levelSchema ?? 'aToZ', school?.customLevels);
@@ -32,6 +34,7 @@ export default async function StudentsRoute() {
       classes={classes.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() }))}
       levelOptions={levelOptions}
       levelSchema={school?.levelSchema ?? 'none'}
+      devAccess={devAccess}
     />
   );
 }

@@ -17,6 +17,10 @@ const studentFormSchema = z.object({
   classId: z.string().min(1, 'Class is required'),
   dateOfBirth: z.string().optional(),
   currentReadingLevel: z.string().optional(),
+  parentEmail: z
+    .string()
+    .optional()
+    .refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), 'Enter a valid email address'),
 });
 
 type StudentFormData = z.infer<typeof studentFormSchema>;
@@ -60,6 +64,7 @@ export function StudentFormModal({
       classId: initialData?.classId ?? '',
       dateOfBirth: initialData?.dateOfBirth ?? '',
       currentReadingLevel: initialData?.currentReadingLevel ?? '',
+      parentEmail: initialData?.parentEmail ?? '',
     },
   });
 
@@ -72,6 +77,7 @@ export function StudentFormModal({
         classId: initialData?.classId ?? '',
         dateOfBirth: initialData?.dateOfBirth ?? '',
         currentReadingLevel: initialData?.currentReadingLevel ?? '',
+        parentEmail: initialData?.parentEmail ?? '',
       });
     }
   }, [open, initialData, reset]);
@@ -125,6 +131,13 @@ export function StudentFormModal({
           label="Date of Birth (optional)"
           type="date"
           {...register('dateOfBirth')}
+        />
+        <Input
+          label="Parent/Guardian Email (optional)"
+          type="email"
+          placeholder="parent@example.com"
+          error={errors.parentEmail?.message}
+          {...register('parentEmail')}
         />
         {levelOptions.length > 0 && (
           <Select

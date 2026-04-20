@@ -1,0 +1,101 @@
+Student ID,First Name,Last Name,Class Name,Date of Birth,Parent Email,Reading Level
+S10001,Oliver,Smith,Prep A,2020-02-14,support+student1@lumi-reading.com,Level 1
+S10002,Amelia,Johnson,Prep A,2020-05-22,support+student2@lumi-reading.com,Level 2
+S10003,Noah,Williams,Prep A,2020-08-03,support+student3@lumi-reading.com,Level 1
+S10004,Olivia,Brown,Prep A,2020-11-17,support+student4@lumi-reading.com,Level 3
+S10005,Liam,Jones,Prep A,2020-01-09,support+student5@lumi-reading.com,Level 2
+S10006,Sophia,Garcia,Prep A,2020-04-25,support+student6@lumi-reading.com,Level 4
+S10007,Ethan,Miller,Prep A,2020-07-30,support+student7@lumi-reading.com,Level 1
+S10008,Isabella,Davis,Prep A,2020-09-12,support+student8@lumi-reading.com,Level 3
+S10009,Mason,Rodriguez,Prep A,2020-12-01,support+student9@lumi-reading.com,Level 2
+S10010,Mia,Martinez,Prep A,2020-03-18,support+student10@lumi-reading.com,Level 4
+S10011,Lucas,Hernandez,Prep A,2020-06-07,support+student11@lumi-reading.com,Level 1
+S10012,Charlotte,Lopez,Prep A,2020-10-24,support+student12@lumi-reading.com,Level 3
+S10013,Logan,Gonzalez,Prep A,2020-02-28,support+student13@lumi-reading.com,Level 2
+S10014,Harper,Wilson,Prep A,2020-05-15,support+student14@lumi-reading.com,Level 5
+S10015,Benjamin,Anderson,Prep A,2020-08-21,support+student15@lumi-reading.com,Level 1
+S10016,Evelyn,Thomas,Prep A,2020-11-04,support+student16@lumi-reading.com,Level 3
+S10017,Henry,Taylor,Prep A,2020-01-19,support+student17@lumi-reading.com,Level 2
+S10018,Abigail,Moore,Prep B,2020-04-11,support+student18@lumi-reading.com,Level 4
+S10019,Alexander,Jackson,Prep B,2020-07-27,support+student19@lumi-reading.com,Level 1
+S10020,Emily,Martin,Prep B,2020-10-06,support+student20@lumi-reading.com,Level 3
+S10021,Sebastian,Lee,Prep B,2020-03-02,support+student21@lumi-reading.com,Level 2
+S10022,Elizabeth,Perez,Prep B,2020-06-15,support+student22@lumi-reading.com,Level 5
+S10023,Michael,Thompson,Prep B,2020-09-28,support+student23@lumi-reading.com,Level 1
+S10024,Sofia,White,Prep B,2020-12-11,support+student24@lumi-reading.com,Level 4
+S10025,Daniel,Harris,Prep B,2020-02-07,support+student25@lumi-reading.com,Level 2
+S10026,Ella,Sanchez,Prep B,2020-05-20,support+student26@lumi-reading.com,Level 3
+S10027,Matthew,Clark,Prep B,2020-08-14,support+student27@lumi-reading.com,Level 1
+S10028,Avery,Ramirez,Prep B,2020-11-02,support+student28@lumi-reading.com,Level 5
+S10029,Jackson,Lewis,Prep B,2020-01-25,support+student29@lumi-reading.com,Level 2
+S10030,Scarlett,Robinson,Prep B,2020-04-30,support+student30@lumi-reading.com,Level 4
+S10031,David,Walker,Prep B,2020-07-08,support+student31@lumi-reading.com,Level 1
+S10032,Grace,Young,Prep B,2020-10-17,support+student32@lumi-reading.com,Level 3
+S10033,Joseph,Allen,Prep B,2020-12-23,support+student33@lumi-reading.com,Level 2
+S10034,Chloe,King,Prep B,2020-03-14,support+student34@lumi-reading.com,Level 5
+S10035,Samuel,Wright,1A,2019-07-08,support+student35@lumi-reading.com,Level 6
+S10036,Victoria,Scott,1A,2019-10-17,support+student36@lumi-reading.com,Level 8
+S10037,Carter,Torres,1A,2019-12-23,support+student37@lumi-reading.com,Level 7
+S10038,Riley,Nguyen,1A,2019-03-14,support+student38@lumi-reading.com,Level 9
+S10039,Owen,Hill,1A,2019-06-26,support+student39@lumi-reading.com,Level 6
+S10040,Aria,Flores,1A,2019-09-09,support+student40@lumi-reading.com,Level 10
+S10041,Wyatt,Green,1A,2019-11-30,support+student41@lumi-reading.com,Level 7
+S10042,Lily,Adams,1A,2019-02-18,support+student42@lumi-reading.com,Level 8
+S10043,John,Nelson,1A,2019-05-04,support+student43@lumi-reading.com,Level 6
+S10044,Aubrey,Baker,1A,2019-08-29,support+student44@lumi-reading.com,Level 9
+S10045,Jack,Hall,1A,2019-04-12,support+student45@lumi-reading.com,Level 7
+S10046,Zoey,Rivera,1A,2019-07-25,support+student46@lumi-reading.com,Level 10
+S10047,Luke,Campbell,1A,2019-10-08,support+student47@lumi-reading.com,Level 6
+S10048,Hannah,Mitchell,1A,2019-01-21,support+student48@lumi-reading.com,Level 8
+S10049,Jayden,Carter,1A,2019-04-03,support+student49@lumi-reading.com,Level 7
+S10050,Lillian,Roberts,1A,2019-07-16,support+student50@lumi-reading.com,Level 9
+S10051,Dylan,Gomez,1A,2019-10-29,support+student51@lumi-reading.com,Level 6
+S10052,Addison,Phillips,1B,2019-02-11,support+student52@lumi-reading.com,Level 8
+S10053,Grayson,Evans,1B,2019-05-24,support+student53@lumi-reading.com,Level 7
+S10054,Eleanor,Turner,1B,2019-08-07,support+student54@lumi-reading.com,Level 10
+S10055,Levi,Diaz,1B,2019-11-20,support+student55@lumi-reading.com,Level 6
+S10056,Natalie,Parker,1B,2019-03-05,support+student56@lumi-reading.com,Level 9
+S10057,Isaac,Cruz,1B,2019-06-18,support+student57@lumi-reading.com,Level 7
+S10058,Luna,Edwards,1B,2019-09-02,support+student58@lumi-reading.com,Level 8
+S10059,Gabriel,Collins,1B,2019-12-15,support+student59@lumi-reading.com,Level 6
+S10060,Savannah,Reyes,1B,2019-01-28,support+student60@lumi-reading.com,Level 10
+S10061,Julian,Stewart,1B,2019-04-10,support+student61@lumi-reading.com,Level 7
+S10062,Brooklyn,Morris,1B,2019-07-23,support+student62@lumi-reading.com,Level 9
+S10063,Mateo,Morales,1B,2019-10-05,support+student63@lumi-reading.com,Level 6
+S10064,Leah,Murphy,1B,2019-12-19,support+student64@lumi-reading.com,Level 8
+S10065,Anthony,Cook,1B,2019-02-02,support+student65@lumi-reading.com,Level 7
+S10066,Zoe,Rogers,1B,2019-05-15,support+student66@lumi-reading.com,Level 10
+S10067,Jaxon,Gutierrez,1B,2019-08-28,support+student67@lumi-reading.com,Level 6
+S10068,Stella,Ortiz,1B,2019-11-10,support+student68@lumi-reading.com,Level 9
+S10069,Lincoln,Morgan,2A,2018-03-11,support+student69@lumi-reading.com,Level 11
+S10070,Hazel,Cooper,2A,2018-06-24,support+student70@lumi-reading.com,Level 13
+S10071,Joshua,Peterson,2A,2018-09-06,support+student71@lumi-reading.com,Level 12
+S10072,Ellie,Bailey,2A,2018-12-19,support+student72@lumi-reading.com,Level 14
+S10073,Christopher,Reed,2A,2018-02-02,support+student73@lumi-reading.com,Level 11
+S10074,Paisley,Kelly,2A,2018-05-15,support+student74@lumi-reading.com,Level 15
+S10075,Andrew,Howard,2A,2018-08-28,support+student75@lumi-reading.com,Level 12
+S10076,Audrey,Ramos,2A,2018-11-10,support+student76@lumi-reading.com,Level 13
+S10077,Theodore,Kim,2A,2018-01-23,support+student77@lumi-reading.com,Level 11
+S10078,Skylar,Cox,2A,2018-04-06,support+student78@lumi-reading.com,Level 14
+S10079,Caleb,Ward,2A,2018-07-19,support+student79@lumi-reading.com,Level 12
+S10080,Violet,Richardson,2A,2018-10-01,support+student80@lumi-reading.com,Level 15
+S10081,Ryan,Watson,2A,2018-12-14,support+student81@lumi-reading.com,Level 11
+S10082,Claire,Brooks,2A,2018-02-27,support+student82@lumi-reading.com,Level 13
+S10083,Asher,Chavez,2A,2018-05-11,support+student83@lumi-reading.com,Level 12
+S10084,Bella,Wood,2A,2018-08-24,support+student84@lumi-reading.com,Level 14
+S10085,Nathan,James,2B,2018-11-06,support+student85@lumi-reading.com,Level 15
+S10086,Aurora,Bennett,2B,2018-01-19,support+student86@lumi-reading.com,Level 11
+S10087,Thomas,Gray,2B,2018-04-02,support+student87@lumi-reading.com,Level 13
+S10088,Lucy,Mendoza,2B,2018-07-15,support+student88@lumi-reading.com,Level 12
+S10089,Leo,Ruiz,2B,2018-03-28,support+student89@lumi-reading.com,Level 14
+S10090,Anna,Hughes,2B,2018-06-10,support+student90@lumi-reading.com,Level 11
+S10091,Isaiah,Price,2B,2018-09-22,support+student91@lumi-reading.com,Level 15
+S10092,Samantha,Alvarez,2B,2018-12-05,support+student92@lumi-reading.com,Level 12
+S10093,Charles,Castillo,2B,2018-02-18,support+student93@lumi-reading.com,Level 13
+S10094,Caroline,Sanders,2B,2018-05-31,support+student94@lumi-reading.com,Level 11
+S10095,Josiah,Patel,2B,2018-08-13,support+student95@lumi-reading.com,Level 14
+S10096,Genesis,Myers,2B,2018-11-26,support+student96@lumi-reading.com,Level 12
+S10097,Hudson,Long,2B,2018-01-08,support+student97@lumi-reading.com,Level 15
+S10098,Aaliyah,Ross,2B,2018-04-21,support+student98@lumi-reading.com,Level 11
+S10099,Christian,Foster,2B,2018-07-04,support+student99@lumi-reading.com,Level 13
+S10100,Kennedy,Jimenez,2B,2018-09-17,support+student100@lumi-reading.com,Level 12

@@ -13,7 +13,7 @@ import {
   normalizeNotificationPermissions,
   validateNotificationAudience,
 } from "./notification_helpers";
-import {buildOnboardingEmail} from "./email_templates";
+import {buildOnboardingEmail, buildOnboardingQrAttachments} from "./email_templates";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -1644,11 +1644,13 @@ export const processParentOnboardingEmail = functions
         });
 
         try {
+          const attachments = await buildOnboardingQrAttachments(entries);
           await sgMail.send({
             to: email,
             from: {email: senderEmail, name: `${schoolName} via Lumi`},
             subject: emailSubject,
             html,
+            attachments,
           });
           sentCount++;
         } catch (err) {
