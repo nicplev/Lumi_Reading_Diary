@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firebase_auth_mocks/firebase_auth_mocks.dart';
 import 'package:google_sign_in_mocks/google_sign_in_mocks.dart';
@@ -40,5 +39,10 @@ class MockUserRepository implements UserRepository {
   }
 
   @override
-  FirebaseFirestore get _firestore => fakeFirestore;
+  Future<UserModel?> getUserInSchool(String schoolId, String uid) async {
+    if (uid == 'some_uid') {
+      return mockUser;
+    }
+    return null;
+  }
 }

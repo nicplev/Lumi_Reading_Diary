@@ -5,6 +5,7 @@ import '../data/models/student_link_code_model.dart';
 import '../data/models/student_model.dart';
 import '../data/models/user_model.dart';
 import '../core/exceptions/linking_exceptions.dart';
+import '../core/services/assert_writable.dart';
 
 class ParentLinkingService {
   final FirebaseFirestore _firestore;
@@ -46,6 +47,11 @@ class ParentLinkingService {
     required String createdBy,
     int validityDays = 365, // Code valid for 1 year by default
   }) async {
+    assertWritable(
+      opLabel: 'parentLinking.createLinkCode',
+      collection: 'studentLinkCodes',
+      operation: 'create',
+    );
     final code = await _generateUniqueCode();
 
     // Fetch student info to store in metadata
@@ -227,6 +233,11 @@ class ParentLinkingService {
     required String parentUserId,
     required String parentEmail,
   }) async {
+    assertWritable(
+      opLabel: 'parentLinking.linkParentToStudent',
+      collection: 'students',
+      operation: 'update',
+    );
     final normalizedCode = code.toUpperCase().trim();
     final verifiedCode = await verifyCode(normalizedCode);
 
@@ -377,6 +388,12 @@ class ParentLinkingService {
     required String revokedBy,
     String? reason,
   }) async {
+    assertWritable(
+      opLabel: 'parentLinking.revokeCode',
+      collection: 'studentLinkCodes',
+      docId: codeId,
+      operation: 'update',
+    );
     await _firestore.collection('studentLinkCodes').doc(codeId).update({
       'status': LinkCodeStatus.revoked.toString().split('.').last,
       'revokedBy': revokedBy,
@@ -438,6 +455,12 @@ class ParentLinkingService {
     String? unlinkedBy,
     String? reason,
   }) async {
+    assertWritable(
+      opLabel: 'parentLinking.unlinkParentFromStudent',
+      collection: 'students',
+      docId: studentId,
+      operation: 'update',
+    );
     // Use transaction to ensure atomic updates (both succeed or both fail)
     await _firestore.runTransaction((transaction) async {
       final studentRef = _firestore

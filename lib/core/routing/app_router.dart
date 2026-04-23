@@ -18,6 +18,8 @@ import '../../services/firebase_service.dart';
 import '../services/navigation_state_service.dart';
 import '../../screens/auth/splash_screen.dart';
 import '../../screens/auth/login_screen.dart';
+import '../../screens/dev/impersonation_picker_screen.dart';
+import '../config/dev_access.dart';
 import '../../screens/auth/forgot_password_screen.dart';
 import '../../screens/auth/web_not_available_screen.dart';
 import '../../screens/parent/parent_home_screen.dart';
@@ -197,6 +199,17 @@ class AppRouter {
         path: '/auth/forgot-password',
         name: 'forgot-password',
         builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+
+      // ============================================
+      // DEVELOPER IMPERSONATION (dev-access gated)
+      // ============================================
+      GoRoute(
+        path: '/dev/impersonate',
+        name: 'dev-impersonate',
+        redirect: (context, state) =>
+            hasDevAccess() ? null : '/auth/login',
+        builder: (context, state) => const ImpersonationPickerScreen(),
       ),
 
       GoRoute(
@@ -742,6 +755,22 @@ class AppRouter {
         return '/teacher/home';
       case UserRole.schoolAdmin:
         return '/admin/home';
+    }
+  }
+
+  /// String-typed variant used by flows (e.g. dev impersonation) that receive
+  /// the role over the wire as a raw string. Falls back to the teacher home
+  /// for any unknown value.
+  static String getHomeRouteForRoleName(String roleName) {
+    switch (roleName) {
+      case 'parent':
+        return '/parent/home';
+      case 'teacher':
+        return '/teacher/home';
+      case 'schoolAdmin':
+        return '/admin/home';
+      default:
+        return '/teacher/home';
     }
   }
 

@@ -1,6 +1,8 @@
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/foundation.dart';
 
+import '../core/services/impersonation_service.dart';
+
 /// Analytics service for Lumi Reading Diary.
 /// Tracks key user actions to understand app usage patterns.
 class AnalyticsService {
@@ -11,6 +13,12 @@ class AnalyticsService {
 
   late final FirebaseAnalytics _analytics;
   bool _initialized = false;
+
+  /// Global gate: skip all analytics when uninitialised OR while a developer
+  /// impersonation session is active (avoids polluting a real school's
+  /// analytics with dev-driven events).
+  bool get _shouldSuppress =>
+      !_initialized || ImpersonationService.instance.isActive;
 
   Future<void> initialize() async {
     try {
@@ -34,7 +42,7 @@ class AnalyticsService {
 
   /// Set the current user for analytics tracking
   Future<void> setUserId(String userId) async {
-    if (!_initialized) return;
+    if (_shouldSuppress) return;
     try {
       await _analytics.setUserId(id: userId);
     } catch (e) {
@@ -44,7 +52,7 @@ class AnalyticsService {
 
   /// Set user role property (parent, teacher, schoolAdmin)
   Future<void> setUserRole(String role) async {
-    if (!_initialized) return;
+    if (_shouldSuppress) return;
     try {
       await _analytics.setUserProperty(name: 'user_role', value: role);
     } catch (e) {
@@ -60,7 +68,7 @@ class AnalyticsService {
     required int bookCount,
     required int minutesRead,
   }) async {
-    if (!_initialized) return;
+    if (_shouldSuppress) return;
     try {
       await _analytics.logEvent(
         name: 'reading_logged',
@@ -77,7 +85,7 @@ class AnalyticsService {
 
   /// Logged when a student earns a new badge
   Future<void> logBadgeEarned({required String badgeType}) async {
-    if (!_initialized) return;
+    if (_shouldSuppress) return;
     try {
       await _analytics.logEvent(
         name: 'badge_earned',
@@ -90,7 +98,7 @@ class AnalyticsService {
 
   /// Logged when a student reaches a streak milestone
   Future<void> logStreakMilestone({required int streakCount}) async {
-    if (!_initialized) return;
+    if (_shouldSuppress) return;
     try {
       await _analytics.logEvent(
         name: 'streak_milestone',
@@ -103,7 +111,7 @@ class AnalyticsService {
 
   /// Logged when the app is opened
   Future<void> logAppOpened({required String role}) async {
-    if (!_initialized) return;
+    if (_shouldSuppress) return;
     try {
       await _analytics.logEvent(
         name: 'app_opened',
@@ -116,7 +124,7 @@ class AnalyticsService {
 
   /// Logged when feedback is submitted
   Future<void> logFeedbackSubmitted({required String category}) async {
-    if (!_initialized) return;
+    if (_shouldSuppress) return;
     try {
       await _analytics.logEvent(
         name: 'feedback_submitted',
@@ -129,7 +137,7 @@ class AnalyticsService {
 
   /// Logged when a parent links a child
   Future<void> logChildLinked() async {
-    if (!_initialized) return;
+    if (_shouldSuppress) return;
     try {
       await _analytics.logEvent(name: 'child_linked');
     } catch (e) {
@@ -139,7 +147,7 @@ class AnalyticsService {
 
   /// Logged when a teacher creates an allocation
   Future<void> logAllocationCreated({required String type}) async {
-    if (!_initialized) return;
+    if (_shouldSuppress) return;
     try {
       await _analytics.logEvent(
         name: 'allocation_created',
@@ -154,7 +162,7 @@ class AnalyticsService {
   Future<void> logOnboardingStepCompleted({
     required String step,
   }) async {
-    if (!_initialized) return;
+    if (_shouldSuppress) return;
     try {
       await _analytics.logEvent(
         name: 'onboarding_step_completed',
@@ -170,7 +178,7 @@ class AnalyticsService {
     required String step,
     required String reason,
   }) async {
-    if (!_initialized) return;
+    if (_shouldSuppress) return;
     try {
       await _analytics.logEvent(
         name: 'onboarding_failed',
@@ -186,7 +194,7 @@ class AnalyticsService {
 
   /// Logged when a parent verifies a link code successfully
   Future<void> logParentCodeVerified() async {
-    if (!_initialized) return;
+    if (_shouldSuppress) return;
     try {
       await _analytics.logEvent(name: 'parent_code_verified');
     } catch (e) {
@@ -196,7 +204,7 @@ class AnalyticsService {
 
   /// Logged when parent linking completes successfully
   Future<void> logParentLinkingCompleted() async {
-    if (!_initialized) return;
+    if (_shouldSuppress) return;
     try {
       await _analytics.logEvent(name: 'parent_linking_completed');
     } catch (e) {
@@ -206,7 +214,7 @@ class AnalyticsService {
 
   /// Logged when parent linking fails
   Future<void> logParentLinkingFailed({required String reason}) async {
-    if (!_initialized) return;
+    if (_shouldSuppress) return;
     try {
       await _analytics.logEvent(
         name: 'parent_linking_failed',
@@ -219,7 +227,7 @@ class AnalyticsService {
 
   /// Logged when staff export parent link codes
   Future<void> logParentCodesExported({required int rowCount}) async {
-    if (!_initialized) return;
+    if (_shouldSuppress) return;
     try {
       await _analytics.logEvent(
         name: 'parent_codes_exported',
@@ -232,7 +240,7 @@ class AnalyticsService {
 
   /// Logged when staff revoke a parent link code
   Future<void> logParentCodeRevoked() async {
-    if (!_initialized) return;
+    if (_shouldSuppress) return;
     try {
       await _analytics.logEvent(name: 'parent_code_revoked');
     } catch (e) {
@@ -242,7 +250,7 @@ class AnalyticsService {
 
   /// Logged when staff unlink a parent from a student
   Future<void> logParentUnlinked() async {
-    if (!_initialized) return;
+    if (_shouldSuppress) return;
     try {
       await _analytics.logEvent(name: 'parent_unlinked');
     } catch (e) {

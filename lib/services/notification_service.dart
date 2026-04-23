@@ -10,6 +10,7 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'dart:io' show Platform;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/services/impersonation_service.dart';
 import '../firebase_options.dart';
 
 // Background message handler (must be top-level function)
@@ -541,6 +542,11 @@ class NotificationService {
   /// Save FCM token to the correct parent document in Firestore
   /// Called after login/auto-login once the user's schoolId and userId are known
   Future<void> saveTokenForUser(String schoolId, String userId) async {
+    // Never overwrite a real parent's FCM token with the dev's device token
+    // during an impersonation session. The dev's phone should not become the
+    // push target for that school's notifications.
+    if (ImpersonationService.instance.isActive) return;
+
     _currentSchoolId = schoolId;
     _currentUserId = userId;
 

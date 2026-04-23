@@ -9,6 +9,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'core/theme/app_theme.dart';
 import 'core/routing/app_router.dart';
 import 'core/services/dev_access_service.dart';
+import 'core/widgets/impersonation_overlay.dart';
 import 'services/firebase_service.dart';
 import 'services/notification_service.dart';
 import 'services/crash_reporting_service.dart';
@@ -97,6 +98,8 @@ class LumiApp extends ConsumerWidget {
       darkTheme: AppTheme.darkTheme(),
       themeMode: ThemeMode.light,
       routerConfig: router,
+      builder: (context, child) =>
+          ImpersonationOverlay(child: child ?? const SizedBox.shrink()),
     );
   }
 }

@@ -48,4 +48,23 @@ class UserRepository {
     }
     return null;
   }
+
+  /// Direct lookup bypassing the email/school index — reads exactly
+  /// `schools/{schoolId}/users/{uid}`. Used by the developer impersonation
+  /// flow where the caller already knows the target school and user and the
+  /// index lookup (which keys on the signed-in user's email) would miss.
+  Future<UserModel?> getUserInSchool(String schoolId, String uid) async {
+    try {
+      final doc = await _firestore
+          .collection('schools')
+          .doc(schoolId)
+          .collection('users')
+          .doc(uid)
+          .get();
+      if (doc.exists) return UserModel.fromFirestore(doc);
+    } catch (_) {
+      // Swallow: caller treats null as "not found / no access".
+    }
+    return null;
+  }
 }

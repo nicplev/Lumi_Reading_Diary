@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../core/services/assert_writable.dart';
 import '../data/models/school_onboarding_model.dart';
 import '../data/models/school_model.dart';
 import '../data/models/user_model.dart';
@@ -25,6 +26,11 @@ class OnboardingService {
     int estimatedStudentCount = 0,
     int estimatedTeacherCount = 0,
   }) async {
+    assertWritable(
+      opLabel: 'onboarding.createDemoRequest',
+      collection: 'schoolOnboarding',
+      operation: 'create',
+    );
     final onboarding = SchoolOnboardingModel(
       id: '',
       schoolName: schoolName,
@@ -51,6 +57,12 @@ class OnboardingService {
     String onboardingId,
     OnboardingStatus status,
   ) async {
+    assertWritable(
+      opLabel: 'onboarding.updateOnboardingStatus',
+      collection: 'schoolOnboarding',
+      docId: onboardingId,
+      operation: 'update',
+    );
     await _firestore.collection('schoolOnboarding').doc(onboardingId).update({
       'status': status.toString().split('.').last,
       'lastUpdatedAt': FieldValue.serverTimestamp(),
@@ -62,6 +74,12 @@ class OnboardingService {
     String onboardingId,
     OnboardingStep step,
   ) async {
+    assertWritable(
+      opLabel: 'onboarding.completeStep',
+      collection: 'schoolOnboarding',
+      docId: onboardingId,
+      operation: 'update',
+    );
     final doc =
         await _firestore.collection('schoolOnboarding').doc(onboardingId).get();
     final onboarding = SchoolOnboardingModel.fromFirestore(doc);
@@ -128,6 +146,11 @@ class OnboardingService {
     String? primaryColor,
     String? secondaryColor,
   }) async {
+    assertWritable(
+      opLabel: 'onboarding.createSchoolAndAdmin',
+      collection: 'schools',
+      operation: 'create',
+    );
     UserCredential? userCredential;
     DocumentReference<Map<String, dynamic>>? schoolDoc;
 

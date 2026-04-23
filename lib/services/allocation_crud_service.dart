@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../core/services/assert_writable.dart';
 import '../data/models/allocation_model.dart';
 
 /// Transaction-safe CRUD operations for allocation book items.
@@ -58,6 +59,12 @@ class AllocationCrudService {
     List<String>? studentIds,
     List<AllocationBookItem>? assignmentItems,
   }) async {
+    assertWritable(
+      opLabel: 'allocation.updateAllocation',
+      collection: 'allocations',
+      docId: allocationId,
+      operation: 'update',
+    );
     final docRef = _allocationDoc(
       schoolId: schoolId,
       allocationId: allocationId,
@@ -110,6 +117,12 @@ class AllocationCrudService {
     String? isbn,
     Map<String, dynamic>? metadata,
   }) async {
+    assertWritable(
+      opLabel: 'allocation.addBookGlobally',
+      collection: 'allocations',
+      docId: allocationId,
+      operation: 'update',
+    );
     final docRef = _allocationDoc(
       schoolId: schoolId,
       allocationId: allocationId,

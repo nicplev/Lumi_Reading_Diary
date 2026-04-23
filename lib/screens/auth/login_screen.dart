@@ -645,6 +645,24 @@ class _LoginScreenState extends State<LoginScreen> {
                         text: 'Create Admin Account',
                         icon: Icons.admin_panel_settings,
                       ),
+                      LumiGap.xs,
+                      LumiTextButton(
+                        onPressed: () {
+                          if (_firebaseService.auth.currentUser == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Sign in to your dev account first.',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                          context.push('/dev/impersonate');
+                        },
+                        text: 'Impersonate School (read-only)',
+                        icon: Icons.shield_outlined,
+                      ),
                     ],
                   ),
                 ),

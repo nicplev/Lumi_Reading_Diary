@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../core/services/assert_writable.dart';
 import '../data/models/school_code_model.dart';
 
 /// Exception thrown when school code validation fails
@@ -127,6 +128,11 @@ class SchoolCodeService {
     DateTime? expiresAt,
     int? maxUsages,
   }) async {
+    assertWritable(
+      opLabel: 'schoolCode.createSchoolCode',
+      collection: 'schoolCodes',
+      operation: 'create',
+    );
     final normalizedCode = code.toUpperCase().trim();
 
     // Check if code already exists
@@ -168,6 +174,12 @@ class SchoolCodeService {
   /// This prevents the code from being used for new registrations
   /// but doesn't affect teachers who already registered with it.
   Future<void> deactivateCode(String codeId) async {
+    assertWritable(
+      opLabel: 'schoolCode.deactivateCode',
+      collection: 'schoolCodes',
+      docId: codeId,
+      operation: 'update',
+    );
     await _firestore
         .collection(_collectionName)
         .doc(codeId)
@@ -176,6 +188,12 @@ class SchoolCodeService {
 
   /// Reactivates a previously deactivated code
   Future<void> reactivateCode(String codeId) async {
+    assertWritable(
+      opLabel: 'schoolCode.reactivateCode',
+      collection: 'schoolCodes',
+      docId: codeId,
+      operation: 'update',
+    );
     await _firestore
         .collection(_collectionName)
         .doc(codeId)
