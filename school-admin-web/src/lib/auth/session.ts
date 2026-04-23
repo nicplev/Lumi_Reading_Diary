@@ -1,12 +1,38 @@
 import { cookies } from 'next/headers';
 import { SignJWT, jwtVerify } from 'jose';
 
+export interface ImpersonationSessionBlock {
+  sessionId: string;
+  /** The Firestore user ID whose experience is being rendered. */
+  targetUserId: string;
+  /** Denormalized for banner rendering. */
+  schoolName: string;
+  /** Why the dev started this session (≥20 chars, stored verbatim). */
+  reason: string;
+  /** Unix ms. */
+  startedAt: number;
+  /** Unix ms; middleware enforces. */
+  expiresAt: number;
+  /** The real session's schoolId/role before impersonation, restored on exit. */
+  realSchoolId: string;
+  realRole: 'teacher' | 'schoolAdmin';
+}
+
 export interface SessionData {
   uid: string;
   email: string;
+  /**
+   * EFFECTIVE schoolId — equals the real schoolId in normal sessions, and the
+   * IMPERSONATED school's id while `impersonation` is set. Every existing API
+   * route that queries by `session.schoolId` therefore naturally reads from
+   * the target school during impersonation without code changes.
+   */
   schoolId: string;
+  /** EFFECTIVE role — see note on schoolId above. */
   role: 'teacher' | 'schoolAdmin';
   fullName: string;
+  /** Present iff a developer impersonation session is active. */
+  impersonation?: ImpersonationSessionBlock;
 }
 
 const SESSION_COOKIE_NAME = 'lumi_session';
@@ -48,6 +74,7 @@ export async function getSession(): Promise<SessionData | null> {
       schoolId: payload.schoolId as string,
       role: payload.role as 'teacher' | 'schoolAdmin',
       fullName: payload.fullName as string,
+      impersonation: payload.impersonation as ImpersonationSessionBlock | undefined,
     };
   } catch {
     // Backward compat: try parsing as plain JSON (for existing sessions during rollout)
@@ -61,6 +88,10 @@ export async function getSession(): Promise<SessionData | null> {
     }
     return null;
   }
+}
+
+export function isImpersonating(session: SessionData | null): boolean {
+  return !!session?.impersonation;
 }
 
 export async function clearSession() {

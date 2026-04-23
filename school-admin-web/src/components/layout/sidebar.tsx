@@ -34,7 +34,14 @@ function getInitials(fullName?: string, email?: string): string {
   return '??';
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  /** True if the signed-in user holds developer access. When set, the footer
+   *  shows an extra "Impersonate School" entry. Computed server-side from the
+   *  session email + `devAccessEmails` doc and passed down. */
+  hasDevAccess?: boolean;
+}
+
+export function Sidebar({ hasDevAccess = false }: SidebarProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const { data: school } = useSchool();
@@ -89,6 +96,19 @@ export function Sidebar() {
           })}
         </ul>
       </nav>
+
+      {/* Dev tools (only when the signed-in user is on the dev allowlist) */}
+      {hasDevAccess && (
+        <div className="px-3 pt-2 border-t border-divider">
+          <Link
+            href="/dev/impersonate"
+            className="flex items-center gap-3 px-3 py-2 rounded-[var(--radius-md)] text-[13px] font-semibold text-[#B91C1C] hover:bg-[#B91C1C]/5 transition-colors"
+          >
+            <Icon name="shield" size={16} />
+            Impersonate School
+          </Link>
+        </div>
+      )}
 
       {/* User section */}
       <div className="px-3 py-4 border-t border-divider">
