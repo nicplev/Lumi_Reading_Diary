@@ -71,17 +71,49 @@ service cloud.firestore {
           );
     }
 
+    // ── Developer impersonation helpers ─────────────────────────────
+    // An allowlisted developer can start a short-lived impersonation
+    // session via a Cloud Function, which mints a custom token carrying
+    // these claims. The claims widen read access to a single target
+    // school and hard-block every write path (devReadOnly).
+    //
+    // All claim reads use `.get(key, default)` so that normal (non-dev)
+    // sessions — where these claims are absent — evaluate the helpers
+    // cleanly to `false` instead of raising "property undefined".
+    function isDevImpersonating() {
+      return request.auth != null
+          && request.auth.token.get('devImpersonating', false) == true
+          && request.auth.token.get('impersonationSessionId', '') is string
+          && request.auth.token.get('impersonationSessionId', '').size() > 0;
+    }
+
+    function isDevImpersonatingSchool(schoolId) {
+      return isDevImpersonating()
+          && request.auth.token.get('impersonationSchoolId', '') == schoolId;
+    }
+
+    function devReadOnly() {
+      return request.auth != null
+          && request.auth.token.get('devReadOnly', false) == true;
+    }
+
+    function writeAllowedForDev() {
+      return !devReadOnly();
+    }
+
     match /schools/{schoolId} {
       allow list: if isSignedIn();
-      allow get: if belongsToSchool(schoolId);
+      allow get: if belongsToSchool(schoolId) || isDevImpersonatingSchool(schoolId);
 
       allow create: if isSignedIn() &&
-          request.resource.data.createdBy == request.auth.uid;
+          request.resource.data.createdBy == request.auth.uid &&
+          writeAllowedForDev();
 
-      allow update: if isSchoolAdmin(schoolId);
+      allow update: if isSchoolAdmin(schoolId) && writeAllowedForDev();
 
       // Controlled counter increments for onboarding/registration lifecycle.
       allow update: if isSignedIn() &&
+          writeAllowedForDev() &&
           request.resource.data.diff(resource.data).affectedKeys().size() == 1 &&
           (
             (
@@ -106,12 +138,16 @@ service cloud.firestore {
       match /users/{userId} {
         allow get: if (isSignedIn() && request.auth.uid == userId) ||
             isSchoolAdmin(schoolId) ||
-            isTeacher(schoolId);
+            isTeacher(schoolId) ||
+            isDevImpersonatingSchool(schoolId);
 
-        allow list: if isSchoolAdmin(schoolId) || isTeacher(schoolId);
+        allow list: if isSchoolAdmin(schoolId) ||
+            isTeacher(schoolId) ||
+            isDevImpersonatingSchool(schoolId);
 
         // Non-admins can only create their own user doc.
         allow create: if isSignedIn() &&
+            writeAllowedForDev() &&
             request.resource.data.schoolId == schoolId &&
             (
               isSchoolAdmin(schoolId) ||
@@ -129,6 +165,7 @@ service cloud.firestore {
             );
 
         allow update: if isSignedIn() &&
+            writeAllowedForDev() &&
             (
               isSchoolAdmin(schoolId) ||
               (
@@ -138,18 +175,22 @@ service cloud.firestore {
               )
             );
 
-        allow delete: if isSchoolAdmin(schoolId);
+        allow delete: if isSchoolAdmin(schoolId) && writeAllowedForDev();
       }
 
       match /parents/{parentId} {
         allow get: if (isSignedIn() && request.auth.uid == parentId) ||
             isSchoolAdmin(schoolId) ||
-            isTeacher(schoolId);
+            isTeacher(schoolId) ||
+            isDevImpersonatingSchool(schoolId);
 
-        allow list: if isSchoolAdmin(schoolId) || isTeacher(schoolId);
+        allow list: if isSchoolAdmin(schoolId) ||
+            isTeacher(schoolId) ||
+            isDevImpersonatingSchool(schoolId);
 
         // Non-admins can only create their own parent doc.
         allow create: if isSignedIn() &&
+            writeAllowedForDev() &&
             request.resource.data.schoolId == schoolId &&
             (
               isSchoolAdmin(schoolId) ||
@@ -160,6 +201,7 @@ service cloud.firestore {
             );
 
         allow update: if isSignedIn() &&
+            writeAllowedForDev() &&
             (
               isSchoolAdmin(schoolId) ||
               (
@@ -169,14 +211,16 @@ service cloud.firestore {
               )
             );
 
-        allow delete: if isSchoolAdmin(schoolId);
+        allow delete: if isSchoolAdmin(schoolId) && writeAllowedForDev();
 
         match /notifications/{notificationId} {
-          allow get, list: if isSignedIn() && request.auth.uid == parentId;
+          allow get, list: if (isSignedIn() && request.auth.uid == parentId) ||
+              isDevImpersonatingSchool(schoolId);
 
           allow create, delete: if false;
 
           allow update: if isSignedIn() &&
+              writeAllowedForDev() &&
               request.auth.uid == parentId &&
               request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']) &&
               request.resource.data.campaignId == resource.data.campaignId &&
@@ -185,33 +229,41 @@ service cloud.firestore {
       }
 
       match /students/{studentId} {
-        allow get, list: if isSchoolAdmin(schoolId) || isTeacher(schoolId);
+        allow get, list: if isSchoolAdmin(schoolId) ||
+            isTeacher(schoolId) ||
+            isDevImpersonatingSchool(schoolId);
 
         allow get: if isSignedIn() &&
             getUserData(schoolId).linkedChildren != null &&
             studentId in getUserData(schoolId).linkedChildren;
 
         allow create: if (isSchoolAdmin(schoolId) || isTeacher(schoolId)) &&
+            writeAllowedForDev() &&
             request.resource.data.schoolId == schoolId;
 
-        allow update, delete: if isSchoolAdmin(schoolId) || isTeacher(schoolId);
+        allow update, delete: if (isSchoolAdmin(schoolId) || isTeacher(schoolId)) &&
+            writeAllowedForDev();
 
         // Parent linking: parent can only append their own UID to parentIds.
         allow update: if isSignedIn() &&
+            writeAllowedForDev() &&
             exists(/databases/$(database)/documents/schools/$(schoolId)/parents/$(request.auth.uid)) &&
             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['parentIds']) &&
             request.resource.data.parentIds.hasAll(resource.data.parentIds) &&
             request.auth.uid in request.resource.data.parentIds;
 
         match /readingLevelEvents/{eventId} {
-          allow get, list: if isSchoolAdmin(schoolId) || isTeacher(schoolId);
-          allow create: if isSchoolAdmin(schoolId) || isTeacher(schoolId);
+          allow get, list: if isSchoolAdmin(schoolId) ||
+              isTeacher(schoolId) ||
+              isDevImpersonatingSchool(schoolId);
+          allow create: if (isSchoolAdmin(schoolId) || isTeacher(schoolId)) &&
+              writeAllowedForDev();
           allow update, delete: if false;
         }
       }
 
       match /classes/{classId} {
-        allow get, list: if isSchoolAdmin(schoolId);
+        allow get, list: if isSchoolAdmin(schoolId) || isDevImpersonatingSchool(schoolId);
 
         allow get, list: if isTeacher(schoolId) &&
             (resource.data.teacherId == request.auth.uid ||
@@ -222,69 +274,83 @@ service cloud.firestore {
             getUserData(schoolId).linkedChildren != null &&
             resource.data.studentIds.hasAny(getUserData(schoolId).linkedChildren);
 
-        allow create, delete: if isSchoolAdmin(schoolId);
+        allow create, delete: if isSchoolAdmin(schoolId) && writeAllowedForDev();
 
-        allow update: if isSchoolAdmin(schoolId) ||
-            (isTeacher(schoolId) &&
-                (resource.data.teacherId == request.auth.uid ||
-                    (resource.data.teacherIds != null &&
-                        request.auth.uid in resource.data.teacherIds)));
+        allow update: if writeAllowedForDev() &&
+            (
+              isSchoolAdmin(schoolId) ||
+              (isTeacher(schoolId) &&
+                  (resource.data.teacherId == request.auth.uid ||
+                      (resource.data.teacherIds != null &&
+                          request.auth.uid in resource.data.teacherIds)))
+            );
       }
 
       match /readingLogs/{logId} {
-        allow get, list: if isSchoolAdmin(schoolId) || isTeacher(schoolId);
+        allow get, list: if isSchoolAdmin(schoolId) ||
+            isTeacher(schoolId) ||
+            isDevImpersonatingSchool(schoolId);
 
         allow get, list: if isSignedIn() &&
             getUserData(schoolId).linkedChildren != null &&
             resource.data.studentId in getUserData(schoolId).linkedChildren;
 
         allow create: if isSignedIn() &&
+            writeAllowedForDev() &&
             getUserData(schoolId).linkedChildren != null &&
             request.resource.data.studentId in getUserData(schoolId).linkedChildren &&
             request.resource.data.parentId == request.auth.uid;
 
-        allow update: if (isSignedIn() && resource.data.parentId == request.auth.uid) ||
-            isSchoolAdmin(schoolId) ||
-            isTeacher(schoolId);
+        allow update: if writeAllowedForDev() &&
+            (
+              (isSignedIn() && resource.data.parentId == request.auth.uid) ||
+              isSchoolAdmin(schoolId) ||
+              isTeacher(schoolId)
+            );
 
-        allow delete: if isSchoolAdmin(schoolId);
+        allow delete: if isSchoolAdmin(schoolId) && writeAllowedForDev();
       }
 
       match /allocations/{allocationId} {
         allow get, list: if isSchoolAdmin(schoolId) ||
             isTeacher(schoolId) ||
-            parentCanReadAllocation(schoolId, resource.data);
-        allow create, update, delete: if isSchoolAdmin(schoolId) || isTeacher(schoolId);
+            parentCanReadAllocation(schoolId, resource.data) ||
+            isDevImpersonatingSchool(schoolId);
+        allow create, update, delete: if (isSchoolAdmin(schoolId) || isTeacher(schoolId)) &&
+            writeAllowedForDev();
       }
 
       match /books/{bookId} {
         // Any school member can read school-scoped book metadata.
-        allow get, list: if belongsToSchool(schoolId);
+        allow get, list: if belongsToSchool(schoolId) || isDevImpersonatingSchool(schoolId);
 
         // Only teachers and admins can add/update books (parents cannot write)
         allow create, update: if (isSchoolAdmin(schoolId) || isTeacher(schoolId)) &&
+            writeAllowedForDev() &&
             request.resource.data.schoolId == schoolId;
 
-        allow delete: if isSchoolAdmin(schoolId);
+        allow delete: if isSchoolAdmin(schoolId) && writeAllowedForDev();
       }
 
       match /readingGroups/{groupId} {
-        allow get, list: if belongsToSchool(schoolId);
-        allow create: if isTeacher(schoolId) || isSchoolAdmin(schoolId);
-        allow update: if isTeacher(schoolId) || isSchoolAdmin(schoolId);
-        allow delete: if isTeacher(schoolId) || isSchoolAdmin(schoolId);
+        allow get, list: if belongsToSchool(schoolId) || isDevImpersonatingSchool(schoolId);
+        allow create: if (isTeacher(schoolId) || isSchoolAdmin(schoolId)) && writeAllowedForDev();
+        allow update: if (isTeacher(schoolId) || isSchoolAdmin(schoolId)) && writeAllowedForDev();
+        allow delete: if (isTeacher(schoolId) || isSchoolAdmin(schoolId)) && writeAllowedForDev();
       }
 
       match /notificationCampaigns/{campaignId} {
         allow get, list: if isSchoolAdmin(schoolId) ||
-            (isTeacher(schoolId) && resource.data.createdBy == request.auth.uid);
+            (isTeacher(schoolId) && resource.data.createdBy == request.auth.uid) ||
+            isDevImpersonatingSchool(schoolId);
 
         allow create, update, delete: if false;
       }
 
       match /parentOnboardingEmails/{emailId} {
-        allow get, list: if isSchoolAdmin(schoolId);
+        allow get, list: if isSchoolAdmin(schoolId) || isDevImpersonatingSchool(schoolId);
         allow create: if isSchoolAdmin(schoolId)
+            && writeAllowedForDev()
             && request.resource.data.status == 'queued'
             && request.resource.data.schoolId == schoolId;
         allow update, delete: if false;
@@ -301,6 +367,7 @@ service cloud.firestore {
       // Only teachers and school admins can create new entries.
       // The contributor must declare their schoolId so the role check can verify.
       allow create: if isSignedIn()
+          && writeAllowedForDev()
           && request.resource.data.contributedBySchoolId is string
           && request.resource.data.contributedBySchoolId.size() > 0
           && (isTeacher(request.resource.data.contributedBySchoolId)
@@ -310,6 +377,7 @@ service cloud.firestore {
       // Teachers/admins can update (improve metadata, add cover).
       // The original contributedBy field is immutable.
       allow update: if isSignedIn()
+          && writeAllowedForDev()
           && request.resource.data.contributedBy == resource.data.contributedBy
           && request.resource.data.contributedBySchoolId is string
           && (isTeacher(request.resource.data.contributedBySchoolId)
@@ -321,6 +389,7 @@ service cloud.firestore {
       // Future: deletion request subcollection.
       match /deletionRequests/{requestId} {
         allow create: if isSignedIn()
+            && writeAllowedForDev()
             && request.resource.data.requestedBy == request.auth.uid
             && request.resource.data.schoolId is string
             && (isTeacher(request.resource.data.schoolId)
@@ -341,11 +410,14 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow get, create, update, delete: if isSignedIn() && request.auth.uid == userId;
+      allow get: if isSignedIn() && request.auth.uid == userId;
+      allow create, update, delete: if isSignedIn() &&
+          request.auth.uid == userId &&
+          writeAllowedForDev();
     }
 
     match /schoolOnboarding/{onboardingId} {
-      allow create: if true;
+      allow create: if writeAllowedForDev();
 
       allow get, list: if isSignedIn() &&
           (
@@ -354,6 +426,7 @@ service cloud.firestore {
           );
 
       allow update: if isSignedIn() &&
+          writeAllowedForDev() &&
           (
             resource.data.contactEmail == request.auth.token.email ||
             resource.data.adminUserId == request.auth.uid ||
@@ -388,11 +461,13 @@ service cloud.firestore {
           );
 
       allow create: if isSignedIn() &&
+          writeAllowedForDev() &&
           request.resource.data.createdBy == request.auth.uid &&
           (isSchoolAdmin(request.resource.data.schoolId) ||
               isTeacher(request.resource.data.schoolId));
 
       allow update: if isSignedIn() &&
+          writeAllowedForDev() &&
           (
             (
               isSchoolAdmin(resource.data.schoolId) ||
@@ -406,7 +481,7 @@ service cloud.firestore {
             )
           );
 
-      allow delete: if isSignedIn() && isSchoolAdmin(resource.data.schoolId);
+      allow delete: if isSignedIn() && isSchoolAdmin(resource.data.schoolId) && writeAllowedForDev();
     }
 
     match /notifications/{notificationId} {
@@ -430,26 +505,30 @@ service cloud.firestore {
           );
 
       allow create: if isSignedIn() &&
+          writeAllowedForDev() &&
           request.resource.data.createdBy == request.auth.uid &&
           isSchoolAdmin(request.resource.data.schoolId);
 
       allow update: if isSignedIn() &&
+          writeAllowedForDev() &&
           isSchoolAdmin(resource.data.schoolId) &&
           request.resource.data.schoolId == resource.data.schoolId;
 
       // Teacher registration increments usage count by exactly 1.
       allow update: if isSignedIn() &&
+          writeAllowedForDev() &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usageCount']) &&
           request.resource.data.usageCount == resource.data.usageCount + 1 &&
           (isSchoolAdmin(resource.data.schoolId) || isTeacher(resource.data.schoolId));
 
-      allow delete: if isSignedIn() && isSchoolAdmin(resource.data.schoolId);
+      allow delete: if isSignedIn() && isSchoolAdmin(resource.data.schoolId) && writeAllowedForDev();
     }
 
     // ── User Feedback ──────────────────────────────────────────────
     match /feedback/{feedbackId} {
       // Any signed-in user can submit feedback.
       allow create: if isSignedIn() &&
+          writeAllowedForDev() &&
           request.resource.data.userId == request.auth.uid;
 
       // Read/update/delete only via Admin SDK (super-admin dashboard).
@@ -465,13 +544,18 @@ service cloud.firestore {
     match /userSchoolIndex/{emailHash} {
       allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
 
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() &&
+          writeAllowedForDev() &&
+          request.resource.data.userId == request.auth.uid;
 
       allow update: if isSignedIn() &&
+          writeAllowedForDev() &&
           resource.data.userId == request.auth.uid &&
           request.resource.data.userId == request.auth.uid;
 
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() &&
+          writeAllowedForDev() &&
+          resource.data.userId == request.auth.uid;
 
       allow list: if false;
     }
@@ -484,6 +568,39 @@ service cloud.firestore {
     match /devAccessEmails/{emailHash} {
       allow get: if isSignedIn();
       allow list, create, update, delete: if false;
+    }
+
+    // ── Super-admin allowlist ───────────────────────────────────────
+    // Doc ID is the Firebase UID. Presence of a doc grants super-admin
+    // power (revoke impersonation sessions, export audit logs). No
+    // self-reads; only the Admin SDK inside Cloud Functions consults
+    // this. Seeded manually via the Firebase console.
+    match /superAdmins/{uid} {
+      allow read, write: if false;
+    }
+
+    // ── Developer impersonation sessions ────────────────────────────
+    // Lifecycle (create, status transitions) is owned by Cloud Functions
+    // via the Admin SDK. Dev clients may `get` their own active session
+    // so they can react when a super-admin revokes it.
+    match /devImpersonationSessions/{sessionId} {
+      allow get: if isSignedIn() && resource.data.devUid == request.auth.uid;
+      allow list, create, update, delete: if false;
+    }
+
+    // ── Developer impersonation audit trail (append-only) ───────────
+    // Entirely closed to clients. Only Cloud Functions write (via
+    // Admin SDK) and only lumi-admin reads (via Admin SDK in server
+    // routes). This keeps the log tamper-resistant.
+    match /devImpersonationAudit/{eventId} {
+      allow read, write: if false;
+    }
+
+    // ── Developer impersonation rate-limit counters ─────────────────
+    // Per-developer counters for session-start throttling. Cloud
+    // Functions only.
+    match /devImpersonationRateLimits/{devUid} {
+      allow read, write: if false;
     }
   }
 }

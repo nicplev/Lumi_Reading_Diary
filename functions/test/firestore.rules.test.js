@@ -1029,3 +1029,543 @@ test('legacy top-level notifications are blocked for clients', async () => {
 test('sanity: test environment initialized', async () => {
   assert.ok(testEnv);
 });
+
+// ────────────────────────────────────────────────────────────────────────────
+// Developer impersonation: read-only real-school access via custom claims.
+// Phase 1 of the impersonation pipeline. See firestore.rules helpers
+// `isDevImpersonating()`, `isDevImpersonatingSchool(schoolId)`, and
+// `writeAllowedForDev()`, plus the new collections:
+//   - devImpersonationSessions
+//   - devImpersonationAudit
+//   - devImpersonationRateLimits
+//   - superAdmins
+// ────────────────────────────────────────────────────────────────────────────
+
+const SCHOOL_A = 'school_a';
+const SCHOOL_B = 'school_b';
+const DEV_UID = 'dev_user_1';
+const DEV_EMAIL = 'dev@lumi.app';
+const TEACHER_A_UID = 'teacher_a_1';
+const TEACHER_B_UID = 'teacher_b_1';
+const STUDENT_A_ID = 'student_a_1';
+const STUDENT_B_ID = 'student_b_1';
+const CLASS_A_ID = 'class_a_1';
+const SESSION_ID = 'sess_abc';
+
+function impersonationClaims(overrides = {}) {
+  return {
+    devImpersonating: true,
+    impersonationSchoolId: SCHOOL_A,
+    impersonationUserId: TEACHER_A_UID,
+    impersonationRole: 'teacher',
+    impersonationSessionId: SESSION_ID,
+    devReadOnly: true,
+    devUid: DEV_UID,
+    devEmail: DEV_EMAIL,
+    ...overrides,
+  };
+}
+
+async function seedTwoSchools() {
+  await seedData(async (db) => {
+    await db.collection('schools').doc(SCHOOL_A).set({
+      name: 'Lumi A',
+      createdBy: 'admin_a',
+      teacherCount: 1,
+      parentCount: 0,
+      studentCount: 1,
+    });
+    await db.collection('schools').doc(SCHOOL_B).set({
+      name: 'Lumi B',
+      createdBy: 'admin_b',
+      teacherCount: 1,
+      parentCount: 0,
+      studentCount: 1,
+    });
+    await db
+      .collection('schools').doc(SCHOOL_A)
+      .collection('users').doc(TEACHER_A_UID).set({
+        email: 'teacher_a@lumi.app',
+        fullName: 'Teacher A',
+        role: 'teacher',
+        schoolId: SCHOOL_A,
+        isActive: true,
+      });
+    await db
+      .collection('schools').doc(SCHOOL_B)
+      .collection('users').doc(TEACHER_B_UID).set({
+        email: 'teacher_b@lumi.app',
+        fullName: 'Teacher B',
+        role: 'teacher',
+        schoolId: SCHOOL_B,
+        isActive: true,
+      });
+    await db
+      .collection('schools').doc(SCHOOL_A)
+      .collection('students').doc(STUDENT_A_ID).set({
+        firstName: 'A',
+        lastName: 'Student',
+        schoolId: SCHOOL_A,
+        classId: CLASS_A_ID,
+        parentIds: [],
+      });
+    await db
+      .collection('schools').doc(SCHOOL_B)
+      .collection('students').doc(STUDENT_B_ID).set({
+        firstName: 'B',
+        lastName: 'Student',
+        schoolId: SCHOOL_B,
+        classId: 'class_b_1',
+        parentIds: [],
+      });
+    await db
+      .collection('schools').doc(SCHOOL_A)
+      .collection('classes').doc(CLASS_A_ID).set({
+        name: 'Class A',
+        schoolId: SCHOOL_A,
+        teacherId: TEACHER_A_UID,
+        teacherIds: [TEACHER_A_UID],
+        studentIds: [STUDENT_A_ID],
+      });
+    await db
+      .collection('schools').doc(SCHOOL_A)
+      .collection('allocations').doc('alloc_a_1').set({
+        schoolId: SCHOOL_A,
+        teacherId: TEACHER_A_UID,
+        classId: CLASS_A_ID,
+        studentIds: [STUDENT_A_ID],
+      });
+    await db
+      .collection('schools').doc(SCHOOL_A)
+      .collection('readingLogs').doc('log_a_1').set({
+        schoolId: SCHOOL_A,
+        studentId: STUDENT_A_ID,
+        parentId: 'parent_a_1',
+        minutesRead: 10,
+      });
+    await db
+      .collection('schools').doc(SCHOOL_A)
+      .collection('books').doc('book_a_1').set({
+        schoolId: SCHOOL_A,
+        title: 'Book A',
+      });
+    await db
+      .collection('schools').doc(SCHOOL_A)
+      .collection('readingGroups').doc('rg_a_1').set({
+        schoolId: SCHOOL_A,
+        name: 'Group A',
+      });
+  });
+}
+
+// ── Reads ──────────────────────────────────────────────────────────────────
+
+test('impersonation: dev with claim reads target-school student', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertSucceeds(
+    db.collection('schools').doc(SCHOOL_A).collection('students').doc(STUDENT_A_ID).get(),
+  );
+});
+
+test('impersonation: dev without claim cannot read target-school student', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID);
+  await assertFails(
+    db.collection('schools').doc(SCHOOL_A).collection('students').doc(STUDENT_A_ID).get(),
+  );
+});
+
+test('impersonation: claim for school_a cannot read school_b student', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims({ impersonationSchoolId: SCHOOL_A }));
+  await assertFails(
+    db.collection('schools').doc(SCHOOL_B).collection('students').doc(STUDENT_B_ID).get(),
+  );
+});
+
+test('impersonation: dev can list students in target school', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertSucceeds(
+    db.collection('schools').doc(SCHOOL_A).collection('students').get(),
+  );
+});
+
+test('impersonation: dev can read classes in target school', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertSucceeds(
+    db.collection('schools').doc(SCHOOL_A).collection('classes').doc(CLASS_A_ID).get(),
+  );
+});
+
+test('impersonation: dev can read allocations in target school', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertSucceeds(
+    db.collection('schools').doc(SCHOOL_A).collection('allocations').doc('alloc_a_1').get(),
+  );
+});
+
+test('impersonation: dev can read reading logs in target school', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertSucceeds(
+    db.collection('schools').doc(SCHOOL_A).collection('readingLogs').doc('log_a_1').get(),
+  );
+});
+
+test('impersonation: dev can read books in target school', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertSucceeds(
+    db.collection('schools').doc(SCHOOL_A).collection('books').doc('book_a_1').get(),
+  );
+});
+
+test('impersonation: dev can read reading groups in target school', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertSucceeds(
+    db.collection('schools').doc(SCHOOL_A).collection('readingGroups').doc('rg_a_1').get(),
+  );
+});
+
+test('impersonation: dev can read users collection in target school', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertSucceeds(
+    db.collection('schools').doc(SCHOOL_A).collection('users').doc(TEACHER_A_UID).get(),
+  );
+  await assertSucceeds(
+    db.collection('schools').doc(SCHOOL_A).collection('users').get(),
+  );
+});
+
+test('impersonation: dev can read parents collection in target school', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertSucceeds(
+    db.collection('schools').doc(SCHOOL_A).collection('parents').get(),
+  );
+});
+
+test('impersonation: missing impersonationSessionId denies reads', async () => {
+  await seedTwoSchools();
+  const claims = impersonationClaims();
+  delete claims.impersonationSessionId;
+  const db = authDb(DEV_UID, claims);
+  await assertFails(
+    db.collection('schools').doc(SCHOOL_A).collection('students').doc(STUDENT_A_ID).get(),
+  );
+});
+
+test('impersonation: devImpersonating=false denies reads even with schoolId match', async () => {
+  await seedTwoSchools();
+  const claims = impersonationClaims({ devImpersonating: false });
+  const db = authDb(DEV_UID, claims);
+  await assertFails(
+    db.collection('schools').doc(SCHOOL_A).collection('students').doc(STUDENT_A_ID).get(),
+  );
+});
+
+test('impersonation: dev can read target school top-level doc', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertSucceeds(
+    db.collection('schools').doc(SCHOOL_A).get(),
+  );
+});
+
+// ── Writes must all fail under devReadOnly ────────────────────────────────
+
+test('impersonation: dev cannot create student in target school', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('schools').doc(SCHOOL_A).collection('students').doc('new_stud').set({
+      firstName: 'X',
+      lastName: 'Y',
+      schoolId: SCHOOL_A,
+      classId: CLASS_A_ID,
+      parentIds: [],
+    }),
+  );
+});
+
+test('impersonation: dev cannot update student', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('schools').doc(SCHOOL_A).collection('students').doc(STUDENT_A_ID).update({
+      firstName: 'Tampered',
+    }),
+  );
+});
+
+test('impersonation: dev cannot delete student', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('schools').doc(SCHOOL_A).collection('students').doc(STUDENT_A_ID).delete(),
+  );
+});
+
+test('impersonation: dev cannot create own user doc in target school', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('schools').doc(SCHOOL_A).collection('users').doc(DEV_UID).set({
+      email: DEV_EMAIL,
+      fullName: 'Dev',
+      role: 'teacher',
+      schoolId: SCHOOL_A,
+      isActive: true,
+    }),
+  );
+});
+
+test('impersonation: dev cannot create own parent doc in target school', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('schools').doc(SCHOOL_A).collection('parents').doc(DEV_UID).set({
+      email: DEV_EMAIL,
+      fullName: 'Dev',
+      role: 'parent',
+      schoolId: SCHOOL_A,
+    }),
+  );
+});
+
+test('impersonation: dev cannot append own uid to student parentIds', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('schools').doc(SCHOOL_A).collection('students').doc(STUDENT_A_ID).update({
+      parentIds: [DEV_UID],
+    }),
+  );
+});
+
+test('impersonation: dev cannot create reading log', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('schools').doc(SCHOOL_A).collection('readingLogs').doc('new_log').set({
+      schoolId: SCHOOL_A,
+      studentId: STUDENT_A_ID,
+      parentId: DEV_UID,
+      minutesRead: 5,
+    }),
+  );
+});
+
+test('impersonation: dev cannot create class', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('schools').doc(SCHOOL_A).collection('classes').doc('new_class').set({
+      schoolId: SCHOOL_A,
+      name: 'C',
+      teacherId: DEV_UID,
+      teacherIds: [DEV_UID],
+      studentIds: [],
+    }),
+  );
+});
+
+test('impersonation: dev cannot create allocation', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('schools').doc(SCHOOL_A).collection('allocations').doc('new_alloc').set({
+      schoolId: SCHOOL_A,
+      classId: CLASS_A_ID,
+      studentIds: [STUDENT_A_ID],
+    }),
+  );
+});
+
+test('impersonation: dev cannot create book in target school', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('schools').doc(SCHOOL_A).collection('books').doc('new_book').set({
+      schoolId: SCHOOL_A,
+      title: 'New',
+    }),
+  );
+});
+
+test('impersonation: dev cannot create reading group', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('schools').doc(SCHOOL_A).collection('readingGroups').doc('new_rg').set({
+      schoolId: SCHOOL_A,
+      name: 'RG',
+    }),
+  );
+});
+
+test('impersonation: dev cannot create a new school', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('schools').doc('new_school').set({
+      name: 'New',
+      createdBy: DEV_UID,
+      teacherCount: 0,
+      parentCount: 0,
+      studentCount: 0,
+    }),
+  );
+});
+
+test('impersonation: dev cannot create community_books entry', async () => {
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('community_books').doc('9780000000000').set({
+      contributedBy: DEV_UID,
+      contributedBySchoolId: SCHOOL_A,
+      title: 'X',
+    }),
+  );
+});
+
+test('impersonation: dev cannot submit feedback', async () => {
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('feedback').doc('fb').set({
+      userId: DEV_UID,
+      message: 'hi',
+    }),
+  );
+});
+
+test('impersonation: dev cannot create schoolOnboarding doc', async () => {
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('schoolOnboarding').doc('ob_1').set({
+      contactEmail: DEV_EMAIL,
+      schoolName: 'X',
+    }),
+  );
+});
+
+test('impersonation: dev cannot write top-level users/{uid}', async () => {
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('users').doc(DEV_UID).set({ name: 'x' }),
+  );
+});
+
+test('impersonation: dev cannot write userSchoolIndex', async () => {
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('userSchoolIndex').doc('hash_x').set({
+      userId: DEV_UID,
+      schoolId: SCHOOL_A,
+    }),
+  );
+});
+
+test('impersonation: devReadOnly claim alone (no impersonating flag) still blocks writes', async () => {
+  const db = authDb(DEV_UID, { devReadOnly: true });
+  await assertFails(
+    db.collection('users').doc(DEV_UID).set({ name: 'x' }),
+  );
+});
+
+// ── New collections: clients are fully locked out ─────────────────────────
+
+test('impersonation collections: dev cannot read own audit events', async () => {
+  await seedData(async (db) => {
+    await db.collection('devImpersonationAudit').doc('evt_1').set({
+      sessionId: SESSION_ID,
+      devUid: DEV_UID,
+      eventType: 'session_started',
+    });
+  });
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('devImpersonationAudit').doc('evt_1').get(),
+  );
+});
+
+test('impersonation collections: dev cannot list sessions', async () => {
+  await seedData(async (db) => {
+    await db.collection('devImpersonationSessions').doc(SESSION_ID).set({
+      devUid: DEV_UID,
+      status: 'active',
+    });
+  });
+  const db = authDb(DEV_UID);
+  await assertFails(db.collection('devImpersonationSessions').get());
+});
+
+test('impersonation collections: dev can get their own session', async () => {
+  await seedData(async (db) => {
+    await db.collection('devImpersonationSessions').doc(SESSION_ID).set({
+      devUid: DEV_UID,
+      status: 'active',
+    });
+  });
+  const db = authDb(DEV_UID);
+  await assertSucceeds(
+    db.collection('devImpersonationSessions').doc(SESSION_ID).get(),
+  );
+});
+
+test("impersonation collections: dev cannot get another dev's session", async () => {
+  await seedData(async (db) => {
+    await db.collection('devImpersonationSessions').doc('other_sess').set({
+      devUid: 'other_dev',
+      status: 'active',
+    });
+  });
+  const db = authDb(DEV_UID);
+  await assertFails(
+    db.collection('devImpersonationSessions').doc('other_sess').get(),
+  );
+});
+
+test('impersonation collections: no one can read superAdmins', async () => {
+  await seedData(async (db) => {
+    await db.collection('superAdmins').doc('me').set({ since: new Date() });
+  });
+  await assertFails(authDb('me').collection('superAdmins').doc('me').get());
+  await assertFails(unauthDb().collection('superAdmins').doc('me').get());
+});
+
+test('impersonation collections: no one can write superAdmins', async () => {
+  await assertFails(
+    authDb('me').collection('superAdmins').doc('me').set({ since: new Date() }),
+  );
+});
+
+test('impersonation collections: no one can write rate-limit counters', async () => {
+  const db = authDb(DEV_UID);
+  await assertFails(
+    db.collection('devImpersonationRateLimits').doc(DEV_UID).set({ hourCount: 0 }),
+  );
+});
+
+test('impersonation collections: no one can write audit events directly', async () => {
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('devImpersonationAudit').doc('evt_x').set({ eventType: 'fake' }),
+  );
+});
+
+test('impersonation collections: no one can write sessions directly', async () => {
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('devImpersonationSessions').doc('fake').set({
+      devUid: DEV_UID,
+      status: 'active',
+    }),
+  );
+});

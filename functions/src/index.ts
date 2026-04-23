@@ -18,6 +18,24 @@ import {buildOnboardingEmail, buildOnboardingQrAttachments} from "./email_templa
 admin.initializeApp();
 const db = admin.firestore();
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Developer impersonation pipeline (read-only, fully-audited). See
+// functions/src/impersonation.ts for the implementation. Re-exported so the
+// Firebase CLI picks them up as deployable functions.
+// ─────────────────────────────────────────────────────────────────────────────
+export {
+  startImpersonationSession,
+  endImpersonationSession,
+  revokeImpersonationSession,
+  reportImpersonationActivity,
+  reportBlockedWrite,
+  exportImpersonationAudit,
+  expireImpersonationSessions,
+  revokeOnDevAccessRemoval,
+  listImpersonableSchools,
+  listImpersonableUsers,
+} from "./impersonation";
+
 /**
  * CRITICAL SECURITY: Stats Aggregation
  * Prevents client-side manipulation of student statistics
