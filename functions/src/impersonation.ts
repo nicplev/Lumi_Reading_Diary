@@ -24,6 +24,25 @@ const COLL_AUDIT = "devImpersonationAudit";
 const COLL_RATE = "devImpersonationRateLimits";
 const COLL_DEV_ACCESS = "devAccessEmails";
 
+// ─── Phase 5 hardening: App Check enforcement ────────────────────────────────
+// Opt-in via the IMPERSONATION_APP_CHECK_ENFORCED env var (set to "true").
+// When enabled, callables refuse requests without a valid App Check token.
+// Leave off during the rollout window while clients are integrating App
+// Check; flip to on once every caller is attested.
+const APP_CHECK_ENFORCED = process.env.IMPERSONATION_APP_CHECK_ENFORCED === "true";
+
+function impersonationRuntime(
+  opts: Pick<functions.RuntimeOptions, "timeoutSeconds" | "memory">
+): functions.RuntimeOptions {
+  return {
+    ...opts,
+    enforceAppCheck: APP_CHECK_ENFORCED,
+    // consumeAppCheckToken only matters for replay-protection; safe to
+    // default on whenever enforcement is on.
+    consumeAppCheckToken: APP_CHECK_ENFORCED,
+  };
+}
+
 type SessionStatus = "active" | "ended" | "expired" | "revoked";
 
 type EventType =
@@ -276,7 +295,7 @@ interface StartImpersonationInput {
 }
 
 export const startImpersonationSession = functions
-  .runWith({timeoutSeconds: 30, memory: "256MB"})
+  .runWith(impersonationRuntime({timeoutSeconds: 30, memory: "256MB"}))
   .https.onCall(async (data: StartImpersonationInput, context) => {
     const {uid: devUid, email: devEmail} = await requireDevAccess(context);
 
@@ -408,7 +427,7 @@ export const startImpersonationSession = functions
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const endImpersonationSession = functions
-  .runWith({timeoutSeconds: 15, memory: "128MB"})
+  .runWith(impersonationRuntime({timeoutSeconds: 15, memory: "128MB"}))
   .https.onCall(async (data: {sessionId?: unknown}, context) => {
     const {uid} = requireAuthed(context);
     const sessionId = asNonEmptyString(data.sessionId, "sessionId");
@@ -457,7 +476,7 @@ export const endImpersonationSession = functions
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const revokeImpersonationSession = functions
-  .runWith({timeoutSeconds: 15, memory: "128MB"})
+  .runWith(impersonationRuntime({timeoutSeconds: 15, memory: "128MB"}))
   .https.onCall(async (data: {sessionId?: unknown; reason?: unknown}, context) => {
     const {uid} = await requireSuperAdminAuth(context);
     const sessionId = asNonEmptyString(data.sessionId, "sessionId");
@@ -497,7 +516,7 @@ export const revokeImpersonationSession = functions
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const reportImpersonationActivity = functions
-  .runWith({timeoutSeconds: 10, memory: "128MB"})
+  .runWith(impersonationRuntime({timeoutSeconds: 10, memory: "128MB"}))
   .https.onCall(
     async (
       data: {sessionId?: unknown; eventType?: unknown; details?: unknown},
@@ -573,7 +592,7 @@ export const reportImpersonationActivity = functions
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const reportBlockedWrite = functions
-  .runWith({timeoutSeconds: 10, memory: "128MB"})
+  .runWith(impersonationRuntime({timeoutSeconds: 10, memory: "128MB"}))
   .https.onCall(
     async (
       data: {
@@ -648,7 +667,7 @@ function csvEscape(value: unknown): string {
 }
 
 export const exportImpersonationAudit = functions
-  .runWith({timeoutSeconds: 60, memory: "512MB"})
+  .runWith(impersonationRuntime({timeoutSeconds: 60, memory: "512MB"}))
   .https.onCall(async (data: ExportInput, context) => {
     const {uid: superUid, email: superEmail} = await requireSuperAdminAuth(context);
 
@@ -758,7 +777,7 @@ export const exportImpersonationAudit = functions
 // through a callable keeps the surface area tight.
 
 export const listImpersonableSchools = functions
-  .runWith({timeoutSeconds: 15, memory: "256MB"})
+  .runWith(impersonationRuntime({timeoutSeconds: 15, memory: "256MB"}))
   .https.onCall(async (_data, context) => {
     await requireDevAccess(context);
 
@@ -791,7 +810,7 @@ interface ListUsersInput {
 }
 
 export const listImpersonableUsers = functions
-  .runWith({timeoutSeconds: 15, memory: "256MB"})
+  .runWith(impersonationRuntime({timeoutSeconds: 15, memory: "256MB"}))
   .https.onCall(async (data: ListUsersInput, context) => {
     await requireDevAccess(context);
     const schoolId = asNonEmptyString(data.schoolId, "schoolId");
@@ -908,6 +927,93 @@ export const revokeOnDevAccessRemoval = functions.firestore
     functions.logger.info("impersonation.revoked_on_dev_access_removal", {
       emailHash,
       count: q.size,
+    });
+    return null;
+  });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scheduled: monitorImpersonationAnomalies
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Runs hourly. For each developer that started at least one session in the
+// last hour, counts the number of distinct schools impersonated and the
+// number of session starts. Anything exceeding the thresholds below emits a
+// structured WARNING log which Cloud Monitoring can be wired to alert on.
+//
+// Intentionally conservative: the per-caller rate limit enforced inside
+// startImpersonationSession is the hard ceiling (5/hr, 20/day). These
+// thresholds are LOWER so they fire as a "pay attention" signal well before
+// the rate limit would reject.
+
+const ANOMALY_SCHOOLS_PER_HOUR = 5;
+const ANOMALY_SESSIONS_PER_HOUR = 4;
+
+export const monitorImpersonationAnomalies = functions.pubsub
+  .schedule("every 60 minutes")
+  .onRun(async () => {
+    const oneHourAgo = admin.firestore.Timestamp.fromMillis(
+      Date.now() - 60 * 60 * 1000
+    );
+
+    const snap = await db()
+      .collection(COLL_SESSIONS)
+      .where("startedAt", ">=", oneHourAgo)
+      .limit(500)
+      .get();
+
+    if (snap.empty) {
+      return null;
+    }
+
+    // Group by devUid → { sessionCount, schoolIds }.
+    const perDev = new Map<
+      string,
+      {devEmail: string; count: number; schools: Set<string>}
+    >();
+    for (const doc of snap.docs) {
+      const d = doc.data();
+      const devUid = String(d.devUid ?? "");
+      if (!devUid) continue;
+      const entry = perDev.get(devUid) ?? {
+        devEmail: String(d.devEmail ?? ""),
+        count: 0,
+        schools: new Set<string>(),
+      };
+      entry.count += 1;
+      if (d.targetSchoolId) entry.schools.add(String(d.targetSchoolId));
+      perDev.set(devUid, entry);
+    }
+
+    let flagged = 0;
+    for (const [devUid, info] of perDev.entries()) {
+      const schoolCount = info.schools.size;
+      const exceedsSchools = schoolCount >= ANOMALY_SCHOOLS_PER_HOUR;
+      const exceedsSessions = info.count >= ANOMALY_SESSIONS_PER_HOUR;
+      if (!exceedsSchools && !exceedsSessions) continue;
+
+      flagged++;
+      functions.logger.warn("impersonation.anomaly", {
+        eventType: "impersonation.anomaly",
+        devUid,
+        devEmail: info.devEmail,
+        windowMinutes: 60,
+        sessionCount: info.count,
+        schoolCount,
+        schools: Array.from(info.schools),
+        thresholds: {
+          schoolsPerHour: ANOMALY_SCHOOLS_PER_HOUR,
+          sessionsPerHour: ANOMALY_SESSIONS_PER_HOUR,
+        },
+        triggered: {
+          schools: exceedsSchools,
+          sessions: exceedsSessions,
+        },
+      });
+    }
+
+    functions.logger.info("impersonation.anomaly_sweep", {
+      devsScanned: perDev.size,
+      flagged,
     });
     return null;
   });

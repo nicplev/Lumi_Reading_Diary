@@ -34,6 +34,7 @@ export {
   revokeOnDevAccessRemoval,
   listImpersonableSchools,
   listImpersonableUsers,
+  monitorImpersonationAnomalies,
 } from "./impersonation";
 
 /**
