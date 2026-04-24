@@ -200,6 +200,9 @@ async function writeAuditEvent(params: {
  * Atomic rate-limit check + increment. Throws HttpsError('resource-exhausted')
  * if the developer has exceeded either the hourly or daily ceiling. Rolls
  * windows forward when their start timestamp is older than the window length.
+ *
+ * @param {string} devUid Firebase UID of the developer starting a session.
+ * @return {Promise<void>} resolves when the counter is incremented.
  */
 async function enforceRateLimit(devUid: string): Promise<void> {
   const ref = db().collection(COLL_RATE).doc(devUid);
@@ -568,10 +571,9 @@ export const reportImpersonationActivity = functions
         );
       }
 
-      const details =
-        typeof data.details === "object" && data.details !== null
-          ? (data.details as Record<string, unknown>)
-          : {};
+      const details = typeof data.details === "object" && data.details !== null ?
+        (data.details as Record<string, unknown>) :
+        {};
 
       await writeAuditEvent({
         sessionId,
@@ -661,7 +663,7 @@ function csvEscape(value: unknown): string {
       JSON.stringify(value) :
       String(value);
   if (/[",\n\r]/.test(s)) {
-    return `"${s.replace(/"/g, '""')}"`;
+    return `"${s.replace(/"/g, "\"\"")}"`;
   }
   return s;
 }

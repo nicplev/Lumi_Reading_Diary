@@ -12,6 +12,9 @@ import * as admin from "firebase-admin";
  * the first super-admin seed the collection without a chicken-and-egg. Once
  * the collection has any members, the env var becomes dead code and should be
  * removed from the function config.
+ *
+ * @param {string | undefined | null} uid Firebase Auth UID to check.
+ * @return {Promise<boolean>} true iff the UID is a super-admin.
  */
 export async function isSuperAdmin(uid: string | undefined | null): Promise<boolean> {
   if (!uid) return false;
