@@ -133,11 +133,23 @@ natively. Workarounds:
 - **Policy-only for now**: write this into the contractor/developer
   agreement. Revisit when Firebase ships group-based MFA policies.
 
-### 3.3 Where to add the client-side check (future work)
-In [lib/core/services/impersonation_service.dart](../lib/core/services/impersonation_service.dart) `start()`:
-before the callable invocation, check `_auth.currentUser?.multiFactor.enrolledFactors.isNotEmpty` and throw if empty.
+### 3.3 Client-side MFA guard (implemented — opt-in)
+The guard is already in the code — just needs a build-time flag to turn on.
 
-Same for [school-admin-web/src/app/(authenticated)/dev/impersonate/impersonation-picker.tsx](../school-admin-web/src/app/(authenticated)/dev/impersonate/impersonation-picker.tsx) `handleStart()`.
+- **Flutter** ([lib/core/services/impersonation_service.dart](../lib/core/services/impersonation_service.dart), `start()`) — checks `FirebaseAuth.instance.currentUser.multiFactor.getEnrolledFactors()` before calling the Cloud Function. Enable with:
+  ```bash
+  flutter run --dart-define=LUMI_IMPERSONATION_REQUIRE_MFA=true
+  ```
+- **admin-web** ([school-admin-web/src/app/(authenticated)/dev/impersonate/impersonation-picker.tsx](../school-admin-web/src/app/(authenticated)/dev/impersonate/impersonation-picker.tsx), `handleStart()`) — checks `multiFactor(auth.currentUser).enrolledFactors`. Enable with `NEXT_PUBLIC_IMPERSONATION_REQUIRE_MFA=true` in `.env.production` (or the Vercel/hosting env settings).
+
+Both throw a clear "Enrol a second factor" message when the user has no
+enrolled factors. Off by default so existing dev accounts keep working
+while the policy rolls out.
+
+**Security note**: this is a FRICTION layer, not a security boundary. The
+session doc gets created by the Cloud Function regardless of this guard —
+a determined dev could bypass by calling the function directly. True
+enforcement would require the Cloud Function to verify `auth.token.firebase.sign_in_second_factor` on the caller, which only gets set when they signed in via MFA.
 
 ---
 
@@ -150,18 +162,45 @@ developer exceeds:
 - **5 distinct schools** impersonated in the last hour, OR
 - **4 sessions** started in the last hour.
 
-### 4.2 Wire a log-based alerting policy
-In GCP console → Monitoring → Alerting → Create policy:
-- **Condition type**: Logs-based
-- **Log filter**:
-  ```
-  resource.type="cloud_function"
-  resource.labels.function_name="monitorImpersonationAnomalies"
-  jsonPayload.eventType="impersonation.anomaly"
-  severity>=WARNING
-  ```
-- **Notification channels**: super-admin email(s) / PagerDuty / Slack webhook.
-- **Auto-close**: 1 hour.
+### 4.2 Wire a log-based alerting policy (step-by-step)
+
+1. Open **GCP console → Monitoring → Alerting** (must be the `lumi-kakakids` project — double-check the top-bar project picker).
+2. **Configure notification channels** first if none exist yet — click **Edit notification channels** → pick Email (simplest) → add super-admin email address → Save.
+3. Back on Alerting, click **Create policy**.
+4. **Select a metric** → switch to the **Logs** tab (not Metric). Click **Next: Add condition based on log events**.
+5. **Log filter** (paste into the filter box):
+   ```
+   resource.type="cloud_function"
+   resource.labels.function_name="monitorImpersonationAnomalies"
+   jsonPayload.eventType="impersonation.anomaly"
+   severity>=WARNING
+   ```
+6. **Condition type**: "Log match". Trigger: **any log entry that matches**.
+7. **Alert threshold**: 0 (trigger on the first matching log line). **Retest window**: 5 min.
+8. **Notifications**: select the Email channel from step 2.
+9. **Incident auto-close**: 1 hour.
+10. **Name**: `Impersonation anomaly detected`. **Severity**: Warning.
+11. **Documentation** (optional but helpful — shown in the alert email):
+    ```
+    A developer has started an unusually high number of impersonation sessions
+    or accessed an unusually high number of distinct schools in the last hour.
+
+    Investigate in lumi-admin → Operations → Impersonation Audit. Filter by
+    the `devUid` value in the alert payload.
+    ```
+12. **Save**.
+
+**Verify it works** without waiting for a real anomaly:
+```bash
+# Temporarily lower the thresholds in functions/src/impersonation.ts
+#   ANOMALY_SCHOOLS_PER_HOUR = 1
+#   ANOMALY_SESSIONS_PER_HOUR = 1
+# Redeploy monitorImpersonationAnomalies only, then:
+gcloud functions call monitorImpersonationAnomalies
+# Check Cloud Logging for the WARNING entry
+# Check email for the alert (usually within 1–3 min)
+# Restore thresholds + redeploy
+```
 
 ### 4.3 Escalation runbook when an anomaly fires
 1. Open lumi-admin → Operations → Impersonation Audit.

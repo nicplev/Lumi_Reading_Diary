@@ -86,6 +86,15 @@ class ImpersonationService extends ChangeNotifier {
 
   // ── Lifecycle ───────────────────────────────────────────────────────────
 
+  /// Compile-time opt-in for the MFA gate. Enable with:
+  ///   flutter run --dart-define=LUMI_IMPERSONATION_REQUIRE_MFA=true
+  /// Off by default so existing dev accounts that haven't enrolled a second
+  /// factor keep working while the policy rolls out.
+  static const bool _requireMfa = bool.fromEnvironment(
+    "LUMI_IMPERSONATION_REQUIRE_MFA",
+    defaultValue: false,
+  );
+
   /// Starts a new impersonation session. Completes when the client is signed
   /// in with the impersonation claims and the session watcher is live.
   Future<ImpersonationSession> start({
@@ -98,6 +107,28 @@ class ImpersonationService extends ChangeNotifier {
   }) async {
     if (_active != null) {
       throw StateError('An impersonation session is already active.');
+    }
+
+    // MFA gate — policy layer enforced client-side. The session doc itself
+    // is created by the Cloud Function regardless, so this is NOT a security
+    // boundary (a determined dev could bypass). It's a friction layer that
+    // nudges the team toward complying with the runbook's MFA expectation.
+    if (_requireMfa) {
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw ImpersonationStartException(
+          'unauthenticated',
+          'Sign in to your dev account before starting an impersonation session.',
+        );
+      }
+      final factors = await user.multiFactor.getEnrolledFactors();
+      if (factors.isEmpty) {
+        throw ImpersonationStartException(
+          'mfa-required',
+          'Enrol a second factor on your dev account before starting an '
+              'impersonation session.',
+        );
+      }
     }
 
     final Map<String, dynamic> response;

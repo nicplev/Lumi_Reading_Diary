@@ -8,6 +8,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 import 'core/theme/app_theme.dart';
 import 'core/routing/app_router.dart';
+import 'core/services/app_check_service.dart';
 import 'core/services/dev_access_service.dart';
 import 'core/widgets/impersonation_overlay.dart';
 import 'services/firebase_service.dart';
@@ -48,6 +49,11 @@ void main() async {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
+
+      // Activate App Check before any other Firebase SDK calls so attested
+      // requests include the token from the very first ID-token mint.
+      // No-op unless built with --dart-define=LUMI_APP_CHECK_ENABLED=true.
+      await AppCheckService.initialize();
 
       // Initialize crash reporting (must be after Firebase init)
       await CrashReportingService.instance.initialize();

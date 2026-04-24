@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '@/lib/firebase/client';
+import { multiFactor } from 'firebase/auth';
+import { auth, functions } from '@/lib/firebase/client';
 import { Button } from '@/components/lumi/button';
 import { Select } from '@/components/lumi/select';
 
@@ -92,6 +93,23 @@ export function ImpersonationPicker() {
     setStarting(true);
     setError(null);
     try {
+      // MFA gate — opt-in via NEXT_PUBLIC_IMPERSONATION_REQUIRE_MFA. Not a
+      // security boundary (server creates the session regardless); it's a
+      // policy-layer friction nudge matching the runbook's MFA expectation.
+      if (process.env.NEXT_PUBLIC_IMPERSONATION_REQUIRE_MFA === 'true') {
+        const user = auth.currentUser;
+        if (!user) {
+          throw new Error('Sign in to your dev account first.');
+        }
+        const factors = multiFactor(user).enrolledFactors;
+        if (factors.length === 0) {
+          throw new Error(
+            'Enrol a second factor on your dev account before starting an ' +
+              'impersonation session.',
+          );
+        }
+      }
+
       const callable = httpsCallable<
         {
           targetSchoolId: string;
