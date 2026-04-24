@@ -26,6 +26,25 @@ firebase deploy --only functions:startImpersonationSession,functions:endImperson
 
 All eleven functions are deploy-safe (no destructive migrations, no backfills).
 
+### 1.2.a — Grant the function service account permission to sign custom tokens
+
+The first time these functions run, `startImpersonationSession` will fail
+with `Permission 'iam.serviceAccounts.signBlob' denied` because 1st-gen
+Cloud Functions default to the App Engine service account, which doesn't
+hold the Token Creator role on itself by default. Grant it once:
+
+```bash
+gcloud iam service-accounts add-iam-policy-binding \
+  <PROJECT_ID>@appspot.gserviceaccount.com \
+  --member="serviceAccount:<PROJECT_ID>@appspot.gserviceaccount.com" \
+  --role="roles/iam.serviceAccountTokenCreator" \
+  --project=<PROJECT_ID>
+```
+
+Minimum-privilege: the service account can sign blobs for ITSELF only.
+Required by `admin.auth().createCustomToken(...)` inside
+`startImpersonationSession`. One-time per project; permanent.
+
 ### 1.3 Seed the super-admin allowlist
 The impersonation Cloud Functions check `/superAdmins/{uid}` as the primary
 source of super-admin privilege. Seed your own UID first — without it,
