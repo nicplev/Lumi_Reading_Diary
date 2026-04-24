@@ -2,6 +2,7 @@ import "server-only";
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getAuth, type Auth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { getStorage, type Storage } from "firebase-admin/storage";
 
 let _app: App | undefined;
 
@@ -27,6 +28,7 @@ function getApp(): App {
 
 let _auth: Auth | undefined;
 let _db: Firestore | undefined;
+let _storage: Storage | undefined;
 
 export function getAdminAuth(): Auth {
   if (!_auth) _auth = getAuth(getApp());
@@ -36,4 +38,9 @@ export function getAdminAuth(): Auth {
 export function getAdminDb(): Firestore {
   if (!_db) _db = getFirestore(getApp());
   return _db;
+}
+
+export function getAdminStorage(): Storage {
+  if (!_storage) _storage = getStorage(getApp());
+  return _storage;
 }

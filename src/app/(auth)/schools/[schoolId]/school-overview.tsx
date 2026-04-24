@@ -1,17 +1,23 @@
 "use client";
 
-import { Users, GraduationCap, UserCheck } from "lucide-react";
+import Link from "next/link";
+import { Users, GraduationCap, UserCheck, BookOpen, ClipboardList, BarChart3 } from "lucide-react";
 import { StatCard } from "@/components/cards/stat-card";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { formatDate } from "@/lib/utils";
 import type { SchoolDetail, SchoolStats } from "@/lib/firestore/schools";
 
 interface SchoolOverviewProps {
   school: SchoolDetail;
   stats: SchoolStats;
+  bookCount?: number;
+  activeAllocationCount?: number;
+  recentLogCount?: number;
 }
 
-export function SchoolOverview({ school, stats }: SchoolOverviewProps) {
+export function SchoolOverview({ school, stats, bookCount, activeAllocationCount, recentLogCount }: SchoolOverviewProps) {
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-3">
@@ -26,6 +32,39 @@ export function SchoolOverview({ school, stats }: SchoolOverviewProps) {
           value={stats.parentCount}
           icon={UserCheck}
         />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <StatCard
+          title="Books"
+          value={bookCount ?? 0}
+          icon={BookOpen}
+        />
+        <StatCard
+          title="Active Allocations"
+          value={activeAllocationCount ?? 0}
+          icon={ClipboardList}
+        />
+        <StatCard
+          title="Reading Logs (7d)"
+          value={recentLogCount ?? 0}
+          icon={BarChart3}
+        />
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Link href={`/schools/${school.id}/library`}>
+          <Button variant="outline">View Library</Button>
+        </Link>
+        <Link href={`/schools/${school.id}/allocations`}>
+          <Button variant="outline">View Allocations</Button>
+        </Link>
+        <Link href={`/schools/${school.id}/reading-logs`}>
+          <Button variant="outline">View Reading Logs</Button>
+        </Link>
+        <Link href={`/schools/${school.id}/analytics`}>
+          <Button variant="outline">View Analytics</Button>
+        </Link>
       </div>
 
       <Card>
@@ -72,9 +111,7 @@ export function SchoolOverview({ school, stats }: SchoolOverviewProps) {
           <div>
             <p className="text-sm text-muted-foreground">Created</p>
             <p className="font-medium">
-              {school.createdAt
-                ? new Date(school.createdAt).toLocaleDateString()
-                : "\u2014"}
+              {formatDate(school.createdAt)}
             </p>
           </div>
         </CardContent>

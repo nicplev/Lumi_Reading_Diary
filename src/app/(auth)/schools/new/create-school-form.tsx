@@ -34,13 +34,6 @@ const TIMEZONES = [
   "Australia/Perth",
 ];
 
-const LEVEL_SCHEMAS = [
-  { value: "aToZ", label: "A to Z" },
-  { value: "pmBenchmark", label: "PM Benchmark" },
-  { value: "lexile", label: "Lexile" },
-  { value: "custom", label: "Custom" },
-];
-
 export function CreateSchoolForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +52,6 @@ export function CreateSchoolForm() {
       contactPhone: "",
       address: "",
       timezone: "Pacific/Auckland",
-      levelSchema: "aToZ",
     },
   });
 
@@ -131,49 +123,23 @@ export function CreateSchoolForm() {
             <Input id="address" {...register("address")} />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Timezone *</Label>
-              <Select
-                defaultValue="Pacific/Auckland"
-                onValueChange={(v) => v && setValue("timezone", v)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TIMEZONES.map((tz) => (
-                    <SelectItem key={tz} value={tz}>
-                      {tz}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Reading Level Schema *</Label>
-              <Select
-                defaultValue="aToZ"
-                onValueChange={(v) =>
-                  v &&
-                  setValue(
-                    "levelSchema",
-                    v as CreateSchoolInput["levelSchema"]
-                  )
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {LEVEL_SCHEMAS.map((ls) => (
-                    <SelectItem key={ls.value} value={ls.value}>
-                      {ls.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label>Timezone *</Label>
+            <Select
+              defaultValue="Pacific/Auckland"
+              onValueChange={(v) => v && setValue("timezone", v)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TIMEZONES.map((tz) => (
+                  <SelectItem key={tz} value={tz}>
+                    {tz}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">

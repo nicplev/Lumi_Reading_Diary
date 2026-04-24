@@ -9,6 +9,7 @@ import { DataTableColumnHeader } from "@/components/data-table/data-table-column
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { formatDate } from "@/lib/utils";
 import type { SchoolCodeListItem } from "@/lib/firestore/school-codes";
 
 function CopyButton({ code }: { code: string }) {
@@ -108,7 +109,7 @@ const columns: ColumnDef<SchoolCodeListItem>[] = [
     header: "Expires",
     cell: ({ row }) => {
       const date = row.original.expiresAt;
-      return date ? new Date(date).toLocaleDateString() : "Never";
+      return date ? formatDate(date) : "Never";
     },
   },
   {
@@ -116,10 +117,7 @@ const columns: ColumnDef<SchoolCodeListItem>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Created" />
     ),
-    cell: ({ row }) => {
-      const date = row.original.createdAt;
-      return date ? new Date(date).toLocaleDateString() : "\u2014";
-    },
+    cell: ({ row }) => formatDate(row.original.createdAt),
   },
   {
     id: "actions",

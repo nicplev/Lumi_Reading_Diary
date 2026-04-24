@@ -6,13 +6,17 @@ import {
   BookOpen,
   GraduationCap,
   LayoutDashboard,
+  Library,
   LogOut,
+  MessageSquare,
   School,
   Settings,
   UserPlus,
   Users,
   BarChart3,
   ClipboardList,
+  Download,
+  Wrench,
 } from "lucide-react";
 import {
   Sidebar,
@@ -56,13 +60,33 @@ const navGroups = [
       { title: "Teachers", href: "/teachers", icon: Users },
       { title: "Parents", href: "/parents", icon: UserPlus },
       { title: "Students", href: "/students", icon: GraduationCap },
+      { title: "Link Codes", href: "/link-codes", icon: Settings },
+    ],
+  },
+  {
+    label: "Library",
+    items: [
+      { title: "Community Books", href: "/community-books", icon: Library },
     ],
   },
   {
     label: "Analytics",
     items: [
+      { title: "Overview", href: "/analytics", icon: BarChart3 },
       { title: "Reading Logs", href: "/reading-logs", icon: BookOpen },
-      { title: "Reports", href: "/reports", icon: BarChart3 },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      { title: "Operations", href: "/operations", icon: Wrench },
+      { title: "Export Data", href: "/operations/export", icon: Download },
+    ],
+  },
+  {
+    label: "Support",
+    items: [
+      { title: "Feedback", href: "/feedback", icon: MessageSquare },
     ],
   },
 ];

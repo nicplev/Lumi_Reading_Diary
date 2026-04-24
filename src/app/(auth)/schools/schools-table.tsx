@@ -5,6 +5,7 @@ import { type ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { formatDate } from "@/lib/utils";
 import type { SchoolListItem } from "@/lib/firestore/schools";
 
 const columns: ColumnDef<SchoolListItem>[] = [
@@ -43,10 +44,7 @@ const columns: ColumnDef<SchoolListItem>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Created" />
     ),
-    cell: ({ row }) => {
-      const date = row.original.createdAt;
-      return date ? new Date(date).toLocaleDateString() : "\u2014";
-    },
+    cell: ({ row }) => formatDate(row.original.createdAt),
   },
 ];
 

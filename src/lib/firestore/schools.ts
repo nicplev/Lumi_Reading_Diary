@@ -84,6 +84,7 @@ export async function listSchools(options?: {
 export interface SchoolDetail {
   id: string;
   name: string;
+  displayName?: string;
   logoUrl?: string;
   primaryColor?: string;
   secondaryColor?: string;
@@ -113,6 +114,7 @@ export async function getSchool(
   return {
     id: doc.id,
     name: data.name,
+    displayName: data.displayName,
     logoUrl: data.logoUrl,
     primaryColor: data.primaryColor,
     secondaryColor: data.secondaryColor,
@@ -139,7 +141,7 @@ export async function createSchool(data: {
   contactPhone?: string;
   address?: string;
   timezone: string;
-  levelSchema: string;
+  levelSchema?: string;
   customLevels?: string[];
   subscriptionPlan?: string;
   createdBy: string;
@@ -152,7 +154,7 @@ export async function createSchool(data: {
       contactPhone: data.contactPhone || null,
       address: data.address || null,
       timezone: data.timezone,
-      levelSchema: data.levelSchema,
+      levelSchema: data.levelSchema || "aToZ",
       customLevels: data.customLevels || [],
       subscriptionPlan: data.subscriptionPlan || null,
       isActive: true,

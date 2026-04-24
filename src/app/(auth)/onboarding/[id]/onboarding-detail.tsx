@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { ProgressStepper } from "@/components/shared/progress-stepper";
+import { formatDate } from "@/lib/utils";
 import type { OnboardingDetail as OnboardingDetailType } from "@/lib/firestore/onboarding";
 import { OnboardingActions } from "./onboarding-actions";
 
@@ -94,9 +95,7 @@ export function OnboardingDetail({ onboarding }: OnboardingDetailProps) {
             <div>
               <p className="text-sm text-muted-foreground">Created</p>
               <p className="font-medium">
-                {onboarding.createdAt
-                  ? new Date(onboarding.createdAt).toLocaleDateString()
-                  : "\u2014"}
+                {formatDate(onboarding.createdAt)}
               </p>
             </div>
             {onboarding.schoolId && (

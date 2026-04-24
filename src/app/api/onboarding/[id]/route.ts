@@ -9,6 +9,7 @@ import {
   updateOnboardingStatusSchema,
   linkOnboardingToSchoolSchema,
 } from "@/lib/validations/onboarding";
+import { logAuditEvent } from "@/lib/firestore/audit-log";
 
 export async function PATCH(
   request: Request,
@@ -28,15 +29,18 @@ export async function PATCH(
       case "updateStatus": {
         const parsed = updateOnboardingStatusSchema.parse(body);
         await updateOnboardingStatus(id, parsed.status);
+        logAuditEvent({ action: "onboarding.updateStatus", performedBy: session.uid, performedByEmail: session.email ?? undefined, targetType: "onboarding", targetId: id, after: body as Record<string, unknown> }).catch(console.error);
         return NextResponse.json({ success: true });
       }
       case "advanceStep": {
         const nextStep = await advanceOnboardingStep(id);
+        logAuditEvent({ action: "onboarding.advanceStep", performedBy: session.uid, performedByEmail: session.email ?? undefined, targetType: "onboarding", targetId: id, after: body as Record<string, unknown> }).catch(console.error);
         return NextResponse.json({ success: true, nextStep });
       }
       case "linkSchool": {
         const parsed = linkOnboardingToSchoolSchema.parse(body);
         await linkOnboardingToSchool(id, parsed.schoolId);
+        logAuditEvent({ action: "onboarding.linkSchool", performedBy: session.uid, performedByEmail: session.email ?? undefined, targetType: "onboarding", targetId: id, after: body as Record<string, unknown> }).catch(console.error);
         return NextResponse.json({ success: true });
       }
       default:

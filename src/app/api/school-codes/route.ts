@@ -3,6 +3,7 @@ import { verifySession } from "@/lib/auth";
 import { createSchoolCode } from "@/lib/firestore/school-codes";
 import { getSchool } from "@/lib/firestore/schools";
 import { createSchoolCodeSchema } from "@/lib/validations/school-code";
+import { logAuditEvent } from "@/lib/firestore/audit-log";
 
 export async function POST(request: Request) {
   const session = await verifySession();
@@ -26,6 +27,8 @@ export async function POST(request: Request) {
       maxUsages: parsed.maxUsages,
       expiresInDays: parsed.expiresInDays,
     });
+
+    logAuditEvent({ action: "schoolCode.create", performedBy: session.uid, performedByEmail: session.email ?? undefined, targetType: "schoolCode", targetId: result.id, after: parsed as Record<string, unknown> }).catch(console.error);
 
     return NextResponse.json(result, { status: 201 });
   } catch (error: unknown) {

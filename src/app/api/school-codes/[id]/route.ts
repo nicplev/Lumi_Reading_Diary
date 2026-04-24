@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifySession } from "@/lib/auth";
 import { revokeSchoolCode } from "@/lib/firestore/school-codes";
+import { logAuditEvent } from "@/lib/firestore/audit-log";
 
 export async function DELETE(
   _request: Request,
@@ -14,6 +15,9 @@ export async function DELETE(
   try {
     const { id } = await params;
     await revokeSchoolCode(id);
+
+    logAuditEvent({ action: "schoolCode.revoke", performedBy: session.uid, performedByEmail: session.email ?? undefined, targetType: "schoolCode", targetId: id }).catch(console.error);
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Revoke school code error:", error);

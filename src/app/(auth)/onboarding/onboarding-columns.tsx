@@ -3,6 +3,7 @@
 import { type ColumnDef } from "@tanstack/react-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { formatDate } from "@/lib/utils";
 import type { OnboardingListItem } from "@/lib/firestore/onboarding";
 
 export const onboardingColumns: ColumnDef<OnboardingListItem>[] = [
@@ -51,9 +52,6 @@ export const onboardingColumns: ColumnDef<OnboardingListItem>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Created" />
     ),
-    cell: ({ row }) => {
-      const date = row.original.createdAt;
-      return date ? new Date(date).toLocaleDateString() : "\u2014";
-    },
+    cell: ({ row }) => formatDate(row.original.createdAt),
   },
 ];

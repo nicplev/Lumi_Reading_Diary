@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { verifySession } from "@/lib/auth";
 import { createSchool } from "@/lib/firestore/schools";
 import { createSchoolSchema } from "@/lib/validations/school";
+import { logAuditEvent } from "@/lib/firestore/audit-log";
 
 export async function POST(request: Request) {
   const session = await verifySession();
@@ -19,6 +20,7 @@ export async function POST(request: Request) {
       createdBy: session.uid,
     });
 
+    logAuditEvent({ action: "school.create", performedBy: session.uid, performedByEmail: session.email ?? undefined, targetType: "school", targetId: schoolId, schoolId, after: parsed as Record<string, unknown> }).catch(console.error);
     return NextResponse.json({ id: schoolId }, { status: 201 });
   } catch (error: unknown) {
     if (error instanceof Error && error.name === "ZodError") {

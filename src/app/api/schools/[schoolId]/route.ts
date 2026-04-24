@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { verifySession } from "@/lib/auth";
 import { updateSchool, deactivateSchool } from "@/lib/firestore/schools";
 import { updateSchoolSchema } from "@/lib/validations/school";
+import { logAuditEvent } from "@/lib/firestore/audit-log";
 
 export async function PATCH(
   request: Request,
@@ -18,6 +19,7 @@ export async function PATCH(
     const parsed = updateSchoolSchema.parse(body);
 
     await updateSchool(schoolId, parsed);
+    logAuditEvent({ action: "school.update", performedBy: session.uid, performedByEmail: session.email ?? undefined, targetType: "school", targetId: schoolId, schoolId, after: parsed as Record<string, unknown> }).catch(console.error);
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     if (error instanceof Error && error.name === "ZodError") {
@@ -46,6 +48,7 @@ export async function DELETE(
   try {
     const { schoolId } = await params;
     await deactivateSchool(schoolId);
+    logAuditEvent({ action: "school.deactivate", performedBy: session.uid, performedByEmail: session.email ?? undefined, targetType: "school", targetId: schoolId, schoolId }).catch(console.error);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Deactivate school error:", error);

@@ -5,6 +5,7 @@ import type { RecentActivity } from "@/lib/firestore/reading-logs";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { formatDateTime } from "@/lib/utils";
 
 const columns: ColumnDef<RecentActivity>[] = [
   {
@@ -49,15 +50,7 @@ const columns: ColumnDef<RecentActivity>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Date" />
     ),
-    cell: ({ row }) => {
-      const date = row.getValue("createdAt") as Date;
-      return date.toLocaleDateString("en-AU", {
-        day: "numeric",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    },
+    cell: ({ row }) => formatDateTime(row.getValue("createdAt")),
   },
 ];
 

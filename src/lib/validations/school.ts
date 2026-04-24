@@ -6,9 +6,11 @@ export const createSchoolSchema = z.object({
   contactPhone: z.string().optional(),
   address: z.string().optional(),
   timezone: z.string().min(1, "Timezone is required"),
-  levelSchema: z.enum(["aToZ", "pmBenchmark", "lexile", "custom"]),
-  customLevels: z.array(z.string()).optional(),
   subscriptionPlan: z.string().optional(),
+  logoUrl: z.string().url().optional().or(z.literal("")),
+  primaryColor: z.string().optional(),
+  secondaryColor: z.string().optional(),
+  displayName: z.string().max(100).optional(),
 });
 
 export const updateSchoolSchema = createSchoolSchema.partial();

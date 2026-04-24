@@ -24,6 +24,15 @@ const routeLabels: Record<string, string> = {
   "reading-logs": "Reading Logs",
   reports: "Reports",
   new: "New",
+  library: "Library",
+  allocations: "Allocations",
+  analytics: "Analytics",
+  operations: "Operations",
+  export: "Export",
+  "link-codes": "Link Codes",
+  "audit-log": "Audit Log",
+  offboard: "Offboard",
+  bulk: "Bulk Import",
 };
 
 function getSegmentLabel(segment: string): string {
@@ -50,20 +59,20 @@ export function AppHeader() {
               <BreadcrumbLink href="/">Dashboard</BreadcrumbLink>
             )}
           </BreadcrumbItem>
-          {segments.map((segment, i) => {
+          {segments.flatMap((segment, i) => {
             const href = "/" + segments.slice(0, i + 1).join("/");
             const isLast = i === segments.length - 1;
             const label = getSegmentLabel(segment);
-            return (
+            return [
+              <BreadcrumbSeparator key={`sep-${href}`} />,
               <BreadcrumbItem key={href}>
-                <BreadcrumbSeparator />
                 {isLast ? (
                   <BreadcrumbPage>{label}</BreadcrumbPage>
                 ) : (
                   <BreadcrumbLink href={href}>{label}</BreadcrumbLink>
                 )}
-              </BreadcrumbItem>
-            );
+              </BreadcrumbItem>,
+            ];
           })}
         </BreadcrumbList>
       </Breadcrumb>
