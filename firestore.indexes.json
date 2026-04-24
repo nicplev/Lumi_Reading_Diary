@@ -446,16 +446,6 @@
       ]
     },
     {
-      "collectionGroup": "pendingUserDeletions",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "scheduledDeletionAt",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
       "collectionGroup": "devImpersonationSessions",
       "queryScope": "COLLECTION",
       "fields": [
