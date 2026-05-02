@@ -15,8 +15,9 @@ import '../../../core/widgets/lumi/lumi_buttons.dart';
 ///  2. We call `signInWithEmailAndPassword` to verify credentials.
 ///  3. If sign-in succeeds, we refresh [DevAccessService] (Firestore lookup
 ///     against `/devAccessEmails/{sha256(email)}`).
-///  4. If they're on the allowlist → modal closes, caller's `hasDevAccess()`
-///     flips to `true` through the service's `ValueNotifier`.
+///  4. If they're on the allowlist → mark [DevAccessService.unlockForSession],
+///     sign the dev account out (so it doesn't poison the mobile auth
+///     session), and close the modal with `true`.
 ///  5. If they're signed in but NOT on the allowlist → we sign them out
 ///     again so a rejected account can't leak into the rest of the app.
 ///
@@ -86,7 +87,21 @@ class _DevAccessDialogState extends State<_DevAccessDialog> {
     await DevAccessService.instance.refresh();
     if (!mounted) return;
 
-    if (DevAccessService.instance.hasAccess) {
+    // Defense in depth: make sure the Firestore lookup we just awaited
+    // applied to the account we actually signed in as (no concurrent
+    // auth change swapped the user out from under us).
+    final stillDevAccount =
+        FirebaseAuth.instance.currentUser?.email?.toLowerCase() == email;
+
+    if (stillDevAccount && DevAccessService.instance.hasAccess) {
+      // Latch the unlock BEFORE signing out — the service's auth listener
+      // will reset its per-user flag on sign-out, but the session flag
+      // survives and keeps [DevAccessService.hasAccess] true.
+      DevAccessService.instance.unlockForSession();
+      try {
+        await auth.signOut();
+      } catch (_) {}
+      if (!mounted) return;
       Navigator.of(context).pop(true);
       return;
     }

@@ -158,9 +158,16 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header
+            // Header — quiet wordmark so the slide content owns the visual
+            // hierarchy. Small mascot + muted overline reads as a professional
+            // B2B wordmark rather than a kids-app banner.
             Padding(
-              padding: LumiPadding.allS,
+              padding: const EdgeInsets.fromLTRB(
+                LumiSpacing.m,
+                LumiSpacing.s,
+                LumiSpacing.s,
+                LumiSpacing.xs,
+              ),
               child: Row(
                 children: [
                   AnimatedSwitcher(
@@ -172,16 +179,18 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
                     child: Image.asset(
                       _bookAssets[_currentPage % _bookAssets.length],
                       key: ValueKey<int>(_currentPage % _bookAssets.length),
-                      width: 36,
-                      height: 36,
+                      width: 22,
+                      height: 22,
                       fit: BoxFit.contain,
                     ),
                   ),
-                  LumiGap.horizontalXS,
+                  LumiGap.horizontalS,
                   Expanded(
                     child: Text(
-                      'Lumi Reading Diary',
-                      style: LumiTextStyles.h3(color: AppColors.rosePink),
+                      'LUMI READING DIARY',
+                      style: LumiTextStyles.overline(
+                        color: AppColors.charcoal.withValues(alpha: 0.55),
+                      ).copyWith(letterSpacing: 1.2),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),

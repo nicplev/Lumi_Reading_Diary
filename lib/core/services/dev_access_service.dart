@@ -44,9 +44,26 @@ class DevAccessService extends ChangeNotifier {
   StreamSubscription<User?>? _authSub;
   String? _activeEmail;
   bool _hasAccess = false;
+  bool _sessionUnlocked = false;
 
   /// Current cached answer. Safe to read synchronously from `build()`.
-  bool get hasAccess => _hasAccess;
+  ///
+  /// Returns true if EITHER the signed-in user is on the dev allowlist, OR
+  /// the dev-access modal verified a dev account during this app run (see
+  /// [unlockForSession]). The latter survives the signOut that the modal
+  /// performs to avoid poisoning the mobile auth session.
+  bool get hasAccess => _sessionUnlocked || _hasAccess;
+
+  /// Marks dev access as unlocked for the remainder of this app process,
+  /// independent of the current Firebase Auth user. Called by the dev-access
+  /// modal after credentials have been verified against Firestore. The flag
+  /// lives only in memory so it's cleared on full app restart — users must
+  /// re-verify each launch.
+  void unlockForSession() {
+    if (_sessionUnlocked) return;
+    _sessionUnlocked = true;
+    notifyListeners();
+  }
 
   /// Email hash used as the Firestore doc ID. Exposed for tests / debugging.
   @visibleForTesting

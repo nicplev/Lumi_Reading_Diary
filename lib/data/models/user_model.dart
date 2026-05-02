@@ -20,6 +20,8 @@ class UserModel {
   final DateTime? lastLoginAt;
   final Map<String, dynamic>? preferences;
   final String? fcmToken; // For notifications
+  final String? phoneNumber; // E.164 format; populated when SMS MFA is enrolled
+  final bool phoneVerified;
 
   UserModel({
     required this.id,
@@ -35,6 +37,8 @@ class UserModel {
     this.lastLoginAt,
     this.preferences,
     this.fcmToken,
+    this.phoneNumber,
+    this.phoneVerified = false,
   });
 
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
@@ -60,6 +64,8 @@ class UserModel {
           : null,
       preferences: data['preferences'],
       fcmToken: data['fcmToken'],
+      phoneNumber: data['phoneNumber'],
+      phoneVerified: data['phoneVerified'] ?? false,
     );
   }
 
@@ -77,6 +83,8 @@ class UserModel {
       'lastLoginAt': lastLoginAt != null ? Timestamp.fromDate(lastLoginAt!) : null,
       'preferences': preferences,
       'fcmToken': fcmToken,
+      'phoneNumber': phoneNumber,
+      'phoneVerified': phoneVerified,
     };
   }
 
@@ -94,6 +102,8 @@ class UserModel {
     DateTime? lastLoginAt,
     Map<String, dynamic>? preferences,
     String? fcmToken,
+    String? phoneNumber,
+    bool? phoneVerified,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -109,6 +119,8 @@ class UserModel {
       lastLoginAt: lastLoginAt ?? this.lastLoginAt,
       preferences: preferences ?? this.preferences,
       fcmToken: fcmToken ?? this.fcmToken,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      phoneVerified: phoneVerified ?? this.phoneVerified,
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../data/models/allocation_model.dart';
@@ -72,10 +73,12 @@ class SchoolLibraryAssignmentService {
         onError: (Object error, StackTrace stackTrace) {
           allocationsSettled = true;
           latestAllocations = null;
-          debugPrint(
-            'SchoolLibraryAssignmentService: allocations stream failed for '
-            '$scopedSchoolId: $error',
-          );
+          if (!_isSignOutRace(error)) {
+            debugPrint(
+              'SchoolLibraryAssignmentService: allocations stream failed for '
+              '$scopedSchoolId: $error',
+            );
+          }
           if (!controller.isClosed) {
             controller.add(const LibraryAssignmentSnapshot());
           }
@@ -94,10 +97,12 @@ class SchoolLibraryAssignmentService {
         onError: (Object error, StackTrace stackTrace) {
           studentsSettled = true;
           latestStudents = null;
-          debugPrint(
-            'SchoolLibraryAssignmentService: students stream failed for '
-            '$scopedSchoolId: $error',
-          );
+          if (!_isSignOutRace(error)) {
+            debugPrint(
+              'SchoolLibraryAssignmentService: students stream failed for '
+              '$scopedSchoolId: $error',
+            );
+          }
           if (!controller.isClosed) {
             controller.add(const LibraryAssignmentSnapshot());
           }
@@ -111,6 +116,12 @@ class SchoolLibraryAssignmentService {
     };
 
     return controller.stream;
+  }
+
+  bool _isSignOutRace(Object error) {
+    if (error is! FirebaseException) return false;
+    if (error.code != 'permission-denied') return false;
+    return FirebaseAuth.instance.currentUser == null;
   }
 
   LibraryAssignmentSnapshot _buildSnapshot({

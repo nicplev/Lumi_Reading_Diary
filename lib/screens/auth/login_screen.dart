@@ -20,6 +20,7 @@ import '../../core/routing/app_router.dart';
 import '../../data/models/user_model.dart';
 import '../../services/firebase_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/sms_verification_service.dart';
 import '../../core/services/user_school_index_service.dart';
 import '../../utils/setup_test_data.dart';
 import 'widgets/dev_access_modal.dart';
@@ -37,6 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormBuilderState>();
   final FirebaseService _firebaseService = FirebaseService.instance;
   final DevAccessService _devAccess = DevAccessService.instance;
+  final SmsVerificationService _smsService = SmsVerificationService();
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _errorMessage;
@@ -82,12 +84,26 @@ class _LoginScreenState extends State<LoginScreen> {
 
       try {
         final indexService = UserSchoolIndexService();
-        // Sign in with email and password
-        final UserCredential userCredential =
-            await _firebaseService.auth.signInWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
+        // Sign in with email and password. If the account has phone MFA
+        // enrolled (teacher/parent signups flow it on) Firebase throws
+        // FirebaseAuthMultiFactorException and we route through the SMS
+        // challenge dialog before carrying on with the rest of the login.
+        UserCredential? userCredential;
+        try {
+          userCredential =
+              await _firebaseService.auth.signInWithEmailAndPassword(
+            email: email,
+            password: password,
+          );
+        } on FirebaseAuthMultiFactorException catch (mfaError) {
+          userCredential = await _resolveMfaChallenge(mfaError.resolver);
+          if (userCredential == null) {
+            // User cancelled or failed the challenge; _resolveMfaChallenge
+            // has already set an error message (or none, if they hit cancel).
+            if (mounted) setState(() => _isLoading = false);
+            return;
+          }
+        }
 
         if (userCredential.user != null) {
           // Check email verification (allow unverified for now with a warning)
@@ -276,6 +292,86 @@ class _LoginScreenState extends State<LoginScreen> {
       default:
         return 'An error occurred. Please try again.';
     }
+  }
+
+  /// Sends the SMS challenge for a MFA-required login and prompts the user
+  /// for the 6-digit code. Returns the completed [UserCredential] on success,
+  /// or null if the user cancelled or the challenge failed (in which case
+  /// [_errorMessage] is set).
+  Future<UserCredential?> _resolveMfaChallenge(
+      MultiFactorResolver resolver) async {
+    SmsCodeHandle handle;
+    try {
+      handle = await _smsService.sendLoginCode(resolver: resolver);
+    } on FirebaseAuthException catch (e) {
+      setState(() =>
+          _errorMessage = SmsVerificationService.friendlyError(e));
+      return null;
+    } catch (e) {
+      setState(() =>
+          _errorMessage = 'Could not send verification code. Please try again.');
+      return null;
+    }
+
+    if (!mounted) return null;
+
+    final hint = resolver.hints.first;
+    final phoneHint =
+        hint is PhoneMultiFactorInfo ? hint.phoneNumber : null;
+
+    final smsCode = await _promptForSmsCode(
+      phoneHint: phoneHint,
+      onResend: () async {
+        try {
+          final resent = await _smsService.sendLoginCode(
+            resolver: resolver,
+            forceResendingToken: handle.resendToken,
+          );
+          handle = resent;
+        } on FirebaseAuthException catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(SmsVerificationService.friendlyError(e)),
+              ),
+            );
+          }
+        }
+      },
+    );
+
+    if (smsCode == null) {
+      // User cancelled. Leave _errorMessage null so we don't shout at them.
+      return null;
+    }
+
+    try {
+      return await _smsService.resolveLogin(
+        resolver: resolver,
+        verificationId: handle.verificationId,
+        smsCode: smsCode,
+      );
+    } on FirebaseAuthException catch (e) {
+      setState(() =>
+          _errorMessage = SmsVerificationService.friendlyError(e));
+      return null;
+    } catch (_) {
+      setState(() =>
+          _errorMessage = 'Could not verify the code. Please try again.');
+      return null;
+    }
+  }
+
+  Future<String?> _promptForSmsCode({
+    required String? phoneHint,
+    required Future<void> Function() onResend,
+  }) {
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) =>
+          _MfaCodeDialog(phoneHint: phoneHint, onResend: onResend),
+    );
   }
 
   void _navigateToHome(UserModel user) {
@@ -748,6 +844,102 @@ class _RegisterRoleCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Dialog that collects a 6-digit SMS code as a second factor. Pops with the
+/// entered code on submit or null on cancel. [onResend] calls back into the
+/// parent so Firebase can dispatch a fresh code with the correct resend token.
+class _MfaCodeDialog extends StatefulWidget {
+  final String? phoneHint;
+  final Future<void> Function() onResend;
+
+  const _MfaCodeDialog({
+    required this.phoneHint,
+    required this.onResend,
+  });
+
+  @override
+  State<_MfaCodeDialog> createState() => _MfaCodeDialogState();
+}
+
+class _MfaCodeDialogState extends State<_MfaCodeDialog> {
+  final _codeController = TextEditingController();
+  bool _resending = false;
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  bool get _codeValid =>
+      RegExp(r'^\d{6}$').hasMatch(_codeController.text.trim());
+
+  @override
+  Widget build(BuildContext context) {
+    final subtitle = widget.phoneHint != null && widget.phoneHint!.isNotEmpty
+        ? 'Enter the 6-digit code sent to ${widget.phoneHint}.'
+        : 'Enter the 6-digit code we just sent to your phone.';
+    return AlertDialog(
+      title: const Text('Verify it\'s you'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            subtitle,
+            style: LumiTextStyles.bodySmall().copyWith(
+              color: AppColors.charcoal.withValues(alpha: 0.7),
+            ),
+          ),
+          LumiGap.s,
+          TextField(
+            controller: _codeController,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            autofocus: true,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              labelText: 'SMS code',
+              counterText: '',
+            ),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: _resending
+                  ? null
+                  : () async {
+                      setState(() => _resending = true);
+                      try {
+                        await widget.onResend();
+                      } finally {
+                        if (mounted) setState(() => _resending = false);
+                      }
+                    },
+              child: Text(
+                _resending ? 'Sending…' : 'Resend code',
+                style: LumiTextStyles.bodySmall(),
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _codeValid
+              ? () => Navigator.of(context).pop(_codeController.text.trim())
+              : null,
+          child: const Text('Verify'),
+        ),
+      ],
     );
   }
 }

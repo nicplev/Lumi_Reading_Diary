@@ -17,6 +17,7 @@ import '../../../core/widgets/lumi/lumi_input.dart';
 import '../../../data/models/user_model.dart';
 import '../../../services/crash_reporting_service.dart';
 import '../../../services/school_code_service.dart';
+import '../../../services/sms_verification_service.dart';
 
 /// Opens the floating teacher registration modal over the current screen.
 /// Blurs the background, rises from the bottom, and walks the user through
@@ -39,7 +40,7 @@ Future<void> showTeacherRegistrationModal(BuildContext context) {
 const double _kMaxBlur = 18;
 const double _kMaxDim = 0.18;
 
-enum _Stage { code, name, email, password, confirm, success }
+enum _Stage { code, name, email, password, confirm, phone, sms, success }
 
 class _TeacherRegistrationOverlay extends StatelessWidget {
   const _TeacherRegistrationOverlay();
@@ -116,6 +117,7 @@ class _TeacherRegistrationCard extends StatefulWidget {
 
 class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
   final _schoolCodeService = SchoolCodeService();
+  final _smsService = SmsVerificationService();
   final _auth = FirebaseAuth.instance;
   final _firestore = FirebaseFirestore.instance;
 
@@ -125,6 +127,8 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _smsCodeController = TextEditingController();
 
   _Stage _stage = _Stage.code;
   bool _busy = false;
@@ -134,6 +138,16 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
   String? _verifiedSchoolName;
   String? _verifiedCodeId;
   UserModel? _createdTeacher;
+
+  // SMS MFA state — once the auth user is created we must not recreate it
+  // on retry, so [_pendingUserId] pins the in-progress registration. The
+  // verification id is refreshed on every resend.
+  String? _pendingUserId;
+  String? _verificationId;
+  int? _resendToken;
+  DateTime? _lastSendAt;
+  Timer? _resendTicker;
+  static const _resendCooldown = Duration(seconds: 30);
 
   bool _lastNameRevealed = false;
   Timer? _lastNameRevealTimer;
@@ -155,6 +169,8 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
       _emailController,
       _passwordController,
       _confirmController,
+      _phoneController,
+      _smsCodeController,
     ]) {
       c.addListener(() => setState(() {}));
     }
@@ -179,6 +195,7 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
   @override
   void dispose() {
     _lastNameRevealTimer?.cancel();
+    _resendTicker?.cancel();
     _passwordFocusNode.dispose();
     _confirmFocusNode.dispose();
     _codeController.dispose();
@@ -187,6 +204,8 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmController.dispose();
+    _phoneController.dispose();
+    _smsCodeController.dispose();
     super.dispose();
   }
 
@@ -246,6 +265,43 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
   bool get _confirmValid =>
       _confirmController.text.isNotEmpty &&
       _confirmController.text == _passwordController.text;
+
+  // Australian mobile numbers only — 10 digits starting with 04. Spaces
+  // are tolerated in the input for legibility but stripped for validation
+  // and the E.164 conversion below.
+  static final _auMobileRegex = RegExp(r'^04\d{8}$');
+
+  String get _phoneDigits =>
+      _phoneController.text.replaceAll(RegExp(r'\s+'), '');
+
+  bool get _phoneValid => _auMobileRegex.hasMatch(_phoneDigits);
+
+  /// Converts the Australian local form (`04XXXXXXXX`) to E.164 for Firebase
+  /// by dropping the leading zero and prefixing `+61`.
+  String get _phoneE164 => '+61${_phoneDigits.substring(1)}';
+
+  bool get _smsCodeValid =>
+      RegExp(r'^\d{6}$').hasMatch(_smsCodeController.text.trim());
+
+  int get _resendRemainingSec {
+    if (_lastSendAt == null) return 0;
+    final remaining =
+        _resendCooldown - DateTime.now().difference(_lastSendAt!);
+    return remaining.isNegative ? 0 : remaining.inSeconds;
+  }
+
+  bool get _canResend => _resendRemainingSec == 0;
+
+  void _startResendCountdown() {
+    _lastSendAt = DateTime.now();
+    _resendTicker?.cancel();
+    _resendTicker = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (_resendRemainingSec == 0) {
+        t.cancel();
+      }
+      if (mounted) setState(() {});
+    });
+  }
 
   // ---------------------------------------------------------------------------
   // Actions
@@ -308,12 +364,17 @@ setState(() {
   }
 
   void _goBack() {
-final prev = switch (_stage) {
+    final prev = switch (_stage) {
       _Stage.code => _Stage.code,
       _Stage.name => _Stage.code,
       _Stage.email => _Stage.name,
       _Stage.password => _Stage.email,
       _Stage.confirm => _Stage.password,
+      // Once the auth user exists we can't rewind to the password stage without
+      // leaking an orphaned Firebase Auth record. The primary button itself is
+      // gated on _pendingUserId == null at those steps.
+      _Stage.phone => _pendingUserId == null ? _Stage.confirm : _Stage.phone,
+      _Stage.sms => _Stage.phone,
       _Stage.success => _Stage.success,
     };
     setState(() {
@@ -322,11 +383,12 @@ final prev = switch (_stage) {
     });
   }
 
-  Future<void> _createAccount() async {
-    if (!_confirmValid) return;
-    final schoolId = _verifiedSchoolId;
-    final codeId = _verifiedCodeId;
-    if (schoolId == null) return;
+  /// Creates the Firebase Auth user (first press) and dispatches an SMS
+  /// enrollment code. Re-pressing resends without recreating the account —
+  /// resends consult [_pendingUserId] to avoid `email-already-in-use` loops.
+  Future<void> _sendPhoneCode() async {
+    if (!_phoneValid) return;
+    if (_verifiedSchoolId == null) return;
 
     setState(() {
       _busy = true;
@@ -338,24 +400,111 @@ final prev = switch (_stage) {
     final fullName =
         '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'
             .trim();
+    final phone = _phoneE164;
 
     try {
+      User user;
+      if (_pendingUserId == null) {
+        final cred = await _auth.createUserWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+        user = cred.user!;
+        await user.updateDisplayName(fullName);
+        await user.sendEmailVerification();
+        _pendingUserId = user.uid;
+      } else {
+        // Mid-flow retry (e.g. resend from the SMS stage). The MFA session
+        // must come from the currently-signed-in user, which is still ours.
+        user = _auth.currentUser!;
+      }
+
+      final handle = await _smsService.sendEnrollmentCode(
+        user: user,
+        phoneNumber: phone,
+        forceResendingToken: _resendToken,
+      );
+
+      if (!mounted) return;
+      _startResendCountdown();
+      setState(() {
+        _verificationId = handle.verificationId;
+        _resendToken = handle.resendToken;
+        _stage = _Stage.sms;
+      });
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      // `email-already-in-use` / weak password surface before we ever touch
+      // phone auth — route the user back to the relevant stage with the
+      // right message instead of leaving them stuck on the phone screen.
+      if (e.code == 'email-already-in-use' ||
+          e.code == 'invalid-email' ||
+          e.code == 'weak-password') {
+        setState(() {
+          _errorMessage = _authErrorMessage(e.code);
+          _stage =
+              e.code == 'weak-password' ? _Stage.password : _Stage.email;
+        });
+      } else {
+        setState(
+            () => _errorMessage = SmsVerificationService.friendlyError(e));
+      }
+    } catch (e, st) {
+      if (!mounted) return;
+      setState(() => _errorMessage =
+          'Could not send code: ${e.toString().replaceAll('Exception: ', '')}');
+      CrashReportingService.instance
+          .recordError(e, st, reason: 'Teacher SMS send failed');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Verifies the SMS code, enrolls the phone factor, writes the teacher
+  /// Firestore document, and transitions to the success screen.
+  Future<void> _verifySmsAndFinish() async {
+    if (!_smsCodeValid) return;
+    final schoolId = _verifiedSchoolId;
+    final codeId = _verifiedCodeId;
+    final verificationId = _verificationId;
+    if (schoolId == null || verificationId == null) return;
+
+    final user = _auth.currentUser;
+    if (user == null) {
+      setState(() =>
+          _errorMessage = 'Your session expired. Please start registration again.');
+      return;
+    }
+
+    setState(() {
+      _busy = true;
+      _errorMessage = null;
+    });
+
+    final email = _emailController.text.trim().toLowerCase();
+    final phone = _phoneE164;
+    final fullName =
+        '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'
+            .trim();
+
+    try {
+      await _smsService.enrollPhoneFactor(
+        user: user,
+        verificationId: verificationId,
+        smsCode: _smsCodeController.text.trim(),
+        phoneNumber: phone,
+      );
+
       final indexService = UserSchoolIndexService();
 
-      final cred = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      final userId = cred.user!.uid;
-      await cred.user!.updateDisplayName(fullName);
-      await cred.user!.sendEmailVerification();
-
       final teacherUser = UserModel(
-        id: userId,
+        id: user.uid,
         email: email,
         fullName: fullName,
         role: UserRole.teacher,
         schoolId: schoolId,
+        phoneNumber: phone,
+        phoneVerified: true,
         createdAt: DateTime.now(),
         lastLoginAt: DateTime.now(),
       );
@@ -364,7 +513,7 @@ final prev = switch (_stage) {
           .collection('schools')
           .doc(schoolId)
           .collection('users')
-          .doc(userId)
+          .doc(user.uid)
           .set({
         ...teacherUser.toFirestore(),
         'permissions': {
@@ -390,7 +539,7 @@ final prev = switch (_stage) {
         email: email,
         schoolId: schoolId,
         userType: 'user',
-        userId: userId,
+        userId: user.uid,
       );
 
       if (codeId != null) {
@@ -408,7 +557,7 @@ final prev = switch (_stage) {
       });
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
-      setState(() => _errorMessage = _authErrorMessage(e.code));
+      setState(() => _errorMessage = SmsVerificationService.friendlyError(e));
     } catch (e, st) {
       if (!mounted) return;
       var detail = e.toString();
@@ -421,9 +570,6 @@ final prev = switch (_stage) {
       setState(() => _errorMessage = 'Registration error: $detail');
       CrashReportingService.instance
           .recordError(e, st, reason: 'Teacher registration failed');
-      try {
-        await _auth.signOut();
-      } catch (_) {}
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -562,6 +708,8 @@ final prev = switch (_stage) {
       _Stage.email => 'Email address',
       _Stage.password => 'Create password',
       _Stage.confirm => 'Confirm password',
+      _Stage.phone => 'Phone number',
+      _Stage.sms => 'Enter SMS code',
       _Stage.success => '',
     };
 
@@ -630,6 +778,18 @@ final prev = switch (_stage) {
         label: 'Password set',
       ));
     }
+    if (_stage.index >= _Stage.phone.index) {
+      chips.add(const _CompletedChip(
+        key: ValueKey('chip_password_confirmed'),
+        label: 'Password confirmed',
+      ));
+    }
+    if (_stage.index >= _Stage.sms.index) {
+      chips.add(_CompletedChip(
+        key: const ValueKey('chip_phone'),
+        label: 'Phone: $_phoneDigits',
+      ));
+    }
 
     if (chips.isEmpty) return const [];
     return [
@@ -673,6 +833,8 @@ final prev = switch (_stage) {
           _Stage.email => _buildEmailInput(),
           _Stage.password => _buildPasswordInput(),
           _Stage.confirm => _buildConfirmInput(),
+          _Stage.phone => _buildPhoneInput(),
+          _Stage.sms => _buildSmsInput(),
           _Stage.success => const SizedBox.shrink(),
         },
       ),
@@ -844,6 +1006,77 @@ final prev = switch (_stage) {
     );
   }
 
+  Widget _buildPhoneInput() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'We\'ll text you a code to confirm your mobile. This becomes your sign-in second factor.',
+          style: LumiTextStyles.bodySmall(
+            color: AppColors.charcoal.withValues(alpha: 0.7),
+          ),
+        ),
+        const SizedBox(height: 12),
+        LumiInput(
+          controller: _phoneController,
+          hintText: '0400 000 000',
+          autofocus: true,
+          keyboardType: TextInputType.phone,
+          textInputAction: TextInputAction.done,
+          helperText: 'Australian mobile only.',
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[\d\s]')),
+          ],
+          errorText: _phoneDigits.isNotEmpty && !_phoneValid
+              ? 'Enter a 10-digit Australian mobile starting with 04'
+              : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSmsInput() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Enter the 6-digit code sent to $_phoneDigits.',
+          style: LumiTextStyles.bodySmall(
+            color: AppColors.charcoal.withValues(alpha: 0.7),
+          ),
+        ),
+        const SizedBox(height: 12),
+        LumiInput(
+          controller: _smsCodeController,
+          hintText: '123456',
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          maxLength: 6,
+          textInputAction: TextInputAction.done,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          onChanged: (_) {
+            // Auto-submit once the full 6-digit code is in — most SMS UX
+            // flows do this so the user doesn't hunt for the verify button.
+            if (_smsCodeValid && !_busy) {
+              _verifySmsAndFinish();
+            }
+          },
+        ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: _busy || !_canResend ? null : _sendPhoneCode,
+            child: Text(
+              _canResend ? 'Resend code' : 'Resend in ${_resendRemainingSec}s',
+              style: LumiTextStyles.bodySmall(color: AppColors.teacherColor),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildPrimaryAction() {
     final (label, enabled, onPressed) = switch (_stage) {
       _Stage.code => (
@@ -867,9 +1100,23 @@ final prev = switch (_stage) {
           () => _advance(_Stage.confirm),
         ),
       _Stage.confirm => (
-          'Create Account',
+          'Next',
           _confirmValid && !_busy,
-          _createAccount,
+          () => _advance(_Stage.phone),
+        ),
+      _Stage.phone => (
+          _pendingUserId == null
+              ? 'Send code'
+              : _canResend
+                  ? 'Resend code'
+                  : 'Resend in ${_resendRemainingSec}s',
+          _phoneValid && !_busy && (_pendingUserId == null || _canResend),
+          _sendPhoneCode,
+        ),
+      _Stage.sms => (
+          'Verify & Create Account',
+          _smsCodeValid && !_busy,
+          _verifySmsAndFinish,
         ),
       _Stage.success => ('', false, () {}),
     };

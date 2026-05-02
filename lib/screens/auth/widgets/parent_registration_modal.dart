@@ -20,6 +20,7 @@ import '../../../data/models/user_model.dart';
 import '../../../services/analytics_service.dart';
 import '../../../services/crash_reporting_service.dart';
 import '../../../services/parent_linking_service.dart';
+import '../../../services/sms_verification_service.dart';
 import '../link_code_scanner_screen.dart';
 
 /// Opens the floating parent registration modal over the current screen.
@@ -43,7 +44,7 @@ Future<void> showParentRegistrationModal(BuildContext context) {
 const double _kMaxBlur = 18;
 const double _kMaxDim = 0.18;
 
-enum _Stage { code, name, email, password, confirm, success }
+enum _Stage { code, name, email, password, confirm, phone, sms, success }
 
 class _ParentRegistrationOverlay extends StatelessWidget {
   const _ParentRegistrationOverlay();
@@ -127,6 +128,7 @@ class _ParentRegistrationCard extends StatefulWidget {
 
 class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
   final _linkingService = ParentLinkingService();
+  final _smsService = SmsVerificationService();
   final _auth = FirebaseAuth.instance;
   final _firestore = FirebaseFirestore.instance;
 
@@ -136,6 +138,8 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _smsCodeController = TextEditingController();
 
   _Stage _stage = _Stage.code;
   bool _busy = false;
@@ -144,6 +148,20 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
   StudentLinkCodeModel? _verifiedCode;
   Map<String, dynamic>? _studentInfo;
   UserModel? _createdParent;
+
+  // SMS MFA state.
+  String? _pendingUserId;
+  String? _verificationId;
+  int? _resendToken;
+  DateTime? _lastSendAt;
+  Timer? _resendTicker;
+  static const _resendCooldown = Duration(seconds: 30);
+  // Login-path MFA: set when we signed in an existing MFA-enrolled parent
+  // and need to complete the second factor before linking the new student.
+  MultiFactorResolver? _loginMfaResolver;
+  // Set when the account already exists AND already has phone MFA enrolled.
+  // Skips the enrollment write but still goes through a challenge.
+  bool _mfaAlreadyEnrolled = false;
 
   bool _lastNameRevealed = false;
   Timer? _lastNameRevealTimer;
@@ -165,6 +183,8 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       _emailController,
       _passwordController,
       _confirmController,
+      _phoneController,
+      _smsCodeController,
     ]) {
       c.addListener(() => setState(() {}));
     }
@@ -189,6 +209,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
   @override
   void dispose() {
     _lastNameRevealTimer?.cancel();
+    _resendTicker?.cancel();
     _passwordFocusNode.dispose();
     _confirmFocusNode.dispose();
     _codeController.dispose();
@@ -197,6 +218,8 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmController.dispose();
+    _phoneController.dispose();
+    _smsCodeController.dispose();
     super.dispose();
   }
 
@@ -264,6 +287,42 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
   bool get _confirmValid =>
       _confirmController.text.isNotEmpty &&
       _confirmController.text == _passwordController.text;
+
+  // Australian mobile numbers only — 10 digits starting with 04. Spaces
+  // are tolerated in the input for legibility but stripped for validation
+  // and the E.164 conversion below.
+  static final _auMobileRegex = RegExp(r'^04\d{8}$');
+
+  String get _phoneDigits =>
+      _phoneController.text.replaceAll(RegExp(r'\s+'), '');
+
+  bool get _phoneValid => _auMobileRegex.hasMatch(_phoneDigits);
+
+  /// Converts the Australian local form (`04XXXXXXXX`) to E.164 for Firebase.
+  String get _phoneE164 => '+61${_phoneDigits.substring(1)}';
+
+  bool get _smsCodeValid =>
+      RegExp(r'^\d{6}$').hasMatch(_smsCodeController.text.trim());
+
+  int get _resendRemainingSec {
+    if (_lastSendAt == null) return 0;
+    final remaining =
+        _resendCooldown - DateTime.now().difference(_lastSendAt!);
+    return remaining.isNegative ? 0 : remaining.inSeconds;
+  }
+
+  bool get _canResend => _resendRemainingSec == 0;
+
+  void _startResendCountdown() {
+    _lastSendAt = DateTime.now();
+    _resendTicker?.cancel();
+    _resendTicker = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (_resendRemainingSec == 0) {
+        t.cancel();
+      }
+      if (mounted) setState(() {});
+    });
+  }
 
   // ---------------------------------------------------------------------------
   // Actions
@@ -354,6 +413,8 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       _Stage.email => _Stage.name,
       _Stage.password => _Stage.email,
       _Stage.confirm => _Stage.password,
+      _Stage.phone => _pendingUserId == null ? _Stage.confirm : _Stage.phone,
+      _Stage.sms => _Stage.phone,
       _Stage.success => _Stage.success,
     };
     setState(() {
@@ -362,8 +423,12 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
     });
   }
 
-  Future<void> _createAccount() async {
-    if (!_confirmValid) return;
+  /// Resolves the Firebase Auth user (creating a new one or signing in if
+  /// the email already exists) and dispatches the SMS challenge. Handles
+  /// three branches: new account, existing account without MFA, existing
+  /// account with MFA already enrolled.
+  Future<void> _sendPhoneCode() async {
+    if (!_phoneValid) return;
     final code = _verifiedCode;
     if (code == null) return;
 
@@ -374,60 +439,182 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
 
     final email = _emailController.text.trim().toLowerCase();
     final password = _passwordController.text;
-    final fullName =
-        '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}';
+    final phone = _phoneE164;
 
     try {
-      final indexService = UserSchoolIndexService();
-      String userId;
-      var isNewAccount = false;
+      // Resolve (create-or-signin) the user exactly once per flow. Subsequent
+      // taps are resends and reuse the existing auth session.
+      if (_pendingUserId == null) {
+        try {
+          final cred = await _auth.createUserWithEmailAndPassword(
+            email: email,
+            password: password,
+          );
+          await cred.user!.sendEmailVerification();
+          _pendingUserId = cred.user!.uid;
+          _mfaAlreadyEnrolled = false;
+        } on FirebaseAuthException catch (e) {
+          if (e.code == 'email-already-in-use') {
+            // Existing account; try to sign in. If MFA is already enrolled,
+            // Firebase throws FirebaseAuthMultiFactorException instead.
+            try {
+              final cred = await _auth.signInWithEmailAndPassword(
+                email: email,
+                password: password,
+              );
+              _pendingUserId = cred.user!.uid;
 
-      try {
-        final cred = await _auth.createUserWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
-        userId = cred.user!.uid;
-        isNewAccount = true;
-        await cred.user!.sendEmailVerification();
-      } on FirebaseAuthException catch (e) {
-        if (e.code == 'email-already-in-use') {
-          try {
-            final cred = await _auth.signInWithEmailAndPassword(
-              email: email,
-              password: password,
-            );
-            userId = cred.user!.uid;
-            final existing = await _firestore
-                .collection('schools')
-                .doc(code.schoolId)
-                .collection('parents')
-                .doc(userId)
-                .get();
-            if (existing.exists &&
-                code.status == LinkCodeStatus.used &&
-                code.usedBy == userId) {
+              // Existing account without MFA — short-circuit "already linked
+              // to this student" before we dispatch an SMS.
+              final existing = await _firestore
+                  .collection('schools')
+                  .doc(code.schoolId)
+                  .collection('parents')
+                  .doc(cred.user!.uid)
+                  .get();
+              if (existing.exists &&
+                  code.status == LinkCodeStatus.used &&
+                  code.usedBy == cred.user!.uid) {
+                await _auth.signOut();
+                _pendingUserId = null;
+                setState(() => _errorMessage =
+                    'You are already registered and linked to this student. Please use the login page.');
+                return;
+              }
+
+              _mfaAlreadyEnrolled =
+                  await _smsService.hasPhoneFactor(cred.user!);
+            } on FirebaseAuthMultiFactorException catch (mfaError) {
+              // Existing account already has MFA — use the login resolver
+              // flow instead. The user must verify with their existing
+              // enrolled phone (not the one they just typed).
+              _loginMfaResolver = mfaError.resolver;
+              _mfaAlreadyEnrolled = true;
+              final loginHandle = await _smsService.sendLoginCode(
+                resolver: mfaError.resolver,
+              );
               if (!mounted) return;
-              setState(() => _errorMessage =
-                  'You are already registered and linked to this student. Please use the login page.');
-              await _auth.signOut();
+              setState(() {
+                _verificationId = loginHandle.verificationId;
+                _resendToken = loginHandle.resendToken;
+                _stage = _Stage.sms;
+              });
               return;
+            } on FirebaseAuthException catch (signInError) {
+              if (signInError.code == 'wrong-password' ||
+                  signInError.code == 'invalid-credential') {
+                setState(() => _errorMessage =
+                    'This email is already registered with a different password. If this is your account, please log in instead.');
+                return;
+              }
+              rethrow;
             }
-          } on FirebaseAuthException catch (signInError) {
-            if (signInError.code == 'wrong-password' ||
-                signInError.code == 'invalid-credential') {
-              if (!mounted) return;
-              setState(() => _errorMessage =
-                  'This email is already registered with a different password. If this is your account, please log in instead.');
-              return;
-            }
+          } else if (e.code == 'invalid-email' || e.code == 'weak-password') {
+            setState(() {
+              _errorMessage = _authErrorMessage(e.code);
+              _stage =
+                  e.code == 'weak-password' ? _Stage.password : _Stage.email;
+            });
+            return;
+          } else {
             rethrow;
           }
-        } else {
-          rethrow;
         }
       }
 
+      // At this point we have a signed-in user. If MFA is already enrolled,
+      // bail — we would have already taken the login-resolver branch above.
+      final user = _auth.currentUser!;
+      if (_mfaAlreadyEnrolled) {
+        // Shouldn't be reached given the login branch returns early, but
+        // guard against a programmer error.
+        setState(() => _errorMessage =
+            'Phone MFA already set up on this account. Please log in instead.');
+        return;
+      }
+
+      final handle = await _smsService.sendEnrollmentCode(
+        user: user,
+        phoneNumber: phone,
+        forceResendingToken: _resendToken,
+      );
+
+      if (!mounted) return;
+      _startResendCountdown();
+      setState(() {
+        _verificationId = handle.verificationId;
+        _resendToken = handle.resendToken;
+        _stage = _Stage.sms;
+      });
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _errorMessage = SmsVerificationService.friendlyError(e));
+      AnalyticsService.instance.logParentLinkingFailed(reason: e.code);
+    } catch (e, st) {
+      if (!mounted) return;
+      setState(() => _errorMessage =
+          'Could not send code: ${e.toString().replaceAll('Exception: ', '')}');
+      CrashReportingService.instance
+          .recordError(e, st, reason: 'Parent SMS send failed');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Verifies the SMS code, either enrolling the phone factor (new / existing
+  /// non-MFA account) or resolving the login (existing MFA account), then
+  /// writes the parent doc and links the student.
+  Future<void> _verifySmsAndFinish() async {
+    if (!_smsCodeValid) return;
+    final code = _verifiedCode;
+    final verificationId = _verificationId;
+    if (code == null || verificationId == null) return;
+
+    setState(() {
+      _busy = true;
+      _errorMessage = null;
+    });
+
+    final email = _emailController.text.trim().toLowerCase();
+    final phone = _phoneE164;
+    final fullName =
+        '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}';
+    final smsCode = _smsCodeController.text.trim();
+
+    try {
+      String userId;
+      String? enrolledPhone;
+      final resolver = _loginMfaResolver;
+
+      if (resolver != null) {
+        // Existing-MFA branch: resolveSignIn completes the login; phone stays
+        // whatever was previously enrolled.
+        final cred = await _smsService.resolveLogin(
+          resolver: resolver,
+          verificationId: verificationId,
+          smsCode: smsCode,
+        );
+        userId = cred.user!.uid;
+        enrolledPhone = null; // not changing the enrolled phone
+      } else {
+        // New-user or existing-no-MFA branch: enroll the phone we collected.
+        final user = _auth.currentUser;
+        if (user == null) {
+          setState(() => _errorMessage =
+              'Your session expired. Please start registration again.');
+          return;
+        }
+        await _smsService.enrollPhoneFactor(
+          user: user,
+          verificationId: verificationId,
+          smsCode: smsCode,
+          phoneNumber: phone,
+        );
+        userId = user.uid;
+        enrolledPhone = phone;
+      }
+
+      final indexService = UserSchoolIndexService();
       final parentRef = _firestore
           .collection('schools')
           .doc(code.schoolId)
@@ -445,6 +632,8 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
           linkedChildren: const [],
           createdAt: DateTime.now(),
           isActive: true,
+          phoneNumber: enrolledPhone,
+          phoneVerified: true,
         );
         await parentRef.set(parentUser.toFirestore());
         try {
@@ -461,12 +650,19 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
           userType: 'parent',
           userId: userId,
         );
-      } else if (isNewAccount) {
-        await parentRef.update({
+      } else {
+        // Existing parent doc — update the mutable fields. Only overwrite
+        // phoneNumber if we just enrolled a new one in this flow.
+        final update = <String, dynamic>{
           'fullName': fullName,
           'email': email,
+          'phoneVerified': true,
           'linkedChildren': FieldValue.arrayUnion([code.studentId]),
-        });
+        };
+        if (enrolledPhone != null) {
+          update['phoneNumber'] = enrolledPhone;
+        }
+        await parentRef.update(update);
         await indexService.createOrUpdateIndex(
           email: email,
           schoolId: code.schoolId,
@@ -488,7 +684,8 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       final refreshed = await parentRef.get();
       if (!mounted) return;
       setState(() {
-        _createdParent = refreshed.exists ? UserModel.fromFirestore(refreshed) : null;
+        _createdParent =
+            refreshed.exists ? UserModel.fromFirestore(refreshed) : null;
         _stage = _Stage.success;
       });
       AnalyticsService.instance.logParentLinkingCompleted();
@@ -497,12 +694,10 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       setState(() => _errorMessage = e.userMessage);
       AnalyticsService.instance
           .logParentLinkingFailed(reason: e.runtimeType.toString());
-      await _auth.signOut();
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
-      setState(() => _errorMessage = _authErrorMessage(e.code));
+      setState(() => _errorMessage = SmsVerificationService.friendlyError(e));
       AnalyticsService.instance.logParentLinkingFailed(reason: e.code);
-      await _auth.signOut();
     } catch (e, st) {
       if (!mounted) return;
       var detail = e.toString();
@@ -516,9 +711,6 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       AnalyticsService.instance.logParentLinkingFailed(reason: detail);
       CrashReportingService.instance
           .recordError(e, st, reason: 'Parent registration failed');
-      try {
-        await _auth.signOut();
-      } catch (_) {}
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -657,6 +849,8 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       _Stage.email => 'Email address',
       _Stage.password => 'Create password',
       _Stage.confirm => 'Confirm password',
+      _Stage.phone => 'Phone number',
+      _Stage.sms => 'Enter SMS code',
       _Stage.success => '',
     };
 
@@ -725,6 +919,20 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         label: 'Password set',
       ));
     }
+    if (_stage.index >= _Stage.phone.index) {
+      chips.add(const _CompletedChip(
+        key: ValueKey('chip_password_confirmed'),
+        label: 'Password confirmed',
+      ));
+    }
+    if (_stage.index >= _Stage.sms.index) {
+      chips.add(_CompletedChip(
+        key: const ValueKey('chip_phone'),
+        label: _loginMfaResolver != null
+            ? 'Verifying existing phone'
+            : 'Phone: $_phoneDigits',
+      ));
+    }
 
     if (chips.isEmpty) return const [];
     return [
@@ -768,6 +976,8 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
           _Stage.email => _buildEmailInput(),
           _Stage.password => _buildPasswordInput(),
           _Stage.confirm => _buildConfirmInput(),
+          _Stage.phone => _buildPhoneInput(),
+          _Stage.sms => _buildSmsInput(),
           _Stage.success => const SizedBox.shrink(),
         },
       ),
@@ -947,6 +1157,78 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
     );
   }
 
+  Widget _buildPhoneInput() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'We\'ll text you a code to confirm your mobile. This becomes your sign-in second factor.',
+          style: LumiTextStyles.bodySmall(
+            color: AppColors.charcoal.withValues(alpha: 0.7),
+          ),
+        ),
+        const SizedBox(height: 12),
+        LumiInput(
+          controller: _phoneController,
+          hintText: '0400 000 000',
+          autofocus: true,
+          keyboardType: TextInputType.phone,
+          textInputAction: TextInputAction.done,
+          helperText: 'Australian mobile only.',
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[\d\s]')),
+          ],
+          errorText: _phoneDigits.isNotEmpty && !_phoneValid
+              ? 'Enter a 10-digit Australian mobile starting with 04'
+              : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSmsInput() {
+    final subtitle = _loginMfaResolver != null
+        ? 'We sent a code to the phone already on this account.'
+        : 'Enter the 6-digit code sent to $_phoneDigits.';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          subtitle,
+          style: LumiTextStyles.bodySmall(
+            color: AppColors.charcoal.withValues(alpha: 0.7),
+          ),
+        ),
+        const SizedBox(height: 12),
+        LumiInput(
+          controller: _smsCodeController,
+          hintText: '123456',
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          maxLength: 6,
+          textInputAction: TextInputAction.done,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          onChanged: (_) {
+            if (_smsCodeValid && !_busy) {
+              _verifySmsAndFinish();
+            }
+          },
+        ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: _busy || !_canResend ? null : _sendPhoneCode,
+            child: Text(
+              _canResend ? 'Resend code' : 'Resend in ${_resendRemainingSec}s',
+              style: LumiTextStyles.bodySmall(color: AppColors.parentColor),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildPrimaryAction() {
     final (label, enabled, onPressed) = switch (_stage) {
       _Stage.code => (
@@ -970,9 +1252,25 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
           () => _advance(_Stage.confirm),
         ),
       _Stage.confirm => (
-          'Create Account',
+          'Next',
           _confirmValid && !_busy,
-          _createAccount,
+          () => _advance(_Stage.phone),
+        ),
+      _Stage.phone => (
+          _pendingUserId == null
+              ? 'Send code'
+              : _canResend
+                  ? 'Resend code'
+                  : 'Resend in ${_resendRemainingSec}s',
+          _phoneValid && !_busy && (_pendingUserId == null || _canResend),
+          _sendPhoneCode,
+        ),
+      _Stage.sms => (
+          _loginMfaResolver != null
+              ? 'Verify & Link Child'
+              : 'Verify & Create Account',
+          _smsCodeValid && !_busy,
+          _verifySmsAndFinish,
         ),
       _Stage.success => ('', false, () {}),
     };
