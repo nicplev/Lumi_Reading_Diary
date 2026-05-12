@@ -7,22 +7,26 @@
 ## STATUS
 
 ```yaml
-current_phase: 3
-current_phase_name: "Extract shared TS types into packages/types"
-last_completed_step: "2.5"
+current_phase: 4
+current_phase_name: "Unify admin auth onto /superAdmins (BLOCKED on user confirmation + bootstrap seeding)"
+last_completed_step: "3.7"
 last_action_at: "2026-05-05"
-last_action_summary: "Phase 2 complete — docs/MONOREPO_OVERLAP.md produced via Explore-agent audit. Catalogued 35 admin API routes, mapped TS types to Dart models (low drift), flagged 6 high + 3 medium priority routes for Phase 5, drafted Phase 4 auth patch and bootstrap-risk mitigation."
-blockers: []
+last_action_summary: "Phase 3 complete — @lumi/types extracted to packages/types/, pnpm workspace established at repo root, 19 type files moved with rename history preserved, admin imports updated, pnpm install + tsc verified."
+blockers:
+  - "Phase 4 needs user confirmation that admin auth should switch from ADMIN_EMAILS env to /superAdmins collection."
+  - "Phase 4 needs the user to seed /superAdmins/{uid} documents for every current admin BEFORE the auth-path flip. See Finding 4 in MONOREPO_OVERLAP.md."
 chosen_layout: "flat"
 notes_for_resumer: |
-  Phases 0-2 done. Overlap doc at docs/MONOREPO_OVERLAP.md is the reference for Phases 3-5.
-  Phase 3 plan: 18 TS types live in admin/src/lib/types/. Move them to packages/types/src/,
-  re-export from an index, update admin imports from "@/lib/types/..." to "@lumi/types".
-  Reconciliation: admin/ already has pnpm-workspace.yaml. Promote to repo root so it covers
-  both `admin` and `packages/*`. Confirm `pnpm install` from repo root works.
-  Dart side stays untouched in this phase — no codegen.
-  Phase 4 (auth) has a documented bootstrap risk: must seed /superAdmins/{uid} for current
-  admins BEFORE flipping the auth path. See Finding 4 in MONOREPO_OVERLAP.md.
+  Phases 0-3 done. Repo is now a pnpm workspace:
+    - admin/ (lumi-admin-scaffold, Next.js)
+    - packages/types/ (@lumi/types, consumed by admin)
+  Root files: package.json, pnpm-lock.yaml, pnpm-workspace.yaml.
+  admin/next.config.ts has transpilePackages: ['@lumi/types'] for runtime enum compilation.
+  Known pre-existing typecheck error (NOT caused by migration):
+    admin/src/app/api/feedback/[id]/status/route.ts:30:54 — Zod .errors API usage.
+    Fix is out of scope; it predates the monorepo work (came in via subtree at e454901).
+  Phase 4 (auth unification) implementation sketch is in docs/MONOREPO_OVERLAP.md Finding 4.
+  STOP at Phase 4 — confirm with user and verify /superAdmins seeding before any code change.
 ```
 
 ### Decisions log
@@ -35,6 +39,7 @@ notes_for_resumer: |
 - **2026-05-05** — Phase 1 executed. `git subtree add --prefix=admin lumi-admin-src main` produced merge commit `e454901`. 11 top-level admin/ entries imported (src/, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, next.config.ts, etc.). Six lumi-admin commits preserved via second-parent (3bcd5ce → 75f28d5). Secret scan clean. Pushed to origin/monorepo-migration.
 - **2026-05-05** — Noted: admin/ already has its own `pnpm-workspace.yaml`. Will need reconciliation in Phase 3 — either move workspace config to repo root or keep nested. Recommended: root-level workspace covering both `admin` and `packages/*`.
 - **2026-05-05** — Phase 2 executed via Explore agent. Output: `docs/MONOREPO_OVERLAP.md`. Key findings: 35 routes catalogued; minimal TS↔Dart drift (only 3 Dart-only fields on Student, 2 on User, no admin-only fields anywhere); 6 high-priority + 3 medium-priority Phase 5 candidates identified; Phase 4 patch sketched with bootstrap-risk mitigation (seed `/superAdmins/{uid}` before cutover).
+- **2026-05-05** — Phase 3 executed. Promoted `pnpm-workspace.yaml` and `pnpm-lock.yaml` to repo root. Added root `package.json` (`lumi-monorepo`) with admin:* scripts. Created `packages/types/` (`@lumi/types`) with peerDep on `firebase-admin@^13.0.0`. 19 type files moved via `git mv` (rename history preserved, 100% similarity). admin imports rewired (2 files). `admin/next.config.ts` adds `transpilePackages: ['@lumi/types']` for runtime enum compilation. `pnpm install` + `tsc --noEmit` verified — only pre-existing Zod typing error remains (not in scope).
 
 ### Open questions for the user
 *(resolve before the indicated phase)*
