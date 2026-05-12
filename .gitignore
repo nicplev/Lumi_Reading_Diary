@@ -4,6 +4,10 @@
 *.pyc
 *.swp
 .DS_Store
+
+# Node / monorepo (Phase 3: pnpm workspace)
+node_modules/
+.turbo/
 .atom/
 .build/
 .buildlog/

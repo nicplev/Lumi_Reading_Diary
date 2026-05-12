@@ -1,7 +1,7 @@
 import "server-only";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
-import type { SchoolOnboarding } from "@/lib/types";
+import type { SchoolOnboarding } from "@lumi/types";
 
 function toISO(ts: unknown): string {
   if (!ts || typeof ts !== "object") return "";
