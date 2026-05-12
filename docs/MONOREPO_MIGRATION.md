@@ -7,19 +7,22 @@
 ## STATUS
 
 ```yaml
-current_phase: 1
-current_phase_name: "Ready for subtree import (awaiting layout confirmation)"
-last_completed_step: "0.4"
+current_phase: 2
+current_phase_name: "Inventory & schema overlap audit"
+last_completed_step: "1.7"
 last_action_at: "2026-05-05"
-last_action_summary: "Phase 0 complete — pre-monorepo-merge tags pushed on both repos; monorepo-migration branch created and pushed."
-blockers:
-  - "Open question: confirm flat vs apps-prefixed layout before Phase 1.2 subtree import."
-chosen_layout: "flat"   # see "Layout decision" below — options: "flat" | "apps-prefixed"
+last_action_summary: "Phase 1 complete — lumi-admin imported via git subtree to ./admin/ (merge commit e454901). History preserved (6 lumi-admin commits reachable via second parent). Secret scan clean. Pushed to origin/monorepo-migration."
+blockers: []
+chosen_layout: "flat"
 notes_for_resumer: |
-  Phase 0 done. Tags pre-monorepo-merge exist on both nicplev/Lumi_Reading_Diary and nicplev/lumi-admin.
-  Working branch: monorepo-migration (tracking origin/monorepo-migration).
-  lumi-admin default branch confirmed: main.
-  DO NOT begin Phase 1.2 (the subtree add) until the user has confirmed the chosen layout.
+  Phases 0 and 1 done. ./admin/ now contains the full Next.js codebase with history.
+  Remote `lumi-admin-src` is configured (https://github.com/nicplev/lumi-admin.git) — keep it for now
+  in case we want to pull future updates via `git subtree pull` before standalone repo is archived.
+  Subtree merge SHA: e454901. Lumi-admin's tip at import time: 75f28d5.
+  admin/.env.example contains placeholder values only — no secrets in history.
+  admin/ uses pnpm (pnpm-lock.yaml present) and already has its own pnpm-workspace.yaml — this needs
+  reconciliation in Phase 3 when we add `packages/types` to the workspace.
+  Phase 2 produces docs/MONOREPO_OVERLAP.md as an artifact. It is mostly read-only investigation.
 ```
 
 ### Decisions log
@@ -28,6 +31,9 @@ notes_for_resumer: |
 - **2026-05-05** — Runbook created. Recommendation: keep Flutter at repo root (`flat` layout) rather than relocating to `apps/mobile/`, because relocating breaks `firebase.json`, `ios/`, `android/`, and IDE config. Subject to user confirmation before Phase 1.
 - **2026-05-05** — Use `git subtree` (not submodules) to import lumi-admin so history is preserved as real commits in this repo and there's no second clone step for collaborators.
 - **2026-05-05** — Phase 0 executed. Tag `pre-monorepo-merge` pushed to both repos. Branch `monorepo-migration` created and pushed on the main repo. lumi-admin default branch confirmed as `main` (relevant for Phase 1.2 subtree command).
+- **2026-05-05** — Layout confirmed: `flat` (admin at ./admin/, Flutter stays at root).
+- **2026-05-05** — Phase 1 executed. `git subtree add --prefix=admin lumi-admin-src main` produced merge commit `e454901`. 11 top-level admin/ entries imported (src/, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, next.config.ts, etc.). Six lumi-admin commits preserved via second-parent (3bcd5ce → 75f28d5). Secret scan clean. Pushed to origin/monorepo-migration.
+- **2026-05-05** — Noted: admin/ already has its own `pnpm-workspace.yaml`. Will need reconciliation in Phase 3 — either move workspace config to repo root or keep nested. Recommended: root-level workspace covering both `admin` and `packages/*`.
 
 ### Open questions for the user
 *(resolve before the indicated phase)*
