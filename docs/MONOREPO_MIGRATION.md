@@ -7,22 +7,22 @@
 ## STATUS
 
 ```yaml
-current_phase: 2
-current_phase_name: "Inventory & schema overlap audit"
-last_completed_step: "1.7"
+current_phase: 3
+current_phase_name: "Extract shared TS types into packages/types"
+last_completed_step: "2.5"
 last_action_at: "2026-05-05"
-last_action_summary: "Phase 1 complete — lumi-admin imported via git subtree to ./admin/ (merge commit e454901). History preserved (6 lumi-admin commits reachable via second parent). Secret scan clean. Pushed to origin/monorepo-migration."
+last_action_summary: "Phase 2 complete — docs/MONOREPO_OVERLAP.md produced via Explore-agent audit. Catalogued 35 admin API routes, mapped TS types to Dart models (low drift), flagged 6 high + 3 medium priority routes for Phase 5, drafted Phase 4 auth patch and bootstrap-risk mitigation."
 blockers: []
 chosen_layout: "flat"
 notes_for_resumer: |
-  Phases 0 and 1 done. ./admin/ now contains the full Next.js codebase with history.
-  Remote `lumi-admin-src` is configured (https://github.com/nicplev/lumi-admin.git) — keep it for now
-  in case we want to pull future updates via `git subtree pull` before standalone repo is archived.
-  Subtree merge SHA: e454901. Lumi-admin's tip at import time: 75f28d5.
-  admin/.env.example contains placeholder values only — no secrets in history.
-  admin/ uses pnpm (pnpm-lock.yaml present) and already has its own pnpm-workspace.yaml — this needs
-  reconciliation in Phase 3 when we add `packages/types` to the workspace.
-  Phase 2 produces docs/MONOREPO_OVERLAP.md as an artifact. It is mostly read-only investigation.
+  Phases 0-2 done. Overlap doc at docs/MONOREPO_OVERLAP.md is the reference for Phases 3-5.
+  Phase 3 plan: 18 TS types live in admin/src/lib/types/. Move them to packages/types/src/,
+  re-export from an index, update admin imports from "@/lib/types/..." to "@lumi/types".
+  Reconciliation: admin/ already has pnpm-workspace.yaml. Promote to repo root so it covers
+  both `admin` and `packages/*`. Confirm `pnpm install` from repo root works.
+  Dart side stays untouched in this phase — no codegen.
+  Phase 4 (auth) has a documented bootstrap risk: must seed /superAdmins/{uid} for current
+  admins BEFORE flipping the auth path. See Finding 4 in MONOREPO_OVERLAP.md.
 ```
 
 ### Decisions log
@@ -34,6 +34,7 @@ notes_for_resumer: |
 - **2026-05-05** — Layout confirmed: `flat` (admin at ./admin/, Flutter stays at root).
 - **2026-05-05** — Phase 1 executed. `git subtree add --prefix=admin lumi-admin-src main` produced merge commit `e454901`. 11 top-level admin/ entries imported (src/, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, next.config.ts, etc.). Six lumi-admin commits preserved via second-parent (3bcd5ce → 75f28d5). Secret scan clean. Pushed to origin/monorepo-migration.
 - **2026-05-05** — Noted: admin/ already has its own `pnpm-workspace.yaml`. Will need reconciliation in Phase 3 — either move workspace config to repo root or keep nested. Recommended: root-level workspace covering both `admin` and `packages/*`.
+- **2026-05-05** — Phase 2 executed via Explore agent. Output: `docs/MONOREPO_OVERLAP.md`. Key findings: 35 routes catalogued; minimal TS↔Dart drift (only 3 Dart-only fields on Student, 2 on User, no admin-only fields anywhere); 6 high-priority + 3 medium-priority Phase 5 candidates identified; Phase 4 patch sketched with bootstrap-risk mitigation (seed `/superAdmins/{uid}` before cutover).
 
 ### Open questions for the user
 *(resolve before the indicated phase)*
