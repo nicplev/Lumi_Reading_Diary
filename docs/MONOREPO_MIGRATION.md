@@ -7,16 +7,19 @@
 ## STATUS
 
 ```yaml
-current_phase: 0
-current_phase_name: "Not started — pre-flight only"
-last_completed_step: null
-last_action_at: null
-last_action_summary: "Runbook created"
-blockers: []
+current_phase: 1
+current_phase_name: "Ready for subtree import (awaiting layout confirmation)"
+last_completed_step: "0.4"
+last_action_at: "2026-05-05"
+last_action_summary: "Phase 0 complete — pre-monorepo-merge tags pushed on both repos; monorepo-migration branch created and pushed."
+blockers:
+  - "Open question: confirm flat vs apps-prefixed layout before Phase 1.2 subtree import."
 chosen_layout: "flat"   # see "Layout decision" below — options: "flat" | "apps-prefixed"
 notes_for_resumer: |
-  No work has begun. Start with Phase 0 (backups + tags) before touching either repo.
-  Both repos currently clean. Main repo on `main`. lumi-admin local at /Users/nicplev/lumi-admin.
+  Phase 0 done. Tags pre-monorepo-merge exist on both nicplev/Lumi_Reading_Diary and nicplev/lumi-admin.
+  Working branch: monorepo-migration (tracking origin/monorepo-migration).
+  lumi-admin default branch confirmed: main.
+  DO NOT begin Phase 1.2 (the subtree add) until the user has confirmed the chosen layout.
 ```
 
 ### Decisions log
@@ -24,6 +27,7 @@ notes_for_resumer: |
 
 - **2026-05-05** — Runbook created. Recommendation: keep Flutter at repo root (`flat` layout) rather than relocating to `apps/mobile/`, because relocating breaks `firebase.json`, `ios/`, `android/`, and IDE config. Subject to user confirmation before Phase 1.
 - **2026-05-05** — Use `git subtree` (not submodules) to import lumi-admin so history is preserved as real commits in this repo and there's no second clone step for collaborators.
+- **2026-05-05** — Phase 0 executed. Tag `pre-monorepo-merge` pushed to both repos. Branch `monorepo-migration` created and pushed on the main repo. lumi-admin default branch confirmed as `main` (relevant for Phase 1.2 subtree command).
 
 ### Open questions for the user
 *(resolve before the indicated phase)*
