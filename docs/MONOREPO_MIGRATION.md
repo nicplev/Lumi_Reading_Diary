@@ -7,26 +7,29 @@
 ## STATUS
 
 ```yaml
-current_phase: 4
-current_phase_name: "Unify admin auth onto /superAdmins (BLOCKED on user confirmation + bootstrap seeding)"
-last_completed_step: "3.7"
-last_action_at: "2026-05-05"
-last_action_summary: "Phase 3 complete — @lumi/types extracted to packages/types/, pnpm workspace established at repo root, 19 type files moved with rename history preserved, admin imports updated, pnpm install + tsc verified."
+current_phase: 5
+current_phase_name: "Migrate business-logic admin routes to Cloud Functions (selective) — BLOCKED on user prioritizing the Phase 2.3 route list"
+last_completed_step: "4.5"
+last_action_at: "2026-05-15"
+last_action_summary: "Phase 4 complete — admin login route gates on /superAdmins/{uid} via new isSuperAdminViaFirestore() (mirrors functions/src/super_admin.ts); ADMIN_EMAILS allowlist removed; .env.example swapped to optional SUPER_ADMIN_UIDS fallback. User's /superAdmins doc seeded + UID verified via read-only Auth lookup, browser auth test passed. Committed 49f2590."
 blockers:
-  - "Phase 4 needs user confirmation that admin auth should switch from ADMIN_EMAILS env to /superAdmins collection."
-  - "Phase 4 needs the user to seed /superAdmins/{uid} documents for every current admin BEFORE the auth-path flip. See Finding 4 in MONOREPO_OVERLAP.md."
+  - "Phase 5 needs the user to review and prioritize the Phase 2.3 candidate route list in docs/MONOREPO_OVERLAP.md before any route is migrated. Phase 5 is selective by design — do NOT migrate every route."
 chosen_layout: "flat"
 notes_for_resumer: |
-  Phases 0-3 done. Repo is now a pnpm workspace:
+  Phases 0-4 done. Repo is a pnpm workspace:
     - admin/ (lumi-admin-scaffold, Next.js)
     - packages/types/ (@lumi/types, consumed by admin)
   Root files: package.json, pnpm-lock.yaml, pnpm-workspace.yaml.
   admin/next.config.ts has transpilePackages: ['@lumi/types'] for runtime enum compilation.
+  Admin auth now uses /superAdmins/{uid} (Phase 4). SUPER_ADMIN_UIDS env is an
+  optional bootstrap fallback only; the deployed admin app no longer reads
+  ADMIN_EMAILS (safe to delete that var from the deploy config).
   Known pre-existing typecheck error (NOT caused by migration):
     admin/src/app/api/feedback/[id]/status/route.ts:30:54 — Zod .errors API usage.
     Fix is out of scope; it predates the monorepo work (came in via subtree at e454901).
-  Phase 4 (auth unification) implementation sketch is in docs/MONOREPO_OVERLAP.md Finding 4.
-  STOP at Phase 4 — confirm with user and verify /superAdmins seeding before any code change.
+  Phase 5 candidate routes are in docs/MONOREPO_OVERLAP.md (Finding 1 table + the
+  high/medium priority list). STOP at Phase 5 — get the user to prioritize which
+  routes to migrate before touching any.
 ```
 
 ### Decisions log
@@ -40,12 +43,13 @@ notes_for_resumer: |
 - **2026-05-05** — Noted: admin/ already has its own `pnpm-workspace.yaml`. Will need reconciliation in Phase 3 — either move workspace config to repo root or keep nested. Recommended: root-level workspace covering both `admin` and `packages/*`.
 - **2026-05-05** — Phase 2 executed via Explore agent. Output: `docs/MONOREPO_OVERLAP.md`. Key findings: 35 routes catalogued; minimal TS↔Dart drift (only 3 Dart-only fields on Student, 2 on User, no admin-only fields anywhere); 6 high-priority + 3 medium-priority Phase 5 candidates identified; Phase 4 patch sketched with bootstrap-risk mitigation (seed `/superAdmins/{uid}` before cutover).
 - **2026-05-05** — Phase 3 executed. Promoted `pnpm-workspace.yaml` and `pnpm-lock.yaml` to repo root. Added root `package.json` (`lumi-monorepo`) with admin:* scripts. Created `packages/types/` (`@lumi/types`) with peerDep on `firebase-admin@^13.0.0`. 19 type files moved via `git mv` (rename history preserved, 100% similarity). admin imports rewired (2 files). `admin/next.config.ts` adds `transpilePackages: ['@lumi/types']` for runtime enum compilation. `pnpm install` + `tsc --noEmit` verified — only pre-existing Zod typing error remains (not in scope).
+- **2026-05-15** — Phase 4 executed. Admin login route (`admin/src/app/api/auth/route.ts`) now gates on `/superAdmins/{uid}` via new `admin/src/lib/auth-firestore.ts#isSuperAdminViaFirestore` (mirrors `functions/src/super_admin.ts`). `ADMIN_EMAILS` allowlist removed entirely — chose the clean cutover over the two-step rollout because the sole current admin (`nicxplev@gmail.com`) had their `/superAdmins` doc seeded and the UID was verified via a read-only `getUserByEmail` lookup before the flip. `.env.example` swapped `ADMIN_EMAILS` → `SUPER_ADMIN_UIDS` (optional bootstrap fallback). `tsc --noEmit` clean except the known pre-existing Zod error. Browser auth test passed. Committed `49f2590`.
 
 ### Open questions for the user
 *(resolve before the indicated phase)*
 
 - [ ] **Before Phase 1:** confirm `flat` layout (admin lives at `./admin/`) vs `apps-prefixed` (mobile relocates to `./apps/mobile/`, admin to `./apps/admin/`). Default = `flat`.
-- [ ] **Before Phase 4:** confirm migration of admin auth from `ADMIN_EMAILS` env allowlist to `/superAdmins` Firestore collection. This is recommended but is a behavior change.
+- [x] **Before Phase 4:** ~~confirm migration of admin auth from `ADMIN_EMAILS` env allowlist to `/superAdmins` Firestore collection.~~ Resolved 2026-05-15 — clean cutover to `/superAdmins`, `ADMIN_EMAILS` removed.
 - [ ] **Before Phase 6:** which CI provider for the admin app? (GitHub Actions assumed unless stated otherwise.)
 
 ---
@@ -348,18 +352,19 @@ lumi_reading_tracker/
 
 **Steps:**
 
-- [ ] **4.1** Locate the admin auth gate (likely `admin/src/lib/auth/...` per Phase 2.4).
+- [x] **4.1** Locate the admin auth gate (likely `admin/src/lib/auth/...` per Phase 2.4). — Found at `admin/src/app/api/auth/route.ts`.
 
-- [ ] **4.2** Replace the email allowlist check with a `/superAdmins/{uid}` lookup using the Admin SDK. The check should:
+- [x] **4.2** Replace the email allowlist check with a `/superAdmins/{uid}` lookup using the Admin SDK. The check should:
   1. `verifyIdToken()` to get the UID (existing behavior — keep).
   2. Read `/superAdmins/{uid}` — if it exists, allow; else 403.
   3. Keep the `auth_time` freshness check (existing behavior — keep).
+  — Done via new `admin/src/lib/auth-firestore.ts#isSuperAdminViaFirestore`.
 
-- [ ] **4.3** Make the `ADMIN_EMAILS` fallback opt-in via a clearly-named env (e.g. `ADMIN_EMAILS_LEGACY_FALLBACK=true`) for emergency lock-out recovery, OR remove it entirely if the user has confirmed they have a Firestore `/superAdmins` entry.
+- [x] **4.3** ~~Make the `ADMIN_EMAILS` fallback opt-in~~ — removed `ADMIN_EMAILS` entirely (user's `/superAdmins` doc seeded + UID verified). `SUPER_ADMIN_UIDS` env remains as the bootstrap fallback, mirroring `functions/src/super_admin.ts`.
 
-- [ ] **4.4** Test from a logged-in browser session: confirm a known superadmin can still load `/admin/...`. Confirm a non-admin gets 403.
+- [x] **4.4** Test from a logged-in browser session: confirm a known superadmin can still load `/admin/...`. Confirm a non-admin gets 403. — Browser auth test passed.
 
-- [ ] **4.5** Commit: `feat(admin): unify auth on /superAdmins collection`.
+- [x] **4.5** Commit: `feat(admin): unify auth on /superAdmins collection`. — Committed `49f2590`.
 
 **Verify:**
 - Manual auth test passes for both an admin and a non-admin.
