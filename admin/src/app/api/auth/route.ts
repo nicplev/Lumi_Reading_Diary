@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminAuth } from "@/lib/firebase-admin";
+import { isSuperAdminViaFirestore } from "@/lib/auth-firestore";
 import { createSession, destroySession } from "@/lib/auth";
 
 export async function POST(request: Request) {
@@ -15,16 +16,12 @@ export async function POST(request: Request) {
     // Verify the ID token
     const decoded = await getAdminAuth().verifyIdToken(idToken);
 
-    // Check allowed emails
-    const allowedEmails = process.env.ADMIN_EMAILS;
-    if (allowedEmails) {
-      const emailList = allowedEmails.split(",").map((e) => e.trim().toLowerCase());
-      if (!decoded.email || !emailList.includes(decoded.email.toLowerCase())) {
-        return NextResponse.json(
-          { error: "Unauthorized email" },
-          { status: 403 }
-        );
-      }
+    // Gate on /superAdmins membership — same source of truth as Cloud Functions
+    if (!(await isSuperAdminViaFirestore(decoded.uid))) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 403 }
+      );
     }
 
     // Check auth_time freshness (must be within 5 minutes)
