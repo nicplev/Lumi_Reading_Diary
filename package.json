@@ -1,0 +1,12 @@
+{
+  "name": "lumi-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.32.1",
+  "scripts": {
+    "admin:dev": "pnpm --filter lumi-admin-scaffold dev",
+    "admin:build": "pnpm --filter lumi-admin-scaffold build",
+    "admin:lint": "pnpm --filter lumi-admin-scaffold lint",
+    "typecheck": "pnpm -r --if-present exec tsc --noEmit"
+  }
+}

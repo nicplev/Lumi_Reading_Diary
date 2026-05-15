@@ -7,16 +7,48 @@
 ## STATUS
 
 ```yaml
-current_phase: 0
-current_phase_name: "Not started — pre-flight only"
-last_completed_step: null
-last_action_at: null
-last_action_summary: "Runbook created"
-blockers: []
-chosen_layout: "flat"   # see "Layout decision" below — options: "flat" | "apps-prefixed"
+current_phase: 6
+current_phase_name: "CI/CD for the admin app (CI live; deploy pending user setup)"
+last_completed_step: "6.1"
+last_action_at: "2026-05-15"
+last_action_summary: "Phase 6.1 done — .github/workflows/admin-ci.yml runs on PRs/pushes touching admin/** + packages/** with install/typecheck/build (lint non-blocking due to pre-existing react-hooks errors in use-mobile.ts). Pre-existing Zod .errors → .issues bug in admin/src/app/api/feedback/[id]/status/route.ts fixed in the same commit so tsc is fully green. Phase 6.2 (deploy workflow) needs Firebase Hosting site setup + GitHub secrets — user action required before the deploy workflow can be wired."
+blockers:
+  - "Phase 6.2 (admin-deploy.yml) needs the user to: (a) create a second Firebase Hosting site in the lumi-kakakids project (e.g. site id `lumi-admin`), (b) run `firebase target:apply hosting admin <site-id>` locally and commit the resulting .firebaserc update, (c) enable web frameworks: `firebase experiments:enable webframeworks`, (d) add GitHub repo secrets FIREBASE_SERVICE_ACCOUNT (deploy key JSON) + FIREBASE_PROJECT_ID. Once those are in place the deploy workflow can be added without further user input."
+chosen_layout: "flat"
+phase5_scope:
+  sequencing: "one commit per route, straight through (no pause between routes)"
+  routes:
+    - { n: 1, route: "POST /bulk/students", cf: "bulkImportStudents", status: "done" }
+    - { n: 2, route: "POST /community-books/deletion-requests/[id]/resolve", cf: "resolveCommunityBookDeletion", status: "done" }
+    - { n: 3, route: "POST /offboard", cf: "offboardSchool", status: "done" }
+    - { n: 4, route: "POST /schools/[schoolId]/users", cf: "createSchoolUser", status: "done" }
+    - { n: 5, route: "POST /schools/[schoolId]/students/[studentId]/reading-level", cf: "updateStudentReadingLevel", status: "done" }
+    - { n: 6, route: "POST /impersonation-audit/sessions/[sessionId]/revoke", cf: "revokeImpersonationSession", status: "deferred" }
+    - { n: 7, route: "POST /schools", cf: "createSchool", status: "done" }
+    - { n: 8, route: "POST /schools/[schoolId]/users/[userId]/auth", cf: "manageSchoolUserAuth", status: "done" }
+    - { n: 9, route: "POST /dev-access", cf: "grantDevAccess", status: "done" }
 notes_for_resumer: |
-  No work has begun. Start with Phase 0 (backups + tags) before touching either repo.
-  Both repos currently clean. Main repo on `main`. lumi-admin local at /Users/nicplev/lumi-admin.
+  Phases 0-4 done. Repo is a pnpm workspace:
+    - admin/ (lumi-admin-scaffold, Next.js)
+    - packages/types/ (@lumi/types, consumed by admin)
+  Root files: package.json, pnpm-lock.yaml, pnpm-workspace.yaml.
+  admin/next.config.ts has transpilePackages: ['@lumi/types'] for runtime enum compilation.
+  Admin auth now uses /superAdmins/{uid} (Phase 4). SUPER_ADMIN_UIDS env is an
+  optional bootstrap fallback only; the deployed admin app no longer reads
+  ADMIN_EMAILS (safe to delete that var from the deploy config).
+  Pre-existing Zod .errors bug at admin/src/app/api/feedback/[id]/status/route.ts:30
+  FIXED in the Phase 6.1 commit (.errors → .issues, Zod 4 API change). tsc
+  --noEmit is now fully green.
+  Phase 5: migrating all 9 candidate routes (see phase5_scope above). Per-route
+  status tracked in phase5_scope.routes[].status — update each pending→done as
+  committed. Calling pattern RESOLVED 2026-05-15: shared workspace module
+  (@lumi/server-ops), admin imports it in-process — NOT deployed Cloud Functions.
+  No token exchange, no network hop, functions/ untouched this phase. Auth gate
+  stays at the route (verifySession → /superAdmins); module fns take an explicit
+  actor:{uid,email} param; audit logging moves into the module. Route #6
+  (revokeImpersonationSession) is special-cased — do NOT fork the hardened
+  callable into the module; either defer it or do a one-off token exchange to
+  the existing deployed callable.
 ```
 
 ### Decisions log
@@ -24,13 +56,27 @@ notes_for_resumer: |
 
 - **2026-05-05** — Runbook created. Recommendation: keep Flutter at repo root (`flat` layout) rather than relocating to `apps/mobile/`, because relocating breaks `firebase.json`, `ios/`, `android/`, and IDE config. Subject to user confirmation before Phase 1.
 - **2026-05-05** — Use `git subtree` (not submodules) to import lumi-admin so history is preserved as real commits in this repo and there's no second clone step for collaborators.
+- **2026-05-05** — Phase 0 executed. Tag `pre-monorepo-merge` pushed to both repos. Branch `monorepo-migration` created and pushed on the main repo. lumi-admin default branch confirmed as `main` (relevant for Phase 1.2 subtree command).
+- **2026-05-05** — Layout confirmed: `flat` (admin at ./admin/, Flutter stays at root).
+- **2026-05-05** — Phase 1 executed. `git subtree add --prefix=admin lumi-admin-src main` produced merge commit `e454901`. 11 top-level admin/ entries imported (src/, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, next.config.ts, etc.). Six lumi-admin commits preserved via second-parent (3bcd5ce → 75f28d5). Secret scan clean. Pushed to origin/monorepo-migration.
+- **2026-05-05** — Noted: admin/ already has its own `pnpm-workspace.yaml`. Will need reconciliation in Phase 3 — either move workspace config to repo root or keep nested. Recommended: root-level workspace covering both `admin` and `packages/*`.
+- **2026-05-05** — Phase 2 executed via Explore agent. Output: `docs/MONOREPO_OVERLAP.md`. Key findings: 35 routes catalogued; minimal TS↔Dart drift (only 3 Dart-only fields on Student, 2 on User, no admin-only fields anywhere); 6 high-priority + 3 medium-priority Phase 5 candidates identified; Phase 4 patch sketched with bootstrap-risk mitigation (seed `/superAdmins/{uid}` before cutover).
+- **2026-05-05** — Phase 3 executed. Promoted `pnpm-workspace.yaml` and `pnpm-lock.yaml` to repo root. Added root `package.json` (`lumi-monorepo`) with admin:* scripts. Created `packages/types/` (`@lumi/types`) with peerDep on `firebase-admin@^13.0.0`. 19 type files moved via `git mv` (rename history preserved, 100% similarity). admin imports rewired (2 files). `admin/next.config.ts` adds `transpilePackages: ['@lumi/types']` for runtime enum compilation. `pnpm install` + `tsc --noEmit` verified — only pre-existing Zod typing error remains (not in scope).
+- **2026-05-15** — Phase 4 executed. Admin login route (`admin/src/app/api/auth/route.ts`) now gates on `/superAdmins/{uid}` via new `admin/src/lib/auth-firestore.ts#isSuperAdminViaFirestore` (mirrors `functions/src/super_admin.ts`). `ADMIN_EMAILS` allowlist removed entirely — chose the clean cutover over the two-step rollout because the sole current admin (`nicxplev@gmail.com`) had their `/superAdmins` doc seeded and the UID was verified via a read-only `getUserByEmail` lookup before the flip. `.env.example` swapped `ADMIN_EMAILS` → `SUPER_ADMIN_UIDS` (optional bootstrap fallback). `tsc --noEmit` clean except the known pre-existing Zod error. Browser auth test passed. Committed `49f2590`.
+- **2026-05-15** — Phase 4 commits verified by next session (diff inspected — `isSuperAdminViaFirestore` matches `functions/src/super_admin.ts`, `auth_time` check untouched) and pushed: `49f2590`, `f8c2646` now on `origin/monorepo-migration` (fast-forward, no divergence).
+- **2026-05-15** — Phase 5 scope decided by user: migrate ALL 9 candidate routes (6 high + 3 medium priority from `docs/MONOREPO_OVERLAP.md` Finding 3). Sequencing: one commit per route, run straight through without pausing between routes. Per-route progress tracked in the `phase5_scope` block of STATUS.
+- **2026-05-15** — Phase 5 calling pattern decided by user: **shared workspace module**, not deployed Cloud Functions. Business logic is extracted into a new `@lumi/server-ops` pnpm-workspace package; admin API routes import and call it **in-process**. Rationale: the admin server has only a service account + session cookie (no Firebase ID token), so calling an `onCall` function would require a custom-token→ID-token exchange helper — a new credential-handling code path and a real network hop — plus reconciling the `firebase-admin` v13 (admin) vs v12 (functions) split. The shared module delivers the runbook's single-source-of-truth goal at the code level with the smallest security surface, doesn't touch `functions/`, and matches the one-commit-per-route sequencing. `functions/` can adopt the same module later (a de-risked Option-3 follow-up). **Security constraints for this approach:** (1) auth stays at the route — every route keeps its `verifySession()` gate (the Phase-4 `/superAdmins` check); (2) `@lumi/server-ops` functions take an explicit `actor: {uid, email}` param so they cannot be called without a resolved identity; (3) input validation stays in the module too (defense in depth); (4) `logAuditEvent` moves into the module so the audit trail can't be skipped by a future caller; (5) route #6 (`revokeImpersonationSession`) is NOT forked into the module — the existing hardened callable in `functions/src/index.ts` stays the source of truth; that route is either deferred or wired via a one-off token exchange to the deployed callable.
+- **2026-05-15** — Phase 5 route 6 (`revokeImpersonationSession`) deferred. Per the 2026-05-15 calling-pattern decision, this route is not to be forked into `@lumi/server-ops` (the hardened callable in `functions/src/impersonation.ts:481` is the source of truth). The remaining options were (a) wire the admin route to call the deployed callable via a custom-token→ID-token exchange, or (b) defer. (b) chosen for this Phase 5 pass — token-exchange is a real new credential code path and warrants its own commit + review rather than being snuck in mid-refactor. The admin route's existing `revokeSession` fork stays in place for now; admin-portal revokes continue working unchanged. Follow-up tracked: write a small `callDeployedCallable(callable, idToken, payload)` helper in `admin/src/lib/`, wire route 6 to it, delete `admin/src/lib/firestore/impersonation-audit.ts#revokeSession`.
+- **2026-05-15** — Phase 5 complete. 8 of 9 candidate routes migrated to `@lumi/server-ops` in-process modules; route 6 deferred (above). One commit per route per the user's chosen sequencing: 1) bulkImportStudents `87df2a3`, 2) resolveCommunityBookDeletion `001dd59`, 3) offboardSchool `d39ec10`, 4) createSchoolUser `d6622f1`, 5) updateStudentReadingLevel `0f5aec8`, 6) DEFERRED `0068b35`, 7) createSchool `68632c3`, 8) manageSchoolUserAuth `438f0ce`, 9) grantDevAccess `8bc172d`. Each migration left a thin admin route (verifySession → server-ops call → response), with input validation, multi-doc/Storage/Auth orchestration, and `adminAuditLog` writes all owned by the module. `firebase-admin/auth` and `firebase-admin/storage` instances are passed explicitly alongside Firestore where needed. Several minor behavior changes documented in individual commits: a few "already X / not found" cases moved from 500/409 to a uniform 400 via `ServerOpsValidationError` (the route 9 dev-access UI may need its 409-specific toast updated). The pre-existing Zod `.errors` typecheck error in `admin/src/app/api/feedback/[id]/status/route.ts:30` is the only remaining tsc complaint and is unchanged from the pre-Phase-5 baseline. No `functions/` files were modified.
+- **2026-05-15** — Phase 6 CI provider + deploy target chosen by user: GitHub Actions for CI; Firebase Hosting (with frameworks) for the admin deploy, on the same `lumi-kakakids` Firebase project as the Flutter web app (requires a second hosting site).
+- **2026-05-15** — Phase 6.1 done — `.github/workflows/admin-ci.yml` added: GitHub Actions, path-filtered to `admin/** + packages/** + workspace files`, installs pnpm, runs `tsc --noEmit`, `lint` (non-blocking, due to two pre-existing react-hooks errors in `admin/src/hooks/use-mobile.ts` that predate the migration), and `next build` (with dummy `NEXT_PUBLIC_FIREBASE_*` env vars since every admin route is server-rendered on demand). Pre-existing Zod `.errors` → `.issues` bug at `admin/src/app/api/feedback/[id]/status/route.ts:30` fixed in the same commit (Zod 4 API rename) so the typecheck step is fully green. No Flutter CI exists yet, so step 6.3 (verify no overlap) is currently a no-op. Phase 6.2 (deploy) is blocked on user setup of a Firebase Hosting site + GitHub secrets — see STATUS.blockers.
 
 ### Open questions for the user
 *(resolve before the indicated phase)*
 
 - [ ] **Before Phase 1:** confirm `flat` layout (admin lives at `./admin/`) vs `apps-prefixed` (mobile relocates to `./apps/mobile/`, admin to `./apps/admin/`). Default = `flat`.
-- [ ] **Before Phase 4:** confirm migration of admin auth from `ADMIN_EMAILS` env allowlist to `/superAdmins` Firestore collection. This is recommended but is a behavior change.
-- [ ] **Before Phase 6:** which CI provider for the admin app? (GitHub Actions assumed unless stated otherwise.)
+- [x] **Before Phase 4:** ~~confirm migration of admin auth from `ADMIN_EMAILS` env allowlist to `/superAdmins` Firestore collection.~~ Resolved 2026-05-15 — clean cutover to `/superAdmins`, `ADMIN_EMAILS` removed.
+- [x] **Before Phase 6:** ~~which CI provider for the admin app?~~ Resolved 2026-05-15 — GitHub Actions + Firebase Hosting (with frameworks) deploy on the `lumi-kakakids` project.
 
 ---
 
@@ -332,18 +378,19 @@ lumi_reading_tracker/
 
 **Steps:**
 
-- [ ] **4.1** Locate the admin auth gate (likely `admin/src/lib/auth/...` per Phase 2.4).
+- [x] **4.1** Locate the admin auth gate (likely `admin/src/lib/auth/...` per Phase 2.4). — Found at `admin/src/app/api/auth/route.ts`.
 
-- [ ] **4.2** Replace the email allowlist check with a `/superAdmins/{uid}` lookup using the Admin SDK. The check should:
+- [x] **4.2** Replace the email allowlist check with a `/superAdmins/{uid}` lookup using the Admin SDK. The check should:
   1. `verifyIdToken()` to get the UID (existing behavior — keep).
   2. Read `/superAdmins/{uid}` — if it exists, allow; else 403.
   3. Keep the `auth_time` freshness check (existing behavior — keep).
+  — Done via new `admin/src/lib/auth-firestore.ts#isSuperAdminViaFirestore`.
 
-- [ ] **4.3** Make the `ADMIN_EMAILS` fallback opt-in via a clearly-named env (e.g. `ADMIN_EMAILS_LEGACY_FALLBACK=true`) for emergency lock-out recovery, OR remove it entirely if the user has confirmed they have a Firestore `/superAdmins` entry.
+- [x] **4.3** ~~Make the `ADMIN_EMAILS` fallback opt-in~~ — removed `ADMIN_EMAILS` entirely (user's `/superAdmins` doc seeded + UID verified). `SUPER_ADMIN_UIDS` env remains as the bootstrap fallback, mirroring `functions/src/super_admin.ts`.
 
-- [ ] **4.4** Test from a logged-in browser session: confirm a known superadmin can still load `/admin/...`. Confirm a non-admin gets 403.
+- [x] **4.4** Test from a logged-in browser session: confirm a known superadmin can still load `/admin/...`. Confirm a non-admin gets 403. — Browser auth test passed.
 
-- [ ] **4.5** Commit: `feat(admin): unify auth on /superAdmins collection`.
+- [x] **4.5** Commit: `feat(admin): unify auth on /superAdmins collection`. — Committed `49f2590`.
 
 **Verify:**
 - Manual auth test passes for both an admin and a non-admin.

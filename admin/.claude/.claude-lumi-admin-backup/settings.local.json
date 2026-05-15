@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(workflow-orchestration)",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs",
+      "Bash(node*)",
+      "Bash(pnpm create:*)",
+      "Bash(which npm:*)",
+      "Bash(npm install:*)"
+    ]
+  }
+}
