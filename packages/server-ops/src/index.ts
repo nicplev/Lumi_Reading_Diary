@@ -4,3 +4,4 @@ export * from "./resolveCommunityBookDeletion";
 export * from "./offboardSchool";
 export * from "./createSchoolUser";
 export * from "./updateStudentReadingLevel";
+export * from "./createSchool";

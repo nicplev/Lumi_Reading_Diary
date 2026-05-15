@@ -23,7 +23,7 @@ phase5_scope:
     - { n: 4, route: "POST /schools/[schoolId]/users", cf: "createSchoolUser", status: "done" }
     - { n: 5, route: "POST /schools/[schoolId]/students/[studentId]/reading-level", cf: "updateStudentReadingLevel", status: "done" }
     - { n: 6, route: "POST /impersonation-audit/sessions/[sessionId]/revoke", cf: "revokeImpersonationSession", status: "deferred" }
-    - { n: 7, route: "POST /schools", cf: "createSchool", status: "pending" }
+    - { n: 7, route: "POST /schools", cf: "createSchool", status: "done" }
     - { n: 8, route: "POST /schools/[schoolId]/users/[userId]/auth", cf: "manageSchoolUserAuth", status: "pending" }
     - { n: 9, route: "POST /dev-access", cf: "grantDevAccess", status: "pending" }
 notes_for_resumer: |

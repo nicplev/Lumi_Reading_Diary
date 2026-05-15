@@ -1,6 +1,5 @@
 import "server-only";
 import { getAdminDb } from "@/lib/firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
 import type { School } from "@lumi/types";
 
 function toISO(ts: unknown): string {
@@ -133,38 +132,6 @@ export async function getSchool(
     subscriptionPlan: data.subscriptionPlan,
     subscriptionExpiry: toISO(data.subscriptionExpiry) || undefined,
   };
-}
-
-export async function createSchool(data: {
-  name: string;
-  contactEmail?: string;
-  contactPhone?: string;
-  address?: string;
-  timezone: string;
-  levelSchema?: string;
-  customLevels?: string[];
-  subscriptionPlan?: string;
-  createdBy: string;
-}): Promise<string> {
-  const docRef = await getAdminDb()
-    .collection("schools")
-    .add({
-      name: data.name,
-      contactEmail: data.contactEmail || null,
-      contactPhone: data.contactPhone || null,
-      address: data.address || null,
-      timezone: data.timezone,
-      levelSchema: data.levelSchema || "aToZ",
-      customLevels: data.customLevels || [],
-      subscriptionPlan: data.subscriptionPlan || null,
-      isActive: true,
-      studentCount: 0,
-      teacherCount: 0,
-      parentCount: 0,
-      createdAt: FieldValue.serverTimestamp(),
-      createdBy: data.createdBy,
-    });
-  return docRef.id;
 }
 
 export async function updateSchool(
