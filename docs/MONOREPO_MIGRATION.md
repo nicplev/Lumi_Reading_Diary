@@ -8,13 +8,24 @@
 
 ```yaml
 current_phase: 5
-current_phase_name: "Migrate business-logic admin routes to Cloud Functions (selective) — BLOCKED on user prioritizing the Phase 2.3 route list"
+current_phase_name: "Migrate business-logic admin routes to Cloud Functions (selective)"
 last_completed_step: "4.5"
 last_action_at: "2026-05-15"
-last_action_summary: "Phase 4 complete — admin login route gates on /superAdmins/{uid} via new isSuperAdminViaFirestore() (mirrors functions/src/super_admin.ts); ADMIN_EMAILS allowlist removed; .env.example swapped to optional SUPER_ADMIN_UIDS fallback. User's /superAdmins doc seeded + UID verified via read-only Auth lookup, browser auth test passed. Committed 49f2590."
-blockers:
-  - "Phase 5 needs the user to review and prioritize the Phase 2.3 candidate route list in docs/MONOREPO_OVERLAP.md before any route is migrated. Phase 5 is selective by design — do NOT migrate every route."
+last_action_summary: "Phase 4 verified + pushed (commits 49f2590, f8c2646 now on origin). Phase 5 scope confirmed by user: ALL 9 candidate routes (6 high + 3 medium). Sequencing: one commit per route, run straight through without pausing. Phase 5 calling pattern RESOLVED 2026-05-15: shared @lumi/server-ops workspace module, in-process import — NOT deployed Cloud Functions. Ready to start route 1 (bulkImportStudents)."
+blockers: []
 chosen_layout: "flat"
+phase5_scope:
+  sequencing: "one commit per route, straight through (no pause between routes)"
+  routes:
+    - { n: 1, route: "POST /bulk/students", cf: "bulkImportStudents", status: "done" }
+    - { n: 2, route: "POST /community-books/deletion-requests/[id]/resolve", cf: "resolveCommunityBookDeletion", status: "pending" }
+    - { n: 3, route: "POST /offboard", cf: "offboardSchool", status: "pending" }
+    - { n: 4, route: "POST /schools/[schoolId]/users", cf: "createSchoolUser", status: "pending" }
+    - { n: 5, route: "POST /schools/[schoolId]/students/[studentId]/reading-level", cf: "updateStudentReadingLevel", status: "pending" }
+    - { n: 6, route: "POST /impersonation-audit/sessions/[sessionId]/revoke", cf: "revokeImpersonationSession", status: "pending" }
+    - { n: 7, route: "POST /schools", cf: "createSchool", status: "pending" }
+    - { n: 8, route: "POST /schools/[schoolId]/users/[userId]/auth", cf: "manageSchoolUserAuth", status: "pending" }
+    - { n: 9, route: "POST /dev-access", cf: "grantDevAccess", status: "pending" }
 notes_for_resumer: |
   Phases 0-4 done. Repo is a pnpm workspace:
     - admin/ (lumi-admin-scaffold, Next.js)
@@ -27,9 +38,16 @@ notes_for_resumer: |
   Known pre-existing typecheck error (NOT caused by migration):
     admin/src/app/api/feedback/[id]/status/route.ts:30:54 — Zod .errors API usage.
     Fix is out of scope; it predates the monorepo work (came in via subtree at e454901).
-  Phase 5 candidate routes are in docs/MONOREPO_OVERLAP.md (Finding 1 table + the
-  high/medium priority list). STOP at Phase 5 — get the user to prioritize which
-  routes to migrate before touching any.
+  Phase 5: migrating all 9 candidate routes (see phase5_scope above). Per-route
+  status tracked in phase5_scope.routes[].status — update each pending→done as
+  committed. Calling pattern RESOLVED 2026-05-15: shared workspace module
+  (@lumi/server-ops), admin imports it in-process — NOT deployed Cloud Functions.
+  No token exchange, no network hop, functions/ untouched this phase. Auth gate
+  stays at the route (verifySession → /superAdmins); module fns take an explicit
+  actor:{uid,email} param; audit logging moves into the module. Route #6
+  (revokeImpersonationSession) is special-cased — do NOT fork the hardened
+  callable into the module; either defer it or do a one-off token exchange to
+  the existing deployed callable.
 ```
 
 ### Decisions log
@@ -44,6 +62,9 @@ notes_for_resumer: |
 - **2026-05-05** — Phase 2 executed via Explore agent. Output: `docs/MONOREPO_OVERLAP.md`. Key findings: 35 routes catalogued; minimal TS↔Dart drift (only 3 Dart-only fields on Student, 2 on User, no admin-only fields anywhere); 6 high-priority + 3 medium-priority Phase 5 candidates identified; Phase 4 patch sketched with bootstrap-risk mitigation (seed `/superAdmins/{uid}` before cutover).
 - **2026-05-05** — Phase 3 executed. Promoted `pnpm-workspace.yaml` and `pnpm-lock.yaml` to repo root. Added root `package.json` (`lumi-monorepo`) with admin:* scripts. Created `packages/types/` (`@lumi/types`) with peerDep on `firebase-admin@^13.0.0`. 19 type files moved via `git mv` (rename history preserved, 100% similarity). admin imports rewired (2 files). `admin/next.config.ts` adds `transpilePackages: ['@lumi/types']` for runtime enum compilation. `pnpm install` + `tsc --noEmit` verified — only pre-existing Zod typing error remains (not in scope).
 - **2026-05-15** — Phase 4 executed. Admin login route (`admin/src/app/api/auth/route.ts`) now gates on `/superAdmins/{uid}` via new `admin/src/lib/auth-firestore.ts#isSuperAdminViaFirestore` (mirrors `functions/src/super_admin.ts`). `ADMIN_EMAILS` allowlist removed entirely — chose the clean cutover over the two-step rollout because the sole current admin (`nicxplev@gmail.com`) had their `/superAdmins` doc seeded and the UID was verified via a read-only `getUserByEmail` lookup before the flip. `.env.example` swapped `ADMIN_EMAILS` → `SUPER_ADMIN_UIDS` (optional bootstrap fallback). `tsc --noEmit` clean except the known pre-existing Zod error. Browser auth test passed. Committed `49f2590`.
+- **2026-05-15** — Phase 4 commits verified by next session (diff inspected — `isSuperAdminViaFirestore` matches `functions/src/super_admin.ts`, `auth_time` check untouched) and pushed: `49f2590`, `f8c2646` now on `origin/monorepo-migration` (fast-forward, no divergence).
+- **2026-05-15** — Phase 5 scope decided by user: migrate ALL 9 candidate routes (6 high + 3 medium priority from `docs/MONOREPO_OVERLAP.md` Finding 3). Sequencing: one commit per route, run straight through without pausing between routes. Per-route progress tracked in the `phase5_scope` block of STATUS.
+- **2026-05-15** — Phase 5 calling pattern decided by user: **shared workspace module**, not deployed Cloud Functions. Business logic is extracted into a new `@lumi/server-ops` pnpm-workspace package; admin API routes import and call it **in-process**. Rationale: the admin server has only a service account + session cookie (no Firebase ID token), so calling an `onCall` function would require a custom-token→ID-token exchange helper — a new credential-handling code path and a real network hop — plus reconciling the `firebase-admin` v13 (admin) vs v12 (functions) split. The shared module delivers the runbook's single-source-of-truth goal at the code level with the smallest security surface, doesn't touch `functions/`, and matches the one-commit-per-route sequencing. `functions/` can adopt the same module later (a de-risked Option-3 follow-up). **Security constraints for this approach:** (1) auth stays at the route — every route keeps its `verifySession()` gate (the Phase-4 `/superAdmins` check); (2) `@lumi/server-ops` functions take an explicit `actor: {uid, email}` param so they cannot be called without a resolved identity; (3) input validation stays in the module too (defense in depth); (4) `logAuditEvent` moves into the module so the audit trail can't be skipped by a future caller; (5) route #6 (`revokeImpersonationSession`) is NOT forked into the module — the existing hardened callable in `functions/src/index.ts` stays the source of truth; that route is either deferred or wired via a one-off token exchange to the deployed callable.
 
 ### Open questions for the user
 *(resolve before the indicated phase)*
