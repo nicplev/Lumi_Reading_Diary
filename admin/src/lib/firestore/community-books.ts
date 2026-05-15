@@ -1,7 +1,5 @@
 import "server-only";
 import { getAdminDb } from "@/lib/firebase-admin";
-import { getAdminStorage } from "@/lib/firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
 
 function toISO(ts: unknown): string {
   if (!ts || typeof ts !== "object") return "";
@@ -107,74 +105,4 @@ export async function listPendingDeletionRequests(): Promise<
   items.push(...results);
 
   return items;
-}
-
-export async function resolveDeletionRequest(
-  isbn: string,
-  requestId: string,
-  action: "approved" | "rejected",
-  resolvedBy: string
-): Promise<void> {
-  const db = getAdminDb();
-  const requestRef = db
-    .collection("community_books")
-    .doc(isbn)
-    .collection("deletionRequests")
-    .doc(requestId);
-
-  const requestDoc = await requestRef.get();
-  if (!requestDoc.exists) {
-    throw new Error("Deletion request not found");
-  }
-  if (requestDoc.data()?.status !== "pending") {
-    throw new Error("Request has already been resolved");
-  }
-
-  if (action === "approved") {
-    const batch = db.batch();
-
-    // Update request status
-    batch.update(requestRef, {
-      status: "approved",
-      resolvedAt: FieldValue.serverTimestamp(),
-      resolvedBy,
-    });
-
-    // Delete the community book document
-    const bookRef = db.collection("community_books").doc(isbn);
-    batch.delete(bookRef);
-
-    await batch.commit();
-
-    // Delete copies from all school libraries (best-effort, outside batch)
-    const schoolsSnap = await db.collection("schools").get();
-    const schoolDeletes = schoolsSnap.docs.map(async (schoolDoc) => {
-      const bookCopy = db
-        .collection("schools")
-        .doc(schoolDoc.id)
-        .collection("books")
-        .doc(`isbn_${isbn}`);
-      const copyDoc = await bookCopy.get();
-      if (copyDoc.exists) {
-        await bookCopy.delete();
-      }
-    });
-    await Promise.all(schoolDeletes);
-
-    // Delete cover image from storage (best-effort)
-    try {
-      const bucket = getAdminStorage().bucket();
-      const file = bucket.file(`community_books/covers/${isbn}.jpg`);
-      await file.delete();
-    } catch {
-      // Cover may not exist — not critical
-    }
-  } else {
-    // Rejected — just update the request status
-    await requestRef.update({
-      status: "rejected",
-      resolvedAt: FieldValue.serverTimestamp(),
-      resolvedBy,
-    });
-  }
 }

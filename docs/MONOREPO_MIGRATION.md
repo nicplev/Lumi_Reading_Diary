@@ -18,7 +18,7 @@ phase5_scope:
   sequencing: "one commit per route, straight through (no pause between routes)"
   routes:
     - { n: 1, route: "POST /bulk/students", cf: "bulkImportStudents", status: "done" }
-    - { n: 2, route: "POST /community-books/deletion-requests/[id]/resolve", cf: "resolveCommunityBookDeletion", status: "pending" }
+    - { n: 2, route: "POST /community-books/deletion-requests/[id]/resolve", cf: "resolveCommunityBookDeletion", status: "done" }
     - { n: 3, route: "POST /offboard", cf: "offboardSchool", status: "pending" }
     - { n: 4, route: "POST /schools/[schoolId]/users", cf: "createSchoolUser", status: "pending" }
     - { n: 5, route: "POST /schools/[schoolId]/students/[studentId]/reading-level", cf: "updateStudentReadingLevel", status: "pending" }

@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
 import { verifySession } from "@/lib/auth";
-import { resolveDeletionRequest } from "@/lib/firestore/community-books";
-import { logAuditEvent } from "@/lib/firestore/audit-log";
-import { z } from "zod";
-
-const resolveSchema = z.object({
-  isbn: z.string().min(1, "ISBN is required"),
-  action: z.enum(["approved", "rejected"]),
-});
+import { getAdminDb, getAdminStorage } from "@/lib/firebase-admin";
+import {
+  resolveCommunityBookDeletion,
+  ServerOpsValidationError,
+} from "@lumi/server-ops";
 
 export async function POST(
   request: Request,
@@ -21,34 +18,16 @@ export async function POST(
   try {
     const { id } = await params;
     const body = await request.json();
-    const parsed = resolveSchema.parse(body);
-
-    await resolveDeletionRequest(
-      parsed.isbn,
-      id,
-      parsed.action,
-      session.uid
+    const result = await resolveCommunityBookDeletion(
+      getAdminDb(),
+      getAdminStorage(),
+      { uid: session.uid, email: session.email ?? undefined },
+      { isbn: body.isbn, requestId: id, action: body.action }
     );
-
-    logAuditEvent({
-      action: `community_book_deletion_${parsed.action}`,
-      performedBy: session.uid,
-      performedByEmail: session.email ?? undefined,
-      targetType: "community_book",
-      targetId: parsed.isbn,
-      metadata: { requestId: id, action: parsed.action },
-    }).catch(console.error);
-
-    return NextResponse.json({ success: true });
-  } catch (error: unknown) {
-    if (error instanceof Error && error.name === "ZodError") {
-      return NextResponse.json(
-        {
-          error: "Validation failed",
-          details: (error as unknown as { errors: unknown }).errors,
-        },
-        { status: 400 }
-      );
+    return NextResponse.json(result);
+  } catch (error) {
+    if (error instanceof ServerOpsValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
     console.error("Error resolving deletion request:", error);
     return NextResponse.json(
