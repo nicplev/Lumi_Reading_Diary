@@ -7,14 +7,17 @@
 ## STATUS
 
 ```yaml
-current_phase: 7
-current_phase_name: "Merge to main + decommission lumi-admin standalone (in-flight; archive pending)"
-last_completed_step: "7.3"
+current_phase: done
+current_phase_name: "Monorepo migration complete; two purely-additive follow-ups outstanding"
+last_completed_step: "7.6"
 last_action_at: "2026-05-15"
-last_action_summary: "Phase 7 in progress. PR #8 (monorepo-migration → main) merged via `gh pr merge --merge` (merge commit `2676e60` preserves subtree history). Local `main` fast-forwarded; `post-monorepo-merge` tag created and pushed; local `lumi-admin-src` remote removed. Pending: archive `nicplev/lumi-admin` standalone repo (user-authorized but the gh api call was blocked by auto-mode classifier; needs user re-approval or manual archive via GitHub Settings → Danger Zone). Phase 6.2 (admin Firebase Hosting deploy) is still its own pending bucket of work."
-blockers:
-  - "Archive of `nicplev/lumi-admin`: user authorized via AskUserQuestion but the `gh api -X PATCH /repos/nicplev/lumi-admin -F archived=true` call needs an interactive permission grant (or manual archive via GitHub Settings → Danger Zone)."
-  - "Phase 6.2 (admin-deploy.yml) needs the user to: (a) create a second Firebase Hosting site in the lumi-kakakids project (e.g. site id `lumi-admin`), (b) run `firebase target:apply hosting admin <site-id>` locally and commit the resulting .firebaserc update, (c) enable web frameworks: `firebase experiments:enable webframeworks`, (d) add GitHub repo secrets FIREBASE_SERVICE_ACCOUNT (deploy key JSON) + FIREBASE_PROJECT_ID."
+last_action_summary: "Phase 7 closed. PR #8 merged with `--merge` (commit `2676e60`); `post-monorepo-merge` tag pushed; local `lumi-admin-src` remote removed; `nicplev/lumi-admin` standalone GitHub repo archived (read-only, reversible via repo Settings)."
+blockers: []
+followups:
+  - "Phase 6.2 (admin-deploy.yml for Firebase Hosting w/ frameworks): blocked on (a) creating a second Firebase Hosting site in `lumi-kakakids`, (b) `firebase target:apply hosting admin <site-id>`, (c) `firebase experiments:enable webframeworks`, (d) GH repo secrets `FIREBASE_SERVICE_ACCOUNT` + `FIREBASE_PROJECT_ID`. Purely additive."
+  - "Route 6 wire-up: add `admin/src/lib/callDeployedCallable.ts` helper, point `/impersonation-audit/sessions/[id]/revoke` at the deployed `revokeImpersonationSession` callable, delete the local `revokeSession` fork in `admin/src/lib/firestore/impersonation-audit.ts`."
+  - "Lint debt: two pre-existing react-hooks errors in `admin/src/hooks/use-mobile.ts` (predate the migration). CI lint is non-blocking until these are addressed."
+  - "Branch cleanup: `monorepo-migration` branch can be deleted locally and on origin once you're confident no rollback is needed: `git push origin --delete monorepo-migration && git branch -d monorepo-migration`."
 chosen_layout: "flat"
 phase5_scope:
   sequencing: "one commit per route, straight through (no pause between routes)"
@@ -72,6 +75,7 @@ notes_for_resumer: |
 - **2026-05-15** — Phase 6 CI provider + deploy target chosen by user: GitHub Actions for CI; Firebase Hosting (with frameworks) for the admin deploy, on the same `lumi-kakakids` Firebase project as the Flutter web app (requires a second hosting site).
 - **2026-05-15** — Phase 6.1 done — `.github/workflows/admin-ci.yml` added: GitHub Actions, path-filtered to `admin/** + packages/** + workspace files`, installs pnpm, runs `tsc --noEmit`, `lint` (non-blocking, due to two pre-existing react-hooks errors in `admin/src/hooks/use-mobile.ts` that predate the migration), and `next build` (with dummy `NEXT_PUBLIC_FIREBASE_*` env vars since every admin route is server-rendered on demand). Pre-existing Zod `.errors` → `.issues` bug at `admin/src/app/api/feedback/[id]/status/route.ts:30` fixed in the same commit (Zod 4 API rename) so the typecheck step is fully green. No Flutter CI exists yet, so step 6.3 (verify no overlap) is currently a no-op. Phase 6.2 (deploy) is blocked on user setup of a Firebase Hosting site + GitHub secrets — see STATUS.blockers.
 - **2026-05-15** — Phase 7 in flight. PR #8 `monorepo-migration → main` opened, then merged via `gh pr merge 8 --merge` (preserves the subtree merge `e454901` on the second parent rather than squashing). New `main` head: `2676e60`. Local `main` fast-forwarded, `post-monorepo-merge` tag created + pushed, local temp remote `lumi-admin-src` removed. Pending: archive of `nicplev/lumi-admin` (user-authorized; first `gh api -X PATCH` attempt blocked by auto-mode classifier — needs interactive permission or manual archive via GitHub Settings → Danger Zone).
+- **2026-05-15** — Phase 7 closed. `nicplev/lumi-admin` archived via `gh api -X PATCH /repos/nicplev/lumi-admin -f archived=true` (response: `{"archived":true}`). The repo is now read-only on GitHub; reversible at any time via repo Settings → "Unarchive". This finishes the monorepo migration as scoped. Remaining items (Phase 6.2 deploy workflow, route 6 token-exchange, use-mobile.ts lint cleanup, branch cleanup) are purely additive follow-ups tracked in STATUS.followups — none gate normal operation.
 
 ### Open questions for the user
 *(resolve before the indicated phase)*
