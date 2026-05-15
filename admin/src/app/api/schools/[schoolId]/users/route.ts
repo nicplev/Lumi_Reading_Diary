@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifySession } from "@/lib/auth";
-import { getAdminAuth } from "@/lib/firebase-admin";
-import { createSchoolUser } from "@/lib/firestore/school-users";
-import { createSchoolUserSchema } from "@/lib/validations/school-user";
-import { logAuditEvent } from "@/lib/firestore/audit-log";
+import { getAdminAuth, getAdminDb } from "@/lib/firebase-admin";
+import { createSchoolUser, ServerOpsValidationError } from "@lumi/server-ops";
 
 export async function POST(
   request: Request,
@@ -17,38 +15,22 @@ export async function POST(
   try {
     const { schoolId } = await params;
     const body = await request.json();
-    const parsed = createSchoolUserSchema.parse(body);
-
-    // Find or create Firebase Auth user
-    let authUid: string;
-    try {
-      const existing = await getAdminAuth().getUserByEmail(parsed.email);
-      authUid = existing.uid;
-    } catch {
-      const newUser = await getAdminAuth().createUser({
-        email: parsed.email,
-        displayName: parsed.fullName,
-      });
-      authUid = newUser.uid;
-    }
-
-    const userId = await createSchoolUser(schoolId, {
-      authUid,
-      email: parsed.email,
-      fullName: parsed.fullName,
-      role: parsed.role,
-      classIds: parsed.classIds,
-    });
-
-    logAuditEvent({ action: "schoolUser.create", performedBy: session.uid, performedByEmail: session.email ?? undefined, targetType: "schoolUser", targetId: userId, schoolId, after: parsed as Record<string, unknown> }).catch(console.error);
-
-    return NextResponse.json({ id: userId }, { status: 201 });
-  } catch (error: unknown) {
-    if (error instanceof Error && error.name === "ZodError") {
-      return NextResponse.json(
-        { error: "Validation failed", details: (error as unknown as { errors: unknown }).errors },
-        { status: 400 }
-      );
+    const result = await createSchoolUser(
+      getAdminAuth(),
+      getAdminDb(),
+      { uid: session.uid, email: session.email ?? undefined },
+      {
+        schoolId,
+        email: body.email,
+        fullName: body.fullName,
+        role: body.role,
+        classIds: body.classIds,
+      }
+    );
+    return NextResponse.json(result, { status: 201 });
+  } catch (error) {
+    if (error instanceof ServerOpsValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
     console.error("Create school user error:", error);
     return NextResponse.json(

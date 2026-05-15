@@ -1,6 +1,5 @@
 import "server-only";
 import { getAdminDb } from "@/lib/firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
 
 function toISO(ts: unknown): string {
   if (!ts || typeof ts !== "object") return "";
@@ -93,33 +92,6 @@ export async function getSchoolUser(
     lastLoginAt: toISO(data.lastLoginAt) || undefined,
     preferences: data.preferences,
   };
-}
-
-export async function createSchoolUser(
-  schoolId: string,
-  data: {
-    authUid: string;
-    email: string;
-    fullName: string;
-    role: string;
-    classIds?: string[];
-  }
-): Promise<string> {
-  await getAdminDb()
-    .collection("schools")
-    .doc(schoolId)
-    .collection("users")
-    .doc(data.authUid)
-    .set({
-      email: data.email,
-      fullName: data.fullName,
-      role: data.role,
-      classIds: data.classIds || [],
-      linkedChildren: [],
-      isActive: true,
-      createdAt: FieldValue.serverTimestamp(),
-    });
-  return data.authUid;
 }
 
 export async function updateSchoolUser(
