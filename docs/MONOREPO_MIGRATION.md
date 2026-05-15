@@ -19,7 +19,7 @@ phase5_scope:
   routes:
     - { n: 1, route: "POST /bulk/students", cf: "bulkImportStudents", status: "done" }
     - { n: 2, route: "POST /community-books/deletion-requests/[id]/resolve", cf: "resolveCommunityBookDeletion", status: "done" }
-    - { n: 3, route: "POST /offboard", cf: "offboardSchool", status: "pending" }
+    - { n: 3, route: "POST /offboard", cf: "offboardSchool", status: "done" }
     - { n: 4, route: "POST /schools/[schoolId]/users", cf: "createSchoolUser", status: "pending" }
     - { n: 5, route: "POST /schools/[schoolId]/students/[studentId]/reading-level", cf: "updateStudentReadingLevel", status: "pending" }
     - { n: 6, route: "POST /impersonation-audit/sessions/[sessionId]/revoke", cf: "revokeImpersonationSession", status: "pending" }
