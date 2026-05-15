@@ -15,7 +15,6 @@ last_action_summary: "Phase 7 closed. PR #8 merged with `--merge` (commit `2676e
 blockers: []
 followups:
   - "Phase 6.2 (admin-deploy.yml for Firebase Hosting w/ frameworks): blocked on (a) creating a second Firebase Hosting site in `lumi-kakakids`, (b) `firebase target:apply hosting admin <site-id>`, (c) `firebase experiments:enable webframeworks`, (d) GH repo secrets `FIREBASE_SERVICE_ACCOUNT` + `FIREBASE_PROJECT_ID`. Purely additive."
-  - "Route 6 wire-up: add `admin/src/lib/callDeployedCallable.ts` helper, point `/impersonation-audit/sessions/[id]/revoke` at the deployed `revokeImpersonationSession` callable, delete the local `revokeSession` fork in `admin/src/lib/firestore/impersonation-audit.ts`."
   - "Branch cleanup: `monorepo-migration` branch can be deleted locally and on origin once you're confident no rollback is needed: `git push origin --delete monorepo-migration && git branch -d monorepo-migration`."
 chosen_layout: "flat"
 phase5_scope:
@@ -26,7 +25,7 @@ phase5_scope:
     - { n: 3, route: "POST /offboard", cf: "offboardSchool", status: "done" }
     - { n: 4, route: "POST /schools/[schoolId]/users", cf: "createSchoolUser", status: "done" }
     - { n: 5, route: "POST /schools/[schoolId]/students/[studentId]/reading-level", cf: "updateStudentReadingLevel", status: "done" }
-    - { n: 6, route: "POST /impersonation-audit/sessions/[sessionId]/revoke", cf: "revokeImpersonationSession", status: "deferred" }
+    - { n: 6, route: "POST /impersonation-audit/sessions/[sessionId]/revoke", cf: "revokeImpersonationSession", status: "done" }
     - { n: 7, route: "POST /schools", cf: "createSchool", status: "done" }
     - { n: 8, route: "POST /schools/[schoolId]/users/[userId]/auth", cf: "manageSchoolUserAuth", status: "done" }
     - { n: 9, route: "POST /dev-access", cf: "grantDevAccess", status: "done" }
@@ -76,6 +75,7 @@ notes_for_resumer: |
 - **2026-05-15** — Phase 7 in flight. PR #8 `monorepo-migration → main` opened, then merged via `gh pr merge 8 --merge` (preserves the subtree merge `e454901` on the second parent rather than squashing). New `main` head: `2676e60`. Local `main` fast-forwarded, `post-monorepo-merge` tag created + pushed, local temp remote `lumi-admin-src` removed. Pending: archive of `nicplev/lumi-admin` (user-authorized; first `gh api -X PATCH` attempt blocked by auto-mode classifier — needs interactive permission or manual archive via GitHub Settings → Danger Zone).
 - **2026-05-15** — Phase 7 closed. `nicplev/lumi-admin` archived via `gh api -X PATCH /repos/nicplev/lumi-admin -f archived=true` (response: `{"archived":true}`). The repo is now read-only on GitHub; reversible at any time via repo Settings → "Unarchive". This finishes the monorepo migration as scoped. Remaining items (Phase 6.2 deploy workflow, route 6 token-exchange, use-mobile.ts lint cleanup, branch cleanup) are purely additive follow-ups tracked in STATUS.followups — none gate normal operation.
 - **2026-05-15** — Lint follow-up closed (commit `bf0407c`). `admin/src/hooks/use-mobile.ts` rewritten with `useSyncExternalStore` (correct SSR-safe pattern for subscribing to a `matchMedia` query). `admin/src/components/shared/search-input.tsx` prop→state sync moved out of `useEffect` into the render body via the "adjust state during render" pattern. CI lint step in `.github/workflows/admin-ci.yml` flipped from `continue-on-error: true` to blocking. Remaining 7 ESLint warnings are all `react-hooks/incompatible-library` notes on `react-hook-form`'s `watch()` and TanStack Table's `useReactTable()` — third-party API shapes that the React Compiler can't safely memoize; no code fix from our side. `tsc --noEmit` and `eslint` both exit 0.
+- **2026-05-15** — Route 6 follow-up closed (commit `a78cc3f`). The previously-deferred `/impersonation-audit/sessions/[sessionId]/revoke` admin route is now wired to the hardened `revokeImpersonationSession` `onCall` via new `admin/src/lib/callDeployedCallable.ts`: Admin SDK mints a short-lived custom token for the super-admin, exchanges it for an ID token via Identity Toolkit (`signInWithCustomToken`), and POSTs `{data: payload}` to the v1 callable's HTTPS endpoint with `Authorization: Bearer <idToken>`. Region defaults to `us-central1` with a `FUNCTIONS_REGION` env override. The route preserves its 404 (not found) and 409 (not active) status codes via a pre-check; the local `revokeSession` fork in `admin/src/lib/firestore/impersonation-audit.ts` is deleted. `phase5_scope.routes[5].status` advanced from `deferred` → `done`. Minor behavior change documented: audit events from admin-portal revokes no longer carry `details.viaLumiAdmin: true` (a flag unique to the local fork; the CF audit shape stays distinguishable via `details.superAdminUid`).
 
 ### Open questions for the user
 *(resolve before the indicated phase)*
