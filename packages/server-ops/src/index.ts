@@ -6,3 +6,4 @@ export * from "./createSchoolUser";
 export * from "./updateStudentReadingLevel";
 export * from "./createSchool";
 export * from "./manageSchoolUserAuth";
+export * from "./grantDevAccess";

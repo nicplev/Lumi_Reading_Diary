@@ -59,43 +59,6 @@ export async function listDevAccessEmails(): Promise<DevAccessEmail[]> {
   });
 }
 
-export async function addDevAccessEmail(input: {
-  email: string;
-  addedBy: string;
-  addedByEmail?: string;
-  note?: string;
-}): Promise<DevAccessEmail> {
-  const normalizedEmail = input.email.trim().toLowerCase();
-  const id = hashEmail(normalizedEmail);
-  const db = getAdminDb();
-  const ref = db.collection(COLLECTION).doc(id);
-
-  const existing = await ref.get();
-  if (existing.exists) {
-    throw new Error(`${normalizedEmail} already has dev access`);
-  }
-
-  const payload: Record<string, unknown> = {
-    email: normalizedEmail,
-    addedBy: input.addedBy,
-    addedAt: FieldValue.serverTimestamp(),
-  };
-  if (input.addedByEmail) payload.addedByEmail = input.addedByEmail;
-  if (input.note) payload.note = input.note.trim();
-
-  await ref.set(payload);
-  const fresh = await ref.get();
-  const data = fresh.data() ?? {};
-  return {
-    id,
-    email: normalizedEmail,
-    addedBy: input.addedBy,
-    addedByEmail: input.addedByEmail,
-    addedAt: toISO(data.addedAt),
-    note: input.note?.trim(),
-  };
-}
-
 export async function updateDevAccessEmail(
   id: string,
   patch: { note?: string | null }

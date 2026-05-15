@@ -25,7 +25,7 @@ phase5_scope:
     - { n: 6, route: "POST /impersonation-audit/sessions/[sessionId]/revoke", cf: "revokeImpersonationSession", status: "deferred" }
     - { n: 7, route: "POST /schools", cf: "createSchool", status: "done" }
     - { n: 8, route: "POST /schools/[schoolId]/users/[userId]/auth", cf: "manageSchoolUserAuth", status: "done" }
-    - { n: 9, route: "POST /dev-access", cf: "grantDevAccess", status: "pending" }
+    - { n: 9, route: "POST /dev-access", cf: "grantDevAccess", status: "done" }
 notes_for_resumer: |
   Phases 0-4 done. Repo is a pnpm workspace:
     - admin/ (lumi-admin-scaffold, Next.js)
