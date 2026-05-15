@@ -45,10 +45,6 @@ jobs:
       - name: Typecheck
         run: pnpm --filter lumi-admin-scaffold exec tsc --noEmit
       - name: Lint
-        # Pre-existing react-hooks/set-state-in-effect errors in
-        # admin/src/hooks/use-mobile.ts and one other; tracked separately. Run
-        # lint for visibility but don't gate PRs on it until those are fixed.
         run: pnpm --filter lumi-admin-scaffold lint
-        continue-on-error: true
       - name: Build
         run: pnpm --filter lumi-admin-scaffold build

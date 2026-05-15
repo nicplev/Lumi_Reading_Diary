@@ -18,10 +18,15 @@ export function SearchInput({
   debounceMs = 300,
 }: SearchInputProps) {
   const [internal, setInternal] = useState(value);
+  const [lastExternalValue, setLastExternalValue] = useState(value);
 
-  useEffect(() => {
+  // Adjust state during render rather than syncing via useEffect — the
+  // react-hooks rule flags prop→state sync effects as a cascading-render risk,
+  // and React batches paired setState calls from a single render correctly.
+  if (value !== lastExternalValue) {
+    setLastExternalValue(value);
     setInternal(value);
-  }, [value]);
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => {
