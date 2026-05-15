@@ -9,12 +9,5 @@ export const createSchoolUserSchema = z.object({
 
 export const updateSchoolUserSchema = createSchoolUserSchema.partial();
 
-export const userAuthActionSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("disable") }),
-  z.object({ action: z.literal("enable") }),
-  z.object({ action: z.literal("resetPassword") }),
-]);
-
 export type CreateSchoolUserInput = z.infer<typeof createSchoolUserSchema>;
 export type UpdateSchoolUserInput = z.infer<typeof updateSchoolUserSchema>;
-export type UserAuthActionInput = z.infer<typeof userAuthActionSchema>;

@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { verifySession } from "@/lib/auth";
-import { getAdminAuth } from "@/lib/firebase-admin";
-import { userAuthActionSchema } from "@/lib/validations/school-user";
-import { logAuditEvent } from "@/lib/firestore/audit-log";
+import { getAdminAuth, getAdminDb } from "@/lib/firebase-admin";
+import {
+  manageSchoolUserAuth,
+  ServerOpsValidationError,
+} from "@lumi/server-ops";
 
 export async function POST(
   request: Request,
@@ -16,40 +18,16 @@ export async function POST(
   try {
     const { schoolId, userId } = await params;
     const body = await request.json();
-    const parsed = userAuthActionSchema.parse(body);
-
-    const auth = getAdminAuth();
-
-    switch (parsed.action) {
-      case "disable":
-        await auth.updateUser(userId, { disabled: true });
-        break;
-      case "enable":
-        await auth.updateUser(userId, { disabled: false });
-        break;
-      case "resetPassword": {
-        const user = await auth.getUser(userId);
-        if (!user.email) {
-          return NextResponse.json(
-            { error: "User has no email address" },
-            { status: 400 }
-          );
-        }
-        const link = await auth.generatePasswordResetLink(user.email);
-        logAuditEvent({ action: "schoolUser.auth", performedBy: session.uid, performedByEmail: session.email ?? undefined, targetType: "schoolUser", targetId: userId, schoolId, after: { action: parsed.action } }).catch(console.error);
-        return NextResponse.json({ success: true, resetLink: link });
-      }
-    }
-
-    logAuditEvent({ action: "schoolUser.auth", performedBy: session.uid, performedByEmail: session.email ?? undefined, targetType: "schoolUser", targetId: userId, schoolId, after: { action: parsed.action } }).catch(console.error);
-
-    return NextResponse.json({ success: true });
-  } catch (error: unknown) {
-    if (error instanceof Error && error.name === "ZodError") {
-      return NextResponse.json(
-        { error: "Validation failed", details: (error as unknown as { errors: unknown }).errors },
-        { status: 400 }
-      );
+    const result = await manageSchoolUserAuth(
+      getAdminAuth(),
+      getAdminDb(),
+      { uid: session.uid, email: session.email ?? undefined },
+      { schoolId, userId, action: body.action }
+    );
+    return NextResponse.json(result);
+  } catch (error) {
+    if (error instanceof ServerOpsValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
     console.error("User auth action error:", error);
     return NextResponse.json(
