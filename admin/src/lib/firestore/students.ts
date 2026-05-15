@@ -254,55 +254,6 @@ export async function getReadingLevelEvents(
   });
 }
 
-export async function updateReadingLevel(
-  schoolId: string,
-  studentId: string,
-  data: {
-    level: string;
-    levelIndex?: number;
-    reason?: string;
-    source?: string;
-    changedByUserId: string;
-    changedByName: string;
-  }
-): Promise<void> {
-  const db = getAdminDb();
-  const studentRef = db
-    .collection("schools")
-    .doc(schoolId)
-    .collection("students")
-    .doc(studentId);
-
-  const studentDoc = await studentRef.get();
-  if (!studentDoc.exists) throw new Error("Student not found");
-
-  const studentData = studentDoc.data()!;
-
-  await studentRef.update({
-    currentReadingLevel: data.level,
-    currentReadingLevelIndex: data.levelIndex ?? null,
-    readingLevelUpdatedAt: FieldValue.serverTimestamp(),
-    readingLevelUpdatedBy: data.changedByUserId,
-    readingLevelSource: data.source ?? "admin",
-  });
-
-  await studentRef.collection("readingLevelEvents").add({
-    studentId,
-    schoolId,
-    classId: studentData.classId,
-    fromLevel: studentData.currentReadingLevel || null,
-    toLevel: data.level,
-    fromLevelIndex: studentData.currentReadingLevelIndex ?? null,
-    toLevelIndex: data.levelIndex ?? null,
-    reason: data.reason || null,
-    source: data.source ?? "admin",
-    changedByUserId: data.changedByUserId,
-    changedByRole: "admin",
-    changedByName: data.changedByName,
-    createdAt: FieldValue.serverTimestamp(),
-  });
-}
-
 export async function listAllStudents(
   options?: { limit?: number }
 ): Promise<StudentListItem[]> {

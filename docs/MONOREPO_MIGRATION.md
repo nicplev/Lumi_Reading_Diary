@@ -21,7 +21,7 @@ phase5_scope:
     - { n: 2, route: "POST /community-books/deletion-requests/[id]/resolve", cf: "resolveCommunityBookDeletion", status: "done" }
     - { n: 3, route: "POST /offboard", cf: "offboardSchool", status: "done" }
     - { n: 4, route: "POST /schools/[schoolId]/users", cf: "createSchoolUser", status: "done" }
-    - { n: 5, route: "POST /schools/[schoolId]/students/[studentId]/reading-level", cf: "updateStudentReadingLevel", status: "pending" }
+    - { n: 5, route: "POST /schools/[schoolId]/students/[studentId]/reading-level", cf: "updateStudentReadingLevel", status: "done" }
     - { n: 6, route: "POST /impersonation-audit/sessions/[sessionId]/revoke", cf: "revokeImpersonationSession", status: "pending" }
     - { n: 7, route: "POST /schools", cf: "createSchool", status: "pending" }
     - { n: 8, route: "POST /schools/[schoolId]/users/[userId]/auth", cf: "manageSchoolUserAuth", status: "pending" }

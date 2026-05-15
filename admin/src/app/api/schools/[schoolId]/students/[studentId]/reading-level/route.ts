@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { verifySession } from "@/lib/auth";
-import { updateReadingLevel } from "@/lib/firestore/students";
-import { updateReadingLevelSchema } from "@/lib/validations/student";
-import { logAuditEvent } from "@/lib/firestore/audit-log";
+import { getAdminDb } from "@/lib/firebase-admin";
+import {
+  updateStudentReadingLevel,
+  ServerOpsValidationError,
+} from "@lumi/server-ops";
 
 export async function POST(
   request: Request,
@@ -16,26 +18,23 @@ export async function POST(
   try {
     const { schoolId, studentId } = await params;
     const body = await request.json();
-    const parsed = updateReadingLevelSchema.parse(body);
-
-    await updateReadingLevel(schoolId, studentId, {
-      level: parsed.level,
-      levelIndex: parsed.levelIndex,
-      reason: parsed.reason,
-      source: parsed.source,
-      changedByUserId: session.uid,
-      changedByName: session.name ?? "Admin",
-    });
-
-    logAuditEvent({ action: "student.updateLevel", performedBy: session.uid, performedByEmail: session.email ?? undefined, targetType: "student", targetId: studentId, schoolId, after: parsed as Record<string, unknown> }).catch(console.error);
-
-    return NextResponse.json({ success: true });
-  } catch (error: unknown) {
-    if (error instanceof Error && error.name === "ZodError") {
-      return NextResponse.json(
-        { error: "Validation failed", details: (error as unknown as { errors: unknown }).errors },
-        { status: 400 }
-      );
+    const result = await updateStudentReadingLevel(
+      getAdminDb(),
+      { uid: session.uid, email: session.email ?? undefined },
+      {
+        schoolId,
+        studentId,
+        level: body.level,
+        levelIndex: body.levelIndex,
+        reason: body.reason,
+        source: body.source,
+        changedByName: session.name ?? "Admin",
+      }
+    );
+    return NextResponse.json(result);
+  } catch (error) {
+    if (error instanceof ServerOpsValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
     console.error("Update reading level error:", error);
     return NextResponse.json(
