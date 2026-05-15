@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { verifySession } from "@/lib/auth";
-import { revokeSession } from "@/lib/firestore/impersonation-audit";
-import { logAuditEvent } from "@/lib/firestore/audit-log";
+import { callDeployedCallable } from "@/lib/callDeployedCallable";
+import { getSession } from "@/lib/firestore/impersonation-audit";
 
 const bodySchema = z.object({
   reason: z.string().trim().min(5, "Reason must be at least 5 characters."),
@@ -30,31 +30,40 @@ export async function POST(
   }
 
   try {
-    const updated = await revokeSession({
-      sessionId,
-      reason: parsed.reason,
-      performedBy: session.uid,
-      performedByEmail: session.email ?? undefined,
-    });
+    // Pre-check to preserve the original 404 / 409 status codes — the deployed
+    // callable returns the same wire shape on already-non-active sessions
+    // (`{sessionId, status}`, HTTP 200) as on a successful revoke, so we'd
+    // lose that distinction without an existence + status check here.
+    const existing = await getSession(sessionId);
+    if (!existing) {
+      return NextResponse.json({ error: "Session not found." }, { status: 404 });
+    }
+    if (existing.status !== "active") {
+      return NextResponse.json(
+        { error: `Session is ${existing.status}, not active.` },
+        { status: 409 },
+      );
+    }
 
-    logAuditEvent({
-      action: "impersonation.revoke",
-      performedBy: session.uid,
-      performedByEmail: session.email ?? undefined,
-      targetType: "impersonationSession",
-      targetId: sessionId,
-      metadata: { reason: parsed.reason },
-    }).catch(console.error);
+    await callDeployedCallable<{ sessionId: string; status: string }>(
+      "revokeImpersonationSession",
+      session.uid,
+      { sessionId, reason: parsed.reason },
+    );
 
+    // Re-read the session so the response shape matches the previous local
+    // fork (caller expects the full ImpersonationSession in `session`).
+    const updated = await getSession(sessionId);
     return NextResponse.json({ session: updated });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Revoke failed.";
-    const status = /not found/i.test(message)
-      ? 404
-      : /not active/i.test(message)
-        ? 409
+    const httpStatus =
+      typeof (error as { httpStatus?: number })?.httpStatus === "number"
+        ? (error as { httpStatus: number }).httpStatus
         : 500;
-    if (status === 500) console.error("Impersonation revoke error:", error);
-    return NextResponse.json({ error: message }, { status });
+    if (httpStatus === 500) {
+      console.error("Impersonation revoke (callable) error:", error);
+    }
+    return NextResponse.json({ error: message }, { status: httpStatus });
   }
 }

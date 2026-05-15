@@ -197,62 +197,6 @@ export async function listEvents(
 }
 
 /**
- * Revoke an active session directly via Admin SDK. Emits the canonical
- * `session_revoked` audit event and returns the updated session. The Flutter
- * / admin-web clients listen to the session doc for status changes so the
- * revoke propagates to the end-user within ~1s.
- *
- * Duplicates the effect of the `revokeImpersonationSession` Cloud Function —
- * kept local so lumi-admin does not need a caller idToken to satisfy that
- * callable's auth context. Safe because the lumi-admin portal's own auth
- * gate is already the super-admin check.
- */
-export async function revokeSession(params: {
-  sessionId: string;
-  reason: string;
-  performedBy: string;
-  performedByEmail?: string;
-}): Promise<ImpersonationSession> {
-  const ref = getAdminDb()
-    .collection("devImpersonationSessions")
-    .doc(params.sessionId);
-
-  const snap = await ref.get();
-  if (!snap.exists) {
-    throw new Error("Session not found.");
-  }
-  const data = snap.data() ?? {};
-  if (data.status !== "active") {
-    throw new Error(`Session is ${data.status}, not active.`);
-  }
-
-  await ref.update({
-    status: "revoked",
-    endedAt: FieldValue.serverTimestamp(),
-    endReason: `revoked_by_super_admin: ${params.reason}`,
-  });
-
-  await getAdminDb().collection("devImpersonationAudit").add({
-    sessionId: params.sessionId,
-    devUid: String(data.devUid ?? ""),
-    devEmail: String(data.devEmail ?? ""),
-    targetSchoolId: String(data.targetSchoolId ?? ""),
-    targetUserId: String(data.targetUserId ?? ""),
-    eventType: "session_revoked" as ImpersonationEventType,
-    details: {
-      superAdminUid: params.performedBy,
-      superAdminEmail: params.performedByEmail ?? null,
-      reason: params.reason,
-      viaLumiAdmin: true,
-    },
-    timestamp: FieldValue.serverTimestamp(),
-  });
-
-  const fresh = await ref.get();
-  return sessionFromDoc(fresh);
-}
-
-/**
  * Build a CSV string for a single session: session metadata header rows
  * followed by every audit event in chronological order. Uses the shared
  * `toCsvString` helper so escaping matches other admin exports.
