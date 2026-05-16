@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "lumi-kakakids"
-  }
+  },
+  "targets": {
+    "lumi-kakakids": {
+      "hosting": {
+        "admin": [
+          "lumi-dev-admin"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
