@@ -60,6 +60,19 @@ jobs:
           echo "=== admin deps after rewrite ==="
           jq '.dependencies | with_entries(select(.key | startswith("@lumi")))' admin/package.json
 
+      # firebase deploy --only hosting:admin still runs firebase.json#functions
+      # .predeploy because the web frameworks deploy treats the SSR Cloud Run
+      # as a function and inherits the predeploy chain. Stripping the entire
+      # functions block scopes this workflow to hosting only — local
+      # `firebase deploy --only functions` is unaffected since the on-disk
+      # firebase.json keeps its functions config.
+      - name: Strip functions block from firebase.json (hosting-only deploy)
+        run: |
+          jq 'del(.functions)' firebase.json > firebase.json.tmp
+          mv firebase.json.tmp firebase.json
+          echo "=== firebase.json top-level keys after strip ==="
+          jq 'keys' firebase.json
+
       # The Next.js build needs every NEXT_PUBLIC_* it'll embed in the client
       # bundle, and the Admin SDK needs FIREBASE_SERVICE_ACCOUNT_KEY at
       # runtime. Public Firebase config values that are project identifiers
@@ -81,15 +94,6 @@ jobs:
             echo "NEXT_PUBLIC_FIREBASE_APP_ID=${NEXT_PUBLIC_FIREBASE_APP_ID}"
             echo "FIREBASE_SERVICE_ACCOUNT_KEY=${FIREBASE_SERVICE_ACCOUNT_KEY}"
           } > admin/.env.production
-
-      # firebase deploy runs the firebase.json#functions.predeploy hooks
-      # (`npm --prefix functions run lint` / `... run build`) even though
-      # we're targeting `--only hosting:admin` — the web frameworks deploy
-      # registers the SSR Cloud Run as a function under the hood and that
-      # inherits the predeploy chain. functions/ is not part of the pnpm
-      # workspace, so its deps aren't installed yet.
-      - name: Install functions/ deps for predeploy hooks
-        run: npm --prefix functions ci
 
       - name: Deploy to Firebase Hosting (admin)
         # @tremor/react@3 peer-requires react@^18 but admin uses react@19.
