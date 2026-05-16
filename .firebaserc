@@ -7,6 +7,9 @@
       "hosting": {
         "admin": [
           "lumi-dev-admin"
+        ],
+        "default": [
+          "lumi-kakakids"
         ]
       }
     }
