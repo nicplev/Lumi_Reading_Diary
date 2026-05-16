@@ -46,6 +46,20 @@ jobs:
       - name: Install workspace
         run: pnpm install --frozen-lockfile
 
+      # firebase-tools' web frameworks pipeline runs `npm install` internally
+      # in admin/, and npm doesn't speak pnpm's workspace: protocol. Rewriting
+      # the two workspace refs to file: paths keeps them resolvable for npm
+      # (it copies the dir contents into node_modules); Next's
+      # transpilePackages config handles the TS-only sources at build time.
+      - name: "Rewrite @lumi/* workspace refs to file: protocol"
+        run: |
+          jq '.dependencies."@lumi/types" = "file:../packages/types" |
+              .dependencies."@lumi/server-ops" = "file:../packages/server-ops"' \
+              admin/package.json > admin/package.json.tmp
+          mv admin/package.json.tmp admin/package.json
+          echo "=== admin deps after rewrite ==="
+          jq '.dependencies | with_entries(select(.key | startswith("@lumi")))' admin/package.json
+
       # The Next.js build needs every NEXT_PUBLIC_* it'll embed in the client
       # bundle, and the Admin SDK needs FIREBASE_SERVICE_ACCOUNT_KEY at
       # runtime. Public Firebase config values that are project identifiers
