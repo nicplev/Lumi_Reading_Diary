@@ -83,6 +83,13 @@ jobs:
           } > admin/.env.production
 
       - name: Deploy to Firebase Hosting (admin)
+        # @tremor/react@3 peer-requires react@^18 but admin uses react@19.
+        # pnpm tolerates this skew; npm 11 (which firebase-tools spawns
+        # internally for prepareFrameworks) does not. The env var below
+        # propagates to that internal `npm i --omit dev` and tells it to
+        # accept the existing peer-dep resolution instead of erroring out.
+        env:
+          NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
