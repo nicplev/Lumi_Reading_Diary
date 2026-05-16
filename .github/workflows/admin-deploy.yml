@@ -73,6 +73,18 @@ jobs:
           echo "=== firebase.json top-level keys after strip ==="
           jq 'keys' firebase.json
 
+      # firebase-tools uploads admin/ to Cloud Build, which runs its own
+      # `npm install` in an isolated container — our GH-runner-only
+      # NPM_CONFIG_LEGACY_PEER_DEPS env var doesn't reach it. Writing
+      # legacy-peer-deps into admin/.npmrc puts it in the source bundle that
+      # Cloud Build extracts, so npm install there inherits the setting.
+      # date-fns is the current conflict: tremor wants v3, base-ui wants v4.
+      - name: "Write admin/.npmrc with legacy-peer-deps for Cloud Build"
+        run: |
+          {
+            echo "legacy-peer-deps=true"
+          } > admin/.npmrc
+
       # The Next.js build needs every NEXT_PUBLIC_* it'll embed in the client
       # bundle, and the Admin SDK needs FIREBASE_SERVICE_ACCOUNT_KEY at
       # runtime. Public Firebase config values that are project identifiers
