@@ -271,10 +271,18 @@ class _ParentLinkingManagementScreenState
     return 'ready';
   }
 
-  String _onboardingStatusLabel(String status) {
+  String _onboardingStatusLabel(
+    String status, {
+    StudentModel? student,
+    StudentLinkCodeModel? code,
+  }) {
     switch (status) {
       case 'linked':
-        return 'Linked';
+        final count = student?.parentIds.length ?? 0;
+        final base = count > 1 ? '$count Guardians' : 'Linked';
+        // A linked student may still have a pending co-parent invite.
+        if (code != null) return '$base · Invite pending';
+        return base;
       case 'invite_active':
         return 'Invite Active';
       case 'ready':
@@ -301,8 +309,56 @@ class _ParentLinkingManagementScreenState
     }
   }
 
-  Future<void> _updateEnrollmentStatus(
-      String studentId, String status) async {
+  /// Lists the guardians linked to [student] with their relationship labels.
+  /// Reads the denormalized `guardianProfiles` map maintained server-side.
+  Widget _buildGuardianList(StudentModel student) {
+    final entries = student.guardianProfiles.entries.toList();
+    if (entries.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: AppColors.success.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            entries.length == 1 ? 'Guardian' : '${entries.length} Guardians',
+            style: TeacherTypography.bodySmall.copyWith(
+              fontWeight: FontWeight.bold,
+              color: AppColors.charcoal.withValues(alpha: 0.7),
+            ),
+          ),
+          const SizedBox(height: 4),
+          ...entries.map((e) {
+            final label = e.value.relationshipLabel;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 1),
+              child: Row(
+                children: [
+                  const Icon(Icons.person_outline, size: 14),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      label != null && label.isNotEmpty
+                          ? '${e.value.name} ($label)'
+                          : e.value.name,
+                      style: TeacherTypography.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updateEnrollmentStatus(String studentId, String status) async {
     try {
       await _firestore
           .collection('schools')
@@ -331,11 +387,13 @@ class _ParentLinkingManagementScreenState
   }
 
   Future<void> _sendOnboardingEmails() async {
-    final eligibleStudents = _students.where((s) =>
-        s.isEnrolled &&
-        s.parentEmail != null &&
-        s.parentEmail!.isNotEmpty &&
-        s.parentIds.isEmpty).toList();
+    final eligibleStudents = _students
+        .where((s) =>
+            s.isEnrolled &&
+            s.parentEmail != null &&
+            s.parentEmail!.isNotEmpty &&
+            s.parentIds.isEmpty)
+        .toList();
 
     if (eligibleStudents.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -388,8 +446,7 @@ class _ParentLinkingManagementScreenState
               backgroundColor: AppColors.teacherPrimary,
               foregroundColor: AppColors.white,
               shape: RoundedRectangleBorder(
-                borderRadius:
-                    BorderRadius.circular(TeacherDimensions.radiusM),
+                borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
               ),
             ),
           ),
@@ -1162,10 +1219,12 @@ class _ParentLinkingManagementScreenState
     if (!mounted) return;
 
     final formKey = GlobalKey<FormState>();
-    final studentIdController = TextEditingController(text: student.studentId ?? '');
+    final studentIdController =
+        TextEditingController(text: student.studentId ?? '');
     final firstNameController = TextEditingController(text: student.firstName);
     final lastNameController = TextEditingController(text: student.lastName);
-    String? selectedClassId = student.classId.isNotEmpty ? student.classId : null;
+    String? selectedClassId =
+        student.classId.isNotEmpty ? student.classId : null;
 
     final result = await showDialog<bool>(
       context: context,
@@ -1303,8 +1362,7 @@ class _ParentLinkingManagementScreenState
           .collection('students')
           .doc(student.id);
 
-      final oldClassId =
-          student.classId.isNotEmpty ? student.classId : null;
+      final oldClassId = student.classId.isNotEmpty ? student.classId : null;
       final newClassId = selectedClassId;
 
       batch.update(studentRef, {
@@ -1323,7 +1381,9 @@ class _ParentLinkingManagementScreenState
                 .doc(schoolId)
                 .collection('classes')
                 .doc(oldClassId),
-            {'studentIds': FieldValue.arrayRemove([student.id])},
+            {
+              'studentIds': FieldValue.arrayRemove([student.id])
+            },
           );
         }
         if (newClassId != null && newClassId.isNotEmpty) {
@@ -1333,7 +1393,9 @@ class _ParentLinkingManagementScreenState
                 .doc(schoolId)
                 .collection('classes')
                 .doc(newClassId),
-            {'studentIds': FieldValue.arrayUnion([student.id])},
+            {
+              'studentIds': FieldValue.arrayUnion([student.id])
+            },
           );
         }
       }
@@ -1408,8 +1470,8 @@ class _ParentLinkingManagementScreenState
                       BorderRadius.circular(TeacherDimensions.radiusS)),
             ),
             child: Text('Delete',
-                style:
-                    TeacherTypography.buttonText.copyWith(color: AppColors.error)),
+                style: TeacherTypography.buttonText
+                    .copyWith(color: AppColors.error)),
           ),
         ],
       ),
@@ -1426,8 +1488,8 @@ class _ParentLinkingManagementScreenState
     }
 
     try {
-      final callable = FirebaseFunctions.instance
-          .httpsCallable('deleteStudentWithCascade');
+      final callable =
+          FirebaseFunctions.instance.httpsCallable('deleteStudentWithCascade');
       await callable.call({
         'schoolId': widget.user.schoolId,
         'studentId': student.id,
@@ -1633,8 +1695,8 @@ class _ParentLinkingManagementScreenState
                           const SizedBox(height: 12),
                           Row(
                             children: [
-                              _buildStatusCountChip(
-                                  'linked', 'Linked', linked, AppColors.success),
+                              _buildStatusCountChip('linked', 'Linked', linked,
+                                  AppColors.success),
                               const SizedBox(width: 6),
                               _buildStatusCountChip('invite_active', 'Active',
                                   inviteActive, AppColors.info),
@@ -1690,7 +1752,8 @@ class _ParentLinkingManagementScreenState
                                           child: CircularProgressIndicator(
                                               strokeWidth: 2),
                                         )
-                                      : const Icon(Icons.auto_awesome, size: 18),
+                                      : const Icon(Icons.auto_awesome,
+                                          size: 18),
                                   label: const Text('Generate Missing Codes'),
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: AppColors.teacherPrimary,
@@ -1795,360 +1858,374 @@ class _ParentLinkingManagementScreenState
                             }
                           }).toList();
                     return ListView.builder(
-                    padding: const EdgeInsets.all(8),
-                    itemCount: filteredStudents.length,
-                    itemBuilder: (context, index) {
-                      final student = filteredStudents[index];
-                      final code = _studentCodes[student.id];
+                      padding: const EdgeInsets.all(8),
+                      itemCount: filteredStudents.length,
+                      itemBuilder: (context, index) {
+                        final student = filteredStudents[index];
+                        final code = _studentCodes[student.id];
 
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 4.0),
-                        child: Container(
-                          clipBehavior: Clip.antiAlias,
-                          decoration: BoxDecoration(
-                            color: AppColors.white,
-                            borderRadius: BorderRadius.circular(
-                                TeacherDimensions.radiusL),
-                            boxShadow: TeacherDimensions.cardShadow,
-                          ),
-                          child: ExpansionTile(
-                            leading: CircleAvatar(
-                              backgroundColor: AppColors.teacherPrimary
-                                  .withValues(alpha: 0.1),
-                              child: Text(
-                                student.firstName[0].toUpperCase(),
-                                style: TeacherTypography.bodyMedium.copyWith(
-                                  color: AppColors.teacherPrimary,
-                                  fontWeight: FontWeight.bold,
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 4.0),
+                          child: Container(
+                            clipBehavior: Clip.antiAlias,
+                            decoration: BoxDecoration(
+                              color: AppColors.white,
+                              borderRadius: BorderRadius.circular(
+                                  TeacherDimensions.radiusL),
+                              boxShadow: TeacherDimensions.cardShadow,
+                            ),
+                            child: ExpansionTile(
+                              leading: CircleAvatar(
+                                backgroundColor: AppColors.teacherPrimary
+                                    .withValues(alpha: 0.1),
+                                child: Text(
+                                  student.firstName[0].toUpperCase(),
+                                  style: TeacherTypography.bodyMedium.copyWith(
+                                    color: AppColors.teacherPrimary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
-                            ),
-                            title: Text(
-                              student.fullName,
-                              style: TeacherTypography.bodyMedium
-                                  .copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            subtitle: Builder(builder: (context) {
-                              final status =
-                                  _onboardingStatus(student, code);
-                              final statusColor =
-                                  _onboardingStatusColor(status);
-                              return Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: statusColor.withValues(alpha: 0.12),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      _onboardingStatusLabel(status),
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                        color: statusColor,
-                                      ),
-                                    ),
-                                  ),
-                                  if (student.parentEmail != null &&
-                                      student.parentEmail!.isNotEmpty) ...[
-                                    const SizedBox(width: 6),
-                                    Flexible(
-                                      child: Text(
-                                        student.parentEmail!,
-                                        style:
-                                            TeacherTypography.bodySmall.copyWith(
-                                          color: AppColors.charcoal
-                                              .withValues(alpha: 0.5),
-                                          fontSize: 10,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              );
-                            }),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  student.parentIds.isNotEmpty
-                                      ? Icons.check_circle
-                                      : code != null
-                                          ? Icons.pending
-                                          : Icons.radio_button_unchecked,
-                                  color: _onboardingStatusColor(
-                                      _onboardingStatus(student, code)),
-                                  size: 20,
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.edit_outlined, size: 20),
-                                  color: AppColors.teacherPrimary,
-                                  tooltip: 'Edit student',
-                                  onPressed: () => _showEditStudentDialog(student),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete_outline, size: 20),
-                                  color: AppColors.error,
-                                  tooltip: 'Delete student',
-                                  onPressed: () => _deleteStudentWithCascade(student),
-                                ),
-                              ],
-                            ),
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.all(8),
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
+                              title: Text(
+                                student.fullName,
+                                style: TeacherTypography.bodyMedium
+                                    .copyWith(fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Builder(builder: (context) {
+                                final status = _onboardingStatus(student, code);
+                                final statusColor =
+                                    _onboardingStatusColor(status);
+                                return Row(
                                   children: [
-                                    if (code != null) ...[
-                                      // Code display
-                                      Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.teacherPrimary
-                                              .withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(
-                                              TeacherDimensions.radiusL),
-                                          border: Border.all(
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            statusColor.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        _onboardingStatusLabel(status,
+                                            student: student, code: code),
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                          color: statusColor,
+                                        ),
+                                      ),
+                                    ),
+                                    if (student.parentEmail != null &&
+                                        student.parentEmail!.isNotEmpty) ...[
+                                      const SizedBox(width: 6),
+                                      Flexible(
+                                        child: Text(
+                                          student.parentEmail!,
+                                          style: TeacherTypography.bodySmall
+                                              .copyWith(
+                                            color: AppColors.charcoal
+                                                .withValues(alpha: 0.5),
+                                            fontSize: 10,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                );
+                              }),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    student.parentIds.isNotEmpty
+                                        ? Icons.check_circle
+                                        : code != null
+                                            ? Icons.pending
+                                            : Icons.radio_button_unchecked,
+                                    color: _onboardingStatusColor(
+                                        _onboardingStatus(student, code)),
+                                    size: 20,
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_outlined,
+                                        size: 20),
+                                    color: AppColors.teacherPrimary,
+                                    tooltip: 'Edit student',
+                                    onPressed: () =>
+                                        _showEditStudentDialog(student),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline,
+                                        size: 20),
+                                    color: AppColors.error,
+                                    tooltip: 'Delete student',
+                                    onPressed: () =>
+                                        _deleteStudentWithCascade(student),
+                                  ),
+                                ],
+                              ),
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      _buildGuardianList(student),
+                                      if (code != null) ...[
+                                        // Code display
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
                                             color: AppColors.teacherPrimary
-                                                .withValues(alpha: 0.3),
+                                                .withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(
+                                                TeacherDimensions.radiusL),
+                                            border: Border.all(
+                                              color: AppColors.teacherPrimary
+                                                  .withValues(alpha: 0.3),
+                                            ),
+                                          ),
+                                          child: Column(
+                                            children: [
+                                              Text(
+                                                code.code,
+                                                style: TeacherTypography.h1
+                                                    .copyWith(
+                                                  color:
+                                                      AppColors.teacherPrimary,
+                                                  fontWeight: FontWeight.bold,
+                                                  letterSpacing: 4,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                'Parent Link Code',
+                                                style: TeacherTypography
+                                                    .bodySmall
+                                                    .copyWith(
+                                                  color: AppColors.charcoal
+                                                      .withValues(alpha: 0.6),
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
-                                        child: Column(
+                                        const SizedBox(height: 4),
+
+                                        // Code info
+                                        Row(
                                           children: [
-                                            Text(
-                                              code.code,
-                                              style:
-                                                  TeacherTypography.h1.copyWith(
-                                                color: AppColors.teacherPrimary,
-                                                fontWeight: FontWeight.bold,
-                                                letterSpacing: 4,
+                                            Expanded(
+                                              child: _buildInfoChip(
+                                                'Status',
+                                                code.status
+                                                    .toString()
+                                                    .split('.')
+                                                    .last,
+                                                code.status ==
+                                                        LinkCodeStatus.active
+                                                    ? AppColors.success
+                                                    : AppColors.charcoal
+                                                        .withValues(alpha: 0.6),
                                               ),
                                             ),
                                             const SizedBox(height: 4),
-                                            Text(
-                                              'Parent Link Code',
-                                              style: TeacherTypography.bodySmall
-                                                  .copyWith(
-                                                color: AppColors.charcoal
-                                                    .withValues(alpha: 0.6),
+                                            Expanded(
+                                              child: _buildInfoChip(
+                                                'Created',
+                                                _formatDate(code.createdAt),
+                                                AppColors.info,
                                               ),
                                             ),
                                           ],
                                         ),
-                                      ),
-                                      const SizedBox(height: 4),
+                                        const SizedBox(height: 4),
 
-                                      // Code info
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: _buildInfoChip(
-                                              'Status',
-                                              code.status
-                                                  .toString()
-                                                  .split('.')
-                                                  .last,
-                                              code.status ==
-                                                      LinkCodeStatus.active
-                                                  ? AppColors.success
-                                                  : AppColors.charcoal
-                                                      .withValues(alpha: 0.6),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Expanded(
-                                            child: _buildInfoChip(
-                                              'Created',
-                                              _formatDate(code.createdAt),
-                                              AppColors.info,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 4),
-
-                                      // Actions
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: OutlinedButton.icon(
-                                              onPressed: () =>
-                                                  _copyCode(code.code),
-                                              icon: const Icon(Icons.copy),
-                                              label: const Text('Copy'),
-                                              style: OutlinedButton.styleFrom(
-                                                foregroundColor:
-                                                    AppColors.teacherPrimary,
-                                                side: const BorderSide(
-                                                    color: AppColors
-                                                        .teacherPrimary,
-                                                    width: 2.0),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                          TeacherDimensions
-                                                              .radiusM),
+                                        // Actions
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: OutlinedButton.icon(
+                                                onPressed: () =>
+                                                    _copyCode(code.code),
+                                                icon: const Icon(Icons.copy),
+                                                label: const Text('Copy'),
+                                                style: OutlinedButton.styleFrom(
+                                                  foregroundColor:
+                                                      AppColors.teacherPrimary,
+                                                  side: const BorderSide(
+                                                      color: AppColors
+                                                          .teacherPrimary,
+                                                      width: 2.0),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            TeacherDimensions
+                                                                .radiusM),
+                                                  ),
                                                 ),
                                               ),
                                             ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: OutlinedButton.icon(
-                                              onPressed: () =>
-                                                  _shareCode(student, code),
-                                              icon: const Icon(Icons.share),
-                                              label: const Text('Share'),
-                                              style: OutlinedButton.styleFrom(
-                                                foregroundColor:
-                                                    AppColors.teacherPrimary,
-                                                side: const BorderSide(
-                                                    color: AppColors
-                                                        .teacherPrimary,
-                                                    width: 2.0),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                          TeacherDimensions
-                                                              .radiusM),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: OutlinedButton.icon(
+                                                onPressed: () =>
+                                                    _shareCode(student, code),
+                                                icon: const Icon(Icons.share),
+                                                label: const Text('Share'),
+                                                style: OutlinedButton.styleFrom(
+                                                  foregroundColor:
+                                                      AppColors.teacherPrimary,
+                                                  side: const BorderSide(
+                                                      color: AppColors
+                                                          .teacherPrimary,
+                                                      width: 2.0),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            TeacherDimensions
+                                                                .radiusM),
+                                                  ),
                                                 ),
                                               ),
                                             ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: OutlinedButton.icon(
-                                              onPressed: () =>
-                                                  _confirmRevokeCode(
-                                                      student, code),
-                                              icon: const Icon(Icons.block),
-                                              label: const Text('Revoke'),
-                                              style: OutlinedButton.styleFrom(
-                                                foregroundColor:
-                                                    AppColors.error,
-                                                side: const BorderSide(
-                                                    color: AppColors.error,
-                                                    width: 2.0),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                          TeacherDimensions
-                                                              .radiusM),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: OutlinedButton.icon(
+                                                onPressed: () =>
+                                                    _confirmRevokeCode(
+                                                        student, code),
+                                                icon: const Icon(Icons.block),
+                                                label: const Text('Revoke'),
+                                                style: OutlinedButton.styleFrom(
+                                                  foregroundColor:
+                                                      AppColors.error,
+                                                  side: const BorderSide(
+                                                      color: AppColors.error,
+                                                      width: 2.0),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            TeacherDimensions
+                                                                .radiusM),
+                                                  ),
                                                 ),
                                               ),
                                             ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: OutlinedButton.icon(
-                                              onPressed: student
-                                                      .parentIds.isEmpty
-                                                  ? null
-                                                  : () => _confirmUnlinkParent(
-                                                      student),
-                                              icon: const Icon(Icons.link_off),
-                                              label:
-                                                  const Text('Unlink Parent'),
-                                              style: OutlinedButton.styleFrom(
-                                                foregroundColor:
-                                                    AppColors.teacherPrimary,
-                                                side: const BorderSide(
-                                                    color: AppColors
-                                                        .teacherPrimary,
-                                                    width: 2.0),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                          TeacherDimensions
-                                                              .radiusM),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: OutlinedButton.icon(
+                                                onPressed: student
+                                                        .parentIds.isEmpty
+                                                    ? null
+                                                    : () =>
+                                                        _confirmUnlinkParent(
+                                                            student),
+                                                icon:
+                                                    const Icon(Icons.link_off),
+                                                label:
+                                                    const Text('Unlink Parent'),
+                                                style: OutlinedButton.styleFrom(
+                                                  foregroundColor:
+                                                      AppColors.teacherPrimary,
+                                                  side: const BorderSide(
+                                                      color: AppColors
+                                                          .teacherPrimary,
+                                                      width: 2.0),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            TeacherDimensions
+                                                                .radiusM),
+                                                  ),
                                                 ),
                                               ),
                                             ),
-                                          ),
-                                        ],
-                                      ),
-                                    ] else ...[
-                                      SizedBox(
-                                        width: double.infinity,
-                                        child: ElevatedButton.icon(
-                                          onPressed: () =>
-                                              _generateCode(student.id),
-                                          icon: const Icon(Icons.add),
-                                          label: const Text('Generate Code'),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor:
-                                                AppColors.teacherPrimary,
-                                            foregroundColor: AppColors.white,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                      TeacherDimensions
-                                                          .radiusM),
+                                          ],
+                                        ),
+                                      ] else ...[
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: ElevatedButton.icon(
+                                            onPressed: () =>
+                                                _generateCode(student.id),
+                                            icon: const Icon(Icons.add),
+                                            label: Text(
+                                                student.parentIds.isEmpty
+                                                    ? 'Generate Code'
+                                                    : 'Add Guardian Code'),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor:
+                                                  AppColors.teacherPrimary,
+                                              foregroundColor: AppColors.white,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                        TeacherDimensions
+                                                            .radiusM),
+                                              ),
                                             ),
                                           ),
                                         ),
+                                      ],
+                                      // Enrollment status section
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Subscription Status',
+                                        style: TeacherTypography.bodySmall
+                                            .copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.charcoal
+                                              .withValues(alpha: 0.6),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Wrap(
+                                        spacing: 6,
+                                        children: [
+                                          for (final entry in {
+                                            'book_pack': 'Confirmed',
+                                            'direct_purchase':
+                                                'Confirmed (Direct)',
+                                            'not_enrolled': 'No Subscription',
+                                            'pending': 'Pending',
+                                          }.entries)
+                                            ChoiceChip(
+                                              label: Text(
+                                                entry.value,
+                                                style: const TextStyle(
+                                                    fontSize: 11),
+                                              ),
+                                              selected:
+                                                  (student.enrollmentStatus ??
+                                                          'pending') ==
+                                                      entry.key,
+                                              selectedColor:
+                                                  _enrollmentColor(entry.key)
+                                                      .withValues(alpha: 0.2),
+                                              onSelected: (_) =>
+                                                  _updateEnrollmentStatus(
+                                                      student.id, entry.key),
+                                              visualDensity:
+                                                  VisualDensity.compact,
+                                            ),
+                                        ],
                                       ),
                                     ],
-                                    // Enrollment status section
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Subscription Status',
-                                      style: TeacherTypography.bodySmall
-                                          .copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.charcoal
-                                            .withValues(alpha: 0.6),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Wrap(
-                                      spacing: 6,
-                                      children: [
-                                        for (final entry in {
-                                          'book_pack': 'Confirmed',
-                                          'direct_purchase': 'Confirmed (Direct)',
-                                          'not_enrolled': 'No Subscription',
-                                          'pending': 'Pending',
-                                        }.entries)
-                                          ChoiceChip(
-                                            label: Text(
-                                              entry.value,
-                                              style: const TextStyle(
-                                                  fontSize: 11),
-                                            ),
-                                            selected:
-                                                (student.enrollmentStatus ??
-                                                        'pending') ==
-                                                    entry.key,
-                                            selectedColor:
-                                                _enrollmentColor(entry.key)
-                                                    .withValues(alpha: 0.2),
-                                            onSelected: (_) =>
-                                                _updateEnrollmentStatus(
-                                                    student.id, entry.key),
-                                            visualDensity:
-                                                VisualDensity.compact,
-                                          ),
-                                      ],
-                                    ),
-                                  ],
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ).animate().fadeIn(delay: (index * 50).ms);
-                    },
-                  );
+                        ).animate().fadeIn(delay: (index * 50).ms);
+                      },
+                    );
                   }),
                 ),
               ],
