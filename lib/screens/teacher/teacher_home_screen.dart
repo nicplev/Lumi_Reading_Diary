@@ -44,9 +44,8 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
 
     _pageController = PageController();
 
-    // Role guard: redirect if user is not a teacher or admin
-    if (widget.user.role != UserRole.teacher &&
-        widget.user.role != UserRole.schoolAdmin) {
+    // Role guard: redirect if user is not a teacher.
+    if (widget.user.role != UserRole.teacher) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) context.go('/auth/login');
       });

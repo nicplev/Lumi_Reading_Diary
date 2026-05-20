@@ -16,9 +16,10 @@ void main() {
     test('getHomeRouteForRole returns correct routes', () {
       expect(AppRouter.getHomeRouteForRole(UserRole.parent), '/parent/home');
       expect(AppRouter.getHomeRouteForRole(UserRole.teacher), '/teacher/home');
+      // School admins manage their school via the web portal.
       expect(
         AppRouter.getHomeRouteForRole(UserRole.schoolAdmin),
-        '/admin/home',
+        '/auth/admin-portal',
       );
     });
 
