@@ -1,7 +1,13 @@
-import path from "path";
-import type { NextConfig } from "next";
+// Plain CommonJS config — NOT next.config.ts. firebase-tools' web frameworks
+// build adapter loads a .ts config without unwrapping the TS→CJS module
+// interop, so Next.js receives `{__esModule, default}` and silently ignores
+// every key ("Unrecognized key(s)" warning). CJS `module.exports` is returned
+// by require() verbatim, so the config actually applies in the deployed build.
 
-const nextConfig: NextConfig = {
+const path = require("path");
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   transpilePackages: ["@lumi/types", "@lumi/server-ops"],
   // firebase-admin is reached through the transpiled @lumi/server-ops
   // package. Without this, Turbopack hash-aliases it (firebase-admin-<hash>)
@@ -17,4 +23,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+module.exports = nextConfig;
