@@ -1,5 +1,4 @@
 import type { Firestore } from "firebase-admin/firestore";
-import { FieldValue } from "firebase-admin/firestore";
 import { z } from "zod";
 import { logAuditEvent, ServerOpsValidationError, type Actor } from "./audit";
 
@@ -60,7 +59,7 @@ export async function updateStudentReadingLevel(
   await studentRef.update({
     currentReadingLevel: level,
     currentReadingLevelIndex: levelIndex ?? null,
-    readingLevelUpdatedAt: FieldValue.serverTimestamp(),
+    readingLevelUpdatedAt: new Date(),
     readingLevelUpdatedBy: actor.uid,
     readingLevelSource: source ?? "admin",
   });
@@ -78,7 +77,7 @@ export async function updateStudentReadingLevel(
     changedByUserId: actor.uid,
     changedByRole: "admin",
     changedByName: changedByName ?? "Admin",
-    createdAt: FieldValue.serverTimestamp(),
+    createdAt: new Date(),
   });
 
   await logAuditEvent(db, {

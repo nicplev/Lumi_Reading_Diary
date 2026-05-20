@@ -1,6 +1,5 @@
 import { createHash } from "crypto";
 import type { Firestore } from "firebase-admin/firestore";
-import { FieldValue } from "firebase-admin/firestore";
 import { z } from "zod";
 import { logAuditEvent, ServerOpsValidationError, type Actor } from "./audit";
 
@@ -64,7 +63,7 @@ export async function grantDevAccess(
   const payload: Record<string, unknown> = {
     email,
     addedBy: actor.uid,
-    addedAt: FieldValue.serverTimestamp(),
+    addedAt: new Date(),
   };
   if (actor.email) payload.addedByEmail = actor.email;
   if (note) payload.note = note;

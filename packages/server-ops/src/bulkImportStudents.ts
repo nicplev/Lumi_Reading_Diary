@@ -1,5 +1,4 @@
 import type { Firestore } from "firebase-admin/firestore";
-import { FieldValue } from "firebase-admin/firestore";
 import { z } from "zod";
 import { logAuditEvent, ServerOpsValidationError, type Actor } from "./audit";
 
@@ -97,7 +96,7 @@ export async function bulkImportStudents(
       parentIds: [],
       levelHistory: [],
       isActive: true,
-      createdAt: FieldValue.serverTimestamp(),
+      createdAt: new Date(),
     });
 
     created += 1;

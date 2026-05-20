@@ -1,5 +1,4 @@
 import type { Firestore } from "firebase-admin/firestore";
-import { FieldValue } from "firebase-admin/firestore";
 import { z } from "zod";
 import { logAuditEvent, ServerOpsValidationError, type Actor } from "./audit";
 
@@ -52,7 +51,7 @@ export async function createSchool(
     studentCount: 0,
     teacherCount: 0,
     parentCount: 0,
-    createdAt: FieldValue.serverTimestamp(),
+    createdAt: new Date(),
     createdBy: actor.uid,
   });
 

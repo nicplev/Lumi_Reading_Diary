@@ -1,6 +1,5 @@
 import type { Firestore } from "firebase-admin/firestore";
 import type { Storage } from "firebase-admin/storage";
-import { FieldValue } from "firebase-admin/firestore";
 import { z } from "zod";
 import { logAuditEvent, ServerOpsValidationError, type Actor } from "./audit";
 
@@ -55,7 +54,7 @@ export async function resolveCommunityBookDeletion(
     const batch = db.batch();
     batch.update(requestRef, {
       status: "approved",
-      resolvedAt: FieldValue.serverTimestamp(),
+      resolvedAt: new Date(),
       resolvedBy: actor.uid,
     });
     batch.delete(db.collection("community_books").doc(isbn));
@@ -85,7 +84,7 @@ export async function resolveCommunityBookDeletion(
   } else {
     await requestRef.update({
       status: "rejected",
-      resolvedAt: FieldValue.serverTimestamp(),
+      resolvedAt: new Date(),
       resolvedBy: actor.uid,
     });
   }

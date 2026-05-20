@@ -1,5 +1,4 @@
 import type { Firestore } from "firebase-admin/firestore";
-import { FieldValue } from "firebase-admin/firestore";
 
 // The resolved super-admin identity performing an operation. Server-ops
 // functions require this explicitly so they can never run without a known
@@ -35,6 +34,6 @@ export async function logAuditEvent(
 ): Promise<void> {
   await db.collection("adminAuditLog").add({
     ...entry,
-    createdAt: FieldValue.serverTimestamp(),
+    createdAt: new Date(),
   });
 }
