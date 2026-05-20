@@ -463,8 +463,20 @@ service cloud.firestore {
       allow create: if isSignedIn() &&
           writeAllowedForDev() &&
           request.resource.data.createdBy == request.auth.uid &&
-          (isSchoolAdmin(request.resource.data.schoolId) ||
-              isTeacher(request.resource.data.schoolId));
+          (
+            isSchoolAdmin(request.resource.data.schoolId) ||
+            isTeacher(request.resource.data.schoolId) ||
+            (
+              // An existing guardian inviting a co-parent into their own
+              // student. Forced to the co_parent_invite channel, and the
+              // requester must already be linked to the target student —
+              // so this grants no access they don't already have.
+              isParentMember(request.resource.data.schoolId) &&
+              request.resource.data.intendedFor == 'co_parent_invite' &&
+              getUserData(request.resource.data.schoolId).linkedChildren != null &&
+              request.resource.data.studentId in getUserData(request.resource.data.schoolId).linkedChildren
+            )
+          );
 
       allow update: if isSignedIn() &&
           writeAllowedForDev() &&
@@ -478,6 +490,14 @@ service cloud.firestore {
               resource.data.status == 'active' &&
               request.resource.data.status == 'used' &&
               request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'usedBy', 'usedAt'])
+            ) ||
+            (
+              // A guardian cancelling their own pending co-parent invite.
+              resource.data.createdBy == request.auth.uid &&
+              resource.data.intendedFor == 'co_parent_invite' &&
+              resource.data.status == 'active' &&
+              request.resource.data.status == 'revoked' &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'revokedBy', 'revokedAt', 'revokeReason'])
             )
           );
 

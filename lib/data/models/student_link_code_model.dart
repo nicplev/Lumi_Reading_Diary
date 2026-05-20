@@ -7,6 +7,14 @@ enum LinkCodeStatus {
   revoked,
 }
 
+/// Who a link code is meant for. Used to scope the one-active-code-per-channel
+/// supersede policy so a staff-issued code and a guardian's co-parent invite
+/// can be active at the same time without clobbering each other.
+class LinkCodeIntent {
+  static const String staffIssued = 'staff_issued';
+  static const String coParentInvite = 'co_parent_invite';
+}
+
 class StudentLinkCodeModel {
   final String id;
   final String studentId;
@@ -22,6 +30,11 @@ class StudentLinkCodeModel {
   final DateTime? revokedAt;
   final String? revokeReason;
   final Map<String, dynamic>? metadata;
+  // Discriminator: LinkCodeIntent.staffIssued or LinkCodeIntent.coParentInvite.
+  // Legacy docs without this field default to staffIssued.
+  final String intendedFor;
+  // Optional free-text note describing the intended recipient (e.g. "For Dad").
+  final String? note;
 
   StudentLinkCodeModel({
     required this.id,
@@ -38,6 +51,8 @@ class StudentLinkCodeModel {
     this.revokedAt,
     this.revokeReason,
     this.metadata,
+    this.intendedFor = LinkCodeIntent.staffIssued,
+    this.note,
   });
 
   factory StudentLinkCodeModel.fromFirestore(DocumentSnapshot doc) {
@@ -66,6 +81,8 @@ class StudentLinkCodeModel {
       revokedAt: _readDateTime(data['revokedAt']),
       revokeReason: data['revokeReason'],
       metadata: data['metadata'],
+      intendedFor: data['intendedFor'] ?? LinkCodeIntent.staffIssued,
+      note: data['note'],
     );
   }
 
@@ -84,6 +101,8 @@ class StudentLinkCodeModel {
       'revokedAt': revokedAt != null ? Timestamp.fromDate(revokedAt!) : null,
       'revokeReason': revokeReason,
       'metadata': metadata,
+      'intendedFor': intendedFor,
+      'note': note,
     };
   }
 
@@ -102,6 +121,8 @@ class StudentLinkCodeModel {
     DateTime? revokedAt,
     String? revokeReason,
     Map<String, dynamic>? metadata,
+    String? intendedFor,
+    String? note,
   }) {
     return StudentLinkCodeModel(
       id: id ?? this.id,
@@ -118,8 +139,12 @@ class StudentLinkCodeModel {
       revokedAt: revokedAt ?? this.revokedAt,
       revokeReason: revokeReason ?? this.revokeReason,
       metadata: metadata ?? this.metadata,
+      intendedFor: intendedFor ?? this.intendedFor,
+      note: note ?? this.note,
     );
   }
+
+  bool get isCoParentInvite => intendedFor == LinkCodeIntent.coParentInvite;
 
   bool get isExpired => DateTime.now().isAfter(expiresAt);
   bool get isUsable => status == LinkCodeStatus.active && !isExpired;

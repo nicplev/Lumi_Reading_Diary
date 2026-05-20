@@ -22,6 +22,10 @@ class UserModel {
   final String? fcmToken; // For notifications
   final String? phoneNumber; // E.164 format; populated when SMS MFA is enrolled
   final bool phoneVerified;
+  // For parents: relationship to the child (e.g. Mum, Dad, Grandparent,
+  // Guardian, or a free-text value). Used for reading-log attribution and
+  // co-parent visibility. Null for legacy parents and non-parent users.
+  final String? relationshipLabel;
 
   UserModel({
     required this.id,
@@ -39,6 +43,7 @@ class UserModel {
     this.fcmToken,
     this.phoneNumber,
     this.phoneVerified = false,
+    this.relationshipLabel,
   });
 
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
@@ -66,6 +71,7 @@ class UserModel {
       fcmToken: data['fcmToken'],
       phoneNumber: data['phoneNumber'],
       phoneVerified: data['phoneVerified'] ?? false,
+      relationshipLabel: data['relationshipLabel'],
     );
   }
 
@@ -85,6 +91,7 @@ class UserModel {
       'fcmToken': fcmToken,
       'phoneNumber': phoneNumber,
       'phoneVerified': phoneVerified,
+      'relationshipLabel': relationshipLabel,
     };
   }
 
@@ -104,6 +111,7 @@ class UserModel {
     String? fcmToken,
     String? phoneNumber,
     bool? phoneVerified,
+    String? relationshipLabel,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -121,6 +129,20 @@ class UserModel {
       fcmToken: fcmToken ?? this.fcmToken,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       phoneVerified: phoneVerified ?? this.phoneVerified,
+      relationshipLabel: relationshipLabel ?? this.relationshipLabel,
     );
   }
+}
+
+/// Canonical relationship-label options shown in pickers. Stored on the
+/// parent's UserModel as a plain string so future values stay forward-safe.
+class GuardianRelationship {
+  static const String mum = 'Mum';
+  static const String dad = 'Dad';
+  static const String grandparent = 'Grandparent';
+  static const String guardian = 'Guardian';
+  static const String other = 'Other';
+
+  /// Preset choices offered in the chip selector (excludes free-text "Other").
+  static const List<String> presets = [mum, dad, grandparent, guardian];
 }

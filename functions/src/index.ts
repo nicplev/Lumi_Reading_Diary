@@ -1912,3 +1912,159 @@ export const processPendingUserDeletions = functions.pubsub
     functions.logger.info(`processPendingUserDeletions: deleted ${deleted} users`);
     return null;
   });
+
+/**
+ * Build the minimal guardian projection denormalized onto student docs.
+ * Deliberately carries name + relationship label only — never email/phone.
+ */
+function guardianProjection(
+  parentData: admin.firestore.DocumentData
+): {name: string; relationshipLabel: string | null} {
+  return {
+    name: parentData.fullName ?? "",
+    relationshipLabel: parentData.relationshipLabel ?? null,
+  };
+}
+
+/**
+ * Maintains the denormalized `guardianProfiles` map on student docs so a
+ * linked guardian can see who else is linked (name + relationship label only)
+ * without read access to other parent documents.
+ *
+ * Triggered on any parent-doc write. Covers account creation, name/label
+ * edits, linking, unlinking, and account deletion in one handler. Writes
+ * students only — no trigger loop.
+ */
+export const syncGuardianProfiles = functions.firestore
+  .document("schools/{schoolId}/parents/{parentId}")
+  .onWrite(async (change, context) => {
+    const schoolId = context.params.schoolId;
+    const parentId = context.params.parentId;
+
+    const before = change.before.exists ? change.before.data()! : null;
+    const after = change.after.exists ? change.after.data()! : null;
+
+    const beforeChildren: string[] = before?.linkedChildren ?? [];
+    const afterChildren: string[] = after?.linkedChildren ?? [];
+
+    // Skip writes that can't affect the projection (e.g. fcmToken refresh).
+    if (after && before) {
+      const sameName = before.fullName === after.fullName;
+      const sameLabel = before.relationshipLabel === after.relationshipLabel;
+      const sameChildren =
+        beforeChildren.length === afterChildren.length &&
+        beforeChildren.every((id) => afterChildren.includes(id));
+      if (sameName && sameLabel && sameChildren) {
+        return null;
+      }
+    }
+
+    const profileField = new admin.firestore.FieldPath(
+      "guardianProfiles",
+      parentId
+    );
+
+    // Students this parent is no longer linked to (or all, if deleted).
+    const removed = beforeChildren.filter((id) => !afterChildren.includes(id));
+    // Students currently linked — refresh their projection.
+    const current = afterChildren;
+
+    const projection = after ? guardianProjection(after) : null;
+    const batch = db.batch();
+
+    for (const studentId of removed) {
+      batch.update(
+        db.doc(`schools/${schoolId}/students/${studentId}`),
+        profileField,
+        admin.firestore.FieldValue.delete()
+      );
+    }
+    for (const studentId of current) {
+      if (!projection) continue;
+      batch.update(
+        db.doc(`schools/${schoolId}/students/${studentId}`),
+        profileField,
+        projection
+      );
+    }
+
+    try {
+      await batch.commit();
+    } catch (err) {
+      functions.logger.warn(
+        `syncGuardianProfiles: partial failure for parent ${parentId}`,
+        err
+      );
+    }
+    return null;
+  });
+
+/**
+ * Admin-only one-off backfill for `guardianProfiles`. Iterates every parent in
+ * the given school and writes their projection onto each linked student. Safe
+ * to re-run — writes are idempotent.
+ */
+export const backfillGuardianProfiles = functions.https.onCall(
+  async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "Must be signed in."
+      );
+    }
+    const {schoolId} = data as {schoolId: string};
+    if (!schoolId) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "schoolId is required."
+      );
+    }
+
+    const callerDoc = await db
+      .doc(`schools/${schoolId}/users/${context.auth.uid}`)
+      .get();
+    if (!callerDoc.exists || callerDoc.data()!.role !== "schoolAdmin") {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "Only a school admin can run the backfill."
+      );
+    }
+
+    const parentsSnap = await db
+      .collection(`schools/${schoolId}/parents`)
+      .get();
+
+    let studentsUpdated = 0;
+    for (const parentDoc of parentsSnap.docs) {
+      const parentData = parentDoc.data();
+      const linkedChildren: string[] = parentData.linkedChildren ?? [];
+      if (linkedChildren.length === 0) continue;
+
+      const profileField = new admin.firestore.FieldPath(
+        "guardianProfiles",
+        parentDoc.id
+      );
+      const projection = guardianProjection(parentData);
+
+      const batch = db.batch();
+      for (const studentId of linkedChildren) {
+        batch.update(
+          db.doc(`schools/${schoolId}/students/${studentId}`),
+          profileField,
+          projection
+        );
+        studentsUpdated++;
+      }
+      try {
+        await batch.commit();
+      } catch (err) {
+        functions.logger.warn(
+          `backfillGuardianProfiles: failed for parent ${parentDoc.id}`,
+          err
+        );
+      }
+    }
+
+    return {success: true, parentsProcessed: parentsSnap.size, studentsUpdated};
+  }
+);

@@ -24,6 +24,11 @@ class StudentModel {
   final String? parentEmail;
   final List<ReadingLevelHistory> levelHistory;
   final StudentStats? stats;
+  // Denormalized name + relationship label for each linked guardian, keyed by
+  // parent UID. Maintained server-side by the syncGuardianProfiles Cloud
+  // Function — never written by clients. Lets a guardian see who else is
+  // linked (name only) without read access to other parent docs.
+  final Map<String, GuardianProfile> guardianProfiles;
 
   StudentModel({
     required this.id,
@@ -49,6 +54,7 @@ class StudentModel {
     this.parentEmail,
     this.levelHistory = const [],
     this.stats,
+    this.guardianProfiles = const {},
   });
 
   bool get isEnrolled =>
@@ -96,6 +102,12 @@ class StudentModel {
               .toList() ??
           [],
       stats: data['stats'] != null ? StudentStats.fromMap(data['stats']) : null,
+      guardianProfiles: (data['guardianProfiles'] as Map<String, dynamic>?)
+              ?.map((uid, value) => MapEntry(
+                  uid,
+                  GuardianProfile.fromMap(
+                      Map<String, dynamic>.from(value as Map)))) ??
+          const {},
     );
   }
 
@@ -126,6 +138,10 @@ class StudentModel {
       'parentEmail': parentEmail,
       'levelHistory': levelHistory.map((e) => e.toMap()).toList(),
       'stats': stats?.toMap(),
+      // Included so a full-document write round-trips the map; the
+      // syncGuardianProfiles Cloud Function is the authoritative writer.
+      'guardianProfiles':
+          guardianProfiles.map((uid, p) => MapEntry(uid, p.toMap())),
     };
   }
 
@@ -153,6 +169,7 @@ class StudentModel {
     String? parentEmail,
     List<ReadingLevelHistory>? levelHistory,
     StudentStats? stats,
+    Map<String, GuardianProfile>? guardianProfiles,
   }) {
     return StudentModel(
       id: id ?? this.id,
@@ -181,8 +198,38 @@ class StudentModel {
       parentEmail: parentEmail ?? this.parentEmail,
       levelHistory: levelHistory ?? this.levelHistory,
       stats: stats ?? this.stats,
+      guardianProfiles: guardianProfiles ?? this.guardianProfiles,
     );
   }
+}
+
+/// Minimal projection of a linked guardian, denormalized onto the student doc.
+/// Deliberately carries name + relationship label only — never email/phone.
+class GuardianProfile {
+  final String name;
+  final String? relationshipLabel;
+
+  GuardianProfile({
+    required this.name,
+    this.relationshipLabel,
+  });
+
+  factory GuardianProfile.fromMap(Map<String, dynamic> map) {
+    return GuardianProfile(
+      name: map['name'] ?? '',
+      relationshipLabel: map['relationshipLabel'],
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'relationshipLabel': relationshipLabel,
+    };
+  }
+
+  /// Display string preferring the relationship label.
+  String get display => relationshipLabel ?? name;
 }
 
 class ReadingLevelHistory {

@@ -49,6 +49,12 @@ class ReadingLogModel {
   final DateTime? commentedAt;
   final String? commentedBy;
 
+  // Denormalized attribution of the guardian who logged this session.
+  // Captured at create time so the display stays correct even if the
+  // guardian later changes their name or relationship label.
+  final String? loggedByName;
+  final String? loggedByLabel;
+
   ReadingLogModel({
     required this.id,
     required this.studentId,
@@ -74,6 +80,8 @@ class ReadingLogModel {
     this.teacherComment,
     this.commentedAt,
     this.commentedBy,
+    this.loggedByName,
+    this.loggedByLabel,
   });
 
   bool get isCompleted => status == LogStatus.completed;
@@ -123,6 +131,8 @@ class ReadingLogModel {
           ? (data['commentedAt'] as Timestamp).toDate()
           : null,
       commentedBy: data['commentedBy'],
+      loggedByName: data['loggedByName'],
+      loggedByLabel: data['loggedByLabel'],
     );
   }
 
@@ -152,6 +162,8 @@ class ReadingLogModel {
       'commentedAt':
           commentedAt != null ? Timestamp.fromDate(commentedAt!) : null,
       'commentedBy': commentedBy,
+      'loggedByName': loggedByName,
+      'loggedByLabel': loggedByLabel,
     };
   }
 
@@ -180,6 +192,8 @@ class ReadingLogModel {
     String? teacherComment,
     DateTime? commentedAt,
     String? commentedBy,
+    String? loggedByName,
+    String? loggedByLabel,
   }) {
     return ReadingLogModel(
       id: id ?? this.id,
@@ -208,6 +222,8 @@ class ReadingLogModel {
       teacherComment: teacherComment ?? this.teacherComment,
       commentedAt: commentedAt ?? this.commentedAt,
       commentedBy: commentedBy ?? this.commentedBy,
+      loggedByName: loggedByName ?? this.loggedByName,
+      loggedByLabel: loggedByLabel ?? this.loggedByLabel,
     );
   }
 
@@ -238,6 +254,8 @@ class ReadingLogModel {
       'teacherComment': teacherComment,
       'commentedAt': commentedAt?.toIso8601String(),
       'commentedBy': commentedBy,
+      'loggedByName': loggedByName,
+      'loggedByLabel': loggedByLabel,
     };
   }
 
@@ -280,6 +298,13 @@ class ReadingLogModel {
           ? DateTime.parse(map['commentedAt'])
           : null,
       commentedBy: map['commentedBy'],
+      loggedByName: map['loggedByName'],
+      loggedByLabel: map['loggedByLabel'],
     );
   }
+
+  /// Human-friendly attribution for "Logged by …" surfaces. Prefers the
+  /// relationship label, falls back to the name, then a generic term.
+  String get loggedByDisplay =>
+      loggedByLabel ?? loggedByName ?? 'Guardian';
 }

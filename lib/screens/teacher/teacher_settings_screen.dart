@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/config/dev_access.dart';
+import '../../core/services/dev_access_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
 import '../../core/widgets/lumi/feedback_widget.dart';
@@ -32,6 +34,11 @@ class TeacherSettingsScreen extends StatefulWidget {
 class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
   final ReadingLevelService _readingLevelService = ReadingLevelService();
 
+  /// Dev-access flag — gates surfaces still in development. Source of truth is
+  /// the `devAccessEmails` allowlist managed in the super-admin portal
+  /// (Operations → Dev Access).
+  final DevAccessService _devAccess = DevAccessService.instance;
+
   // Teacher's classes (for class picker navigation)
   List<ClassModel> _classes = [];
   bool _loadingClasses = true;
@@ -42,6 +49,19 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
     super.initState();
     _loadClasses();
     _loadReadingLevelOptions();
+    // Rebuild if dev-access flips (e.g. the Firestore lookup resolves after a
+    // session resume, or a super-admin grants/revokes access).
+    _devAccess.addListener(_onDevAccessChanged);
+  }
+
+  @override
+  void dispose() {
+    _devAccess.removeListener(_onDevAccessChanged);
+    super.dispose();
+  }
+
+  void _onDevAccessChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadReadingLevelOptions() async {
@@ -439,12 +459,15 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
                   label: 'Reading Groups',
                   onTap: () => _navigateWithClass('/teacher/reading-groups'),
                 ),
-                TeacherSettingsItem(
-                  icon: Icons.assessment,
-                  iconBgColor: AppColors.libraryGreen,
-                  label: 'Class Reports',
-                  onTap: () => _navigateWithClass('/teacher/class-report'),
-                ),
+                // Class Reports is still in development — visible only to
+                // dev-access accounts until it ships in a later update.
+                if (hasDevAccess())
+                  TeacherSettingsItem(
+                    icon: Icons.assessment,
+                    iconBgColor: AppColors.libraryGreen,
+                    label: 'Class Reports',
+                    onTap: () => _navigateWithClass('/teacher/class-report'),
+                  ),
               ],
             )
                 .animate()
