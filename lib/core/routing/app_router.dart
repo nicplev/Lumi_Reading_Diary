@@ -22,6 +22,7 @@ import '../../screens/dev/impersonation_picker_screen.dart';
 import '../config/dev_access.dart';
 import '../../screens/auth/forgot_password_screen.dart';
 import '../../screens/auth/web_not_available_screen.dart';
+import '../../screens/auth/admin_use_web_portal_screen.dart';
 import '../../screens/parent/parent_home_screen.dart';
 import '../../screens/parent/log_reading_screen.dart';
 import '../../screens/parent/reading_history_screen.dart';
@@ -44,15 +45,7 @@ import '../../screens/teacher/teacher_student_reading_history_screen.dart';
 import '../../screens/teacher/isbn_scanner_screen.dart';
 import '../../screens/teacher/cover_scanner_screen.dart';
 import '../../screens/teacher/teacher_level_management_screen.dart';
-import '../../screens/admin/admin_home_screen.dart';
-import '../../screens/admin/user_management_screen.dart';
-import '../../screens/admin/student_management_screen.dart';
-import '../../screens/admin/class_management_screen.dart';
-import '../../screens/admin/school_analytics_dashboard.dart';
-import '../../screens/admin/parent_linking_management_screen.dart';
-import '../../screens/admin/database_migration_screen.dart';
 import '../../screens/shared/staff_notifications_screen.dart';
-import '../../screens/admin/reading_level_settings_screen.dart';
 import '../../screens/onboarding/school_registration_wizard.dart';
 import '../../screens/onboarding/school_demo_screen.dart';
 import '../../screens/onboarding/demo_request_screen.dart';
@@ -99,11 +92,8 @@ class AppRouter {
       // Dev routes: block in production (design-system-demo)
       if (location == '/design-system-demo') {
         if (!isLoggedIn) return '/auth/login';
-        // Only allow admin access to design system demo
-        final userModel = await _ref.read(userProvider.future);
-        if (userModel == null || userModel.role != UserRole.schoolAdmin) {
-          return '/auth/login';
-        }
+        // Gated to dev-access accounts.
+        if (!hasDevAccess()) return '/auth/login';
         return null;
       }
 
@@ -141,7 +131,10 @@ class AppRouter {
       if (location.startsWith('/teacher') && userRole != UserRole.teacher) {
         return getHomeRouteForRole(userRole);
       }
-      if (location.startsWith('/admin') && userRole != UserRole.schoolAdmin) {
+      // School admins use the web portal — there are no /admin/* routes in
+      // the mobile app. Any legacy /admin link funnels to the role home,
+      // which sends a school admin to the web-portal notice screen.
+      if (location.startsWith('/admin')) {
         return getHomeRouteForRole(userRole);
       }
 
@@ -604,113 +597,14 @@ class AppRouter {
       ),
 
       // ============================================
-      // ADMIN ROUTES
+      // ADMIN PORTAL NOTICE
       // ============================================
+      // School admins manage their school via the separate web portal.
+      // Any school-admin account that signs into the mobile app lands here.
       GoRoute(
-        path: '/admin/home',
-        name: 'admin-home',
-        builder: (context, state) {
-          final user =
-              state.extra as UserModel? ?? _ref.read(userProvider).value;
-          if (user == null) return const LoginScreen();
-          return AdminHomeScreen(user: user);
-        },
-      ),
-
-      GoRoute(
-        path: '/admin/user-management',
-        name: 'user-management',
-        builder: (context, state) {
-          final user = state.extra as UserModel?;
-          if (user == null) return const LoginScreen();
-          return UserManagementScreen(adminUser: user);
-        },
-      ),
-
-      GoRoute(
-        path: '/admin/student-management',
-        name: 'student-management',
-        builder: (context, state) {
-          final params = state.extra as Map<String, dynamic>?;
-          final adminUser = params?['adminUser'] as UserModel?;
-          final classModel = params?['classModel'] as ClassModel?;
-          if (adminUser == null || classModel == null) {
-            return const LoginScreen();
-          }
-          return StudentManagementScreen(
-            adminUser: adminUser,
-            classModel: classModel,
-          );
-        },
-      ),
-
-      GoRoute(
-        path: '/admin/class-management',
-        name: 'class-management',
-        builder: (context, state) {
-          final user = state.extra as UserModel?;
-          if (user == null) return const LoginScreen();
-          return ClassManagementScreen(adminUser: user);
-        },
-      ),
-
-      GoRoute(
-        path: '/admin/analytics',
-        name: 'school-analytics',
-        builder: (context, state) {
-          final user = state.extra as UserModel?;
-          if (user == null || user.schoolId == null) return const LoginScreen();
-          return SchoolAnalyticsDashboard(schoolId: user.schoolId!);
-        },
-      ),
-
-      GoRoute(
-        path: '/admin/parent-linking',
-        name: 'parent-linking',
-        builder: (context, state) {
-          final user = state.extra as UserModel?;
-          if (user == null) return const LoginScreen();
-          return ParentLinkingManagementScreen(user: user);
-        },
-      ),
-
-      GoRoute(
-        path: '/admin/reading-level-settings',
-        name: 'reading-level-settings',
-        builder: (context, state) {
-          final user = state.extra as UserModel?;
-          if (user == null) return const LoginScreen();
-          return ReadingLevelSettingsScreen(adminUser: user);
-        },
-      ),
-
-      GoRoute(
-        path: '/admin/database-migration',
-        name: 'database-migration',
-        builder: (context, state) {
-          final user = state.extra as UserModel?;
-          if (user == null) return const LoginScreen();
-          return DatabaseMigrationScreen(adminUser: user);
-        },
-      ),
-
-      GoRoute(
-        path: '/admin/notifications',
-        name: 'admin-notifications',
-        builder: (context, state) {
-          final extra = state.extra;
-          UserModel? user;
-
-          if (extra is Map<String, dynamic>) {
-            user = extra['user'] as UserModel?;
-          } else if (extra is UserModel) {
-            user = extra;
-          }
-
-          user ??= _ref.read(userProvider).value;
-          if (user == null) return const LoginScreen();
-          return StaffNotificationsScreen(user: user);
-        },
+        path: '/auth/admin-portal',
+        name: 'admin-portal',
+        builder: (context, state) => const AdminUseWebPortalScreen(),
       ),
 
       // ============================================
@@ -754,7 +648,8 @@ class AppRouter {
       case UserRole.teacher:
         return '/teacher/home';
       case UserRole.schoolAdmin:
-        return '/admin/home';
+        // School admins manage their school via the web portal.
+        return '/auth/admin-portal';
     }
   }
 
@@ -768,7 +663,7 @@ class AppRouter {
       case 'teacher':
         return '/teacher/home';
       case 'schoolAdmin':
-        return '/admin/home';
+        return '/auth/admin-portal';
       default:
         return '/teacher/home';
     }

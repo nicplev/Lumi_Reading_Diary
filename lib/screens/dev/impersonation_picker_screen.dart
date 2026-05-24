@@ -23,7 +23,7 @@ class _ImpersonationPickerScreenState
   List<ImpersonationUserSummary> _users = const [];
 
   ImpersonationSchoolSummary? _selectedSchool;
-  String _selectedRole = 'teacher';
+  final String _selectedRole = 'teacher';
   ImpersonationUserSummary? _selectedUser;
 
   bool _loadingSchools = true;
@@ -148,8 +148,6 @@ class _ImpersonationPickerScreenState
                     const SizedBox(height: 16),
                     _buildSchoolDropdown(),
                     const SizedBox(height: 12),
-                    _buildRoleSelector(),
-                    const SizedBox(height: 12),
                     _buildUserDropdown(),
                     const SizedBox(height: 16),
                     TextField(
@@ -232,22 +230,6 @@ class _ImpersonationPickerScreenState
     );
   }
 
-  Widget _buildRoleSelector() {
-    return SegmentedButton<String>(
-      segments: const [
-        ButtonSegment(value: 'teacher', label: Text('Teacher')),
-        ButtonSegment(value: 'schoolAdmin', label: Text('School admin')),
-      ],
-      selected: {_selectedRole},
-      onSelectionChanged: (s) {
-        setState(() {
-          _selectedRole = s.first;
-        });
-        _fetchUsersForSelection();
-      },
-    );
-  }
-
   Widget _buildUserDropdown() {
     if (_loadingUsers) {
       return const Padding(
@@ -260,7 +242,7 @@ class _ImpersonationPickerScreenState
     }
     if (_users.isEmpty) {
       return Text(
-        'No ${_selectedRole == "teacher" ? "teachers" : "school admins"} found in this school.',
+        'No teachers found in this school.',
         style: TextStyle(color: Colors.grey.shade600),
       );
     }

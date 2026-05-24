@@ -50,7 +50,6 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
   final Set<String> _selectedClassIds = <String>{};
   final Set<String> _selectedStudentIds = <String>{};
 
-  bool get _canTargetWholeSchool => widget.user.role == UserRole.schoolAdmin;
 
   @override
   void initState() {
@@ -1680,22 +1679,6 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                         },
                       ),
                     ),
-                    if (_canTargetWholeSchool) ...[
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TeacherFilterChip(
-                          label: 'School',
-                          isActive: _audienceType == 'school',
-                          onTap: () {
-                            setState(() {
-                              _audienceType = 'school';
-                              _selectedClassIds.clear();
-                              _selectedStudentIds.clear();
-                            });
-                          },
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
