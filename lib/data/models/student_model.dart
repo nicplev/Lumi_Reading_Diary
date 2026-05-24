@@ -58,8 +58,7 @@ class StudentModel {
   });
 
   bool get isEnrolled =>
-      enrollmentStatus == 'book_pack' ||
-      enrollmentStatus == 'direct_purchase';
+      enrollmentStatus == 'book_pack' || enrollmentStatus == 'direct_purchase';
 
   String get fullName => '$firstName $lastName';
 
@@ -96,7 +95,8 @@ class StudentModel {
       additionalInfo: data['additionalInfo'],
       enrollmentStatus: data['enrollmentStatus'],
       parentEmail: data['parentEmail'] ??
-          (data['additionalInfo'] as Map<String, dynamic>?)?['pendingParentEmail'],
+          (data['additionalInfo']
+              as Map<String, dynamic>?)?['pendingParentEmail'],
       levelHistory: (data['levelHistory'] as List<dynamic>?)
               ?.map((item) => ReadingLevelHistory.fromMap(item))
               .toList() ??
@@ -265,6 +265,9 @@ class ReadingLevelHistory {
 }
 
 class StudentStats {
+  /// Default streak freezes a student starts with, and the cap they can hold.
+  static const int defaultStreakFreezes = 2;
+
   final int totalMinutesRead;
   final int totalBooksRead;
   final int currentStreak;
@@ -272,6 +275,22 @@ class StudentStats {
   final DateTime? lastReadingDate;
   final double averageMinutesPerDay;
   final int totalReadingDays;
+
+  // ─── Shame-free streaks (Rec 6) ──────────────────────────────────
+  /// Unused streak freezes the student currently holds (capped at
+  /// [defaultStreakFreezes]). A freeze bridges a single missed day so an
+  /// off-day (illness, travel) doesn't reset the streak.
+  final int streakFreezesAvailable;
+
+  /// Lifetime count of freezes consumed — for trend/celebration copy.
+  final int streakFreezesUsed;
+
+  /// When the most recent freeze was earned (every ~7 consecutive days).
+  final DateTime? streakFreezeLastEarnedDate;
+
+  /// Optional rolling count of days read in the last 50 — used for
+  /// shame-free "X of the last 50 days" framing. Null when not computed.
+  final int? last50DaysCount;
 
   StudentStats({
     this.totalMinutesRead = 0,
@@ -281,6 +300,10 @@ class StudentStats {
     this.lastReadingDate,
     this.averageMinutesPerDay = 0,
     this.totalReadingDays = 0,
+    this.streakFreezesAvailable = defaultStreakFreezes,
+    this.streakFreezesUsed = 0,
+    this.streakFreezeLastEarnedDate,
+    this.last50DaysCount,
   });
 
   factory StudentStats.fromMap(Map<String, dynamic> map) {
@@ -294,6 +317,14 @@ class StudentStats {
           : null,
       averageMinutesPerDay: (map['averageMinutesPerDay'] ?? 0).toDouble(),
       totalReadingDays: map['totalReadingDays'] ?? 0,
+      // Null-safe defaults keep pre-Rec-6 documents backward compatible.
+      streakFreezesAvailable:
+          map['streakFreezesAvailable'] ?? defaultStreakFreezes,
+      streakFreezesUsed: map['streakFreezesUsed'] ?? 0,
+      streakFreezeLastEarnedDate: map['streakFreezeLastEarnedDate'] != null
+          ? (map['streakFreezeLastEarnedDate'] as Timestamp).toDate()
+          : null,
+      last50DaysCount: map['last50DaysCount'],
     );
   }
 
@@ -307,6 +338,12 @@ class StudentStats {
           lastReadingDate != null ? Timestamp.fromDate(lastReadingDate!) : null,
       'averageMinutesPerDay': averageMinutesPerDay,
       'totalReadingDays': totalReadingDays,
+      'streakFreezesAvailable': streakFreezesAvailable,
+      'streakFreezesUsed': streakFreezesUsed,
+      'streakFreezeLastEarnedDate': streakFreezeLastEarnedDate != null
+          ? Timestamp.fromDate(streakFreezeLastEarnedDate!)
+          : null,
+      'last50DaysCount': last50DaysCount,
     };
   }
 }

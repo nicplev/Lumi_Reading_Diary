@@ -44,7 +44,17 @@ Future<void> showParentRegistrationModal(BuildContext context) {
 const double _kMaxBlur = 18;
 const double _kMaxDim = 0.18;
 
-enum _Stage { code, name, email, password, confirm, phone, sms, success }
+enum _Stage {
+  code,
+  name,
+  relationship,
+  email,
+  password,
+  confirm,
+  phone,
+  sms,
+  success
+}
 
 class _ParentRegistrationOverlay extends StatelessWidget {
   const _ParentRegistrationOverlay();
@@ -97,9 +107,8 @@ class _ParentRegistrationOverlay extends StatelessWidget {
                     animation.status == AnimationStatus.reverse ||
                         animation.status == AnimationStatus.dismissed;
                 final raw = animation.value.clamp(0.0, 1.0);
-                final slideT = isReversing
-                    ? Curves.easeInCubic.transform(1 - raw)
-                    : 0.0;
+                final slideT =
+                    isReversing ? Curves.easeInCubic.transform(1 - raw) : 0.0;
                 final opacity = isReversing ? raw : 1.0;
                 return Opacity(
                   opacity: opacity,
@@ -140,6 +149,11 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
   final _confirmController = TextEditingController();
   final _phoneController = TextEditingController();
   final _smsCodeController = TextEditingController();
+  // Free-text relationship label, used only when "Other" is selected.
+  final _relationshipOtherController = TextEditingController();
+
+  // Selected relationship: a preset (Mum/Dad/Grandparent/Guardian) or 'Other'.
+  String? _relationshipChoice;
 
   _Stage _stage = _Stage.code;
   bool _busy = false;
@@ -185,6 +199,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       _confirmController,
       _phoneController,
       _smsCodeController,
+      _relationshipOtherController,
     ]) {
       c.addListener(() => setState(() {}));
     }
@@ -193,7 +208,9 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
     // Progressive reveal: tapping into the peek field commits the stage
     // advance so the previous field compacts to a chip.
     _passwordFocusNode.addListener(() {
-      if (_passwordFocusNode.hasFocus && _stage == _Stage.email && _emailValid) {
+      if (_passwordFocusNode.hasFocus &&
+          _stage == _Stage.email &&
+          _emailValid) {
         _advance(_Stage.password);
       }
     });
@@ -220,6 +237,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
     _confirmController.dispose();
     _phoneController.dispose();
     _smsCodeController.dispose();
+    _relationshipOtherController.dispose();
     super.dispose();
   }
 
@@ -260,7 +278,6 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
   bool get _showLastNameField =>
       _lastNameRevealed || _lastNameController.text.isNotEmpty;
 
-
   String get _studentName =>
       (_studentInfo?['studentFullName'] as String?) ?? 'your child';
 
@@ -271,6 +288,27 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       RegExp(r"^[A-Za-zÀ-ÿ'\-\s]{1,}$").hasMatch(v.trim());
   bool get _firstValid => _isValidName(_firstNameController.text);
   bool get _lastValid => _isValidName(_lastNameController.text);
+
+  // Relationship is valid once a preset is chosen, or "Other" is chosen with
+  // non-empty free text. Resolves to the label stored on the parent doc.
+  bool get _relationshipValid {
+    final choice = _relationshipChoice;
+    if (choice == null) return false;
+    if (choice == GuardianRelationship.other) {
+      return _relationshipOtherController.text.trim().isNotEmpty;
+    }
+    return true;
+  }
+
+  String? get _relationshipLabel {
+    final choice = _relationshipChoice;
+    if (choice == null) return null;
+    if (choice == GuardianRelationship.other) {
+      final text = _relationshipOtherController.text.trim();
+      return text.isEmpty ? null : text;
+    }
+    return choice;
+  }
 
   bool get _emailValid => RegExp(
         r'^[\w.+-]+@([\w-]+\.)+[\w-]{2,}$',
@@ -306,8 +344,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
 
   int get _resendRemainingSec {
     if (_lastSendAt == null) return 0;
-    final remaining =
-        _resendCooldown - DateTime.now().difference(_lastSendAt!);
+    final remaining = _resendCooldown - DateTime.now().difference(_lastSendAt!);
     return remaining.isNegative ? 0 : remaining.inSeconds;
   }
 
@@ -410,7 +447,8 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
     final prev = switch (_stage) {
       _Stage.code => _Stage.code,
       _Stage.name => _Stage.code,
-      _Stage.email => _Stage.name,
+      _Stage.relationship => _Stage.name,
+      _Stage.email => _Stage.relationship,
       _Stage.password => _Stage.email,
       _Stage.confirm => _Stage.password,
       _Stage.phone => _pendingUserId == null ? _Stage.confirm : _Stage.phone,
@@ -634,6 +672,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
           isActive: true,
           phoneNumber: enrolledPhone,
           phoneVerified: true,
+          relationshipLabel: _relationshipLabel,
         );
         await parentRef.set(parentUser.toFirestore());
         try {
@@ -661,6 +700,10 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         };
         if (enrolledPhone != null) {
           update['phoneNumber'] = enrolledPhone;
+        }
+        // Only overwrite the label if the guardian picked one in this flow.
+        if (_relationshipLabel != null) {
+          update['relationshipLabel'] = _relationshipLabel;
         }
         await parentRef.update(update);
         await indexService.createOrUpdateIndex(
@@ -846,6 +889,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
     final title = switch (_stage) {
       _Stage.code => 'Link your child',
       _Stage.name => 'Your name',
+      _Stage.relationship => 'Your relationship',
       _Stage.email => 'Email address',
       _Stage.password => 'Create password',
       _Stage.confirm => 'Confirm password',
@@ -898,13 +942,19 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         label: 'Connected to $_studentName',
       ));
     }
-    if (_stage.index >= _Stage.email.index) {
+    if (_stage.index >= _Stage.relationship.index) {
       final name =
           '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'
               .trim();
       chips.add(_CompletedChip(
         key: const ValueKey('chip_name'),
         label: name,
+      ));
+    }
+    if (_stage.index >= _Stage.email.index && _relationshipLabel != null) {
+      chips.add(_CompletedChip(
+        key: const ValueKey('chip_relationship'),
+        label: 'Relationship: ${_relationshipLabel!}',
       ));
     }
     if (_stage.index >= _Stage.password.index) {
@@ -973,6 +1023,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         child: switch (_stage) {
           _Stage.code => _buildCodeInput(),
           _Stage.name => _buildNameInputs(),
+          _Stage.relationship => _buildRelationshipInput(),
           _Stage.email => _buildEmailInput(),
           _Stage.password => _buildPasswordInput(),
           _Stage.confirm => _buildConfirmInput(),
@@ -1040,10 +1091,66 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
                     controller: _lastNameController,
                     hintText: 'Last name',
                     textInputAction: TextInputAction.done,
-                    errorText: _lastNameController.text.isNotEmpty &&
-                            !_lastValid
-                        ? 'Enter a valid last name'
-                        : null,
+                    errorText:
+                        _lastNameController.text.isNotEmpty && !_lastValid
+                            ? 'Enter a valid last name'
+                            : null,
+                  )
+                      .animate()
+                      .fadeIn(duration: 220.ms, curve: Curves.easeOut)
+                      .slideY(
+                        begin: 0.15,
+                        end: 0,
+                        duration: 260.ms,
+                        curve: Curves.easeOutCubic,
+                      ),
+                )
+              : const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRelationshipInput() {
+    final options = [
+      ...GuardianRelationship.presets,
+      GuardianRelationship.other,
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'How are you related to $_studentName? This appears on reading logs you record.',
+          style: LumiTextStyles.bodySmall(
+            color: AppColors.charcoal.withValues(alpha: 0.7),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final option in options)
+              ChoiceChip(
+                label: Text(option),
+                selected: _relationshipChoice == option,
+                selectedColor: AppColors.parentColor.withValues(alpha: 0.2),
+                onSelected: (_) => setState(() => _relationshipChoice = option),
+              ),
+          ],
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: _relationshipChoice == GuardianRelationship.other
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: LumiInput(
+                    controller: _relationshipOtherController,
+                    hintText: 'e.g. Aunt, Foster carer',
+                    autofocus: true,
+                    textInputAction: TextInputAction.done,
                   )
                       .animate()
                       .fadeIn(duration: 220.ms, curve: Curves.easeOut)
@@ -1239,6 +1346,11 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       _Stage.name => (
           'Next',
           _firstValid && _lastValid,
+          () => _advance(_Stage.relationship),
+        ),
+      _Stage.relationship => (
+          'Next',
+          _relationshipValid,
           () => _advance(_Stage.email),
         ),
       _Stage.email => (
@@ -1318,10 +1430,8 @@ class _CompletedChip extends StatelessWidget {
           ),
         ],
       ),
-    )
-        .animate()
-        .fadeIn(duration: 260.ms, curve: Curves.easeOut)
-        .slideY(begin: 0.3, end: 0, duration: 320.ms, curve: Curves.easeOutCubic);
+    ).animate().fadeIn(duration: 260.ms, curve: Curves.easeOut).slideY(
+        begin: 0.3, end: 0, duration: 320.ms, curve: Curves.easeOutCubic);
   }
 }
 

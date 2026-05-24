@@ -30,6 +30,13 @@ const statusLabels: Record<string, string> = {
   expired: 'Expired',
 };
 
+// How a code was issued. Co-parent invites are created by an already-linked
+// guardian (from the parent app) to bring in a second guardian.
+const intentLabels: Record<string, string> = {
+  staff_issued: 'Staff',
+  co_parent_invite: 'Co-parent invite',
+};
+
 export function LinkCodesTab() {
   const { toast } = useToast();
   const { data: codes, isLoading, error } = useLinkCodes();
@@ -133,6 +140,16 @@ export function LinkCodesTab() {
       header: 'Student',
       accessorFn: (row) => row.studentName,
       sortable: true,
+    },
+    {
+      id: 'type',
+      header: 'Type',
+      accessorFn: (row) => row.intendedFor,
+      cell: (value) => (
+        <Badge variant={value === 'co_parent_invite' ? 'info' : 'default'}>
+          {intentLabels[value as string] ?? 'Staff'}
+        </Badge>
+      ),
     },
     {
       id: 'status',

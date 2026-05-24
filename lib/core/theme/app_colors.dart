@@ -10,10 +10,18 @@ class AppColors {
   // LUMI DESIGN SYSTEM COLORS (New Palette)
   // ============================================
 
-  /// Primary brand color - Used for CTAs, highlights, active states
-  /// Usage: Primary buttons, links, active navigation items
-  /// Accessibility: Use with white text (meets WCAG AA)
+  /// Primary brand color - Used for highlights, decorative fills, active states
+  /// Usage: Decorative fills, badges, active navigation accents
+  /// Accessibility: White text on this fails WCAG AA (~2.3:1). For buttons and
+  /// any text/CTA surface use [rosePinkAccessible] instead.
   static const Color rosePink = Color(0xFFFF8698);
+
+  /// Accessible variant of the brand rose-pink - Used for buttons / CTAs only.
+  /// Usage: Primary button fills, secondary button text+border, text buttons.
+  /// Accessibility: White text on this fill measures ~4.65:1 (passes WCAG AA
+  /// for normal text). Keeps [rosePink] for decorative fills and badges.
+  /// NOTE: pending design sign-off that it still reads as "Lumi pink".
+  static const Color rosePinkAccessible = Color(0xFFC8475C);
 
   /// Secondary brand color - Used for success states, positive feedback
   /// Usage: Success messages, completion indicators, positive actions

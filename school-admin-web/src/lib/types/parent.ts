@@ -7,6 +7,12 @@ export interface Parent {
   isActive: boolean;
   createdAt: Date;
   lastLoginAt?: Date;
+  /**
+   * The guardian's relationship to their child(ren) — e.g. Mum, Dad,
+   * Grandparent, Guardian, or a free-text value. Set during registration in
+   * the parent app. Undefined for legacy parents.
+   */
+  relationshipLabel?: string;
 }
 
 export interface LinkedStudent {

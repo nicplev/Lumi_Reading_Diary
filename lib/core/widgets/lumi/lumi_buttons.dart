@@ -32,7 +32,7 @@ class LumiPrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = color ?? AppColors.rosePink;
+    final primaryColor = color ?? AppColors.rosePinkAccessible;
     final shape = borderRadius != null
         ? RoundedRectangleBorder(borderRadius: borderRadius!)
         : LumiBorders.shapePill;
@@ -112,7 +112,7 @@ class LumiSecondaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accentColor = color ?? AppColors.rosePink;
+    final accentColor = color ?? AppColors.rosePinkAccessible;
     final br = borderRadius ?? LumiBorders.pill;
     final shape = RoundedRectangleBorder(
       borderRadius: br,
@@ -184,7 +184,7 @@ class LumiTextButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final foregroundColor = color ?? AppColors.rosePink;
+    final foregroundColor = color ?? AppColors.rosePinkAccessible;
 
     return TextButton(
       onPressed: isLoading ? null : onPressed,

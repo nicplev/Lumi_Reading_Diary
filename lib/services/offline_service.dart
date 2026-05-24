@@ -19,6 +19,8 @@ class OfflineService {
   late Box<Map> _allocationsBox;
   late Box<Map> _pendingSyncBox;
   late Box<Map> _settingsBox;
+  // Rec 5a: in-progress reading-log wizard drafts, keyed by studentId.
+  late Box<Map> _logDraftsBox;
 
   // Connectivity
   final Connectivity _connectivity = Connectivity();
@@ -45,6 +47,7 @@ class OfflineService {
       _allocationsBox = await Hive.openBox<Map>('allocations');
       _pendingSyncBox = await Hive.openBox<Map>('pending_sync');
       _settingsBox = await Hive.openBox<Map>('settings');
+      _logDraftsBox = await Hive.openBox<Map>('log_drafts');
 
       // Load pending syncs
       _loadPendingSyncs();
@@ -79,6 +82,7 @@ class OfflineService {
       await _allocationsBox.clear();
       await _pendingSyncBox.clear();
       await _settingsBox.clear();
+      await _logDraftsBox.clear();
       _syncQueue.clear();
       debugPrint('All offline caches cleared');
     } catch (e) {
@@ -171,6 +175,42 @@ class OfflineService {
     } catch (e) {
       debugPrint('Error getting local reading logs: $e');
       return [];
+    }
+  }
+
+  // ─── Reading-log wizard drafts (Rec 5a) ────────────────────────────
+  // One draft per studentId, so a wizard interrupted mid-flow can be
+  // restored. Saved on app background; cleared on a successful log.
+
+  Future<void> saveLogDraft(
+    String studentId,
+    Map<String, dynamic> draft,
+  ) async {
+    if (!_initialized) return;
+    try {
+      await _logDraftsBox.put(studentId, draft);
+    } catch (e) {
+      debugPrint('Error saving log draft: $e');
+    }
+  }
+
+  Map<String, dynamic>? getLogDraft(String studentId) {
+    if (!_initialized) return null;
+    try {
+      final data = _logDraftsBox.get(studentId);
+      return data != null ? Map<String, dynamic>.from(data) : null;
+    } catch (e) {
+      debugPrint('Error reading log draft: $e');
+      return null;
+    }
+  }
+
+  Future<void> clearLogDraft(String studentId) async {
+    if (!_initialized) return;
+    try {
+      await _logDraftsBox.delete(studentId);
+    } catch (e) {
+      debugPrint('Error clearing log draft: $e');
     }
   }
 
@@ -441,6 +481,7 @@ class OfflineService {
     await _studentsBox.clear();
     await _allocationsBox.clear();
     await _pendingSyncBox.clear();
+    await _logDraftsBox.clear();
     _syncQueue.clear();
   }
 

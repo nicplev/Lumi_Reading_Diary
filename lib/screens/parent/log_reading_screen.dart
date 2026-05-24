@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -17,7 +16,8 @@ import '../../data/models/school_model.dart';
 import '../../data/models/parent_comment_settings.dart';
 import '../../services/firebase_service.dart';
 import '../../services/isbn_assignment_service.dart';
-import '../../services/widget_data_service.dart';
+import '../../services/offline_service.dart';
+import '../../services/reading_log_service.dart';
 
 class LogReadingScreen extends StatefulWidget {
   final StudentModel student;
@@ -35,7 +35,8 @@ class LogReadingScreen extends StatefulWidget {
   State<LogReadingScreen> createState() => _LogReadingScreenState();
 }
 
-class _LogReadingScreenState extends State<LogReadingScreen> {
+class _LogReadingScreenState extends State<LogReadingScreen>
+    with WidgetsBindingObserver {
   final FirebaseService _firebaseService = FirebaseService.instance;
   final PageController _pageController = PageController();
   final TextEditingController _bookTitleController = TextEditingController();
@@ -65,16 +66,21 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
   bool _isLoading = false;
   String? _errorMessage;
 
+  // Soft, non-blocking notice when another guardian already logged today.
+  String? _alreadyLoggedNotice;
+
   @override
   void initState() {
     super.initState();
-    _selectedMinutes =
-        widget.allocations.isNotEmpty ? widget.allocations.first.targetMinutes : 20;
+    WidgetsBinding.instance.addObserver(this);
+    _selectedMinutes = widget.allocations.isNotEmpty
+        ? widget.allocations.first.targetMinutes
+        : 20;
 
     final seen = <String>{};
     for (final allocation in widget.allocations) {
-      for (final item in allocation
-          .effectiveAssignmentItemsForStudent(widget.student.id)) {
+      for (final item
+          in allocation.effectiveAssignmentItemsForStudent(widget.student.id)) {
         final title = item.title.trim();
         if (title.isNotEmpty && seen.add(title.toLowerCase())) {
           _assignedBookTitles
@@ -83,7 +89,159 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
       }
     }
 
+    // Rec 5a: restore an interrupted draft (validated against current books).
+    _restoreDraft();
+
     _loadCommentSettings();
+    _checkAlreadyLoggedToday();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Persist a draft when the app is backgrounded mid-wizard so an
+    // interruption (call, notification, app switch) doesn't lose progress.
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      if (_hasDraftContent && !_isLoading) {
+        OfflineService.instance
+            .saveLogDraft(widget.student.id, _buildDraft());
+      }
+    }
+  }
+
+  /// True when the wizard holds enough input to be worth keeping as a draft.
+  bool get _hasDraftContent =>
+      _selectedBookTitles.isNotEmpty ||
+      _customBookTitles.isNotEmpty ||
+      _selectedFeeling != null ||
+      _selectedComments.isNotEmpty ||
+      _notesController.text.trim().isNotEmpty;
+
+  Map<String, dynamic> _buildDraft() => {
+        'currentStep': _currentStep,
+        'selectedMinutes': _selectedMinutes,
+        'selectedBookTitles': _selectedBookTitles.toList(),
+        'customBookTitles': List<String>.from(_customBookTitles),
+        'selectedFeeling': _selectedFeeling?.name,
+        'selectedComments': List<String>.from(_selectedComments),
+        'notes': _notesController.text,
+        'savedAt': DateTime.now().toIso8601String(),
+      };
+
+  /// Restores a previously-saved draft for this student, if one exists.
+  /// Restored assigned-book titles are re-validated against the current
+  /// allocations so stale assignments are silently dropped.
+  void _restoreDraft() {
+    final draft = OfflineService.instance.getLogDraft(widget.student.id);
+    if (draft == null) return;
+
+    final validAssigned = _assignedBookTitles.toSet();
+    _selectedBookTitles.addAll(
+      (draft['selectedBookTitles'] as List?)
+              ?.whereType<String>()
+              .where(validAssigned.contains) ??
+          const <String>[],
+    );
+    _customBookTitles.addAll(
+      (draft['customBookTitles'] as List?)?.whereType<String>() ??
+          const <String>[],
+    );
+    _selectedMinutes = draft['selectedMinutes'] as int? ?? _selectedMinutes;
+
+    final feelingName = draft['selectedFeeling'] as String?;
+    if (feelingName != null) {
+      for (final feeling in ReadingFeeling.values) {
+        if (feeling.name == feelingName) {
+          _selectedFeeling = feeling;
+          break;
+        }
+      }
+    }
+    _selectedComments =
+        (draft['selectedComments'] as List?)?.whereType<String>().toList() ??
+            [];
+    _notesController.text = draft['notes'] as String? ?? '';
+
+    final step = draft['currentStep'] as int? ?? 0;
+    _currentStep = step.clamp(0, _totalSteps - 1);
+    if (_currentStep > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _pageController.hasClients) {
+          _pageController.jumpToPage(_currentStep);
+        }
+      });
+    }
+  }
+
+  /// Close handler: when the wizard holds unsaved input, ask whether to keep
+  /// the draft for later or discard it.
+  Future<void> _handleClose() async {
+    if (!_hasDraftContent) {
+      context.pop();
+      return;
+    }
+    final action = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Discard draft?'),
+        content: const Text(
+          'Keep your progress to finish logging later, or discard it.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'keep'),
+            child: const Text('Keep draft'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'discard'),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    if (action == null) return; // Dismissed — stay on the wizard.
+    if (action == 'keep') {
+      await OfflineService.instance
+          .saveLogDraft(widget.student.id, _buildDraft());
+    } else {
+      await OfflineService.instance.clearLogDraft(widget.student.id);
+    }
+    if (mounted) context.pop();
+  }
+
+  /// Soft check: did another guardian already log reading for this student
+  /// today? Surfaces a dismissible, non-blocking notice — duplicate logs are
+  /// allowed and stats aggregation sums them correctly.
+  Future<void> _checkAlreadyLoggedToday() async {
+    try {
+      final snapshot = await _firebaseService.firestore
+          .collection('schools')
+          .doc(widget.student.schoolId)
+          .collection('readingLogs')
+          .where('studentId', isEqualTo: widget.student.id)
+          .get();
+
+      final now = DateTime.now();
+      for (final doc in snapshot.docs) {
+        final log = ReadingLogModel.fromFirestore(doc);
+        final sameDay = log.date.year == now.year &&
+            log.date.month == now.month &&
+            log.date.day == now.day;
+        if (sameDay && log.parentId != widget.parent.id) {
+          if (mounted) {
+            setState(() {
+              _alreadyLoggedNotice =
+                  '${log.loggedByDisplay} already logged ${log.minutesRead} '
+                  'min for ${widget.student.firstName} today. '
+                  'You can still add another session.';
+            });
+          }
+          return;
+        }
+      }
+    } catch (_) {
+      // Non-critical — the notice is purely informational.
+    }
   }
 
   Future<void> _loadCommentSettings() async {
@@ -105,6 +263,7 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
     _bookTitleController.dispose();
     _notesController.dispose();
@@ -148,15 +307,6 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
     return [..._selectedBookTitles, ..._customBookTitles];
   }
 
-  String get _parentCommentText {
-    final chips = _selectedComments.join('. ');
-    final notes = _notesController.text.trim();
-    if (chips.isNotEmpty && notes.isNotEmpty) {
-      return '$chips. $notes';
-    }
-    return chips.isNotEmpty ? chips : notes;
-  }
-
   Future<void> _saveReadingLog() async {
     setState(() {
       _isLoading = true;
@@ -164,56 +314,27 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
     });
 
     try {
-      final now = DateTime.now();
-      final log = ReadingLogModel(
-        id: now.millisecondsSinceEpoch.toString(),
-        studentId: widget.student.id,
-        parentId: widget.parent.id,
-        schoolId: widget.student.schoolId,
-        classId: widget.student.classId,
-        date: now,
-        minutesRead: _selectedMinutes,
-        targetMinutes:
-            widget.allocations.isNotEmpty ? widget.allocations.first.targetMinutes : 20,
-        status: LogStatus.completed,
-        bookTitles: _finalBookTitles,
-        notes: _notesController.text.isNotEmpty ? _notesController.text : null,
-        childFeeling: _selectedFeeling,
-        parentComment:
-            _parentCommentText.isNotEmpty ? _parentCommentText : null,
-        parentCommentSelections: List<String>.from(_selectedComments),
-        parentCommentFreeText: _notesController.text.trim().isNotEmpty
-            ? _notesController.text.trim()
-            : null,
-        createdAt: now,
-        allocationId: widget.allocations.isNotEmpty ? widget.allocations.first.id : null,
-      );
-
-      final logData = log.toFirestore();
-      // Use server timestamp for audit trail (teachers can see exact submission time)
-      logData['createdAt'] = FieldValue.serverTimestamp();
-
-      await _firebaseService.firestore
-          .collection('schools')
-          .doc(widget.parent.schoolId)
-          .collection('readingLogs')
-          .doc(log.id)
-          .set(logData);
-
-      final updatedStats = await _updateStudentStats();
-
-      // Push fresh data to the home screen widget immediately after a successful log.
-      WidgetDataService.instance.updateAfterLog(
+      final result = await ReadingLogService.instance.logReading(
         student: widget.student,
-        log: log,
+        parent: widget.parent,
+        allocations: widget.allocations,
+        minutesRead: _selectedMinutes,
+        bookTitles: _finalBookTitles,
+        feeling: _selectedFeeling,
+        commentSelections: List<String>.from(_selectedComments),
+        freeText: _notesController.text,
       );
+
+      // Rec 5a: a completed log supersedes any saved draft.
+      await OfflineService.instance.clearLogDraft(widget.student.id);
 
       if (mounted) {
         context.go('/parent/reading-success', extra: {
           'student': widget.student,
           'parent': widget.parent,
-          'readingLog': log,
-          'updatedStats': updatedStats,
+          'readingLog': result.log,
+          'updatedStats': result.updatedStats,
+          'freezeUsed': result.freezeUsed,
         });
       }
     } catch (e) {
@@ -221,80 +342,6 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
         _errorMessage = 'Failed to save reading log. Please try again.';
         _isLoading = false;
       });
-    }
-  }
-
-  Future<Map<String, dynamic>?> _updateStudentStats() async {
-    try {
-      final studentRef = _firebaseService.firestore
-          .collection('schools')
-          .doc(widget.parent.schoolId)
-          .collection('students')
-          .doc(widget.student.id);
-
-      Map<String, dynamic>? newStats;
-
-      await _firebaseService.firestore.runTransaction((transaction) async {
-        final studentDoc = await transaction.get(studentRef);
-
-        if (studentDoc.exists) {
-          final data = studentDoc.data() as Map<String, dynamic>;
-          final stats = data['stats'] as Map<String, dynamic>? ?? {};
-
-          final currentStreak = stats['currentStreak'] ?? 0;
-          final longestStreak = stats['longestStreak'] ?? 0;
-          final totalMinutesRead = stats['totalMinutesRead'] ?? 0;
-          final totalBooksRead = stats['totalBooksRead'] ?? 0;
-          final totalReadingDays = stats['totalReadingDays'] ?? 0;
-
-          final lastReadingDate = stats['lastReadingDate'] != null
-              ? (stats['lastReadingDate'] as Timestamp).toDate().toLocal()
-              : null;
-
-          int newStreak = 1;
-          bool isNewDay = true;
-          if (lastReadingDate != null) {
-            final now = DateTime.now();
-            final today = DateTime(now.year, now.month, now.day);
-            final lastDay = DateTime(
-              lastReadingDate.year,
-              lastReadingDate.month,
-              lastReadingDate.day,
-            );
-            final calendarDaysDiff = today.difference(lastDay).inDays;
-
-            if (calendarDaysDiff == 1) {
-              newStreak = currentStreak + 1;
-            } else if (calendarDaysDiff == 0) {
-              newStreak = currentStreak;
-              isNewDay = false; // Same day — don't double-count
-            }
-            // calendarDaysDiff > 1 means streak is broken, newStreak stays 1
-          }
-
-          final newTotalDays =
-              isNewDay ? totalReadingDays + 1 : totalReadingDays;
-
-          newStats = {
-            'totalMinutesRead': totalMinutesRead + _selectedMinutes,
-            'totalBooksRead': totalBooksRead + _finalBookTitles.length,
-            'currentStreak': newStreak,
-            'longestStreak':
-                newStreak > longestStreak ? newStreak : longestStreak,
-            'lastReadingDate': FieldValue.serverTimestamp(),
-            'totalReadingDays': newTotalDays,
-            'averageMinutesPerDay': (totalMinutesRead + _selectedMinutes) /
-                (newTotalDays > 0 ? newTotalDays : 1),
-          };
-
-          transaction.update(studentRef, {'stats': newStats});
-        }
-      });
-
-      return newStats;
-    } catch (e) {
-      debugPrint('Error updating student stats: $e');
-      return null;
     }
   }
 
@@ -311,7 +358,7 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () => context.pop(),
+          onPressed: _handleClose,
         ),
       ),
       body: SafeArea(
@@ -319,6 +366,40 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
           children: [
             // Step indicator
             _buildStepIndicator(),
+
+            // Soft notice: another guardian already logged today.
+            if (_alreadyLoggedNotice != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.warmOrange.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline,
+                          color: AppColors.warmOrange, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _alreadyLoggedNotice!,
+                          style: LumiTextStyles.bodySmall(
+                            color: AppColors.charcoal,
+                          ),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () =>
+                            setState(() => _alreadyLoggedNotice = null),
+                        child: const Icon(Icons.close,
+                            color: AppColors.warmOrange, size: 18),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
 
             // Page content
             Expanded(
@@ -550,7 +631,8 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
                       child: Center(
                         child: Text(
                           '$_selectedMinutes min',
-                          style: LumiTextStyles.displayMedium(color: AppColors.rosePink),
+                          style: LumiTextStyles.displayMedium(
+                              color: AppColors.rosePink),
                           maxLines: 1,
                         ),
                       ),
@@ -568,30 +650,30 @@ class _LogReadingScreenState extends State<LogReadingScreen> {
                 const SizedBox(height: 8),
                 Center(
                   child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  alignment: WrapAlignment.center,
-                  children: [10, 15, 20, 25, 30].map((minutes) {
-                    return ChoiceChip(
-                      label: Text('$minutes'),
-                      selected: _selectedMinutes == minutes,
-                      onSelected: (selected) {
-                        if (selected) {
-                          setState(() => _selectedMinutes = minutes);
-                        }
-                      },
-                      selectedColor: AppColors.rosePink,
-                      labelStyle: TextStyle(
-                        color: _selectedMinutes == minutes
-                            ? AppColors.white
-                            : AppColors.charcoal,
-                        fontWeight: _selectedMinutes == minutes
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                      ),
-                    );
-                  }).toList(),
-                ),
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.center,
+                    children: [10, 15, 20, 25, 30].map((minutes) {
+                      return ChoiceChip(
+                        label: Text('$minutes'),
+                        selected: _selectedMinutes == minutes,
+                        onSelected: (selected) {
+                          if (selected) {
+                            setState(() => _selectedMinutes = minutes);
+                          }
+                        },
+                        selectedColor: AppColors.rosePink,
+                        labelStyle: TextStyle(
+                          color: _selectedMinutes == minutes
+                              ? AppColors.white
+                              : AppColors.charcoal,
+                          fontWeight: _selectedMinutes == minutes
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 ),
               ],
             ),

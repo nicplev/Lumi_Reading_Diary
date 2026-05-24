@@ -13,6 +13,7 @@ function toParent(doc: FirebaseFirestore.DocumentSnapshot): Parent {
     isActive: data.isActive ?? true,
     createdAt: data.createdAt?.toDate() ?? new Date(),
     lastLoginAt: data.lastLoginAt?.toDate(),
+    relationshipLabel: data.relationshipLabel,
   };
 }
 

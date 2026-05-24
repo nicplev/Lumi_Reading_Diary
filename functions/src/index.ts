@@ -1913,18 +1913,16 @@ export const processPendingUserDeletions = functions.pubsub
     return null;
   });
 
-/**
- * Build the minimal guardian projection denormalized onto student docs.
- * Deliberately carries name + relationship label only — never email/phone.
- */
-function guardianProjection(
+// Build the minimal guardian projection denormalized onto student docs.
+// Deliberately carries name + relationship label only — never email/phone.
+const guardianProjection = (
   parentData: admin.firestore.DocumentData
-): {name: string; relationshipLabel: string | null} {
+): {name: string; relationshipLabel: string | null} => {
   return {
     name: parentData.fullName ?? "",
     relationshipLabel: parentData.relationshipLabel ?? null,
   };
-}
+};
 
 /**
  * Maintains the denormalized `guardianProfiles` map on student docs so a
@@ -1993,6 +1991,74 @@ export const syncGuardianProfiles = functions.firestore
     } catch (err) {
       functions.logger.warn(
         `syncGuardianProfiles: partial failure for parent ${parentId}`,
+        err
+      );
+    }
+    return null;
+  });
+
+/**
+ * Companion to syncGuardianProfiles. Fires on student-doc writes; when
+ * `parentIds` changes (a guardian linked or unlinked), it (re)writes the
+ * guardianProfiles entry for every currently-linked parent — including
+ * parents whose own doc was not touched, e.g. the original guardian when a
+ * co-parent is added. Loop-safe: writing guardianProfiles does not change
+ * parentIds, so the re-trigger sees no change and no-ops.
+ */
+export const refreshGuardianProfilesOnLink = functions.firestore
+  .document("schools/{schoolId}/students/{studentId}")
+  .onWrite(async (change, context) => {
+    const schoolId = context.params.schoolId;
+
+    const before = change.before.exists ? change.before.data()! : null;
+    const after = change.after.exists ? change.after.data()! : null;
+    if (!after) return null; // Student deleted — nothing to maintain.
+
+    const beforeParents: string[] = before?.parentIds ?? [];
+    const afterParents: string[] = after.parentIds ?? [];
+
+    // React only when the parent set actually changed. This also makes this
+    // function's own guardianProfiles write a no-op (parentIds unchanged).
+    const sameParents =
+      beforeParents.length === afterParents.length &&
+      beforeParents.every((id) => afterParents.includes(id));
+    if (sameParents) return null;
+
+    const studentRef = change.after.ref;
+    const profileField = (parentId: string) =>
+      new admin.firestore.FieldPath("guardianProfiles", parentId);
+    const batch = db.batch();
+
+    // Drop entries for parents no longer linked.
+    for (const parentId of beforeParents.filter(
+      (id) => !afterParents.includes(id)
+    )) {
+      batch.update(
+        studentRef,
+        profileField(parentId),
+        admin.firestore.FieldValue.delete()
+      );
+    }
+
+    // (Re)write entries for every currently-linked parent.
+    for (const parentId of afterParents) {
+      const parentSnap = await db
+        .doc(`schools/${schoolId}/parents/${parentId}`)
+        .get();
+      if (!parentSnap.exists) continue;
+      batch.update(
+        studentRef,
+        profileField(parentId),
+        guardianProjection(parentSnap.data()!)
+      );
+    }
+
+    try {
+      await batch.commit();
+    } catch (err) {
+      functions.logger.warn(
+        "refreshGuardianProfilesOnLink: failed for student " +
+          context.params.studentId,
         err
       );
     }

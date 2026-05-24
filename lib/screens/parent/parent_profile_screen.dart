@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/lumi_text_styles.dart';
@@ -10,14 +12,18 @@ import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_card.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
 import 'widgets/character_picker_sheet.dart';
+import 'widgets/parent_child_switcher.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
+import '../../data/models/student_link_code_model.dart';
+import '../../data/providers/active_child_provider.dart';
 import '../../services/firebase_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/parent_linking_service.dart';
 import '../../core/widgets/lumi/feedback_widget.dart';
 
-class ParentProfileScreen extends StatefulWidget {
+class ParentProfileScreen extends ConsumerStatefulWidget {
   final UserModel user;
 
   const ParentProfileScreen({
@@ -26,10 +32,11 @@ class ParentProfileScreen extends StatefulWidget {
   });
 
   @override
-  State<ParentProfileScreen> createState() => _ParentProfileScreenState();
+  ConsumerState<ParentProfileScreen> createState() =>
+      _ParentProfileScreenState();
 }
 
-class _ParentProfileScreenState extends State<ParentProfileScreen> {
+class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
   final FirebaseService _firebaseService = FirebaseService.instance;
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _settingsKey = GlobalKey();
@@ -40,6 +47,10 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
   bool _isLoading = false;
   List<StudentModel> _linkedChildren = [];
   bool _settingsExpanded = false;
+  final _linkingService = ParentLinkingService();
+  // Local copy of the parent's relationship label so edits reflect immediately
+  // without needing the upstream UserModel to refresh.
+  String? _relationshipLabel;
 
   static const _dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   static const _dayValues = [1, 2, 3, 4, 5, 6, 7]; // DateTime weekdays
@@ -47,8 +58,8 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _relationshipLabel = widget.user.relationshipLabel;
     _loadPreferences();
-    _loadLinkedChildren();
   }
 
   @override
@@ -81,28 +92,8 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
       });
     }
 
-    // Sync local notifications after children are loaded
-    // (called again from _loadLinkedChildren once children are available)
-  }
-
-  Future<void> _loadLinkedChildren() async {
-    final children = <StudentModel>[];
-    for (String childId in widget.user.linkedChildren) {
-      final doc = await _firebaseService.firestore
-          .collection('schools')
-          .doc(widget.user.schoolId)
-          .collection('students')
-          .doc(childId)
-          .get();
-      if (doc.exists) {
-        children.add(StudentModel.fromFirestore(doc));
-      }
-    }
-    setState(() {
-      _linkedChildren = children;
-    });
-
-    // Now that children are loaded, sync local notification state
+    // Children flow in reactively via [parentChildrenProvider] (see build);
+    // re-sync reminders once preferences are known, regardless of order.
     await _syncLocalNotifications();
   }
 
@@ -110,7 +101,17 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
   Future<void> _syncLocalNotifications() async {
     if (_notificationsEnabled && _linkedChildren.isNotEmpty) {
       await NotificationService.instance.scheduleReminders(
-        childNames: _linkedChildren.map((c) => c.firstName).toList(),
+        children: _linkedChildren
+            .map((c) => ReminderChild(
+                  studentId: c.id,
+                  firstName: c.firstName,
+                  schoolId: c.schoolId,
+                  classId: c.classId,
+                ))
+            .toList(),
+        parentId: widget.user.id,
+        parentName: widget.user.fullName,
+        parentLabel: widget.user.relationshipLabel,
         hour: _reminderTime.hour,
         minute: _reminderTime.minute,
         days: _reminderDays.isEmpty ? null : _reminderDays,
@@ -210,6 +211,24 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Keep the local children list in sync with the live provider so the
+    // "Your Children" card and reminder preview reflect in-app links at once.
+    ref.listen<AsyncValue<List<StudentModel>>>(
+      parentChildrenProvider,
+      (_, next) {
+        final children = next.value;
+        if (children == null || !mounted) return;
+        final sameSet = children.length == _linkedChildren.length &&
+            children.every(
+              (c) => _linkedChildren.any((existing) => existing.id == c.id),
+            );
+        if (!sameSet) {
+          setState(() => _linkedChildren = children);
+          _syncLocalNotifications();
+        }
+      },
+    );
+
     return Scaffold(
       backgroundColor: AppColors.offWhite,
       body: SafeArea(
@@ -218,7 +237,12 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
           padding: LumiPadding.allS,
           child: Column(
             children: [
+              const ParentChildSwitcher(
+                padding: EdgeInsets.only(bottom: LumiSpacing.s),
+              ),
               _buildProfileHeader(),
+              LumiGap.m,
+              _buildRelationshipCard(),
               LumiGap.m,
               _buildLinkedChildrenCard(),
               LumiGap.m,
@@ -306,8 +330,7 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                         int totalStreak = 0;
                         if (snapshot.hasData) {
                           for (final doc in snapshot.data!) {
-                            final data =
-                                doc.data() as Map<String, dynamic>?;
+                            final data = doc.data() as Map<String, dynamic>?;
                             final stats =
                                 data?['stats'] as Map<String, dynamic>?;
                             totalStreak +=
@@ -409,9 +432,8 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
         title: 'No children linked',
         message: 'Link a child to start tracking their reading progress.',
         actionText: 'Add Child',
-        onAction: () {
-          // Navigate to add child
-        },
+        onAction: () =>
+            context.push('/parent/link-child', extra: widget.user),
       );
     }
 
@@ -423,123 +445,278 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
           Row(
             children: [
               Icon(Icons.family_restroom,
-                  size: 20,
-                  color: AppColors.charcoal.withValues(alpha: 0.7)),
+                  size: 20, color: AppColors.charcoal.withValues(alpha: 0.7)),
               LumiGap.horizontalXS,
               Text('Your Children', style: LumiTextStyles.h3()),
             ],
           ),
           LumiGap.s,
           // Child rows
-          ..._linkedChildren.map((child) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: LumiSpacing.xs),
-              child: Container(
-                padding: const EdgeInsets.all(LumiSpacing.xs + 4),
-                decoration: BoxDecoration(
-                  color: AppColors.offWhite,
-                  borderRadius: LumiBorders.medium,
+          ..._linkedChildren.map(_buildChildEntry),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChildEntry(StudentModel child) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: LumiSpacing.xs),
+      child: Container(
+        padding: const EdgeInsets.all(LumiSpacing.xs + 4),
+        decoration: BoxDecoration(
+          color: AppColors.offWhite,
+          borderRadius: LumiBorders.medium,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                GestureDetector(
+                  onTap: () => showCharacterPicker(
+                    context,
+                    student: child,
+                    schoolId: widget.user.schoolId ?? '',
+                    onChanged: (updated) {
+                      setState(() {
+                        final idx = _linkedChildren
+                            .indexWhere((c) => c.id == updated.id);
+                        if (idx != -1) _linkedChildren[idx] = updated;
+                      });
+                    },
+                  ),
+                  child: Stack(
+                    children: [
+                      StudentAvatar.fromStudent(child, size: 40),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          width: 16,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: AppColors.rosePink,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 1.5),
+                          ),
+                          child: const Icon(Icons.edit,
+                              size: 9, color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                LumiGap.horizontalS,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(child.fullName, style: LumiTextStyles.bodyMedium()),
+                      Text(
+                        'Level: ${child.currentReadingLevel ?? "Not set"}',
+                        style: LumiTextStyles.bodySmall(
+                          color: AppColors.charcoal.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                StreamBuilder<DocumentSnapshot>(
+                  stream: _firebaseService.firestore
+                      .collection('schools')
+                      .doc(widget.user.schoolId)
+                      .collection('students')
+                      .doc(child.id)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) return const SizedBox();
+                    final data = snapshot.data!.data() as Map<String, dynamic>?;
+                    final stats = data?['stats'] as Map<String, dynamic>?;
+                    final streak = stats?['currentStreak'] ?? 0;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: LumiSpacing.xs,
+                        vertical: LumiSpacing.xxs,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.warmOrange.withValues(alpha: 0.1),
+                        borderRadius: LumiBorders.medium,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.local_fire_department,
+                            size: 16,
+                            color: AppColors.warmOrange,
+                          ),
+                          LumiGap.horizontalXXS,
+                          Text(
+                            '$streak',
+                            style: LumiTextStyles.label(
+                              color: AppColors.warmOrange,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            _buildGuardiansSection(child),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Co-parents linked to [child], shown name-only with relationship labels,
+  /// plus an action to invite another guardian. Hidden entirely when the
+  /// student has no denormalized guardian data yet.
+  Widget _buildGuardiansSection(StudentModel child) {
+    final entries = child.guardianProfiles.entries.toList();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: LumiSpacing.xs),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (entries.length > 1) ...[
+            Divider(
+              height: LumiSpacing.s,
+              color: AppColors.charcoal.withValues(alpha: 0.06),
+            ),
+            Text(
+              'Guardians',
+              style: LumiTextStyles.label(
+                color: AppColors.charcoal.withValues(alpha: 0.6),
+              ),
+            ),
+            LumiGap.xxs,
+            ...entries.map((e) {
+              final isMe = e.key == widget.user.id;
+              final profile = e.value;
+              final label = profile.relationshipLabel;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 2),
                 child: Row(
                   children: [
-                    GestureDetector(
-                      onTap: () => showCharacterPicker(
-                        context,
-                        student: child,
-                        schoolId: widget.user.schoolId ?? '',
-                        onChanged: (updated) {
-                          setState(() {
-                            final idx = _linkedChildren.indexWhere((c) => c.id == updated.id);
-                            if (idx != -1) _linkedChildren[idx] = updated;
-                          });
-                        },
-                      ),
-                      child: Stack(
-                        children: [
-                          StudentAvatar.fromStudent(child, size: 40),
-                          Positioned(
-                            right: 0,
-                            bottom: 0,
-                            child: Container(
-                              width: 16,
-                              height: 16,
-                              decoration: BoxDecoration(
-                                color: AppColors.rosePink,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 1.5),
-                              ),
-                              child: const Icon(Icons.edit, size: 9, color: Colors.white),
-                            ),
-                          ),
-                        ],
-                      ),
+                    Icon(
+                      Icons.person_outline,
+                      size: 14,
+                      color: AppColors.charcoal.withValues(alpha: 0.5),
                     ),
-                    LumiGap.horizontalS,
+                    LumiGap.horizontalXXS,
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(child.fullName,
-                              style: LumiTextStyles.bodyMedium()),
-                          Text(
-                            'Level: ${child.currentReadingLevel ?? "Not set"}',
-                            style: LumiTextStyles.bodySmall(
-                              color:
-                                  AppColors.charcoal.withValues(alpha: 0.7),
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        [
+                          profile.name,
+                          if (label != null && label.isNotEmpty) '($label)',
+                          if (isMe) '— You',
+                        ].join(' '),
+                        style: LumiTextStyles.bodySmall(
+                          color: AppColors.charcoal.withValues(alpha: 0.7),
+                        ),
                       ),
-                    ),
-                    StreamBuilder<DocumentSnapshot>(
-                      stream: _firebaseService.firestore
-                          .collection('schools')
-                          .doc(widget.user.schoolId)
-                          .collection('students')
-                          .doc(child.id)
-                          .snapshots(),
-                      builder: (context, snapshot) {
-                        if (!snapshot.hasData) return const SizedBox();
-                        final data = snapshot.data!.data()
-                            as Map<String, dynamic>?;
-                        final stats =
-                            data?['stats'] as Map<String, dynamic>?;
-                        final streak = stats?['currentStreak'] ?? 0;
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: LumiSpacing.xs,
-                            vertical: LumiSpacing.xxs,
-                          ),
-                          decoration: BoxDecoration(
-                            color:
-                                AppColors.warmOrange.withValues(alpha: 0.1),
-                            borderRadius: LumiBorders.medium,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.local_fire_department,
-                                size: 16,
-                                color: AppColors.warmOrange,
-                              ),
-                              LumiGap.horizontalXXS,
-                              Text(
-                                '$streak',
-                                style: LumiTextStyles.label(
-                                  color: AppColors.warmOrange,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
                     ),
                   ],
                 ),
+              );
+            }),
+          ],
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => _inviteCoParent(child),
+              icon: const Icon(Icons.person_add_alt_1, size: 16),
+              label: const Text('Invite another guardian'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.rosePink,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: LumiSpacing.xs,
+                  vertical: LumiSpacing.xxs,
+                ),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                textStyle: LumiTextStyles.bodySmall(),
               ),
-            );
-          }),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Generates a co-parent invite code for [child] and shows it for sharing.
+  Future<void> _inviteCoParent(StudentModel child) async {
+    StudentLinkCodeModel? code;
+    Object? error;
+    try {
+      code = await _linkingService.createCoParentInviteCode(
+        studentId: child.id,
+        schoolId: child.schoolId,
+        parentUserId: widget.user.id,
+      );
+    } catch (e) {
+      error = e;
+    }
+    if (!mounted) return;
+
+    if (code == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not create invite: $error')),
+      );
+      return;
+    }
+
+    final inviteCode = code.code;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: LumiBorders.shapeLarge,
+        title: Text('Invite a guardian', style: LumiTextStyles.h3()),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Share this code with another guardian of ${child.firstName}. '
+              'They enter it when registering for the Lumi app.',
+              style: LumiTextStyles.body(),
+            ),
+            LumiGap.m,
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(LumiSpacing.s),
+              decoration: BoxDecoration(
+                color: AppColors.rosePink.withValues(alpha: 0.08),
+                borderRadius: LumiBorders.medium,
+              ),
+              child: Text(
+                inviteCode,
+                textAlign: TextAlign.center,
+                style: LumiTextStyles.h2(color: AppColors.rosePink).copyWith(
+                  letterSpacing: 4,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          LumiTextButton(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: inviteCode));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Code copied')),
+              );
+            },
+            text: 'Copy code',
+          ),
+          LumiTextButton(
+            onPressed: () => Navigator.pop(context),
+            text: 'Done',
+          ),
         ],
       ),
     );
@@ -554,8 +731,7 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
           Row(
             children: [
               Icon(Icons.notifications_outlined,
-                  size: 20,
-                  color: AppColors.charcoal.withValues(alpha: 0.7)),
+                  size: 20, color: AppColors.charcoal.withValues(alpha: 0.7)),
               LumiGap.horizontalXS,
               Text('Reminders', style: LumiTextStyles.h3()),
               const Spacer(),
@@ -609,8 +785,7 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
             Row(
               children: [
                 Icon(Icons.access_time,
-                    size: 18,
-                    color: AppColors.charcoal.withValues(alpha: 0.7)),
+                    size: 18, color: AppColors.charcoal.withValues(alpha: 0.7)),
                 LumiGap.horizontalXS,
                 Text('Remind me at', style: LumiTextStyles.bodySmall()),
                 LumiGap.horizontalXS,
@@ -647,7 +822,9 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
             LumiGap.s,
             // Day chips row
             Text(
-              _reminderDays.isEmpty ? 'On these days (every day)' : 'On these days',
+              _reminderDays.isEmpty
+                  ? 'On these days (every day)'
+                  : 'On these days',
               style: LumiTextStyles.bodySmall(),
             ),
             LumiGap.xs,
@@ -691,9 +868,8 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
                     child: Text(
                       _dayLabels[index],
                       style: LumiTextStyles.label(
-                        color: isSelected
-                            ? AppColors.white
-                            : AppColors.rosePink,
+                        color:
+                            isSelected ? AppColors.white : AppColors.rosePink,
                       ),
                     ),
                   ),
@@ -708,7 +884,8 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(
-                onPressed: () => NotificationService.instance.testNotification(),
+                onPressed: () =>
+                    NotificationService.instance.testNotification(),
                 icon: Icon(
                   Icons.send_outlined,
                   size: 16,
@@ -781,11 +958,147 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
     );
   }
 
+  Widget _buildRelationshipCard() {
+    final label = _relationshipLabel;
+    return LumiCard(
+      onTap: _editRelationship,
+      child: Row(
+        children: [
+          Icon(Icons.family_restroom, color: AppColors.rosePink, size: 24),
+          LumiGap.horizontalS,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your relationship',
+                  style: LumiTextStyles.bodyMedium(),
+                ),
+                Text(
+                  label == null || label.isEmpty
+                      ? 'Tap to set how you\'re related'
+                      : label,
+                  style: LumiTextStyles.bodySmall(
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.edit_outlined, size: 20, color: AppColors.rosePink),
+        ],
+      ),
+    );
+  }
+
+  /// Opens a picker to set the parent's relationship label, then persists it
+  /// to their own parent doc. The syncGuardianProfiles Cloud Function then
+  /// propagates the change to each linked student's guardianProfiles map.
+  Future<void> _editRelationship() async {
+    String? choice = _relationshipLabel != null &&
+            GuardianRelationship.presets.contains(_relationshipLabel)
+        ? _relationshipLabel
+        : (_relationshipLabel == null ? null : GuardianRelationship.other);
+    final otherController = TextEditingController(
+      text: choice == GuardianRelationship.other ? _relationshipLabel : '',
+    );
+
+    final saved = await showDialog<String>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final options = [
+            ...GuardianRelationship.presets,
+            GuardianRelationship.other,
+          ];
+          String? resolveLabel() {
+            if (choice == null) return null;
+            if (choice == GuardianRelationship.other) {
+              final t = otherController.text.trim();
+              return t.isEmpty ? null : t;
+            }
+            return choice;
+          }
+
+          return AlertDialog(
+            shape: LumiBorders.shapeLarge,
+            title: Text('Your relationship', style: LumiTextStyles.h3()),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final option in options)
+                      ChoiceChip(
+                        label: Text(option),
+                        selected: choice == option,
+                        selectedColor:
+                            AppColors.rosePink.withValues(alpha: 0.2),
+                        onSelected: (_) =>
+                            setDialogState(() => choice = option),
+                      ),
+                  ],
+                ),
+                if (choice == GuardianRelationship.other) ...[
+                  LumiGap.s,
+                  TextField(
+                    controller: otherController,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      hintText: 'e.g. Aunt, Foster carer',
+                    ),
+                    onChanged: (_) => setDialogState(() {}),
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              LumiTextButton(
+                onPressed: () => Navigator.pop(context),
+                text: 'Cancel',
+              ),
+              LumiTextButton(
+                onPressed: resolveLabel() == null
+                    ? null
+                    : () => Navigator.pop(context, resolveLabel()),
+                text: 'Save',
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    otherController.dispose();
+
+    if (saved == null || saved == _relationshipLabel) return;
+    setState(() => _relationshipLabel = saved);
+    try {
+      await _firebaseService.firestore
+          .collection('schools')
+          .doc(widget.user.schoolId)
+          .collection('parents')
+          .doc(widget.user.id)
+          .update({'relationshipLabel': saved});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Relationship updated')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update relationship')),
+        );
+      }
+    }
+  }
+
   Widget _buildInviteCodeCard() {
     return LumiCard(
-      onTap: () {
-        // Navigate to enter invite code
-      },
+      onTap: () => context.push('/parent/link-child', extra: widget.user),
       child: Row(
         children: [
           Icon(Icons.qr_code_scanner, color: AppColors.rosePink, size: 24),
@@ -832,8 +1145,7 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
             child: Row(
               children: [
                 Icon(Icons.settings_outlined,
-                    size: 20,
-                    color: AppColors.charcoal.withValues(alpha: 0.7)),
+                    size: 20, color: AppColors.charcoal.withValues(alpha: 0.7)),
                 LumiGap.horizontalXS,
                 Text('Settings', style: LumiTextStyles.h3()),
                 const Spacer(),
@@ -922,7 +1234,9 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
             padding: const EdgeInsets.symmetric(vertical: LumiSpacing.xs + 2),
             child: Row(
               children: [
-                Icon(icon, size: 20, color: color ?? AppColors.charcoal.withValues(alpha: 0.7)),
+                Icon(icon,
+                    size: 20,
+                    color: color ?? AppColors.charcoal.withValues(alpha: 0.7)),
                 LumiGap.horizontalS,
                 Expanded(
                   child: Column(

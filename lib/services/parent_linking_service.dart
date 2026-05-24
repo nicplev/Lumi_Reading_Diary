@@ -40,12 +40,18 @@ class ParentLinkingService {
     throw Exception('Unable to generate unique link code after max attempts');
   }
 
-  // Create linking code for a student
+  // Create linking code for a student.
+  //
+  // [intendedFor] scopes the one-active-code supersede policy: a new code only
+  // revokes existing active codes with the SAME intent. This lets a staff code
+  // and a guardian's co-parent invite coexist without clobbering each other.
   Future<StudentLinkCodeModel> createLinkCode({
     required String studentId,
     required String schoolId,
     required String createdBy,
     int validityDays = 365, // Code valid for 1 year by default
+    String intendedFor = LinkCodeIntent.staffIssued,
+    String? note,
   }) async {
     assertWritable(
       opLabel: 'parentLinking.createLinkCode',
@@ -84,9 +90,14 @@ class ParentLinkingService {
       expiresAt: DateTime.now().add(Duration(days: validityDays)),
       createdBy: createdBy,
       metadata: metadata,
+      intendedFor: intendedFor,
+      note: note,
     );
 
-    // Enforce one-active-code-per-student lifecycle policy.
+    // Enforce one-active-code-per-(student, intent) lifecycle policy. Only
+    // codes sharing this code's intent are superseded — a pending co-parent
+    // invite survives a staff regeneration and vice versa. Filtered in-code
+    // (not via a where clause) to avoid needing a new composite index.
     final activeCodesQuery = await _firestore
         .collection('studentLinkCodes')
         .where('studentId', isEqualTo: studentId)
@@ -95,6 +106,8 @@ class ParentLinkingService {
 
     final batch = _firestore.batch();
     for (final codeDoc in activeCodesQuery.docs) {
+      final existing = StudentLinkCodeModel.fromFirestore(codeDoc);
+      if (existing.intendedFor != intendedFor) continue;
       batch.update(codeDoc.reference, {
         'status': LinkCodeStatus.revoked.toString().split('.').last,
         'revokedBy': createdBy,
@@ -108,6 +121,26 @@ class ParentLinkingService {
     await batch.commit();
 
     return linkCode.copyWith(id: docRef.id);
+  }
+
+  // Create a co-parent invite code that an already-linked guardian can share
+  // with another guardian (e.g. a separated parent). The requester must
+  // already be linked to [studentId]; firestore.rules enforces this.
+  Future<StudentLinkCodeModel> createCoParentInviteCode({
+    required String studentId,
+    required String schoolId,
+    required String parentUserId,
+    int validityDays = 365,
+    String? note,
+  }) {
+    return createLinkCode(
+      studentId: studentId,
+      schoolId: schoolId,
+      createdBy: parentUserId,
+      validityDays: validityDays,
+      intendedFor: LinkCodeIntent.coParentInvite,
+      note: note,
+    );
   }
 
   // Generate codes for multiple students
@@ -314,8 +347,7 @@ class ParentLinkingService {
         final parentSnapshot = await transaction.get(parentRef);
         final existingLinked = parentSnapshot.exists
             ? List<String>.from(
-                (parentSnapshot.data()?['linkedChildren'] as List?) ??
-                    const [])
+                (parentSnapshot.data()?['linkedChildren'] as List?) ?? const [])
             : <String>[];
         if (existingLinked.contains(studentId)) {
           throw AlreadyLinkedException();
@@ -504,21 +536,11 @@ class ParentLinkingService {
         'linkedChildren': FieldValue.arrayRemove([studentId]),
       });
 
-      // Find and revoke any active link codes for this student
-      final linkCodesSnapshot = await _firestore
-          .collection('studentLinkCodes')
-          .where('studentId', isEqualTo: studentId)
-          .where('status', isEqualTo: 'active')
-          .get();
-
-      for (final codeDoc in linkCodesSnapshot.docs) {
-        transaction.update(codeDoc.reference, {
-          'status': 'revoked',
-          'revokedBy': unlinkedBy ?? parentUserId,
-          'revokedAt': FieldValue.serverTimestamp(),
-          'revokeReason': reason ?? 'Parent unlinked from student',
-        });
-      }
+      // NOTE: Active link codes are intentionally NOT revoked here. With
+      // multi-guardian support, a student may have a pending co-parent
+      // invite for a different guardian — unlinking one parent must not
+      // clobber it. Code revocation is now an explicit staff/guardian
+      // action, not a side effect of unlinking.
     });
   }
 

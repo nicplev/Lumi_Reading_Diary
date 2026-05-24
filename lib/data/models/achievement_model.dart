@@ -493,6 +493,7 @@ class AchievementTemplates {
     AchievementThresholds thresholds = AchievementThresholds.defaults,
     AchievementCustomization? customization,
     double minProgress = 0.8,
+    Set<String>? requirementTypes,
   }) {
     final templates = generateTemplates(thresholds, customization: customization);
     AchievementModel? closest;
@@ -501,6 +502,12 @@ class AchievementTemplates {
     for (final template in templates) {
       if (earnedAchievementIds.contains(template.id)) continue;
       if (template.requiredValue <= 0) continue;
+      // Rec 7: optionally restrict to habit-type achievements (streak/days)
+      // so the parent nudge celebrates consistency over volume.
+      if (requirementTypes != null &&
+          !requirementTypes.contains(template.requirementType)) {
+        continue;
+      }
 
       int current;
       switch (template.requirementType) {

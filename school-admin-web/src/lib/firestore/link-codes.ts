@@ -39,6 +39,9 @@ function toLinkCode(doc: FirebaseFirestore.DocumentSnapshot): StudentLinkCode {
     studentName: data.studentName ?? data.metadata?.studentFullName ?? '',
     classId: data.classId ?? '',
     status: data.status ?? 'active',
+    // Legacy codes predate this field — treat them as staff-issued.
+    intendedFor: data.intendedFor ?? 'staff_issued',
+    note: data.note,
     createdAt: data.createdAt?.toDate() ?? new Date(),
     expiresAt: data.expiresAt?.toDate() ?? new Date(),
     usedAt: data.usedAt?.toDate(),
@@ -79,7 +82,9 @@ export async function createLinkCode(
     classId = sd.classId ?? '';
   }
 
-  // Revoke any existing active codes for this student
+  // Supersede existing active codes for this student — but ONLY staff-issued
+  // ones. A pending co_parent_invite (created by a guardian inviting another
+  // guardian) must survive a staff regeneration, so it is left untouched.
   const activeCodes = await adminDb
     .collection('studentLinkCodes')
     .where('studentId', '==', studentId)
@@ -88,6 +93,8 @@ export async function createLinkCode(
 
   const batch = adminDb.batch();
   for (const codeDoc of activeCodes.docs) {
+    // Legacy codes (no intendedFor) are treated as staff-issued.
+    if (codeDoc.data().intendedFor === 'co_parent_invite') continue;
     batch.update(codeDoc.ref, {
       status: 'revoked',
       revokedBy: createdBy,
@@ -107,6 +114,9 @@ export async function createLinkCode(
     studentName,
     classId,
     status: 'active',
+    // The admin portal only ever issues staff codes; guardian-initiated
+    // co-parent invites are created from the parent app.
+    intendedFor: 'staff_issued',
     createdAt: FieldValue.serverTimestamp(),
     expiresAt,
     createdBy,
@@ -123,6 +133,7 @@ export async function createLinkCode(
     studentName,
     classId,
     status: 'active',
+    intendedFor: 'staff_issued',
     createdAt: new Date(),
     expiresAt,
     createdBy,

@@ -86,7 +86,8 @@ class UserModel {
       'profileImageUrl': profileImageUrl,
       'isActive': isActive,
       'createdAt': Timestamp.fromDate(createdAt),
-      'lastLoginAt': lastLoginAt != null ? Timestamp.fromDate(lastLoginAt!) : null,
+      'lastLoginAt':
+          lastLoginAt != null ? Timestamp.fromDate(lastLoginAt!) : null,
       'preferences': preferences,
       'fcmToken': fcmToken,
       'phoneNumber': phoneNumber,

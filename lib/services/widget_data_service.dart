@@ -7,10 +7,15 @@ import 'package:intl/intl.dart';
 
 import '../data/models/student_model.dart';
 import '../data/models/reading_log_model.dart';
+import '../data/models/user_model.dart';
+import 'reading_log_service.dart';
 
 const _appGroupId = 'group.com.lumi.lumiReadingTracker';
 const _widgetDataKey = 'lumi_widget_data';
 const _widgetName = 'LumiWidget';
+// Rec 4: App Group keys shared with the iOS widget's LogReadingIntent.
+const _pendingLogsKey = 'lumi_pending_widget_logs';
+const _optimisticKey = 'lumi_optimistic_logged_ids';
 
 /// Manages data written to the iOS home screen widget via App Group shared storage.
 ///
@@ -61,6 +66,53 @@ class WidgetDataService {
       _selectedChildId = student.id;
     }
     await _push();
+  }
+
+  /// Reconciles one-tap logs queued by the iOS widget's `LogReadingIntent`.
+  ///
+  /// The widget extension can't reach Firestore, so each tap is queued in App
+  /// Group storage; this drains that queue on app launch/resume and performs
+  /// the real writes via [ReadingLogService]. Call when the parent's children
+  /// are loaded (see ParentHomeScreen).
+  Future<void> drainPendingWidgetLogs({
+    required List<StudentModel> children,
+    required UserModel parent,
+  }) async {
+    if (!_isSupported || children.isEmpty) return;
+    try {
+      final raw = await HomeWidget.getWidgetData<String>(_pendingLogsKey);
+      if (raw == null || raw.isEmpty || raw == '[]') return;
+
+      final decoded = jsonDecode(raw);
+      if (decoded is! List || decoded.isEmpty) return;
+
+      final byId = {for (final child in children) child.id: child};
+      final processed = <String>{};
+      for (final entry in decoded) {
+        if (entry is! Map) continue;
+        final studentId = entry['studentId'] as String?;
+        // Dedupe per child — the widget already dedupes per day.
+        if (studentId == null || !processed.add(studentId)) continue;
+        final child = byId[studentId];
+        if (child == null) continue;
+        try {
+          await ReadingLogService.instance.logReading(
+            student: child,
+            parent: parent,
+            quickLog: true,
+          );
+        } catch (e) {
+          debugPrint('[WidgetDataService] widget log drain failed for '
+              '$studentId: $e');
+        }
+      }
+
+      // Queue reconciled — clear it and the optimistic flags.
+      await HomeWidget.saveWidgetData<String>(_pendingLogsKey, '[]');
+      await HomeWidget.saveWidgetData<String>(_optimisticKey, '');
+    } catch (e) {
+      debugPrint('[WidgetDataService] drainPendingWidgetLogs failed: $e');
+    }
   }
 
   Future<void> _push() async {

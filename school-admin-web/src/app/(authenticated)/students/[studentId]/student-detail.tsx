@@ -81,6 +81,9 @@ export function StudentDetail({ studentId, classId, levelOptions, className }: S
   };
 
   const fullName = `${student.firstName} ${student.lastName}`;
+  // Denormalized guardian list (name + relationship label), maintained
+  // server-side. May be empty for students linked before the feature shipped.
+  const guardians = Object.entries(student.guardianProfiles ?? {});
 
   return (
     <div>
@@ -190,16 +193,36 @@ export function StudentDetail({ studentId, classId, levelOptions, className }: S
           )}
         </Card>
 
-        {/* Parent Info */}
+        {/* Guardians */}
         <Card>
-          <h2 className="text-lg font-bold text-charcoal mb-4">Parent Information</h2>
+          <h2 className="text-lg font-bold text-charcoal mb-4">Guardians</h2>
           {student.parentIds.length === 0 ? (
             <div className="flex items-center gap-2">
-              <Badge variant="default">No parent linked</Badge>
+              <Badge variant="default">No guardian linked</Badge>
             </div>
           ) : (
-            <div>
-              <Badge variant="success">{student.parentIds.length} parent{student.parentIds.length !== 1 ? 's' : ''} linked</Badge>
+            <div className="space-y-3">
+              <Badge variant="success">
+                {student.parentIds.length} guardian{student.parentIds.length !== 1 ? 's' : ''} linked
+              </Badge>
+              {guardians.length > 0 ? (
+                <ul className="space-y-2">
+                  {guardians.map(([uid, g]) => (
+                    <li key={uid} className="flex items-center gap-2 text-sm">
+                      <Icon name="person" size={16} />
+                      <span className="text-charcoal font-medium">{g.name}</span>
+                      {g.relationshipLabel && (
+                        <Badge variant="info">{g.relationshipLabel}</Badge>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-text-secondary">
+                  Guardian details will appear once a guardian next signs in or
+                  updates their profile.
+                </p>
+              )}
             </div>
           )}
         </Card>
