@@ -27,6 +27,7 @@ import '../../data/models/allocation_model.dart';
 import '../../data/providers/active_child_provider.dart';
 import '../../services/book_cover_cache_service.dart';
 import '../../services/firebase_service.dart';
+import '../../services/notification_service.dart';
 import '../../services/reading_log_service.dart';
 import '../../services/widget_data_service.dart';
 import '../../services/isbn_assignment_service.dart';
@@ -80,6 +81,19 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
           children: children,
           parent: widget.user,
         );
+        // Rec 3: if the active child has already been logged today, drop
+        // today's scheduled reminder. Fire-and-forget — no need to await.
+        final active = ref.read(activeChildProvider).value ?? children.first;
+        if (active.stats?.lastReadingDate != null) {
+          final last = active.stats!.lastReadingDate!;
+          final now = DateTime.now();
+          if (last.year == now.year &&
+              last.month == now.month &&
+              last.day == now.day) {
+            NotificationService.instance
+                .refreshReminderForToday(studentId: active.id);
+          }
+        }
       }
     }
   }

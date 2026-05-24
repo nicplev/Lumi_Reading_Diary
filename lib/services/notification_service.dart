@@ -150,6 +150,16 @@ class NotificationService {
       iOS: iosSettings,
     );
 
+    // Rec 3: by design, the "Log reading" action on both platforms uses
+    // a foreground-bringing option (iOS `.foreground`, Android
+    // `showsUserInterface: true`). That means tapping the action — whether
+    // the app is alive, backgrounded, or killed — always routes through
+    // _handleNotificationTap once the app comes to the foreground. No
+    // `onDidReceiveBackgroundNotificationResponse` is wired because the
+    // background-isolate code path is never exercised; doing a real
+    // background-isolate write would require duplicating Firebase + Hive
+    // init in a separate isolate, which the doc explicitly flags as a
+    // future hardening (see docs/parent-ux-research.md, Rec 3 risks).
     await _localNotifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse: _handleNotificationTap,
@@ -389,6 +399,10 @@ class NotificationService {
   // Notification ID scheme: childIndex * 10 + slot
   // slot 0 = daily (all days), slots 1-7 = specific weekday (Mon=1 .. Sun=7)
   static const String _scheduledIdsKey = 'scheduled_notification_ids';
+  // Rec 3: ordered student IDs paired with the schedule above so
+  // `refreshReminderForToday` can resolve studentId → childIndex and cancel
+  // just today's slot when a log is already saved.
+  static const String _scheduledChildOrderKey = 'scheduled_child_order';
 
   static int _notificationId(int childIndex, int slot) => childIndex * 10 + slot;
 
@@ -470,6 +484,12 @@ class NotificationService {
     await prefs.setStringList(
       _scheduledIdsKey,
       scheduledIds.map((id) => id.toString()).toList(),
+    );
+    // Persist the studentId order used to derive notification IDs so
+    // refreshReminderForToday can cancel only today's slot per child.
+    await prefs.setStringList(
+      _scheduledChildOrderKey,
+      children.map((c) => c.studentId).toList(),
     );
     await prefs.setInt('reminder_hour', hour);
     await prefs.setInt('reminder_minute', minute);
@@ -564,10 +584,48 @@ class NotificationService {
     }
 
     await prefs.remove(_scheduledIdsKey);
+    await prefs.remove(_scheduledChildOrderKey);
     await prefs.setBool('reminders_enabled', false);
     await prefs.remove('reminder_days');
 
     debugPrint('Cancelled ${idStrings.length} scheduled reminders');
+  }
+
+  /// Cancels today's "log reading" reminder for [studentId] because the
+  /// child has already been logged. The recurring schedule re-arms
+  /// automatically for tomorrow because [_scheduleOne] uses
+  /// `matchDateTimeComponents` (time or day-of-week-and-time).
+  ///
+  /// Best-effort and silent — no-ops when reminders aren't configured or
+  /// [studentId] isn't in the scheduled set, and swallows cancel errors
+  /// so the calling write path is never blocked.
+  Future<void> refreshReminderForToday({required String studentId}) async {
+    if (!_initialized) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final order = prefs.getStringList(_scheduledChildOrderKey);
+      if (order == null || order.isEmpty) return;
+      final childIdx = order.indexOf(studentId);
+      if (childIdx < 0) return;
+
+      // Cancel today's daily slot (id = idx*10) and today's-weekday slot
+      // (id = idx*10 + weekday). Whichever the user configured is the one
+      // that will be present; the other cancel is a harmless no-op.
+      final today = DateTime.now().weekday; // 1=Mon .. 7=Sun
+      final candidates = <int>[
+        _notificationId(childIdx, 0),
+        _notificationId(childIdx, today),
+      ];
+      for (final id in candidates) {
+        try {
+          await _localNotifications.cancel(id);
+        } catch (e) {
+          debugPrint('refreshReminderForToday cancel($id) failed: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('refreshReminderForToday failed: $e');
+    }
   }
 
   /// Backward-compatible wrappers ------------------------------------------------
