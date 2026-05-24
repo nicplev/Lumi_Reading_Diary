@@ -50,10 +50,22 @@ class _StatsUpdate {
 /// [logReading] / [writeLog] so the Firestore write, the stats transaction,
 /// and the home-widget refresh stay in one place.
 class ReadingLogService {
-  ReadingLogService._();
+  ReadingLogService._() : _firestoreOverride = null;
+
+  /// Test-only constructor that injects a [FirebaseFirestore] (typically a
+  /// `FakeFirebaseFirestore`). Production code keeps using [instance].
+  @visibleForTesting
+  ReadingLogService.forTest({required FirebaseFirestore firestore})
+      : _firestoreOverride = firestore;
+
   static final ReadingLogService instance = ReadingLogService._();
 
-  FirebaseFirestore get _firestore => FirebaseService.instance.firestore;
+  /// Set on the test-only constructor; null in production so [_firestore]
+  /// resolves via the FirebaseService singleton.
+  final FirebaseFirestore? _firestoreOverride;
+
+  FirebaseFirestore get _firestore =>
+      _firestoreOverride ?? FirebaseService.instance.firestore;
 
   /// Fallback target/duration when no allocation supplies one.
   static const int _defaultTargetMinutes = 20;

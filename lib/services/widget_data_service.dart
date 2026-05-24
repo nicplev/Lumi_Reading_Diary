@@ -98,20 +98,13 @@ class WidgetDataService {
     if (!_isSupported || children.isEmpty) return;
     try {
       final raw = await HomeWidget.getWidgetData<String>(_pendingLogsKey);
-      if (raw == null || raw.isEmpty || raw == '[]') return;
-
-      final decoded = jsonDecode(raw);
-      if (decoded is! List || decoded.isEmpty) return;
+      final validIds = {for (final child in children) child.id};
+      final studentIds = parsePendingQueue(raw, validIds);
+      if (studentIds.isEmpty) return;
 
       final byId = {for (final child in children) child.id: child};
-      final processed = <String>{};
-      for (final entry in decoded) {
-        if (entry is! Map) continue;
-        final studentId = entry['studentId'] as String?;
-        // Dedupe per child — the widget already dedupes per day.
-        if (studentId == null || !processed.add(studentId)) continue;
-        final child = byId[studentId];
-        if (child == null) continue;
+      for (final studentId in studentIds) {
+        final child = byId[studentId]!;
         try {
           await ReadingLogService.instance.logReading(
             student: child,
@@ -129,6 +122,45 @@ class WidgetDataService {
       await HomeWidget.saveWidgetData<String>(_optimisticKey, '');
     } catch (e) {
       debugPrint('[WidgetDataService] drainPendingWidgetLogs failed: $e');
+    }
+  }
+
+  /// Pure parsing/dedupe of the App Group pending-log queue.
+  ///
+  /// Exposed for testing (the surrounding [drainPendingWidgetLogs] is gated
+  /// to iOS via `Platform.isIOS` and uses the `home_widget` plugin, so this
+  /// is the slice that can be unit-tested on the host).
+  ///
+  /// - Returns the ordered list of unique student IDs that should be
+  ///   reconciled to real reading logs.
+  /// - Drops entries that aren't well-formed maps with a non-null
+  ///   `studentId`, or that reference a student not in [validStudentIds].
+  /// - Dedupes per student (the widget already dedupes per day, but a
+  ///   defensive second pass keeps the drain idempotent if the App Group
+  ///   storage somehow accumulates duplicates).
+  /// - Treats null / empty / `'[]'` / malformed JSON as an empty queue.
+  @visibleForTesting
+  static List<String> parsePendingQueue(
+    String? raw,
+    Set<String> validStudentIds,
+  ) {
+    if (raw == null || raw.isEmpty || raw == '[]') return const [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List || decoded.isEmpty) return const [];
+      final processed = <String>{};
+      final result = <String>[];
+      for (final entry in decoded) {
+        if (entry is! Map) continue;
+        final studentId = entry['studentId'] as String?;
+        if (studentId == null) continue;
+        if (!validStudentIds.contains(studentId)) continue;
+        if (!processed.add(studentId)) continue;
+        result.add(studentId);
+      }
+      return result;
+    } catch (_) {
+      return const [];
     }
   }
 
