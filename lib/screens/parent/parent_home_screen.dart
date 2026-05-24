@@ -97,6 +97,9 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
             selectedChildId:
                 ref.read(activeChildProvider).value?.id ?? children.first.id,
             todaysLogs: const {},
+            // Caches the parent so the lifecycle-driven drain can run on
+            // resume from any parent screen (not only ParentHome).
+            parent: widget.user,
           );
           // Rec 4: reconcile any reading logged from the iOS widget while
           // the app was closed.

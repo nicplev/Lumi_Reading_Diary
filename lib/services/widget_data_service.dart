@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:intl/intl.dart';
 
@@ -30,10 +31,23 @@ class WidgetDataService {
   List<_ChildPayload> _cachedChildren = [];
   String _selectedChildId = '';
 
+  // Rec 4: cached references for the lifecycle-driven drain. Populated on
+  // `updateFromChildren`; needed because the WidgetsBindingObserver runs at
+  // the app level and otherwise has no UserModel/StudentModel in scope.
+  List<StudentModel> _cachedChildModels = const [];
+  UserModel? _cachedParent;
+  _LifecycleDrainObserver? _observer;
+
   /// Call once at app startup (after Firebase init).
   static Future<void> initialize() async {
     if (!_isSupported) return;
     await HomeWidget.setAppGroupId(_appGroupId);
+    // Rec 4: register a lifecycle observer so the pending-widget-log queue
+    // drains on every app resume, not only while ParentHomeScreen is the
+    // active route. The observer no-ops until updateFromChildren has cached
+    // the children + parent on a prior session.
+    instance._observer ??= _LifecycleDrainObserver(instance);
+    WidgetsBinding.instance.addObserver(instance._observer!);
   }
 
   /// Replaces the full children list. Called from ParentHomeScreen after load.
@@ -41,6 +55,7 @@ class WidgetDataService {
     required List<StudentModel> children,
     required String selectedChildId,
     required Map<String, ReadingLogModel?> todaysLogs,
+    UserModel? parent,
   }) async {
     if (!_isSupported) return;
     _selectedChildId = selectedChildId;
@@ -48,6 +63,8 @@ class WidgetDataService {
       final log = todaysLogs[student.id];
       return _ChildPayload.fromStudent(student, log);
     }).toList();
+    _cachedChildModels = children;
+    if (parent != null) _cachedParent = parent;
     await _push();
   }
 
@@ -133,7 +150,34 @@ class WidgetDataService {
     }
   }
 
+  /// Re-runs the drain using the cached children + parent. Returns silently
+  /// when no context is cached yet (first launch before ParentHomeScreen has
+  /// reported its children) — the existing parent-home init drain will pick
+  /// up that case.
+  Future<void> drainWithCachedContext() async {
+    final parent = _cachedParent;
+    if (parent == null || _cachedChildModels.isEmpty) return;
+    await drainPendingWidgetLogs(
+      children: _cachedChildModels,
+      parent: parent,
+    );
+  }
+
   static bool get _isSupported => !kIsWeb && Platform.isIOS;
+}
+
+class _LifecycleDrainObserver with WidgetsBindingObserver {
+  _LifecycleDrainObserver(this._service);
+  final WidgetDataService _service;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Fire-and-forget — drain is best-effort and silently no-ops when
+      // there's no cached context yet.
+      _service.drainWithCachedContext();
+    }
+  }
 }
 
 class _ChildPayload {

@@ -284,7 +284,9 @@ class LumiFab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = color ?? AppColors.rosePink;
+    // Rec 10: default to the AA-accessible variant so white-on-pink FABs
+    // meet contrast. `rosePink` is preserved for decorative fills only.
+    final bgColor = color ?? AppColors.rosePinkAccessible;
 
     if (isExtended && label != null) {
       return FloatingActionButton.extended(
