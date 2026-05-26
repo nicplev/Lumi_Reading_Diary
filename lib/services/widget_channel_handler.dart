@@ -29,7 +29,9 @@ class WidgetChannelHandler {
 
   static void _handle(Uri uri, GoRouter router) {
     final childId = uri.queryParameters['childId'] ?? '';
-    final action = uri.host; // 'log' or 'home'
+    // For `lumi://widget/home`, scheme=lumi, host=widget, path=/home — so the
+    // action lives in pathSegments, not uri.host.
+    final action = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : '';
 
     switch (action) {
       case 'log':

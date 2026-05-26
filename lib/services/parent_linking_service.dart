@@ -98,10 +98,18 @@ class ParentLinkingService {
     // codes sharing this code's intent are superseded — a pending co-parent
     // invite survives a staff regeneration and vice versa. Filtered in-code
     // (not via a where clause) to avoid needing a new composite index.
+    //
+    // The .limit(10) is required so a guardian creating a co-parent invite
+    // matches the bounded-list rule on studentLinkCodes — the broader list
+    // rule for parents only matches docs already keyed to them via usedBy,
+    // which never holds for the active codes we're trying to supersede. 10
+    // is comfortably above the steady-state cap of one active code per
+    // (student, intent).
     final activeCodesQuery = await _firestore
         .collection('studentLinkCodes')
         .where('studentId', isEqualTo: studentId)
         .where('status', isEqualTo: 'active')
+        .limit(10)
         .get();
 
     final batch = _firestore.batch();
