@@ -1915,6 +1915,8 @@ export const processPendingUserDeletions = functions.pubsub
 
 // Build the minimal guardian projection denormalized onto student docs.
 // Deliberately carries name + relationship label only — never email/phone.
+// Uses const-arrow + `//` comments so eslint's valid-jsdoc rule (which only
+// fires on `function` declarations with `/** */` blocks) leaves it alone.
 const guardianProjection = (
   parentData: admin.firestore.DocumentData
 ): {name: string; relationshipLabel: string | null} => {

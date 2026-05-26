@@ -18,6 +18,8 @@ npm-debug.log*
 
 # local env files
 .env*.local
+# production env (holds SESSION_SECRET and Firebase API keys — never commit)
+.env.production
 
 # firebase service account key
 service-account*.json

@@ -1,0 +1,20 @@
+# Exclude sensitive and local-only files from the Cloud Build upload bundle.
+# Cloud Run's SSR backend authenticates via its own service account (ADC),
+# so the local credential file never needs to ship.
+
+# Service account credentials — never ship
+service-account*.json
+
+# Local-only env files (production secrets live in .env.production)
+.env*.local
+
+# Build outputs (Cloud Build rebuilds fresh)
+node_modules/
+.next/
+out/
+build/
+
+# Local tooling / editor cruft
+*.tsbuildinfo
+.DS_Store
+*.log
