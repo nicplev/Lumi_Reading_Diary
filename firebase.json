@@ -37,6 +37,15 @@
         "memory": "512MiB",
         "maxInstances": 10
       }
+    },
+    {
+      "target": "school",
+      "source": "school-admin-web",
+      "frameworksBackend": {
+        "region": "us-central1",
+        "memory": "512MiB",
+        "maxInstances": 10
+      }
     }
   ],
   "flutter": {

@@ -10,6 +10,9 @@
         ],
         "default": [
           "lumi-kakakids"
+        ],
+        "school": [
+          "lumi-school-admin"
         ]
       }
     }
