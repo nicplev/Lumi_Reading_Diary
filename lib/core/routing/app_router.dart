@@ -77,6 +77,17 @@ class AppRouter {
     // Global redirect handler for authentication and authorization
     redirect: (context, state) async {
       final location = state.matchedLocation;
+
+      // iOS widget deep links arrive as `lumi://widget/home?childId=…` or
+      // `lumi://widget/log?childId=…`. Flutter's deep-link channel hands the
+      // raw URI to GoRouter, which only sees the path (`/home` or `/log`) and
+      // would otherwise 404. Funnel both into the parent home with the child
+      // pre-selected; the home_widget plugin's own callback is best-effort.
+      if (location == '/home' || location == '/log') {
+        final childId = state.uri.queryParameters['childId'] ?? '';
+        return '/parent/home?widgetChildId=$childId';
+      }
+
       final firebaseService = _ref.read(firebaseServiceProvider);
       final isLoggedIn = firebaseService.auth.currentUser != null;
 
