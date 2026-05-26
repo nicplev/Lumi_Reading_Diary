@@ -16,9 +16,7 @@ import '../../core/widgets/lumi_mascot.dart';
 class AdminUseWebPortalScreen extends StatelessWidget {
   const AdminUseWebPortalScreen({super.key});
 
-  // School-admin web portal. Update this when the production portal URL
-  // differs from the current (dev) deployment.
-  static const String _portalUrl = 'https://lumi-dev-admin.web.app';
+  static const String _portalUrl = 'https://lumi-school-admin.web.app';
 
   Future<void> _launchPortal() async {
     final uri = Uri.parse(_portalUrl);

@@ -35,7 +35,11 @@ export interface SessionData {
   impersonation?: ImpersonationSessionBlock;
 }
 
-const SESSION_COOKIE_NAME = 'lumi_session';
+// MUST be '__session' — Firebase Hosting strips every cookie except this one
+// before forwarding to the backend (CDN caching). Any other name silently
+// breaks auth: the cookie is Set on the browser but never reaches Cloud Run
+// on subsequent requests, so middleware always redirects to /login.
+const SESSION_COOKIE_NAME = '__session';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 5; // 5 days
 
 function getSecret() {

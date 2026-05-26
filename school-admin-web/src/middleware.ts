@@ -52,7 +52,7 @@ export async function middleware(request: NextRequest) {
   // ── Impersonation enforcement (runs BEFORE the /api/ passthrough so API
   // mutations are locked regardless of what the handler does) ──────────────
   // Read the session up-front so both API and page requests can consult it.
-  const cookie = request.cookies.get('lumi_session');
+  const cookie = request.cookies.get('__session');
   const sessionData = cookie?.value ? await getSessionData(cookie.value) : null;
   const impersonation = sessionData?.impersonation as
     | { expiresAt?: number }
@@ -72,7 +72,7 @@ export async function middleware(request: NextRequest) {
             { status: 401 },
           )
         : NextResponse.redirect(new URL('/login', request.url));
-      response.cookies.delete('lumi_session');
+      response.cookies.delete('__session');
       return response;
     }
 
@@ -117,7 +117,7 @@ export async function middleware(request: NextRequest) {
   if (!sessionData) {
     const loginUrl = new URL('/login', request.url);
     const response = NextResponse.redirect(loginUrl);
-    response.cookies.delete('lumi_session');
+    response.cookies.delete('__session');
     return response;
   }
 
