@@ -173,8 +173,10 @@ export function GenerateCodeModal({ open, onClose }: GenerateCodeModalProps) {
           )}
 
           <p className="text-xs text-text-secondary">
-            Generating a new code for a student will revoke any existing active codes.
-            Codes are valid for 1 year.
+            Generating a new code supersedes any existing active staff code for
+            the student. A guardian&apos;s pending co-parent invite is not
+            affected. Use this to add a second guardian to an already-linked
+            student. Codes are valid for 1 year.
           </p>
         </div>
       )}

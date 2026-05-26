@@ -24,13 +24,17 @@ import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../data/models/allocation_model.dart';
+import '../../data/providers/active_child_provider.dart';
 import '../../services/book_cover_cache_service.dart';
 import '../../services/firebase_service.dart';
+import '../../services/notification_service.dart';
+import '../../services/reading_log_service.dart';
 import '../../services/widget_data_service.dart';
 import '../../services/isbn_assignment_service.dart';
 import '../../services/staff_notification_service.dart';
 import 'reading_history_screen.dart';
 import 'parent_profile_screen.dart';
+import 'widgets/parent_child_switcher.dart';
 
 class ParentHomeScreen extends ConsumerStatefulWidget {
   final UserModel user;
@@ -44,11 +48,9 @@ class ParentHomeScreen extends ConsumerStatefulWidget {
   ConsumerState<ParentHomeScreen> createState() => _ParentHomeScreenState();
 }
 
-class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
+class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
+    with WidgetsBindingObserver {
   int _selectedIndex = 0;
-  String? _selectedChildId;
-  List<StudentModel> _children = [];
-  bool _isLoading = true;
 
   void _onCoversUpdated() {
     if (mounted) setState(() {});
@@ -57,195 +59,209 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     BookCoverCacheService.instance.addListener(_onCoversUpdated);
-    _loadChildren();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     BookCoverCacheService.instance.removeListener(_onCoversUpdated);
     super.dispose();
   }
 
-  Future<void> _loadChildren() async {
-    try {
-      final firebaseService = ref.read(firebaseServiceProvider);
-      if (widget.user.linkedChildren.isEmpty) {
-        setState(() {
-          _isLoading = false;
-        });
-        return;
-      }
-
-      final List<StudentModel> children = [];
-      for (String childId in widget.user.linkedChildren) {
-        final doc = await firebaseService.firestore
-            .collection('schools')
-            .doc(widget.user.schoolId)
-            .collection('students')
-            .doc(childId)
-            .get();
-
-        if (doc.exists) {
-          children.add(StudentModel.fromFirestore(doc));
-        }
-      }
-
-      setState(() {
-        _children = children;
-        if (children.isNotEmpty) {
-          _selectedChildId = children.first.id;
-        }
-        _isLoading = false;
-      });
-
-      // Refresh widget data whenever the parent's children list is (re)loaded.
-      // Pass empty logs map — loggedToday is inferred from stats.lastReadingDate.
-      if (children.isNotEmpty) {
-        WidgetDataService.instance.updateFromChildren(
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Rec 4: reconcile any reading logged from the iOS widget while the app
+    // was backgrounded.
+    if (state == AppLifecycleState.resumed) {
+      final children = ref.read(parentChildrenProvider).value;
+      if (children != null && children.isNotEmpty) {
+        WidgetDataService.instance.drainPendingWidgetLogs(
           children: children,
-          selectedChildId: children.first.id,
-          todaysLogs: {},
+          parent: widget.user,
         );
+        // Rec 3: if the active child has already been logged today, drop
+        // today's scheduled reminder. Fire-and-forget — no need to await.
+        final active = ref.read(activeChildProvider).value ?? children.first;
+        if (active.stats?.lastReadingDate != null) {
+          final last = active.stats!.lastReadingDate!;
+          final now = DateTime.now();
+          if (last.year == now.year &&
+              last.month == now.month &&
+              last.day == now.day) {
+            NotificationService.instance
+                .refreshReminderForToday(studentId: active.id);
+          }
+        }
       }
-    } catch (e) {
-      debugPrint('Error loading children: $e');
-      setState(() {
-        _isLoading = false;
-      });
     }
-  }
-
-  /// Combines two Firestore query streams into a single stream of both results.
-  Stream<List<QuerySnapshot>> _combineStreams(
-    Stream<QuerySnapshot> stream1,
-    Stream<QuerySnapshot> stream2,
-  ) {
-    QuerySnapshot? latest1;
-    QuerySnapshot? latest2;
-    late final StreamController<List<QuerySnapshot>> controller;
-
-    StreamSubscription? sub1;
-    StreamSubscription? sub2;
-
-    controller = StreamController<List<QuerySnapshot>>(
-      onListen: () {
-        sub1 = stream1.listen((snapshot) {
-          latest1 = snapshot;
-          if (latest2 != null) {
-            controller.add([latest1!, latest2!]);
-          }
-        });
-        sub2 = stream2.listen((snapshot) {
-          latest2 = snapshot;
-          if (latest1 != null) {
-            controller.add([latest1!, latest2!]);
-          }
-        });
-      },
-      onCancel: () {
-        sub1?.cancel();
-        sub2?.cancel();
-      },
-    );
-
-    return controller.stream;
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: AppColors.offWhite,
-        body: Center(
-          child: CircularProgressIndicator(
-            color: AppColors.rosePink,
+    // Keep the iOS/Android home-screen widget in sync with the child list.
+    ref.listen<AsyncValue<List<StudentModel>>>(
+      parentChildrenProvider,
+      (_, next) {
+        final children = next.value;
+        if (children != null && children.isNotEmpty) {
+          WidgetDataService.instance.updateFromChildren(
+            children: children,
+            selectedChildId:
+                ref.read(activeChildProvider).value?.id ?? children.first.id,
+            todaysLogs: const {},
+            // Caches the parent so the lifecycle-driven drain can run on
+            // resume from any parent screen (not only ParentHome).
+            parent: widget.user,
+          );
+          // Rec 4: reconcile any reading logged from the iOS widget while
+          // the app was closed.
+          WidgetDataService.instance.drainPendingWidgetLogs(
+            children: children,
+            parent: widget.user,
+          );
+        }
+      },
+    );
+
+    return ref.watch(parentChildrenProvider).when(
+          loading: () => const Scaffold(
+            backgroundColor: AppColors.offWhite,
+            body: Center(
+              child: CircularProgressIndicator(color: AppColors.rosePink),
+            ),
           ),
+          error: (_, __) => Scaffold(
+            backgroundColor: AppColors.offWhite,
+            body: _buildErrorView(),
+          ),
+          data: (children) {
+            if (children.isEmpty) {
+              return Scaffold(
+                backgroundColor: AppColors.offWhite,
+                body: _buildNoChildrenView(),
+              );
+            }
+            final activeChild =
+                ref.watch(activeChildProvider).value ?? children.first;
+            return Scaffold(
+              backgroundColor: AppColors.offWhite,
+              body: IndexedStack(
+                index: _selectedIndex,
+                children: [
+                  _buildHomeView(activeChild, children),
+                  ReadingHistoryScreen(
+                    // Re-key on the active child so a switch rebuilds the
+                    // Bookshelf with fresh state instead of stale data.
+                    key: ValueKey(activeChild.id),
+                    studentId: activeChild.id,
+                    parentId: widget.user.id,
+                    schoolId: widget.user.schoolId!,
+                  ),
+                  ParentProfileScreen(user: widget.user),
+                ],
+              ),
+              bottomNavigationBar: _buildBottomNav(),
+            );
+          },
+        );
+  }
+
+  Widget _buildBottomNav() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(24),
         ),
-      );
-    }
-
-    if (_children.isEmpty) {
-      return Scaffold(
-        backgroundColor: AppColors.offWhite,
-        body: _buildNoChildrenView(),
-      );
-    }
-
-    return Scaffold(
-      backgroundColor: AppColors.offWhite,
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: [
-          _buildHomeView(),
-          ReadingHistoryScreen(
-            studentId: _selectedChildId!,
-            parentId: widget.user.id,
-            schoolId: widget.user.schoolId!,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.charcoal.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
           ),
-          ParentProfileScreen(user: widget.user),
         ],
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(24),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.charcoal.withValues(alpha: 0.08),
-              blurRadius: 16,
-              offset: const Offset(0, -4),
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(24),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: (index) => setState(() => _selectedIndex = index),
+          backgroundColor: AppColors.white,
+          selectedItemColor: AppColors.rosePink,
+          unselectedItemColor: AppColors.textSecondary,
+          elevation: 0,
+          type: BottomNavigationBarType.fixed,
+          selectedLabelStyle: LumiTextStyles.caption(color: AppColors.rosePink)
+              .copyWith(fontWeight: FontWeight.w600),
+          unselectedLabelStyle: LumiTextStyles.caption(),
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.auto_stories_outlined),
+              activeIcon: Icon(Icons.auto_stories),
+              label: 'Bookshelf',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: 'Profile',
             ),
           ],
-        ),
-        child: ClipRRect(
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(24),
-          ),
-          child: BottomNavigationBar(
-            currentIndex: _selectedIndex,
-            onTap: (index) => setState(() => _selectedIndex = index),
-            backgroundColor: AppColors.white,
-            selectedItemColor: AppColors.rosePink,
-            unselectedItemColor: AppColors.textSecondary,
-            elevation: 0,
-            type: BottomNavigationBarType.fixed,
-            selectedLabelStyle:
-                LumiTextStyles.caption(color: AppColors.rosePink)
-                    .copyWith(fontWeight: FontWeight.w600),
-            unselectedLabelStyle: LumiTextStyles.caption(),
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.home_outlined),
-                activeIcon: Icon(Icons.home),
-                label: 'Home',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.auto_stories_outlined),
-                activeIcon: Icon(Icons.auto_stories),
-                label: 'Bookshelf',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.person_outline),
-                activeIcon: Icon(Icons.person),
-                label: 'Profile',
-              ),
-            ],
-          ),
         ),
       ),
     );
   }
 
-  Widget _buildHomeView() {
-    final selectedChild = _children.firstWhere(
-      (child) => child.id == _selectedChildId,
-      orElse: () => _children.first,
+  Widget _buildErrorView() {
+    return SafeArea(
+      child: Padding(
+        padding: LumiPadding.allM,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.cloud_off,
+              size: 56,
+              color: AppColors.textSecondary,
+            ),
+            LumiGap.s,
+            Text(
+              'Couldn\'t load your children',
+              style: LumiTextStyles.h3(color: AppColors.charcoal),
+              textAlign: TextAlign.center,
+            ),
+            LumiGap.xs,
+            Text(
+              'Please check your connection and try again.',
+              style: LumiTextStyles.bodyLarge(
+                color: AppColors.charcoal.withValues(alpha: 0.7),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            LumiGap.m,
+            LumiPrimaryButton(
+              onPressed: () => ref.invalidate(parentChildrenProvider),
+              text: 'Retry',
+              icon: Icons.refresh,
+            ),
+          ],
+        ),
+      ),
     );
-    final firebaseService = ref.read(firebaseServiceProvider);
+  }
 
+  Widget _buildHomeView(
+    StudentModel selectedChild,
+    List<StudentModel> children,
+  ) {
     return SafeArea(
       child: CustomScrollView(
         slivers: [
@@ -263,28 +279,10 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
                     color: AppColors.charcoal.withValues(alpha: 0.7),
                   ),
                 ),
-                if (_children.length > 1)
-                  DropdownButton<String>(
-                    value: _selectedChildId,
-                    items: _children.map((child) {
-                      return DropdownMenuItem(
-                        value: child.id,
-                        child: Text(child.firstName),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedChildId = value;
-                      });
-                    },
-                    underline: const SizedBox(),
-                    style: LumiTextStyles.h2(color: AppColors.charcoal),
-                  )
-                else
-                  Text(
-                    selectedChild.firstName,
-                    style: LumiTextStyles.h2(color: AppColors.charcoal),
-                  ),
+                Text(
+                  selectedChild.firstName,
+                  style: LumiTextStyles.h2(color: AppColors.charcoal),
+                ),
               ],
             ),
             actions: [
@@ -296,14 +294,20 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
                   return Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      LumiIconButton(
-                        icon: Icons.notifications_outlined,
-                        onPressed: () {
-                          context.push(
-                            '/parent/notifications',
-                            extra: widget.user,
-                          );
-                        },
+                      Semantics(
+                        label: unreadCount > 0
+                            ? 'Notifications, $unreadCount unread'
+                            : 'Notifications',
+                        button: true,
+                        child: LumiIconButton(
+                          icon: Icons.notifications_outlined,
+                          onPressed: () {
+                            context.push(
+                              '/parent/notifications',
+                              extra: widget.user,
+                            );
+                          },
+                        ),
                       ),
                       if (unreadCount > 0)
                         Positioned(
@@ -333,110 +337,31 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
             ],
           ),
 
+          // Persistent child switcher — renders only for 2+ children.
+          const SliverToBoxAdapter(child: ParentChildSwitcher()),
+
           // Content
           SliverPadding(
             padding: LumiPadding.allS,
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                // Today's Reading Card
-                StreamBuilder<QuerySnapshot>(
-                  stream: () {
-                    final now = DateTime.now();
-                    final startOfDay = DateTime(now.year, now.month, now.day);
-                    return firebaseService.firestore
-                        .collection('schools')
-                        .doc(widget.user.schoolId)
-                        .collection('readingLogs')
-                        .where('studentId', isEqualTo: selectedChild.id)
-                        .where('date',
-                            isGreaterThanOrEqualTo:
-                                Timestamp.fromDate(startOfDay))
-                        .orderBy('date', descending: true)
-                        .snapshots();
-                  }(),
-                  builder: (context, logSnapshot) {
-                    final todayLogs = logSnapshot.hasData
-                        ? logSnapshot.data!.docs
-                            .map((doc) => ReadingLogModel.fromFirestore(doc))
-                            .toList()
-                        : <ReadingLogModel>[];
-                    final hasLoggedToday = todayLogs.isNotEmpty;
-
-                    // Query 1: Allocations specifically for this student
-                    final studentAllocationsStream = firebaseService.firestore
-                        .collection('schools')
-                        .doc(widget.user.schoolId!)
-                        .collection('allocations')
-                        .where('studentIds', arrayContains: selectedChild.id)
-                        .where('isActive', isEqualTo: true)
-                        .snapshots();
-
-                    // Query 2: Whole-class allocations (studentIds is empty)
-                    final classAllocationsStream = firebaseService.firestore
-                        .collection('schools')
-                        .doc(widget.user.schoolId!)
-                        .collection('allocations')
-                        .where('classId', isEqualTo: selectedChild.classId)
-                        .where('studentIds', isEqualTo: [])
-                        .where('isActive', isEqualTo: true)
-                        .snapshots();
-
-                    return StreamBuilder<List<QuerySnapshot>>(
-                      stream: _combineStreams(
-                        studentAllocationsStream,
-                        classAllocationsStream,
-                      ),
-                      builder: (context, allocationSnapshot) {
-                        final activeAllocations = <AllocationModel>[];
-                        if (allocationSnapshot.hasData) {
-                          final now = DateTime.now();
-                          final seen = <String>{};
-                          final allDocs = allocationSnapshot.data!
-                              .expand((qs) => qs.docs)
-                              .toList();
-                          for (final doc in allDocs) {
-                            if (seen.contains(doc.id)) continue;
-                            seen.add(doc.id);
-                            final candidate =
-                                AllocationModel.fromFirestore(doc);
-                            if (candidate.startDate.isBefore(now) &&
-                                candidate.endDate.isAfter(now)) {
-                              activeAllocations.add(candidate);
-                            }
-                          }
-                        }
-                        BookCoverCacheService.instance.primeFromAllocations(
-                          activeAllocations,
-                          ref.read(firebaseServiceProvider).firestore,
-                        );
-
-                        return _TodayCard(
-                          student: selectedChild,
-                          activeAllocations: activeAllocations,
-                          coverUrlResolver:
-                              BookCoverCacheService.instance.resolveCoverUrl,
-                          hasLoggedToday: hasLoggedToday,
-                          todayLogs: todayLogs,
-                          onTap: () async {
-                            // Store data in navigation service
-                            NavigationStateService().setTempData({
-                              'parent': widget.user,
-                              'student': selectedChild,
-                              'allocations': activeAllocations,
-                            });
-
-                            final result =
-                                await context.push('/parent/log-reading');
-                            if (result == true) {
-                              // Refresh after logging
-                              setState(() {});
-                            }
-                          },
-                        ).animate().fadeIn().scale();
-                      },
-                    );
-                  },
-                ),
+                // Rec 5b: one Today card per child so a multi-child parent
+                // can log every child without switching context. Each card
+                // owns its own log + allocation streams (see _ChildTodayCard).
+                if (children.length == 1)
+                  _ChildTodayCard(
+                    student: children.first,
+                    parent: widget.user,
+                  ).animate().fadeIn().scale()
+                else
+                  for (final child in children) ...[
+                    _ChildTodayCard(
+                      student: child,
+                      parent: widget.user,
+                      showChildName: true,
+                    ).animate().fadeIn(),
+                    LumiGap.s,
+                  ],
 
                 LumiGap.m,
 
@@ -457,6 +382,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
                       currentStreak: stats?.currentStreak ?? 0,
                       bestStreak: stats?.longestStreak ?? 0,
                       totalNights: stats?.totalReadingDays ?? 0,
+                      streakFreezes: stats?.streakFreezesAvailable,
                     ).animate().fadeIn(delay: 300.ms);
                   },
                 ),
@@ -500,9 +426,8 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
             ),
             LumiGap.l,
             LumiPrimaryButton(
-              onPressed: () {
-                // Navigate to enter invite code screen
-              },
+              onPressed: () =>
+                  context.push('/parent/link-child', extra: widget.user),
               text: 'Enter Invite Code',
               icon: Icons.qr_code,
             ),
@@ -598,16 +523,29 @@ class _AchievementNearMissCardState extends State<_AchievementNearMissCard> {
             .where((id) => id.isNotEmpty)
             .toList();
 
+        // Rec 7: prefer a consistency-based near-miss (streak / days); fall
+        // back to volume-based (books / minutes) only when none is close.
         final result = AchievementTemplates.nearestUnearned(
-          currentStreak: stats.currentStreak,
-          totalBooksRead: stats.totalBooksRead,
-          totalMinutesRead: stats.totalMinutesRead,
-          totalReadingDays: stats.totalReadingDays,
-          earnedAchievementIds: earnedIds,
-          thresholds: _thresholds,
-          customization: _customization,
-          minProgress: 0.8,
-        );
+              currentStreak: stats.currentStreak,
+              totalBooksRead: stats.totalBooksRead,
+              totalMinutesRead: stats.totalMinutesRead,
+              totalReadingDays: stats.totalReadingDays,
+              earnedAchievementIds: earnedIds,
+              thresholds: _thresholds,
+              customization: _customization,
+              minProgress: 0.8,
+              requirementTypes: const {'streak', 'days'},
+            ) ??
+            AchievementTemplates.nearestUnearned(
+              currentStreak: stats.currentStreak,
+              totalBooksRead: stats.totalBooksRead,
+              totalMinutesRead: stats.totalMinutesRead,
+              totalReadingDays: stats.totalReadingDays,
+              earnedAchievementIds: earnedIds,
+              thresholds: _thresholds,
+              customization: _customization,
+              minProgress: 0.8,
+            );
 
         if (result == null) return const SizedBox.shrink();
 
@@ -734,22 +672,103 @@ class _AchievementNearMissCardState extends State<_AchievementNearMissCard> {
   }
 }
 
-class _TodayCard extends StatelessWidget {
+class _TodayCard extends StatefulWidget {
   final StudentModel student;
+  final UserModel parent;
   final List<AllocationModel> activeAllocations;
   final String? Function(String title)? coverUrlResolver;
   final bool hasLoggedToday;
   final List<ReadingLogModel> todayLogs;
+
+  /// When true the heading names the child — used when several Today cards
+  /// are stacked for a multi-child parent (Rec 5b).
+  final bool showChildName;
+
+  /// Opens the full detail wizard ("Add detail" / "Log another session").
   final VoidCallback? onTap;
 
   const _TodayCard({
     required this.student,
+    required this.parent,
     this.activeAllocations = const [],
     this.coverUrlResolver,
     required this.hasLoggedToday,
     this.todayLogs = const [],
+    this.showChildName = false,
     this.onTap,
   });
+
+  @override
+  State<_TodayCard> createState() => _TodayCardState();
+}
+
+class _TodayCardState extends State<_TodayCard> {
+  bool _isQuickLogging = false;
+
+  StudentModel get student => widget.student;
+  List<AllocationModel> get activeAllocations => widget.activeAllocations;
+  bool get hasLoggedToday => widget.hasLoggedToday;
+  List<ReadingLogModel> get todayLogs => widget.todayLogs;
+  String? Function(String title)? get coverUrlResolver =>
+      widget.coverUrlResolver;
+  bool get showChildName => widget.showChildName;
+  VoidCallback? get onTap => widget.onTap;
+
+  int get _targetMinutes => activeAllocations.isNotEmpty
+      ? activeAllocations.first.targetMinutes
+      : 20;
+
+  /// First assigned book title for this student, sanitized for display.
+  String? get _firstAssignedTitle {
+    for (final allocation in activeAllocations) {
+      for (final item
+          in allocation.effectiveAssignmentItemsForStudent(student.id)) {
+        final title = item.title.trim();
+        if (title.isNotEmpty) {
+          return IsbnAssignmentService.sanitizeDisplayTitle(title);
+        }
+      }
+    }
+    return null;
+  }
+
+  /// One-line preview of exactly what a single tap will record.
+  String get _quickLogSummary {
+    final book = _firstAssignedTitle;
+    return book != null
+        ? '$_targetMinutes min · $book'
+        : '$_targetMinutes min of reading';
+  }
+
+  /// Records a default reading log for today in a single tap (Rec 1).
+  Future<void> _handleQuickLog() async {
+    if (_isQuickLogging) return;
+    setState(() => _isQuickLogging = true);
+    try {
+      final result = await ReadingLogService.instance.logReading(
+        student: student,
+        parent: widget.parent,
+        allocations: activeAllocations,
+        quickLog: true,
+      );
+      if (!mounted) return;
+      context.go('/parent/reading-success', extra: {
+        'student': student,
+        'parent': widget.parent,
+        'readingLog': result.log,
+        'updatedStats': result.updatedStats,
+        'freezeUsed': result.freezeUsed,
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isQuickLogging = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Couldn't log reading. Please try again."),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -767,15 +786,20 @@ class _TodayCard extends StatelessWidget {
                     vertical: LumiSpacing.xxs,
                   ),
                   decoration: BoxDecoration(
+                    // Rec 10: white-on-#FF8698 fails WCAG AA. Use the
+                    // accessible rose for the unread badge, and charcoal
+                    // text on the light mint "logged" badge.
                     color: hasLoggedToday
                         ? AppColors.mintGreen
-                        : AppColors.rosePink,
+                        : AppColors.rosePinkAccessible,
                     borderRadius: LumiBorders.circular,
                   ),
                   child: Text(
                     DateFormat('EEEE, MMM d').format(DateTime.now()),
                     style: LumiTextStyles.label(
-                      color: AppColors.white,
+                      color: hasLoggedToday
+                          ? AppColors.charcoal
+                          : AppColors.white,
                     ),
                   ),
                 ),
@@ -790,7 +814,13 @@ class _TodayCard extends StatelessWidget {
             ),
             LumiGap.m,
             Text(
-              hasLoggedToday ? 'Reading Complete!' : "Today's Reading",
+              showChildName
+                  ? (hasLoggedToday
+                      ? '${student.firstName} — all done!'
+                      : "${student.firstName}'s reading")
+                  : (hasLoggedToday
+                      ? 'Reading Complete!'
+                      : "Today's Reading"),
               style: LumiTextStyles.h2(color: AppColors.charcoal),
             ),
             LumiGap.s,
@@ -896,18 +926,41 @@ class _TodayCard extends StatelessWidget {
               ),
             ],
             LumiGap.m,
-            SizedBox(
-              width: double.infinity,
-              child: LumiPrimaryButton(
-                onPressed: onTap,
-                text: hasLoggedToday
-                    ? 'Log Another Session'
-                    : 'Tap to Mark as Done',
-                icon: hasLoggedToday
-                    ? Icons.add_circle_outline
-                    : Icons.check_circle_outline,
+            if (hasLoggedToday)
+              SizedBox(
+                width: double.infinity,
+                child: LumiPrimaryButton(
+                  onPressed: onTap,
+                  text: 'Log Another Session',
+                  icon: Icons.add_circle_outline,
+                ),
+              )
+            else ...[
+              // Rec 1: one-tap log is the default action. The caption tells
+              // the parent exactly what a single tap will record.
+              Text(
+                'One tap logs $_quickLogSummary',
+                style: LumiTextStyles.caption(
+                  color: AppColors.charcoal.withValues(alpha: 0.6),
+                ),
               ),
-            ),
+              LumiGap.xs,
+              LumiPrimaryButton(
+                onPressed: _isQuickLogging ? null : _handleQuickLog,
+                isLoading: _isQuickLogging,
+                isFullWidth: true,
+                text: 'Did ${student.firstName} read today?',
+                icon: Icons.check_circle_outline,
+              ),
+              LumiGap.xxs,
+              Center(
+                child: LumiTextButton(
+                  onPressed: _isQuickLogging ? null : onTap,
+                  text: 'Add detail',
+                  icon: Icons.tune,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -1053,4 +1106,157 @@ class _ProgressAndWeekSection extends ConsumerWidget {
       },
     );
   }
+}
+
+/// Owns the per-child Today card and its Firestore streams (today's logs +
+/// active allocations). Encapsulating the streams here lets ParentHomeScreen
+/// render one card per child (Rec 5b) without the build method juggling 3N
+/// listeners — each card starts and stops its own subscriptions with its
+/// own lifecycle.
+class _ChildTodayCard extends StatefulWidget {
+  final StudentModel student;
+  final UserModel parent;
+  final bool showChildName;
+
+  const _ChildTodayCard({
+    required this.student,
+    required this.parent,
+    this.showChildName = false,
+  });
+
+  @override
+  State<_ChildTodayCard> createState() => _ChildTodayCardState();
+}
+
+class _ChildTodayCardState extends State<_ChildTodayCard> {
+  late final Stream<QuerySnapshot> _todayLogsStream;
+  late final Stream<List<QuerySnapshot>> _allocationsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    final firestore = FirebaseService.instance.firestore;
+    final schoolId = widget.parent.schoolId;
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+
+    _todayLogsStream = firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('readingLogs')
+        .where('studentId', isEqualTo: widget.student.id)
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+        .orderBy('date', descending: true)
+        .snapshots();
+
+    // Allocations targeting this student specifically …
+    final studentAllocations = firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('allocations')
+        .where('studentIds', arrayContains: widget.student.id)
+        .where('isActive', isEqualTo: true)
+        .snapshots();
+
+    // … and whole-class allocations (empty studentIds).
+    final classAllocations = firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('allocations')
+        .where('classId', isEqualTo: widget.student.classId)
+        .where('studentIds', isEqualTo: [])
+        .where('isActive', isEqualTo: true)
+        .snapshots();
+
+    _allocationsStream = _combineStreams(studentAllocations, classAllocations);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _todayLogsStream,
+      builder: (context, logSnapshot) {
+        final todayLogs = logSnapshot.hasData
+            ? logSnapshot.data!.docs
+                .map((doc) => ReadingLogModel.fromFirestore(doc))
+                .toList()
+            : <ReadingLogModel>[];
+        final hasLoggedToday = todayLogs.isNotEmpty;
+
+        return StreamBuilder<List<QuerySnapshot>>(
+          stream: _allocationsStream,
+          builder: (context, allocationSnapshot) {
+            final activeAllocations = <AllocationModel>[];
+            if (allocationSnapshot.hasData) {
+              final now = DateTime.now();
+              final seen = <String>{};
+              for (final doc
+                  in allocationSnapshot.data!.expand((qs) => qs.docs)) {
+                if (!seen.add(doc.id)) continue;
+                final candidate = AllocationModel.fromFirestore(doc);
+                if (candidate.startDate.isBefore(now) &&
+                    candidate.endDate.isAfter(now)) {
+                  activeAllocations.add(candidate);
+                }
+              }
+            }
+            BookCoverCacheService.instance.primeFromAllocations(
+              activeAllocations,
+              FirebaseService.instance.firestore,
+            );
+
+            return _TodayCard(
+              student: widget.student,
+              parent: widget.parent,
+              activeAllocations: activeAllocations,
+              coverUrlResolver: BookCoverCacheService.instance.resolveCoverUrl,
+              hasLoggedToday: hasLoggedToday,
+              todayLogs: todayLogs,
+              showChildName: widget.showChildName,
+              onTap: () {
+                NavigationStateService().setTempData({
+                  'parent': widget.parent,
+                  'student': widget.student,
+                  'allocations': activeAllocations,
+                });
+                context.push('/parent/log-reading');
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+/// Merges two Firestore query streams into one stream that emits the latest
+/// pair whenever either side updates.
+Stream<List<QuerySnapshot>> _combineStreams(
+  Stream<QuerySnapshot> stream1,
+  Stream<QuerySnapshot> stream2,
+) {
+  QuerySnapshot? latest1;
+  QuerySnapshot? latest2;
+  late final StreamController<List<QuerySnapshot>> controller;
+  StreamSubscription? sub1;
+  StreamSubscription? sub2;
+
+  controller = StreamController<List<QuerySnapshot>>(
+    onListen: () {
+      sub1 = stream1.listen((snapshot) {
+        latest1 = snapshot;
+        if (latest2 != null) controller.add([latest1!, latest2!]);
+      });
+      sub2 = stream2.listen((snapshot) {
+        latest2 = snapshot;
+        if (latest1 != null) controller.add([latest1!, latest2!]);
+      });
+    },
+    onCancel: () {
+      sub1?.cancel();
+      sub2?.cancel();
+    },
+  );
+
+  return controller.stream;
 }

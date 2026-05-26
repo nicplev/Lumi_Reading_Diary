@@ -42,6 +42,9 @@ function toStudent(doc: FirebaseFirestore.DocumentSnapshot): Student {
           totalReadingDays: data.stats.totalReadingDays ?? 0,
         }
       : undefined,
+    // Denormalized guardian projections (name + relationship label only),
+    // maintained server-side by the syncGuardianProfiles Cloud Function.
+    guardianProfiles: data.guardianProfiles ?? {},
   };
 }
 

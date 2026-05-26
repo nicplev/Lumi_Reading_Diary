@@ -7,11 +7,30 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
+import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/services/impersonation_service.dart';
 import '../firebase_options.dart';
+import 'reading_log_service.dart';
+
+/// One linked child's identifiers, threaded into a scheduled reminder so the
+/// notification's "Log reading" action can record a log without the app
+/// having to re-resolve the child (Rec 3).
+class ReminderChild {
+  const ReminderChild({
+    required this.studentId,
+    required this.firstName,
+    required this.schoolId,
+    required this.classId,
+  });
+
+  final String studentId;
+  final String firstName;
+  final String schoolId;
+  final String classId;
+}
 
 // Background message handler (must be top-level function)
 @pragma('vm:entry-point')
@@ -52,6 +71,10 @@ class NotificationService {
   static const String _readingReminderChannel = 'reading_reminders';
   static const String _achievementChannel = 'achievements';
   static const String _generalChannel = 'general';
+
+  // Rec 3: actionable reminder — a "Log reading" button on the notification.
+  static const String _logActionId = 'log_reading';
+  static const String _reminderCategoryId = 'lumi_reminder';
 
   /// Wire in the GoRouter instance so notification taps can navigate.
   /// Called from routerProvider after the router is built.
@@ -102,17 +125,41 @@ class NotificationService {
   /// Initialize local notifications
   Future<void> _initializeLocalNotifications() async {
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosSettings = DarwinInitializationSettings(
+    // Rec 3: register the reminder category so the iOS notification can show
+    // an inline "Log reading" action button.
+    final iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
+      notificationCategories: [
+        DarwinNotificationCategory(
+          _reminderCategoryId,
+          actions: [
+            DarwinNotificationAction.plain(
+              _logActionId,
+              'Log reading ✓',
+              options: {DarwinNotificationActionOption.foreground},
+            ),
+          ],
+        ),
+      ],
     );
 
-    const initSettings = InitializationSettings(
+    final initSettings = InitializationSettings(
       android: androidSettings,
       iOS: iosSettings,
     );
 
+    // Rec 3: by design, the "Log reading" action on both platforms uses
+    // a foreground-bringing option (iOS `.foreground`, Android
+    // `showsUserInterface: true`). That means tapping the action — whether
+    // the app is alive, backgrounded, or killed — always routes through
+    // _handleNotificationTap once the app comes to the foreground. No
+    // `onDidReceiveBackgroundNotificationResponse` is wired because the
+    // background-isolate code path is never exercised; doing a real
+    // background-isolate write would require duplicating Firebase + Hive
+    // init in a separate isolate, which the doc explicitly flags as a
+    // future hardening (see docs/parent-ux-research.md, Rec 3 risks).
     await _localNotifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse: _handleNotificationTap,
@@ -248,9 +295,61 @@ class NotificationService {
     }
   }
 
-  /// Handle notification tap (local — reading reminders)
+  /// Handle notification tap (local — reading reminders).
+  ///
+  /// A tap on the inline "Log reading" action records a one-tap log straight
+  /// from the reminder's payload; a plain tap just opens the home screen.
   void _handleNotificationTap(NotificationResponse response) {
-    debugPrint('Local notification tapped: ${response.payload}');
+    debugPrint(
+      'Local notification tapped: action=${response.actionId} '
+      'payload=${response.payload}',
+    );
+    if (response.actionId == _logActionId) {
+      _handleQuickLogAction(response.payload);
+      return;
+    }
+    _navigateTo('/parent/home');
+  }
+
+  /// Records a quick log from a reminder's "Log reading" action and posts a
+  /// confirmation notification. Best-effort — failures are logged, not shown.
+  Future<void> _handleQuickLogAction(String? payload) async {
+    if (payload == null) {
+      _navigateTo('/parent/home');
+      return;
+    }
+    try {
+      final data = jsonDecode(payload) as Map<String, dynamic>;
+      final studentId = data['studentId'] as String? ?? '';
+      final parentId = data['parentId'] as String? ?? '';
+      final schoolId = data['schoolId'] as String? ?? '';
+      final classId = data['classId'] as String? ?? '';
+      if (studentId.isEmpty || parentId.isEmpty || schoolId.isEmpty) {
+        _navigateTo('/parent/home');
+        return;
+      }
+
+      final result = await ReadingLogService.instance.logQuickFromIds(
+        studentId: studentId,
+        parentId: parentId,
+        schoolId: schoolId,
+        classId: classId,
+        loggedByName: data['parentName'] as String?,
+        loggedByLabel: data['parentLabel'] as String?,
+      );
+
+      final childName = data['childName'] as String? ?? 'your child';
+      final streak = result.updatedStats?['currentStreak'] as int?;
+      await _showLocalNotification(
+        title: result.savedOffline ? 'Saved — will sync' : 'Reading logged ✓',
+        body: (streak != null && streak > 0)
+            ? "$childName is on a $streak day streak!"
+            : "$childName's reading is logged.",
+        channelId: _readingReminderChannel,
+      );
+    } catch (e) {
+      debugPrint('Quick-log from notification failed: $e');
+    }
     _navigateTo('/parent/home');
   }
 
@@ -300,16 +399,26 @@ class NotificationService {
   // Notification ID scheme: childIndex * 10 + slot
   // slot 0 = daily (all days), slots 1-7 = specific weekday (Mon=1 .. Sun=7)
   static const String _scheduledIdsKey = 'scheduled_notification_ids';
+  // Rec 3: ordered student IDs paired with the schedule above so
+  // `refreshReminderForToday` can resolve studentId → childIndex and cancel
+  // just today's slot when a log is already saved.
+  static const String _scheduledChildOrderKey = 'scheduled_child_order';
 
   static int _notificationId(int childIndex, int slot) => childIndex * 10 + slot;
 
   /// Schedule reading reminders for one or more children.
   ///
-  /// [childNames] — list of linked children's first names.
+  /// [children] — linked children, with the identifiers the notification's
+  ///   "Log reading" action needs to record a log (Rec 3).
+  /// [parentId] / [parentName] / [parentLabel] — guardian attribution for a
+  ///   log created from the action.
   /// [hour], [minute] — time of day for the reminder.
   /// [days] — weekdays to remind on (1=Mon .. 7=Sun). Empty/null = every day.
   Future<void> scheduleReminders({
-    required List<String> childNames,
+    required List<ReminderChild> children,
+    required String parentId,
+    String? parentName,
+    String? parentLabel,
     required int hour,
     required int minute,
     List<int>? days,
@@ -326,9 +435,21 @@ class NotificationService {
     final isDaily = effectiveDays.isEmpty;
     final scheduledIds = <int>[];
 
-    for (int childIdx = 0; childIdx < childNames.length; childIdx++) {
-      final name = childNames[childIdx];
-      final body = "Don't forget to log $name's reading today!";
+    for (int childIdx = 0; childIdx < children.length; childIdx++) {
+      final child = children[childIdx];
+      final body = "Don't forget to log ${child.firstName}'s reading today!";
+      // Payload carries everything the "Log reading" action needs so it can
+      // record a log without re-resolving the child.
+      final payload = jsonEncode({
+        'type': 'reading_reminder',
+        'studentId': child.studentId,
+        'schoolId': child.schoolId,
+        'classId': child.classId,
+        'parentId': parentId,
+        if (parentName != null) 'parentName': parentName,
+        if (parentLabel != null) 'parentLabel': parentLabel,
+        'childName': child.firstName,
+      });
 
       if (isDaily) {
         final id = _notificationId(childIdx, 0);
@@ -337,6 +458,7 @@ class NotificationService {
           body: body,
           hour: hour,
           minute: minute,
+          payload: payload,
           matchComponents: DateTimeComponents.time,
         );
         scheduledIds.add(id);
@@ -348,6 +470,7 @@ class NotificationService {
             body: body,
             hour: hour,
             minute: minute,
+            payload: payload,
             weekday: day,
             matchComponents: DateTimeComponents.dayOfWeekAndTime,
           );
@@ -362,6 +485,12 @@ class NotificationService {
       _scheduledIdsKey,
       scheduledIds.map((id) => id.toString()).toList(),
     );
+    // Persist the studentId order used to derive notification IDs so
+    // refreshReminderForToday can cancel only today's slot per child.
+    await prefs.setStringList(
+      _scheduledChildOrderKey,
+      children.map((c) => c.studentId).toList(),
+    );
     await prefs.setInt('reminder_hour', hour);
     await prefs.setInt('reminder_minute', minute);
     await prefs.setBool('reminders_enabled', true);
@@ -372,7 +501,7 @@ class NotificationService {
 
     debugPrint(
       'Reminders scheduled: ${scheduledIds.length} notifications for '
-      '${childNames.length} child(ren) at '
+      '${children.length} child(ren) at '
       '$hour:${minute.toString().padLeft(2, '0')} on '
       '${isDaily ? "every day" : "days $effectiveDays"}',
     );
@@ -384,6 +513,7 @@ class NotificationService {
     required String body,
     required int hour,
     required int minute,
+    required String payload,
     int? weekday,
     required DateTimeComponents matchComponents,
   }) async {
@@ -399,6 +529,7 @@ class NotificationService {
       scheduled = scheduled.add(const Duration(days: 1));
     }
 
+    // Rec 3: an inline "Log reading" action on the reminder itself.
     final androidDetails = AndroidNotificationDetails(
       _readingReminderChannel,
       'Reading Reminders',
@@ -406,12 +537,20 @@ class NotificationService {
       priority: Priority.high,
       playSound: true,
       enableVibration: true,
+      actions: const [
+        AndroidNotificationAction(
+          _logActionId,
+          'Log reading ✓',
+          showsUserInterface: true,
+        ),
+      ],
     );
 
     const iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
+      categoryIdentifier: _reminderCategoryId,
     );
 
     final details = NotificationDetails(
@@ -427,6 +566,7 @@ class NotificationService {
       details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       matchDateTimeComponents: matchComponents,
+      payload: payload,
     );
   }
 
@@ -444,26 +584,51 @@ class NotificationService {
     }
 
     await prefs.remove(_scheduledIdsKey);
+    await prefs.remove(_scheduledChildOrderKey);
     await prefs.setBool('reminders_enabled', false);
     await prefs.remove('reminder_days');
 
     debugPrint('Cancelled ${idStrings.length} scheduled reminders');
   }
 
-  /// Backward-compatible wrappers ------------------------------------------------
+  /// Cancels today's "log reading" reminder for [studentId] because the
+  /// child has already been logged. The recurring schedule re-arms
+  /// automatically for tomorrow because [_scheduleOne] uses
+  /// `matchDateTimeComponents` (time or day-of-week-and-time).
+  ///
+  /// Best-effort and silent — no-ops when reminders aren't configured or
+  /// [studentId] isn't in the scheduled set, and swallows cancel errors
+  /// so the calling write path is never blocked.
+  Future<void> refreshReminderForToday({required String studentId}) async {
+    if (!_initialized) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final order = prefs.getStringList(_scheduledChildOrderKey);
+      if (order == null || order.isEmpty) return;
+      final childIdx = order.indexOf(studentId);
+      if (childIdx < 0) return;
 
-  /// Schedule a daily reminder for a single child (legacy callers).
-  Future<void> scheduleDailyReminder({
-    required int hour,
-    required int minute,
-    required String studentName,
-  }) async {
-    await scheduleReminders(
-      childNames: [studentName],
-      hour: hour,
-      minute: minute,
-    );
+      // Cancel today's daily slot (id = idx*10) and today's-weekday slot
+      // (id = idx*10 + weekday). Whichever the user configured is the one
+      // that will be present; the other cancel is a harmless no-op.
+      final today = DateTime.now().weekday; // 1=Mon .. 7=Sun
+      final candidates = <int>[
+        _notificationId(childIdx, 0),
+        _notificationId(childIdx, today),
+      ];
+      for (final id in candidates) {
+        try {
+          await _localNotifications.cancel(id);
+        } catch (e) {
+          debugPrint('refreshReminderForToday cancel($id) failed: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('refreshReminderForToday failed: $e');
+    }
   }
+
+  /// Backward-compatible wrappers ------------------------------------------------
 
   /// Cancel all reminders (legacy callers).
   Future<void> cancelDailyReminder() async {

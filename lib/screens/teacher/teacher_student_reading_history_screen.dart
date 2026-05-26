@@ -172,7 +172,8 @@ class _TeacherStudentReadingHistoryScreenState
             slivers: [
               SliverToBoxAdapter(
                   child: _buildStatsBar(allLogs,
-                      filteredCount: _hasActiveFilters ? filtered.length : null)),
+                      filteredCount:
+                          _hasActiveFilters ? filtered.length : null)),
               SliverToBoxAdapter(child: _buildFilterSection()),
               if (filtered.isEmpty)
                 SliverFillRemaining(
@@ -220,8 +221,7 @@ class _TeacherStudentReadingHistoryScreenState
 
   // ─── Stats Bar ──────────────────────────────────────────────────────────────
 
-  Widget _buildStatsBar(List<_ReadingLogSnapshot> logs,
-      {int? filteredCount}) {
+  Widget _buildStatsBar(List<_ReadingLogSnapshot> logs, {int? filteredCount}) {
     final totalNights = logs.length;
     final totalMinutes = logs.fold(0, (acc, l) => acc + l.minutesRead);
     final booksRead = logs
@@ -314,8 +314,7 @@ class _TeacherStudentReadingHistoryScreenState
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
                     isDense: true,
-                    contentPadding:
-                        const EdgeInsets.symmetric(vertical: 10),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
                   ),
                   cursorColor: AppColors.teacherPrimary,
                 ),
@@ -360,8 +359,7 @@ class _TeacherStudentReadingHistoryScreenState
                       setState(() => _dateFilter = _DateFilter.thisMonth),
                 ),
                 const SizedBox(width: 12),
-                Container(
-                    width: 1, height: 24, color: AppColors.teacherBorder),
+                Container(width: 1, height: 24, color: AppColors.teacherBorder),
                 const SizedBox(width: 12),
                 for (final feeling in const [
                   'hard',
@@ -414,11 +412,25 @@ class _TeacherStudentReadingHistoryScreenState
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  books,
-                  style: TeacherTypography.bodyMedium,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      books,
+                      style: TeacherTypography.bodyMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (log.loggedByDisplay != null)
+                      Text(
+                        'Logged by ${log.loggedByDisplay}',
+                        style: TeacherTypography.caption.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
                 ),
               ),
               const SizedBox(width: 8),
@@ -462,8 +474,7 @@ class _TeacherStudentReadingHistoryScreenState
 
   // ─── Book Summary Row ────────────────────────────────────────────────────────
 
-  Widget _buildBookSummaryRow(_BookSummary book,
-      {required bool showDivider}) {
+  Widget _buildBookSummaryRow(_BookSummary book, {required bool showDivider}) {
     final dateRange = book.sessionCount == 1
         ? _formatCommentDate(book.lastRead)
         : '${_formatCommentDate(book.firstRead)} – ${_formatCommentDate(book.lastRead)}';
@@ -549,8 +560,7 @@ class _TeacherStudentReadingHistoryScreenState
       final commentSelections = data['parentCommentSelections'];
       return _ReadingLogSnapshot(
         id: doc.id,
-        date:
-            dateTimestamp?.toDate() ?? DateTime.fromMillisecondsSinceEpoch(0),
+        date: dateTimestamp?.toDate() ?? DateTime.fromMillisecondsSinceEpoch(0),
         allocationId: data['allocationId'] as String?,
         bookTitles: List<String>.from(data['bookTitles'] ?? const []),
         status: (data['status'] as String?) ?? '',
@@ -564,6 +574,8 @@ class _TeacherStudentReadingHistoryScreenState
         parentCommentFreeText:
             (data['parentCommentFreeText'] as String?)?.trim(),
         childFeeling: data['childFeeling'] as String?,
+        loggedByName: (data['loggedByName'] as String?)?.trim(),
+        loggedByLabel: (data['loggedByLabel'] as String?)?.trim(),
       );
     }).toList();
   }
@@ -672,7 +684,8 @@ class _BlobFilterChip extends StatelessWidget {
           color: isActive ? AppColors.teacherPrimaryLight : AppColors.white,
           shape: BoxShape.circle,
           border: Border.all(
-            color: isActive ? AppColors.teacherPrimary : AppColors.teacherBorder,
+            color:
+                isActive ? AppColors.teacherPrimary : AppColors.teacherBorder,
             width: isActive ? 1.5 : 1.0,
           ),
         ),
@@ -703,6 +716,8 @@ class _ReadingLogSnapshot {
   final List<String> parentCommentSelections;
   final String? parentCommentFreeText;
   final String? childFeeling;
+  final String? loggedByName;
+  final String? loggedByLabel;
 
   const _ReadingLogSnapshot({
     required this.id,
@@ -717,7 +732,12 @@ class _ReadingLogSnapshot {
     required this.parentCommentSelections,
     required this.parentCommentFreeText,
     required this.childFeeling,
+    this.loggedByName,
+    this.loggedByLabel,
   });
+
+  /// "Logged by …" attribution, or null if this is a legacy log.
+  String? get loggedByDisplay => loggedByLabel ?? loggedByName;
 }
 
 class _BookSummary {

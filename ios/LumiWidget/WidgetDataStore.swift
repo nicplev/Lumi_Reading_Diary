@@ -45,6 +45,12 @@ struct WidgetDataStore {
             return .placeholder
         }
 
+        // Rec 4: reflect an optimistic widget-intent tap before the Flutter
+        // app has reconciled the real Firestore write.
+        let optimisticallyLogged =
+            WidgetLogQueue.isOptimisticallyLogged(studentId: child.studentId)
+        let effectiveLogged = child.loggedToday || optimisticallyLogged
+
         return LumiWidgetEntry(
             date: Date(),
             studentId: child.studentId,
@@ -53,8 +59,8 @@ struct WidgetDataStore {
             currentStreak: child.currentStreak,
             minutesReadToday: child.minutesReadToday,
             targetMinutes: max(child.targetMinutes, 1),
-            loggedToday: child.loggedToday,
-            displayMode: displayMode(for: child)
+            loggedToday: effectiveLogged,
+            displayMode: effectiveLogged ? .celebrating : displayMode(for: child)
         )
     }
 

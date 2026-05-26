@@ -162,7 +162,8 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
             Tab(text: 'My Books'),
           ],
           labelColor: AppColors.rosePink,
-          labelStyle: LumiTextStyles.label().copyWith(fontWeight: FontWeight.bold),
+          labelStyle:
+              LumiTextStyles.label().copyWith(fontWeight: FontWeight.bold),
           unselectedLabelColor: AppColors.charcoal.withValues(alpha: 0.5),
           unselectedLabelStyle: LumiTextStyles.label(),
           indicatorSize: TabBarIndicatorSize.tab,
@@ -1383,21 +1384,24 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen>
                             Text(
                               '$pageCount pages',
                               style: LumiTextStyles.caption().copyWith(
-                                color: AppColors.charcoal.withValues(alpha: 0.5),
+                                color:
+                                    AppColors.charcoal.withValues(alpha: 0.5),
                               ),
                             ),
                           if (pageCount != null && metadata?.isbn != null)
                             Text(
                               '  ·  ',
                               style: LumiTextStyles.caption().copyWith(
-                                color: AppColors.charcoal.withValues(alpha: 0.3),
+                                color:
+                                    AppColors.charcoal.withValues(alpha: 0.3),
                               ),
                             ),
                           if (metadata?.isbn != null)
                             Text(
                               'ISBN ${metadata!.isbn}',
                               style: LumiTextStyles.caption().copyWith(
-                                color: AppColors.charcoal.withValues(alpha: 0.5),
+                                color:
+                                    AppColors.charcoal.withValues(alpha: 0.5),
                               ),
                             ),
                         ],
@@ -2020,6 +2024,15 @@ class _LogCard extends StatelessWidget {
                           color: AppColors.charcoal.withValues(alpha: 0.5),
                         ),
                       ),
+                      if (log.loggedByName != null) ...[
+                        LumiGap.horizontalXXS,
+                        Text(
+                          '· Logged by ${log.loggedByDisplay}',
+                          style: LumiTextStyles.caption().copyWith(
+                            color: AppColors.charcoal.withValues(alpha: 0.5),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                   if (log.notes != null && log.notes!.isNotEmpty) ...[
@@ -2270,11 +2283,33 @@ class _SessionDetailSheet extends StatelessWidget {
                             Text(
                               '${log.minutesRead} minutes',
                               style: LumiTextStyles.bodySmall().copyWith(
-                                color: AppColors.charcoal.withValues(alpha: 0.7),
+                                color:
+                                    AppColors.charcoal.withValues(alpha: 0.7),
                               ),
                             ),
                           ],
                         ),
+                        if (log.loggedByName != null) ...[
+                          LumiGap.xxs,
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.person_outline,
+                                size: 16,
+                                color:
+                                    AppColors.charcoal.withValues(alpha: 0.7),
+                              ),
+                              LumiGap.horizontalXXS,
+                              Text(
+                                'Logged by ${log.loggedByDisplay}',
+                                style: LumiTextStyles.bodySmall().copyWith(
+                                  color:
+                                      AppColors.charcoal.withValues(alpha: 0.7),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),

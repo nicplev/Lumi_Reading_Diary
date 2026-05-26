@@ -32,7 +32,7 @@ class LumiPrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = color ?? AppColors.rosePink;
+    final primaryColor = color ?? AppColors.rosePinkAccessible;
     final shape = borderRadius != null
         ? RoundedRectangleBorder(borderRadius: borderRadius!)
         : LumiBorders.shapePill;
@@ -112,7 +112,7 @@ class LumiSecondaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accentColor = color ?? AppColors.rosePink;
+    final accentColor = color ?? AppColors.rosePinkAccessible;
     final br = borderRadius ?? LumiBorders.pill;
     final shape = RoundedRectangleBorder(
       borderRadius: br,
@@ -184,7 +184,7 @@ class LumiTextButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final foregroundColor = color ?? AppColors.rosePink;
+    final foregroundColor = color ?? AppColors.rosePinkAccessible;
 
     return TextButton(
       onPressed: isLoading ? null : onPressed,
@@ -284,7 +284,9 @@ class LumiFab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = color ?? AppColors.rosePink;
+    // Rec 10: default to the AA-accessible variant so white-on-pink FABs
+    // meet contrast. `rosePink` is preserved for decorative fills only.
+    final bgColor = color ?? AppColors.rosePinkAccessible;
 
     if (isExtended && label != null) {
       return FloatingActionButton.extended(

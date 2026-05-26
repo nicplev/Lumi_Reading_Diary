@@ -17,6 +17,17 @@ export interface ReadingLevelHistory {
 
 export type EnrollmentStatus = 'book_pack' | 'direct_purchase' | 'not_enrolled' | 'pending';
 
+/**
+ * Minimal projection of a linked guardian, denormalized onto the student doc
+ * and maintained server-side by the syncGuardianProfiles Cloud Function.
+ * Deliberately carries name + relationship label only — never email/phone.
+ * Keyed by parent UID.
+ */
+export interface GuardianProfile {
+  name: string;
+  relationshipLabel?: string | null;
+}
+
 export interface Student {
   id: string;
   firstName: string;
@@ -40,4 +51,6 @@ export interface Student {
   parentEmail?: string;
   levelHistory: ReadingLevelHistory[];
   stats?: StudentStats;
+  /** Denormalized guardian projections keyed by parent UID. */
+  guardianProfiles: Record<string, GuardianProfile>;
 }

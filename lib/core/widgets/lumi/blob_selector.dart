@@ -89,7 +89,11 @@ class _BlobSelectorState extends State<BlobSelector> {
     final isHovered = _hoveredFeeling == blob.feeling;
     final isActive = isSelected || isHovered;
 
-    return GestureDetector(
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: 'Reading felt ${blob.label}',
+      child: GestureDetector(
       onTap: () => widget.onFeelingSelected(blob.feeling),
       onTapDown: (_) => setState(() => _hoveredFeeling = blob.feeling),
       onTapUp: (_) => setState(() => _hoveredFeeling = null),
@@ -145,8 +149,9 @@ class _BlobSelectorState extends State<BlobSelector> {
           ],
         ),
       ),
-    ).animate(
-      target: isActive ? 1 : 0,
+      ).animate(
+        target: isActive ? 1 : 0,
+      ),
     );
   }
 }

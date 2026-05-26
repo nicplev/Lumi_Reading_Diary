@@ -1,10 +1,13 @@
+import AppIntents
 import SwiftUI
 import WidgetKit
 
 // MARK: - Colours (mirrors Lumi Dart theme)
 
 private extension Color {
-    static let lumiRosePink   = Color(red: 1.00, green: 0.53, blue: 0.60)  // #FF8698
+    static let lumiRosePink   = Color(red: 1.00, green: 0.53, blue: 0.60)  // #FF8698 — decorative only
+    // Accessible rose-pink for CTAs: white text on this fill passes WCAG AA.
+    static let lumiRosePinkAccessible = Color(red: 0.784, green: 0.278, blue: 0.361)  // #C8475C
     static let lumiMint       = Color(red: 0.82, green: 0.92, blue: 0.75)  // #D2EBBF
     static let lumiOrange     = Color(red: 1.00, green: 0.66, blue: 0.48)  // #FFA97C
     static let lumiCharcoal   = Color(red: 0.07, green: 0.07, blue: 0.07)  // #121211
@@ -18,15 +21,13 @@ struct LumiWidgetEntryView: View {
     var entry: LumiWidgetEntry
 
     var body: some View {
-        // Link wraps the entire widget for iOS 14–16.
-        // On iOS 17+ each Button sub-view can have its own Link/AppIntent.
-        Link(destination: tapURL) {
-            ZStack {
-                backgroundView
-                contentView
-                    .padding(14)
-            }
+        ZStack {
+            backgroundView
+            contentView
+                .padding(14)
         }
+        // Whole-widget tap → deep link (works on iOS 14+). On iOS 17+ the CTA
+        // Button overrides its own region with an in-place LogReadingIntent.
         .widgetURL(tapURL)
     }
 
@@ -166,7 +167,22 @@ struct LumiWidgetEntryView: View {
 
     // MARK: CTA Button
 
+    // Rec 4: on iOS 17+ the reminder CTA logs reading in place via an
+    // AppIntent; on iOS 14–16 it stays a plain label and the whole-widget
+    // deep link (widgetURL) opens the app instead.
+    @ViewBuilder
     private var ctaButton: some View {
+        if #available(iOS 17.0, *), entry.displayMode != .celebrating {
+            Button(intent: LogReadingIntent(studentId: entry.studentId)) {
+                ctaLabelView
+            }
+            .buttonStyle(.plain)
+        } else {
+            ctaLabelView
+        }
+    }
+
+    private var ctaLabelView: some View {
         Text(ctaLabel)
             .font(.system(size: 11, weight: .semibold, design: .rounded))
             .foregroundColor(.white)
@@ -186,7 +202,7 @@ struct LumiWidgetEntryView: View {
 
     private var ctaColor: Color {
         switch entry.displayMode {
-        case .reminder:    return .lumiRosePink
+        case .reminder:    return .lumiRosePinkAccessible
         case .celebrating: return .green
         case .streakAtRisk: return .lumiOrange
         }

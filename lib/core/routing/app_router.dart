@@ -34,6 +34,7 @@ import '../../screens/parent/parent_profile_screen.dart';
 import '../../screens/parent/book_browser_screen.dart';
 import '../../screens/parent/parent_notifications_screen.dart';
 import '../../screens/parent/reading_success_screen.dart';
+import '../../screens/parent/link_child_screen.dart';
 import '../../screens/teacher/teacher_home_screen.dart';
 import '../../screens/teacher/allocation/allocation_screen.dart';
 import '../../screens/teacher/class_detail_screen.dart';
@@ -251,6 +252,17 @@ class AppRouter {
       ),
 
       GoRoute(
+        path: '/parent/link-child',
+        name: 'link-child',
+        builder: (context, state) {
+          final user =
+              state.extra as UserModel? ?? _ref.read(userProvider).value;
+          if (user == null) return const LoginScreen();
+          return LinkChildScreen(user: user);
+        },
+      ),
+
+      GoRoute(
         path: '/parent/log-reading',
         name: 'log-reading',
         builder: (context, state) {
@@ -383,6 +395,7 @@ class AppRouter {
           final parent = params?['parent'] as UserModel?;
           final readingLog = params?['readingLog'] as ReadingLogModel?;
           final updatedStats = params?['updatedStats'] as Map<String, dynamic>?;
+          final freezeUsed = params?['freezeUsed'] as bool? ?? false;
           if (student == null || parent == null || readingLog == null) {
             return const LoginScreen();
           }
@@ -391,6 +404,7 @@ class AppRouter {
             parent: parent,
             readingLog: readingLog,
             updatedStats: updatedStats,
+            freezeUsed: freezeUsed,
           );
         },
       ),

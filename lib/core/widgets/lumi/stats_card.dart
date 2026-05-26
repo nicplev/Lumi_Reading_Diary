@@ -12,15 +12,21 @@ class StatsCard extends StatelessWidget {
   final int bestStreak;
   final int totalNights;
 
+  /// Streak freezes the student has banked (Rec 6). When > 0 a small
+  /// footer reassures the parent that a missed day is protected.
+  final int? streakFreezes;
+
   const StatsCard({
     super.key,
     required this.currentStreak,
     required this.bestStreak,
     required this.totalNights,
+    this.streakFreezes,
   });
 
   @override
   Widget build(BuildContext context) {
+    final freezes = streakFreezes ?? 0;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
       decoration: BoxDecoration(
@@ -34,7 +40,9 @@ class StatsCard extends StatelessWidget {
           ),
         ],
       ),
-      child: IntrinsicHeight(
+      child: Column(
+        children: [
+          IntrinsicHeight(
         child: Row(
           children: [
             Expanded(
@@ -71,6 +79,28 @@ class StatsCard extends StatelessWidget {
             ),
           ],
         ),
+          ),
+          if (freezes > 0) ...[
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                vertical: 8,
+                horizontal: 12,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.skyBlue.withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '❄️ $freezes streak ${freezes == 1 ? 'freeze' : 'freezes'} '
+                'banked — a missed day is covered',
+                style: LumiTextStyles.caption(color: AppColors.charcoal),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

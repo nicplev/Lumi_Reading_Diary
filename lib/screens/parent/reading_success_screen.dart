@@ -7,10 +7,17 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/lumi_text_styles.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/blob_selector.dart';
+import '../../core/widgets/lumi/comment_chips.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/reading_log_model.dart';
+import '../../data/models/school_model.dart';
+import '../../data/models/parent_comment_settings.dart';
 import '../../services/analytics_service.dart';
+import '../../services/firebase_service.dart';
+import '../../services/reading_log_service.dart';
 
 /// Celebration screen shown after a reading log is successfully saved.
 /// Displays confetti, night count, streak info, and badge notifications.
@@ -20,12 +27,16 @@ class ReadingSuccessScreen extends StatefulWidget {
   final ReadingLogModel readingLog;
   final Map<String, dynamic>? updatedStats;
 
+  /// True when this log spent a streak freeze to bridge a missed day.
+  final bool freezeUsed;
+
   const ReadingSuccessScreen({
     super.key,
     required this.student,
     required this.parent,
     required this.readingLog,
     this.updatedStats,
+    this.freezeUsed = false,
   });
 
   @override
@@ -36,6 +47,25 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
     with TickerProviderStateMixin {
   late final AnimationController _confettiController;
   Timer? _autoNavigateTimer;
+
+  // ─── Rec 2: progressive disclosure of feeling + comment ──────────
+  // For a one-tap quick log the feeling/comment were skipped; offer them
+  // here as an optional, post-hoc prompt instead of gating the log on them.
+
+  /// The log was created via the one-tap path (`metadata.quickLog == true`).
+  bool get _isQuickLog => widget.readingLog.metadata?['quickLog'] == true;
+
+  /// Show the optional feeling prompt only for a quick log with no feeling yet.
+  bool get _showFollowUp =>
+      _isQuickLog && widget.readingLog.childFeeling == null;
+
+  ReadingFeeling? _pickedFeeling;
+
+  ParentCommentSettings? _commentSettings;
+  bool _noteExpanded = false;
+  List<String> _selectedComments = [];
+  final TextEditingController _noteController = TextEditingController();
+  bool _commentSaved = false;
 
   int get _totalNights =>
       widget.updatedStats?['totalReadingDays'] ??
@@ -74,7 +104,61 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
       duration: const Duration(seconds: 3),
     )..forward();
     _logAnalytics();
-    _autoNavigateTimer = Timer(const Duration(seconds: 3), _goHome);
+    if (_showFollowUp) {
+      // Quick log: offer the optional feeling/comment prompt and let the
+      // parent leave on their own terms — no rushed auto-navigation.
+      _loadCommentSettings();
+    } else {
+      _autoNavigateTimer = Timer(const Duration(seconds: 3), _goHome);
+    }
+  }
+
+  Future<void> _loadCommentSettings() async {
+    try {
+      final doc = await FirebaseService.instance.firestore
+          .collection('schools')
+          .doc(widget.readingLog.schoolId)
+          .get();
+      if (doc.exists && mounted) {
+        setState(() {
+          _commentSettings =
+              SchoolModel.fromFirestore(doc).parentCommentSettings;
+        });
+      }
+    } catch (_) {
+      // Optional UI — safe to proceed without comment settings.
+    }
+  }
+
+  /// Patches the chosen feeling onto the already-saved log.
+  Future<void> _onFeelingSelected(ReadingFeeling feeling) async {
+    setState(() => _pickedFeeling = feeling);
+    try {
+      await ReadingLogService.instance
+          .attachFeeling(widget.readingLog, feeling);
+    } catch (_) {
+      // Feeling is optional — a failed patch is non-critical.
+    }
+  }
+
+  /// Patches any note the parent added, then returns home.
+  Future<void> _finishFollowUp() async {
+    final hasNote = _noteExpanded &&
+        (_selectedComments.isNotEmpty ||
+            _noteController.text.trim().isNotEmpty);
+    if (hasNote && !_commentSaved) {
+      try {
+        await ReadingLogService.instance.attachComment(
+          widget.readingLog,
+          selections: _selectedComments,
+          freeText: _noteController.text,
+        );
+        _commentSaved = true;
+      } catch (_) {
+        // Non-critical — proceed home regardless.
+      }
+    }
+    _goHome();
   }
 
   void _goHome() {
@@ -108,6 +192,7 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
   void dispose() {
     _autoNavigateTimer?.cancel();
     _confettiController.dispose();
+    _noteController.dispose();
     super.dispose();
   }
 
@@ -207,6 +292,38 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
                         ),
                       ).animate().fadeIn(delay: 600.ms).slideY(begin: 0.3),
 
+                    // Rec 6: shame-free framing — celebrate the freeze that
+                    // protected the streak rather than mourning a missed day.
+                    if (widget.freezeUsed) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.skyBlue.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: AppColors.skyBlue),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text('❄️', style: TextStyle(fontSize: 22)),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                'Freeze used — streak protected!',
+                                style: LumiTextStyles.bodyMedium(
+                                  color: AppColors.charcoal,
+                                ).copyWith(fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ).animate().fadeIn(delay: 700.ms).slideY(begin: 0.3),
+                    ],
+
                     const SizedBox(height: 16),
 
                     // Badge earned notification
@@ -289,32 +406,39 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
                       ),
                     ).animate().fadeIn(delay: 1000.ms),
 
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 32),
 
-                    // Auto-returning indicator (tappable to skip)
-                    GestureDetector(
-                      onTap: _goHome,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.charcoal.withValues(alpha: 0.4),
+                    // Rec 2: for a quick log, offer the optional feeling /
+                    // comment prompt instead of auto-navigating away.
+                    if (_showFollowUp)
+                      _buildFollowUp().animate().fadeIn(delay: 900.ms)
+                    else
+                      // Auto-returning indicator (tappable to skip)
+                      GestureDetector(
+                        onTap: _goHome,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color:
+                                    AppColors.charcoal.withValues(alpha: 0.4),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Returning home...',
-                            style: LumiTextStyles.bodySmall(
-                              color: AppColors.charcoal.withValues(alpha: 0.5),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Returning home...',
+                              style: LumiTextStyles.bodySmall(
+                                color:
+                                    AppColors.charcoal.withValues(alpha: 0.5),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ).animate().fadeIn(delay: 1200.ms),
+                          ],
+                        ),
+                      ).animate().fadeIn(delay: 1200.ms),
                   ],
                 ),
               ),
@@ -322,6 +446,80 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
           ],
         ),
       ),
+    );
+  }
+
+  /// Optional post-log prompt shown for one-tap quick logs (Rec 2):
+  /// a feeling selector and, if the school enables it, a note.
+  Widget _buildFollowUp() {
+    final settings = _commentSettings;
+    final commentsEnabled = settings?.enabled ?? false;
+
+    return Column(
+      children: [
+        // Feeling prompt — BlobSelector carries its own heading + helper text.
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          decoration: BoxDecoration(
+            color: AppColors.offWhite,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: BlobSelector(
+            selectedFeeling: _pickedFeeling,
+            onFeelingSelected: _onFeelingSelected,
+          ),
+        ),
+        if (commentsEnabled) ...[
+          const SizedBox(height: 12),
+          if (!_noteExpanded)
+            LumiTextButton(
+              onPressed: () => setState(() => _noteExpanded = true),
+              text: 'Add a note',
+              icon: Icons.edit_note,
+            )
+          else
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.offWhite,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CommentChips(
+                    selectedComments: _selectedComments,
+                    onCommentsChanged: (comments) =>
+                        setState(() => _selectedComments = comments),
+                    categories: settings!.effectivePresets.isNotEmpty
+                        ? settings.effectivePresets
+                        : null,
+                  ),
+                  if (settings.freeTextEnabled) ...[
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _noteController,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        hintText: 'Anything else to add? (optional)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+        ],
+        const SizedBox(height: 20),
+        LumiPrimaryButton(
+          onPressed: _finishFollowUp,
+          text: 'Done',
+          isFullWidth: true,
+          icon: Icons.check,
+        ),
+      ],
     );
   }
 }

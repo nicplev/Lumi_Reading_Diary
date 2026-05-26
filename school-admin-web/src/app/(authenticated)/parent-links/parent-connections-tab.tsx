@@ -41,8 +41,20 @@ export function ParentConnectionsTab() {
   const columns: DataTableColumn<SerializedParent>[] = [
     {
       id: 'name',
-      header: 'Parent Name',
+      header: 'Guardian Name',
       accessorFn: (row) => row.fullName,
+      sortable: true,
+    },
+    {
+      id: 'relationship',
+      header: 'Relationship',
+      accessorFn: (row) => row.relationshipLabel ?? '',
+      cell: (value) =>
+        value ? (
+          <Badge variant="default">{value as string}</Badge>
+        ) : (
+          <span className="text-text-secondary text-sm">—</span>
+        ),
       sortable: true,
     },
     {

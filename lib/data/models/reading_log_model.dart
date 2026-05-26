@@ -305,6 +305,5 @@ class ReadingLogModel {
 
   /// Human-friendly attribution for "Logged by …" surfaces. Prefers the
   /// relationship label, falls back to the name, then a generic term.
-  String get loggedByDisplay =>
-      loggedByLabel ?? loggedByName ?? 'Guardian';
+  String get loggedByDisplay => loggedByLabel ?? loggedByName ?? 'Guardian';
 }
