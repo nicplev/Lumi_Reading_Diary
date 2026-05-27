@@ -1,6 +1,14 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Healthcheck doc read by every client every ~30s as the L3 probe.
+    // Tiny, public to signed-in users, never written from the client.
+    // Seed once via an admin script: `_meta/healthcheck = { version: 1 }`.
+    match /_meta/healthcheck {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
     function isSignedIn() {
       return request.auth != null;
     }

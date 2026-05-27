@@ -10,7 +10,12 @@ import 'core/theme/app_theme.dart';
 import 'core/routing/app_router.dart';
 import 'core/services/app_check_service.dart';
 import 'core/services/dev_access_service.dart';
+import 'core/services/remote_message_controller.dart';
+import 'core/services/service_status_controller.dart';
 import 'core/widgets/impersonation_overlay.dart';
+import 'core/widgets/remote_message_overlay.dart';
+import 'core/widgets/service_status_overlay.dart';
+import 'data/providers/remote_message_provider.dart';
 import 'services/firebase_service.dart';
 import 'services/notification_service.dart';
 import 'services/crash_reporting_service.dart';
@@ -74,6 +79,26 @@ void main() async {
       // Initialize iOS home screen widget data bridge
       await WidgetDataService.initialize();
 
+      // Bring up the layered service-status probe before any UI mounts so
+      // the first probe is already in flight by the time the splash screen
+      // renders. Non-fatal — the controller defaults to `unknown` on
+      // failure and the banner suppresses itself.
+      try {
+        await ServiceStatusController.instance.initialize();
+      } catch (e) {
+        debugPrint('Warning: ServiceStatusController init failed: $e');
+      }
+
+      // Bring up the out-of-band remote-message client. No-op unless
+      // `LUMI_STATUS_WORKER_URL` was supplied at build time.
+      if (isRemoteMessageConfigured) {
+        try {
+          await RemoteMessageController.instance.initialize();
+        } catch (e) {
+          debugPrint('Warning: RemoteMessageController init failed: $e');
+        }
+      }
+
       // Configure Flutter Animate
       Animate.restartOnHotReload = true;
 
@@ -104,8 +129,13 @@ class LumiApp extends ConsumerWidget {
       darkTheme: AppTheme.darkTheme(),
       themeMode: ThemeMode.light,
       routerConfig: router,
-      builder: (context, child) =>
-          ImpersonationOverlay(child: child ?? const SizedBox.shrink()),
+      builder: (context, child) => RemoteMessageOverlay(
+        child: ServiceStatusOverlay(
+          child: ImpersonationOverlay(
+            child: child ?? const SizedBox.shrink(),
+          ),
+        ),
+      ),
     );
   }
 }
