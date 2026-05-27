@@ -29,6 +29,7 @@ import '../../screens/parent/reading_history_screen.dart';
 import '../../screens/parent/student_goals_screen.dart';
 import '../../screens/parent/achievements_screen.dart';
 import '../../screens/parent/offline_management_screen.dart';
+import '../../screens/shared/service_status_screen.dart';
 import '../../screens/parent/student_report_screen.dart';
 import '../../screens/parent/parent_profile_screen.dart';
 import '../../screens/parent/book_browser_screen.dart';
@@ -347,6 +348,12 @@ class AppRouter {
         builder: (context, state) {
           return const OfflineManagementScreen();
         },
+      ),
+
+      GoRoute(
+        path: '/settings/service-status',
+        name: 'service-status',
+        builder: (context, state) => const ServiceStatusScreen(),
       ),
 
       GoRoute(

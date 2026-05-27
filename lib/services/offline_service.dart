@@ -2,10 +2,13 @@ import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'dart:async';
+import '../core/models/service_status.dart';
+import '../core/services/service_status_controller.dart';
 import '../data/models/reading_log_model.dart';
 import '../data/models/student_model.dart';
 import '../data/models/allocation_model.dart';
 import 'firebase_service.dart';
+import 'reading_log_service.dart';
 
 class OfflineService {
   static OfflineService? _instance;
@@ -21,11 +24,14 @@ class OfflineService {
   late Box<Map> _settingsBox;
   // Rec 5a: in-progress reading-log wizard drafts, keyed by studentId.
   late Box<Map> _logDraftsBox;
+  late Box<dynamic> _serviceMetaBox;
 
   // Connectivity
   final Connectivity _connectivity = Connectivity();
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  StreamSubscription<ServiceStatusSnapshot>? _serviceStatusSubscription;
   bool _isOnline = true;
+  ServiceStatus _lastObservedStatus = ServiceStatus.unknown;
 
   // Initialization flag
   bool _initialized = false;
@@ -35,9 +41,26 @@ class OfflineService {
   Timer? _syncTimer;
   bool _isSyncing = false;
 
+  /// Broadcasts the current pending queue whenever it mutates. Drives the
+  /// `pendingSyncProvider` so the global banner and detail sheet update
+  /// live.
+  final StreamController<List<PendingSync>> _queueController =
+      StreamController<List<PendingSync>>.broadcast();
+
+  /// Broadcasts the timestamp of the most recent fully-successful drain.
+  final StreamController<DateTime?> _lastSyncController =
+      StreamController<DateTime?>.broadcast();
+
   // Getters
   bool get isOnline => _isOnline;
-  List<PendingSync> get pendingSyncs => _syncQueue;
+  List<PendingSync> get pendingSyncs => List.unmodifiable(_syncQueue);
+  Stream<List<PendingSync>> get queueStream => _queueController.stream;
+  Stream<DateTime?> get lastSyncStream => _lastSyncController.stream;
+  DateTime? get lastSuccessfulSyncAt {
+    if (!_initialized) return null;
+    final raw = _serviceMetaBox.get('lastSuccessfulSyncAt');
+    return raw is String ? DateTime.tryParse(raw) : null;
+  }
 
   Future<void> initialize() async {
     try {
@@ -48,6 +71,7 @@ class OfflineService {
       _pendingSyncBox = await Hive.openBox<Map>('pending_sync');
       _settingsBox = await Hive.openBox<Map>('settings');
       _logDraftsBox = await Hive.openBox<Map>('log_drafts');
+      _serviceMetaBox = await Hive.openBox<dynamic>('service_meta');
 
       // Load pending syncs
       _loadPendingSyncs();
@@ -58,6 +82,13 @@ class OfflineService {
       // Listen to connectivity changes
       _connectivitySubscription =
           _connectivity.onConnectivityChanged.listen(_handleConnectivityChange);
+
+      // Listen to layered status — covers the Firebase-recovered case
+      // where device connectivity hasn't changed but Firestore is reachable
+      // again. The sync is coalesced via `_isSyncing` so the connectivity
+      // trigger and this one can't fire concurrently.
+      _serviceStatusSubscription =
+          ServiceStatusController.instance.stream.listen(_handleServiceStatus);
 
       // Start sync timer
       _startSyncTimer();
@@ -115,6 +146,15 @@ class OfflineService {
     }
   }
 
+  void _handleServiceStatus(ServiceStatusSnapshot snapshot) {
+    final wasUnhealthy = _lastObservedStatus != ServiceStatus.healthy;
+    _lastObservedStatus = snapshot.status;
+    if (wasUnhealthy && snapshot.status == ServiceStatus.healthy) {
+      debugPrint('Firebase reachable again, draining pending queue...');
+      unawaited(_syncPendingData());
+    }
+  }
+
   void _startSyncTimer() {
     _syncTimer?.cancel();
     _syncTimer = Timer.periodic(const Duration(minutes: 5), (_) {
@@ -130,30 +170,97 @@ class OfflineService {
       final data = _pendingSyncBox.get(key) as Map;
       _syncQueue.add(PendingSync.fromMap(Map<String, dynamic>.from(data)));
     }
+    _broadcastQueue();
   }
 
-  // Save reading log locally
+  void _broadcastQueue() {
+    if (_queueController.isClosed) return;
+    _queueController.add(List.unmodifiable(_syncQueue));
+  }
+
+  /// Externally callable sync trigger — used by the "Try syncing now"
+  /// button on the service-status sheet. Coalesces with an in-flight sync.
+  Future<void> triggerSync() => _syncPendingData();
+
+  Future<void> _enqueueAndPersist(PendingSync sync) async {
+    await _pendingSyncBox.put(sync.id, sync.toMap());
+    _syncQueue.add(sync);
+    _broadcastQueue();
+  }
+
+  /// Save reading log locally AND queue it for sync. Callers only invoke
+  /// this from the offline-fallback path, so queuing is unconditional —
+  /// `_isOnline` (a pure connectivity check) is too narrow now that
+  /// `ServiceStatusController.canWriteToFirebase` also covers
+  /// `firebaseDown` and `degraded`.
   Future<void> saveReadingLogLocally(ReadingLogModel log) async {
     try {
       await _readingLogsBox.put(log.id, log.toLocal());
-
-      // Add to sync queue if offline
-      if (!_isOnline) {
-        final pendingSync = PendingSync(
-          id: log.id,
-          type: SyncType.readingLog,
-          action: SyncAction.create,
-          data: log.toLocal(),
-          createdAt: DateTime.now(),
-        );
-
-        await _pendingSyncBox.put(pendingSync.id, pendingSync.toMap());
-        _syncQueue.add(pendingSync);
-      }
+      await _enqueueAndPersist(PendingSync(
+        id: log.id,
+        type: SyncType.readingLog,
+        action: SyncAction.create,
+        data: log.toLocal(),
+        createdAt: DateTime.now(),
+      ));
     } catch (e) {
       debugPrint('Error saving reading log locally: $e');
       rethrow;
     }
+  }
+
+  /// Queue a parent-comment attach. The log itself may already exist in
+  /// Firestore (online when logged, comment added offline) or also be
+  /// queued (both offline) — the drain sorts so the log creates first.
+  Future<void> enqueueParentComment({
+    required String logId,
+    required String schoolId,
+    required List<String> selections,
+    required String? freeText,
+    required String composedComment,
+  }) async {
+    final sync = PendingSync(
+      id: 'comment_$logId',
+      type: SyncType.parentComment,
+      action: SyncAction.update,
+      data: {
+        'logId': logId,
+        'schoolId': schoolId,
+        'selections': selections,
+        'freeText': freeText,
+        'composedComment': composedComment,
+      },
+      createdAt: DateTime.now(),
+    );
+    await _enqueueAndPersist(sync);
+  }
+
+  /// Queue a parent-preferences update. Dedupes — multiple offline edits
+  /// to the same parent collapse to the latest values.
+  Future<void> enqueueParentPrefs({
+    required String parentId,
+    required String schoolId,
+    required Map<String, dynamic> preferences,
+  }) async {
+    final syncId = 'prefs_$parentId';
+    final existing =
+        _syncQueue.indexWhere((p) => p.id == syncId && p.type == SyncType.parentPrefs);
+    if (existing >= 0) {
+      _syncQueue.removeAt(existing);
+      await _pendingSyncBox.delete(syncId);
+    }
+    final sync = PendingSync(
+      id: syncId,
+      type: SyncType.parentPrefs,
+      action: SyncAction.update,
+      data: {
+        'parentId': parentId,
+        'schoolId': schoolId,
+        'preferences': preferences,
+      },
+      createdAt: DateTime.now(),
+    );
+    await _enqueueAndPersist(sync);
   }
 
   // Get local reading logs
@@ -284,7 +391,13 @@ class OfflineService {
     final firebaseService = FirebaseService.instance;
     final syncedItems = <String>[];
 
-    for (final pendingSync in List.from(_syncQueue)) {
+    // Drain in priority order: reading-log creates first (so dependent
+    // comment writes have a doc to target), then comments, then prefs,
+    // then any other types in their natural order.
+    final ordered = List<PendingSync>.from(_syncQueue)
+      ..sort((a, b) => _syncPriority(a.type).compareTo(_syncPriority(b.type)));
+
+    for (final pendingSync in ordered) {
       try {
         switch (pendingSync.type) {
           case SyncType.readingLog:
@@ -295,6 +408,12 @@ class OfflineService {
             break;
           case SyncType.allocation:
             await _syncAllocation(pendingSync, firebaseService);
+            break;
+          case SyncType.parentComment:
+            await _syncParentComment(pendingSync, firebaseService);
+            break;
+          case SyncType.parentPrefs:
+            await _syncParentPrefs(pendingSync, firebaseService);
             break;
         }
 
@@ -322,7 +441,31 @@ class OfflineService {
     }
 
     _isSyncing = false;
+    if (syncedItems.isNotEmpty) {
+      final now = DateTime.now();
+      await _serviceMetaBox.put(
+          'lastSuccessfulSyncAt', now.toIso8601String());
+      if (!_lastSyncController.isClosed) _lastSyncController.add(now);
+    }
+    _broadcastQueue();
     debugPrint('Sync completed. Remaining items: ${_syncQueue.length}');
+  }
+
+  /// Lower number → drained earlier. Reading-log creates must precede any
+  /// parent-comment updates that target the same log.
+  int _syncPriority(SyncType type) {
+    switch (type) {
+      case SyncType.readingLog:
+        return 0;
+      case SyncType.parentComment:
+        return 1;
+      case SyncType.student:
+        return 2;
+      case SyncType.allocation:
+        return 3;
+      case SyncType.parentPrefs:
+        return 4;
+    }
   }
 
   Future<void> _syncReadingLog(
@@ -376,6 +519,65 @@ class OfflineService {
       isOfflineCreated: false,
     );
     await _readingLogsBox.put(log.id, syncedLog.toLocal());
+
+    // Replay the stats transaction for offline-created logs. Without this,
+    // queued logs reached Firestore but streaks and freeze counters never
+    // advanced (latent pre-redesign bug).
+    if (pendingSync.action == SyncAction.create) {
+      await ReadingLogService.instance.recomputeStatsAfterSync(syncedLog);
+    }
+  }
+
+  Future<void> _syncParentComment(
+    PendingSync pendingSync,
+    FirebaseService firebaseService,
+  ) async {
+    final logId = pendingSync.data['logId'] as String?;
+    final schoolId = pendingSync.data['schoolId'] as String?;
+    if (logId == null || schoolId == null) {
+      throw Exception('Missing logId/schoolId for parent comment sync');
+    }
+    final selections =
+        (pendingSync.data['selections'] as List?)?.cast<String>() ??
+            const <String>[];
+    final freeText = pendingSync.data['freeText'] as String?;
+    final composed = pendingSync.data['composedComment'] as String?;
+
+    final logRef = firebaseService.firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('readingLogs')
+        .doc(logId);
+
+    await logRef.update({
+      'parentCommentSelections': selections,
+      'parentCommentFreeText':
+          (freeText != null && freeText.isNotEmpty) ? freeText : null,
+      'parentComment':
+          (composed != null && composed.isNotEmpty) ? composed : null,
+    });
+  }
+
+  Future<void> _syncParentPrefs(
+    PendingSync pendingSync,
+    FirebaseService firebaseService,
+  ) async {
+    final parentId = pendingSync.data['parentId'] as String?;
+    final schoolId = pendingSync.data['schoolId'] as String?;
+    final prefs = pendingSync.data['preferences'];
+    if (parentId == null || schoolId == null || prefs is! Map) {
+      throw Exception('Missing parentId/schoolId/preferences for prefs sync');
+    }
+
+    final parentRef = firebaseService.firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('parents')
+        .doc(parentId);
+
+    await parentRef.update({
+      'preferences': Map<String, dynamic>.from(prefs),
+    });
   }
 
   /// Resolve conflicts when syncing reading logs
@@ -521,7 +723,10 @@ class OfflineService {
 
   void dispose() {
     _connectivitySubscription?.cancel();
+    _serviceStatusSubscription?.cancel();
     _syncTimer?.cancel();
+    if (!_queueController.isClosed) _queueController.close();
+    if (!_lastSyncController.isClosed) _lastSyncController.close();
   }
 }
 
@@ -530,6 +735,8 @@ enum SyncType {
   readingLog,
   student,
   allocation,
+  parentComment,
+  parentPrefs,
 }
 
 enum SyncAction {
