@@ -246,6 +246,12 @@ class ServiceStatusController with WidgetsBindingObserver {
           .get(const GetOptions(source: Source.server))
           .timeout(_probeTimeout);
       l3 = true;
+    } on FirebaseException catch (e) {
+      // `permission-denied` means Firestore answered — the user just isn't
+      // authenticated yet (the healthcheck rule requires `auth != null`).
+      // That's still proof the backend is reachable, so treat it as L3 OK
+      // rather than flashing "Lumi service unavailable" on the splash.
+      l3 = e.code == 'permission-denied';
     } catch (_) {
       l3 = false;
     }

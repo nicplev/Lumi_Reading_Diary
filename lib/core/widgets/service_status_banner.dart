@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers/service_status_provider.dart';
 import '../models/service_status.dart';
+import '../routing/app_router.dart' show rootNavigatorKey;
 import '../theme/app_colors.dart';
 import 'service_status_sheet.dart';
 
@@ -92,8 +93,14 @@ class ServiceStatusBanner extends ConsumerWidget {
   }
 
   void _open(BuildContext context) {
+    // The banner is mounted by `MaterialApp.router.builder` *above* the
+    // Navigator, so its own context has no Navigator ancestor. Route the
+    // modal through the root navigator's overlay (always a Navigator
+    // descendant) to avoid the "context does not include a Navigator" crash.
+    final navContext = rootNavigatorKey.currentState?.overlay?.context;
+    if (navContext == null) return;
     showModalBottomSheet<void>(
-      context: context,
+      context: navContext,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => const ServiceStatusSheet(),
