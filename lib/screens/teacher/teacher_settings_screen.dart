@@ -513,6 +513,12 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
                   label: 'Sync Status',
                   trailing: _buildSyncStatusTrailing(),
                 ),
+                TeacherSettingsItem(
+                  icon: Icons.network_check,
+                  iconBgColor: AppColors.skyBlue,
+                  label: 'Connection status',
+                  onTap: () => context.push('/settings/service-status'),
+                ),
               ],
             )
                 .animate()

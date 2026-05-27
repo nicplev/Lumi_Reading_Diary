@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
+import '../core/services/service_status_controller.dart';
 import '../data/models/allocation_model.dart';
 import '../data/models/reading_log_model.dart';
 import '../data/models/student_model.dart';
@@ -215,7 +216,7 @@ class ReadingLogService {
     ReadingLogModel log, {
     StudentModel? student,
   }) async {
-    if (OfflineService.instance.isOnline) {
+    if (ServiceStatusController.instance.current.canWriteToFirebase) {
       final logData = log.toFirestore();
       // Server timestamp for an accurate audit trail (teachers can see the
       // exact submission time).
@@ -276,6 +277,10 @@ class ReadingLogService {
   }
 
   /// Patches parent-comment fields onto an already-saved log document.
+  ///
+  /// Queues the update locally when Firebase isn't writable so a parent
+  /// can leave a comment offline and have it land when reconnection
+  /// happens, rather than losing what they typed.
   Future<void> attachComment(
     ReadingLogModel log, {
     List<String> selections = const [],
@@ -284,11 +289,31 @@ class ReadingLogService {
     final trimmed = freeText?.trim();
     final hasFreeText = trimmed != null && trimmed.isNotEmpty;
     final commentText = _composeComment(selections, trimmed);
+
+    if (!ServiceStatusController.instance.current.canWriteToFirebase) {
+      await OfflineService.instance.enqueueParentComment(
+        logId: log.id,
+        schoolId: log.schoolId,
+        selections: selections,
+        freeText: hasFreeText ? trimmed : null,
+        composedComment: commentText,
+      );
+      return;
+    }
+
     await _logRef(log).update({
       'parentCommentSelections': selections,
       'parentCommentFreeText': hasFreeText ? trimmed : null,
       'parentComment': commentText.isNotEmpty ? commentText : null,
     });
+  }
+
+  /// Replays the stats transaction for a log that was just synced from
+  /// the offline queue. Public for [OfflineService] to call — kept
+  /// out-of-band so the private [_updateStudentStats] still drives the
+  /// online write path.
+  Future<void> recomputeStatsAfterSync(ReadingLogModel log) async {
+    await _updateStudentStats(log);
   }
 
   DocumentReference<Map<String, dynamic>> _logRef(ReadingLogModel log) {

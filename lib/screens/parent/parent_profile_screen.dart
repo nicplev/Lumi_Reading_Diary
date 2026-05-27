@@ -18,8 +18,10 @@ import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/student_link_code_model.dart';
 import '../../data/providers/active_child_provider.dart';
+import '../../core/services/service_status_controller.dart';
 import '../../services/firebase_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/offline_service.dart';
 import '../../services/parent_linking_service.dart';
 import '../../core/widgets/lumi/feedback_widget.dart';
 
@@ -126,27 +128,46 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
       _isLoading = true;
     });
 
-    try {
-      // Save to Firestore (including reminder days)
-      await _firebaseService.firestore
-          .collection('schools')
-          .doc(widget.user.schoolId)
-          .collection('parents')
-          .doc(widget.user.id)
-          .update({
-        'preferences': {
-          'notificationsEnabled': _notificationsEnabled,
-          'reminderTime': '${_reminderTime.hour}:${_reminderTime.minute}',
-          'reminderDays': _reminderDays, // [] = every day
-        },
-      });
+    final prefs = <String, dynamic>{
+      'notificationsEnabled': _notificationsEnabled,
+      'reminderTime': '${_reminderTime.hour}:${_reminderTime.minute}',
+      'reminderDays': _reminderDays, // [] = every day
+    };
+    final schoolId = widget.user.schoolId;
 
-      // Sync local notifications
+    try {
+      if (ServiceStatusController.instance.current.canWriteToFirebase) {
+        await _firebaseService.firestore
+            .collection('schools')
+            .doc(schoolId)
+            .collection('parents')
+            .doc(widget.user.id)
+            .update({'preferences': prefs});
+      } else if (schoolId != null) {
+        // Queue for sync — the parent's choice is local-first, so the
+        // notification reschedule below still happens and the value
+        // lands in Firestore the moment Firebase is reachable again.
+        await OfflineService.instance.enqueueParentPrefs(
+          parentId: widget.user.id,
+          schoolId: schoolId,
+          preferences: prefs,
+        );
+      }
+
+      // Sync local notifications regardless — these don't depend on
+      // Firestore and the user expects their reminder change to take
+      // effect immediately.
       await _syncLocalNotifications();
 
       if (mounted) {
+        final queued =
+            !ServiceStatusController.instance.current.canWriteToFirebase;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Preferences updated')),
+          SnackBar(
+            content: Text(queued
+                ? 'Saved — will sync when reconnected'
+                : 'Preferences updated'),
+          ),
         );
       }
     } catch (e) {
@@ -1190,6 +1211,12 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
                         userRole: widget.user.role.name,
                       );
                     },
+                  ),
+                  _buildSettingsRow(
+                    Icons.network_check,
+                    'Connection status',
+                    subtitle: 'Diagnostics for Lumi service & sync',
+                    onTap: () => context.push('/settings/service-status'),
                   ),
                   _buildSettingsRow(
                     Icons.privacy_tip_outlined,
