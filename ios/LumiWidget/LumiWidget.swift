@@ -10,11 +10,14 @@ struct LumiWidget: Widget {
         StaticConfiguration(kind: Self.kind, provider: LumiWidgetProvider()) { entry in
             if #available(iOS 17.0, *) {
                 LumiWidgetEntryView(entry: entry)
-                    .containerBackground(.fill.tertiary, for: .widget)
+                    .containerBackground(for: .widget) {
+                        LumiWidgetEntryView.backgroundFor(entry)
+                    }
             } else {
-                LumiWidgetEntryView(entry: entry)
-                    .padding()
-                    .background()
+                ZStack {
+                    LumiWidgetEntryView.backgroundFor(entry)
+                    LumiWidgetEntryView(entry: entry)
+                }
             }
         }
         .configurationDisplayName("Lumi Reading")

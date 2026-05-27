@@ -23,35 +23,33 @@ struct LumiWidgetEntryView: View {
     var entry: LumiWidgetEntry
 
     var body: some View {
-        ZStack {
-            backgroundView
-            contentView
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-        }
-        .widgetURL(tapURL)
+        contentView
+            .widgetURL(tapURL)
     }
 
-    // MARK: Background — two-tone Lumi gradients per mode
+    // MARK: Background — exposed as a static builder so LumiWidget can pass it
+    // into `.containerBackground(for: .widget)` (iOS 17+), where it fills the
+    // entire widget surface edge-to-edge. On iOS 14–16 it's stacked underneath
+    // the content via a ZStack in LumiWidget.swift.
 
     @ViewBuilder
-    private var backgroundView: some View {
+    static func backgroundFor(_ entry: LumiWidgetEntry) -> some View {
         switch entry.displayMode {
         case .reminder:
             LinearGradient(
-                colors: [Color.lumiOffWhite, Color.lumiRosePink.opacity(0.10)],
+                colors: [Color.lumiOffWhite, Color.lumiRosePink.opacity(0.22)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
         case .celebrating:
             LinearGradient(
-                colors: [Color.lumiMint.opacity(0.55), Color.lumiOffWhite],
+                colors: [Color.lumiMint.opacity(0.70), Color.lumiOffWhite],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
         case .streakAtRisk:
             LinearGradient(
-                colors: [Color.lumiAmber.opacity(0.35), Color.lumiOrange.opacity(0.15)],
+                colors: [Color.lumiAmber.opacity(0.45), Color.lumiOrange.opacity(0.20)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -76,22 +74,23 @@ struct LumiWidgetEntryView: View {
     // MARK: Header — avatar + name/subtitle + streak chip
 
     private var headerRow: some View {
-        HStack(alignment: .center, spacing: 8) {
+        HStack(alignment: .center, spacing: 6) {
             avatar
             VStack(alignment: .leading, spacing: -1) {
                 Text(entry.firstName)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundColor(.lumiCharcoal)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(0.7)
                 Text(modeSubtitle)
-                    .font(.system(size: 8.5, weight: .semibold, design: .rounded))
-                    .tracking(0.4)
+                    .font(.system(size: 8, weight: .semibold, design: .rounded))
+                    .tracking(0.3)
                     .textCase(.uppercase)
                     .foregroundColor(subtitleColor)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
-            Spacer(minLength: 4)
+            Spacer(minLength: 2)
             // In celebrating mode the streak moves into the hero, so we hide the chip here
             if entry.displayMode != .celebrating && entry.currentStreak > 0 {
                 streakChip
@@ -103,25 +102,25 @@ struct LumiWidgetEntryView: View {
         Image(entry.characterId)
             .resizable()
             .aspectRatio(contentMode: .fit)
-            .frame(width: 30, height: 30)
+            .frame(width: 26, height: 26)
             .clipShape(Circle())
             .overlay(
                 Circle()
-                    .stroke(Color.white.opacity(0.9), lineWidth: 1.5)
+                    .stroke(Color.white.opacity(0.9), lineWidth: 1.2)
             )
-            .shadow(color: Color.lumiCharcoal.opacity(0.10), radius: 3, x: 0, y: 1)
+            .shadow(color: Color.lumiCharcoal.opacity(0.10), radius: 2.5, x: 0, y: 1)
     }
 
     private var streakChip: some View {
-        HStack(spacing: 3) {
+        HStack(spacing: 2) {
             Text("🔥")
-                .font(.system(size: 10))
+                .font(.system(size: 9))
             Text("\(entry.currentStreak)")
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .font(.system(size: 10, weight: .bold, design: .rounded))
                 .foregroundColor(.lumiCharcoal)
         }
-        .padding(.horizontal, 7)
-        .padding(.vertical, 3)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2.5)
         .background(
             Capsule()
                 .fill(Color.white.opacity(0.92))
@@ -135,9 +134,9 @@ struct LumiWidgetEntryView: View {
 
     private var modeSubtitle: String {
         switch entry.displayMode {
-        case .reminder:      return "Today's read"
-        case .celebrating:   return "Done for today"
-        case .streakAtRisk:  return "Streak at risk"
+        case .reminder:      return "Reading"
+        case .celebrating:   return "All done"
+        case .streakAtRisk:  return "Don't break it"
         }
     }
 
@@ -284,7 +283,7 @@ struct LumiWidgetEntryView: View {
     private var ctaLabel: String {
         switch entry.displayMode {
         case .reminder:     return "Log reading"
-        case .celebrating:  return "View progress"
+        case .celebrating:  return "View today"
         case .streakAtRisk: return "Log now"
         }
     }
