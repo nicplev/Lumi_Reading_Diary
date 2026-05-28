@@ -216,25 +216,16 @@ class ServiceStatusController with WidgetsBindingObserver {
       return snap;
     }
 
-    // L2 — public internet HEAD. We deliberately don't depend on Firebase
-    // here so this layer remains meaningful during a Firebase outage.
-    bool l2;
-    try {
-      final resp = await _http.head(_internetProbeUrl).timeout(_probeTimeout);
-      l2 = resp.statusCode < 500;
-    } catch (_) {
-      l2 = false;
-    }
-    if (!l2) {
-      final snap = _buildSnapshot(
-        status: ServiceStatus.offline,
-        deviceConnected: true,
-        internetReachable: false,
-        firebaseReachable: false,
-      );
-      _emit(snap);
-      return snap;
-    }
+    // L2 (public internet HEAD) runs in parallel with L3. L3 is the
+    // authoritative answer to "can we talk to the backend"; L2 is only
+    // consulted when L3 fails so we can tell `offline` from `firebaseDown`.
+    // Running L2 concurrently means we never block the happy path on a
+    // network that quietly drops 1.1.1.1 traffic.
+    final l2Future = _http
+        .head(_internetProbeUrl)
+        .timeout(_probeTimeout)
+        .then<bool>((resp) => resp.statusCode < 500)
+        .catchError((_) => false);
 
     // L3 — Firestore healthcheck doc, server-source forced so we don't
     // get a stale cache hit and miss the outage.
@@ -257,24 +248,29 @@ class ServiceStatusController with WidgetsBindingObserver {
     }
     l3Stopwatch.stop();
 
-    if (!l3) {
+    if (l3) {
+      // Authoritative — Firebase responded, so we're online. Don't await
+      // L2; whatever it ends up reporting can't change the verdict.
+      final degraded = l3Stopwatch.elapsed > _degradedThreshold;
       final snap = _buildSnapshot(
-        status: ServiceStatus.firebaseDown,
+        status: degraded ? ServiceStatus.degraded : ServiceStatus.healthy,
         deviceConnected: true,
         internetReachable: true,
-        firebaseReachable: false,
+        firebaseReachable: true,
         latency: l3Stopwatch.elapsed,
       );
       _emit(snap);
       return snap;
     }
 
-    final degraded = l3Stopwatch.elapsed > _degradedThreshold;
+    // L3 failed — fall back to L2 to disambiguate `firebaseDown` (internet
+    // up, Firebase down) from a genuinely offline device.
+    final l2 = await l2Future;
     final snap = _buildSnapshot(
-      status: degraded ? ServiceStatus.degraded : ServiceStatus.healthy,
+      status: l2 ? ServiceStatus.firebaseDown : ServiceStatus.offline,
       deviceConnected: true,
-      internetReachable: true,
-      firebaseReachable: true,
+      internetReachable: l2,
+      firebaseReachable: false,
       latency: l3Stopwatch.elapsed,
     );
     _emit(snap);
