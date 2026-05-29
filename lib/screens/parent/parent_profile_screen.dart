@@ -61,6 +61,11 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
   void initState() {
     super.initState();
     _relationshipLabel = widget.user.relationshipLabel;
+    // Seed from any value the provider has already resolved. The build-time
+    // ref.listen only fires on *changes*, so without this we miss the data
+    // when another widget (e.g. ParentChildSwitcher) already warmed the stream.
+    _linkedChildren =
+        ref.read(parentChildrenProvider).value ?? const <StudentModel>[];
     _loadPreferences();
   }
 
