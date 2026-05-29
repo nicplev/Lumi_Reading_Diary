@@ -142,6 +142,71 @@ test('parents: parent can create only own profile doc', async () => {
   );
 });
 
+test('users self-update: whitelisted fields succeed, sensitive fields fail', async () => {
+  await seedData(async (db) => {
+    await db.collection('schools').doc('school_1').set({
+      name: 'Lumi School',
+      createdBy: 'admin_1',
+      teacherCount: 1,
+      parentCount: 0,
+      studentCount: 0,
+    });
+    await db.collection('schools').doc('school_1').collection('users').doc('teacher_1').set({
+      role: 'teacher',
+      schoolId: 'school_1',
+      fullName: 'Teacher One',
+    });
+  });
+
+  const teacherDb = authDb('teacher_1');
+  const userRef = teacherDb.collection('schools').doc('school_1').collection('users').doc('teacher_1');
+
+  await assertSucceeds(userRef.update({ preferences: { theme: 'dark' } }));
+  await assertSucceeds(userRef.update({ fcmToken: 'token-abc' }));
+  await assertSucceeds(userRef.update({ lastLoginAt: new Date() }));
+
+  // Sensitive / server-owned fields must be rejected on self-update.
+  await assertFails(userRef.update({ subscriptionTier: 'pro' }));
+  await assertFails(userRef.update({ rateLimit: 1000 }));
+  await assertFails(userRef.update({ quota: { reads: 5000 } }));
+  await assertFails(userRef.update({ stripeCustomerId: 'cus_x' }));
+  await assertFails(userRef.update({ permissions: { admin: true } }));
+  await assertFails(userRef.update({ isActive: false }));
+  // Allowed field bundled with a sensitive one — whole write rejected.
+  await assertFails(userRef.update({ preferences: { theme: 'dark' }, subscriptionTier: 'pro' }));
+});
+
+test('parents self-update: whitelisted fields succeed, sensitive fields fail', async () => {
+  await seedData(async (db) => {
+    await db.collection('schools').doc('school_1').set({
+      name: 'Lumi School',
+      createdBy: 'admin_1',
+      teacherCount: 0,
+      parentCount: 1,
+      studentCount: 0,
+    });
+    await db.collection('schools').doc('school_1').collection('parents').doc('parent_1').set({
+      role: 'parent',
+      schoolId: 'school_1',
+      fullName: 'Parent One',
+      linkedChildren: [],
+    });
+  });
+
+  const parentDb = authDb('parent_1');
+  const parentRef = parentDb.collection('schools').doc('school_1').collection('parents').doc('parent_1');
+
+  await assertSucceeds(parentRef.update({ preferences: { reminderTime: '19:00' } }));
+  await assertSucceeds(parentRef.update({ relationshipLabel: 'Mum' }));
+  await assertSucceeds(parentRef.update({ fcmToken: 'token-xyz' }));
+
+  // Parent must not be able to grant themselves entitlements or alter linking.
+  await assertFails(parentRef.update({ subscriptionStatus: 'active' }));
+  await assertFails(parentRef.update({ isPremium: true }));
+  await assertFails(parentRef.update({ rateLimitOverride: 99999 }));
+  await assertFails(parentRef.update({ linkedChildren: ['student_smuggled'] }));
+});
+
 test('school counters: only role-aligned increments are allowed', async () => {
   await seedData(async (db) => {
     await db.collection('schools').doc('school_1').set({
