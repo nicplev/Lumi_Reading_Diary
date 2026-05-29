@@ -124,6 +124,24 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
         }
       },
     );
+    // Push the new selected child to the iOS widget when the parent switches
+    // children via ParentChildSwitcher. Widgets configured as "Active child in
+    // app" pick this up; widgets pinned to a specific child via the iOS
+    // configuration intent ignore it.
+    ref.listen<String?>(
+      activeChildIdProvider,
+      (_, __) {
+        final children = ref.read(parentChildrenProvider).value;
+        if (children == null || children.isEmpty) return;
+        WidgetDataService.instance.updateFromChildren(
+          children: children,
+          selectedChildId:
+              ref.read(activeChildProvider).value?.id ?? children.first.id,
+          todaysLogs: const {},
+          parent: widget.user,
+        );
+      },
+    );
 
     return ref.watch(parentChildrenProvider).when(
           loading: () => const Scaffold(

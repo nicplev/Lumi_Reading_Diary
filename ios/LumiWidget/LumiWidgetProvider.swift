@@ -1,41 +1,42 @@
 import WidgetKit
+import AppIntents
 
-// MARK: - Timeline Provider
-
-/// Provides timeline entries to WidgetKit.
-/// Uses `TimelineProvider` (not IntentTimelineProvider) for the base implementation.
-/// The child selection is handled by `SelectChildIntent` (intent definition file)
-/// wired in `LumiWidget.swift`.
-struct LumiWidgetProvider: TimelineProvider {
+/// Drives the configurable Lumi widget. Reads the configured child from
+/// `SelectChildIntent.child` and renders it. When the parent chose the
+/// "Active child in app" sentinel (or hasn't customised the widget),
+/// `child?.id` resolves to the empty string and
+/// `WidgetDataStore.buildEntry(forChildId:)` falls back to the App Group
+/// `selectedChildId`, preserving today's default behaviour.
+struct LumiWidgetIntentProvider: AppIntentTimelineProvider {
+    typealias Intent = SelectChildIntent
+    typealias Entry = LumiWidgetEntry
 
     func placeholder(in context: Context) -> LumiWidgetEntry {
         .placeholder
     }
 
-    func getSnapshot(in context: Context, completion: @escaping (LumiWidgetEntry) -> Void) {
-        completion(WidgetDataStore.buildEntry(forChildId: ""))
+    func snapshot(for configuration: SelectChildIntent, in context: Context) async -> LumiWidgetEntry {
+        WidgetDataStore.buildEntry(forChildId: configuration.child?.id ?? "")
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<LumiWidgetEntry>) -> Void) {
-        let entry = WidgetDataStore.buildEntry(forChildId: "")
-
-        // Schedule the next refresh:
-        //  • If not yet 7pm and the child hasn't read → refresh at 7pm to switch to "streakAtRisk".
-        //  • Otherwise → refresh at midnight so the widget resets for the new day.
-        let calendar = Calendar.current
-        let now = Date()
-
-        let sevenPM = calendar.date(bySettingHour: 19, minute: 0, second: 0, of: now) ?? now
-        let midnight = calendar.startOfDay(for: calendar.date(byAdding: .day, value: 1, to: now) ?? now)
-
-        let nextRefresh: Date
-        if now < sevenPM && !entry.loggedToday {
-            nextRefresh = sevenPM
-        } else {
-            nextRefresh = midnight
-        }
-
-        let timeline = Timeline(entries: [entry], policy: .after(nextRefresh))
-        completion(timeline)
+    func timeline(for configuration: SelectChildIntent, in context: Context) async -> Timeline<LumiWidgetEntry> {
+        let entry = WidgetDataStore.buildEntry(forChildId: configuration.child?.id ?? "")
+        return Timeline(entries: [entry], policy: .after(nextRefreshDate(for: entry)))
     }
+}
+
+// MARK: - Refresh schedule
+
+/// Computes the next timeline refresh point:
+///  • If not yet 7pm and the child hasn't read → refresh at 7pm to switch to "streakAtRisk".
+///  • Otherwise → refresh at midnight so the widget resets for the new day.
+private func nextRefreshDate(for entry: LumiWidgetEntry) -> Date {
+    let calendar = Calendar.current
+    let now = Date()
+    let sevenPM = calendar.date(bySettingHour: 19, minute: 0, second: 0, of: now) ?? now
+    let midnight = calendar.startOfDay(for: calendar.date(byAdding: .day, value: 1, to: now) ?? now)
+    if now < sevenPM && !entry.loggedToday {
+        return sevenPM
+    }
+    return midnight
 }
