@@ -3,22 +3,26 @@ import SwiftUI
 
 // MARK: - Widget Definition
 
+/// The Lumi home screen widget. iOS 17+ only.
+///
+/// Long-press → Edit Widget surfaces the "Choose child" picker defined in
+/// `SelectChildIntent`, letting parents with multiple linked children pin a
+/// widget instance to a specific child. The default sentinel
+/// (`ChildEntity.activeChildSentinel`) keeps the historical behaviour of
+/// following whichever child is currently active in the app.
 struct LumiWidget: Widget {
     static let kind = "LumiWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: Self.kind, provider: LumiWidgetProvider()) { entry in
-            if #available(iOS 17.0, *) {
-                LumiWidgetEntryView(entry: entry)
-                    .containerBackground(for: .widget) {
-                        LumiWidgetEntryView.backgroundFor(entry)
-                    }
-            } else {
-                ZStack {
+        AppIntentConfiguration(
+            kind: Self.kind,
+            intent: SelectChildIntent.self,
+            provider: LumiWidgetIntentProvider()
+        ) { entry in
+            LumiWidgetEntryView(entry: entry)
+                .containerBackground(for: .widget) {
                     LumiWidgetEntryView.backgroundFor(entry)
-                    LumiWidgetEntryView(entry: entry)
                 }
-            }
         }
         .configurationDisplayName("Lumi Reading")
         .description("Track your child's daily reading and streak.")
