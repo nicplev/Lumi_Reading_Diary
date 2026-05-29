@@ -254,8 +254,11 @@ For issues or questions:
    - Define allocation templates
 
 4. **Deploy**
-   - Build for iOS: `flutter build ios`
-   - Build for Android: `flutter build apk`
+   - Build for iOS: `./scripts/flutter-build.sh ios` (or `ipa` for TestFlight)
+   - Build for Android: `./scripts/flutter-build.sh apk` (or `appbundle` for Play)
+   - The wrapper script picks up repo-wide build flags from `.dart_define.json`
+     (e.g. the status-worker URL). Raw `flutter build` works too but won't
+     include those defines.
    - Upload to app stores
 
 ## 📱 Screenshots

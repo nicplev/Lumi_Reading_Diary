@@ -295,11 +295,21 @@ class ServiceStatusController with WidgetsBindingObserver {
   }
 
   void _emit(ServiceStatusSnapshot next) {
-    // Flap suppression: only let `healthy → not-healthy` through after two
-    // consecutive non-healthy probes. Recovery is immediate.
-    if (_current.status == ServiceStatus.healthy &&
-        next.status != ServiceStatus.healthy &&
-        next.status != ServiceStatus.unknown) {
+    // Flap / cold-start suppression: when transitioning from healthy or
+    // the initial `unknown` state into something non-healthy, hold the
+    // emission back until a second probe confirms it. This swallows the
+    // very common cold-start false positive where the first probe runs
+    // before Firestore's SDK / DNS / TLS are warm and times out at 3s.
+    //
+    // We DON'T suppress when the OS itself reports no network
+    // (`deviceConnected = false`) — that's an authoritative signal (e.g.,
+    // airplane mode) and we want the banner up immediately. Recovery to
+    // healthy is also always immediate.
+    final wasHealthyOrUnknown = _current.status == ServiceStatus.healthy ||
+        _current.status == ServiceStatus.unknown;
+    final goingUnhealthy = next.status != ServiceStatus.healthy &&
+        next.status != ServiceStatus.unknown;
+    if (wasHealthyOrUnknown && goingUnhealthy && next.deviceConnected) {
       _consecutiveUnhealthyProbes += 1;
       if (_consecutiveUnhealthyProbes < 2) {
         return;

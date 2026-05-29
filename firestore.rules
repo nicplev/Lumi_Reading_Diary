@@ -172,6 +172,11 @@ service cloud.firestore {
               )
             );
 
+        // Self-updates restricted to a small set of user-owned fields.
+        // Anything outside this list (rate limits, subscription/entitlement
+        // state, role/permissions, MFA verification flags, etc.) must be
+        // written exclusively from a trusted source (Admin SDK in Cloud
+        // Functions or the super-admin backend), bypassing client rules.
         allow update: if isSignedIn() &&
             writeAllowedForDev() &&
             (
@@ -179,7 +184,14 @@ service cloud.firestore {
               (
                 request.auth.uid == userId &&
                 request.resource.data.role == resource.data.role &&
-                request.resource.data.schoolId == resource.data.schoolId
+                request.resource.data.schoolId == resource.data.schoolId &&
+                request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                  'preferences',
+                  'fcmToken',
+                  'fcmTokenUpdatedAt',
+                  'lastLoginAt',
+                  'relationshipLabel',
+                ])
               )
             );
 
@@ -208,6 +220,11 @@ service cloud.firestore {
               )
             );
 
+        // Self-updates restricted to a small set of parent-owned fields.
+        // Anything outside this list (rate limits, subscription/entitlement
+        // state, role, MFA verification flags, linked-children mutations,
+        // etc.) must be written exclusively from a trusted source (Admin SDK
+        // in Cloud Functions or the super-admin backend).
         allow update: if isSignedIn() &&
             writeAllowedForDev() &&
             (
@@ -215,7 +232,14 @@ service cloud.firestore {
               (
                 request.auth.uid == parentId &&
                 request.resource.data.role == resource.data.role &&
-                request.resource.data.schoolId == resource.data.schoolId
+                request.resource.data.schoolId == resource.data.schoolId &&
+                request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                  'preferences',
+                  'fcmToken',
+                  'fcmTokenUpdatedAt',
+                  'lastLoginAt',
+                  'relationshipLabel',
+                ])
               )
             );
 
