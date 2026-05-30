@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 // MARK: - Codable payload structs (mirror the JSON written by WidgetDataService.dart)
 
@@ -35,15 +36,19 @@ struct WidgetDataStore {
             let data = jsonString.data(using: .utf8),
             let payload = try? JSONDecoder().decode(WidgetPayload.self, from: data)
         else {
+            widgetDebugLog.notice("buildEntry — no/invalid payload, returning placeholder. requested childId=\(childId, privacy: .public)")
             return .placeholder
         }
 
         let targetId = childId.isEmpty ? payload.selectedChildId : childId
-        guard let child = payload.children.first(where: { $0.studentId == targetId })
-                          ?? payload.children.first
+        let exactMatch = payload.children.first(where: { $0.studentId == targetId })
+        let availableIds = payload.children.map { $0.studentId }.joined(separator: ",")
+        widgetDebugLog.notice("buildEntry — requested='\(childId, privacy: .public)' resolved targetId='\(targetId, privacy: .public)' exactMatch=\(exactMatch != nil, privacy: .public) availableIds=[\(availableIds, privacy: .public)] selectedChildId='\(payload.selectedChildId, privacy: .public)'")
+        guard let child = exactMatch ?? payload.children.first
         else {
             return .placeholder
         }
+        widgetDebugLog.notice("buildEntry — rendering child id=\(child.studentId, privacy: .public) name=\(child.firstName, privacy: .public)")
 
         // Rec 4: reflect an optimistic widget-intent tap before the Flutter
         // app has reconciled the real Firestore write.

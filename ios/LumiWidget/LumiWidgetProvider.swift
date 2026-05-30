@@ -1,5 +1,17 @@
 import WidgetKit
 import AppIntents
+import os
+
+// MARK: - Diagnostics
+//
+// Temporary debug logging to trace why the configured child sometimes
+// reverts to the active child ~1-2s after Edit Widget commits. View in
+// Console.app filtered by subsystem `com.lumi.lumiReadingTracker.LumiWidget`.
+// TODO: remove once the rehydration / sync race is understood.
+let widgetDebugLog = Logger(
+    subsystem: "com.lumi.lumiReadingTracker.LumiWidget",
+    category: "widget-debug"
+)
 
 /// Drives the configurable Lumi widget. Reads the configured child from
 /// `SelectChildIntent.child` and renders it. When the parent chose the
@@ -16,10 +28,16 @@ struct LumiWidgetIntentProvider: AppIntentTimelineProvider {
     }
 
     func snapshot(for configuration: SelectChildIntent, in context: Context) async -> LumiWidgetEntry {
-        WidgetDataStore.buildEntry(forChildId: configuration.child?.id ?? "")
+        let configuredId = configuration.child?.id ?? "<nil>"
+        let configuredName = configuration.child?.firstName ?? "<nil>"
+        widgetDebugLog.notice("snapshot called — configured child id=\(configuredId, privacy: .public) name=\(configuredName, privacy: .public)")
+        return WidgetDataStore.buildEntry(forChildId: configuration.child?.id ?? "")
     }
 
     func timeline(for configuration: SelectChildIntent, in context: Context) async -> Timeline<LumiWidgetEntry> {
+        let configuredId = configuration.child?.id ?? "<nil>"
+        let configuredName = configuration.child?.firstName ?? "<nil>"
+        widgetDebugLog.notice("timeline called — configured child id=\(configuredId, privacy: .public) name=\(configuredName, privacy: .public)")
         let entry = WidgetDataStore.buildEntry(forChildId: configuration.child?.id ?? "")
         return Timeline(entries: [entry], policy: .after(nextRefreshDate(for: entry)))
     }

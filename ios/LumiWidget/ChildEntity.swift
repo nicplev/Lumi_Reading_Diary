@@ -1,5 +1,6 @@
 import AppIntents
 import SwiftUI
+import os
 
 /// A child the parent has linked to their account. Powers the widget
 /// configuration picker (long-press widget → Edit Widget → "Choose child").
@@ -44,7 +45,8 @@ struct ChildEntity: AppEntity, Identifiable {
 struct ChildEntityQuery: EntityQuery {
     func entities(for identifiers: [ChildEntity.ID]) async throws -> [ChildEntity] {
         let children = WidgetDataStore.allChildren()
-        return identifiers.map { id in
+        widgetDebugLog.notice("entities(for:) called — requested ids=\(identifiers, privacy: .public), allChildren count=\(children.count, privacy: .public)")
+        let result = identifiers.map { id -> ChildEntity in
             if id == ChildEntity.activeChildId {
                 return ChildEntity.activeChildSentinel
             }
@@ -57,6 +59,9 @@ struct ChildEntityQuery: EntityQuery {
             // to the active child at render time.
             return ChildEntity(id: id, firstName: "Unknown")
         }
+        let summary = result.map { "\($0.id):\($0.firstName)" }.joined(separator: ", ")
+        widgetDebugLog.notice("entities(for:) returning — \(summary, privacy: .public)")
+        return result
     }
 
     /// What appears in the picker when the parent opens Edit Widget.
@@ -67,11 +72,14 @@ struct ChildEntityQuery: EntityQuery {
         suggestions.append(contentsOf: WidgetDataStore.allChildren().map {
             ChildEntity(id: $0.id, firstName: $0.name)
         })
+        let summary = suggestions.map { "\($0.id):\($0.firstName)" }.joined(separator: ", ")
+        widgetDebugLog.notice("suggestedEntities returning — \(summary, privacy: .public)")
         return suggestions
     }
 
     /// Pre-selected default when the parent first adds the widget.
     func defaultResult() async -> ChildEntity? {
-        ChildEntity.activeChildSentinel
+        widgetDebugLog.notice("defaultResult() called — returning activeChildSentinel")
+        return ChildEntity.activeChildSentinel
     }
 }
