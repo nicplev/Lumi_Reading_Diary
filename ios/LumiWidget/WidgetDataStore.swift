@@ -40,7 +40,12 @@ struct WidgetDataStore {
             return .placeholder
         }
 
-        let targetId = childId.isEmpty ? payload.selectedChildId : childId
+        // Two sentinels both mean "fall back to App Group selectedChildId":
+        //   • empty string (legacy / explicit "use default")
+        //   • ChildEntity.activeChildId (persisted form of the picker's
+        //     "Active child in app" sentinel entity)
+        let isActiveSentinel = childId.isEmpty || childId == ChildEntity.activeChildId
+        let targetId = isActiveSentinel ? payload.selectedChildId : childId
         let exactMatch = payload.children.first(where: { $0.studentId == targetId })
         let availableIds = payload.children.map { $0.studentId }.joined(separator: ",")
         widgetDebugLog.notice("buildEntry — requested='\(childId, privacy: .public)' resolved targetId='\(targetId, privacy: .public)' exactMatch=\(exactMatch != nil, privacy: .public) availableIds=[\(availableIds, privacy: .public)] selectedChildId='\(payload.selectedChildId, privacy: .public)'")

@@ -11,11 +11,14 @@ import os
 /// A sentinel entity with id `ChildEntity.activeChildId` represents "follow
 /// the active child in the app." It is the default and what the widget shows
 /// before the parent customises anything.
-struct ChildEntity: AppEntity, Identifiable {
+struct ChildEntity: AppEntity, Identifiable, Hashable {
     /// Sentinel ID meaning "use whatever child is currently active in the app."
-    /// Matches the empty-string convention used by `WidgetDataStore.buildEntry`,
-    /// which falls back to `selectedChildId` when given an empty string.
-    static let activeChildId = ""
+    /// Must be a NON-EMPTY string — iOS silently drops entities with empty IDs
+    /// from persisted widget configuration, which makes any picker selection
+    /// revert to `defaultResult()` on the next timeline reload.
+    /// `WidgetDataStore.buildEntry` treats this exact string as the signal to
+    /// fall back to the App Group `selectedChildId`.
+    static let activeChildId = "__lumi_active_child__"
 
     let id: String
     let firstName: String
@@ -34,12 +37,15 @@ struct ChildEntity: AppEntity, Identifiable {
         return DisplayRepresentation(title: LocalizedStringResource(stringLiteral: firstName))
     }
 
-    static var defaultQuery = ChildEntityQuery()
+    static let defaultQuery = ChildEntityQuery()
 
     /// The default sentinel — "follow the in-app active child."
-    static var activeChildSentinel: ChildEntity {
-        ChildEntity(id: activeChildId, firstName: "Active child in app")
-    }
+    /// Stored (not computed) because `SelectChildIntent.@Parameter(default:)`
+    /// requires a compile-time constant.
+    static let activeChildSentinel = ChildEntity(
+        id: activeChildId,
+        firstName: "Active child in app"
+    )
 }
 
 struct ChildEntityQuery: EntityQuery {
