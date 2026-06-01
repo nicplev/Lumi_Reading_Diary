@@ -93,9 +93,15 @@ struct ChildEntityQuery: EnumerableEntityQuery {
         return result
     }
 
-    /// Pre-selected default when the parent first adds the widget.
-    func defaultResult() async -> ChildEntity? {
-        widgetDebugLog.notice("defaultResult() called — returning activeChildSentinel")
-        return ChildEntity.activeChildSentinel
-    }
+    // NOTE: deliberately no `defaultResult()`.
+    //
+    // Returning a non-nil default appears to make Apple's WidgetConfigurationIntent
+    // framework treat the parameter as "always has the default value" and never
+    // persist or rehydrate the user's picker selection (entities(for:) is never
+    // called, defaultResult fires on every reload). Apple's own sample widgets
+    // with EntityQuery omit defaultResult and rely on the @Parameter being
+    // optional. The "follow active child" behaviour for a newly-added widget
+    // (configuration.child == nil) is preserved by the provider's `?? ""`
+    // fallback, which WidgetDataStore.buildEntry interprets as "use the App
+    // Group selectedChildId" (= the in-app active child).
 }
