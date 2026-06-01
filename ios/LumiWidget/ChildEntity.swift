@@ -48,7 +48,30 @@ struct ChildEntity: AppEntity, Identifiable, Hashable {
     )
 }
 
-struct ChildEntityQuery: EntityQuery {
+/// Closed-set query: the picker's options are exactly the sentinel plus the
+/// parent's linked children — nothing else exists, nothing to search for.
+///
+/// `EnumerableEntityQuery` is the documented Apple pattern for closed sets and
+/// it's what enables `WidgetConfigurationIntent` to actually persist picker
+/// selections across timeline reloads. With basic `EntityQuery` iOS treats
+/// `suggestedEntities()` as a hint set and (in practice) discards selections
+/// on reload — `entities(for:)` is never called and the parameter snaps back
+/// to `defaultResult()`. EnumerableEntityQuery gives iOS the full valid set,
+/// so it can commit the chosen id to disk and rehydrate it cleanly.
+struct ChildEntityQuery: EnumerableEntityQuery {
+    /// The complete set of valid entities — sentinel + every linked child.
+    /// iOS uses this to (a) populate the picker, (b) validate a saved entity
+    /// id, and (c) persist the user's selection.
+    func allEntities() async throws -> [ChildEntity] {
+        var all: [ChildEntity] = [ChildEntity.activeChildSentinel]
+        all.append(contentsOf: WidgetDataStore.allChildren().map {
+            ChildEntity(id: $0.id, firstName: $0.name)
+        })
+        let summary = all.map { "\($0.id):\($0.firstName)" }.joined(separator: ", ")
+        widgetDebugLog.notice("allEntities returning — \(summary, privacy: .public)")
+        return all
+    }
+
     func entities(for identifiers: [ChildEntity.ID]) async throws -> [ChildEntity] {
         let children = WidgetDataStore.allChildren()
         widgetDebugLog.notice("entities(for:) called — requested ids=\(identifiers, privacy: .public), allChildren count=\(children.count, privacy: .public)")
@@ -68,19 +91,6 @@ struct ChildEntityQuery: EntityQuery {
         let summary = result.map { "\($0.id):\($0.firstName)" }.joined(separator: ", ")
         widgetDebugLog.notice("entities(for:) returning — \(summary, privacy: .public)")
         return result
-    }
-
-    /// What appears in the picker when the parent opens Edit Widget.
-    /// Starts with the "Active child in app" sentinel, then lists every
-    /// linked child.
-    func suggestedEntities() async throws -> [ChildEntity] {
-        var suggestions: [ChildEntity] = [ChildEntity.activeChildSentinel]
-        suggestions.append(contentsOf: WidgetDataStore.allChildren().map {
-            ChildEntity(id: $0.id, firstName: $0.name)
-        })
-        let summary = suggestions.map { "\($0.id):\($0.firstName)" }.joined(separator: ", ")
-        widgetDebugLog.notice("suggestedEntities returning — \(summary, privacy: .public)")
-        return suggestions
     }
 
     /// Pre-selected default when the parent first adds the widget.
