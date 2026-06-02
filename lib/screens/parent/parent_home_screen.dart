@@ -35,6 +35,7 @@ import '../../services/staff_notification_service.dart';
 import 'reading_history_screen.dart';
 import 'parent_profile_screen.dart';
 import 'widgets/parent_child_switcher.dart';
+import 'widgets/widget_undo_banner.dart';
 
 class ParentHomeScreen extends ConsumerStatefulWidget {
   final UserModel user;
@@ -165,19 +166,33 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                 ref.watch(activeChildProvider).value ?? children.first;
             return Scaffold(
               backgroundColor: AppColors.offWhite,
-              body: IndexedStack(
-                index: _selectedIndex,
+              body: Column(
                 children: [
-                  _buildHomeView(activeChild, children),
-                  ReadingHistoryScreen(
-                    // Re-key on the active child so a switch rebuilds the
-                    // Bookshelf with fresh state instead of stale data.
-                    key: ValueKey(activeChild.id),
-                    studentId: activeChild.id,
-                    parentId: widget.user.id,
-                    schoolId: widget.user.schoolId!,
+                  // In-app undo banner — Layer 2 of the widget undo flow.
+                  // Self-hides when no recent widget commit is in window.
+                  // Sits above the IndexedStack so it's visible on every
+                  // parent tab during the ~5-minute undo window.
+                  const SafeArea(
+                    bottom: false,
+                    child: WidgetUndoBanner(),
                   ),
-                  ParentProfileScreen(user: widget.user),
+                  Expanded(
+                    child: IndexedStack(
+                      index: _selectedIndex,
+                      children: [
+                        _buildHomeView(activeChild, children),
+                        ReadingHistoryScreen(
+                          // Re-key on the active child so a switch rebuilds the
+                          // Bookshelf with fresh state instead of stale data.
+                          key: ValueKey(activeChild.id),
+                          studentId: activeChild.id,
+                          parentId: widget.user.id,
+                          schoolId: widget.user.schoolId!,
+                        ),
+                        ParentProfileScreen(user: widget.user),
+                      ],
+                    ),
+                  ),
                 ],
               ),
               bottomNavigationBar: _buildBottomNav(),

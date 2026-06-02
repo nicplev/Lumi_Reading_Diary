@@ -55,6 +55,7 @@ struct WidgetDataStore {
         let optimisticallyLogged =
             WidgetLogQueue.isOptimisticallyLogged(studentId: child.studentId)
         let effectiveLogged = child.loggedToday || optimisticallyLogged
+        let undoExpiresAt = WidgetLogQueue.undoUntil(studentId: child.studentId)
 
         return LumiWidgetEntry(
             date: Date(),
@@ -65,7 +66,9 @@ struct WidgetDataStore {
             minutesReadToday: child.minutesReadToday,
             targetMinutes: max(child.targetMinutes, 1),
             loggedToday: effectiveLogged,
-            displayMode: effectiveLogged ? .celebrating : displayMode(for: child)
+            displayMode: effectiveLogged ? .celebrating : displayMode(for: child),
+            undoAvailable: undoExpiresAt != nil,
+            undoExpiresAt: undoExpiresAt
         )
     }
 
