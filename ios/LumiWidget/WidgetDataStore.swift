@@ -1,5 +1,4 @@
 import Foundation
-import os
 
 // MARK: - Codable payload structs (mirror the JSON written by WidgetDataService.dart)
 
@@ -36,24 +35,20 @@ struct WidgetDataStore {
             let data = jsonString.data(using: .utf8),
             let payload = try? JSONDecoder().decode(WidgetPayload.self, from: data)
         else {
-            widgetDebugLog.notice("buildEntry — no/invalid payload, returning placeholder. requested childId=\(childId, privacy: .public)")
             return .placeholder
         }
 
         // Two sentinels both mean "fall back to App Group selectedChildId":
-        //   • empty string (legacy / explicit "use default")
+        //   • empty string (provider passes this when configuration.child is nil)
         //   • ChildEntity.activeChildId (persisted form of the picker's
         //     "Active child in app" sentinel entity)
         let isActiveSentinel = childId.isEmpty || childId == ChildEntity.activeChildId
         let targetId = isActiveSentinel ? payload.selectedChildId : childId
-        let exactMatch = payload.children.first(where: { $0.studentId == targetId })
-        let availableIds = payload.children.map { $0.studentId }.joined(separator: ",")
-        widgetDebugLog.notice("buildEntry — requested='\(childId, privacy: .public)' resolved targetId='\(targetId, privacy: .public)' exactMatch=\(exactMatch != nil, privacy: .public) availableIds=[\(availableIds, privacy: .public)] selectedChildId='\(payload.selectedChildId, privacy: .public)'")
-        guard let child = exactMatch ?? payload.children.first
+        guard let child = payload.children.first(where: { $0.studentId == targetId })
+                          ?? payload.children.first
         else {
             return .placeholder
         }
-        widgetDebugLog.notice("buildEntry — rendering child id=\(child.studentId, privacy: .public) name=\(child.firstName, privacy: .public)")
 
         // Rec 4: reflect an optimistic widget-intent tap before the Flutter
         // app has reconciled the real Firestore write.
