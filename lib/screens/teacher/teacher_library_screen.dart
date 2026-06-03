@@ -248,13 +248,13 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
                       assignmentSummary: assignmentSummary,
                     ),
 
-                  const SliverToBoxAdapter(child: SizedBox(height: 100)),
+                  const SliverToBoxAdapter(child: SizedBox(height: 200)),
                 ],
               ),
                 // ── Scan FAB ───────────────────────────────────────────
                 Positioned(
                   right: 16,
-                  bottom: 20,
+                  bottom: MediaQuery.viewPaddingOf(context).bottom + 84,
                   child: FloatingActionButton(
                     heroTag: 'library_add_book_fab',
                     onPressed: _openAddBook,

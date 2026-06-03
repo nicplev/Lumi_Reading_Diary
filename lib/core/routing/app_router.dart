@@ -255,23 +255,19 @@ class AppRouter {
       GoRoute(
         path: '/parent/home',
         name: 'parent-home',
-        builder: (context, state) {
-          final user =
-              state.extra as UserModel? ?? _ref.read(userProvider).value;
-          if (user == null) return const LoginScreen();
-          return ParentHomeScreen(user: user);
-        },
+        builder: (context, state) => _userScopedRoute(
+          extra: state.extra,
+          child: (user) => ParentHomeScreen(user: user),
+        ),
       ),
 
       GoRoute(
         path: '/parent/link-child',
         name: 'link-child',
-        builder: (context, state) {
-          final user =
-              state.extra as UserModel? ?? _ref.read(userProvider).value;
-          if (user == null) return const LoginScreen();
-          return LinkChildScreen(user: user);
-        },
+        builder: (context, state) => _userScopedRoute(
+          extra: state.extra,
+          child: (user) => LinkChildScreen(user: user),
+        ),
       ),
 
       GoRoute(
@@ -372,23 +368,19 @@ class AppRouter {
       GoRoute(
         path: '/parent/profile',
         name: 'parent-profile',
-        builder: (context, state) {
-          final user =
-              state.extra as UserModel? ?? _ref.read(userProvider).value;
-          if (user == null) return const LoginScreen();
-          return ParentProfileScreen(user: user);
-        },
+        builder: (context, state) => _userScopedRoute(
+          extra: state.extra,
+          child: (user) => ParentProfileScreen(user: user),
+        ),
       ),
 
       GoRoute(
         path: '/parent/notifications',
         name: 'parent-notifications',
-        builder: (context, state) {
-          final user =
-              state.extra as UserModel? ?? _ref.read(userProvider).value;
-          if (user == null) return const LoginScreen();
-          return ParentNotificationsScreen(user: user);
-        },
+        builder: (context, state) => _userScopedRoute(
+          extra: state.extra,
+          child: (user) => ParentNotificationsScreen(user: user),
+        ),
       ),
 
       GoRoute(
@@ -433,12 +425,10 @@ class AppRouter {
       GoRoute(
         path: '/teacher/home',
         name: 'teacher-home',
-        builder: (context, state) {
-          final user =
-              state.extra as UserModel? ?? _ref.read(userProvider).value;
-          if (user == null) return const LoginScreen();
-          return TeacherHomeScreen(user: user);
-        },
+        builder: (context, state) => _userScopedRoute(
+          extra: state.extra,
+          child: (user) => TeacherHomeScreen(user: user),
+        ),
       ),
 
       GoRoute(
@@ -500,12 +490,10 @@ class AppRouter {
       GoRoute(
         path: '/teacher/profile',
         name: 'teacher-profile',
-        builder: (context, state) {
-          final user =
-              state.extra as UserModel? ?? _ref.read(userProvider).value;
-          if (user == null) return const LoginScreen();
-          return TeacherProfileScreen(user: user);
-        },
+        builder: (context, state) => _userScopedRoute(
+          extra: state.extra,
+          child: (user) => TeacherProfileScreen(user: user),
+        ),
       ),
 
       GoRoute(
@@ -513,13 +501,13 @@ class AppRouter {
         name: 'teacher-notifications',
         builder: (context, state) {
           final extra = state.extra;
-          UserModel? user;
+          UserModel? extraUser;
           String? preFilledTitle;
           String? preFilledBody;
           Set<String>? preSelectedStudentIds;
 
           if (extra is Map<String, dynamic>) {
-            user = extra['user'] as UserModel?;
+            extraUser = extra['user'] as UserModel?;
             preFilledTitle = extra['preFilledTitle'] as String?;
             preFilledBody = extra['preFilledBody'] as String?;
             final ids = extra['preSelectedStudentIds'];
@@ -529,16 +517,17 @@ class AppRouter {
               preSelectedStudentIds = ids.cast<String>().toSet();
             }
           } else if (extra is UserModel) {
-            user = extra;
+            extraUser = extra;
           }
 
-          user ??= _ref.read(userProvider).value;
-          if (user == null) return const LoginScreen();
-          return StaffNotificationsScreen(
-            user: user,
-            preFilledTitle: preFilledTitle,
-            preFilledBody: preFilledBody,
-            preSelectedStudentIds: preSelectedStudentIds,
+          return _userScopedRoute(
+            extra: extraUser,
+            child: (user) => StaffNotificationsScreen(
+              user: user,
+              preFilledTitle: preFilledTitle,
+              preFilledBody: preFilledBody,
+              preSelectedStudentIds: preSelectedStudentIds,
+            ),
           );
         },
       ),
@@ -618,14 +607,10 @@ class AppRouter {
       GoRoute(
         path: '/teacher/community-scanner',
         name: 'teacher-community-scanner',
-        builder: (context, state) {
-          final teacher = AppRouter.resolveUserFromRoute(
-            extra: state.extra,
-            fallback: _ref.read(userProvider).value,
-          );
-          if (teacher == null) return const LoginScreen();
-          return CoverScannerScreen(teacher: teacher);
-        },
+        builder: (context, state) => _userScopedRoute(
+          extra: state.extra,
+          child: (teacher) => CoverScannerScreen(teacher: teacher),
+        ),
       ),
 
       // ============================================
@@ -716,6 +701,30 @@ class AppRouter {
   }) {
     return extra is UserModel ? extra : fallback;
   }
+}
+
+/// Builds a route that needs a [UserModel]. Prefers `extra` when it's a
+/// [UserModel] (callers that pass it explicitly); otherwise reactively
+/// watches [userProvider] so the route does not flash LoginScreen during
+/// the brief AsyncLoading window right after sign-in or cold start.
+Widget _userScopedRoute({
+  required Object? extra,
+  required Widget Function(UserModel user) child,
+}) {
+  if (extra is UserModel) return child(extra);
+  return Consumer(
+    builder: (context, ref, _) {
+      final userAsync = ref.watch(userProvider);
+      return userAsync.when(
+        data: (user) =>
+            user == null ? const LoginScreen() : child(user),
+        loading: () => const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        ),
+        error: (_, __) => const LoginScreen(),
+      );
+    },
+  );
 }
 
 /// Splash PNG rendered as a book cover hinged on the left edge. As [animation]

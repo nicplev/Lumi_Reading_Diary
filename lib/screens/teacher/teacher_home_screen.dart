@@ -1,6 +1,9 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:rive/rive.dart' hide Animation;
+
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
@@ -163,27 +166,40 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.teacherBackground,
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: (index) => setState(() {
-          _selectedIndex = index;
-          _dashboardResetTrigger++;
-        }),
+      body: Stack(
         children: [
-          _KeepAlivePage(child: _buildDashboardView()),
-          _KeepAlivePage(
-            child: TeacherClassroomScreen(
-              teacher: widget.user,
-              selectedClass: _selectedClass,
-              classes: _classes,
-              onClassChanged: (c) => setState(() => _selectedClass = c),
+          PageView(
+            controller: _pageController,
+            onPageChanged: (index) => setState(() {
+              _selectedIndex = index;
+              _dashboardResetTrigger++;
+            }),
+            children: [
+              _KeepAlivePage(child: _buildDashboardView()),
+              _KeepAlivePage(
+                child: TeacherClassroomScreen(
+                  teacher: widget.user,
+                  selectedClass: _selectedClass,
+                  classes: _classes,
+                  onClassChanged: (c) => setState(() => _selectedClass = c),
+                ),
+              ),
+              _KeepAlivePage(child: TeacherLibraryScreen(teacher: widget.user)),
+              _KeepAlivePage(child: TeacherSettingsScreen(user: widget.user)),
+            ],
+          ),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 0,
+            child: SafeArea(
+              top: false,
+              minimum: const EdgeInsets.only(bottom: 8),
+              child: _buildBottomNavigationBar(),
             ),
           ),
-          _KeepAlivePage(child: TeacherLibraryScreen(teacher: widget.user)),
-          _KeepAlivePage(child: TeacherSettingsScreen(user: widget.user)),
         ],
       ),
-      bottomNavigationBar: _buildBottomNavigationBar(),
     );
   }
 
@@ -296,44 +312,79 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
   // ============================================
 
   Widget _buildBottomNavigationBar() {
-    const navItems = [
-      ('assets/animations/nav_dashboard.riv', 'Dashboard'),
-      ('assets/animations/nav_class.riv', 'Class'),
-      ('assets/animations/nav_library.riv', 'Library'),
-      ('assets/animations/nav_settings.riv', 'Settings'),
+    final navItems = <_NavItemSpec>[
+      const _NavItemSpec.rive(
+        assetPath: 'assets/animations/nav_dashboard.riv',
+        label: 'Dashboard',
+      ),
+      const _NavItemSpec.icon(
+        icon: Icons.groups_outlined,
+        label: 'Class',
+        size: 27,
+      ),
+      const _NavItemSpec.icon(icon: Icons.book_outlined, label: 'Library'),
+      const _NavItemSpec.icon(icon: Icons.settings_outlined, label: 'Settings'),
     ];
 
-    return Container(
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: BorderRadius.circular(36),
         boxShadow: [
           BoxShadow(
-            color: AppColors.teacherPrimary.withValues(alpha: 0.12),
-            blurRadius: 24,
-            spreadRadius: -10,
-            offset: const Offset(0, -6),
+            color: AppColors.teacherPrimary.withValues(alpha: 0.10),
+            blurRadius: 28,
+            spreadRadius: -8,
+            offset: const Offset(0, 12),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 16,
+            spreadRadius: -6,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Row(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(36),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.white.withValues(alpha: 0.65),
+              borderRadius: BorderRadius.circular(36),
+              border: Border.all(
+                color: AppColors.white.withValues(alpha: 0.55),
+                width: 1,
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            child: Row(
             children: [
               for (int i = 0; i < navItems.length; i++)
                 Expanded(
-                  child: _RiveNavItem(
-                    assetPath: navItems[i].$1,
-                    label: navItems[i].$2,
-                    isSelected: _selectedIndex == i,
-                    onTap: () => _onTabTapped(i),
-                    selectedColor: AppColors.teacherPrimary,
-                    unselectedColor: AppColors.textSecondary,
-                  ),
+                  child: switch (navItems[i]) {
+                    _RiveNavSpec(:final assetPath, :final label) => _RiveNavItem(
+                        assetPath: assetPath,
+                        label: label,
+                        isSelected: _selectedIndex == i,
+                        onTap: () => _onTabTapped(i),
+                        selectedColor: AppColors.teacherPrimary,
+                        unselectedColor: AppColors.textSecondary,
+                      ),
+                    _IconNavSpec(:final icon, :final label, :final size) =>
+                      _IconNavItem(
+                        icon: icon,
+                        label: label,
+                        size: size,
+                        isSelected: _selectedIndex == i,
+                        onTap: () => _onTabTapped(i),
+                        selectedColor: AppColors.teacherPrimary,
+                        unselectedColor: AppColors.textSecondary,
+                      ),
+                  },
                 ),
             ],
+          ),
           ),
         ),
       ),
@@ -456,6 +507,84 @@ class _KeepAlivePageState extends State<_KeepAlivePage>
   }
 }
 
+sealed class _NavItemSpec {
+  const _NavItemSpec();
+
+  const factory _NavItemSpec.rive({
+    required String assetPath,
+    required String label,
+  }) = _RiveNavSpec;
+
+  const factory _NavItemSpec.icon({
+    required IconData icon,
+    required String label,
+    double size,
+  }) = _IconNavSpec;
+}
+
+final class _RiveNavSpec extends _NavItemSpec {
+  final String assetPath;
+  final String label;
+  const _RiveNavSpec({required this.assetPath, required this.label});
+}
+
+final class _IconNavSpec extends _NavItemSpec {
+  final IconData icon;
+  final String label;
+  final double size;
+  const _IconNavSpec({
+    required this.icon,
+    required this.label,
+    this.size = 24,
+  });
+}
+
+class _IconNavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final double size;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final Color selectedColor;
+  final Color unselectedColor;
+
+  const _IconNavItem({
+    required this.icon,
+    required this.label,
+    required this.size,
+    required this.isSelected,
+    required this.onTap,
+    required this.selectedColor,
+    required this.unselectedColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isSelected ? selectedColor : unselectedColor;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 28,
+            height: 28,
+            child: Center(
+              child: Icon(icon, size: size, color: color),
+            ),
+          ),
+          const SizedBox(height: 1),
+          Text(
+            label,
+            style: TeacherTypography.caption.copyWith(color: color),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // Custom controller that plays nav animations when triggered.
 // Files with 'Timeline 1' are driven directly; files using a state machine
 // with an 'isActive' boolean input use that instead.
@@ -573,22 +702,30 @@ class _RiveNavItemState extends State<_RiveNavItem> {
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
-            width: 48,
-            height: 48,
-            child: RiveWidgetBuilder(
-              fileLoader: _fileLoader,
-              controller: (file) => _NavRiveController(file),
-              onLoaded: _onLoaded,
-              builder: (context, state) => switch (state) {
-                RiveLoaded() => RiveWidget(
-                    controller: state.controller,
-                    fit: Fit.contain,
-                  ),
-                _ => const SizedBox(),
-              },
+            width: 28,
+            height: 28,
+            child: ClipRect(
+              child: OverflowBox(
+                minWidth: 40,
+                maxWidth: 40,
+                minHeight: 40,
+                maxHeight: 40,
+                child: RiveWidgetBuilder(
+                  fileLoader: _fileLoader,
+                  controller: (file) => _NavRiveController(file),
+                  onLoaded: _onLoaded,
+                  builder: (context, state) => switch (state) {
+                    RiveLoaded() => RiveWidget(
+                        controller: state.controller,
+                        fit: Fit.contain,
+                      ),
+                    _ => const SizedBox(),
+                  },
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 1),
           Text(
             widget.label,
             style: TeacherTypography.caption.copyWith(

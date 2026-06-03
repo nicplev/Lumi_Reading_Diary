@@ -478,12 +478,12 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                       visibleStudents: visibleStudents,
                       assignmentStatus: assignmentStatus,
                     ),
-                    const SliverToBoxAdapter(child: SizedBox(height: 100)),
+                    const SliverToBoxAdapter(child: SizedBox(height: 200)),
                   ],
                 ),
                 Positioned(
                   right: 16,
-                  bottom: 20,
+                  bottom: MediaQuery.viewPaddingOf(context).bottom + 84,
                   child: FloatingActionButton(
                     onPressed: () => _showStudentScannerPicker(selectedClass),
                     backgroundColor: AppColors.teacherPrimary,

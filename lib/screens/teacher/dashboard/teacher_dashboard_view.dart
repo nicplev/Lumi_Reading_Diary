@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -498,10 +499,27 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
         .whereType<DashboardWidgetDefinition>()
         .toList();
 
-    return GestureDetector(
-      onTap: _isEditMode ? null : resetEngagementCard,
-      onLongPress: _isEditMode ? null : _enterEditMode,
+    return RawGestureDetector(
       behavior: HitTestBehavior.translucent,
+      gestures: <Type, GestureRecognizerFactory>{
+        TapGestureRecognizer:
+            GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
+          () => TapGestureRecognizer(),
+          (TapGestureRecognizer instance) {
+            instance.onTap = _isEditMode ? null : resetEngagementCard;
+          },
+        ),
+        if (!_isEditMode)
+          LongPressGestureRecognizer:
+              GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
+            () => LongPressGestureRecognizer(
+              duration: const Duration(milliseconds: 900),
+            ),
+            (LongPressGestureRecognizer instance) {
+              instance.onLongPress = _enterEditMode;
+            },
+          ),
+      },
       child: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(child: SizedBox(height: topPadding + 12)),
@@ -556,8 +574,8 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
               ),
             ),
 
-          // ── Bottom padding ──
-          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          // ── Bottom padding (clears floating nav pill) ──
+          const SliverToBoxAdapter(child: SizedBox(height: 200)),
         ],
       ),
     );
