@@ -504,6 +504,16 @@ class _AchievementNearMissCardState extends State<_AchievementNearMissCard> {
   AchievementThresholds _thresholds = AchievementThresholds.defaults;
   AchievementCustomization _customization = AchievementCustomization.empty;
 
+  // Cached so transient Firestore re-emits (waiting state, no-data flicker)
+  // don't collapse the card's height mid-scroll, which can cause an
+  // overscroll-bounce / SliverAppBar(floating) feedback loop on the home page.
+  ({
+    AchievementModel achievement,
+    double progress,
+    int current,
+    StudentModel student,
+  })? _lastResult;
+
   @override
   void initState() {
     super.initState();
@@ -538,77 +548,104 @@ class _AchievementNearMissCardState extends State<_AchievementNearMissCard> {
           .doc(widget.studentId)
           .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const SizedBox.shrink();
+        StudentStats? stats;
+        List<String> earnedIds = const [];
+        StudentModel? student;
 
-        final data = snapshot.data!.data() as Map<String, dynamic>?;
-        if (data == null) return const SizedBox.shrink();
+        if (snapshot.hasData) {
+          final data = snapshot.data!.data() as Map<String, dynamic>?;
+          if (data != null) {
+            student = StudentModel.fromFirestore(snapshot.data!);
+            stats = student.stats;
+            earnedIds = (data['achievements'] as List<dynamic>? ?? [])
+                .map((a) => a['id'] as String? ?? '')
+                .where((id) => id.isNotEmpty)
+                .toList();
+          }
+        }
 
-        final student = StudentModel.fromFirestore(snapshot.data!);
-        final stats = student.stats;
-        if (stats == null) return const SizedBox.shrink();
-
-        final earnedIds = (data['achievements'] as List<dynamic>? ?? [])
-            .map((a) => a['id'] as String? ?? '')
-            .where((id) => id.isNotEmpty)
-            .toList();
-
-        // Rec 7: prefer a consistency-based near-miss (streak / days); fall
-        // back to volume-based (books / minutes) only when none is close.
-        final result = AchievementTemplates.nearestUnearned(
-              currentStreak: stats.currentStreak,
-              totalBooksRead: stats.totalBooksRead,
-              totalMinutesRead: stats.totalMinutesRead,
-              totalReadingDays: stats.totalReadingDays,
-              earnedAchievementIds: earnedIds,
-              thresholds: _thresholds,
-              customization: _customization,
-              minProgress: 0.8,
-              requirementTypes: const {'streak', 'days'},
-            ) ??
-            AchievementTemplates.nearestUnearned(
-              currentStreak: stats.currentStreak,
-              totalBooksRead: stats.totalBooksRead,
-              totalMinutesRead: stats.totalMinutesRead,
-              totalReadingDays: stats.totalReadingDays,
-              earnedAchievementIds: earnedIds,
-              thresholds: _thresholds,
-              customization: _customization,
-              minProgress: 0.8,
+        // Recompute only when we have fresh stats; otherwise fall back to the
+        // last result so a transient empty snapshot doesn't change the card's
+        // height mid-scroll.
+        ({
+          AchievementModel achievement,
+          double progress,
+          int current,
+          StudentModel student,
+        })? result;
+        if (stats != null && student != null) {
+          // Rec 7: prefer a consistency-based near-miss (streak / days); fall
+          // back to volume-based (books / minutes) only when none is close.
+          final raw = AchievementTemplates.nearestUnearned(
+                currentStreak: stats.currentStreak,
+                totalBooksRead: stats.totalBooksRead,
+                totalMinutesRead: stats.totalMinutesRead,
+                totalReadingDays: stats.totalReadingDays,
+                earnedAchievementIds: earnedIds,
+                thresholds: _thresholds,
+                customization: _customization,
+                minProgress: 0.8,
+                requirementTypes: const {'streak', 'days'},
+              ) ??
+              AchievementTemplates.nearestUnearned(
+                currentStreak: stats.currentStreak,
+                totalBooksRead: stats.totalBooksRead,
+                totalMinutesRead: stats.totalMinutesRead,
+                totalReadingDays: stats.totalReadingDays,
+                earnedAchievementIds: earnedIds,
+                thresholds: _thresholds,
+                customization: _customization,
+                minProgress: 0.8,
+              );
+          if (raw != null) {
+            final int current;
+            switch (raw.achievement.requirementType) {
+              case 'streak':
+                current = stats.currentStreak;
+                break;
+              case 'books':
+                current = stats.totalBooksRead;
+                break;
+              case 'minutes':
+                current = stats.totalMinutesRead;
+                break;
+              case 'days':
+              default:
+                current = stats.totalReadingDays;
+                break;
+            }
+            result = (
+              achievement: raw.achievement,
+              progress: raw.progress,
+              current: current,
+              student: student,
             );
+            _lastResult = result;
+          } else {
+            result = null;
+            _lastResult = null;
+          }
+        } else {
+          result = _lastResult;
+        }
 
         if (result == null) return const SizedBox.shrink();
 
         final achievement = result.achievement;
         final progress = result.progress;
+        final current = result.current;
+        final cardStudent = result.student;
         final rarityColor = Color(achievement.effectiveColor);
 
-        int current;
-        int remaining;
-        String unit;
-        switch (achievement.requirementType) {
-          case 'streak':
-            current = stats.currentStreak;
-            break;
-          case 'books':
-            current = stats.totalBooksRead;
-            break;
-          case 'minutes':
-            current = stats.totalMinutesRead;
-            break;
-          case 'days':
-          default:
-            current = stats.totalReadingDays;
-            break;
-        }
-        remaining = achievement.requiredValue - current;
-        unit = remaining == 1
+        final remaining = achievement.requiredValue - current;
+        final unit = remaining == 1
             ? achievement.requirementType == 'books' ? 'book' : 'day'
             : achievement.requirementType == 'books' ? 'books' : 'days';
 
         return GestureDetector(
           onTap: () => context.push(
             '/parent/achievements',
-            extra: {'student': student},
+            extra: {'student': cardStudent},
           ),
           child: Container(
             margin: EdgeInsets.only(top: LumiSpacing.m),
