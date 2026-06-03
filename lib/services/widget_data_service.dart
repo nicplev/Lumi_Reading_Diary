@@ -145,9 +145,6 @@ class WidgetDataService {
       final byId = {for (final child in children) child.id: child};
       for (final studentId in queuedIds) {
         final child = byId[studentId]!;
-        final prevStats = child.stats != null
-            ? _statsToJsonable(child.stats!)
-            : null;
         try {
           final result = await ReadingLogService.instance.logReading(
             student: child,
@@ -160,7 +157,6 @@ class WidgetDataService {
             logId: result.log.id,
             schoolId: child.schoolId,
             committedAt: DateTime.now(),
-            prevStatsJsonable: prevStats,
           );
         } catch (e) {
           debugPrint('[WidgetDataService] widget log drain failed for '
@@ -204,30 +200,22 @@ class WidgetDataService {
     return live;
   }
 
-  /// Reverses a recent widget log: deletes the Firestore log doc and restores
-  /// the captured pre-write stats, both in one transaction. Then refreshes
-  /// the widget so the celebrating state goes away immediately.
+  /// Reverses a recent widget log by deleting the Firestore log doc.
+  ///
+  /// Stats are NOT touched client-side. The `aggregateStudentStats` Cloud
+  /// Function ([functions/src/index.ts]) recomputes the student's stats from
+  /// the remaining reading logs whenever a log doc is written or deleted, so
+  /// the streak / minutes / freezes settle to their pre-log values within a
+  /// second of the delete. Going through the function also keeps stats
+  /// updates within the security boundary parents are allowed to cross.
   Future<void> undoCommit(WidgetCommitRecord commit) async {
-    final firestore = FirebaseFirestore.instance;
-    final logRef = firestore
+    final logRef = FirebaseFirestore.instance
         .collection('schools')
         .doc(commit.schoolId)
         .collection('readingLogs')
         .doc(commit.logId);
-    final studentRef = firestore
-        .collection('schools')
-        .doc(commit.schoolId)
-        .collection('students')
-        .doc(commit.studentId);
     try {
-      await firestore.runTransaction((tx) async {
-        tx.delete(logRef);
-        if (commit.prevStatsJsonable != null) {
-          tx.update(studentRef, {
-            'stats': _statsJsonableToFirestore(commit.prevStatsJsonable!),
-          });
-        }
-      });
+      await logRef.delete();
     } catch (e) {
       debugPrint('[WidgetDataService] undoCommit failed: $e');
       rethrow;
@@ -255,7 +243,6 @@ class WidgetDataService {
     required String logId,
     required String schoolId,
     required DateTime committedAt,
-    required Map<String, dynamic>? prevStatsJsonable,
   }) async {
     final commits = await _loadCommits();
     commits.add(WidgetCommitRecord(
@@ -264,7 +251,6 @@ class WidgetDataService {
       logId: logId,
       schoolId: schoolId,
       committedAt: committedAt,
-      prevStatsJsonable: prevStatsJsonable,
     ));
     await _saveCommits(commits);
   }
@@ -475,17 +461,15 @@ class _ChildPayload {
 /// A reading log committed to Firestore via the widget-tap drain, retained in
 /// SharedPreferences while it's still within the in-app undo window.
 ///
-/// `prevStatsJsonable` captures the student's `stats` field as it was *before*
-/// the log was written. Undo restores it verbatim in the same transaction
-/// that deletes the log doc, sidestepping the need to reverse the
-/// streak/freeze math in `ReadingLogService._updateStudentStats`.
+/// Stats restore is handled server-side by the `aggregateStudentStats` Cloud
+/// Function on log delete, so the record only needs the identifiers needed to
+/// locate the log doc and present a friendly banner.
 class WidgetCommitRecord {
   final String studentId;
   final String firstName;
   final String logId;
   final String schoolId;
   final DateTime committedAt;
-  final Map<String, dynamic>? prevStatsJsonable;
 
   const WidgetCommitRecord({
     required this.studentId,
@@ -493,7 +477,6 @@ class WidgetCommitRecord {
     required this.logId,
     required this.schoolId,
     required this.committedAt,
-    required this.prevStatsJsonable,
   });
 
   Map<String, dynamic> toJson() => {
@@ -502,7 +485,6 @@ class WidgetCommitRecord {
         'logId': logId,
         'schoolId': schoolId,
         'committedAt': committedAt.toIso8601String(),
-        'prevStats': prevStatsJsonable,
       };
 
   factory WidgetCommitRecord.fromJson(Map<String, dynamic> json) =>
@@ -513,48 +495,5 @@ class WidgetCommitRecord {
         schoolId: json['schoolId'] as String? ?? '',
         committedAt: DateTime.tryParse(json['committedAt'] as String? ?? '') ??
             DateTime.now(),
-        prevStatsJsonable: (json['prevStats'] as Map?)?.cast<String, dynamic>(),
       );
-}
-
-/// Converts `StudentStats` into a JSON-safe map (Timestamps → ISO strings)
-/// suitable for SharedPreferences storage.
-Map<String, dynamic> _statsToJsonable(StudentStats s) => {
-      'totalMinutesRead': s.totalMinutesRead,
-      'totalBooksRead': s.totalBooksRead,
-      'currentStreak': s.currentStreak,
-      'longestStreak': s.longestStreak,
-      'lastReadingDate': s.lastReadingDate?.toIso8601String(),
-      'averageMinutesPerDay': s.averageMinutesPerDay,
-      'totalReadingDays': s.totalReadingDays,
-      'streakFreezesAvailable': s.streakFreezesAvailable,
-      'streakFreezesUsed': s.streakFreezesUsed,
-      'streakFreezeLastEarnedDate':
-          s.streakFreezeLastEarnedDate?.toIso8601String(),
-      'last50DaysCount': s.last50DaysCount,
-    };
-
-/// Converts the JSON-safe snapshot back to a Firestore-ready map (ISO strings
-/// → Timestamps). Mirrors the shape `ReadingLogService._updateStudentStats`
-/// writes to `student.stats`.
-Map<String, dynamic> _statsJsonableToFirestore(Map<String, dynamic> j) {
-  DateTime? parse(dynamic v) => v is String ? DateTime.tryParse(v) : null;
-  final lastReadingDate = parse(j['lastReadingDate']);
-  final freezeEarned = parse(j['streakFreezeLastEarnedDate']);
-  return {
-    'totalMinutesRead': j['totalMinutesRead'] ?? 0,
-    'totalBooksRead': j['totalBooksRead'] ?? 0,
-    'currentStreak': j['currentStreak'] ?? 0,
-    'longestStreak': j['longestStreak'] ?? 0,
-    'lastReadingDate':
-        lastReadingDate != null ? Timestamp.fromDate(lastReadingDate) : null,
-    'averageMinutesPerDay': (j['averageMinutesPerDay'] ?? 0).toDouble(),
-    'totalReadingDays': j['totalReadingDays'] ?? 0,
-    'streakFreezesAvailable': j['streakFreezesAvailable'] ??
-        StudentStats.defaultStreakFreezes,
-    'streakFreezesUsed': j['streakFreezesUsed'] ?? 0,
-    'streakFreezeLastEarnedDate':
-        freezeEarned != null ? Timestamp.fromDate(freezeEarned) : null,
-    'last50DaysCount': j['last50DaysCount'],
-  };
 }
