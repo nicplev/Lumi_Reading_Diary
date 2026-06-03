@@ -1015,22 +1015,22 @@ async function processSchool(
   const msgParentIds: string[] = [];
 
   for (const parent of eligible) {
-    const unloggedChildren = parent.linkedChildren
-      .filter((id) => !loggedToday.has(id))
-      .map((id) => studentNames.get(id))
-      .filter((name): name is string => !!name);
-
-    if (unloggedChildren.length === 0) continue;
+    const unloggedIds = parent.linkedChildren.filter(
+      (id) => !loggedToday.has(id) && studentNames.has(id),
+    );
+    if (unloggedIds.length === 0) continue;
+    const unloggedNames = unloggedIds.map((id) => studentNames.get(id) as string);
 
     // Build a human-readable body
     let body: string;
-    if (unloggedChildren.length === 1) {
-      body = `Don't forget to log ${unloggedChildren[0]}'s reading today!`;
-    } else if (unloggedChildren.length === 2) {
-      body = `Don't forget to log ${unloggedChildren[0]} and ${unloggedChildren[1]}'s reading today!`;
+    if (unloggedNames.length === 1) {
+      body = `Don't forget to log ${unloggedNames[0]}'s reading today!`;
+    } else if (unloggedNames.length === 2) {
+      body = `Don't forget to log ${unloggedNames[0]} and ${unloggedNames[1]}'s reading today!`;
     } else {
-      const last = unloggedChildren.pop();
-      body = `Don't forget to log ${unloggedChildren.join(", ")} and ${last}'s reading today!`;
+      const last = unloggedNames[unloggedNames.length - 1];
+      const rest = unloggedNames.slice(0, -1).join(", ");
+      body = `Don't forget to log ${rest} and ${last}'s reading today!`;
     }
 
     messages.push({
@@ -1042,6 +1042,10 @@ async function processSchool(
       data: {
         type: "reading_reminder",
         schoolId,
+        // Comma-joined because FCM data values must be strings. Lets a future
+        // client-side tap handler route directly to the right child's log
+        // screen without re-fetching state.
+        studentIds: unloggedIds.join(","),
       },
       apns: {payload: {aps: {sound: "default"}}},
       android: {
@@ -1138,6 +1142,98 @@ export const sendReadingReminders = functions
       return null;
     } catch (error) {
       functions.logger.error("Error in sendReadingReminders", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  });
+
+// ─── Stale FCM token GC ──────────────────────────────────────────────────────
+
+/** Days of inactivity before an FCM token is treated as abandoned. */
+const FCM_TOKEN_STALE_DAYS = 30;
+
+/**
+ * Remove FCM tokens whose `fcmTokenUpdatedAt` is older than the cutoff.
+ *
+ * Tokens auto-refresh whenever the app opens (via NotificationService.onTokenRefresh
+ * and saveTokenForUser), so a token that hasn't moved in {@link FCM_TOKEN_STALE_DAYS}
+ * days is from a device the parent no longer uses. Leaving it in place keeps
+ * `sendReadingReminders` issuing pushes that always fail — wasted reads/writes
+ * and noise in delivery metrics.
+ *
+ * The per-send cleanup in `processSchool` only prunes tokens that FCM actively
+ * rejects; this catches the long tail where the token is still technically
+ * registered but the user has uninstalled or stopped opening the app.
+ *
+ * @param {string} schoolId
+ * @param {FirebaseFirestore.Timestamp} cutoff
+ * @return {Promise<number>} Number of parent documents whose token was deleted.
+ */
+async function pruneStaleTokensForSchool(
+  schoolId: string,
+  cutoff: FirebaseFirestore.Timestamp,
+): Promise<number> {
+  const parentsSnap = await db
+    .collection(`schools/${schoolId}/parents`)
+    .where("fcmTokenUpdatedAt", "<", cutoff)
+    .get();
+
+  if (parentsSnap.empty) return 0;
+
+  let removed = 0;
+  let batch = db.batch();
+  let inBatch = 0;
+  for (const doc of parentsSnap.docs) {
+    if (!doc.data().fcmToken) continue;
+    batch.update(doc.ref, {
+      fcmToken: admin.firestore.FieldValue.delete(),
+      fcmTokenUpdatedAt: admin.firestore.FieldValue.delete(),
+    });
+    inBatch++;
+    removed++;
+    if (inBatch >= 400) {
+      await batch.commit();
+      batch = db.batch();
+      inBatch = 0;
+    }
+  }
+  if (inBatch > 0) await batch.commit();
+
+  return removed;
+}
+
+/**
+ * Weekly sweep to drop FCM tokens that haven't refreshed in 30 days.
+ * Runs Mondays at 04:00 UTC — off-peak across LON/NYC/SYD.
+ */
+export const pruneStaleFcmTokens = functions
+  .runWith({timeoutSeconds: 540, memory: "512MB"})
+  .pubsub.schedule("0 4 * * 1")
+  .timeZone("UTC")
+  .onRun(async () => {
+    const cutoff = admin.firestore.Timestamp.fromMillis(
+      Date.now() - FCM_TOKEN_STALE_DAYS * 24 * 60 * 60 * 1000,
+    );
+    functions.logger.info("pruneStaleFcmTokens tick", {
+      cutoff: cutoff.toDate().toISOString(),
+    });
+
+    try {
+      const schoolsSnap = await db.collection("schools").get();
+      const results = await mapConcurrent(
+        schoolsSnap.docs,
+        SCHOOL_CONCURRENCY,
+        (doc) => pruneStaleTokensForSchool(doc.id, cutoff),
+      );
+      const total = results.reduce((sum, r) => sum + r, 0);
+      functions.logger.info("pruneStaleFcmTokens complete", {
+        schools: schoolsSnap.size,
+        removed: total,
+      });
+      return null;
+    } catch (error) {
+      functions.logger.error("Error in pruneStaleFcmTokens", {
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
@@ -1573,8 +1669,10 @@ export const processParentOnboardingEmail = functions
             continue;
           }
 
-          const enrollmentStatus = student.enrollmentStatus ?? "pending";
-          if (enrollmentStatus === "not_enrolled") {
+          const enrollmentStatus = student.enrollmentStatus;
+          const isSubscribed =
+            enrollmentStatus === "book_pack" || enrollmentStatus === "direct_purchase";
+          if (!isSubscribed) {
             recipients.push({
               studentId: snap.id,
               studentName,
@@ -1841,7 +1939,13 @@ export const deleteStudentWithCascade = functions.https.onCall(
           );
         }
       } else {
-        await parentRef.update({linkedChildren: remaining});
+        await parentRef.update({
+          linkedChildren: remaining,
+          // Audit trail so a stray "Don't forget to log <name>'s reading"
+          // notification can be traced back to the mutation that introduced it.
+          linkedChildrenUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          linkedChildrenUpdatedBy: `cascade:deleteStudent:${context.auth.uid}`,
+        });
       }
     }
 

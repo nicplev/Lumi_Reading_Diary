@@ -4,7 +4,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { z } from 'zod';
 
 const enrollmentSchema = z.object({
-  enrollmentStatus: z.enum(['book_pack', 'direct_purchase', 'not_enrolled', 'pending']),
+  enrollmentStatus: z.enum(['book_pack', 'direct_purchase', 'not_enrolled']),
 });
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ studentId: string }> }) {

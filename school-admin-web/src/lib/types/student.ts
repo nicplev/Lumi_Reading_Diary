@@ -15,7 +15,7 @@ export interface ReadingLevelHistory {
   reason?: string;
 }
 
-export type EnrollmentStatus = 'book_pack' | 'direct_purchase' | 'not_enrolled' | 'pending';
+export type EnrollmentStatus = 'book_pack' | 'direct_purchase' | 'not_enrolled';
 
 /**
  * Minimal projection of a linked guardian, denormalized onto the student doc

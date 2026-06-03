@@ -142,7 +142,7 @@ export function SendOnboardingEmailModal({
                 )}
                 {summary.notEnrolled > 0 && (
                   <p className="text-xs text-text-secondary">
-                    {summary.notEnrolled} not confirmed
+                    {summary.notEnrolled} not subscribed
                   </p>
                 )}
                 {summary.alreadyLinked > 0 && (

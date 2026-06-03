@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 const bulkEnrollmentSchema = z.object({
   studentIds: z.array(z.string()).min(1),
-  enrollmentStatus: z.enum(['book_pack', 'direct_purchase', 'not_enrolled', 'pending']),
+  enrollmentStatus: z.enum(['book_pack', 'direct_purchase', 'not_enrolled']),
 });
 
 export async function POST(request: NextRequest) {

@@ -243,13 +243,9 @@ class _LoginScreenState extends State<LoginScreen> {
               'lastLoginAt': FieldValue.serverTimestamp(),
             });
 
-            // Save FCM token to correct parent Firestore path
-            if (user.role == UserRole.parent) {
-              NotificationService.instance.saveTokenForUser(
-                userSchoolId,
-                userCredential.user!.uid,
-              );
-            }
+            // Register the FCM token via the single auth entry point. No-op
+            // for non-parents or users without a school.
+            NotificationService.instance.onParentAuthenticated(user);
 
             if (!mounted) return;
 

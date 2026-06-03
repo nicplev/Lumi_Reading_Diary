@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
@@ -10,7 +8,6 @@ import '../data/models/student_model.dart';
 import '../data/models/user_model.dart';
 import 'firebase_service.dart';
 import 'isbn_assignment_service.dart';
-import 'notification_service.dart';
 import 'offline_service.dart';
 import 'widget_data_service.dart';
 
@@ -236,12 +233,6 @@ class ReadingLogService {
         WidgetDataService.instance.updateAfterLog(student: student, log: log);
       }
 
-      // Rec 3: context-aware notification firing — cancel today's reminder
-      // for this child now that they're logged. Fire-and-forget; failures
-      // are logged inside the service and never block the write path.
-      unawaited(NotificationService.instance
-          .refreshReminderForToday(studentId: log.studentId));
-
       return ReadingLogResult(
         log: log,
         updatedStats: statsUpdate.stats,
@@ -256,10 +247,6 @@ class ReadingLogService {
       WidgetDataService.instance
           .updateAfterLog(student: student, log: offlineLog);
     }
-    // Same Rec 3 hook applies offline — the user has "done their part" for
-    // today, so don't keep nudging them.
-    unawaited(NotificationService.instance
-        .refreshReminderForToday(studentId: log.studentId));
     return ReadingLogResult(log: offlineLog, savedOffline: true);
   }
 

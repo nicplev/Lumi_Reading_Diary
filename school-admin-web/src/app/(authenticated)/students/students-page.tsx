@@ -38,13 +38,12 @@ interface StudentsPageProps {
 }
 
 type QuickFilter = 'all' | 'has-parent' | 'no-parent';
-type EnrollmentFilter = 'all' | 'enrolled' | 'not-enrolled' | 'pending';
+type EnrollmentFilter = 'all' | 'subscribed' | 'not-subscribed';
 
-const enrollmentBadge: Record<string, { label: string; variant: 'success' | 'info' | 'error' | 'warning' }> = {
-  book_pack: { label: 'Confirmed', variant: 'success' },
-  direct_purchase: { label: 'Confirmed (Direct)', variant: 'info' },
-  not_enrolled: { label: 'Not Confirmed', variant: 'error' },
-  pending: { label: 'Pending', variant: 'warning' },
+const enrollmentBadge: Record<string, { label: string; variant: 'success' | 'error' }> = {
+  book_pack: { label: 'Subscribed', variant: 'success' },
+  direct_purchase: { label: 'Subscribed', variant: 'success' },
+  not_enrolled: { label: 'Not Subscribed', variant: 'error' },
 };
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
@@ -89,12 +88,10 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
       list = list.filter((s) => s.parentIds.length === 0);
     }
 
-    if (enrollmentFilter === 'enrolled') {
+    if (enrollmentFilter === 'subscribed') {
       list = list.filter((s) => s.enrollmentStatus === 'book_pack' || s.enrollmentStatus === 'direct_purchase');
-    } else if (enrollmentFilter === 'not-enrolled') {
-      list = list.filter((s) => s.enrollmentStatus === 'not_enrolled');
-    } else if (enrollmentFilter === 'pending') {
-      list = list.filter((s) => !s.enrollmentStatus || s.enrollmentStatus === 'pending');
+    } else if (enrollmentFilter === 'not-subscribed') {
+      list = list.filter((s) => !s.enrollmentStatus || s.enrollmentStatus === 'not_enrolled');
     }
 
     if (search) {
@@ -229,10 +226,20 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
     {
       id: 'enrollment',
       header: 'Status',
-      accessorFn: (row) => row.enrollmentStatus ?? 'pending',
+      accessorFn: (row) => row.enrollmentStatus ?? 'not_enrolled',
       cell: (val) => {
-        const info = enrollmentBadge[val as string] ?? enrollmentBadge.pending;
-        return <Badge variant={info.variant}>{info.label}</Badge>;
+        const status = val as string;
+        const info = enrollmentBadge[status] ?? enrollmentBadge.not_enrolled;
+        return (
+          <div className="flex items-center gap-1.5">
+            <Badge variant={info.variant}>{info.label}</Badge>
+            {status === 'direct_purchase' && (
+              <span title="Paid directly through the school (not via book pack)">
+                <Badge variant="info">Direct</Badge>
+              </span>
+            )}
+          </div>
+        );
       },
       sortable: true,
     },
@@ -337,13 +344,12 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
           ))}
         </div>
         <div className="flex flex-wrap gap-2">
-          {(['all', 'enrolled', 'not-enrolled', 'pending'] as const).map((filter) => (
+          {(['all', 'subscribed', 'not-subscribed'] as const).map((filter) => (
             <FilterChip
               key={filter}
               label={
                 filter === 'all' ? 'All Status' :
-                filter === 'enrolled' ? 'Confirmed' :
-                filter === 'not-enrolled' ? 'Not Confirmed' : 'Pending'
+                filter === 'subscribed' ? 'Subscribed' : 'Not Subscribed'
               }
               selected={enrollmentFilter === filter}
               onClick={() => setEnrollmentFilter(filter)}
@@ -365,13 +371,13 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
           <span className="text-sm font-semibold text-charcoal">{selectedIds.size} selected</span>
           <div className="flex flex-wrap gap-2 ml-auto">
             <Button variant="outline" size="sm" onClick={() => handleBulkEnrollment('book_pack')}>
-              Mark Confirmed
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => handleBulkEnrollment('not_enrolled')}>
-              Mark Not Confirmed
+              Mark Subscribed
             </Button>
             <Button variant="outline" size="sm" onClick={() => handleBulkEnrollment('direct_purchase')}>
-              Mark Confirmed (Direct)
+              Mark Subscribed (Direct)
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => handleBulkEnrollment('not_enrolled')}>
+              Mark Not Subscribed
             </Button>
             <Button variant="danger" size="sm" onClick={() => setShowBulkDeleteConfirm(true)}>
               Delete
