@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:timezone/data/latest.dart' as tz;
+import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -240,7 +241,9 @@ class NotificationService {
       title: message.notification?.title ?? 'Lumi',
       body: message.notification?.body ?? '',
       channelId: channelId,
-      payload: message.data.toString(),
+      // JSON-encoded so the local tap handler can parse it the same way
+      // _handleMessageTap does the FCM `data` map.
+      payload: jsonEncode(message.data),
     );
   }
 
@@ -250,12 +253,58 @@ class NotificationService {
     final type = message.data['type'];
     if (type == 'staff_message') {
       _navigateTo('/parent/notifications');
+      return;
+    }
+    if (type == 'reading_reminder') {
+      _routeReadingReminderTap(message.data);
+      return;
     }
   }
 
   /// Handle notification tap (local notifications shown via _showLocalNotification).
+  ///
+  /// In foreground, FCM messages are re-shown locally — so this also routes
+  /// reading_reminder taps via the same helper as the background path.
   void _handleNotificationTap(NotificationResponse response) {
-    debugPrint('Local notification tapped: payload=${response.payload}');
+    final payload = response.payload;
+    if (payload != null && payload.isNotEmpty) {
+      try {
+        final data = jsonDecode(payload);
+        if (data is Map<String, dynamic> && data['type'] == 'reading_reminder') {
+          _routeReadingReminderTap(data);
+          return;
+        }
+      } catch (_) {
+        // Payload wasn't JSON; fall through to the default home navigation.
+      }
+    }
+    _navigateTo('/parent/home');
+  }
+
+  /// SharedPreferences key for a child id pulled from a tapped reading
+  /// reminder. ParentHomeScreen consumes (and clears) this on init/resume to
+  /// pre-select the child the parent was prompted about, so logging that
+  /// child's reading is one tap away after the deep link.
+  static const String pendingLogChildIdKey = 'pending_log_child_id';
+
+  /// Persist the first studentId from a tapped reading reminder and route
+  /// the user to the parent home. ParentHomeScreen does the actual
+  /// active-child selection so the controller stays the single owner of
+  /// that state.
+  Future<void> _routeReadingReminderTap(Map<String, dynamic> data) async {
+    final rawIds = data['studentIds'];
+    String? firstId;
+    if (rawIds is String && rawIds.isNotEmpty) {
+      firstId = rawIds.split(',').first.trim();
+    }
+    if (firstId != null && firstId.isNotEmpty) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(pendingLogChildIdKey, firstId);
+      } catch (e) {
+        debugPrint('Could not persist pending log child id: $e');
+      }
+    }
     _navigateTo('/parent/home');
   }
 

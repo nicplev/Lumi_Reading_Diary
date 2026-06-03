@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/lumi_text_styles.dart';
@@ -27,6 +28,7 @@ import '../../data/models/allocation_model.dart';
 import '../../data/providers/active_child_provider.dart';
 import '../../services/book_cover_cache_service.dart';
 import '../../services/firebase_service.dart';
+import '../../services/notification_service.dart';
 import '../../services/reading_log_service.dart';
 import '../../services/widget_data_service.dart';
 import '../../services/isbn_assignment_service.dart';
@@ -61,6 +63,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     BookCoverCacheService.instance.addListener(_onCoversUpdated);
+    _consumePendingReminderDeepLink();
   }
 
   @override
@@ -83,7 +86,21 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
           parent: widget.user,
         );
       }
+      _consumePendingReminderDeepLink();
     }
+  }
+
+  /// If the user just tapped a reading-reminder notification,
+  /// NotificationService stored the child id in SharedPreferences. Adopt it
+  /// as the active child so logging that child's reading is one tap away,
+  /// then clear the key so it can't replay on a later cold start.
+  Future<void> _consumePendingReminderDeepLink() async {
+    final prefs = await SharedPreferences.getInstance();
+    final pendingId = prefs.getString(NotificationService.pendingLogChildIdKey);
+    if (pendingId == null || pendingId.isEmpty) return;
+    await prefs.remove(NotificationService.pendingLogChildIdKey);
+    if (!mounted) return;
+    await ref.read(activeChildIdProvider.notifier).select(pendingId);
   }
 
   @override
