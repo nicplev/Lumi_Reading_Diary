@@ -25,8 +25,10 @@ import {
   useDeleteStudent,
   useBulkDeleteStudents,
   useBulkUpdateEnrollmentStatus,
+  useUpdateEnrollmentStatus,
 } from '@/lib/hooks/use-students';
 import type { SchoolClass, ReadingLevelOption, ReadingLevelSchema, EnrollmentStatus } from '@/lib/types';
+import { StatusEditorBadge } from '@/components/lumi/status-editor-badge';
 
 type SerializedClass = Omit<SchoolClass, 'createdAt'> & { createdAt: string };
 
@@ -40,12 +42,6 @@ interface StudentsPageProps {
 type QuickFilter = 'all' | 'has-parent' | 'no-parent';
 type EnrollmentFilter = 'all' | 'subscribed' | 'not-subscribed';
 
-const enrollmentBadge: Record<string, { label: string; variant: 'success' | 'error' }> = {
-  book_pack: { label: 'Subscribed', variant: 'success' },
-  direct_purchase: { label: 'Subscribed', variant: 'success' },
-  not_enrolled: { label: 'Not Subscribed', variant: 'error' },
-};
-
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: StudentsPageProps) {
@@ -57,6 +53,7 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
   const deleteStudent = useDeleteStudent();
   const bulkDeleteStudents = useBulkDeleteStudents();
   const bulkUpdateEnrollment = useBulkUpdateEnrollmentStatus();
+  const updateEnrollment = useUpdateEnrollmentStatus();
 
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState<string[]>([]);
@@ -123,6 +120,21 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
       setSelectedIds(new Set());
     } else {
       setSelectedIds(new Set(filtered.map((s) => s.id)));
+    }
+  };
+
+  const handleSingleEnrollment = async (
+    student: StudentRow,
+    status: EnrollmentStatus,
+  ) => {
+    try {
+      await updateEnrollment.mutateAsync({ studentId: student.id, enrollmentStatus: status });
+      const label =
+        status === 'book_pack' ? 'Subscribed' :
+        status === 'direct_purchase' ? 'Subscribed (Direct)' : 'Not Subscribed';
+      toast(`${student.firstName} marked ${label}`, 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to update status', 'error');
     }
   };
 
@@ -227,20 +239,12 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
       id: 'enrollment',
       header: 'Status',
       accessorFn: (row) => row.enrollmentStatus ?? 'not_enrolled',
-      cell: (val) => {
-        const status = val as string;
-        const info = enrollmentBadge[status] ?? enrollmentBadge.not_enrolled;
-        return (
-          <div className="flex items-center gap-1.5">
-            <Badge variant={info.variant}>{info.label}</Badge>
-            {status === 'direct_purchase' && (
-              <span title="Paid directly through the school (not via book pack)">
-                <Badge variant="info">Direct</Badge>
-              </span>
-            )}
-          </div>
-        );
-      },
+      cell: (_val, row) => (
+        <StatusEditorBadge
+          status={row.enrollmentStatus}
+          onChange={(next) => handleSingleEnrollment(row, next)}
+        />
+      ),
       sortable: true,
     },
     {
@@ -292,6 +296,9 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
         <div className="flex justify-end">
           <KebabMenu
             items={[
+              { label: 'Mark Subscribed', onClick: () => handleSingleEnrollment(row, 'book_pack') },
+              { label: 'Mark Subscribed (Direct)', onClick: () => handleSingleEnrollment(row, 'direct_purchase') },
+              { label: 'Mark Not Subscribed', onClick: () => handleSingleEnrollment(row, 'not_enrolled') },
               { label: 'Edit', onClick: () => setEditingStudent(row) },
               { label: 'Delete', onClick: () => setDeletingStudent(row), variant: 'danger' },
             ]}
