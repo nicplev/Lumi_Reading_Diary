@@ -952,7 +952,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
         final nav = GoRouter.of(context);
         Future.delayed(const Duration(milliseconds: 400), () {
           if (mounted) {
-            nav.push('/teacher/notifications', extra: widget.user);
+            nav.push('/teacher/notifications');
           }
         });
       },

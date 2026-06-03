@@ -382,10 +382,11 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    // Navigate to role-based home screen
+    // Navigate to role-based home screen. Don't pass UserModel via `extra`
+    // (no codec → iOS state restoration crashes); the route reads from
+    // userProvider instead.
     final homeRoute = AppRouter.getHomeRouteForRole(user.role);
-    // ignore: invalid_use_of_internal_member
-    context.go(homeRoute, extra: user);
+    context.go(homeRoute);
   }
 
   void _showCreateAdminDialog() {

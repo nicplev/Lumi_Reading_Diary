@@ -458,8 +458,7 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
         title: 'No children linked',
         message: 'Link a child to start tracking their reading progress.',
         actionText: 'Add Child',
-        onAction: () =>
-            context.push('/parent/link-child', extra: widget.user),
+        onAction: () => context.push('/parent/link-child'),
       );
     }
 
@@ -1124,7 +1123,7 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
 
   Widget _buildInviteCodeCard() {
     return LumiCard(
-      onTap: () => context.push('/parent/link-child', extra: widget.user),
+      onTap: () => context.push('/parent/link-child'),
       child: Row(
         children: [
           Icon(Icons.qr_code_scanner, color: AppColors.rosePink, size: 24),

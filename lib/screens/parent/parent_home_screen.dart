@@ -320,10 +320,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                         child: LumiIconButton(
                           icon: Icons.notifications_outlined,
                           onPressed: () {
-                            context.push(
-                              '/parent/notifications',
-                              extra: widget.user,
-                            );
+                            context.push('/parent/notifications');
                           },
                         ),
                       ),
@@ -444,8 +441,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
             ),
             LumiGap.l,
             LumiPrimaryButton(
-              onPressed: () =>
-                  context.push('/parent/link-child', extra: widget.user),
+              onPressed: () => context.push('/parent/link-child'),
               text: 'Enter Invite Code',
               icon: Icons.qr_code,
             ),

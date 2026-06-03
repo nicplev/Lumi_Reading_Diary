@@ -84,9 +84,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             return;
           }
 
-          // Navigate based on role
+          // Navigate based on role. Don't pass UserModel via `extra` —
+          // the route reads from userProvider (avoids the no-codec crash).
           final homeRoute = AppRouter.getHomeRouteForRole(user.role);
-          context.go(homeRoute, extra: user);
+          context.go(homeRoute);
         } else {
           // User document doesn't exist, go to login
           _navigateToLogin();

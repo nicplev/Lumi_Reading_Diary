@@ -165,7 +165,7 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
     _autoNavigateTimer?.cancel();
     _autoNavigateTimer = null;
     if (mounted) {
-      context.go('/parent/home', extra: widget.parent);
+      context.go('/parent/home');
     }
   }
 
