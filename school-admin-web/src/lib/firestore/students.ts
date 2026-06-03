@@ -23,7 +23,9 @@ function toStudent(doc: FirebaseFirestore.DocumentSnapshot): Student {
     createdAt: data.createdAt?.toDate() ?? new Date(),
     enrolledAt: data.enrolledAt?.toDate(),
     additionalInfo: data.additionalInfo,
-    enrollmentStatus: data.enrollmentStatus,
+    // Legacy 'pending' rows (and unset rows) are surfaced as 'not_enrolled' —
+    // we collapsed the two when the four-state model was simplified.
+    enrollmentStatus: data.enrollmentStatus === 'pending' ? 'not_enrolled' : data.enrollmentStatus,
     parentEmail: data.parentEmail ?? data.additionalInfo?.pendingParentEmail,
     levelHistory: (data.levelHistory ?? []).map((lh: Record<string, unknown>) => ({
       level: lh.level as string,
@@ -123,6 +125,7 @@ export async function createStudent(
       isActive: true,
       createdAt: new Date(),
       enrolledAt: new Date(),
+      enrollmentStatus: 'not_enrolled',
       levelHistory: [],
       stats: {
         totalMinutesRead: 0,
@@ -413,7 +416,7 @@ export async function importStudents(
         dateOfBirth: row.dateOfBirth ? new Date(row.dateOfBirth) : null,
         currentReadingLevel: row.readingLevel || null,
         parentEmail: row.parentEmail || null,
-        enrollmentStatus: 'pending',
+        enrollmentStatus: 'not_enrolled',
         parentIds: [],
         isActive: true,
         createdAt: new Date(),

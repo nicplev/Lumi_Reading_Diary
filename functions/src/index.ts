@@ -1669,8 +1669,10 @@ export const processParentOnboardingEmail = functions
             continue;
           }
 
-          const enrollmentStatus = student.enrollmentStatus ?? "pending";
-          if (enrollmentStatus === "not_enrolled") {
+          const enrollmentStatus = student.enrollmentStatus;
+          const isSubscribed =
+            enrollmentStatus === "book_pack" || enrollmentStatus === "direct_purchase";
+          if (!isSubscribed) {
             recipients.push({
               studentId: snap.id,
               studentName,

@@ -17,7 +17,7 @@ import { SendOnboardingEmailModal } from './send-onboarding-email-modal';
 import { EmailPreviewModal } from './email-preview-modal';
 import type { EnrollmentStatus } from '@/lib/types';
 
-type OnboardingStatus = 'linked' | 'ready' | 'pending' | 'no_subscription';
+type OnboardingStatus = 'linked' | 'ready' | 'no_subscription';
 
 type StudentRow = {
   id: string;
@@ -32,21 +32,18 @@ type StudentRow = {
 function getOnboardingStatus(student: StudentRow): OnboardingStatus {
   if (student.parentIds.length > 0) return 'linked';
   if (!student.enrollmentStatus || student.enrollmentStatus === 'not_enrolled') return 'no_subscription';
-  if (student.enrollmentStatus === 'pending') return 'pending';
   return 'ready'; // book_pack or direct_purchase, not yet linked
 }
 
 const onboardingStatusLabel: Record<OnboardingStatus, string> = {
   linked: 'Linked',
   ready: 'Ready',
-  pending: 'Pending',
-  no_subscription: 'No Subscription',
+  no_subscription: 'Not Subscribed',
 };
 
-const onboardingStatusVariant: Record<OnboardingStatus, 'success' | 'warning' | 'info' | 'default'> = {
+const onboardingStatusVariant: Record<OnboardingStatus, 'success' | 'warning' | 'default'> = {
   linked: 'success',
   ready: 'warning',
-  pending: 'info',
   no_subscription: 'default',
 };
 
@@ -226,10 +223,9 @@ export function ParentOnboardingTab() {
         <span className="text-sm font-semibold text-text-secondary">Onboarding Status Guide</span>
         <InfoTooltip>
           <strong>Linked</strong> = parent account connected.{' '}
-          <strong>Ready</strong> = confirmed subscription, can receive invite.{' '}
-          <strong>Pending</strong> = payment not yet reviewed.{' '}
-          <strong>No Subscription</strong> = no paid subscription yet.
-          {' '}Update statuses on the Students page.
+          <strong>Ready</strong> = subscribed, can receive invite.{' '}
+          <strong>Not Subscribed</strong> = no paid subscription yet.
+          {' '}Update subscription status on the Students page.
         </InfoTooltip>
       </div>
 
@@ -253,13 +249,12 @@ export function ParentOnboardingTab() {
 
         {/* Count chips — tap to filter */}
         <div className="flex flex-wrap gap-2">
-          {(['linked', 'ready', 'pending', 'no_subscription'] as OnboardingStatus[]).map((s) => {
+          {(['linked', 'ready', 'no_subscription'] as OnboardingStatus[]).map((s) => {
             const count = activeStudents.filter((st) => getOnboardingStatus(st) === s).length;
             const isActive = statusFilter === s;
             const variantColors: Record<OnboardingStatus, string> = {
               linked: 'border-mint-green/60 text-mint-green-dark bg-mint-green/10',
               ready: 'border-soft-yellow/60 text-charcoal bg-soft-yellow/20',
-              pending: 'border-sky-blue/60 text-sky-blue-dark bg-sky-blue/10',
               no_subscription: 'border-divider text-text-secondary bg-background',
             };
             return (
@@ -365,7 +360,7 @@ export function ParentOnboardingTab() {
             onClick={selectAllEligible}
             className="text-sm text-rose-pink hover:underline font-semibold"
           >
-            Select all eligible (confirmed + email + not linked)
+            Select all eligible (subscribed + email + not linked)
           </button>
         </div>
       )}
