@@ -14,6 +14,8 @@ import '../../data/models/class_model.dart';
 import '../../data/models/allocation_model.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../data/providers/user_provider.dart';
+import '../../data/providers/class_by_id_provider.dart';
+import '../../data/providers/student_by_id_provider.dart';
 import '../../services/firebase_service.dart';
 import '../services/navigation_state_service.dart';
 import '../../screens/auth/splash_screen.dart';
@@ -435,13 +437,16 @@ class AppRouter {
         path: '/teacher/allocation',
         name: 'allocation',
         builder: (context, state) {
-          final params = state.extra as Map<String, dynamic>?;
-          final teacher = params?['teacher'] as UserModel?;
-          if (teacher == null) return const LoginScreen();
-          return AllocationScreen(
-            teacher: teacher,
-            selectedClass: params?['selectedClass'] as ClassModel?,
-            preselectedStudentId: params?['preselectedStudentId'] as String?,
+          final params = state.extra is Map<String, dynamic>
+              ? state.extra as Map<String, dynamic>
+              : null;
+          return _userScopedRoute(
+            extra: state.extra,
+            child: (teacher) => AllocationScreen(
+              teacher: teacher,
+              selectedClass: params?['selectedClass'] as ClassModel?,
+              preselectedStudentId: params?['preselectedStudentId'] as String?,
+            ),
           );
         },
       ),
@@ -449,27 +454,32 @@ class AppRouter {
       GoRoute(
         path: '/teacher/class-detail/:classId',
         name: 'class-detail',
-        builder: (context, state) {
-          final params = state.extra as Map<String, dynamic>?;
-          final teacher = params?['teacher'] as UserModel?;
-          final classModel = params?['classModel'] as ClassModel?;
-          if (teacher == null || classModel == null) return const LoginScreen();
-          return ClassDetailScreen(
+        builder: (context, state) => _classScopedTeacherRoute(
+          extra: state.extra,
+          classIdFromPath: state.pathParameters['classId']!,
+          child: (teacher, classModel) => ClassDetailScreen(
             teacher: teacher,
             classModel: classModel,
-          );
-        },
+          ),
+        ),
       ),
 
       GoRoute(
         path: '/teacher/reading-groups',
         name: 'reading-groups',
         builder: (context, state) {
-          final params = state.extra as Map<String, dynamic>?;
+          final params = state.extra is Map<String, dynamic>
+              ? state.extra as Map<String, dynamic>
+              : null;
           final classModel = params?['classModel'] as ClassModel?;
-          if (classModel == null) return const LoginScreen();
-          return ReadingGroupsScreen(
-            classModel: classModel,
+          if (classModel == null) {
+            return const _ResourceNotFoundScaffold(
+              message: 'Pick a class first',
+            );
+          }
+          return _userScopedRoute(
+            extra: state.extra,
+            child: (_) => ReadingGroupsScreen(classModel: classModel),
           );
         },
       ),
@@ -478,11 +488,18 @@ class AppRouter {
         path: '/teacher/class-report',
         name: 'class-report',
         builder: (context, state) {
-          final params = state.extra as Map<String, dynamic>?;
+          final params = state.extra is Map<String, dynamic>
+              ? state.extra as Map<String, dynamic>
+              : null;
           final classModel = params?['classModel'] as ClassModel?;
-          if (classModel == null) return const LoginScreen();
-          return ClassReportScreen(
-            classModel: classModel,
+          if (classModel == null) {
+            return const _ResourceNotFoundScaffold(
+              message: 'Pick a class first',
+            );
+          }
+          return _userScopedRoute(
+            extra: state.extra,
+            child: (_) => ClassReportScreen(classModel: classModel),
           );
         },
       ),
@@ -536,15 +553,18 @@ class AppRouter {
         path: '/teacher/student-detail/:studentId',
         name: 'student-detail',
         builder: (context, state) {
-          final params = state.extra as Map<String, dynamic>?;
-          final teacher = params?['teacher'] as UserModel?;
-          final student = params?['student'] as StudentModel?;
+          final params = state.extra is Map<String, dynamic>
+              ? state.extra as Map<String, dynamic>
+              : null;
           final classModel = params?['classModel'] as ClassModel?;
-          if (teacher == null || student == null) return const LoginScreen();
-          return StudentDetailScreen(
-            teacher: teacher,
-            student: student,
-            classModel: classModel,
+          return _studentScopedTeacherRoute(
+            extra: state.extra,
+            studentIdFromPath: state.pathParameters['studentId']!,
+            child: (teacher, student) => StudentDetailScreen(
+              teacher: teacher,
+              student: student,
+              classModel: classModel,
+            ),
           );
         },
       ),
@@ -552,27 +572,33 @@ class AppRouter {
       GoRoute(
         path: '/teacher/student-reading-history/:studentId',
         name: 'teacher-student-reading-history',
-        builder: (context, state) {
-          final params = state.extra as Map<String, dynamic>?;
-          final student = params?['student'] as StudentModel?;
-          if (student == null) return const LoginScreen();
-          return TeacherStudentReadingHistoryScreen(student: student);
-        },
+        builder: (context, state) => _studentScopedTeacherRoute(
+          extra: state.extra,
+          studentIdFromPath: state.pathParameters['studentId']!,
+          child: (_, student) =>
+              TeacherStudentReadingHistoryScreen(student: student),
+        ),
       ),
 
       GoRoute(
         path: '/teacher/level-management',
         name: 'teacher-level-management',
         builder: (context, state) {
-          final params = state.extra as Map<String, dynamic>?;
-          final teacher = params?['teacher'] as UserModel?;
+          final params = state.extra is Map<String, dynamic>
+              ? state.extra as Map<String, dynamic>
+              : null;
           final classModel = params?['classModel'] as ClassModel?;
-          if (teacher == null || classModel == null) {
-            return const LoginScreen();
+          if (classModel == null) {
+            return const _ResourceNotFoundScaffold(
+              message: 'Pick a class first',
+            );
           }
-          return TeacherLevelManagementScreen(
-            teacher: teacher,
-            classModel: classModel,
+          return _userScopedRoute(
+            extra: state.extra,
+            child: (teacher) => TeacherLevelManagementScreen(
+              teacher: teacher,
+              classModel: classModel,
+            ),
           );
         },
       ),
@@ -581,25 +607,33 @@ class AppRouter {
         path: '/teacher/isbn-scanner',
         name: 'teacher-isbn-scanner',
         builder: (context, state) {
-          final params = state.extra as Map<String, dynamic>?;
-          final teacher = params?['teacher'] as UserModel?;
+          final params = state.extra is Map<String, dynamic>
+              ? state.extra as Map<String, dynamic>
+              : null;
           final student = params?['student'] as StudentModel?;
           final studentQueue = params?['studentQueue'] as List<StudentModel>?;
           final classModel = params?['classModel'] as ClassModel?;
           final initialTargetDate = params?['initialTargetDate'] as DateTime?;
-          if (teacher == null || classModel == null) {
-            return const LoginScreen();
+          if (classModel == null) {
+            return const _ResourceNotFoundScaffold(
+              message: 'Pick a class first',
+            );
           }
           if (student == null &&
               (studentQueue == null || studentQueue.isEmpty)) {
-            return const LoginScreen();
+            return const _ResourceNotFoundScaffold(
+              message: 'Pick a student to scan for',
+            );
           }
-          return IsbnScannerScreen(
-            teacher: teacher,
-            student: student,
-            studentQueue: studentQueue,
-            classModel: classModel,
-            initialTargetDate: initialTargetDate,
+          return _userScopedRoute(
+            extra: state.extra,
+            child: (teacher) => IsbnScannerScreen(
+              teacher: teacher,
+              student: student,
+              studentQueue: studentQueue,
+              classModel: classModel,
+              initialTargetDate: initialTargetDate,
+            ),
           );
         },
       ),
@@ -712,19 +746,167 @@ Widget _userScopedRoute({
   required Widget Function(UserModel user) child,
 }) {
   if (extra is UserModel) return child(extra);
+  if (extra is Map<String, dynamic>) {
+    final mapped = extra['teacher'] ?? extra['user'];
+    if (mapped is UserModel) return child(mapped);
+  }
   return Consumer(
     builder: (context, ref, _) {
       final userAsync = ref.watch(userProvider);
       return userAsync.when(
         data: (user) =>
             user == null ? const LoginScreen() : child(user),
-        loading: () => const Scaffold(
-          body: Center(child: CircularProgressIndicator()),
-        ),
+        loading: () => const _RouteLoadingScaffold(),
         error: (_, __) => const LoginScreen(),
       );
     },
   );
+}
+
+/// Builds a teacher route that needs both a [UserModel] and a [ClassModel].
+/// Fast path: both come via `extra`. Otherwise the user resolves from
+/// [userProvider] and the class hydrates from [classByIdProvider] using
+/// [classIdFromPath]. Survives cold-start deep links.
+Widget _classScopedTeacherRoute({
+  required Object? extra,
+  required String classIdFromPath,
+  required Widget Function(UserModel teacher, ClassModel classModel) child,
+}) {
+  final params = extra is Map<String, dynamic> ? extra : null;
+  final extraUser = params?['teacher'] as UserModel?;
+  final extraClass = params?['classModel'] as ClassModel?;
+
+  if (extraUser != null && extraClass != null) {
+    return child(extraUser, extraClass);
+  }
+
+  return Consumer(
+    builder: (context, ref, _) {
+      final userAsync = extraUser != null
+          ? AsyncValue<UserModel?>.data(extraUser)
+          : ref.watch(userProvider);
+      return userAsync.when(
+        loading: () => const _RouteLoadingScaffold(),
+        error: (_, __) => const LoginScreen(),
+        data: (user) {
+          if (user == null) return const LoginScreen();
+          if (extraClass != null) return child(user, extraClass);
+          final schoolId = user.schoolId;
+          if (schoolId == null) {
+            return const _ResourceNotFoundScaffold(message: 'Class not found');
+          }
+          final classAsync = ref.watch(
+            classByIdProvider(
+              (schoolId: schoolId, classId: classIdFromPath),
+            ),
+          );
+          return classAsync.when(
+            loading: () => const _RouteLoadingScaffold(),
+            error: (_, __) => const _ResourceNotFoundScaffold(
+              message: 'Class not found',
+            ),
+            data: (classModel) => classModel == null
+                ? const _ResourceNotFoundScaffold(message: 'Class not found')
+                : child(user, classModel),
+          );
+        },
+      );
+    },
+  );
+}
+
+/// Builds a teacher route that needs a [UserModel] and a [StudentModel].
+/// Fast path: both come via `extra`. Otherwise resolves user from
+/// [userProvider] and hydrates the student via [studentByIdProvider] using
+/// [studentIdFromPath]. Survives cold-start deep links.
+Widget _studentScopedTeacherRoute({
+  required Object? extra,
+  required String studentIdFromPath,
+  required Widget Function(UserModel teacher, StudentModel student) child,
+}) {
+  final params = extra is Map<String, dynamic> ? extra : null;
+  final extraUser = params?['teacher'] as UserModel?;
+  final extraStudent = params?['student'] as StudentModel?;
+
+  if (extraUser != null && extraStudent != null) {
+    return child(extraUser, extraStudent);
+  }
+
+  return Consumer(
+    builder: (context, ref, _) {
+      final userAsync = extraUser != null
+          ? AsyncValue<UserModel?>.data(extraUser)
+          : ref.watch(userProvider);
+      return userAsync.when(
+        loading: () => const _RouteLoadingScaffold(),
+        error: (_, __) => const LoginScreen(),
+        data: (user) {
+          if (user == null) return const LoginScreen();
+          if (extraStudent != null) return child(user, extraStudent);
+          final schoolId = user.schoolId;
+          if (schoolId == null) {
+            return const _ResourceNotFoundScaffold(message: 'Student not found');
+          }
+          final studentAsync = ref.watch(
+            studentByIdProvider(
+              (schoolId: schoolId, studentId: studentIdFromPath),
+            ),
+          );
+          return studentAsync.when(
+            loading: () => const _RouteLoadingScaffold(),
+            error: (_, __) => const _ResourceNotFoundScaffold(
+              message: 'Student not found',
+            ),
+            data: (student) => student == null
+                ? const _ResourceNotFoundScaffold(message: 'Student not found')
+                : child(user, student),
+          );
+        },
+      );
+    },
+  );
+}
+
+class _RouteLoadingScaffold extends StatelessWidget {
+  const _RouteLoadingScaffold();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
+    );
+  }
+}
+
+/// Shown when a route's required resource (class, student) can't be
+/// hydrated — invalid id, deleted record, or no extras + no path param.
+/// Friendlier than bouncing to LoginScreen.
+class _ResourceNotFoundScaffold extends StatelessWidget {
+  const _ResourceNotFoundScaffold({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.grey),
+            const SizedBox(height: 12),
+            Text(message),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => context.go('/teacher/home'),
+              child: const Text('Back to home'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// Splash PNG rendered as a book cover hinged on the left edge. As [animation]
