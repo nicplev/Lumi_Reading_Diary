@@ -1634,3 +1634,58 @@ test('impersonation collections: no one can write sessions directly', async () =
     }),
   );
 });
+
+// ── Reading log delete (widget-undo banner powers this) ────────────────────
+
+async function seedSchoolWithParentAndLog({ parentUid, otherParentUid }) {
+  await seedData(async (db) => {
+    await db.collection('schools').doc('school_1').set({
+      name: 'Lumi School One',
+      createdBy: 'admin_1',
+    });
+    await db.collection('schools').doc('school_1').collection('parents').doc(parentUid).set({
+      role: 'parent',
+      schoolId: 'school_1',
+      linkedChildren: ['student_1'],
+    });
+    if (otherParentUid) {
+      await db.collection('schools').doc('school_1').collection('parents').doc(otherParentUid).set({
+        role: 'parent',
+        schoolId: 'school_1',
+        linkedChildren: ['student_1'],
+      });
+    }
+    await db.collection('schools').doc('school_1').collection('readingLogs').doc('log_1').set({
+      schoolId: 'school_1',
+      studentId: 'student_1',
+      parentId: parentUid,
+      minutesRead: 20,
+      status: 'completed',
+      bookTitles: ['Reading'],
+    });
+  });
+}
+
+test('readingLogs: parent can delete a log they created (powers widget undo)', async () => {
+  await seedSchoolWithParentAndLog({ parentUid: 'parent_1' });
+  const db = authDb('parent_1');
+  await assertSucceeds(
+    db.collection('schools').doc('school_1').collection('readingLogs').doc('log_1').delete(),
+  );
+});
+
+test('readingLogs: parent cannot delete a log created by a different parent', async () => {
+  await seedSchoolWithParentAndLog({ parentUid: 'parent_1', otherParentUid: 'parent_2' });
+  const db = authDb('parent_2');
+  await assertFails(
+    db.collection('schools').doc('school_1').collection('readingLogs').doc('log_1').delete(),
+  );
+});
+
+test('readingLogs: unauthenticated user cannot delete a log', async () => {
+  await seedSchoolWithParentAndLog({ parentUid: 'parent_1' });
+  const db = unauthDb();
+  await assertFails(
+    db.collection('schools').doc('school_1').collection('readingLogs').doc('log_1').delete(),
+  );
+});

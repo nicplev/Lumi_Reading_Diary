@@ -40,16 +40,23 @@ export {
 /**
  * CRITICAL SECURITY: Stats Aggregation
  * Prevents client-side manipulation of student statistics
- * Triggered whenever a reading log is created or updated
+ * Triggered on every reading log create, update, AND delete — the delete
+ * path powers the widget-undo banner in the parent app, which deletes the
+ * log doc and relies on this trigger to recompute the student's stats from
+ * the remaining logs.
  */
 export const aggregateStudentStats = functions.firestore
   .document("schools/{schoolId}/readingLogs/{logId}")
   .onWrite(async (change, context) => {
     const schoolId = context.params.schoolId;
-    const log = change.after.exists ? change.after.data() : null;
+    // On delete, change.after.exists is false; pull studentId from the
+    // pre-delete snapshot so we still know which student's stats to recompute.
+    const log = change.after.exists ? change.after.data() : change.before.data();
 
     if (!log) {
-      // Log was deleted, we'll handle this separately
+      functions.logger.warn("Reading log write event with no before or after data", {
+        logId: context.params.logId,
+      });
       return null;
     }
 

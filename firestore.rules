@@ -340,7 +340,14 @@ service cloud.firestore {
               isTeacher(schoolId)
             );
 
-        allow delete: if isSchoolAdmin(schoolId) && writeAllowedForDev();
+        // Parent can delete a log they created (powers the widget-undo
+        // banner). Stats are reconciled by the aggregateStudentStats Cloud
+        // Function on log delete, so no client-side stats write is needed.
+        allow delete: if writeAllowedForDev() &&
+            (
+              isSchoolAdmin(schoolId) ||
+              (isSignedIn() && resource.data.parentId == request.auth.uid)
+            );
       }
 
       match /allocations/{allocationId} {
