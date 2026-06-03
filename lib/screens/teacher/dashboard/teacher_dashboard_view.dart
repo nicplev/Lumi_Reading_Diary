@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -498,10 +499,27 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
         .whereType<DashboardWidgetDefinition>()
         .toList();
 
-    return GestureDetector(
-      onTap: _isEditMode ? null : resetEngagementCard,
-      onLongPress: _isEditMode ? null : _enterEditMode,
+    return RawGestureDetector(
       behavior: HitTestBehavior.translucent,
+      gestures: <Type, GestureRecognizerFactory>{
+        TapGestureRecognizer:
+            GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
+          () => TapGestureRecognizer(),
+          (TapGestureRecognizer instance) {
+            instance.onTap = _isEditMode ? null : resetEngagementCard;
+          },
+        ),
+        if (!_isEditMode)
+          LongPressGestureRecognizer:
+              GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
+            () => LongPressGestureRecognizer(
+              duration: const Duration(milliseconds: 900),
+            ),
+            (LongPressGestureRecognizer instance) {
+              instance.onLongPress = _enterEditMode;
+            },
+          ),
+      },
       child: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(child: SizedBox(height: topPadding + 12)),
@@ -556,8 +574,8 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
               ),
             ),
 
-          // ── Bottom padding ──
-          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          // ── Bottom padding (clears floating nav pill) ──
+          const SliverToBoxAdapter(child: SizedBox(height: 200)),
         ],
       ),
     );
@@ -569,40 +587,47 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
 
   Widget _buildNormalWidgetSliver(
       List<DashboardWidgetDefinition> defs, DashboardWidgetContext ctx) {
+    // Eagerly materialize all dashboard widgets via SliverChildListDelegate
+    // rather than the lazy SliverChildBuilderDelegate. With variable-height
+    // cards, the lazy delegate caches estimated extents and revises them when
+    // off-screen children are recycled — which causes the scroll position to
+    // jump up the page when overscrolling at the bottom. The dashboard has a
+    // small fixed widget count, so eager build is cheap and the extent stays
+    // exact.
+    final children = <Widget>[];
+    for (var i = 0; i < defs.length; i++) {
+      if (i > 0) children.add(const SizedBox(height: 24));
+      final def = defs[i];
+
+      // Skip widgets whose shared data hasn't loaded yet
+      final isLoading = (def.dataDependencies
+                  .contains(WidgetDataDependency.students) &&
+              !_studentsLoaded) ||
+          (def.dataDependencies.contains(WidgetDataDependency.weeklyLogs) &&
+              !_weeklyLogsLoaded) ||
+          (def.dataDependencies
+                  .contains(WidgetDataDependency.readingGroups) &&
+              !_readingGroupsLoaded);
+      if (isLoading) {
+        children.add(const SizedBox.shrink());
+        continue;
+      }
+
+      children.add(
+        def
+            .builder(ctx)
+            .animate()
+            .fadeIn(
+                delay: (60 * i).ms,
+                duration: 300.ms,
+                curve: Curves.easeOut)
+            .slideY(begin: 0.02, end: 0, duration: 300.ms),
+      );
+    }
+
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-      sliver: SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            // Interleave widgets with spacers: 0=widget, 1=space, 2=widget…
-            if (index.isOdd) return const SizedBox(height: 24);
-            final widgetIndex = index ~/ 2;
-            final def = defs[widgetIndex];
-
-            // Skip widgets whose shared data hasn't loaded yet
-            if ((def.dataDependencies.contains(WidgetDataDependency.students) &&
-                    !_studentsLoaded) ||
-                (def.dataDependencies
-                        .contains(WidgetDataDependency.weeklyLogs) &&
-                    !_weeklyLogsLoaded) ||
-                (def.dataDependencies
-                        .contains(WidgetDataDependency.readingGroups) &&
-                    !_readingGroupsLoaded)) {
-              return const SizedBox.shrink();
-            }
-
-            return def
-                .builder(ctx)
-                .animate()
-                .fadeIn(
-                    delay: (60 * widgetIndex).ms,
-                    duration: 300.ms,
-                    curve: Curves.easeOut)
-                .slideY(begin: 0.02, end: 0, duration: 300.ms);
-          },
-          childCount: defs.isEmpty ? 0 : defs.length * 2 - 1,
-        ),
-      ),
+      sliver: SliverList(delegate: SliverChildListDelegate(children)),
     );
   }
 
