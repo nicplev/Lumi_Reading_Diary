@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/routing/app_router.dart';
 import '../../data/providers/user_provider.dart';
-import '../../data/models/user_model.dart';
 import '../../services/firebase_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/analytics_service.dart';
@@ -69,13 +68,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           CrashReportingService.instance.setUserId(user.id);
           CrashReportingService.instance.setCustomKey('role', user.role.name);
 
-          // Save FCM token for parents on auto-login
-          if (user.role == UserRole.parent && user.schoolId != null) {
-            NotificationService.instance.saveTokenForUser(
-              user.schoolId!,
-              user.id,
-            );
-          }
+          // Register the FCM token + flush any pending refresh. No-op for
+          // non-parents or users without a school.
+          NotificationService.instance.onParentAuthenticated(user);
 
           // Check if parent is trying to access web
           final redirectRoute = AppRouter.checkParentWebAccess(user.role);

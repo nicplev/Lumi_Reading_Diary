@@ -99,33 +99,9 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
       });
     }
 
-    // Children flow in reactively via [parentChildrenProvider] (see build);
-    // re-sync reminders once preferences are known, regardless of order.
-    await _syncLocalNotifications();
-  }
-
-  /// Schedule or cancel local notifications based on current preferences.
-  Future<void> _syncLocalNotifications() async {
-    if (_notificationsEnabled && _linkedChildren.isNotEmpty) {
-      await NotificationService.instance.scheduleReminders(
-        children: _linkedChildren
-            .map((c) => ReminderChild(
-                  studentId: c.id,
-                  firstName: c.firstName,
-                  schoolId: c.schoolId,
-                  classId: c.classId,
-                ))
-            .toList(),
-        parentId: widget.user.id,
-        parentName: widget.user.fullName,
-        parentLabel: widget.user.relationshipLabel,
-        hour: _reminderTime.hour,
-        minute: _reminderTime.minute,
-        days: _reminderDays.isEmpty ? null : _reminderDays,
-      );
-    } else {
-      await NotificationService.instance.cancelAllReminders();
-    }
+    // Preferences are the source of truth for the server-side reminder cron
+    // (`sendReadingReminders`). Writes to Firestore in [_updatePreferences]
+    // are picked up on the next hourly tick — nothing client-side to schedule.
   }
 
   Future<void> _updatePreferences() async {
@@ -158,11 +134,6 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
           preferences: prefs,
         );
       }
-
-      // Sync local notifications regardless — these don't depend on
-      // Firestore and the user expects their reminder change to take
-      // effect immediately.
-      await _syncLocalNotifications();
 
       if (mounted) {
         final queued =
@@ -250,7 +221,6 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
             );
         if (!sameSet) {
           setState(() => _linkedChildren = children);
-          _syncLocalNotifications();
         }
       },
     );

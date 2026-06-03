@@ -103,9 +103,16 @@ class FirebaseService {
     }
   }
 
-  // Clear FCM token from Firestore on logout
-  // Delegates to NotificationService which knows the correct Firestore path
-  Future<void> _clearFCMToken() async {
+  // Clear FCM token from Firestore and wipe all parent-scoped local prefs.
+  // Without this, the OS-scheduled reminders, the active-child id, and the
+  // FCM target would all outlive sign-out — letting reminders for a previously
+  // linked child fire on the device under a different account.
+  Future<void> _clearNotificationsForUser() async {
+    try {
+      await NotificationService.instance.clearUserScopedPrefs();
+    } catch (e) {
+      debugPrint('Error clearing notification prefs: $e');
+    }
     try {
       await NotificationService.instance.clearTokenForUser();
     } catch (e) {
@@ -137,8 +144,10 @@ class FirebaseService {
   // Sign out and clear local caches
   Future<void> signOut() async {
     try {
-      // Clear FCM token from Firestore before signing out
-      await _clearFCMToken();
+      // Cancel OS-scheduled reminders, wipe parent-scoped SharedPreferences,
+      // and drop the FCM token from Firestore — all before we lose the auth
+      // context that NotificationService.clearTokenForUser needs.
+      await _clearNotificationsForUser();
       // Clear offline caches
       await OfflineService.instance.clearAllCaches();
       await _auth.signOut();
