@@ -127,40 +127,24 @@ class WidgetDataService {
     if (!_isSupported || children.isEmpty) return;
     try {
       final raw = await HomeWidget.getWidgetData<String>(_pendingLogsKey);
-      final undoUntilRaw =
-          await HomeWidget.getWidgetData<String>(_undoUntilKey);
-      final undoUntil = parseUndoUntilMap(undoUntilRaw);
       final validIds = {for (final child in children) child.id};
-      final allQueued = parsePendingQueue(raw, validIds);
-      if (allQueued.isEmpty) return;
+      final queuedIds = parsePendingQueue(raw, validIds);
+      if (queuedIds.isEmpty) return;
 
-      // Layer 1: while a child's post-tap undo window is still open, leave
-      // their entry in the queue. The widget shows an "Undo" CTA during this
-      // window and tapping it removes the queue entry (no Firestore write
-      // happens). Once the window closes, the next drain picks it up.
-      final now = DateTime.now();
-      final readyIds = <String>[];
-      final skippedIds = <String>[];
-      DateTime? earliestSkipped;
-      for (final studentId in allQueued) {
-        final until = undoUntil[studentId];
-        if (until != null && until.isAfter(now)) {
-          skippedIds.add(studentId);
-          if (earliestSkipped == null || until.isBefore(earliestSkipped)) {
-            earliestSkipped = until;
-          }
-        } else {
-          readyIds.add(studentId);
-        }
-      }
+      // Two-layer undo model:
+      //   • Layer 1 (widget Undo button, 10 s) is for the home-screen flow:
+      //     parent taps Log on the widget then realises mid-tap. The pending
+      //     queue + undoUntil timestamp in App Group keep that recoverable
+      //     until the app is opened.
+      //   • Layer 2 (in-app banner, ~5 min) takes over the moment the app is
+      //     foregrounded. Commit immediately, capture pre-write stats, and
+      //     surface the banner — far less confusing than making the parent
+      //     stare at the home screen waiting for a Timer to fire.
+      // So we no longer skip entries whose widget undo window is still open.
 
       final byId = {for (final child in children) child.id: child};
-      final processedIds = <String>{};
-      for (final studentId in readyIds) {
+      for (final studentId in queuedIds) {
         final child = byId[studentId]!;
-        // Capture pre-write stats for the in-app banner's undo path. Read
-        // from the StudentModel (already streamed from Firestore via
-        // parentChildrenProvider) — fresh enough for a 5-minute undo window.
         final prevStats = child.stats != null
             ? _statsToJsonable(child.stats!)
             : null;
@@ -170,9 +154,6 @@ class WidgetDataService {
             parent: parent,
             quickLog: true,
           );
-          processedIds.add(studentId);
-          // Layer 2: record the commit so the in-app banner can offer undo
-          // for the next ~5 minutes.
           await _recordWidgetCommit(
             studentId: studentId,
             firstName: child.firstName,
@@ -187,42 +168,17 @@ class WidgetDataService {
         }
       }
 
-      // Persist only the unprocessed entries — anything still in its undo
-      // window stays in the queue for the next drain.
-      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      final remaining = [
-        for (final id in skippedIds)
-          {'studentId': id, 'date': today},
-      ];
-      await HomeWidget.saveWidgetData<String>(
-        _pendingLogsKey,
-        remaining.isEmpty ? '[]' : jsonEncode(remaining),
-      );
-      if (skippedIds.isEmpty) {
-        // No more pending entries → safe to clear the optimistic flag map.
-        await HomeWidget.saveWidgetData<String>(_optimisticKey, '');
-      } else {
-        // Schedule a re-drain right after the earliest undo window closes,
-        // so a parent who stays inside the app still sees the eventual
-        // commit + in-app banner without having to background/foreground.
-        _scheduleUndoWindowRedrain(earliestSkipped!);
-      }
+      // Clear all transient widget-side state — the queue is now drained, the
+      // optimistic flags served their purpose, and any open undo window is
+      // moot now that the banner has taken over. Clearing undoUntil also
+      // flips the widget's CTA back from "Undo" to "View today" on the next
+      // refresh that `updateAfterLog` already kicked off inside writeLog.
+      await HomeWidget.saveWidgetData<String>(_pendingLogsKey, '[]');
+      await HomeWidget.saveWidgetData<String>(_optimisticKey, '');
+      await HomeWidget.saveWidgetData<String>(_undoUntilKey, '');
     } catch (e) {
       debugPrint('[WidgetDataService] drainPendingWidgetLogs failed: $e');
     }
-  }
-
-  /// One-shot timer that fires `drainWithCachedContext` just after the earliest
-  /// undo window we skipped expires. Cancelled if a sooner deadline arrives.
-  Timer? _undoWindowRedrainTimer;
-  void _scheduleUndoWindowRedrain(DateTime fireAt) {
-    final delay = fireAt.difference(DateTime.now()) + const Duration(seconds: 1);
-    if (delay.isNegative) {
-      drainWithCachedContext();
-      return;
-    }
-    _undoWindowRedrainTimer?.cancel();
-    _undoWindowRedrainTimer = Timer(delay, drainWithCachedContext);
   }
 
   // ─── Layer 2: in-app undo banner ────────────────────────────────────
@@ -353,26 +309,6 @@ class WidgetDataService {
     // round-trips as a String. We don't read it from Dart elsewhere — easiest
     // is to clear the whole map; the next genuine log will repopulate.
     await HomeWidget.saveWidgetData<String>(_optimisticKey, '');
-  }
-
-  /// Parses the App Group `lumi_widget_undo_until` map written by Swift.
-  /// Returns `studentId -> expiry DateTime`. Treats malformed/missing as empty.
-  @visibleForTesting
-  static Map<String, DateTime> parseUndoUntilMap(String? raw) {
-    if (raw == null || raw.isEmpty) return const {};
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map) return const {};
-      final result = <String, DateTime>{};
-      decoded.forEach((key, value) {
-        if (key is! String || value is! String) return;
-        final parsed = DateTime.tryParse(value);
-        if (parsed != null) result[key] = parsed;
-      });
-      return result;
-    } catch (_) {
-      return const {};
-    }
   }
 
   /// Pure parsing/dedupe of the App Group pending-log queue.
