@@ -61,6 +61,11 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
   void initState() {
     super.initState();
     _relationshipLabel = widget.user.relationshipLabel;
+    // Seed from any value the provider has already resolved. The build-time
+    // ref.listen only fires on *changes*, so without this we miss the data
+    // when another widget (e.g. ParentChildSwitcher) already warmed the stream.
+    _linkedChildren =
+        ref.read(parentChildrenProvider).value ?? const <StudentModel>[];
     _loadPreferences();
   }
 
@@ -453,8 +458,7 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
         title: 'No children linked',
         message: 'Link a child to start tracking their reading progress.',
         actionText: 'Add Child',
-        onAction: () =>
-            context.push('/parent/link-child', extra: widget.user),
+        onAction: () => context.push('/parent/link-child'),
       );
     }
 
@@ -1119,7 +1123,7 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
 
   Widget _buildInviteCodeCard() {
     return LumiCard(
-      onTap: () => context.push('/parent/link-child', extra: widget.user),
+      onTap: () => context.push('/parent/link-child'),
       child: Row(
         children: [
           Icon(Icons.qr_code_scanner, color: AppColors.rosePink, size: 24),

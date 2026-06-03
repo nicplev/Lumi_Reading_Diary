@@ -485,8 +485,7 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
                   iconBgColor: AppColors.skyBlue,
                   label: 'Parent/Guardian Notifications',
                   onTap: () {
-                    context.push('/teacher/notifications',
-                        extra: widget.user);
+                    context.push('/teacher/notifications');
                   },
                 ),
               ],

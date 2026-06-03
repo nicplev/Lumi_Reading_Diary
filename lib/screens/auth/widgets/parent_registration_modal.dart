@@ -779,7 +779,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
     navigator.pop();
     if (parent != null) {
       final route = AppRouter.getHomeRouteForRole(parent.role);
-      router.go(route, extra: parent);
+      router.go(route);
     }
   }
 

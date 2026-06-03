@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/config/dev_access.dart';
 import '../../core/models/remote_message.dart';
 import '../../core/models/service_status.dart';
 import '../../core/theme/app_colors.dart';
@@ -20,6 +21,7 @@ class ServiceStatusScreen extends ConsumerWidget {
     final pending = ref.watch(pendingSyncListProvider).value ?? const [];
     final lastSync = ref.watch(lastSyncAtProvider).value;
     final remote = ref.watch(remoteMessageProvider).value;
+    final showDevDetails = hasDevAccess();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -52,21 +54,27 @@ class ServiceStatusScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _section(
-            title: 'Sync',
-            child: Column(
-              children: [
-                _kv('Last successful sync', _formatLastSync(lastSync)),
-                const SizedBox(height: 8),
-                _kv('Pending changes', pending.length.toString()),
-              ],
+          if (showDevDetails) ...[
+            _section(
+              title: 'Sync',
+              child: Column(
+                children: [
+                  _kv('Last successful sync', _formatLastSync(lastSync)),
+                  const SizedBox(height: 8),
+                  _kv('Pending changes', pending.length.toString()),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          if (remote != null) _RemoteSection(message: remote),
-          const SizedBox(height: 16),
-          _DiagnosticsTile(snapshot: snapshot, pending: pending),
-          const SizedBox(height: 24),
+            const SizedBox(height: 16),
+          ],
+          if (remote != null) ...[
+            _RemoteSection(message: remote),
+            const SizedBox(height: 16),
+          ],
+          if (showDevDetails) ...[
+            _DiagnosticsTile(snapshot: snapshot, pending: pending),
+            const SizedBox(height: 24),
+          ],
           SizedBox(
             width: double.infinity,
             child: FilledButton(
