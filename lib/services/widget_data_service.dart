@@ -69,6 +69,54 @@ class WidgetDataService {
     WidgetsBinding.instance.addObserver(instance._observer!);
   }
 
+  /// Wipe every widget storage surface and reset the in-memory cache. Called
+  /// from sign-out so the home-screen widget can't keep showing the previous
+  /// account's child names, and the in-app undo banner can't try to delete a
+  /// log out of the prior parent's school.
+  ///
+  /// App Group payload is replaced with an empty-children document (rather
+  /// than nuked) so the iOS widget decodes cleanly and renders its
+  /// placeholder; an empty/missing JSON would also fall through to the
+  /// placeholder but via the decode-error path, which is noisier.
+  Future<void> clearAll() async {
+    _cachedChildren = [];
+    _selectedChildId = '';
+    _cachedChildModels = const [];
+    _cachedParent = null;
+    _inFlightDrain = null;
+
+    // In-app undo banner (SharedPreferences, not App Group) — runs on every
+    // platform, so clear it regardless of [_isSupported].
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_recentCommitsPrefsKey);
+      if (!_commitsChanges.isClosed) _commitsChanges.add(null);
+    } catch (e) {
+      debugPrint('[WidgetDataService] clearAll: prefs remove failed: $e');
+    }
+
+    if (!_isSupported) return;
+
+    try {
+      final emptyPayload = jsonEncode({
+        'schemaVersion': 1,
+        'updatedAt': DateTime.now().toUtc().toIso8601String(),
+        'selectedChildId': '',
+        'children': <Map<String, dynamic>>[],
+      });
+      await HomeWidget.saveWidgetData<String>(_widgetDataKey, emptyPayload);
+      await HomeWidget.saveWidgetData<String>(_pendingLogsKey, '[]');
+      await HomeWidget.saveWidgetData<String>(_optimisticKey, '');
+      await HomeWidget.saveWidgetData<String>(_undoUntilKey, '');
+      await HomeWidget.updateWidget(
+        iOSName: _widgetName,
+        androidName: _widgetName,
+      );
+    } catch (e) {
+      debugPrint('[WidgetDataService] clearAll: widget wipe failed: $e');
+    }
+  }
+
   /// Replaces the full children list. Called from ParentHomeScreen after load.
   Future<void> updateFromChildren({
     required List<StudentModel> children,

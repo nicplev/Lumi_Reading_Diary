@@ -4,8 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 
-import 'offline_service.dart';
 import 'notification_service.dart';
+import 'offline_service.dart';
+import 'widget_data_service.dart';
 
 class FirebaseService {
   static FirebaseService? _instance;
@@ -103,11 +104,13 @@ class FirebaseService {
     }
   }
 
-  // Clear FCM token from Firestore and wipe all parent-scoped local prefs.
-  // Without this, the OS-scheduled reminders, the active-child id, and the
-  // FCM target would all outlive sign-out — letting reminders for a previously
-  // linked child fire on the device under a different account.
-  Future<void> _clearNotificationsForUser() async {
+  // Wipe every parent-scoped local surface that would otherwise outlive
+  // sign-out: OS-scheduled reminders, the active-child id, the FCM target,
+  // the home-screen widget payload, and the in-app undo banner. Without
+  // this, a previous account's child names keep appearing on the device's
+  // notifications, home-screen widget, and undo banner under a different
+  // sign-in.
+  Future<void> _clearParentScopedDeviceState() async {
     try {
       await NotificationService.instance.clearUserScopedPrefs();
     } catch (e) {
@@ -117,6 +120,11 @@ class FirebaseService {
       await NotificationService.instance.clearTokenForUser();
     } catch (e) {
       debugPrint('Error clearing FCM token: $e');
+    }
+    try {
+      await WidgetDataService.instance.clearAll();
+    } catch (e) {
+      debugPrint('Error clearing widget data: $e');
     }
   }
 
@@ -145,9 +153,10 @@ class FirebaseService {
   Future<void> signOut() async {
     try {
       // Cancel OS-scheduled reminders, wipe parent-scoped SharedPreferences,
-      // and drop the FCM token from Firestore — all before we lose the auth
-      // context that NotificationService.clearTokenForUser needs.
-      await _clearNotificationsForUser();
+      // drop the FCM token from Firestore, and wipe the iOS widget payload
+      // — all before we lose the auth context that NotificationService.
+      // clearTokenForUser needs.
+      await _clearParentScopedDeviceState();
       // Clear offline caches
       await OfflineService.instance.clearAllCaches();
       await _auth.signOut();
