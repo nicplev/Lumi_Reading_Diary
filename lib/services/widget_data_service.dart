@@ -38,6 +38,12 @@ class WidgetDataService {
   UserModel? _cachedParent;
   _LifecycleDrainObserver? _observer;
 
+  // Coalesces concurrent drain callers onto a single future. On app resume
+  // ParentHomeScreen's lifecycle observer AND its parentChildrenProvider
+  // re-emit listener both fire `drainPendingWidgetLogs` within a few ms,
+  // racing on the pending queue and writing the same tap twice to Firestore.
+  Future<void>? _inFlightDrain;
+
   /// Call once at app startup (after Firebase init).
   static Future<void> initialize() async {
     if (!_isSupported) return;
@@ -92,6 +98,16 @@ class WidgetDataService {
   /// the real writes via [ReadingLogService]. Call when the parent's children
   /// are loaded (see ParentHomeScreen).
   Future<void> drainPendingWidgetLogs({
+    required List<StudentModel> children,
+    required UserModel parent,
+  }) {
+    return _inFlightDrain ??= _drainPendingWidgetLogsImpl(
+      children: children,
+      parent: parent,
+    ).whenComplete(() => _inFlightDrain = null);
+  }
+
+  Future<void> _drainPendingWidgetLogsImpl({
     required List<StudentModel> children,
     required UserModel parent,
   }) async {
