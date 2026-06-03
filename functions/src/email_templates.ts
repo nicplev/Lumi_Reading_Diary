@@ -140,8 +140,8 @@ export function renderEmailShell(params: EmailShellParams): string {
   const {schoolName, customMessage, appStoreUrl, playStoreUrl, entryCards} =
     params;
 
-  const customMessageBlock = customMessage
-    ? `
+  const customMessageBlock = customMessage ?
+    `
       <tr>
         <td style="padding: 0 24px 24px 24px;">
           <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #FFF8E1; border-radius: 12px;">
@@ -157,8 +157,8 @@ export function renderEmailShell(params: EmailShellParams): string {
             </tr>
           </table>
         </td>
-      </tr>`
-    : "";
+      </tr>` :
+    "";
 
   return `<!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
