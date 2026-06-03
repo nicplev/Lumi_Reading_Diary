@@ -1,4 +1,4 @@
-name = "lumi-status-worker"
+name = "lumistatus"
 main = "src/index.ts"
 compatibility_date = "2026-01-01"
 
@@ -7,8 +7,8 @@ compatibility_date = "2026-01-01"
 #   wrangler kv:namespace create STATUS_KV --preview
 [[kv_namespaces]]
 binding = "STATUS_KV"
-id = "REPLACE_WITH_PROD_KV_ID"
-preview_id = "REPLACE_WITH_PREVIEW_KV_ID"
+id = "e0f6fbbe917741db92ba17e5e01d0757"
+preview_id = "740e6ab2d5d446498aa79717798fef4a"
 
 # Set with: wrangler secret put ADMIN_TOKEN
 # (do NOT commit the token here)
