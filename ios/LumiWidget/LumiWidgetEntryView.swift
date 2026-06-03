@@ -243,15 +243,25 @@ struct LumiWidgetEntryView: View {
 
     // MARK: CTA Button
 
-    // iOS 17+: reminder & at-risk fire LogReadingIntent in place.
+    // iOS 17+: reminder/at-risk fire LogReadingIntent in place; celebrating
+    // with an open undo window fires UndoReadingIntent.
     // iOS 14–16: whole-widget tap routes through widgetURL.
     @ViewBuilder
     private var ctaButton: some View {
-        if #available(iOS 17.0, *), entry.displayMode != .celebrating {
-            Button(intent: LogReadingIntent(studentId: entry.studentId)) {
+        if #available(iOS 17.0, *) {
+            if entry.undoAvailable {
+                Button(intent: UndoReadingIntent(studentId: entry.studentId)) {
+                    ctaLabelView
+                }
+                .buttonStyle(.plain)
+            } else if entry.displayMode != .celebrating {
+                Button(intent: LogReadingIntent(studentId: entry.studentId)) {
+                    ctaLabelView
+                }
+                .buttonStyle(.plain)
+            } else {
                 ctaLabelView
             }
-            .buttonStyle(.plain)
         } else {
             ctaLabelView
         }
@@ -281,6 +291,7 @@ struct LumiWidgetEntryView: View {
     }
 
     private var ctaLabel: String {
+        if entry.undoAvailable { return "Undo" }
         switch entry.displayMode {
         case .reminder:     return "Log reading"
         case .celebrating:  return "View today"
@@ -289,6 +300,7 @@ struct LumiWidgetEntryView: View {
     }
 
     private var ctaIcon: String {
+        if entry.undoAvailable { return "arrow.uturn.backward" }
         switch entry.displayMode {
         case .reminder:     return "plus"
         case .celebrating:  return "arrow.right"
@@ -297,6 +309,11 @@ struct LumiWidgetEntryView: View {
     }
 
     private var ctaGradient: [Color] {
+        if entry.undoAvailable {
+            // Slightly muted vs. the bright celebrating green so the undo
+            // action reads as a recoverable side-action, not a primary CTA.
+            return [Color.lumiCharcoal.opacity(0.55), Color.lumiCharcoal.opacity(0.75)]
+        }
         switch entry.displayMode {
         case .reminder:
             return [Color.lumiRosePinkAccessible, Color.lumiPeach]
@@ -308,6 +325,7 @@ struct LumiWidgetEntryView: View {
     }
 
     private var ctaShadow: Color {
+        if entry.undoAvailable { return Color.lumiCharcoal.opacity(0.25) }
         switch entry.displayMode {
         case .reminder:     return Color.lumiRosePinkAccessible.opacity(0.30)
         case .celebrating:  return Color.lumiGreen.opacity(0.30)
@@ -340,7 +358,22 @@ struct LumiWidgetEntryView: View {
         minutesReadToday: 20,
         targetMinutes: 20,
         loggedToday: true,
-        displayMode: .celebrating
+        displayMode: .celebrating,
+        undoAvailable: false,
+        undoExpiresAt: nil
+    )
+    LumiWidgetEntry(
+        date: Date(),
+        studentId: "abc",
+        firstName: "Sophie",
+        characterId: "character_default",
+        currentStreak: 13,
+        minutesReadToday: 20,
+        targetMinutes: 20,
+        loggedToday: true,
+        displayMode: .celebrating,
+        undoAvailable: true,
+        undoExpiresAt: Date().addingTimeInterval(10)
     )
     LumiWidgetEntry(
         date: Date(),
@@ -351,6 +384,8 @@ struct LumiWidgetEntryView: View {
         minutesReadToday: 0,
         targetMinutes: 20,
         loggedToday: false,
-        displayMode: .streakAtRisk
+        displayMode: .streakAtRisk,
+        undoAvailable: false,
+        undoExpiresAt: nil
     )
 }

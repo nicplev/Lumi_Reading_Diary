@@ -202,6 +202,18 @@ class ServiceStatusController with WidgetsBindingObserver {
   }
 
   Future<ServiceStatusSnapshot> _probe() async {
+    // Re-check connectivity at probe time. The cached `_lastConnectivity`
+    // can lag reality at cold start on iOS — `checkConnectivity()` in
+    // `initialize()` sometimes returns `[none]` before the wifi state has
+    // propagated, and the `onConnectivityChanged` listener doesn't always
+    // re-fire once the OS catches up. Treat any check failure as "keep
+    // last known" rather than overwriting to offline.
+    try {
+      _lastConnectivity = await _connectivity.checkConnectivity();
+    } catch (_) {
+      // ignore — fall back to the previous value
+    }
+
     final l1 = !_lastConnectivity.contains(ConnectivityResult.none) ||
         _lastConnectivity.length > 1;
 
@@ -295,21 +307,29 @@ class ServiceStatusController with WidgetsBindingObserver {
   }
 
   void _emit(ServiceStatusSnapshot next) {
-    // Flap / cold-start suppression: when transitioning from healthy or
-    // the initial `unknown` state into something non-healthy, hold the
-    // emission back until a second probe confirms it. This swallows the
-    // very common cold-start false positive where the first probe runs
-    // before Firestore's SDK / DNS / TLS are warm and times out at 3s.
+    // Flap / cold-start suppression: hold the first emission back until a
+    // confirming probe lands. Two regimes:
     //
-    // We DON'T suppress when the OS itself reports no network
-    // (`deviceConnected = false`) — that's an authoritative signal (e.g.,
-    // airplane mode) and we want the banner up immediately. Recovery to
-    // healthy is also always immediate.
-    final wasHealthyOrUnknown = _current.status == ServiceStatus.healthy ||
-        _current.status == ServiceStatus.unknown;
+    //  - From `healthy` → not-healthy: suppress only when the probe layer
+    //    says we're offline (`deviceConnected = true` but L2/L3 failed).
+    //    If `connectivity_plus` itself flips to no-network mid-session,
+    //    that's almost certainly an airplane-mode toggle — fire instantly.
+    //
+    //  - From the initial `unknown` state: ALWAYS suppress, even when
+    //    `deviceConnected = false`. On iOS, `connectivity_plus` reports
+    //    `[none]` for a beat after cold start before the wifi state has
+    //    propagated; without this guard the banner flashes for 20–30s
+    //    while we wait for the change listener to fire.
+    //
+    // Mid-session airplane toggles aren't affected: they go through
+    // `_handleConnectivity`, which emits directly and resets the counter.
+    // Recovery to healthy is also always immediate.
     final goingUnhealthy = next.status != ServiceStatus.healthy &&
         next.status != ServiceStatus.unknown;
-    if (wasHealthyOrUnknown && goingUnhealthy && next.deviceConnected) {
+    final fromHealthyAndProbeBased = _current.status == ServiceStatus.healthy &&
+        next.deviceConnected;
+    final fromUnknown = _current.status == ServiceStatus.unknown;
+    if (goingUnhealthy && (fromHealthyAndProbeBased || fromUnknown)) {
       _consecutiveUnhealthyProbes += 1;
       if (_consecutiveUnhealthyProbes < 2) {
         return;

@@ -10,11 +10,11 @@ import SwiftUI
 /// A sentinel entity with id `ChildEntity.activeChildId` represents "follow
 /// the active child in the app." It is the default and what the widget shows
 /// before the parent customises anything.
-struct ChildEntity: AppEntity, Identifiable {
+struct ChildEntity: AppEntity, Identifiable, Hashable {
     /// Sentinel ID meaning "use whatever child is currently active in the app."
-    /// Matches the empty-string convention used by `WidgetDataStore.buildEntry`,
-    /// which falls back to `selectedChildId` when given an empty string.
-    static let activeChildId = ""
+    /// `WidgetDataStore.buildEntry` treats this exact string as the signal to
+    /// fall back to the App Group `selectedChildId`.
+    static let activeChildId = "__lumi_active_child__"
 
     let id: String
     let firstName: String
@@ -33,15 +33,39 @@ struct ChildEntity: AppEntity, Identifiable {
         return DisplayRepresentation(title: LocalizedStringResource(stringLiteral: firstName))
     }
 
-    static var defaultQuery = ChildEntityQuery()
+    static let defaultQuery = ChildEntityQuery()
 
-    /// The default sentinel — "follow the in-app active child."
-    static var activeChildSentinel: ChildEntity {
-        ChildEntity(id: activeChildId, firstName: "Active child in app")
-    }
+    /// The "follow the in-app active child" entity surfaced at the top of the
+    /// picker via `ChildEntityQuery.allEntities()`.
+    static let activeChildSentinel = ChildEntity(
+        id: activeChildId,
+        firstName: "Active child in app"
+    )
 }
 
-struct ChildEntityQuery: EntityQuery {
+/// Closed-set query: the picker's options are exactly the sentinel plus the
+/// parent's linked children. `EnumerableEntityQuery` is Apple's documented
+/// pattern for closed sets and exposes the full valid set to the framework
+/// via `allEntities()`, which is what `WidgetConfigurationIntent` needs to
+/// persist and rehydrate picker selections cleanly.
+///
+/// Deliberately no `defaultResult()` — returning a non-nil default makes the
+/// framework treat the parameter as "always has the default value" and skip
+/// persisting user selections. Apple's own AppEntity widget samples (e.g.
+/// TLocation/weather) omit defaultResult and rely on the @Parameter being
+/// optional. The "follow active child in app" behaviour for a newly-added
+/// widget (configuration.child == nil) is preserved by the provider's
+/// `?? ""` fallback, which `WidgetDataStore.buildEntry` interprets as "use
+/// the App Group selectedChildId".
+struct ChildEntityQuery: EnumerableEntityQuery {
+    func allEntities() async throws -> [ChildEntity] {
+        var all: [ChildEntity] = [ChildEntity.activeChildSentinel]
+        all.append(contentsOf: WidgetDataStore.allChildren().map {
+            ChildEntity(id: $0.id, firstName: $0.name)
+        })
+        return all
+    }
+
     func entities(for identifiers: [ChildEntity.ID]) async throws -> [ChildEntity] {
         let children = WidgetDataStore.allChildren()
         return identifiers.map { id in
@@ -53,25 +77,9 @@ struct ChildEntityQuery: EntityQuery {
             }
             // Fallback for a stale/unknown ID (e.g. child was unlinked): keep
             // the entry visible in the picker with a placeholder name so the
-            // user can re-select. `WidgetDataStore.buildEntry` will fall back
-            // to the active child at render time.
+            // user can re-select. `WidgetDataStore.buildEntry` falls back to
+            // the active child at render time.
             return ChildEntity(id: id, firstName: "Unknown")
         }
-    }
-
-    /// What appears in the picker when the parent opens Edit Widget.
-    /// Starts with the "Active child in app" sentinel, then lists every
-    /// linked child.
-    func suggestedEntities() async throws -> [ChildEntity] {
-        var suggestions: [ChildEntity] = [ChildEntity.activeChildSentinel]
-        suggestions.append(contentsOf: WidgetDataStore.allChildren().map {
-            ChildEntity(id: $0.id, firstName: $0.name)
-        })
-        return suggestions
-    }
-
-    /// Pre-selected default when the parent first adds the widget.
-    func defaultResult() async -> ChildEntity? {
-        ChildEntity.activeChildSentinel
     }
 }

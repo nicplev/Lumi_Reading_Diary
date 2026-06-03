@@ -24,6 +24,13 @@ struct LumiWidgetEntry: TimelineEntry {
     let targetMinutes: Int
     let loggedToday: Bool
     let displayMode: LumiDisplayMode
+    /// True while the 10-second post-tap undo window is open for this child.
+    /// In celebrating mode this swaps the "View today" CTA for an "Undo"
+    /// button driven by `UndoReadingIntent`.
+    let undoAvailable: Bool
+    /// When the undo window expires, used by the provider to schedule the next
+    /// timeline refresh exactly at the flip from "Undo" to "View today".
+    let undoExpiresAt: Date?
 
     // Shown in the widget gallery before real data is available.
     static var placeholder: LumiWidgetEntry {
@@ -36,7 +43,9 @@ struct LumiWidgetEntry: TimelineEntry {
             minutesReadToday: 0,
             targetMinutes: 20,
             loggedToday: false,
-            displayMode: .reminder
+            displayMode: .reminder,
+            undoAvailable: false,
+            undoExpiresAt: nil
         )
     }
 }

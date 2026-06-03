@@ -38,7 +38,12 @@ struct WidgetDataStore {
             return .placeholder
         }
 
-        let targetId = childId.isEmpty ? payload.selectedChildId : childId
+        // Two sentinels both mean "fall back to App Group selectedChildId":
+        //   • empty string (provider passes this when configuration.child is nil)
+        //   • ChildEntity.activeChildId (persisted form of the picker's
+        //     "Active child in app" sentinel entity)
+        let isActiveSentinel = childId.isEmpty || childId == ChildEntity.activeChildId
+        let targetId = isActiveSentinel ? payload.selectedChildId : childId
         guard let child = payload.children.first(where: { $0.studentId == targetId })
                           ?? payload.children.first
         else {
@@ -50,6 +55,7 @@ struct WidgetDataStore {
         let optimisticallyLogged =
             WidgetLogQueue.isOptimisticallyLogged(studentId: child.studentId)
         let effectiveLogged = child.loggedToday || optimisticallyLogged
+        let undoExpiresAt = WidgetLogQueue.undoUntil(studentId: child.studentId)
 
         return LumiWidgetEntry(
             date: Date(),
@@ -60,7 +66,9 @@ struct WidgetDataStore {
             minutesReadToday: child.minutesReadToday,
             targetMinutes: max(child.targetMinutes, 1),
             loggedToday: effectiveLogged,
-            displayMode: effectiveLogged ? .celebrating : displayMode(for: child)
+            displayMode: effectiveLogged ? .celebrating : displayMode(for: child),
+            undoAvailable: undoExpiresAt != nil,
+            undoExpiresAt: undoExpiresAt
         )
     }
 

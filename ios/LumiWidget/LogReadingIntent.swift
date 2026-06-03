@@ -50,9 +50,17 @@ enum WidgetLogQueue {
     /// `studentId -> yyyy-MM-dd` map of optimistically-logged children, so the
     /// widget can show "logged" before the Flutter app performs the write.
     static let optimisticKey = "lumi_optimistic_logged_ids"
+    /// `studentId -> ISO8601` map of "undo window expires at" timestamps. While
+    /// `Date() < undoUntil[studentId]`, the widget renders a "Logged! Undo"
+    /// state and `WidgetDataService.drainPendingWidgetLogs` (Dart side) skips
+    /// the entry so no Firestore write happens until the window closes.
+    static let undoUntilKey = "lumi_widget_undo_until"
+    /// How long the post-tap undo window lasts on the widget.
+    static let undoWindowSeconds: TimeInterval = 10
 
     /// Appends a tap to the pending queue, deduped per child per calendar day,
-    /// and records an optimistic "logged today" flag for the child.
+    /// records an optimistic "logged today" flag, and opens the 10-second
+    /// undo window for this child.
     static func enqueue(studentId: String) {
         guard !studentId.isEmpty,
               let defaults = UserDefaults(suiteName: appGroupId) else { return }
@@ -72,6 +80,34 @@ enum WidgetLogQueue {
             defaults.dictionary(forKey: optimisticKey) as? [String: String] ?? [:]
         optimistic[studentId] = today
         defaults.set(optimistic, forKey: optimisticKey)
+
+        var undoUntil = defaults.dictionary(forKey: undoUntilKey) as? [String: String] ?? [:]
+        undoUntil[studentId] = isoFormatter.string(from: Date().addingTimeInterval(undoWindowSeconds))
+        defaults.set(undoUntil, forKey: undoUntilKey)
+    }
+
+    /// Reverses a recent `enqueue` for the given child: drops the pending
+    /// queue entry, clears the optimistic flag, and closes the undo window.
+    /// Safe to call when nothing is enqueued — fields just no-op.
+    static func cancel(studentId: String) {
+        guard !studentId.isEmpty,
+              let defaults = UserDefaults(suiteName: appGroupId) else { return }
+
+        let today = dateKey(Date())
+
+        var pending = decodePending(defaults.string(forKey: pendingKey))
+        pending.removeAll { $0.studentId == studentId && $0.date == today }
+        defaults.set(encodePending(pending), forKey: pendingKey)
+
+        if var optimistic = defaults.dictionary(forKey: optimisticKey) as? [String: String] {
+            optimistic.removeValue(forKey: studentId)
+            defaults.set(optimistic, forKey: optimisticKey)
+        }
+
+        if var undoUntil = defaults.dictionary(forKey: undoUntilKey) as? [String: String] {
+            undoUntil.removeValue(forKey: studentId)
+            defaults.set(undoUntil, forKey: undoUntilKey)
+        }
     }
 
     /// True when the child has been optimistically logged for today.
@@ -81,6 +117,26 @@ enum WidgetLogQueue {
             defaults.dictionary(forKey: optimisticKey) as? [String: String] ?? [:]
         return optimistic[studentId] == dateKey(Date())
     }
+
+    /// The future date until which the post-tap undo window is open for the
+    /// given child, or nil if no window is active. Drives both the widget UI
+    /// ("Undo" CTA) and the timeline-refresh schedule (flip to normal
+    /// celebrating state at expiry).
+    static func undoUntil(studentId: String) -> Date? {
+        guard let defaults = UserDefaults(suiteName: appGroupId),
+              let dict = defaults.dictionary(forKey: undoUntilKey) as? [String: String],
+              let iso = dict[studentId],
+              let date = isoFormatter.date(from: iso),
+              date > Date()
+        else { return nil }
+        return date
+    }
+
+    private static let isoFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
 
     // MARK: Private
 
