@@ -248,6 +248,8 @@ class _PendingRow extends StatelessWidget {
         return Icons.menu_book_outlined;
       case SyncType.parentComment:
         return Icons.chat_bubble_outline;
+      case SyncType.commentReply:
+        return Icons.reply_outlined;
       case SyncType.parentPrefs:
         return Icons.notifications_none;
       case SyncType.student:
@@ -263,6 +265,8 @@ class _PendingRow extends StatelessWidget {
         return 'Reading log';
       case SyncType.parentComment:
         return 'Parent comment';
+      case SyncType.commentReply:
+        return 'Comment reply';
       case SyncType.parentPrefs:
         return 'Notification settings';
       case SyncType.student:

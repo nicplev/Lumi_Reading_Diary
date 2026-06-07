@@ -556,5 +556,112 @@ void main() {
         expect(log.bookTitles.last, equals('Book 20'));
       });
     });
+
+    group('comment thread denormalization', () {
+      ReadingLogModel buildLog({
+        DateTime? lastCommentAt,
+        String? lastCommentByRole,
+        Map<String, DateTime> commentsViewedAt = const {},
+      }) {
+        return ReadingLogModel(
+          id: 'thread-log',
+          studentId: 'student-1',
+          parentId: 'parent-1',
+          schoolId: 'school-1',
+          classId: 'class-1',
+          date: testDateTime,
+          minutesRead: 20,
+          targetMinutes: 20,
+          bookTitles: const ['Book'],
+          status: LogStatus.completed,
+          createdAt: testDateTime,
+          lastCommentPreview: 'See you tomorrow',
+          lastCommentAt: lastCommentAt,
+          lastCommentByRole: lastCommentByRole,
+          commentsViewedAt: commentsViewedAt,
+        );
+      }
+
+      test('round-trips through Firestore', () async {
+        final firestore = TestHelpers.createFakeFirestore();
+        final viewed = DateTime(2026, 1, 2, 9);
+        final lastAt = DateTime(2026, 1, 2, 10);
+        final log = buildLog(
+          lastCommentAt: lastAt,
+          lastCommentByRole: 'teacher',
+          commentsViewedAt: {'parent-1': viewed},
+        );
+
+        await firestore
+            .collection('readingLogs')
+            .doc(log.id)
+            .set(log.toFirestore());
+        final doc =
+            await firestore.collection('readingLogs').doc(log.id).get();
+        final restored = ReadingLogModel.fromFirestore(doc);
+
+        expect(restored.lastCommentPreview, equals('See you tomorrow'));
+        expect(restored.lastCommentByRole, equals('teacher'));
+        expect(restored.lastCommentAt, equals(lastAt));
+        expect(restored.commentsViewedAt['parent-1'], equals(viewed));
+      });
+
+      test('round-trips through local storage', () {
+        final viewed = DateTime(2026, 1, 2, 9);
+        final lastAt = DateTime(2026, 1, 2, 10);
+        final log = buildLog(
+          lastCommentAt: lastAt,
+          lastCommentByRole: 'parent',
+          commentsViewedAt: {'teacher-9': viewed},
+        );
+
+        final restored = ReadingLogModel.fromLocal(log.toLocal());
+
+        expect(restored.lastCommentByRole, equals('parent'));
+        expect(restored.lastCommentAt, equals(lastAt));
+        expect(restored.commentsViewedAt['teacher-9'], equals(viewed));
+      });
+
+      test('hasUnreadFor truth table', () {
+        final lastAt = DateTime(2026, 1, 2, 10);
+
+        // No thread yet → nothing unread.
+        expect(buildLog().hasUnreadFor('parent-1', 'parent'), isFalse);
+
+        // Newest comment is my own → not unread.
+        expect(
+          buildLog(lastCommentAt: lastAt, lastCommentByRole: 'parent')
+              .hasUnreadFor('parent-1', 'parent'),
+          isFalse,
+        );
+
+        // Other party commented, never viewed → unread.
+        expect(
+          buildLog(lastCommentAt: lastAt, lastCommentByRole: 'teacher')
+              .hasUnreadFor('parent-1', 'parent'),
+          isTrue,
+        );
+
+        // Viewed before the latest comment → still unread.
+        expect(
+          buildLog(
+            lastCommentAt: lastAt,
+            lastCommentByRole: 'teacher',
+            commentsViewedAt: {'parent-1': lastAt.subtract(const Duration(hours: 1))},
+          ).hasUnreadFor('parent-1', 'parent'),
+          isTrue,
+        );
+
+        // Viewed after the latest comment → read.
+        expect(
+          buildLog(
+            lastCommentAt: lastAt,
+            lastCommentByRole: 'teacher',
+            commentsViewedAt: {'parent-1': lastAt.add(const Duration(minutes: 1))},
+          ).hasUnreadFor('parent-1', 'parent'),
+          isFalse,
+        );
+      });
+    });
   });
 }

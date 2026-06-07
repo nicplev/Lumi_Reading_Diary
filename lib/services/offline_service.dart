@@ -10,6 +10,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import '../core/models/service_status.dart';
 import '../core/services/service_status_controller.dart';
+import '../data/models/log_comment_model.dart';
 import '../data/models/reading_log_model.dart';
 import '../data/models/student_model.dart';
 import '../data/models/allocation_model.dart';
@@ -373,6 +374,42 @@ class OfflineService with WidgetsBindingObserver {
     await _enqueueAndPersist(sync);
   }
 
+  /// Queue a comment-thread reply composed offline. Keyed by `commentId` so
+  /// each reply is a distinct queue item (unlike the single `parentComment`
+  /// per log). Replays as a batch: the comment doc plus the log's denormalized
+  /// "last comment" preview, drained after the log's own create.
+  Future<void> enqueueCommentReply({
+    required String logId,
+    required String schoolId,
+    required String commentId,
+    required String authorId,
+    required String authorRole,
+    required String authorName,
+    required String body,
+    required String studentId,
+    required String parentId,
+  }) async {
+    final sync = PendingSync(
+      id: 'reply_$commentId',
+      type: SyncType.commentReply,
+      action: SyncAction.create,
+      data: {
+        'logId': logId,
+        'schoolId': schoolId,
+        'commentId': commentId,
+        'authorId': authorId,
+        'authorRole': authorRole,
+        'authorName': authorName,
+        'body': body,
+        'studentId': studentId,
+        'parentId': parentId,
+        'createdAt': DateTime.now().toIso8601String(),
+      },
+      createdAt: DateTime.now(),
+    );
+    await _enqueueAndPersist(sync);
+  }
+
   /// Queue a parent-preferences update. Dedupes — multiple offline edits
   /// to the same parent collapse to the latest values.
   Future<void> enqueueParentPrefs({
@@ -631,6 +668,9 @@ class OfflineService with WidgetsBindingObserver {
       case SyncType.parentComment:
         await _syncParentComment(item);
         break;
+      case SyncType.commentReply:
+        await _syncCommentReply(item);
+        break;
       case SyncType.parentPrefs:
         await _syncParentPrefs(item);
         break;
@@ -645,12 +685,14 @@ class OfflineService with WidgetsBindingObserver {
         return 0;
       case SyncType.parentComment:
         return 1;
-      case SyncType.student:
+      case SyncType.commentReply:
         return 2;
-      case SyncType.allocation:
+      case SyncType.student:
         return 3;
-      case SyncType.parentPrefs:
+      case SyncType.allocation:
         return 4;
+      case SyncType.parentPrefs:
+        return 5;
     }
   }
 
@@ -745,6 +787,65 @@ class OfflineService with WidgetsBindingObserver {
         // The target log hasn't reached the server yet (its own create may
         // still be backing off). Keep retrying rather than quarantining —
         // re-thrown as a plain Exception so it's classified transient.
+        throw Exception('Target log $logId not yet present; will retry');
+      }
+      rethrow;
+    }
+  }
+
+  /// Replay a comment-thread reply composed offline: write the comment doc and
+  /// refresh the log's denormalized preview in one batch, preserving the time
+  /// the comment was originally written.
+  Future<void> _syncCommentReply(PendingSync pendingSync) async {
+    final data = pendingSync.data;
+    final logId = data['logId'] as String?;
+    final schoolId = data['schoolId'] as String?;
+    final commentId = data['commentId'] as String?;
+    if (logId == null || schoolId == null || commentId == null) {
+      throw Exception('Missing logId/schoolId/commentId for comment reply sync');
+    }
+
+    final roleName = data['authorRole'] as String? ?? 'parent';
+    final body = data['body'] as String? ?? '';
+    final createdIso = data['createdAt'] as String?;
+    final createdAt = createdIso != null
+        ? Timestamp.fromDate(DateTime.parse(createdIso))
+        : Timestamp.now();
+
+    final logRef = _firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('readingLogs')
+        .doc(logId);
+    final commentRef = logRef.collection('comments').doc(commentId);
+
+    final comment = LogCommentModel(
+      id: commentId,
+      authorId: data['authorId'] as String? ?? '',
+      authorRole: CommentAuthorRole.values.firstWhere(
+        (e) => e.toString() == 'CommentAuthorRole.$roleName',
+        orElse: () => CommentAuthorRole.parent,
+      ),
+      authorName: data['authorName'] as String? ?? '',
+      body: body,
+      createdAt: createdAt.toDate(),
+      studentId: data['studentId'] as String? ?? '',
+      parentId: data['parentId'] as String? ?? '',
+    );
+
+    try {
+      final batch = _firestore.batch();
+      batch.set(commentRef, comment.toFirestore(createdAt: createdAt));
+      batch.update(logRef, {
+        'lastCommentPreview': body,
+        'lastCommentAt': createdAt,
+        'lastCommentByRole': roleName,
+      });
+      await batch.commit();
+    } on FirebaseException catch (e) {
+      if (e.code == 'not-found') {
+        // The target log hasn't reached the server yet — keep retrying rather
+        // than quarantining (classified transient via a plain Exception).
         throw Exception('Target log $logId not yet present; will retry');
       }
       rethrow;
@@ -1012,6 +1113,7 @@ enum SyncType {
   student,
   allocation,
   parentComment,
+  commentReply,
   parentPrefs,
 }
 

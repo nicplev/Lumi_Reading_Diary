@@ -354,7 +354,7 @@ void main() {
 
     group('sync types and actions', () {
       test('SyncType enum has all expected values', () {
-        expect(SyncType.values.length, equals(5));
+        expect(SyncType.values.length, equals(6));
         expect(
           SyncType.values,
           containsAll([
@@ -362,6 +362,7 @@ void main() {
             SyncType.student,
             SyncType.allocation,
             SyncType.parentComment,
+            SyncType.commentReply,
             SyncType.parentPrefs,
           ]),
         );
@@ -515,6 +516,48 @@ void main() {
             .doc('rl-ok')
             .get();
         expect(doc.exists, isTrue);
+      });
+
+      test('comment reply writes the comment and updates the log preview',
+          () async {
+        final fake = FakeFirebaseFirestore();
+        offlineService.firestoreForTest = fake;
+        goHealthy();
+
+        final logRef = fake
+            .collection('schools')
+            .doc('school-1')
+            .collection('readingLogs')
+            .doc('rl-comment');
+        // The target log must exist for the batched preview update to land.
+        await logRef.set({'studentId': 'student-1', 'parentId': 'parent-1'});
+
+        await offlineService.enqueueCommentReply(
+          logId: 'rl-comment',
+          schoolId: 'school-1',
+          commentId: 'cmt-1',
+          authorId: 'parent-1',
+          authorRole: 'parent',
+          authorName: 'Dad',
+          body: 'Thank you!',
+          studentId: 'student-1',
+          parentId: 'parent-1',
+        );
+        expect(offlineService.pendingSyncs, hasLength(1));
+        expect(offlineService.pendingSyncs.single.type, SyncType.commentReply);
+
+        await offlineService.triggerSync();
+
+        expect(offlineService.pendingSyncs, isEmpty);
+        final commentDoc = await logRef.collection('comments').doc('cmt-1').get();
+        expect(commentDoc.exists, isTrue);
+        expect(commentDoc.data()!['body'], 'Thank you!');
+        expect(commentDoc.data()!['authorRole'], 'parent');
+        expect(commentDoc.data()!['studentId'], 'student-1');
+
+        final logDoc = await logRef.get();
+        expect(logDoc.data()!['lastCommentPreview'], 'Thank you!');
+        expect(logDoc.data()!['lastCommentByRole'], 'parent');
       });
 
       test('transient failure keeps the item and persists backoff state',

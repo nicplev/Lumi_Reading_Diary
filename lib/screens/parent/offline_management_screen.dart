@@ -320,6 +320,8 @@ String _syncTypeLabel(SyncType type) {
       return 'Reading log';
     case SyncType.parentComment:
       return 'Parent comment';
+    case SyncType.commentReply:
+      return 'Comment reply';
     case SyncType.parentPrefs:
       return 'Notification settings';
     case SyncType.student:
