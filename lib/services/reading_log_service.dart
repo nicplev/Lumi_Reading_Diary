@@ -196,6 +196,53 @@ class ReadingLogService {
     return writeLog(log);
   }
 
+  /// Persists a reading log entered by a teacher on behalf of a student
+  /// whose carer cannot use the app. `parentId` carries the teacher's UID
+  /// (the creator) so existing ownership rules keep working; `loggedByRole`
+  /// = `teacher` is the proxy signal that consumers filter on. Reuses the
+  /// regular [writeLog] path so offline + stats handling stays identical to
+  /// parent-side logs.
+  Future<ReadingLogResult> logReadingAsTeacher({
+    required UserModel teacher,
+    required StudentModel student,
+    required DateTime date,
+    required int minutesRead,
+    required List<String> bookTitles,
+    String? notes,
+    String? allocationId,
+    int targetMinutes = _defaultTargetMinutes,
+  }) {
+    final now = DateTime.now();
+    final cleanedTitles = bookTitles
+        .map((t) => t.trim())
+        .where((t) => t.isNotEmpty)
+        .toList();
+    final titles = cleanedTitles.isNotEmpty ? cleanedTitles : const ['Reading'];
+    final trimmedNotes = notes?.trim();
+
+    final log = ReadingLogModel(
+      id: now.millisecondsSinceEpoch.toString(),
+      studentId: student.id,
+      parentId: teacher.id,
+      schoolId: student.schoolId,
+      classId: student.classId,
+      date: date,
+      minutesRead: minutesRead,
+      targetMinutes: targetMinutes,
+      status: LogStatus.completed,
+      bookTitles: titles,
+      notes: (trimmedNotes != null && trimmedNotes.isNotEmpty)
+          ? trimmedNotes
+          : null,
+      createdAt: now,
+      allocationId: allocationId,
+      loggedByName: teacher.fullName,
+      loggedByLabel: 'Logged by ${teacher.fullName}',
+      loggedByRole: LoggedByRole.teacher,
+    );
+    return writeLog(log, student: student);
+  }
+
   /// Persists an already-built [log].
   ///
   /// Online: writes to Firestore, runs the stats transaction, refreshes the

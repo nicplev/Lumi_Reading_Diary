@@ -150,6 +150,11 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
 
         final uniqueStudentsToday = logs.map((l) => l.studentId).toSet();
         final readCount = uniqueStudentsToday.length;
+        final teacherLoggedCount = logs
+            .where((l) => l.isTeacherProxy)
+            .map((l) => l.studentId)
+            .toSet()
+            .length;
         final totalMinutes =
             logs.fold<int>(0, (total, log) => total + log.minutesRead);
 
@@ -225,6 +230,7 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
                         engagementPercent: engagementPercent,
                         isAllRead: isAllRead,
                         totalMinutes: totalMinutes,
+                        teacherLoggedCount: teacherLoggedCount,
                       ),
                     ),
                   ),
@@ -339,6 +345,7 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
     required int engagementPercent,
     required bool isAllRead,
     required int totalMinutes,
+    required int teacherLoggedCount,
   }) {
     final ringColors = isAllRead
         ? [const Color(0xFF28A745), const Color(0xFF66BB6A)]
@@ -407,6 +414,17 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
                     value: '$readCount / $totalStudents',
                     label: 'read',
                   ),
+                  if (teacherLoggedCount > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 22, top: 2),
+                      child: Text(
+                        '$teacherLoggedCount logged by teacher',
+                        style: TeacherTypography.caption.copyWith(
+                          fontSize: 10,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 14),
                   GestureDetector(
                     onTap:

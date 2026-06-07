@@ -17,6 +17,15 @@ enum ReadingFeeling {
   great, // blob-great.png
 }
 
+/// Who created the reading log.
+/// `parent` is the default (and is assumed for historical logs that predate
+/// this field). `teacher` indicates a proxy log entered by a teacher on
+/// behalf of a student whose carer cannot use the app.
+enum LoggedByRole {
+  parent,
+  teacher,
+}
+
 class ReadingLogModel {
   final String id;
   final String studentId;
@@ -55,6 +64,11 @@ class ReadingLogModel {
   final String? loggedByName;
   final String? loggedByLabel;
 
+  // Role of the creator. Null on legacy docs (treated as parent on read).
+  // For teacher-proxy logs `parentId` holds the teacher's UID so existing
+  // ownership rules (parentId == auth.uid) cover create/update/delete.
+  final LoggedByRole? loggedByRole;
+
   ReadingLogModel({
     required this.id,
     required this.studentId,
@@ -82,10 +96,12 @@ class ReadingLogModel {
     this.commentedBy,
     this.loggedByName,
     this.loggedByLabel,
+    this.loggedByRole,
   });
 
   bool get isCompleted => status == LogStatus.completed;
   bool get hasMetTarget => minutesRead >= targetMinutes;
+  bool get isTeacherProxy => loggedByRole == LoggedByRole.teacher;
 
   factory ReadingLogModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -133,6 +149,12 @@ class ReadingLogModel {
       commentedBy: data['commentedBy'],
       loggedByName: data['loggedByName'],
       loggedByLabel: data['loggedByLabel'],
+      loggedByRole: data['loggedByRole'] != null
+          ? LoggedByRole.values.firstWhere(
+              (e) => e.toString() == 'LoggedByRole.${data['loggedByRole']}',
+              orElse: () => LoggedByRole.parent,
+            )
+          : null,
     );
   }
 
@@ -164,6 +186,7 @@ class ReadingLogModel {
       'commentedBy': commentedBy,
       'loggedByName': loggedByName,
       'loggedByLabel': loggedByLabel,
+      'loggedByRole': loggedByRole?.toString().split('.').last,
     };
   }
 
@@ -194,6 +217,7 @@ class ReadingLogModel {
     String? commentedBy,
     String? loggedByName,
     String? loggedByLabel,
+    LoggedByRole? loggedByRole,
   }) {
     return ReadingLogModel(
       id: id ?? this.id,
@@ -224,6 +248,7 @@ class ReadingLogModel {
       commentedBy: commentedBy ?? this.commentedBy,
       loggedByName: loggedByName ?? this.loggedByName,
       loggedByLabel: loggedByLabel ?? this.loggedByLabel,
+      loggedByRole: loggedByRole ?? this.loggedByRole,
     );
   }
 
@@ -256,6 +281,7 @@ class ReadingLogModel {
       'commentedBy': commentedBy,
       'loggedByName': loggedByName,
       'loggedByLabel': loggedByLabel,
+      'loggedByRole': loggedByRole?.toString().split('.').last,
     };
   }
 
@@ -300,6 +326,12 @@ class ReadingLogModel {
       commentedBy: map['commentedBy'],
       loggedByName: map['loggedByName'],
       loggedByLabel: map['loggedByLabel'],
+      loggedByRole: map['loggedByRole'] != null
+          ? LoggedByRole.values.firstWhere(
+              (e) => e.toString() == 'LoggedByRole.${map['loggedByRole']}',
+              orElse: () => LoggedByRole.parent,
+            )
+          : null,
     );
   }
 

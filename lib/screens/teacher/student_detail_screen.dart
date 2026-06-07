@@ -30,6 +30,7 @@ import '../../services/firebase_service.dart';
 import '../../services/isbn_assignment_service.dart';
 import '../../services/reading_level_service.dart';
 import '../../services/student_reading_level_service.dart';
+import 'teacher_log_reading_sheet.dart';
 
 /// Student Detail Screen
 ///
@@ -917,6 +918,12 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
           child: Text('Assigned Books', style: TeacherTypography.h3),
         ),
         _buildActionHeaderButton(
+          icon: Icons.edit_note_rounded,
+          label: 'Log',
+          onPressed: _openTeacherLogSheet,
+        ),
+        const SizedBox(width: 8),
+        _buildActionHeaderButton(
           icon: Icons.refresh_rounded,
           label: 'Renew',
           onPressed: _showRenewSheet,
@@ -934,6 +941,14 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
           onPressed: _openAssignFlow,
         ),
       ],
+    );
+  }
+
+  Future<void> _openTeacherLogSheet() async {
+    await TeacherLogReadingSheet.show(
+      context: context,
+      teacher: widget.teacher,
+      student: widget.student,
     );
   }
 
