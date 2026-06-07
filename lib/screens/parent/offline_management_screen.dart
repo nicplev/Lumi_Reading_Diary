@@ -43,6 +43,8 @@ class OfflineManagementScreen extends ConsumerWidget {
             LumiGap.s,
             _PendingCard(pending: pending, canSync: isOnline),
             LumiGap.s,
+            const _SyncHistoryCard(),
+            LumiGap.s,
             _CacheCard(),
             LumiGap.s,
             LumiCard(
@@ -177,36 +179,13 @@ class _PendingCard extends ConsumerWidget {
               style: LumiTextStyles.bodyLarge(),
             ),
             LumiGap.xs,
-            ...pending.take(5).map((sync) {
-              return Padding(
-                padding: EdgeInsets.only(bottom: LumiSpacing.xs),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppColors.warmOrange,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    LumiGap.horizontalXS,
-                    Expanded(
-                      child: Text(
-                        _label(sync),
-                        style: LumiTextStyles.body(),
-                      ),
-                    ),
-                    Text(
-                      _formatTimestamp(sync.createdAt),
-                      style: LumiTextStyles.bodySmall(
-                        color: AppColors.charcoal.withValues(alpha: 0.6),
-                      ),
-                    ),
-                  ],
+            ...pending.take(5).map(
+                  (sync) => _PendingDetailRow(
+                    sync: sync,
+                    label: _syncTypeLabel(sync.type),
+                    timeLabel: _formatTimestamp(sync.createdAt),
+                  ),
                 ),
-              );
-            }),
             if (pending.length > 5)
               Padding(
                 padding: EdgeInsets.only(top: LumiSpacing.xs),
@@ -224,13 +203,27 @@ class _PendingCard extends ConsumerWidget {
                 onPressed: !canSync
                     ? null
                     : () async {
+                        final before =
+                            OfflineService.instance.pendingSyncs.length;
                         await ref
                             .read(serviceStatusControllerProvider)
                             .forceProbe();
                         await OfflineService.instance.triggerSync();
                         if (!context.mounted) return;
+                        final after =
+                            OfflineService.instance.pendingSyncs.length;
+                        final synced = (before - after).clamp(0, before);
+                        final String msg;
+                        if (after == 0) {
+                          msg = synced == 0
+                              ? 'Nothing to sync'
+                              : 'All $synced change${synced == 1 ? "" : "s"} '
+                                  'synced successfully';
+                        } else {
+                          msg = '$synced synced · $after still waiting';
+                        }
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Syncing changes…')),
+                          SnackBar(content: Text(msg)),
                         );
                       },
                 text: 'Sync now',
@@ -241,21 +234,6 @@ class _PendingCard extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  String _label(PendingSync sync) {
-    switch (sync.type) {
-      case SyncType.readingLog:
-        return 'Reading log';
-      case SyncType.parentComment:
-        return 'Parent comment';
-      case SyncType.parentPrefs:
-        return 'Notification settings';
-      case SyncType.student:
-        return 'Child profile';
-      case SyncType.allocation:
-        return 'Allocation';
-    }
   }
 
   String _formatTimestamp(DateTime t) {
@@ -333,5 +311,236 @@ class _CacheCard extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Cache cleared')),
     );
+  }
+}
+
+String _syncTypeLabel(SyncType type) {
+  switch (type) {
+    case SyncType.readingLog:
+      return 'Reading log';
+    case SyncType.parentComment:
+      return 'Parent comment';
+    case SyncType.parentPrefs:
+      return 'Notification settings';
+    case SyncType.student:
+      return 'Child profile';
+    case SyncType.allocation:
+      return 'Allocation';
+  }
+}
+
+String _relativeAge(DateTime t) {
+  final delta = DateTime.now().difference(t);
+  if (delta.inMinutes < 1) return 'just now';
+  if (delta.inHours < 1) return '${delta.inMinutes}m ago';
+  if (delta.inDays < 1) return '${delta.inHours}h ago';
+  return '${delta.inDays}d ago';
+}
+
+/// A single pending item, with failure/retry detail and a dismiss affordance
+/// for items parked needing attention.
+class _PendingDetailRow extends StatelessWidget {
+  const _PendingDetailRow({
+    required this.sync,
+    required this.label,
+    required this.timeLabel,
+  });
+
+  final PendingSync sync;
+  final String label;
+  final String timeLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final attention = sync.needsAttention;
+    final dotColor = attention ? AppColors.error : AppColors.warmOrange;
+
+    String? detail;
+    if (attention) {
+      detail = sync.lastError == null
+          ? "Couldn't sync"
+          : "Couldn't sync — ${sync.lastError}";
+    } else if (sync.retryCount > 0) {
+      detail = 'Retrying… (attempt ${sync.retryCount})';
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: LumiSpacing.xs),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: dotColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              LumiGap.horizontalXS,
+              Expanded(child: Text(label, style: LumiTextStyles.body())),
+              Text(
+                timeLabel,
+                style: LumiTextStyles.bodySmall(
+                  color: AppColors.charcoal.withValues(alpha: 0.6),
+                ),
+              ),
+            ],
+          ),
+          if (detail != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 16, top: 2),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      detail,
+                      style: LumiTextStyles.bodySmall(
+                        color: attention
+                            ? AppColors.error
+                            : AppColors.charcoal.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ),
+                  if (attention)
+                    GestureDetector(
+                      onTap: () async {
+                        await OfflineService.instance.dismissPending(sync.id);
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Removed from queue')),
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Text(
+                          'Dismiss',
+                          style: LumiTextStyles.bodySmall(
+                            color: AppColors.rosePink,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Diagnostic log of the last ~20 sync attempts — the single most useful
+/// surface for investigating a real "never synced" report.
+class _SyncHistoryCard extends ConsumerWidget {
+  const _SyncHistoryCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final history = ref.watch(syncHistoryProvider).value ??
+        const <SyncHistoryEntry>[];
+
+    return LumiCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.history, color: AppColors.rosePink),
+              LumiGap.horizontalXS,
+              Text('Sync history', style: LumiTextStyles.h3()),
+            ],
+          ),
+          LumiGap.s,
+          if (history.isEmpty)
+            Text(
+              'No sync attempts yet.',
+              style: LumiTextStyles.bodySmall(
+                color: AppColors.charcoal.withValues(alpha: 0.6),
+              ),
+            )
+          else
+            // Most recent first.
+            ...history.reversed.map((e) => _HistoryRow(entry: e)),
+        ],
+      ),
+    );
+  }
+}
+
+class _HistoryRow extends StatelessWidget {
+  const _HistoryRow({required this.entry});
+
+  final SyncHistoryEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, color) = _visual(entry.result);
+    return Padding(
+      padding: EdgeInsets.only(bottom: LumiSpacing.xs),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: color),
+          LumiGap.horizontalXS,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${_syncTypeLabel(entry.type)} · ${_resultLabel(entry.result)}',
+                  style: LumiTextStyles.bodySmall(),
+                ),
+                if (entry.error != null)
+                  Text(
+                    entry.error!,
+                    style: LumiTextStyles.bodySmall(
+                      color: AppColors.charcoal.withValues(alpha: 0.6),
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
+          ),
+          LumiGap.horizontalXS,
+          Text(
+            _relativeAge(entry.at),
+            style: LumiTextStyles.bodySmall(
+              color: AppColors.charcoal.withValues(alpha: 0.6),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  (IconData, Color) _visual(SyncResult result) {
+    switch (result) {
+      case SyncResult.success:
+        return (Icons.check_circle, AppColors.success);
+      case SyncResult.transientFail:
+        return (Icons.sync_problem, AppColors.warmOrange);
+      case SyncResult.permanentFail:
+        return (Icons.error, AppColors.error);
+      case SyncResult.integrityFail:
+        return (Icons.gpp_bad, AppColors.error);
+    }
+  }
+
+  String _resultLabel(SyncResult result) {
+    switch (result) {
+      case SyncResult.success:
+        return 'Synced';
+      case SyncResult.transientFail:
+        return 'Will retry';
+      case SyncResult.permanentFail:
+        return 'Failed';
+      case SyncResult.integrityFail:
+        return 'Integrity error';
+    }
   }
 }

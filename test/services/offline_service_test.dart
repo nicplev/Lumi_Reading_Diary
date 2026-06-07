@@ -1,9 +1,39 @@
-import 'package:flutter_test/flutter_test.dart';
-import 'package:lumi_reading_tracker/services/offline_service.dart';
-import 'package:lumi_reading_tracker/data/models/reading_log_model.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'dart:io';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:lumi_reading_tracker/core/models/service_status.dart';
+import 'package:lumi_reading_tracker/core/services/service_status_controller.dart';
+import 'package:lumi_reading_tracker/data/models/reading_log_model.dart';
+import 'package:lumi_reading_tracker/services/offline_service.dart';
+
+/// Minimal reading log for queue/drain specs.
+ReadingLogModel _log(
+  String id, {
+  String schoolId = 'school-1',
+  String studentId = 'student-1',
+}) {
+  return ReadingLogModel(
+    id: id,
+    studentId: studentId,
+    parentId: 'parent-1',
+    schoolId: schoolId,
+    classId: 'class-1',
+    date: DateTime(2024, 1, 1),
+    minutesRead: 20,
+    targetMinutes: 20,
+    bookTitles: const ['Book'],
+    notes: null,
+    status: LogStatus.completed,
+    photoUrls: null,
+    isOfflineCreated: true,
+    syncedAt: null,
+    createdAt: DateTime(2024, 1, 1),
+  );
+}
 
 void main() {
   final binding = TestWidgetsFlutterBinding.ensureInitialized();
@@ -247,14 +277,94 @@ void main() {
         pendingSync.retryCount++;
         expect(pendingSync.retryCount, equals(4));
       });
+
+      test('round-trips the new backoff/integrity fields', () {
+        final p = PendingSync(
+          id: 'sync-new',
+          type: SyncType.readingLog,
+          action: SyncAction.create,
+          data: {'k': 'v'},
+          createdAt: DateTime(2024, 1, 1),
+          retryCount: 2,
+          lastAttemptAt: DateTime(2024, 1, 2, 3, 4),
+          nextAttemptAt: DateTime(2024, 1, 2, 3, 9),
+          lastError: 'unavailable',
+          contentHash: 'abc123',
+          needsAttention: true,
+        );
+
+        final r = PendingSync.fromMap(p.toMap());
+        expect(r.retryCount, equals(2));
+        expect(r.lastAttemptAt, equals(DateTime(2024, 1, 2, 3, 4)));
+        expect(r.nextAttemptAt, equals(DateTime(2024, 1, 2, 3, 9)));
+        expect(r.lastError, equals('unavailable'));
+        expect(r.contentHash, equals('abc123'));
+        expect(r.needsAttention, isTrue);
+      });
+
+      test('fromMap tolerates legacy maps without the new fields', () {
+        final legacy = {
+          'id': 'legacy',
+          'type': 'SyncType.readingLog',
+          'action': 'SyncAction.create',
+          'data': {'k': 'v'},
+          'createdAt': DateTime(2024, 1, 1).toIso8601String(),
+          'retryCount': 0,
+        };
+
+        final r = PendingSync.fromMap(legacy);
+        expect(r.needsAttention, isFalse);
+        expect(r.lastAttemptAt, isNull);
+        expect(r.nextAttemptAt, isNull);
+        expect(r.lastError, isNull);
+        expect(r.contentHash, isNull);
+      });
+
+      test('backoffFor grows exponentially and caps at 30 minutes', () {
+        expect(PendingSync.backoffFor(1).inSeconds, equals(5));
+        expect(PendingSync.backoffFor(2).inSeconds, equals(10));
+        expect(PendingSync.backoffFor(3).inSeconds, equals(20));
+        expect(PendingSync.backoffFor(4).inSeconds, equals(40));
+        // Far out: clamped to the 30-minute ceiling.
+        expect(PendingSync.backoffFor(100).inMinutes, equals(30));
+      });
+
+      test('computeContentHash is stable regardless of key order', () {
+        final a = PendingSync.computeContentHash({
+          'a': 1,
+          'b': {'x': 1, 'y': 2},
+          'c': [1, 2, 3],
+        });
+        final b = PendingSync.computeContentHash({
+          'c': [1, 2, 3],
+          'b': {'y': 2, 'x': 1},
+          'a': 1,
+        });
+        expect(a, equals(b));
+
+        // A changed value yields a different hash.
+        final c = PendingSync.computeContentHash({
+          'a': 2,
+          'b': {'x': 1, 'y': 2},
+          'c': [1, 2, 3],
+        });
+        expect(a, isNot(equals(c)));
+      });
     });
 
     group('sync types and actions', () {
       test('SyncType enum has all expected values', () {
-        expect(SyncType.values.length, equals(3));
-        expect(SyncType.values, contains(SyncType.readingLog));
-        expect(SyncType.values, contains(SyncType.student));
-        expect(SyncType.values, contains(SyncType.allocation));
+        expect(SyncType.values.length, equals(5));
+        expect(
+          SyncType.values,
+          containsAll([
+            SyncType.readingLog,
+            SyncType.student,
+            SyncType.allocation,
+            SyncType.parentComment,
+            SyncType.parentPrefs,
+          ]),
+        );
       });
 
       test('SyncAction enum has all expected values', () {
@@ -370,7 +480,130 @@ void main() {
       });
     });
 
+    group('drain hardening', () {
+      void goHealthy() => ServiceStatusController.instance
+          .debugSetCurrent(ServiceStatusSnapshot.healthy());
+
+      test('does not drain while the write path is unhealthy', () async {
+        // Status defaults to `unknown` (canWriteToFirebase == false).
+        var attempts = 0;
+        offlineService.syncOneOverrideForTest = (_) async => attempts++;
+        await offlineService.saveReadingLogLocally(_log('rl-gated'));
+
+        await offlineService.triggerSync();
+
+        expect(attempts, equals(0));
+        expect(offlineService.pendingSyncs, hasLength(1));
+      });
+
+      test('confirmed reading-log write leaves the queue', () async {
+        final fake = FakeFirebaseFirestore();
+        offlineService.firestoreForTest = fake;
+        goHealthy();
+
+        await offlineService.saveReadingLogLocally(_log('rl-ok'));
+        expect(offlineService.pendingSyncs, hasLength(1));
+
+        await offlineService.triggerSync();
+
+        // Removed only after the server read-back confirmed the doc.
+        expect(offlineService.pendingSyncs, isEmpty);
+        final doc = await fake
+            .collection('schools')
+            .doc('school-1')
+            .collection('readingLogs')
+            .doc('rl-ok')
+            .get();
+        expect(doc.exists, isTrue);
+      });
+
+      test('transient failure keeps the item and persists backoff state',
+          () async {
+        goHealthy();
+        offlineService.syncOneOverrideForTest = (_) async {
+          throw FirebaseException(plugin: 'cloud_firestore', code: 'unavailable');
+        };
+
+        await offlineService.saveReadingLogLocally(_log('rl-transient'));
+        await offlineService.triggerSync();
+
+        // Still queued — never silently dropped.
+        expect(offlineService.pendingSyncs, hasLength(1));
+
+        // Prove the retry/backoff state hit disk (the old bug only mutated
+        // it in memory and lost it on restart).
+        offlineService.reloadPendingFromDiskForTest();
+        final item = offlineService.pendingSyncs.single;
+        expect(item.retryCount, equals(1));
+        expect(item.nextAttemptAt, isNotNull);
+        expect(item.needsAttention, isFalse);
+        expect(item.lastError, contains('unavailable'));
+      });
+
+      test('permanent failure parks the item and stops retrying', () async {
+        goHealthy();
+        offlineService.syncOneOverrideForTest = (_) async {
+          throw FirebaseException(
+              plugin: 'cloud_firestore', code: 'permission-denied');
+        };
+
+        await offlineService.saveReadingLogLocally(_log('rl-perm'));
+        await offlineService.triggerSync();
+
+        offlineService.reloadPendingFromDiskForTest();
+        final item = offlineService.pendingSyncs.single;
+        expect(item.needsAttention, isTrue);
+        expect(item.retryCount, equals(1));
+
+        // A subsequent drain must not re-attempt a parked item.
+        var attempts = 0;
+        offlineService.syncOneOverrideForTest = (_) async {
+          attempts++;
+          throw FirebaseException(
+              plugin: 'cloud_firestore', code: 'permission-denied');
+        };
+        await offlineService.triggerSync();
+        expect(attempts, equals(0));
+        expect(offlineService.pendingSyncs, hasLength(1));
+      });
+
+      test('corrupted payload trips the integrity check', () async {
+        goHealthy();
+        await offlineService.saveReadingLogLocally(_log('rl-integrity'));
+
+        // Tamper the queued payload so its hash no longer matches.
+        offlineService.pendingSyncs.single.data['minutesRead'] = 9999;
+
+        var attempts = 0;
+        offlineService.syncOneOverrideForTest = (_) async => attempts++;
+        await offlineService.triggerSync();
+
+        // The network write is never attempted for corrupted data...
+        expect(attempts, equals(0));
+        // ...and the item is parked for attention rather than synced.
+        offlineService.reloadPendingFromDiskForTest();
+        expect(offlineService.pendingSyncs.single.needsAttention, isTrue);
+      });
+
+      test('dismissPending is the only way an unsynced item leaves the queue',
+          () async {
+        await offlineService.saveReadingLogLocally(_log('rl-dismiss'));
+        expect(offlineService.pendingSyncs, hasLength(1));
+
+        await offlineService.dismissPending('rl-dismiss');
+
+        expect(offlineService.pendingSyncs, isEmpty);
+        offlineService.reloadPendingFromDiskForTest();
+        expect(offlineService.pendingSyncs, isEmpty);
+      });
+    });
+
     tearDown(() async {
+      // Reset test seams so they don't leak across specs.
+      offlineService.syncOneOverrideForTest = null;
+      offlineService.firestoreForTest = null;
+      ServiceStatusController.instance
+          .debugSetCurrent(ServiceStatusSnapshot.unknown());
       // Clean up test data
       await offlineService.clearLocalData();
     });
