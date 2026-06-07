@@ -333,6 +333,19 @@ service cloud.firestore {
             request.resource.data.studentId in getUserData(schoolId).linkedChildren &&
             request.resource.data.parentId == request.auth.uid;
 
+        // Teacher proxy logs: a teacher logs reading on behalf of a student
+        // whose carer can't use the app. `parentId` holds the teacher's UID
+        // (creator) so the existing ownership clauses in update/delete keep
+        // working. `loggedByRole == 'teacher'` is the explicit proxy signal
+        // and stops a teacher accidentally writing a parent-shaped log.
+        allow create: if isSignedIn() &&
+            writeAllowedForDev() &&
+            isTeacher(schoolId) &&
+            request.resource.data.parentId == request.auth.uid &&
+            request.resource.data.loggedByRole == 'teacher' &&
+            getUserData(schoolId).classIds != null &&
+            request.resource.data.classId in getUserData(schoolId).classIds;
+
         allow update: if writeAllowedForDev() &&
             (
               (isSignedIn() && resource.data.parentId == request.auth.uid) ||
