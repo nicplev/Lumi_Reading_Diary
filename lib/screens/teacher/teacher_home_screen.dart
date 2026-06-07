@@ -38,6 +38,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
   List<ClassModel> _classes = [];
   ClassModel? _selectedClass;
   bool _isLoading = true;
+  bool _isProgrammaticPageChange = false;
 
   late final PageController _pageController;
 
@@ -69,11 +70,16 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
       _selectedIndex = index;
       _dashboardResetTrigger++;
     });
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
+    _isProgrammaticPageChange = true;
+    _pageController
+        .animateToPage(
+          index,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        )
+        .whenComplete(() {
+      if (mounted) _isProgrammaticPageChange = false;
+    });
   }
 
   Future<void> _loadClasses() async {
@@ -170,10 +176,13 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
         children: [
           PageView(
             controller: _pageController,
-            onPageChanged: (index) => setState(() {
-              _selectedIndex = index;
-              _dashboardResetTrigger++;
-            }),
+            onPageChanged: (index) {
+              if (_isProgrammaticPageChange) return;
+              setState(() {
+                _selectedIndex = index;
+                _dashboardResetTrigger++;
+              });
+            },
             children: [
               _KeepAlivePage(child: _buildDashboardView()),
               _KeepAlivePage(
