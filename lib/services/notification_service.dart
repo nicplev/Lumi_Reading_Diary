@@ -259,6 +259,14 @@ class NotificationService {
       _routeReadingReminderTap(message.data);
       return;
     }
+    if (type == 'comment_reply') {
+      // Land on parent home; the unread dot in reading history guides the
+      // parent into the specific log's thread. (Deep-linking straight to the
+      // thread needs the StudentModel the reading-history route requires —
+      // tracked as a follow-up.)
+      _navigateTo('/parent/home');
+      return;
+    }
   }
 
   /// Handle notification tap (local notifications shown via _showLocalNotification).

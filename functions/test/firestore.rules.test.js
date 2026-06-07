@@ -1689,3 +1689,117 @@ test('readingLogs: unauthenticated user cannot delete a log', async () => {
     db.collection('schools').doc('school_1').collection('readingLogs').doc('log_1').delete(),
   );
 });
+
+// ── Reading-log comment thread ─────────────────────────────────────────────
+
+async function seedSchoolForComments() {
+  await seedData(async (db) => {
+    await db.collection('schools').doc('school_1').set({
+      name: 'Lumi School One',
+      createdBy: 'admin_1',
+    });
+    await db.collection('schools').doc('school_1').collection('parents').doc('parent_1').set({
+      role: 'parent',
+      schoolId: 'school_1',
+      linkedChildren: ['student_1'],
+    });
+    await db.collection('schools').doc('school_1').collection('parents').doc('parent_outsider').set({
+      role: 'parent',
+      schoolId: 'school_1',
+      linkedChildren: ['student_999'],
+    });
+    await db.collection('schools').doc('school_1').collection('users').doc('teacher_1').set({
+      role: 'teacher',
+      schoolId: 'school_1',
+      classIds: ['class_1'],
+    });
+    await db.collection('schools').doc('school_1').collection('readingLogs').doc('log_1').set({
+      schoolId: 'school_1',
+      studentId: 'student_1',
+      parentId: 'parent_1',
+      minutesRead: 20,
+      status: 'completed',
+      bookTitles: ['Reading'],
+    });
+    // A pre-existing teacher comment, to exercise read + immutability.
+    await db.collection('schools').doc('school_1').collection('readingLogs').doc('log_1')
+      .collection('comments').doc('existing').set({
+        authorId: 'teacher_1',
+        authorRole: 'teacher',
+        authorName: 'Ms Smith',
+        body: 'Lovely work',
+        studentId: 'student_1',
+        parentId: 'parent_1',
+        createdAt: new Date(),
+      });
+  });
+}
+
+function commentRef(db, commentId) {
+  return db.collection('schools').doc('school_1').collection('readingLogs').doc('log_1')
+    .collection('comments').doc(commentId);
+}
+
+const parentComment = {
+  authorId: 'parent_1',
+  authorRole: 'parent',
+  authorName: 'Dad',
+  body: 'Thank you!',
+  studentId: 'student_1',
+  parentId: 'parent_1',
+  createdAt: new Date(),
+};
+
+test('comments: parent of the student can read the thread and post', async () => {
+  await seedSchoolForComments();
+  const db = authDb('parent_1');
+  await assertSucceeds(commentRef(db, 'existing').get());
+  await assertSucceeds(commentRef(db, 'p1').set(parentComment));
+});
+
+test('comments: teacher can post a teacher comment on any log in the school', async () => {
+  await seedSchoolForComments();
+  const db = authDb('teacher_1');
+  await assertSucceeds(commentRef(db, 't1').set({
+    authorId: 'teacher_1',
+    authorRole: 'teacher',
+    authorName: 'Ms Smith',
+    body: 'Great progress',
+    studentId: 'student_1',
+    parentId: 'parent_1',
+    createdAt: new Date(),
+  }));
+});
+
+test('comments: an unrelated parent cannot read or post', async () => {
+  await seedSchoolForComments();
+  const db = authDb('parent_outsider');
+  await assertFails(commentRef(db, 'existing').get());
+  await assertFails(commentRef(db, 'x').set({ ...parentComment, authorId: 'parent_outsider' }));
+});
+
+test('comments: authorId cannot be spoofed as another user', async () => {
+  await seedSchoolForComments();
+  const db = authDb('parent_1');
+  await assertFails(commentRef(db, 'spoof').set({ ...parentComment, authorId: 'teacher_1' }));
+});
+
+test('comments: a parent cannot post claiming the teacher role', async () => {
+  await seedSchoolForComments();
+  const db = authDb('parent_1');
+  await assertFails(commentRef(db, 'roleswap').set({ ...parentComment, authorRole: 'teacher' }));
+});
+
+test('comments: are immutable (no update or delete)', async () => {
+  await seedSchoolForComments();
+  const db = authDb('teacher_1');
+  await assertFails(commentRef(db, 'existing').update({ body: 'edited' }));
+  await assertFails(commentRef(db, 'existing').delete());
+});
+
+test('comments: unauthenticated user cannot read or post', async () => {
+  await seedSchoolForComments();
+  const db = unauthDb();
+  await assertFails(commentRef(db, 'existing').get());
+  await assertFails(commentRef(db, 'u1').set({ ...parentComment, authorId: 'anon' }));
+});

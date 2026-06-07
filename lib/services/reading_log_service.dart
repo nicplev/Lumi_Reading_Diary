@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 
 import '../core/services/service_status_controller.dart';
 import '../data/models/allocation_model.dart';
+import '../data/models/log_comment_model.dart';
 import '../data/models/reading_log_model.dart';
 import '../data/models/student_model.dart';
 import '../data/models/user_model.dart';
@@ -354,6 +355,90 @@ class ReadingLogService {
         .doc(log.schoolId)
         .collection('readingLogs')
         .doc(log.id);
+  }
+
+  /// Live comment thread for a log, oldest message first. Powers the in-app
+  /// conversation view for both parents and teachers.
+  Stream<List<LogCommentModel>> commentsStream(ReadingLogModel log) {
+    return _logRef(log)
+        .collection('comments')
+        .orderBy('createdAt')
+        .snapshots()
+        .map((snap) => snap.docs.map(LogCommentModel.fromFirestore).toList());
+  }
+
+  /// Posts a comment to a log's thread and refreshes the denormalized "last
+  /// comment" preview on the log so history lists update without reading the
+  /// subcollection. The teacher→parent push and the legacy `teacherComment`
+  /// mirror are handled server-side by the `onCommentCreated` Cloud Function.
+  ///
+  /// Queues the write locally when Firebase isn't writable so a comment typed
+  /// offline lands on reconnect (the drain creates the log first if needed).
+  Future<void> addComment(
+    ReadingLogModel log, {
+    required String body,
+    required CommentAuthorRole authorRole,
+    required String authorId,
+    required String authorName,
+  }) async {
+    final trimmed = body.trim();
+    if (trimmed.isEmpty) return;
+
+    final roleName = authorRole.toString().split('.').last;
+    final commentRef = _logRef(log).collection('comments').doc();
+
+    if (!ServiceStatusController.instance.current.canWriteToFirebase) {
+      await OfflineService.instance.enqueueCommentReply(
+        logId: log.id,
+        schoolId: log.schoolId,
+        commentId: commentRef.id,
+        authorId: authorId,
+        authorRole: roleName,
+        authorName: authorName,
+        body: trimmed,
+        studentId: log.studentId,
+        parentId: log.parentId,
+      );
+      return;
+    }
+
+    final comment = LogCommentModel(
+      id: commentRef.id,
+      authorId: authorId,
+      authorRole: authorRole,
+      authorName: authorName,
+      body: trimmed,
+      createdAt: DateTime.now(), // server timestamp wins on write
+      studentId: log.studentId,
+      parentId: log.parentId,
+    );
+
+    final batch = _firestore.batch();
+    batch.set(commentRef, comment.toFirestore());
+    batch.update(_logRef(log), {
+      'lastCommentPreview': trimmed,
+      'lastCommentAt': FieldValue.serverTimestamp(),
+      'lastCommentByRole': roleName,
+    });
+    await batch.commit();
+  }
+
+  /// Marks a log's thread as seen for [uid] (clears the unread badge).
+  /// Best-effort: a failure only means the dot lingers, so errors are swallowed
+  /// rather than surfaced. Skipped offline — the read marker is low-value and
+  /// not worth a queue slot.
+  Future<void> markCommentsRead(
+    ReadingLogModel log, {
+    required String uid,
+  }) async {
+    if (!ServiceStatusController.instance.current.canWriteToFirebase) return;
+    try {
+      await _logRef(log).update({
+        'commentsViewedAt.$uid': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('markCommentsRead failed for ${log.id}: $e');
+    }
   }
 
   /// Resolves the book titles for a log: explicit titles win; otherwise the

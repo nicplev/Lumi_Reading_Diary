@@ -58,6 +58,18 @@ class ReadingLogModel {
   final DateTime? commentedAt;
   final String? commentedBy;
 
+  // Denormalized preview of the most recent comment-thread message, kept on the
+  // log so history lists can show a preview and an unread badge without reading
+  // the `comments` subcollection. `lastCommentByRole` is 'parent' | 'teacher'.
+  final String? lastCommentPreview;
+  final DateTime? lastCommentAt;
+  final String? lastCommentByRole;
+
+  // Per-user read marker for the comment thread, keyed by Firebase UID. A log is
+  // "unread" for a viewer when the newest comment is from the other party and is
+  // newer than that viewer's entry here.
+  final Map<String, DateTime> commentsViewedAt;
+
   // Denormalized attribution of the guardian who logged this session.
   // Captured at create time so the display stays correct even if the
   // guardian later changes their name or relationship label.
@@ -94,6 +106,10 @@ class ReadingLogModel {
     this.teacherComment,
     this.commentedAt,
     this.commentedBy,
+    this.lastCommentPreview,
+    this.lastCommentAt,
+    this.lastCommentByRole,
+    this.commentsViewedAt = const {},
     this.loggedByName,
     this.loggedByLabel,
     this.loggedByRole,
@@ -102,6 +118,15 @@ class ReadingLogModel {
   bool get isCompleted => status == LogStatus.completed;
   bool get hasMetTarget => minutesRead >= targetMinutes;
   bool get isTeacherProxy => loggedByRole == LoggedByRole.teacher;
+
+  /// Whether the viewer [uid] (acting as [role], 'parent' | 'teacher') has an
+  /// unseen comment: there's a thread, its newest message is from the other
+  /// party, and it postdates this viewer's last view.
+  bool hasUnreadFor(String uid, String role) {
+    if (lastCommentAt == null || lastCommentByRole == role) return false;
+    final viewed = commentsViewedAt[uid];
+    return viewed == null || viewed.isBefore(lastCommentAt!);
+  }
 
   factory ReadingLogModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -147,6 +172,14 @@ class ReadingLogModel {
           ? (data['commentedAt'] as Timestamp).toDate()
           : null,
       commentedBy: data['commentedBy'],
+      lastCommentPreview: data['lastCommentPreview'],
+      lastCommentAt: data['lastCommentAt'] != null
+          ? (data['lastCommentAt'] as Timestamp).toDate()
+          : null,
+      lastCommentByRole: data['lastCommentByRole'],
+      commentsViewedAt: (data['commentsViewedAt'] as Map<String, dynamic>?)
+              ?.map((k, v) => MapEntry(k, (v as Timestamp).toDate())) ??
+          const {},
       loggedByName: data['loggedByName'],
       loggedByLabel: data['loggedByLabel'],
       loggedByRole: data['loggedByRole'] != null
@@ -184,6 +217,12 @@ class ReadingLogModel {
       'commentedAt':
           commentedAt != null ? Timestamp.fromDate(commentedAt!) : null,
       'commentedBy': commentedBy,
+      'lastCommentPreview': lastCommentPreview,
+      'lastCommentAt':
+          lastCommentAt != null ? Timestamp.fromDate(lastCommentAt!) : null,
+      'lastCommentByRole': lastCommentByRole,
+      'commentsViewedAt': commentsViewedAt
+          .map((k, v) => MapEntry(k, Timestamp.fromDate(v))),
       'loggedByName': loggedByName,
       'loggedByLabel': loggedByLabel,
       'loggedByRole': loggedByRole?.toString().split('.').last,
@@ -215,6 +254,10 @@ class ReadingLogModel {
     String? teacherComment,
     DateTime? commentedAt,
     String? commentedBy,
+    String? lastCommentPreview,
+    DateTime? lastCommentAt,
+    String? lastCommentByRole,
+    Map<String, DateTime>? commentsViewedAt,
     String? loggedByName,
     String? loggedByLabel,
     LoggedByRole? loggedByRole,
@@ -246,6 +289,10 @@ class ReadingLogModel {
       teacherComment: teacherComment ?? this.teacherComment,
       commentedAt: commentedAt ?? this.commentedAt,
       commentedBy: commentedBy ?? this.commentedBy,
+      lastCommentPreview: lastCommentPreview ?? this.lastCommentPreview,
+      lastCommentAt: lastCommentAt ?? this.lastCommentAt,
+      lastCommentByRole: lastCommentByRole ?? this.lastCommentByRole,
+      commentsViewedAt: commentsViewedAt ?? this.commentsViewedAt,
       loggedByName: loggedByName ?? this.loggedByName,
       loggedByLabel: loggedByLabel ?? this.loggedByLabel,
       loggedByRole: loggedByRole ?? this.loggedByRole,
@@ -279,6 +326,11 @@ class ReadingLogModel {
       'teacherComment': teacherComment,
       'commentedAt': commentedAt?.toIso8601String(),
       'commentedBy': commentedBy,
+      'lastCommentPreview': lastCommentPreview,
+      'lastCommentAt': lastCommentAt?.toIso8601String(),
+      'lastCommentByRole': lastCommentByRole,
+      'commentsViewedAt':
+          commentsViewedAt.map((k, v) => MapEntry(k, v.toIso8601String())),
       'loggedByName': loggedByName,
       'loggedByLabel': loggedByLabel,
       'loggedByRole': loggedByRole?.toString().split('.').last,
@@ -324,6 +376,14 @@ class ReadingLogModel {
           ? DateTime.parse(map['commentedAt'])
           : null,
       commentedBy: map['commentedBy'],
+      lastCommentPreview: map['lastCommentPreview'],
+      lastCommentAt: map['lastCommentAt'] != null
+          ? DateTime.parse(map['lastCommentAt'])
+          : null,
+      lastCommentByRole: map['lastCommentByRole'],
+      commentsViewedAt: (map['commentsViewedAt'] as Map<String, dynamic>?)
+              ?.map((k, v) => MapEntry(k, DateTime.parse(v as String))) ??
+          const {},
       loggedByName: map['loggedByName'],
       loggedByLabel: map['loggedByLabel'],
       loggedByRole: map['loggedByRole'] != null

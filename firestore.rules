@@ -361,6 +361,35 @@ service cloud.firestore {
               isSchoolAdmin(schoolId) ||
               (isSignedIn() && resource.data.parentId == request.auth.uid)
             );
+
+        // Threaded comments. `studentId` is denormalized onto each comment so
+        // these rules mirror the parent/teacher access on the parent log
+        // without an extra get() to read it.
+        match /comments/{commentId} {
+          allow get, list: if isSchoolAdmin(schoolId) ||
+              isTeacher(schoolId) ||
+              isDevImpersonatingSchool(schoolId);
+
+          allow get, list: if isSignedIn() &&
+              getUserData(schoolId).linkedChildren != null &&
+              resource.data.studentId in getUserData(schoolId).linkedChildren;
+
+          // Teachers post as staff; parents post on their own child's log.
+          // authorId is pinned to the caller so attribution can't be spoofed.
+          allow create: if writeAllowedForDev() &&
+              request.resource.data.authorId == request.auth.uid &&
+              (
+                (isTeacher(schoolId) &&
+                    request.resource.data.authorRole == 'teacher') ||
+                (isSignedIn() &&
+                    request.resource.data.authorRole == 'parent' &&
+                    getUserData(schoolId).linkedChildren != null &&
+                    request.resource.data.studentId in
+                        getUserData(schoolId).linkedChildren)
+              );
+
+          // Comments are immutable; edits/deletes are denied (default).
+        }
       }
 
       match /allocations/{allocationId} {

@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -8,9 +9,11 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/lumi_text_styles.dart';
 import '../../core/theme/lumi_spacing.dart';
 import '../../core/theme/lumi_borders.dart';
+import '../../core/widgets/comments/comment_thread.dart';
 import '../../core/widgets/lumi/persistent_cached_image.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_card.dart';
+import '../../data/models/log_comment_model.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../services/book_lookup_service.dart';
 import '../../services/book_metadata_resolver.dart';
@@ -1933,6 +1936,8 @@ class _LogCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasMultipleBooks = log.bookTitles.length > 1;
     final extraCount = log.bookTitles.length - 1;
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final hasUnread = uid.isNotEmpty && log.hasUnreadFor(uid, 'parent');
 
     return GestureDetector(
       onTap: () => _showSessionDetail(context),
@@ -1940,32 +1945,52 @@ class _LogCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Date badge
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: AppColors.rosePink.withValues(alpha: 0.1),
-                borderRadius: LumiBorders.medium,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    DateFormat('dd').format(log.date),
-                    style: LumiTextStyles.h3().copyWith(
-                      color: AppColors.rosePink,
+            // Date badge (with an unread-comment dot when a teacher has
+            // commented since this parent last opened the thread)
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: AppColors.rosePink.withValues(alpha: 0.1),
+                    borderRadius: LumiBorders.medium,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        DateFormat('dd').format(log.date),
+                        style: LumiTextStyles.h3().copyWith(
+                          color: AppColors.rosePink,
+                        ),
+                      ),
+                      Text(
+                        DateFormat('MMM').format(log.date),
+                        style: LumiTextStyles.caption().copyWith(
+                          color: AppColors.rosePink,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (hasUnread)
+                  Positioned(
+                    top: -3,
+                    right: -3,
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: AppColors.rosePink,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
                     ),
                   ),
-                  Text(
-                    DateFormat('MMM').format(log.date),
-                    style: LumiTextStyles.caption().copyWith(
-                      color: AppColors.rosePink,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
+              ],
             ),
             SizedBox(width: LumiSpacing.s),
             // Content
@@ -2448,43 +2473,25 @@ class _SessionDetailSheet extends StatelessWidget {
                       ),
                     ),
                   ],
-                  // Teacher comment
-                  if (log.teacherComment != null) ...[
-                    LumiGap.s,
-                    Text(
-                      'Teacher comment',
-                      style: LumiTextStyles.bodySmall().copyWith(
-                        color: AppColors.charcoal.withValues(alpha: 0.5),
-                        fontWeight: FontWeight.w600,
-                      ),
+                  // Comments thread (teacher ↔ parent conversation). Replaces
+                  // the old single-comment box — the thread shows the latest
+                  // teacher comment as a bubble plus any replies and a composer.
+                  LumiGap.s,
+                  Text(
+                    'Comments',
+                    style: LumiTextStyles.bodySmall().copyWith(
+                      color: AppColors.charcoal.withValues(alpha: 0.5),
+                      fontWeight: FontWeight.w600,
                     ),
-                    LumiGap.xs,
-                    Container(
-                      padding: LumiPadding.allS,
-                      decoration: BoxDecoration(
-                        color: AppColors.info.withValues(alpha: 0.1),
-                        borderRadius: LumiBorders.small,
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.comment,
-                            size: 16,
-                            color: AppColors.info,
-                          ),
-                          LumiGap.horizontalXS,
-                          Expanded(
-                            child: Text(
-                              log.teacherComment!,
-                              style: LumiTextStyles.body().copyWith(
-                                color: AppColors.info,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
+                  LumiGap.xs,
+                  CommentThread(
+                    log: log,
+                    authorRole: CommentAuthorRole.parent,
+                    accentColor: AppColors.rosePink,
+                  ),
+                  // Clear the keyboard inset so the composer stays visible.
+                  SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
                 ],
               ),
             ),

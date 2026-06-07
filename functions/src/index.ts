@@ -2243,3 +2243,123 @@ export const backfillGuardianProfiles = functions.https.onCall(
     return {success: true, parentsProcessed: parentsSnap.size, studentsUpdated};
   }
 );
+
+/**
+ * On Comment Created
+ *
+ * Fires when a message is posted to a reading log's comment thread at
+ * `schools/{schoolId}/readingLogs/{logId}/comments/{commentId}`.
+ *
+ * Teacher → parent: mirrors the latest teacher message onto the log's legacy
+ * `teacherComment`/`commentedAt`/`commentedBy` fields (so the existing
+ * parent-side display keeps working) and pushes the parent an FCM notification,
+ * respecting their push preference and the school's quiet hours.
+ *
+ * Parent → teacher: no push. Teachers have no FCM tokens registered, so a
+ * parent reply surfaces as an in-app unread badge instead (handled client-side
+ * via the log's denormalized `lastComment*` fields).
+ */
+export const onCommentCreated = functions.firestore
+  .document("schools/{schoolId}/readingLogs/{logId}/comments/{commentId}")
+  .onCreate(async (snap, context) => {
+    const {schoolId, logId} = context.params as {
+      schoolId: string;
+      logId: string;
+    };
+    const comment = snap.data() ?? {};
+
+    // Only teacher comments drive a push; parent replies show as an in-app
+    // badge (no staff tokens exist yet).
+    if (comment.authorRole !== "teacher") return null;
+
+    const logRef = snap.ref.parent.parent;
+    if (!logRef) return null;
+
+    const body = typeof comment.body === "string" ? comment.body : "";
+    const authorName =
+      typeof comment.authorName === "string" ? comment.authorName : "Teacher";
+
+    // Mirror the latest teacher message onto the log for the legacy
+    // single-comment display surfaces.
+    await logRef.update({
+      teacherComment: body,
+      commentedAt:
+        comment.createdAt ?? admin.firestore.FieldValue.serverTimestamp(),
+      commentedBy: authorName,
+    });
+
+    const parentId =
+      typeof comment.parentId === "string" ? comment.parentId : "";
+    if (!parentId) return null;
+
+    // Teacher-proxy logs store the teacher's own UID in `parentId`. If the
+    // recipient is the comment author, there's no real parent to notify.
+    if (parentId === comment.authorId) return null;
+
+    const parentSnap = await db
+      .doc(`schools/${schoolId}/parents/${parentId}`)
+      .get();
+    if (!parentSnap.exists) return null;
+    const parentData = parentSnap.data() ?? {};
+    if (parentData.isActive === false) return null;
+
+    const pushEnabled =
+      parentData.preferences?.pushNotificationsEnabled !== false;
+    const token =
+      typeof parentData.fcmToken === "string" ? parentData.fcmToken : undefined;
+    if (!pushEnabled || !token) return null;
+
+    // Respect the school's quiet hours (the thread + badge still land; only the
+    // push is suppressed).
+    const schoolSnap = await db.doc(`schools/${schoolId}`).get();
+    const schoolData = schoolSnap.data() ?? {};
+    const timezone = String(schoolData.timezone ?? "UTC");
+    if (isWithinQuietHours(new Date(), timezone, schoolData.quietHours)) {
+      functions.logger.info("Comment push suppressed by quiet hours", {
+        schoolId,
+        logId,
+      });
+      return null;
+    }
+
+    const studentId = String(comment.studentId ?? "");
+    const preview = body.length > 120 ? `${body.slice(0, 117)}...` : body;
+
+    try {
+      await admin.messaging().send({
+        token,
+        notification: {
+          title: `New comment from ${authorName}`,
+          body: preview,
+        },
+        data: {
+          type: "comment_reply",
+          logId,
+          schoolId,
+          studentId,
+        },
+        apns: {payload: {aps: {sound: "default"}}},
+        android: {
+          priority: "high" as const,
+          notification: {
+            sound: "default",
+            clickAction: "FLUTTER_NOTIFICATION_CLICK",
+          },
+        },
+      });
+      functions.logger.info("Comment notification sent", {
+        schoolId,
+        logId,
+        parentId,
+      });
+    } catch (error) {
+      functions.logger.error("Failed to send comment notification", {
+        schoolId,
+        logId,
+        parentId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    return null;
+  });

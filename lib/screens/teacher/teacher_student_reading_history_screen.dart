@@ -1,10 +1,14 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
+import '../../core/widgets/comments/comment_thread.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
 import '../../core/widgets/lumi/teacher_filter_chip.dart';
+import '../../data/models/log_comment_model.dart';
+import '../../data/models/reading_log_model.dart';
 import '../../data/models/student_model.dart';
 import '../../services/firebase_service.dart';
 
@@ -399,13 +403,17 @@ class _TeacherStudentReadingHistoryScreenState
     final books =
         log.bookTitles.isNotEmpty ? log.bookTitles.join(', ') : 'Free reading';
     final minutes = log.minutesRead;
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final hasUnread = uid.isNotEmpty && log.hasUnreadForTeacher(uid);
 
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Row(
-            children: [
+        InkWell(
+          onTap: () => _openCommentsSheet(log),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              children: [
               SizedBox(
                 width: 70,
                 child: Text(dateStr, style: TeacherTypography.caption),
@@ -458,7 +466,10 @@ class _TeacherStudentReadingHistoryScreenState
                   height: 18,
                 ),
               ],
-            ],
+              const SizedBox(width: 8),
+              _CommentAffordance(hasUnread: hasUnread),
+              ],
+            ),
           ),
         ),
         if (showDivider)
@@ -553,19 +564,63 @@ class _TeacherStudentReadingHistoryScreenState
         _ => AppColors.textSecondary,
       };
 
+  /// Builds a full [ReadingLogModel] from the lightweight snapshot plus the
+  /// screen's student, carrying the fields the comment thread and its writes
+  /// need (ids and the denormalized comment state).
+  ReadingLogModel _toReadingLogModel(_ReadingLogSnapshot snap) {
+    return ReadingLogModel(
+      id: snap.id,
+      studentId: widget.student.id,
+      parentId: snap.parentId ?? '',
+      schoolId: widget.student.schoolId,
+      classId: widget.student.classId,
+      date: snap.date,
+      minutesRead: snap.minutesRead,
+      targetMinutes: snap.targetMinutes,
+      status: LogStatus.values.firstWhere(
+        (e) => e.toString() == 'LogStatus.${snap.status}',
+        orElse: () => LogStatus.pending,
+      ),
+      bookTitles: snap.bookTitles,
+      notes: snap.notes,
+      createdAt: snap.createdAt,
+      lastCommentAt: snap.lastCommentAt,
+      lastCommentByRole: snap.lastCommentByRole,
+      commentsViewedAt: snap.commentsViewedAt,
+    );
+  }
+
+  void _openCommentsSheet(_ReadingLogSnapshot snap) {
+    final log = _toReadingLogModel(snap);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _TeacherCommentsSheet(
+        log: log,
+        studentName: widget.student.fullName,
+      ),
+    );
+  }
+
   List<_ReadingLogSnapshot> _toReadingLogs(QuerySnapshot snapshot) {
     return snapshot.docs.map((doc) {
       final data = doc.data() as Map<String, dynamic>;
       final dateTimestamp = data['date'] as Timestamp?;
       final commentSelections = data['parentCommentSelections'];
+      final viewedRaw = data['commentsViewedAt'] as Map<String, dynamic>?;
       return _ReadingLogSnapshot(
         id: doc.id,
         date: dateTimestamp?.toDate() ?? DateTime.fromMillisecondsSinceEpoch(0),
+        createdAt: (data['createdAt'] as Timestamp?)?.toDate() ??
+            dateTimestamp?.toDate() ??
+            DateTime.fromMillisecondsSinceEpoch(0),
         allocationId: data['allocationId'] as String?,
         bookTitles: List<String>.from(data['bookTitles'] ?? const []),
         status: (data['status'] as String?) ?? '',
         minutesRead: (data['minutesRead'] as num?)?.toInt() ?? 0,
         targetMinutes: (data['targetMinutes'] as num?)?.toInt() ?? 0,
+        notes: (data['notes'] as String?)?.trim(),
         parentId: data['parentId'] as String?,
         parentComment: (data['parentComment'] as String?)?.trim(),
         parentCommentSelections: commentSelections is List
@@ -576,6 +631,13 @@ class _TeacherStudentReadingHistoryScreenState
         childFeeling: data['childFeeling'] as String?,
         loggedByName: (data['loggedByName'] as String?)?.trim(),
         loggedByLabel: (data['loggedByLabel'] as String?)?.trim(),
+        lastCommentAt: (data['lastCommentAt'] as Timestamp?)?.toDate(),
+        lastCommentByRole: data['lastCommentByRole'] as String?,
+        commentsViewedAt: viewedRaw == null
+            ? const {}
+            : viewedRaw.map(
+                (k, v) => MapEntry(k, (v as Timestamp).toDate()),
+              ),
       );
     }).toList();
   }
@@ -701,16 +763,139 @@ class _BlobFilterChip extends StatelessWidget {
   }
 }
 
+/// Trailing comment icon on a log row, with an accent dot when the teacher has
+/// an unseen parent reply.
+class _CommentAffordance extends StatelessWidget {
+  final bool hasUnread;
+
+  const _CommentAffordance({required this.hasUnread});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(
+          Icons.mode_comment_outlined,
+          size: 18,
+          color: hasUnread ? AppColors.teacherPrimary : AppColors.textSecondary,
+        ),
+        if (hasUnread)
+          Positioned(
+            top: -3,
+            right: -3,
+            child: Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: AppColors.teacherPrimary,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.white, width: 1.5),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Bottom sheet hosting a reading log's comment thread for a teacher, with a
+/// composer that lifts above the keyboard.
+class _TeacherCommentsSheet extends StatelessWidget {
+  final ReadingLogModel log;
+  final String studentName;
+
+  const _TeacherCommentsSheet({
+    required this.log,
+    required this.studentName,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final books =
+        log.bookTitles.isNotEmpty ? log.bookTitles.join(', ') : 'Free reading';
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.teacherBorder,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.mode_comment_outlined,
+                        size: 20, color: AppColors.teacherPrimary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Comments', style: TeacherTypography.h3),
+                          Text(
+                            '$studentName · $books',
+                            style: TeacherTypography.caption
+                                .copyWith(color: AppColors.textSecondary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(height: 1, color: AppColors.teacherBorder),
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    CommentThread(
+                      log: log,
+                      authorRole: CommentAuthorRole.teacher,
+                      accentColor: AppColors.teacherPrimary,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ─── Data Classes ─────────────────────────────────────────────────────────────
 
 class _ReadingLogSnapshot {
   final String id;
   final DateTime date;
+  final DateTime createdAt;
   final String? allocationId;
   final List<String> bookTitles;
   final String status;
   final int minutesRead;
   final int targetMinutes;
+  final String? notes;
   final String? parentId;
   final String? parentComment;
   final List<String> parentCommentSelections;
@@ -718,10 +903,14 @@ class _ReadingLogSnapshot {
   final String? childFeeling;
   final String? loggedByName;
   final String? loggedByLabel;
+  final DateTime? lastCommentAt;
+  final String? lastCommentByRole;
+  final Map<String, DateTime> commentsViewedAt;
 
   const _ReadingLogSnapshot({
     required this.id,
     required this.date,
+    required this.createdAt,
     required this.allocationId,
     required this.bookTitles,
     required this.status,
@@ -732,12 +921,24 @@ class _ReadingLogSnapshot {
     required this.parentCommentSelections,
     required this.parentCommentFreeText,
     required this.childFeeling,
+    this.notes,
     this.loggedByName,
     this.loggedByLabel,
+    this.lastCommentAt,
+    this.lastCommentByRole,
+    this.commentsViewedAt = const {},
   });
 
   /// "Logged by …" attribution, or null if this is a legacy log.
   String? get loggedByDisplay => loggedByLabel ?? loggedByName;
+
+  /// Whether the teacher [uid] has an unseen reply: the newest comment is from
+  /// a parent and postdates this teacher's last view of the thread.
+  bool hasUnreadForTeacher(String uid) {
+    if (lastCommentAt == null || lastCommentByRole == 'teacher') return false;
+    final viewed = commentsViewedAt[uid];
+    return viewed == null || viewed.isBefore(lastCommentAt!);
+  }
 }
 
 class _BookSummary {
