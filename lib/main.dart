@@ -17,6 +17,7 @@ import 'core/widgets/remote_message_overlay.dart';
 import 'core/widgets/service_status_overlay.dart';
 import 'data/providers/remote_message_provider.dart';
 import 'services/firebase_service.dart';
+import 'services/offline_service.dart';
 import 'services/notification_service.dart';
 import 'services/crash_reporting_service.dart';
 import 'services/analytics_service.dart';
@@ -87,6 +88,18 @@ void main() async {
         await ServiceStatusController.instance.initialize();
       } catch (e) {
         debugPrint('Warning: ServiceStatusController init failed: $e');
+      }
+
+      // Bring up the offline sync service: open its Hive boxes and load any
+      // writes queued during a prior offline session so they start draining.
+      // Without this the offline-fallback path (saveReadingLogLocally) throws
+      // a LateInitializationError and the write is lost — the root cause of
+      // "logged offline but never synced." Non-fatal; runs after Firebase and
+      // the status controller so the first drain has both available.
+      try {
+        await OfflineService.instance.initialize();
+      } catch (e) {
+        debugPrint('Warning: OfflineService init failed: $e');
       }
 
       // Bring up the out-of-band remote-message client. No-op unless

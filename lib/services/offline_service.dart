@@ -1,7 +1,13 @@
-import 'package:flutter/foundation.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:crypto/crypto.dart';
+import 'package:flutter/widgets.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+
 import '../core/models/service_status.dart';
 import '../core/services/service_status_controller.dart';
 import '../data/models/reading_log_model.dart';
@@ -9,7 +15,22 @@ import '../data/models/student_model.dart';
 import '../data/models/allocation_model.dart';
 import 'firebase_service.dart';
 
-class OfflineService {
+/// Local-first persistence + an outbound sync queue for writes made while
+/// Firestore is unreachable.
+///
+/// Hardening invariants (see `fix/offline-sync-bulletproofing`):
+///  - A queued write is **never silently dropped**. Transient failures back
+///    off exponentially and retry forever; permanent failures are parked as
+///    `needsAttention` and surfaced to the user, not deleted.
+///  - Retry/backoff state is **persisted to Hive after every attempt**, so it
+///    survives app restarts and mid-sync kills.
+///  - The drain is gated on [ServiceStatusController.canWriteToFirebase] and
+///    every Firestore call is time-bounded, so a write that would otherwise
+///    hang against an L1-up / Firestore-down network can't wedge the syncer.
+///  - Reading-log writes are confirmed by a **server read-back** before the
+///    item leaves the queue — closing the "resolved against local cache but
+///    never reached the server" silent-loss window.
+class OfflineService with WidgetsBindingObserver {
   static OfflineService? _instance;
   static OfflineService get instance => _instance ??= OfflineService._();
 
@@ -34,11 +55,51 @@ class OfflineService {
 
   // Initialization flag
   bool _initialized = false;
+  bool _lifecycleObserverAdded = false;
 
   // Sync queue
   final List<PendingSync> _syncQueue = [];
   Timer? _syncTimer;
+  Timer? _retryTimer;
   bool _isSyncing = false;
+  final Random _jitter = Random();
+
+  /// Per-Firestore-call timeout. Bounds a write that would otherwise hang
+  /// indefinitely when the device has connectivity but Firestore is
+  /// unreachable — the failure mode that used to leave `_isSyncing` stuck.
+  static const Duration _opTimeout = Duration(seconds: 30);
+
+  /// A queued item is treated as "stale" past this age, escalating the UI
+  /// even on a healthy connection.
+  static const Duration staleThreshold = Duration(hours: 48);
+
+  // ── Sync-attempt history (diagnostics) ──────────────────────────────
+  static const int _historyLimit = 20;
+  final List<SyncHistoryEntry> _history = [];
+  final StreamController<List<SyncHistoryEntry>> _historyController =
+      StreamController<List<SyncHistoryEntry>>.broadcast();
+
+  // ── Test seams ──────────────────────────────────────────────────────
+  FirebaseFirestore? _firestoreOverride;
+  FirebaseFirestore get _firestore =>
+      _firestoreOverride ?? FirebaseService.instance.firestore;
+
+  /// Inject a fake Firestore so specs can exercise the real drain (including
+  /// receipt read-back) without a live backend. Pass `null` to reset.
+  @visibleForTesting
+  set firestoreForTest(FirebaseFirestore? firestore) =>
+      _firestoreOverride = firestore;
+
+  /// Reload the pending queue from Hive — lets specs prove that retry/backoff
+  /// state was actually persisted (not just mutated in memory).
+  @visibleForTesting
+  void reloadPendingFromDiskForTest() => _loadPendingSyncs();
+
+  /// Override the per-item network write so specs can deterministically
+  /// inject failures (the fake Firestore can't simulate errors). When set,
+  /// it fully replaces the real per-type sync dispatch.
+  @visibleForTesting
+  Future<void> Function(PendingSync item)? syncOneOverrideForTest;
 
   /// Broadcasts the current pending queue whenever it mutates. Drives the
   /// `pendingSyncProvider` so the global banner and detail sheet update
@@ -55,6 +116,8 @@ class OfflineService {
   List<PendingSync> get pendingSyncs => List.unmodifiable(_syncQueue);
   Stream<List<PendingSync>> get queueStream => _queueController.stream;
   Stream<DateTime?> get lastSyncStream => _lastSyncController.stream;
+  List<SyncHistoryEntry> get syncHistory => List.unmodifiable(_history);
+  Stream<List<SyncHistoryEntry>> get historyStream => _historyController.stream;
   DateTime? get lastSuccessfulSyncAt {
     if (!_initialized) return null;
     final raw = _serviceMetaBox.get('lastSuccessfulSyncAt');
@@ -62,6 +125,7 @@ class OfflineService {
   }
 
   Future<void> initialize() async {
+    if (_initialized) return;
     try {
       // Open Hive boxes
       _readingLogsBox = await Hive.openBox<Map>('reading_logs');
@@ -72,8 +136,9 @@ class OfflineService {
       _logDraftsBox = await Hive.openBox<Map>('log_drafts');
       _serviceMetaBox = await Hive.openBox<dynamic>('service_meta');
 
-      // Load pending syncs
+      // Load pending syncs + diagnostic history
       _loadPendingSyncs();
+      _loadHistory();
 
       // Check initial connectivity
       await _checkConnectivity();
@@ -89,15 +154,43 @@ class OfflineService {
       _serviceStatusSubscription =
           ServiceStatusController.instance.stream.listen(_handleServiceStatus);
 
-      // Start sync timer
+      // Drain on app resume ("grandma reopens the app") even when the
+      // connection never changed and was already healthy.
+      if (!_lifecycleObserverAdded) {
+        WidgetsBinding.instance.addObserver(this);
+        _lifecycleObserverAdded = true;
+      }
+
+      // Start sync timer + any pending backoff wake-up.
       _startSyncTimer();
+      _scheduleNextRetry();
 
       _initialized = true;
-      debugPrint('Offline service initialized');
+      debugPrint('Offline service initialized (${_syncQueue.length} pending)');
     } catch (e) {
       debugPrint('Error initializing offline service: $e');
       rethrow;
     }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_resumeSync());
+    }
+  }
+
+  /// On resume: re-probe so `canWriteToFirebase` is fresh, then drain. A
+  /// transition to healthy also drains via [_handleServiceStatus], but that
+  /// path is a no-op when we were *already* healthy — hence the explicit
+  /// trigger here.
+  Future<void> _resumeSync() async {
+    try {
+      await ServiceStatusController.instance.forceProbe();
+    } catch (_) {
+      // ignore — fall through to a best-effort drain
+    }
+    await _syncPendingData();
   }
 
   // Clear all cached data (call on logout)
@@ -114,6 +207,9 @@ class OfflineService {
       await _settingsBox.clear();
       await _logDraftsBox.clear();
       _syncQueue.clear();
+      _retryTimer?.cancel();
+      await _clearHistory();
+      _broadcastQueue();
       debugPrint('All offline caches cleared');
     } catch (e) {
       debugPrint('Error clearing offline caches: $e');
@@ -157,10 +253,30 @@ class OfflineService {
   void _startSyncTimer() {
     _syncTimer?.cancel();
     _syncTimer = Timer.periodic(const Duration(minutes: 5), (_) {
-      if (_isOnline && _syncQueue.isNotEmpty) {
+      if (_syncQueue.isNotEmpty) {
         _syncPendingData();
       }
     });
+  }
+
+  /// One-shot wake for the soonest backed-off item, so exponential backoff
+  /// actually fires without waiting on the 5-minute timer or a connectivity
+  /// event.
+  void _scheduleNextRetry() {
+    _retryTimer?.cancel();
+    DateTime? soonest;
+    for (final it in _syncQueue) {
+      if (it.needsAttention) continue;
+      final t = it.nextAttemptAt;
+      if (t == null) continue;
+      if (soonest == null || t.isBefore(soonest)) soonest = t;
+    }
+    if (soonest == null) return;
+    final delay = soonest.difference(DateTime.now());
+    final wait = delay.isNegative
+        ? const Duration(seconds: 1)
+        : delay + const Duration(milliseconds: 250);
+    _retryTimer = Timer(wait, () => unawaited(_syncPendingData()));
   }
 
   void _loadPendingSyncs() {
@@ -181,10 +297,33 @@ class OfflineService {
   /// button on the service-status sheet. Coalesces with an in-flight sync.
   Future<void> triggerSync() => _syncPendingData();
 
+  /// Manually drop a parked item the user has acknowledged. The only path by
+  /// which a queued write ever leaves the queue without syncing.
+  Future<void> dismissPending(String id) async {
+    _syncQueue.removeWhere((it) => it.id == id);
+    if (_initialized) await _pendingSyncBox.delete(id);
+    _broadcastQueue();
+  }
+
   Future<void> _enqueueAndPersist(PendingSync sync) async {
+    // Stamp an integrity hash at enqueue time. Best-effort: a payload that
+    // isn't JSON-encodable simply goes unhashed rather than failing the write.
+    try {
+      sync.contentHash ??= PendingSync.computeContentHash(sync.data);
+    } catch (_) {
+      // leave contentHash null — integrity check will be skipped for this item
+    }
     await _pendingSyncBox.put(sync.id, sync.toMap());
     _syncQueue.add(sync);
     _broadcastQueue();
+    // A fresh item is immediately eligible; nudge a drain in case we're
+    // already online and idle.
+    _scheduleNextRetry();
+  }
+
+  Future<void> _persistItem(PendingSync item) async {
+    if (!_initialized) return;
+    await _pendingSyncBox.put(item.id, item.toMap());
   }
 
   /// Save reading log locally AND queue it for sync. Callers only invoke
@@ -242,8 +381,8 @@ class OfflineService {
     required Map<String, dynamic> preferences,
   }) async {
     final syncId = 'prefs_$parentId';
-    final existing =
-        _syncQueue.indexWhere((p) => p.id == syncId && p.type == SyncType.parentPrefs);
+    final existing = _syncQueue
+        .indexWhere((p) => p.id == syncId && p.type == SyncType.parentPrefs);
     if (existing >= 0) {
       _syncQueue.removeAt(existing);
       await _pendingSyncBox.delete(syncId);
@@ -333,14 +472,8 @@ class OfflineService {
   // Get local student data
   Future<StudentModel?> getLocalStudent(String studentId) async {
     try {
-      final data = _studentsBox.get(studentId);
-      if (data != null) {
-        // Create a fake DocumentSnapshot for StudentModel
-        final docData = Map<String, dynamic>.from(data);
-        // StudentModel expects a DocumentSnapshot, so we'll need to handle this differently
-        // For now, return null and rely on online data
-        return null;
-      }
+      // StudentModel expects a DocumentSnapshot, so reconstructing it from a
+      // plain Hive Map isn't wired up yet — fall back to online data.
       return null;
     } catch (e) {
       debugPrint('Error getting local student: $e');
@@ -378,76 +511,130 @@ class OfflineService {
     }
   }
 
-  // Sync pending data
+  /// Drain the pending queue.
+  ///
+  /// Coalesced by `_isSyncing`, gated on a healthy write path, and wrapped in
+  /// try/finally so a timeout can never leave the syncer wedged. Items are
+  /// removed only after a confirmed write; failures persist their backoff
+  /// state and stay queued (transient) or are parked (permanent).
   Future<void> _syncPendingData() async {
-    if (_isSyncing || !_isOnline || _syncQueue.isEmpty) {
-      return;
-    }
+    if (_isSyncing || _syncQueue.isEmpty) return;
+    if (!ServiceStatusController.instance.current.canWriteToFirebase) return;
 
     _isSyncing = true;
-    debugPrint('Starting sync of ${_syncQueue.length} pending items...');
+    _broadcastQueue();
 
-    final firebaseService = FirebaseService.instance;
     final syncedItems = <String>[];
+    var anySuccess = false;
 
-    // Drain in priority order: reading-log creates first (so dependent
-    // comment writes have a doc to target), then comments, then prefs,
-    // then any other types in their natural order.
-    final ordered = List<PendingSync>.from(_syncQueue)
-      ..sort((a, b) => _syncPriority(a.type).compareTo(_syncPriority(b.type)));
+    try {
+      // Drain in priority order: reading-log creates first (so dependent
+      // comment writes have a doc to target), then comments, then prefs.
+      final ordered = List<PendingSync>.from(_syncQueue)
+        ..sort((a, b) => _syncPriority(a.type).compareTo(_syncPriority(b.type)));
 
-    for (final pendingSync in ordered) {
-      try {
-        switch (pendingSync.type) {
-          case SyncType.readingLog:
-            await _syncReadingLog(pendingSync, firebaseService);
-            break;
-          case SyncType.student:
-            await _syncStudent(pendingSync, firebaseService);
-            break;
-          case SyncType.allocation:
-            await _syncAllocation(pendingSync, firebaseService);
-            break;
-          case SyncType.parentComment:
-            await _syncParentComment(pendingSync, firebaseService);
-            break;
-          case SyncType.parentPrefs:
-            await _syncParentPrefs(pendingSync, firebaseService);
-            break;
+      for (final item in ordered) {
+        // Skip parked items and items still inside their backoff window.
+        if (item.needsAttention) continue;
+        final nextAt = item.nextAttemptAt;
+        if (nextAt != null && nextAt.isAfter(DateTime.now())) continue;
+
+        // Integrity: a stored hash that no longer matches the payload means
+        // the persisted data was corrupted — quarantine rather than sync it.
+        final expected = item.contentHash;
+        if (expected != null &&
+            expected != PendingSync.computeContentHash(item.data)) {
+          item
+            ..needsAttention = true
+            ..lastError = 'Integrity check failed'
+            ..lastAttemptAt = DateTime.now();
+          await _persistItem(item);
+          _recordHistory(item, SyncResult.integrityFail, item.lastError);
+          continue;
         }
+        // Back-fill a hash for items queued before checksums shipped, so
+        // future corruption becomes detectable.
+        item.contentHash ??= PendingSync.computeContentHash(item.data);
 
-        syncedItems.add(pendingSync.id);
-        debugPrint('Synced: ${pendingSync.type} - ${pendingSync.id}');
-      } catch (e) {
-        debugPrint('Error syncing ${pendingSync.type}: $e');
-
-        // Increment retry count
-        pendingSync.retryCount++;
-
-        // Remove from queue if max retries exceeded
-        if (pendingSync.retryCount >= 5) {
-          syncedItems.add(pendingSync.id);
-          debugPrint(
-              'Max retries exceeded for ${pendingSync.id}, removing from queue');
+        try {
+          await _syncOne(item).timeout(_opTimeout);
+          syncedItems.add(item.id);
+          anySuccess = true;
+          _recordHistory(item, SyncResult.success, null);
+        } catch (e) {
+          await _handleItemFailure(item, e);
         }
       }
-    }
 
-    // Remove synced items from queue and storage
-    for (final id in syncedItems) {
-      _syncQueue.removeWhere((item) => item.id == id);
-      await _pendingSyncBox.delete(id);
-    }
+      // Remove only confirmed items from queue and storage.
+      for (final id in syncedItems) {
+        _syncQueue.removeWhere((it) => it.id == id);
+        await _pendingSyncBox.delete(id);
+      }
 
-    _isSyncing = false;
-    if (syncedItems.isNotEmpty) {
-      final now = DateTime.now();
-      await _serviceMetaBox.put(
-          'lastSuccessfulSyncAt', now.toIso8601String());
-      if (!_lastSyncController.isClosed) _lastSyncController.add(now);
+      if (anySuccess) {
+        final ts = DateTime.now();
+        await _serviceMetaBox.put('lastSuccessfulSyncAt', ts.toIso8601String());
+        if (!_lastSyncController.isClosed) _lastSyncController.add(ts);
+      }
+    } finally {
+      _isSyncing = false;
+      _broadcastQueue();
+      _scheduleNextRetry();
+      debugPrint('Sync pass complete. Remaining items: ${_syncQueue.length}');
     }
-    _broadcastQueue();
-    debugPrint('Sync completed. Remaining items: ${_syncQueue.length}');
+  }
+
+  /// Classify a failure and update the item's persisted retry/backoff state.
+  /// Never drops the item.
+  Future<void> _handleItemFailure(PendingSync item, Object error) async {
+    item
+      ..retryCount += 1
+      ..lastAttemptAt = DateTime.now()
+      ..lastError = _describeError(error);
+
+    if (_isPermanent(error)) {
+      // Won't succeed on retry (auth/rules/validation). Park it for the user
+      // rather than dropping it or hammering the backend forever.
+      item.needsAttention = true;
+      _recordHistory(item, SyncResult.permanentFail, item.lastError);
+      debugPrint('Permanent sync failure for ${item.id}: ${item.lastError}');
+    } else {
+      item.nextAttemptAt =
+          item.lastAttemptAt!.add(PendingSync.backoffFor(item.retryCount, _jitter));
+      _recordHistory(item, SyncResult.transientFail, item.lastError);
+      debugPrint(
+          'Transient sync failure for ${item.id} (attempt ${item.retryCount}); '
+          'next try ${item.nextAttemptAt}');
+    }
+    // Persist the updated state so backoff/attention survives a restart —
+    // the bug that previously made retry counting incoherent.
+    await _persistItem(item);
+  }
+
+  Future<void> _syncOne(PendingSync item) async {
+    final override = syncOneOverrideForTest;
+    if (override != null) {
+      await override(item);
+      return;
+    }
+    switch (item.type) {
+      case SyncType.readingLog:
+        await _syncReadingLog(item);
+        break;
+      case SyncType.student:
+        await _syncStudent(item);
+        break;
+      case SyncType.allocation:
+        await _syncAllocation(item);
+        break;
+      case SyncType.parentComment:
+        await _syncParentComment(item);
+        break;
+      case SyncType.parentPrefs:
+        await _syncParentPrefs(item);
+        break;
+    }
   }
 
   /// Lower number → drained earlier. Reading-log creates must precede any
@@ -467,67 +654,67 @@ class OfflineService {
     }
   }
 
-  Future<void> _syncReadingLog(
-    PendingSync pendingSync,
-    FirebaseService firebaseService,
-  ) async {
+  Future<void> _syncReadingLog(PendingSync pendingSync) async {
     final log = ReadingLogModel.fromLocal(pendingSync.data);
 
-    // Get the school ID from the log data
     final schoolId = pendingSync.data['schoolId'] as String?;
     if (schoolId == null) {
       throw Exception('Missing schoolId for reading log sync');
     }
 
-    final logRef = firebaseService.firestore
+    final logRef = _firestore
         .collection('schools')
         .doc(schoolId)
         .collection('readingLogs')
         .doc(log.id);
 
+    var resolvedConflict = false;
     switch (pendingSync.action) {
       case SyncAction.create:
-        // Check for conflicts before creating
-        final existingDoc = await logRef.get();
-        if (existingDoc.exists) {
-          // Conflict: document already exists
-          debugPrint('Conflict detected for reading log ${log.id}');
-          await _resolveReadingLogConflict(log, existingDoc, logRef);
-        } else {
-          await logRef.set(log.toFirestore());
-        }
-        break;
       case SyncAction.update:
-        // For updates, use server timestamp to detect conflicts
         final existingDoc = await logRef.get();
         if (existingDoc.exists) {
+          // Conflict (or a re-run after a half-completed sync): resolve by
+          // last-write-wins. The resolver owns the local-copy update.
           await _resolveReadingLogConflict(log, existingDoc, logRef);
+          resolvedConflict = true;
         } else {
-          // Document was deleted remotely, treat as create
           await logRef.set(log.toFirestore());
         }
         break;
       case SyncAction.delete:
         await logRef.delete();
-        break;
+        // Receipt for a delete: confirm it's actually gone server-side.
+        final gone = await logRef.get(const GetOptions(source: Source.server));
+        if (gone.exists) {
+          throw Exception('Receipt failed: log ${log.id} still present');
+        }
+        return;
     }
 
-    // Update local copy with synced timestamp
-    final syncedLog = log.copyWith(
-      syncedAt: DateTime.now(),
-      isOfflineCreated: false,
-    );
-    await _readingLogsBox.put(log.id, syncedLog.toLocal());
+    // Receipt confirmation — read the doc back from the SERVER. This is the
+    // crux of "never silently dropped": only once the server confirms the
+    // write do we let the drain remove this item from the queue. A failure
+    // here throws (transient) and the item is retried next cycle.
+    final receipt = await logRef.get(const GetOptions(source: Source.server));
+    if (!receipt.exists) {
+      throw Exception('Receipt failed: log ${log.id} not on server after write');
+    }
+
+    if (!resolvedConflict) {
+      final syncedLog = log.copyWith(
+        syncedAt: DateTime.now(),
+        isOfflineCreated: false,
+      );
+      await _readingLogsBox.put(log.id, syncedLog.toLocal());
+    }
 
     // No client-side stats recompute needed: writing the synced log to
-    // Firestore (above) triggers the aggregateStudentStats Cloud Function,
-    // which is the single source of truth for the student's stats.
+    // Firestore triggers the aggregateStudentStats Cloud Function, which is
+    // the single source of truth for the student's stats.
   }
 
-  Future<void> _syncParentComment(
-    PendingSync pendingSync,
-    FirebaseService firebaseService,
-  ) async {
+  Future<void> _syncParentComment(PendingSync pendingSync) async {
     final logId = pendingSync.data['logId'] as String?;
     final schoolId = pendingSync.data['schoolId'] as String?;
     if (logId == null || schoolId == null) {
@@ -539,25 +726,32 @@ class OfflineService {
     final freeText = pendingSync.data['freeText'] as String?;
     final composed = pendingSync.data['composedComment'] as String?;
 
-    final logRef = firebaseService.firestore
+    final logRef = _firestore
         .collection('schools')
         .doc(schoolId)
         .collection('readingLogs')
         .doc(logId);
 
-    await logRef.update({
-      'parentCommentSelections': selections,
-      'parentCommentFreeText':
-          (freeText != null && freeText.isNotEmpty) ? freeText : null,
-      'parentComment':
-          (composed != null && composed.isNotEmpty) ? composed : null,
-    });
+    try {
+      await logRef.update({
+        'parentCommentSelections': selections,
+        'parentCommentFreeText':
+            (freeText != null && freeText.isNotEmpty) ? freeText : null,
+        'parentComment':
+            (composed != null && composed.isNotEmpty) ? composed : null,
+      });
+    } on FirebaseException catch (e) {
+      if (e.code == 'not-found') {
+        // The target log hasn't reached the server yet (its own create may
+        // still be backing off). Keep retrying rather than quarantining —
+        // re-thrown as a plain Exception so it's classified transient.
+        throw Exception('Target log $logId not yet present; will retry');
+      }
+      rethrow;
+    }
   }
 
-  Future<void> _syncParentPrefs(
-    PendingSync pendingSync,
-    FirebaseService firebaseService,
-  ) async {
+  Future<void> _syncParentPrefs(PendingSync pendingSync) async {
     final parentId = pendingSync.data['parentId'] as String?;
     final schoolId = pendingSync.data['schoolId'] as String?;
     final prefs = pendingSync.data['preferences'];
@@ -565,7 +759,7 @@ class OfflineService {
       throw Exception('Missing parentId/schoolId/preferences for prefs sync');
     }
 
-    final parentRef = firebaseService.firestore
+    final parentRef = _firestore
         .collection('schools')
         .doc(schoolId)
         .collection('parents')
@@ -576,7 +770,9 @@ class OfflineService {
     });
   }
 
-  /// Resolve conflicts when syncing reading logs
+  /// Resolve conflicts when syncing reading logs. Owns the local-copy update
+  /// for the branch it takes, so callers must not overwrite the local box
+  /// afterwards.
   Future<void> _resolveReadingLogConflict(
     ReadingLogModel localLog,
     dynamic remoteDoc,
@@ -586,6 +782,10 @@ class OfflineService {
     if (remoteData == null) {
       // Remote was deleted, use local
       await logRef.set(localLog.toFirestore());
+      await _readingLogsBox.put(
+        localLog.id,
+        localLog.copyWith(syncedAt: DateTime.now(), isOfflineCreated: false).toLocal(),
+      );
       return;
     }
 
@@ -598,6 +798,10 @@ class OfflineService {
       // Local is newer, use local
       debugPrint('Local version is newer, updating remote');
       await logRef.update(localLog.toFirestore());
+      await _readingLogsBox.put(
+        localLog.id,
+        localLog.copyWith(syncedAt: DateTime.now(), isOfflineCreated: false).toLocal(),
+      );
     } else {
       // Remote is newer, keep remote and update local
       debugPrint('Remote version is newer, updating local');
@@ -606,10 +810,7 @@ class OfflineService {
     }
   }
 
-  Future<void> _syncStudent(
-    PendingSync pendingSync,
-    FirebaseService firebaseService,
-  ) async {
+  Future<void> _syncStudent(PendingSync pendingSync) async {
     final studentData = Map<String, dynamic>.from(pendingSync.data);
     final studentId = pendingSync.id;
     final schoolId = studentData['schoolId'] as String?;
@@ -618,7 +819,7 @@ class OfflineService {
       throw Exception('Missing schoolId for student sync');
     }
 
-    final studentRef = firebaseService.firestore
+    final studentRef = _firestore
         .collection('schools')
         .doc(schoolId)
         .collection('students')
@@ -639,10 +840,7 @@ class OfflineService {
     debugPrint('Student synced: $studentId');
   }
 
-  Future<void> _syncAllocation(
-    PendingSync pendingSync,
-    FirebaseService firebaseService,
-  ) async {
+  Future<void> _syncAllocation(PendingSync pendingSync) async {
     final allocationData = Map<String, dynamic>.from(pendingSync.data);
     final allocationId = pendingSync.id;
     final schoolId = allocationData['schoolId'] as String?;
@@ -651,7 +849,7 @@ class OfflineService {
       throw Exception('Missing schoolId for allocation sync');
     }
 
-    final allocationRef = firebaseService.firestore
+    final allocationRef = _firestore
         .collection('schools')
         .doc(schoolId)
         .collection('allocations')
@@ -672,6 +870,79 @@ class OfflineService {
     debugPrint('Allocation synced: $allocationId');
   }
 
+  /// Firestore error codes that won't be fixed by retrying — the write is
+  /// rejected for auth / rules / validation reasons. Everything else
+  /// (`unavailable`, `deadline-exceeded`, timeouts, network) is transient.
+  static const Set<String> _permanentCodes = {
+    'permission-denied',
+    'invalid-argument',
+    'not-found',
+    'failed-precondition',
+    'already-exists',
+    'out-of-range',
+    'unimplemented',
+    'data-loss',
+  };
+
+  bool _isPermanent(Object error) =>
+      error is FirebaseException && _permanentCodes.contains(error.code);
+
+  String _describeError(Object error) {
+    if (error is FirebaseException) {
+      final msg = error.message;
+      return msg == null || msg.isEmpty ? error.code : '${error.code}: $msg';
+    }
+    if (error is TimeoutException) return 'Timed out';
+    return error.toString();
+  }
+
+  // ── Sync-attempt history ────────────────────────────────────────────
+  void _recordHistory(PendingSync item, SyncResult result, String? error) {
+    _history.add(SyncHistoryEntry(
+      at: DateTime.now(),
+      itemId: item.id,
+      type: item.type,
+      action: item.action,
+      result: result,
+      error: error,
+    ));
+    while (_history.length > _historyLimit) {
+      _history.removeAt(0);
+    }
+    if (_initialized) {
+      unawaited(_serviceMetaBox.put(
+        'syncHistory',
+        _history.map((e) => e.toMap()).toList(),
+      ));
+    }
+    if (!_historyController.isClosed) {
+      _historyController.add(List.unmodifiable(_history));
+    }
+  }
+
+  void _loadHistory() {
+    _history.clear();
+    final raw = _serviceMetaBox.get('syncHistory');
+    if (raw is List) {
+      for (final e in raw) {
+        try {
+          _history.add(
+              SyncHistoryEntry.fromMap(Map<String, dynamic>.from(e as Map)));
+        } catch (_) {
+          // skip malformed entries
+        }
+      }
+    }
+  }
+
+  Future<void> _clearHistory() async {
+    _history.clear();
+    if (_initialized) await _serviceMetaBox.delete('syncHistory');
+    if (!_historyController.isClosed) {
+      _historyController.add(const []);
+    }
+  }
+
   // Clear all local data
   Future<void> clearLocalData() async {
     if (!_initialized) return;
@@ -681,6 +952,9 @@ class OfflineService {
     await _pendingSyncBox.clear();
     await _logDraftsBox.clear();
     _syncQueue.clear();
+    _retryTimer?.cancel();
+    await _clearHistory();
+    _broadcastQueue();
   }
 
   // Clear old data
@@ -721,8 +995,14 @@ class OfflineService {
     _connectivitySubscription?.cancel();
     _serviceStatusSubscription?.cancel();
     _syncTimer?.cancel();
+    _retryTimer?.cancel();
+    if (_lifecycleObserverAdded) {
+      WidgetsBinding.instance.removeObserver(this);
+      _lifecycleObserverAdded = false;
+    }
     if (!_queueController.isClosed) _queueController.close();
     if (!_lastSyncController.isClosed) _lastSyncController.close();
+    if (!_historyController.isClosed) _historyController.close();
   }
 }
 
@@ -748,13 +1028,41 @@ enum SyncStatus {
   offline,
 }
 
+/// Outcome of a single sync attempt, recorded in the diagnostic history.
+enum SyncResult {
+  success,
+  transientFail,
+  permanentFail,
+  integrityFail,
+}
+
 class PendingSync {
   final String id;
   final SyncType type;
   final SyncAction action;
   final Map<String, dynamic> data;
   final DateTime createdAt;
+
+  /// Number of failed attempts so far. Persisted after every attempt.
   int retryCount;
+
+  /// When we last tried to sync this item.
+  DateTime? lastAttemptAt;
+
+  /// Earliest time the item is eligible to retry (exponential backoff).
+  DateTime? nextAttemptAt;
+
+  /// Human-readable description of the most recent failure.
+  String? lastError;
+
+  /// SHA-256 of the canonical payload, stamped at enqueue time. Verified
+  /// before each sync to detect Hive corruption.
+  String? contentHash;
+
+  /// Set when the failure is permanent (auth/rules/validation) or the payload
+  /// failed integrity. Such items are skipped by the drain and surfaced to the
+  /// user — never silently dropped, never retried in a tight loop.
+  bool needsAttention;
 
   PendingSync({
     required this.id,
@@ -763,6 +1071,11 @@ class PendingSync {
     required this.data,
     required this.createdAt,
     this.retryCount = 0,
+    this.lastAttemptAt,
+    this.nextAttemptAt,
+    this.lastError,
+    this.contentHash,
+    this.needsAttention = false,
   });
 
   factory PendingSync.fromMap(Map<String, dynamic> map) {
@@ -777,6 +1090,11 @@ class PendingSync {
       data: Map<String, dynamic>.from(map['data']),
       createdAt: DateTime.parse(map['createdAt']),
       retryCount: map['retryCount'] ?? 0,
+      lastAttemptAt: _parseDate(map['lastAttemptAt']),
+      nextAttemptAt: _parseDate(map['nextAttemptAt']),
+      lastError: map['lastError'] as String?,
+      contentHash: map['contentHash'] as String?,
+      needsAttention: map['needsAttention'] as bool? ?? false,
     );
   }
 
@@ -788,6 +1106,105 @@ class PendingSync {
       'data': data,
       'createdAt': createdAt.toIso8601String(),
       'retryCount': retryCount,
+      'lastAttemptAt': lastAttemptAt?.toIso8601String(),
+      'nextAttemptAt': nextAttemptAt?.toIso8601String(),
+      'lastError': lastError,
+      'contentHash': contentHash,
+      'needsAttention': needsAttention,
     };
+  }
+
+  static DateTime? _parseDate(Object? v) =>
+      v is String ? DateTime.tryParse(v) : null;
+
+  // Backoff: base * 2^(retryCount-1), capped, plus up to 20% jitter.
+  static const int _backoffBaseMs = 5 * 1000; // 5s
+  static const int _backoffMaxMs = 30 * 60 * 1000; // 30 min
+
+  static Duration backoffFor(int retryCount, [Random? random]) {
+    final n = retryCount < 1 ? 1 : retryCount;
+    final shift = (n - 1).clamp(0, 20);
+    var ms = _backoffBaseMs * (1 << shift);
+    if (ms > _backoffMaxMs) ms = _backoffMaxMs;
+    if (random != null) {
+      ms = (ms * (1 + random.nextDouble() * 0.2)).round();
+      if (ms > _backoffMaxMs) ms = _backoffMaxMs;
+    }
+    return Duration(milliseconds: ms);
+  }
+
+  /// Stable SHA-256 over the payload. Map keys are sorted recursively so the
+  /// hash is independent of insertion order.
+  static String computeContentHash(Map<String, dynamic> data) {
+    final canonical = _canonicalJson(data);
+    return sha256.convert(utf8.encode(canonical)).toString();
+  }
+
+  static String _canonicalJson(Object? value) {
+    if (value is Map) {
+      final keys = value.keys.map((k) => k.toString()).toList()..sort();
+      final buf = StringBuffer('{');
+      for (var i = 0; i < keys.length; i++) {
+        if (i > 0) buf.write(',');
+        buf
+          ..write(jsonEncode(keys[i]))
+          ..write(':')
+          ..write(_canonicalJson(value[keys[i]]));
+      }
+      buf.write('}');
+      return buf.toString();
+    }
+    if (value is List) {
+      final buf = StringBuffer('[');
+      for (var i = 0; i < value.length; i++) {
+        if (i > 0) buf.write(',');
+        buf.write(_canonicalJson(value[i]));
+      }
+      buf.write(']');
+      return buf.toString();
+    }
+    return jsonEncode(value);
+  }
+}
+
+/// One recorded sync attempt, surfaced in the offline-management screen so a
+/// real "two weeks never synced" report can be diagnosed.
+class SyncHistoryEntry {
+  final DateTime at;
+  final String itemId;
+  final SyncType type;
+  final SyncAction action;
+  final SyncResult result;
+  final String? error;
+
+  SyncHistoryEntry({
+    required this.at,
+    required this.itemId,
+    required this.type,
+    required this.action,
+    required this.result,
+    this.error,
+  });
+
+  Map<String, dynamic> toMap() => {
+        'at': at.toIso8601String(),
+        'itemId': itemId,
+        'type': type.toString(),
+        'action': action.toString(),
+        'result': result.toString(),
+        'error': error,
+      };
+
+  factory SyncHistoryEntry.fromMap(Map<String, dynamic> map) {
+    return SyncHistoryEntry(
+      at: DateTime.parse(map['at']),
+      itemId: map['itemId'] as String,
+      type: SyncType.values.firstWhere((e) => e.toString() == map['type']),
+      action:
+          SyncAction.values.firstWhere((e) => e.toString() == map['action']),
+      result:
+          SyncResult.values.firstWhere((e) => e.toString() == map['result']),
+      error: map['error'] as String?,
+    );
   }
 }

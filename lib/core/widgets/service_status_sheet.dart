@@ -205,17 +205,28 @@ class _PendingRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final attention = item.needsAttention;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Icon(_iconFor(item.type),
-              size: 16, color: AppColors.charcoal.withValues(alpha: 0.6)),
+          Icon(
+            attention ? Icons.error_outline : _iconFor(item.type),
+            size: 16,
+            color: attention
+                ? AppColors.error
+                : AppColors.charcoal.withValues(alpha: 0.6),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              _labelFor(item.type),
-              style: const TextStyle(fontSize: 13, color: AppColors.charcoal),
+              attention
+                  ? "${_labelFor(item.type)} · couldn't sync"
+                  : _labelFor(item.type),
+              style: TextStyle(
+                fontSize: 13,
+                color: attention ? AppColors.error : AppColors.charcoal,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -315,6 +326,7 @@ class _SyncButtonState extends ConsumerState<_SyncButton> {
 
   Future<void> _trigger() async {
     setState(() => _busy = true);
+    final before = OfflineService.instance.pendingSyncs.length;
     try {
       final controller = ref.read(serviceStatusControllerProvider);
       await controller.forceProbe();
@@ -322,5 +334,17 @@ class _SyncButtonState extends ConsumerState<_SyncButton> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+    if (!mounted) return;
+    final after = OfflineService.instance.pendingSyncs.length;
+    final synced = (before - after).clamp(0, before);
+    final String msg;
+    if (after == 0) {
+      msg = synced == 0
+          ? 'Nothing to sync'
+          : 'All $synced change${synced == 1 ? "" : "s"} synced successfully';
+    } else {
+      msg = '$synced synced · $after still waiting';
+    }
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 }
