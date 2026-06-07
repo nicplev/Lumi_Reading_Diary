@@ -31,7 +31,7 @@ void main() {
         ),
       ));
 
-      expect(find.text('Current\nStreak'), findsOneWidget);
+      expect(find.text('Streak'), findsOneWidget);
       expect(find.text('Best\nStreak'), findsOneWidget);
       expect(find.text('Total\nNights'), findsOneWidget);
     });

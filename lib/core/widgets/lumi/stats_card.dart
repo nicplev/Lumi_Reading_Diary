@@ -5,28 +5,28 @@ import '../../theme/lumi_spacing.dart';
 
 /// Lumi Design System - Stats Card
 ///
-/// 3-column layout with vertical dividers showing key reading stats.
-/// Each stat: icon (28px), number (24px bold), label (12px secondary).
+/// 3-column layout with vertical dividers. Total Nights (cumulative, the hero
+/// metric) is foregrounded; the streaks are gentle secondary signals.
 class StatsCard extends StatelessWidget {
   final int currentStreak;
   final int bestStreak;
   final int totalNights;
 
-  /// Streak freezes the student has banked (Rec 6). When > 0 a small
-  /// footer reassures the parent that a missed day is protected.
-  final int? streakFreezes;
+  /// Rest days remaining in the current streak (0–2). When exactly one has been
+  /// used, a small footer reassures the parent the streak is still protected.
+  final int? restDaysRemaining;
 
   const StatsCard({
     super.key,
     required this.currentStreak,
     required this.bestStreak,
     required this.totalNights,
-    this.streakFreezes,
+    this.restDaysRemaining,
   });
 
   @override
   Widget build(BuildContext context) {
-    final freezes = streakFreezes ?? 0;
+    final restDays = restDaysRemaining ?? 2;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
       decoration: BoxDecoration(
@@ -43,44 +43,40 @@ class StatsCard extends StatelessWidget {
       child: Column(
         children: [
           IntrinsicHeight(
-        child: Row(
-          children: [
-            Expanded(
-              child: _StatColumn(
-                icon: Icons.local_fire_department,
-                iconColor: AppColors.warmOrange,
-                value: currentStreak.toString(),
-                label: 'Current\nStreak',
-              ),
+            child: Row(
+              children: [
+                // Hero: cumulative nights read — the number that only ever grows.
+                Expanded(
+                  child: _StatColumn(
+                    icon: Icons.menu_book,
+                    iconColor: AppColors.rosePink,
+                    value: totalNights.toString(),
+                    label: 'Total\nNights',
+                    prominent: true,
+                  ),
+                ),
+                Container(width: 1, color: AppColors.divider),
+                Expanded(
+                  child: _StatColumn(
+                    icon: Icons.local_fire_department,
+                    iconColor: AppColors.warmOrange,
+                    value: currentStreak.toString(),
+                    label: 'Streak',
+                  ),
+                ),
+                Container(width: 1, color: AppColors.divider),
+                Expanded(
+                  child: _StatColumn(
+                    icon: Icons.emoji_events,
+                    iconColor: AppColors.gold,
+                    value: bestStreak.toString(),
+                    label: 'Best\nStreak',
+                  ),
+                ),
+              ],
             ),
-            Container(
-              width: 1,
-              color: AppColors.divider,
-            ),
-            Expanded(
-              child: _StatColumn(
-                icon: Icons.emoji_events,
-                iconColor: AppColors.gold,
-                value: bestStreak.toString(),
-                label: 'Best\nStreak',
-              ),
-            ),
-            Container(
-              width: 1,
-              color: AppColors.divider,
-            ),
-            Expanded(
-              child: _StatColumn(
-                icon: Icons.menu_book,
-                iconColor: AppColors.rosePink,
-                value: totalNights.toString(),
-                label: 'Total\nNights',
-              ),
-            ),
-          ],
-        ),
           ),
-          if (freezes > 0) ...[
+          if (currentStreak > 0 && restDays == 1) ...[
             const SizedBox(height: 14),
             Container(
               width: double.infinity,
@@ -93,8 +89,7 @@ class StatsCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                '❄️ $freezes streak ${freezes == 1 ? 'freeze' : 'freezes'} '
-                'banked — a missed day is covered',
+                '🌙 1 rest day left — your streak is safe',
                 style: LumiTextStyles.caption(color: AppColors.charcoal),
                 textAlign: TextAlign.center,
               ),
@@ -112,11 +107,15 @@ class _StatColumn extends StatelessWidget {
   final String value;
   final String label;
 
+  /// When true the value is rendered larger to foreground the hero metric.
+  final bool prominent;
+
   const _StatColumn({
     required this.icon,
     required this.iconColor,
     required this.value,
     required this.label,
+    this.prominent = false,
   });
 
   @override
@@ -124,11 +123,16 @@ class _StatColumn extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: iconColor, size: 28),
+        Icon(icon, color: iconColor, size: prominent ? 32 : 26),
         const SizedBox(height: LumiSpacing.xs),
         Text(
           value,
-          style: LumiTextStyles.h2(color: AppColors.charcoal),
+          style: prominent
+              ? LumiTextStyles.display(color: AppColors.charcoal)
+                  .copyWith(fontSize: 30)
+              : LumiTextStyles.h2(
+                  color: AppColors.charcoal.withValues(alpha: 0.85),
+                ),
         ),
         const SizedBox(height: LumiSpacing.xxs),
         Text(

@@ -14,6 +14,12 @@ import {
   validateNotificationAudience,
 } from "./notification_helpers";
 import {buildOnboardingEmail, buildOnboardingQrAttachments} from "./email_templates";
+import {
+  computeGentleStreak,
+  computeLongestStreak,
+  countInWindow,
+  localDateString,
+} from "./dateUtils";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -76,15 +82,23 @@ export const aggregateStudentStats = functions.firestore
         .where("status", "in", ["completed", "partial"])
         .get();
 
-      // Calculate stats from scratch (authoritative source)
+      // Resolve the school's local day boundary so streaks and rolling windows
+      // are bucketed by the family's calendar day, not UTC (mirrors
+      // sendReadingReminders / getLocalTime). A 23:30 local log must count as
+      // that night, not the next UTC day.
+      const schoolSnap = await db.collection("schools").doc(schoolId).get();
+      const tz = schoolSnap.data()?.timezone ?? "Europe/London";
+
+      // Prior longestStreak — read so we can guarantee it never decreases
+      // ("nothing earned is lost", even if the streak definition changes later).
+      const priorLongest = (await studentRef.get()).data()?.stats?.longestStreak ?? 0;
+
+      // Calculate stats from scratch (authoritative source).
       let totalMinutesRead = 0;
       let totalBooksRead = 0;
-      let currentStreak = 0;
-      let longestStreak = 0;
       let lastReadingDate: admin.firestore.Timestamp | null = null;
+      // Unique local-day strings (YYYY-MM-DD in school tz) the student has read.
       const readingDates: Set<string> = new Set();
-
-      const logsByDate: Array<{date: admin.firestore.Timestamp; minutes: number; books: number}> = [];
 
       logsSnapshot.docs.forEach((doc) => {
         const logData = doc.data();
@@ -92,66 +106,42 @@ export const aggregateStudentStats = functions.firestore
         totalBooksRead += (logData.bookTitles?.length || 0);
 
         if (logData.date) {
-          const dateStr = logData.date.toDate().toISOString().split("T")[0];
-          readingDates.add(dateStr);
-          logsByDate.push({
-            date: logData.date,
-            minutes: logData.minutesRead || 0,
-            books: logData.bookTitles?.length || 0,
-          });
+          const ts = logData.date as admin.firestore.Timestamp;
+          readingDates.add(localDateString(ts.toDate(), tz));
+          if (!lastReadingDate || ts.toMillis() > lastReadingDate.toMillis()) {
+            lastReadingDate = ts;
+          }
         }
       });
 
-      // Calculate streaks
-      const sortedLogs = logsByDate.sort((a, b) => b.date.toMillis() - a.date.toMillis());
+      const today = localDateString(new Date(), tz);
 
-      if (sortedLogs.length > 0) {
-        lastReadingDate = sortedLogs[0].date;
+      // Gentle, forgiving streak: tolerates up to 2 missed days, computed fresh
+      // from the local-day set. A missed night never resets it to zero on its
+      // own — see computeGentleStreak in ./dateUtils.
+      const {currentStreak, restDaysRemaining} = computeGentleStreak(readingDates, today);
 
-        // Calculate current streak
-        let streakCount = 0;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        for (const log of sortedLogs) {
-          const logDate = log.date.toDate();
-          logDate.setHours(0, 0, 0, 0);
-
-          const expectedDate = new Date(today);
-          expectedDate.setDate(expectedDate.getDate() - streakCount);
-
-          if (logDate.getTime() === expectedDate.getTime()) {
-            streakCount++;
-          } else {
-            break;
-          }
-        }
-        currentStreak = streakCount;
-
-        // Calculate longest streak
-        let tempStreak = 1;
-        for (let i = 0; i < sortedLogs.length - 1; i++) {
-          const currentDate = sortedLogs[i].date.toDate();
-          const nextDate = sortedLogs[i + 1].date.toDate();
-
-          const diffDays = Math.floor(
-            (currentDate.getTime() - nextDate.getTime()) / (1000 * 60 * 60 * 24)
-          );
-
-          if (diffDays === 1) {
-            tempStreak++;
-            longestStreak = Math.max(longestStreak, tempStreak);
-          } else {
-            tempStreak = 1;
-          }
-        }
-        longestStreak = Math.max(longestStreak, tempStreak, currentStreak);
-      }
+      // Longest streak is monotonic — guard so it can never decrease.
+      const longestStreak = Math.max(
+        priorLongest,
+        computeLongestStreak(readingDates),
+        currentStreak,
+      );
 
       const totalReadingDays = readingDates.size;
       const averageMinutesPerDay = totalReadingDays > 0 ? totalMinutesRead / totalReadingDays : 0;
 
-      // Update student document with calculated stats
+      // Rolling "rhythm" windows — forgiving counts that slide instead of
+      // resetting ("X of the last 30/50 nights").
+      const last30DaysCount = countInWindow(readingDates, today, 30);
+      const last50DaysCount = countInWindow(readingDates, today, 50);
+
+      // Update student document with calculated stats (the single source of
+      // truth — the client no longer persists computed stats).
+      // NOTE: the legacy streakFreezes* fields are intentionally NOT written.
+      // The earn/spend freeze economy is retired in favour of stateless
+      // rest-day tolerance; old docs keep their values for back-compat reads but
+      // they are now vestigial.
       await studentRef.update({
         "stats.totalMinutesRead": totalMinutesRead,
         "stats.totalBooksRead": totalBooksRead,
@@ -160,6 +150,9 @@ export const aggregateStudentStats = functions.firestore
         "stats.lastReadingDate": lastReadingDate,
         "stats.averageMinutesPerDay": Math.round(averageMinutesPerDay * 10) / 10,
         "stats.totalReadingDays": totalReadingDays,
+        "stats.last30DaysCount": last30DaysCount,
+        "stats.last50DaysCount": last50DaysCount,
+        "stats.restDaysRemaining": restDaysRemaining,
         "stats.lastUpdated": admin.firestore.FieldValue.serverTimestamp(),
       });
 
@@ -1242,11 +1235,14 @@ export const pruneStaleFcmTokens = functions
 
 // ─── Achievement system constants ────────────────────────────────────────────
 
+// Keep in sync with AchievementThresholds.defaults in
+// lib/data/models/achievement_model.dart. readingDays is the primary
+// (cumulative "nights read") reward ladder; streak tiers are no longer awarded.
 const DEFAULT_ACHIEVEMENT_THRESHOLDS = {
   streak: [5, 10, 20, 50, 100],
   books: [5, 10, 25, 50, 100],
   minutes: [300, 600, 1500, 3000, 6000],
-  readingDays: [10, 30, 50, 100],
+  readingDays: [10, 50, 100, 365],
 };
 
 interface AchievementTierMeta {
@@ -1259,15 +1255,12 @@ interface AchievementTierMeta {
   description: (value: number) => string;
 }
 
-/* eslint-disable max-len */
-const STREAK_TIERS: AchievementTierMeta[] = [
-  {id: "streak_t1", name: "Weekly Winner", icon: "🔥", category: "streak", rarity: "common", requirementType: "streak", description: (v) => `Read for ${v} school days in a row!`},
-  {id: "streak_t2", name: "Fortnight Fan", icon: "🔥", category: "streak", rarity: "uncommon", requirementType: "streak", description: (v) => `Read for ${v} school days in a row!`},
-  {id: "streak_t3", name: "Month Warrior", icon: "🌟", category: "streak", rarity: "rare", requirementType: "streak", description: (v) => `Read for ${v} school days in a row!`},
-  {id: "streak_t4", name: "Season Streak", icon: "⭐", category: "streak", rarity: "epic", requirementType: "streak", description: (v) => `Read for ${v} school days in a row!`},
-  {id: "streak_t5", name: "Century Champion", icon: "💯", category: "streak", rarity: "legendary", requirementType: "streak", description: (v) => `Read for ${v} school days in a row!`},
-];
+// NOTE: streak tiers are intentionally NOT awarded. Streaks are a gentle,
+// secondary signal that earns no rewards — cumulative "nights read" (DAYS_TIERS)
+// is the reward ladder, so a missed night never costs a child a badge. Streak
+// badges earned under the old system remain on student docs and still render.
 
+/* eslint-disable max-len */
 const BOOKS_TIERS: AchievementTierMeta[] = [
   {id: "books_t1", name: "Book Beginner", icon: "📖", category: "books", rarity: "common", requirementType: "books", description: (v) => `Read ${v} books!`},
   {id: "books_t2", name: "Book Collector", icon: "📚", category: "books", rarity: "uncommon", requirementType: "books", description: (v) => `Read ${v} books!`},
@@ -1284,11 +1277,14 @@ const MINUTES_TIERS: AchievementTierMeta[] = [
   {id: "minutes_t5", name: "Eternal Reader", icon: "♾️", category: "minutes", rarity: "legendary", requirementType: "minutes", description: (v) => `Read for ${v / 60} hours total!`},
 ];
 
+// Cumulative "nights read" ladder — the primary reward track. Every night
+// counts forever and is never lost. Thresholds: see DEFAULT_ACHIEVEMENT_THRESHOLDS
+// (readingDays) and the mirror in achievement_model.dart.
 const DAYS_TIERS: AchievementTierMeta[] = [
-  {id: "days_t1", name: "Decade Reader", icon: "📅", category: "readingDays", rarity: "common", requirementType: "days", description: (v) => `Read on ${v} different days!`},
-  {id: "days_t2", name: "Monthly Reader", icon: "🗓️", category: "readingDays", rarity: "uncommon", requirementType: "days", description: (v) => `Read on ${v} different days!`},
-  {id: "days_t3", name: "Consistent Reader", icon: "📆", category: "readingDays", rarity: "rare", requirementType: "days", description: (v) => `Read on ${v} different days!`},
-  {id: "days_t4", name: "Century Reader", icon: "📊", category: "readingDays", rarity: "epic", requirementType: "days", description: (v) => `Read on ${v} different days!`},
+  {id: "days_t1", name: "Decade Reader", icon: "📅", category: "readingDays", rarity: "common", requirementType: "days", description: (v) => `Read on ${v} nights!`},
+  {id: "days_t2", name: "Fifty Nights", icon: "🌙", category: "readingDays", rarity: "rare", requirementType: "days", description: (v) => `Read on ${v} nights!`},
+  {id: "days_t3", name: "Century Reader", icon: "💯", category: "readingDays", rarity: "epic", requirementType: "days", description: (v) => `Read on ${v} nights!`},
+  {id: "days_t4", name: "Year of Reading", icon: "🏆", category: "readingDays", rarity: "legendary", requirementType: "days", description: (v) => `Read on ${v} nights — a whole year!`},
 ];
 
 /* eslint-enable max-len */
@@ -1369,7 +1365,7 @@ export const detectAchievements = functions.firestore
       }
     }
 
-    checkTiers(STREAK_TIERS, thresholds.streak, newStats.currentStreak || 0, oldStats.currentStreak || 0);
+    // Streaks deliberately award nothing (see DAYS_TIERS note above).
     checkTiers(BOOKS_TIERS, thresholds.books, newStats.totalBooksRead || 0, oldStats.totalBooksRead || 0);
     checkTiers(MINUTES_TIERS, thresholds.minutes, newStats.totalMinutesRead|| 0, oldStats.totalMinutesRead|| 0);
     checkTiers(DAYS_TIERS, thresholds.readingDays, newStats.totalReadingDays|| 0, oldStats.totalReadingDays|| 0);

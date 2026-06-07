@@ -2329,17 +2329,19 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
           ),
           child: Row(
             children: [
+              // Total nights (cumulative) is the hero metric — shown first.
+              _buildCompactStat(
+                '$totalNights', 'Total nights',
+                icon: Icons.nights_stay_outlined,
+              ),
+              _compactDivider(),
+              // Streak is a gentle, secondary signal.
               _buildCompactStat(
                 '$streak', 'Day streak',
                 icon: Icons.local_fire_department_outlined,
                 iconSize: 20,
                 iconColor: AppColors.warmOrange,
                 circleColor: AppColors.warmOrange.withValues(alpha: 0.12),
-              ),
-              _compactDivider(),
-              _buildCompactStat(
-                '$totalNights', 'Total nights',
-                icon: Icons.nights_stay_outlined,
               ),
               _compactDivider(),
               _buildCompactStat(

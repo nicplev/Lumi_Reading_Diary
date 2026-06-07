@@ -240,6 +240,36 @@ void main() {
         expect(stats.currentStreak, lessThanOrEqualTo(stats.longestStreak));
         expect(stats.currentStreak, lessThanOrEqualTo(stats.totalReadingDays));
       });
+
+      test('round-trips the rhythm + rest-day fields through to/fromMap', () {
+        final stats = StudentStats(
+          totalReadingDays: 40,
+          currentStreak: 6,
+          longestStreak: 12,
+          last30DaysCount: 23,
+          last50DaysCount: 35,
+          restDaysRemaining: 1,
+        );
+
+        final restored = StudentStats.fromMap(stats.toMap());
+
+        expect(restored.last30DaysCount, 23);
+        expect(restored.last50DaysCount, 35);
+        expect(restored.restDaysRemaining, 1);
+        expect(restored.restDaysLeft, 1);
+      });
+
+      test('defaults new fields on legacy documents (back-compat)', () {
+        // A pre-rewrite document with none of the new fields.
+        final stats = StudentStats.fromMap({
+          'totalReadingDays': 5,
+          'currentStreak': 2,
+        });
+
+        expect(stats.last30DaysCount, isNull);
+        expect(stats.restDaysRemaining, isNull);
+        expect(stats.restDaysLeft, 0, reason: 'getter is null-safe');
+      });
     });
 
     group('ReadingLevelHistory', () {

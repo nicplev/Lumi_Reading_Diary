@@ -49,6 +49,16 @@ class ServiceStatusSnapshot {
         checkedAt: DateTime.fromMillisecondsSinceEpoch(0),
       );
 
+  /// An all-systems-healthy snapshot. Useful for tests that need the online
+  /// write path, and as an optimistic seed.
+  factory ServiceStatusSnapshot.healthy() => ServiceStatusSnapshot(
+        status: ServiceStatus.healthy,
+        deviceConnected: true,
+        internetReachable: true,
+        firebaseReachable: true,
+        checkedAt: DateTime.fromMillisecondsSinceEpoch(0),
+      );
+
   final ServiceStatus status;
   final bool deviceConnected;
   final bool internetReachable;

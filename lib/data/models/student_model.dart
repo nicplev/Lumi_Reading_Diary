@@ -266,31 +266,53 @@ class ReadingLevelHistory {
 
 class StudentStats {
   /// Default streak freezes a student starts with, and the cap they can hold.
+  /// Retained only for back-compat reads of old documents; see the deprecated
+  /// freeze fields below.
   static const int defaultStreakFreezes = 2;
 
   final int totalMinutesRead;
   final int totalBooksRead;
+
+  /// Gentle, forgiving streak (server-computed). Tolerates up to 2 missed days
+  /// before resetting — a single missed night never resets it to zero. Earns no
+  /// rewards; it's a secondary momentum signal, not the hero metric.
   final int currentStreak;
   final int longestStreak;
   final DateTime? lastReadingDate;
   final double averageMinutesPerDay;
+
+  /// Cumulative count of distinct nights read — the hero metric and the basis
+  /// for all rewards. Monotonic: it only ever increases.
   final int totalReadingDays;
 
-  // ─── Shame-free streaks (Rec 6) ──────────────────────────────────
-  /// Unused streak freezes the student currently holds (capped at
-  /// [defaultStreakFreezes]). A freeze bridges a single missed day so an
-  /// off-day (illness, travel) doesn't reset the streak.
+  // ─── Rolling "rhythm" + rest days (server-computed) ──────────────
+  /// Distinct nights read in the last 30 days — a forgiving, sliding "rhythm"
+  /// count for the "X of the last 30 nights" framing. Null when not computed.
+  final int? last30DaysCount;
+
+  /// Distinct nights read in the last 50 days. Null when not computed.
+  final int? last50DaysCount;
+
+  /// Rest days remaining in the current streak (2 minus missed days already
+  /// bridged). Derived server-side; null on documents predating the rewrite.
+  final int? restDaysRemaining;
+
+  // ─── Deprecated: streak-freeze economy (replaced by rest-day tolerance) ──
+  // These fields are no longer written or surfaced. The earn/spend freeze
+  // economy was replaced by stateless rest-day tolerance in the streak
+  // calculation (see functions/src/dateUtils.ts computeGentleStreak). They
+  // remain only so [fromMap] of historical documents keeps working.
+  /// Deprecated. Unused freezes on legacy documents.
   final int streakFreezesAvailable;
 
-  /// Lifetime count of freezes consumed — for trend/celebration copy.
+  /// Deprecated. Lifetime freezes consumed on legacy documents.
   final int streakFreezesUsed;
 
-  /// When the most recent freeze was earned (every ~7 consecutive days).
+  /// Deprecated. When the most recent legacy freeze was earned.
   final DateTime? streakFreezeLastEarnedDate;
 
-  /// Optional rolling count of days read in the last 50 — used for
-  /// shame-free "X of the last 50 days" framing. Null when not computed.
-  final int? last50DaysCount;
+  /// Rest days left in the current streak (0 when none), back-compat safe.
+  int get restDaysLeft => restDaysRemaining ?? 0;
 
   StudentStats({
     this.totalMinutesRead = 0,
@@ -300,10 +322,12 @@ class StudentStats {
     this.lastReadingDate,
     this.averageMinutesPerDay = 0,
     this.totalReadingDays = 0,
+    this.last30DaysCount,
+    this.last50DaysCount,
+    this.restDaysRemaining,
     this.streakFreezesAvailable = defaultStreakFreezes,
     this.streakFreezesUsed = 0,
     this.streakFreezeLastEarnedDate,
-    this.last50DaysCount,
   });
 
   factory StudentStats.fromMap(Map<String, dynamic> map) {
@@ -317,14 +341,16 @@ class StudentStats {
           : null,
       averageMinutesPerDay: (map['averageMinutesPerDay'] ?? 0).toDouble(),
       totalReadingDays: map['totalReadingDays'] ?? 0,
-      // Null-safe defaults keep pre-Rec-6 documents backward compatible.
+      last30DaysCount: map['last30DaysCount'],
+      last50DaysCount: map['last50DaysCount'],
+      restDaysRemaining: map['restDaysRemaining'],
+      // Null-safe defaults keep legacy (pre-rewrite) documents readable.
       streakFreezesAvailable:
           map['streakFreezesAvailable'] ?? defaultStreakFreezes,
       streakFreezesUsed: map['streakFreezesUsed'] ?? 0,
       streakFreezeLastEarnedDate: map['streakFreezeLastEarnedDate'] != null
           ? (map['streakFreezeLastEarnedDate'] as Timestamp).toDate()
           : null,
-      last50DaysCount: map['last50DaysCount'],
     );
   }
 
@@ -338,12 +364,14 @@ class StudentStats {
           lastReadingDate != null ? Timestamp.fromDate(lastReadingDate!) : null,
       'averageMinutesPerDay': averageMinutesPerDay,
       'totalReadingDays': totalReadingDays,
+      'last30DaysCount': last30DaysCount,
+      'last50DaysCount': last50DaysCount,
+      'restDaysRemaining': restDaysRemaining,
       'streakFreezesAvailable': streakFreezesAvailable,
       'streakFreezesUsed': streakFreezesUsed,
       'streakFreezeLastEarnedDate': streakFreezeLastEarnedDate != null
           ? Timestamp.fromDate(streakFreezeLastEarnedDate!)
           : null,
-      'last50DaysCount': last50DaysCount,
     };
   }
 }

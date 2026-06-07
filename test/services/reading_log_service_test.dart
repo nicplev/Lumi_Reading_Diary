@@ -1,18 +1,23 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lumi_reading_tracker/core/models/service_status.dart';
+import 'package:lumi_reading_tracker/core/services/service_status_controller.dart';
 import 'package:lumi_reading_tracker/data/models/student_model.dart';
 import 'package:lumi_reading_tracker/data/models/user_model.dart';
 import 'package:lumi_reading_tracker/services/reading_log_service.dart';
 
-/// Stat-update + streak-freeze behaviour of [ReadingLogService.writeLog].
+/// Stats-preview behaviour of [ReadingLogService.writeLog].
 ///
-/// These tests exercise the Firestore transaction by injecting a
-/// [FakeFirebaseFirestore] via [ReadingLogService.forTest]. They verify the
-/// streak/freeze accounting that drives the parent-home indicator + the
-/// "Freeze used — streak protected!" success copy (Rec 6).
+/// Since the redesign, the client is NOT the source of truth for stats — the
+/// aggregateStudentStats Cloud Function is. [writeLog] writes the log doc and
+/// returns a display-only *preview* (for the success-screen celebration) but
+/// must never mutate `students/{id}.stats`. These tests inject a
+/// [FakeFirebaseFirestore] via [ReadingLogService.forTest] to verify both the
+/// preview values (incl. the forgiving rest-day tolerance) and the
+/// no-persist guarantee.
 void main() {
-  group('ReadingLogService.writeLog stats + freezes', () {
+  group('ReadingLogService.writeLog (preview-only)', () {
     late FakeFirebaseFirestore firestore;
     late ReadingLogService service;
     const schoolId = 'school_1';
@@ -22,6 +27,15 @@ void main() {
     setUp(() {
       firestore = FakeFirebaseFirestore();
       service = ReadingLogService.forTest(firestore: firestore);
+      // Force the online write path so writeLog persists the log + previews
+      // stats (rather than queuing offline).
+      ServiceStatusController.instance
+          .debugSetCurrent(ServiceStatusSnapshot.healthy());
+    });
+
+    tearDown(() {
+      ServiceStatusController.instance
+          .debugSetCurrent(ServiceStatusSnapshot.unknown());
     });
 
     UserModel buildParent() => UserModel(
@@ -43,8 +57,7 @@ void main() {
           stats: stats,
         );
 
-    /// Seeds the Firestore student doc with the supplied stats map. The doc
-    /// must exist before the writeLog transaction runs.
+    /// Seeds the Firestore student doc with the supplied stats map.
     Future<void> seedStudent(Map<String, dynamic>? stats) async {
       await firestore
           .collection('schools')
@@ -60,17 +73,19 @@ void main() {
       });
     }
 
-    Future<Map<String, dynamic>> readStats() async {
+    /// Reads the raw persisted student document.
+    Future<Map<String, dynamic>> readRawStudent() async {
       final doc = await firestore
           .collection('schools')
           .doc(schoolId)
           .collection('students')
           .doc(studentId)
           .get();
-      return (doc.data()!['stats'] as Map<String, dynamic>);
+      return doc.data()!;
     }
 
-    test('first log persists the log doc and seeds streak=1', () async {
+    test('writes the log doc and returns a streak=1 preview, persisting no stats',
+        () async {
       await seedStudent(null);
 
       final result = await service.logReading(
@@ -88,52 +103,50 @@ void main() {
       expect(logs.docs, hasLength(1));
       expect(logs.docs.first.data()['studentId'], studentId);
 
-      // Stats freshly seeded.
-      final stats = await readStats();
-      expect(stats['currentStreak'], 1);
-      expect(stats['longestStreak'], 1);
-      expect(stats['totalReadingDays'], 1);
-      expect(stats['totalMinutesRead'], 15);
-      expect(stats['streakFreezesAvailable'],
-          StudentStats.defaultStreakFreezes);
-      expect(stats['streakFreezesUsed'], 0);
-
-      expect(result.freezeUsed, isFalse);
+      // The preview reflects the first night.
+      expect(result.updatedStats?['currentStreak'], 1);
+      expect(result.updatedStats?['totalReadingDays'], 1);
+      expect(result.updatedStats?['totalMinutesRead'], 15);
+      expect(result.restDayApplied, isFalse);
       expect(result.savedOffline, isFalse);
+
+      // The client did NOT write stats — that's the Cloud Function's job.
+      expect(readRawStudent().then((d) => d.containsKey('stats')),
+          completion(isFalse));
     });
 
-    test('same-day repeat does not double-count totalReadingDays', () async {
+    test('same-day repeat: preview keeps the streak and does not double-count',
+        () async {
       await seedStudent({
         'currentStreak': 1,
         'totalReadingDays': 1,
         'totalMinutesRead': 10,
         'lastReadingDate': Timestamp.fromDate(DateTime.now()),
-        'streakFreezesAvailable': StudentStats.defaultStreakFreezes,
-        'streakFreezesUsed': 0,
       });
 
-      await service.logReading(
+      final result = await service.logReading(
         student: buildStudent(),
         parent: buildParent(),
         minutesRead: 12,
       );
 
-      final stats = await readStats();
-      expect(stats['currentStreak'], 1, reason: 'same day → streak unchanged');
-      expect(stats['totalReadingDays'], 1, reason: 'same day → not counted');
-      expect(stats['totalMinutesRead'], 22, reason: 'minutes still accrue');
+      expect(result.updatedStats?['currentStreak'], 1,
+          reason: 'same day → streak unchanged');
+      expect(result.updatedStats?['totalReadingDays'], 1,
+          reason: 'same day → night not counted again');
+      expect(result.updatedStats?['totalMinutesRead'], 22,
+          reason: 'minutes still accrue in the preview');
+      expect(result.restDayApplied, isFalse);
     });
 
-    test('1-day gap with freeze available spends a freeze and keeps streak',
+    test('one missed night: preview bridges the streak and flags a rest day',
         () async {
-      // Last log was 2 calendar days ago — i.e. yesterday was skipped.
+      // Last log 2 calendar days ago → yesterday was missed (within tolerance).
       final twoDaysAgo = DateTime.now().subtract(const Duration(days: 2));
       await seedStudent({
         'currentStreak': 5,
         'totalReadingDays': 5,
         'lastReadingDate': Timestamp.fromDate(twoDaysAgo),
-        'streakFreezesAvailable': 2,
-        'streakFreezesUsed': 0,
       });
 
       final result = await service.logReading(
@@ -142,21 +155,18 @@ void main() {
         minutesRead: 15,
       );
 
-      final stats = await readStats();
-      expect(result.freezeUsed, isTrue);
-      expect(stats['currentStreak'], 6, reason: 'freeze protected the streak');
-      expect(stats['streakFreezesAvailable'], 1, reason: 'one freeze spent');
-      expect(stats['streakFreezesUsed'], 1);
+      expect(result.restDayApplied, isTrue);
+      expect(result.updatedStats?['currentStreak'], 6,
+          reason: 'rest-day tolerance bridges the missed night');
     });
 
-    test('1-day gap without freezes resets the streak to 1', () async {
-      final twoDaysAgo = DateTime.now().subtract(const Duration(days: 2));
+    test('three missed nights: preview restarts the streak with no rest day',
+        () async {
+      final fourDaysAgo = DateTime.now().subtract(const Duration(days: 4));
       await seedStudent({
         'currentStreak': 5,
         'totalReadingDays': 5,
-        'lastReadingDate': Timestamp.fromDate(twoDaysAgo),
-        'streakFreezesAvailable': 0,
-        'streakFreezesUsed': 2,
+        'lastReadingDate': Timestamp.fromDate(fourDaysAgo),
       });
 
       final result = await service.logReading(
@@ -165,60 +175,33 @@ void main() {
         minutesRead: 15,
       );
 
-      final stats = await readStats();
-      expect(result.freezeUsed, isFalse);
-      expect(stats['currentStreak'], 1, reason: 'no freezes → streak resets');
-      expect(stats['streakFreezesAvailable'], 0);
+      expect(result.restDayApplied, isFalse);
+      expect(result.updatedStats?['currentStreak'], 1,
+          reason: 'beyond the 2-day tolerance → fresh start');
     });
 
-    test('streak crossing a multiple of 7 earns back a freeze (capped)',
+    test('never persists computed stats (Cloud Function is the source of truth)',
         () async {
-      // Logged yesterday on a streak of 6 → today extends to 7 → earn back.
-      final yesterday = DateTime.now().subtract(const Duration(days: 1));
-      await seedStudent({
-        'currentStreak': 6,
-        'totalReadingDays': 6,
-        'lastReadingDate': Timestamp.fromDate(yesterday),
-        // Below the cap so a freeze can be earned.
-        'streakFreezesAvailable': 1,
-        'streakFreezesUsed': 1,
-      });
+      final seeded = {
+        'currentStreak': 5,
+        'longestStreak': 9,
+        'totalReadingDays': 5,
+        'totalMinutesRead': 100,
+        'lastReadingDate':
+            Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 2))),
+      };
+      await seedStudent(seeded);
 
       await service.logReading(
         student: buildStudent(),
         parent: buildParent(),
-        minutesRead: 20,
+        minutesRead: 15,
       );
 
-      final stats = await readStats();
-      expect(stats['currentStreak'], 7);
-      expect(stats['streakFreezesAvailable'], 2,
-          reason: 'earn-back fires at multiples of 7');
-      expect(stats['streakFreezeLastEarnedDate'], isNotNull);
-    });
-
-    test('earn-back is capped at the default', () async {
-      // Already at the cap → multiple-of-7 streak should NOT exceed it.
-      final yesterday = DateTime.now().subtract(const Duration(days: 1));
-      await seedStudent({
-        'currentStreak': 6,
-        'totalReadingDays': 6,
-        'lastReadingDate': Timestamp.fromDate(yesterday),
-        'streakFreezesAvailable': StudentStats.defaultStreakFreezes,
-        'streakFreezesUsed': 0,
-      });
-
-      await service.logReading(
-        student: buildStudent(),
-        parent: buildParent(),
-        minutesRead: 20,
-      );
-
-      final stats = await readStats();
-      expect(stats['currentStreak'], 7);
-      expect(stats['streakFreezesAvailable'],
-          StudentStats.defaultStreakFreezes,
-          reason: 'cap respected — no extra freeze added');
+      final stats = (await readRawStudent())['stats'] as Map<String, dynamic>;
+      expect(stats['currentStreak'], 5, reason: 'untouched by the client');
+      expect(stats['totalReadingDays'], 5, reason: 'untouched by the client');
+      expect(stats['totalMinutesRead'], 100, reason: 'untouched by the client');
     });
   });
 }
