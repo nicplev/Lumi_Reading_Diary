@@ -407,7 +407,7 @@ class AppRouter {
           final parent = params?['parent'] as UserModel?;
           final readingLog = params?['readingLog'] as ReadingLogModel?;
           final updatedStats = params?['updatedStats'] as Map<String, dynamic>?;
-          final freezeUsed = params?['freezeUsed'] as bool? ?? false;
+          final restDayApplied = params?['restDayApplied'] as bool? ?? false;
           if (student == null || parent == null || readingLog == null) {
             return const LoginScreen();
           }
@@ -416,7 +416,7 @@ class AppRouter {
             parent: parent,
             readingLog: readingLog,
             updatedStats: updatedStats,
-            freezeUsed: freezeUsed,
+            restDayApplied: restDayApplied,
           );
         },
       ),

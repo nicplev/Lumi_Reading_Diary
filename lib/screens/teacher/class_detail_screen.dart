@@ -129,6 +129,13 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
           });
         }
         break;
+      case 'nights':
+        students.sort((a, b) {
+          final nightsA = a.stats?.totalReadingDays ?? 0;
+          final nightsB = b.stats?.totalReadingDays ?? 0;
+          return nightsB.compareTo(nightsA);
+        });
+        break;
       case 'streak':
         students.sort((a, b) {
           final streakA = a.stats?.currentStreak ?? 0;
@@ -403,6 +410,11 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                         child: Text('Sort by Level',
                             style: TeacherTypography.bodySmall),
                       ),
+                    DropdownMenuItem(
+                      value: 'nights',
+                      child: Text('Sort by Total Nights',
+                          style: TeacherTypography.bodySmall),
+                    ),
                     DropdownMenuItem(
                       value: 'streak',
                       child: Text('Sort by Streak',

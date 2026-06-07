@@ -8,7 +8,6 @@ import '../data/models/reading_log_model.dart';
 import '../data/models/student_model.dart';
 import '../data/models/allocation_model.dart';
 import 'firebase_service.dart';
-import 'reading_log_service.dart';
 
 class OfflineService {
   static OfflineService? _instance;
@@ -520,12 +519,9 @@ class OfflineService {
     );
     await _readingLogsBox.put(log.id, syncedLog.toLocal());
 
-    // Replay the stats transaction for offline-created logs. Without this,
-    // queued logs reached Firestore but streaks and freeze counters never
-    // advanced (latent pre-redesign bug).
-    if (pendingSync.action == SyncAction.create) {
-      await ReadingLogService.instance.recomputeStatsAfterSync(syncedLog);
-    }
+    // No client-side stats recompute needed: writing the synced log to
+    // Firestore (above) triggers the aggregateStudentStats Cloud Function,
+    // which is the single source of truth for the student's stats.
   }
 
   Future<void> _syncParentComment(

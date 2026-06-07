@@ -13,6 +13,7 @@ import '../../core/widgets/lumi/comment_chips.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/reading_log_model.dart';
+import '../../data/models/achievement_model.dart';
 import '../../data/models/school_model.dart';
 import '../../data/models/parent_comment_settings.dart';
 import '../../services/analytics_service.dart';
@@ -27,8 +28,8 @@ class ReadingSuccessScreen extends StatefulWidget {
   final ReadingLogModel readingLog;
   final Map<String, dynamic>? updatedStats;
 
-  /// True when this log spent a streak freeze to bridge a missed day.
-  final bool freezeUsed;
+  /// True when this log bridged a missed night via rest-day tolerance.
+  final bool restDayApplied;
 
   const ReadingSuccessScreen({
     super.key,
@@ -36,7 +37,7 @@ class ReadingSuccessScreen extends StatefulWidget {
     required this.parent,
     required this.readingLog,
     this.updatedStats,
-    this.freezeUsed = false,
+    this.restDayApplied = false,
   });
 
   @override
@@ -77,23 +78,27 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
       widget.student.stats?.currentStreak ??
       0;
 
-  // Check if a badge milestone was just reached
+  int get _last30Nights =>
+      widget.updatedStats?['last30DaysCount'] ??
+      widget.student.stats?.last30DaysCount ??
+      0;
+
+  // Cumulative-nights milestones, unified with the achievement ladder
+  // (AchievementThresholds.readingDays) so the celebration matches the badge
+  // the Cloud Function actually awards. 1 night = the "First Chapter" special.
   String? get _earnedBadge {
-    const milestones = {
-      1: 'First Night',
-      25: '25 Nights',
-      50: '50 Nights',
-      100: '100 Nights',
-    };
-    return milestones[_totalNights];
+    if (_totalNights == 1) return 'First Night';
+    for (final t in AchievementThresholds.defaults.readingDays) {
+      if (_totalNights == t) return '$t Nights';
+    }
+    return null;
   }
 
   int get _nextMilestone {
-    const milestones = [25, 50, 75, 100, 150, 200];
-    for (final m in milestones) {
-      if (_totalNights < m) return m;
+    for (final t in AchievementThresholds.defaults.readingDays) {
+      if (_totalNights < t) return t;
     }
-    return ((_totalNights ~/ 50) + 1) * 50;
+    return ((_totalNights ~/ 100) + 1) * 100;
   }
 
   @override
@@ -292,9 +297,9 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
                         ),
                       ).animate().fadeIn(delay: 600.ms).slideY(begin: 0.3),
 
-                    // Rec 6: shame-free framing — celebrate the freeze that
-                    // protected the streak rather than mourning a missed day.
-                    if (widget.freezeUsed) ...[
+                    // Shame-free framing — a missed night is absorbed by a rest
+                    // day, so the streak simply keeps going (never "lost").
+                    if (widget.restDayApplied) ...[
                       const SizedBox(height: 12),
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -309,11 +314,11 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Text('❄️', style: TextStyle(fontSize: 22)),
+                            const Text('🌙', style: TextStyle(fontSize: 22)),
                             const SizedBox(width: 8),
                             Flexible(
                               child: Text(
-                                'Freeze used — streak protected!',
+                                'Rest day — your streak keeps going!',
                                 style: LumiTextStyles.bodyMedium(
                                   color: AppColors.charcoal,
                                 ).copyWith(fontWeight: FontWeight.w600),
@@ -322,6 +327,19 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
                           ],
                         ),
                       ).animate().fadeIn(delay: 700.ms).slideY(begin: 0.3),
+                    ],
+
+                    // Forgiving rhythm: how many of the last 30 nights — a
+                    // sliding count that never resets.
+                    if (_last30Nights > 0) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        '🌙 $_last30Nights of the last 30 nights',
+                        style: LumiTextStyles.bodySmall(
+                          color: AppColors.textSecondary,
+                        ),
+                        textAlign: TextAlign.center,
+                      ).animate().fadeIn(delay: 750.ms),
                     ],
 
                     const SizedBox(height: 16),

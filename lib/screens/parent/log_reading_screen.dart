@@ -334,7 +334,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
           'parent': widget.parent,
           'readingLog': result.log,
           'updatedStats': result.updatedStats,
-          'freezeUsed': result.freezeUsed,
+          'restDayApplied': result.restDayApplied,
         });
       }
     } catch (e) {

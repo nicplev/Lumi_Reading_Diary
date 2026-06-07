@@ -17,6 +17,7 @@ import '../../core/widgets/lumi/lumi_card.dart';
 import '../../core/widgets/lumi/stats_card.dart';
 import '../../core/widgets/lumi/week_progress_bar.dart';
 import '../../core/widgets/lumi/progress_ring.dart';
+import '../../core/widgets/lumi/rhythm_calendar.dart';
 import '../../core/widgets/lumi/lumi_book_card.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../core/services/navigation_state_service.dart';
@@ -416,10 +417,18 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                       currentStreak: stats?.currentStreak ?? 0,
                       bestStreak: stats?.longestStreak ?? 0,
                       totalNights: stats?.totalReadingDays ?? 0,
-                      streakFreezes: stats?.streakFreezesAvailable,
+                      restDaysRemaining: stats?.restDaysRemaining,
                     ).animate().fadeIn(delay: 300.ms);
                   },
                 ),
+
+                LumiGap.m,
+
+                // 30-day reading rhythm (forgiving "X of last 30 nights")
+                _RhythmSection(
+                  studentId: selectedChild.id,
+                  schoolId: widget.user.schoolId!,
+                ).animate().fadeIn(delay: 350.ms),
 
                 // Achievement near-miss nudge
                 _AchievementNearMissCard(
@@ -589,7 +598,9 @@ class _AchievementNearMissCardState extends State<_AchievementNearMissCard> {
                 thresholds: _thresholds,
                 customization: _customization,
                 minProgress: 0.8,
-                requirementTypes: const {'streak', 'days'},
+                // Consistency-first nudge: cumulative nights only (streaks earn
+                // no rewards). Falls back to all reward types below.
+                requirementTypes: const {'days'},
               ) ??
               AchievementTemplates.nearestUnearned(
                 currentStreak: stats.currentStreak,
@@ -827,7 +838,7 @@ class _TodayCardState extends State<_TodayCard> {
         'parent': widget.parent,
         'readingLog': result.log,
         'updatedStats': result.updatedStats,
-        'freezeUsed': result.freezeUsed,
+        'restDayApplied': result.restDayApplied,
       });
     } catch (_) {
       if (!mounted) return;
@@ -1057,6 +1068,64 @@ class _TodayCardState extends State<_TodayCard> {
   }
 }
 
+/// The next cumulative-nights milestone above [totalNights] — drives the
+/// progress ring's outer goal so it always tracks progress to the next badge
+/// rather than a flat 100.
+int _nextNightsGoal(int totalNights) {
+  for (final threshold in AchievementThresholds.defaults.readingDays) {
+    if (threshold > totalNights) return threshold;
+  }
+  // Past the top badge — keep the ring meaningful with the next round century.
+  return ((totalNights ~/ 100) + 1) * 100;
+}
+
+/// Forgiving 30-day "rhythm" calendar: an X-of-last-30-nights dot grid that
+/// slides forward each day instead of resetting. Streams the last 30 days of
+/// logs and derives the read-day set; hidden until the child has read at least
+/// once so a brand-new account isn't greeted by an empty grid.
+class _RhythmSection extends ConsumerWidget {
+  final String studentId;
+  final String schoolId;
+
+  const _RhythmSection({
+    required this.studentId,
+    required this.schoolId,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final firebaseService = ref.read(firebaseServiceProvider);
+    final now = DateTime.now();
+    final windowStart = DateTime(now.year, now.month, now.day)
+        .subtract(const Duration(days: 29));
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: firebaseService.firestore
+          .collection('schools')
+          .doc(schoolId)
+          .collection('readingLogs')
+          .where('studentId', isEqualTo: studentId)
+          .where('date',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(windowStart))
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox.shrink();
+
+        final readDays = <DateTime>{};
+        for (final doc in snapshot.data!.docs) {
+          final log = ReadingLogModel.fromFirestore(doc);
+          readDays.add(DateTime(log.date.year, log.date.month, log.date.day));
+        }
+        if (readDays.isEmpty) return const SizedBox.shrink();
+
+        return LumiCard(
+          child: RhythmCalendar(readDays: readDays, windowDays: 30),
+        );
+      },
+    );
+  }
+}
+
 class _ProgressAndWeekSection extends ConsumerWidget {
   final String studentId;
   final String schoolId;
@@ -1124,25 +1193,28 @@ class _ProgressAndWeekSection extends ConsumerWidget {
                     children: [
                       ProgressRing(
                         totalNights: totalNights,
+                        totalNightsGoal: _nextNightsGoal(totalNights),
                         weeklyProgress: completedDays.length,
                         todayComplete: todayComplete,
                       ),
                       LumiGap.s,
+                      // Streak is a gentle, secondary signal — small and muted,
+                      // so cumulative nights (the ring centre) stays the hero.
                       if (currentStreak > 0)
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.local_fire_department,
-                              color: AppColors.rosePink,
-                              size: 20,
+                              color: AppColors.warmOrange.withValues(alpha: 0.8),
+                              size: 16,
                             ),
                             LumiGap.horizontalXXS,
                             Text(
-                              '$currentStreak day streak!',
-                              style: LumiTextStyles.bodyMedium(
-                                color: AppColors.rosePink,
-                              ).copyWith(fontWeight: FontWeight.w600),
+                              '$currentStreak day streak',
+                              style: LumiTextStyles.caption(
+                                color: AppColors.textSecondary,
+                              ),
                             ),
                           ],
                         ),

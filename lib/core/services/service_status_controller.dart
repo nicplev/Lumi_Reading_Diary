@@ -111,6 +111,11 @@ class ServiceStatusController with WidgetsBindingObserver {
   ServiceStatusSnapshot _current = ServiceStatusSnapshot.unknown();
   ServiceStatusSnapshot get current => _current;
 
+  /// Test-only: force the current snapshot so specs can exercise the online /
+  /// offline write branches deterministically without a live connectivity probe.
+  @visibleForTesting
+  void debugSetCurrent(ServiceStatusSnapshot snapshot) => _current = snapshot;
+
   bool _initialized = false;
   bool _foregrounded = true;
 

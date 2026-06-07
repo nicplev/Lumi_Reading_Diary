@@ -13,31 +13,36 @@ import 'widget_data_service.dart';
 
 /// Outcome of a reading-log write.
 ///
-/// Carries the persisted [log], the recomputed student [updatedStats] (null
-/// when the stats transaction was skipped — e.g. an offline write), and a
-/// [savedOffline] flag so callers can tailor their confirmation copy.
+/// Carries the persisted [log], a display-only [updatedStats] **preview** for
+/// the success screen (null for offline writes), and a [savedOffline] flag so
+/// callers can tailor their confirmation copy. The authoritative stats are
+/// written by the aggregateStudentStats Cloud Function; the preview just lets
+/// the celebration render instantly before the server reconciles.
 class ReadingLogResult {
   const ReadingLogResult({
     required this.log,
     this.updatedStats,
     this.savedOffline = false,
-    this.freezeUsed = false,
+    this.restDayApplied = false,
   });
 
   final ReadingLogModel log;
+
+  /// Optimistic, display-only preview of the student's stats after this log.
+  /// Not persisted — the Cloud Function is the single source of truth.
   final Map<String, dynamic>? updatedStats;
   final bool savedOffline;
 
-  /// True when this log spent a streak freeze to bridge a missed day —
-  /// drives the shame-free "streak protected" celebration copy (Rec 6).
-  final bool freezeUsed;
+  /// True when this log bridged a missed night via rest-day tolerance —
+  /// drives the shame-free "rest day, your streak keeps going" celebration.
+  final bool restDayApplied;
 }
 
-/// Internal result of the stats transaction.
+/// Internal result of the stats preview.
 class _StatsUpdate {
-  const _StatsUpdate(this.stats, this.freezeUsed);
+  const _StatsUpdate(this.stats, this.restDayApplied);
   final Map<String, dynamic>? stats;
-  final bool freezeUsed;
+  final bool restDayApplied;
 }
 
 /// Single owner of the reading-log write path.
@@ -198,13 +203,14 @@ class ReadingLogService {
 
   /// Persists an already-built [log].
   ///
-  /// Online: writes to Firestore, runs the stats transaction, refreshes the
-  /// home-screen widget, and returns the recomputed stats. A genuine online
-  /// failure rethrows so the caller can surface it.
+  /// Online: writes the log to Firestore, refreshes the home-screen widget, and
+  /// returns a display-only stats preview for the celebration. The authoritative
+  /// stats are recomputed by the aggregateStudentStats Cloud Function (the
+  /// single source of truth) — the client no longer persists computed stats. A
+  /// genuine online failure rethrows so the caller can surface it.
   ///
-  /// Offline: persists to local Hive storage (queued for sync) and skips the
-  /// stats transaction — transactions need a server round-trip, and stats are
-  /// recomputed when the log syncs.
+  /// Offline: persists to local Hive storage (queued for sync). Stats are
+  /// computed by the Cloud Function when the queued log lands in Firestore.
   ///
   /// [student] is optional: when supplied the home-screen widget is refreshed
   /// immediately; id-only callers (notification / widget intent) omit it and
@@ -226,7 +232,7 @@ class ReadingLogService {
           .doc(log.id)
           .set(logData);
 
-      final statsUpdate = await _updateStudentStats(log);
+      final statsUpdate = await _previewStatsAfterLog(log);
 
       // Push fresh data to the home-screen widget immediately after the log.
       if (student != null) {
@@ -236,7 +242,7 @@ class ReadingLogService {
       return ReadingLogResult(
         log: log,
         updatedStats: statsUpdate.stats,
-        freezeUsed: statsUpdate.freezeUsed,
+        restDayApplied: statsUpdate.restDayApplied,
       );
     }
 
@@ -295,14 +301,6 @@ class ReadingLogService {
     });
   }
 
-  /// Replays the stats transaction for a log that was just synced from
-  /// the offline queue. Public for [OfflineService] to call — kept
-  /// out-of-band so the private [_updateStudentStats] still drives the
-  /// online write path.
-  Future<void> recomputeStatsAfterSync(ReadingLogModel log) async {
-    await _updateStudentStats(log);
-  }
-
   DocumentReference<Map<String, dynamic>> _logRef(ReadingLogModel log) {
     return _firestore
         .collection('schools')
@@ -346,12 +344,15 @@ class ReadingLogService {
     return chips.isNotEmpty ? chips : notes;
   }
 
-  /// Recomputes `students/{id}.stats` inside a transaction.
+  /// Computes a display-only **preview** of `students/{id}.stats` after [log],
+  /// for the success-screen celebration. Does NOT write to Firestore.
   ///
-  /// Streak handling is shame-free (Rec 6): a single missed day spends a
-  /// streak freeze instead of resetting the streak, and a fresh freeze is
-  /// earned every 7 consecutive days (capped at [StudentStats.defaultStreakFreezes]).
-  Future<_StatsUpdate> _updateStudentStats(ReadingLogModel log) async {
+  /// The aggregateStudentStats Cloud Function is the single source of truth and
+  /// reconciles the persisted stats within ~1s (the home StreamBuilder then
+  /// updates). This is a lightweight mirror of the server's gentle-streak rule
+  /// — it tolerates up to 2 missed nights — and is intentionally approximate;
+  /// the server corrects any drift.
+  Future<_StatsUpdate> _previewStatsAfterLog(ReadingLogModel log) async {
     try {
       final studentRef = _firestore
           .collection('schools')
@@ -359,99 +360,62 @@ class ReadingLogService {
           .collection('students')
           .doc(log.studentId);
 
-      Map<String, dynamic>? newStats;
-      bool freezeUsed = false;
+      final studentDoc = await studentRef.get();
+      if (!studentDoc.exists) return const _StatsUpdate(null, false);
 
-      await _firestore.runTransaction((transaction) async {
-        // Reset per-attempt — a transaction closure may run more than once.
-        freezeUsed = false;
-        final studentDoc = await transaction.get(studentRef);
+      final data = studentDoc.data() as Map<String, dynamic>;
+      final stats = data['stats'] as Map<String, dynamic>? ?? {};
 
-        if (studentDoc.exists) {
-          final data = studentDoc.data() as Map<String, dynamic>;
-          final stats = data['stats'] as Map<String, dynamic>? ?? {};
+      final currentStreak = (stats['currentStreak'] ?? 0) as int;
+      final longestStreak = (stats['longestStreak'] ?? 0) as int;
+      final totalMinutesRead = (stats['totalMinutesRead'] ?? 0) as int;
+      final totalBooksRead = (stats['totalBooksRead'] ?? 0) as int;
+      final totalReadingDays = (stats['totalReadingDays'] ?? 0) as int;
 
-          final currentStreak = stats['currentStreak'] ?? 0;
-          final longestStreak = stats['longestStreak'] ?? 0;
-          final totalMinutesRead = stats['totalMinutesRead'] ?? 0;
-          final totalBooksRead = stats['totalBooksRead'] ?? 0;
-          final totalReadingDays = stats['totalReadingDays'] ?? 0;
+      final lastReadingDate = stats['lastReadingDate'] != null
+          ? (stats['lastReadingDate'] as Timestamp).toDate().toLocal()
+          : null;
 
-          int freezesAvailable = stats['streakFreezesAvailable'] ??
-              StudentStats.defaultStreakFreezes;
-          int freezesUsedTotal = stats['streakFreezesUsed'] ?? 0;
-          DateTime? freezeEarnedDate =
-              stats['streakFreezeLastEarnedDate'] != null
-                  ? (stats['streakFreezeLastEarnedDate'] as Timestamp).toDate()
-                  : null;
+      int newStreak = 1;
+      bool isNewDay = true;
+      bool restDayApplied = false;
 
-          final lastReadingDate = stats['lastReadingDate'] != null
-              ? (stats['lastReadingDate'] as Timestamp).toDate().toLocal()
-              : null;
+      if (lastReadingDate != null) {
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        final lastDay = DateTime(
+          lastReadingDate.year,
+          lastReadingDate.month,
+          lastReadingDate.day,
+        );
+        final daysSinceLast = today.difference(lastDay).inDays;
 
-          int newStreak = 1;
-          bool isNewDay = true;
-          if (lastReadingDate != null) {
-            final now = DateTime.now();
-            final today = DateTime(now.year, now.month, now.day);
-            final lastDay = DateTime(
-              lastReadingDate.year,
-              lastReadingDate.month,
-              lastReadingDate.day,
-            );
-            final calendarDaysDiff = today.difference(lastDay).inDays;
-
-            if (calendarDaysDiff == 1) {
-              newStreak = currentStreak + 1;
-            } else if (calendarDaysDiff == 0) {
-              newStreak = currentStreak;
-              isNewDay = false; // Same day — don't double-count
-            } else if (calendarDaysDiff == 2 && freezesAvailable > 0) {
-              // Exactly one day missed — spend a freeze to protect the streak.
-              newStreak = currentStreak + 1;
-              freezesAvailable -= 1;
-              freezesUsedTotal += 1;
-              freezeUsed = true;
-            }
-            // More than one day missed (or no freeze) → newStreak resets to 1.
-          }
-
-          // Earn a freeze every 7 consecutive days, capped at the default.
-          if (isNewDay &&
-              newStreak > 0 &&
-              newStreak % 7 == 0 &&
-              freezesAvailable < StudentStats.defaultStreakFreezes) {
-            freezesAvailable += 1;
-            freezeEarnedDate = DateTime.now();
-          }
-
-          final newTotalDays =
-              isNewDay ? totalReadingDays + 1 : totalReadingDays;
-
-          newStats = {
-            'totalMinutesRead': totalMinutesRead + log.minutesRead,
-            'totalBooksRead': totalBooksRead + log.bookTitles.length,
-            'currentStreak': newStreak,
-            'longestStreak':
-                newStreak > longestStreak ? newStreak : longestStreak,
-            'lastReadingDate': FieldValue.serverTimestamp(),
-            'totalReadingDays': newTotalDays,
-            'averageMinutesPerDay': (totalMinutesRead + log.minutesRead) /
-                (newTotalDays > 0 ? newTotalDays : 1),
-            'streakFreezesAvailable': freezesAvailable,
-            'streakFreezesUsed': freezesUsedTotal,
-            'streakFreezeLastEarnedDate': freezeEarnedDate != null
-                ? Timestamp.fromDate(freezeEarnedDate)
-                : null,
-          };
-
-          transaction.update(studentRef, {'stats': newStats});
+        if (daysSinceLast == 0) {
+          newStreak = currentStreak;
+          isNewDay = false; // Already logged today — don't double-count.
+        } else if (daysSinceLast == 1) {
+          newStreak = currentStreak + 1; // Consecutive night.
+        } else if (daysSinceLast <= 3) {
+          // 1–2 missed nights, bridged by rest-day tolerance (≤ 2 days).
+          newStreak = currentStreak + 1;
+          restDayApplied = true;
         }
-      });
+        // More missed nights than the tolerance → fresh start (newStreak = 1).
+      }
 
-      return _StatsUpdate(newStats, freezeUsed);
+      final newTotalDays = isNewDay ? totalReadingDays + 1 : totalReadingDays;
+
+      final previewStats = <String, dynamic>{
+        'totalMinutesRead': totalMinutesRead + log.minutesRead,
+        'totalBooksRead': totalBooksRead + log.bookTitles.length,
+        'currentStreak': newStreak,
+        'longestStreak': newStreak > longestStreak ? newStreak : longestStreak,
+        'totalReadingDays': newTotalDays,
+      };
+
+      return _StatsUpdate(previewStats, restDayApplied);
     } catch (e) {
-      debugPrint('Error updating student stats: $e');
+      debugPrint('Error previewing student stats: $e');
       return const _StatsUpdate(null, false);
     }
   }

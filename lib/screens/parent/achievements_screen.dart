@@ -8,6 +8,7 @@ import 'package:lumi_reading_tracker/core/theme/lumi_spacing.dart';
 import 'package:lumi_reading_tracker/core/theme/lumi_borders.dart';
 import 'package:lumi_reading_tracker/core/widgets/lumi/lumi_buttons.dart';
 import 'package:lumi_reading_tracker/core/widgets/glass/glass_achievement_card.dart';
+import 'package:lumi_reading_tracker/core/widgets/lumi/rhythm_calendar.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 /// Achievements screen showing earned and locked achievements
@@ -74,6 +75,7 @@ class _AchievementsScreenState extends State<AchievementsScreen>
           children: [
             _buildAppBar(),
             _buildCategoryFilter(),
+            _buildRhythmBanner(),
             _buildTabs(),
             Expanded(
               child: TabBarView(
@@ -154,6 +156,50 @@ class _AchievementsScreenState extends State<AchievementsScreen>
             ? AppColors.rosePink
             : AppColors.charcoal.withValues(alpha: 0.3),
       ),
+    );
+  }
+
+  /// Forgiving 30-day rhythm grid above the badge tabs. Hidden until the child
+  /// has read at least once in the window so a new account isn't shown an empty
+  /// grid. Derives the read-day set from the last 30 days of logs.
+  Widget _buildRhythmBanner() {
+    final now = DateTime.now();
+    final windowStart = DateTime(now.year, now.month, now.day)
+        .subtract(const Duration(days: 29));
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('schools')
+          .doc(widget.schoolId)
+          .collection('readingLogs')
+          .where('studentId', isEqualTo: widget.studentId)
+          .where('date',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(windowStart))
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox.shrink();
+
+        final readDays = <DateTime>{};
+        for (final doc in snapshot.data!.docs) {
+          final data = doc.data() as Map<String, dynamic>;
+          final ts = data['date'];
+          if (ts is Timestamp) {
+            final d = ts.toDate();
+            readDays.add(DateTime(d.year, d.month, d.day));
+          }
+        }
+        if (readDays.isEmpty) return const SizedBox.shrink();
+
+        return Container(
+          margin: LumiPadding.horizontalS,
+          padding: LumiPadding.allM,
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: LumiBorders.large,
+          ),
+          child: RhythmCalendar(readDays: readDays, windowDays: 30),
+        );
+      },
     );
   }
 

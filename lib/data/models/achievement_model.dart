@@ -174,11 +174,14 @@ class AchievementThresholds {
     required this.readingDays,
   });
 
+  // Keep readingDays in sync with DEFAULT_ACHIEVEMENT_THRESHOLDS in
+  // functions/src/index.ts. readingDays (cumulative "nights read") is the
+  // primary reward ladder; streak tiers are no longer awarded.
   static const AchievementThresholds defaults = AchievementThresholds(
     streak:      [5, 10, 20, 50, 100],
     books:       [5, 10, 25, 50, 100],
     minutes:     [300, 600, 1500, 3000, 6000],
-    readingDays: [10, 30, 50, 100],
+    readingDays: [10, 50, 100, 365],
   );
 
   factory AchievementThresholds.fromMap(Map<String, dynamic>? map) {
@@ -305,11 +308,14 @@ class AchievementTemplates {
     {'id': 'minutes_t5', 'name': 'Eternal Reader',  'icon': '♾️', 'rarity': 'legendary'},
   ];
 
+  // Cumulative "nights read" ladder — the primary reward track. Names/rarity
+  // mirror DAYS_TIERS in functions/src/index.ts; thresholds come from
+  // AchievementThresholds.readingDays.
   static const _daysMeta = [
-    {'id': 'days_t1', 'name': 'Decade Reader',    'icon': '📅',  'rarity': 'common'},
-    {'id': 'days_t2', 'name': 'Monthly Reader',   'icon': '🗓️', 'rarity': 'uncommon'},
-    {'id': 'days_t3', 'name': 'Consistent Reader','icon': '📆',  'rarity': 'rare'},
-    {'id': 'days_t4', 'name': 'Century Reader',   'icon': '📊',  'rarity': 'epic'},
+    {'id': 'days_t1', 'name': 'Decade Reader',  'icon': '📅', 'rarity': 'common'},
+    {'id': 'days_t2', 'name': 'Fifty Nights',   'icon': '🌙', 'rarity': 'rare'},
+    {'id': 'days_t3', 'name': 'Century Reader', 'icon': '💯', 'rarity': 'epic'},
+    {'id': 'days_t4', 'name': 'Year of Reading','icon': '🏆', 'rarity': 'legendary'},
   ];
 
   // ─── Dynamic template generation ─────────────────────────────────────────
@@ -457,6 +463,8 @@ class AchievementTemplates {
 
     for (final template in templates) {
       if (earnedAchievementIds.contains(template.id)) continue;
+      // Streaks earn no rewards — never auto-unlock streak badges.
+      if (template.requirementType == 'streak') continue;
 
       bool shouldUnlock = false;
       switch (template.requirementType) {
@@ -502,7 +510,9 @@ class AchievementTemplates {
     for (final template in templates) {
       if (earnedAchievementIds.contains(template.id)) continue;
       if (template.requiredValue <= 0) continue;
-      // Rec 7: optionally restrict to habit-type achievements (streak/days)
+      // Streaks earn no rewards — never surface streak near-miss nudges.
+      if (template.requirementType == 'streak') continue;
+      // Rec 7: optionally restrict to habit-type achievements (now days-only)
       // so the parent nudge celebrates consistency over volume.
       if (requirementTypes != null &&
           !requirementTypes.contains(template.requirementType)) {
