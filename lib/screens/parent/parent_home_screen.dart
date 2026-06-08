@@ -36,6 +36,7 @@ import '../../services/isbn_assignment_service.dart';
 import '../../services/staff_notification_service.dart';
 import 'reading_history_screen.dart';
 import 'parent_profile_screen.dart';
+import 'widgets/add_email_for_recovery_modal.dart';
 import 'widgets/parent_child_switcher.dart';
 import 'widgets/widget_undo_banner.dart';
 
@@ -296,6 +297,42 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     );
   }
 
+  Widget _buildRecoveryBanner() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: Material(
+        color: AppColors.rosePink.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () =>
+              AddEmailForRecoveryModal.show(context: context, user: widget.user),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Icon(Icons.shield_outlined,
+                    size: 18,
+                    color: AppColors.rosePink.withValues(alpha: 0.9)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Add an email so you can get back in if you lose your phone',
+                    style: LumiTextStyles.bodySmall(
+                      color: AppColors.charcoal.withValues(alpha: 0.85),
+                    ),
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded,
+                    color: AppColors.charcoal.withValues(alpha: 0.5)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildHomeView(
     StudentModel selectedChild,
     List<StudentModel> children,
@@ -374,6 +411,11 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
 
           // Persistent child switcher — renders only for 2+ children.
           const SliverToBoxAdapter(child: ParentChildSwitcher()),
+
+          // Quiet recovery nudge for phone-only parents — disappears the
+          // moment they finish the add-email flow.
+          if ((widget.user.email ?? '').isEmpty)
+            SliverToBoxAdapter(child: _buildRecoveryBanner()),
 
           // Content
           SliverPadding(

@@ -21,6 +21,17 @@ class UserSchoolIndexService {
     return digest.toString();
   }
 
+  /// Generates a consistent hash for a phone number. Phone numbers must
+  /// already be in E.164 form (e.g. `+61412345678`).
+  /// SHA-256 namespace doesn't collide with email hashes, so phone and email
+  /// records can safely share the same Firestore collection.
+  String _hashPhone(String phoneE164) {
+    final normalized = phoneE164.trim();
+    final bytes = utf8.encode(normalized);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
   /// Creates or updates an index entry for a user.
   ///
   /// This should be called when:
@@ -94,6 +105,68 @@ class UserSchoolIndexService {
     final doc = await _firestore
         .collection(_collectionName)
         .doc(emailHash)
+        .get();
+    return doc.exists;
+  }
+
+  /// Creates or updates an index entry keyed by a hashed phone number.
+  ///
+  /// Called when:
+  /// - A new parent registers via the phone-primary path (no email).
+  /// - An existing user adds a phone number (e.g. MFA enrolment).
+  ///
+  /// Records share the same collection as email-keyed records; the SHA-256
+  /// hash namespace prevents collisions.
+  Future<void> createOrUpdatePhoneIndex({
+    required String phoneE164,
+    required String schoolId,
+    required String userType,
+    required String userId,
+  }) async {
+    final phoneHash = _hashPhone(phoneE164);
+
+    await _firestore.collection(_collectionName).doc(phoneHash).set({
+      'phoneNumber': phoneE164,
+      'schoolId': schoolId,
+      'userType': userType,
+      'userId': userId,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Looks up which school a user belongs to by their phone number.
+  /// Returns the same shape as [lookupSchoolByEmail], or null on miss.
+  Future<Map<String, dynamic>?> lookupSchoolByPhone(String phoneE164) async {
+    final phoneHash = _hashPhone(phoneE164);
+
+    final doc = await _firestore
+        .collection(_collectionName)
+        .doc(phoneHash)
+        .get();
+
+    if (!doc.exists) return null;
+
+    final data = doc.data()!;
+    return {
+      'schoolId': data['schoolId'],
+      'userType': data['userType'],
+      'userId': data['userId'],
+    };
+  }
+
+  /// Deletes a phone-keyed index entry. Mirror of [deleteIndex].
+  Future<void> deletePhoneIndex(String phoneE164) async {
+    final phoneHash = _hashPhone(phoneE164);
+    await _firestore.collection(_collectionName).doc(phoneHash).delete();
+  }
+
+  /// Checks if a phone number is already registered. Used to fail fast
+  /// on duplicate phone signups before invoking Firebase Auth.
+  Future<bool> phoneExists(String phoneE164) async {
+    final phoneHash = _hashPhone(phoneE164);
+    final doc = await _firestore
+        .collection(_collectionName)
+        .doc(phoneHash)
         .get();
     return doc.exists;
   }

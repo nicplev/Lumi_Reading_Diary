@@ -21,6 +21,7 @@ import 'services/offline_service.dart';
 import 'services/notification_service.dart';
 import 'services/crash_reporting_service.dart';
 import 'services/analytics_service.dart';
+import 'services/phone_verification_recovery_service.dart';
 import 'services/teacher_device_book_cache_service.dart';
 import 'services/widget_data_service.dart';
 import 'firebase_options.dart';
@@ -66,6 +67,16 @@ void main() async {
 
       // Initialize Firebase services
       await FirebaseService.instance.initialize();
+
+      // Bring up the phone-verification recovery store before any auth UI
+      // mounts. It needs to be ready before the splash screen runs its
+      // peek check, and before the registration/login screens can install
+      // the `codeSent` persistence callbacks.
+      try {
+        await PhoneVerificationRecoveryService.instance.initialize();
+      } catch (e) {
+        debugPrint('Warning: PhoneVerificationRecoveryService init failed: $e');
+      }
 
       // Kick off the dev-access listener so the flag is hot by the time
       // the login screen (or any DEV-gated surface) reads it.
@@ -129,11 +140,31 @@ void main() async {
   );
 }
 
-class LumiApp extends ConsumerWidget {
+class LumiApp extends ConsumerStatefulWidget {
   const LumiApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LumiApp> createState() => _LumiAppState();
+}
+
+class _LumiAppState extends ConsumerState<LumiApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Install the warm-resume hook for the phone verification recovery
+    // service. When `codeSent` fires while the originating widget (e.g.
+    // the registration modal) is unmounted, this hook jumps the user
+    // straight to /auth/phone-verify instead of orphaning them at login.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final router = ref.read(routerProvider);
+      PhoneVerificationRecoveryService.instance.onRecoveryNeeded = (_) {
+        router.go('/auth/phone-verify');
+      };
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
     return MaterialApp.router(
       title: 'Lumi Reading Diary',

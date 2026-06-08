@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -20,6 +21,7 @@ import '../../../data/models/user_model.dart';
 import '../../../services/analytics_service.dart';
 import '../../../services/crash_reporting_service.dart';
 import '../../../services/parent_linking_service.dart';
+import '../../../services/phone_verification_recovery_service.dart';
 import '../../../services/sms_verification_service.dart';
 import '../link_code_scanner_screen.dart';
 
@@ -48,12 +50,31 @@ enum _Stage {
   code,
   name,
   relationship,
+  phone,
   email,
   password,
   confirm,
-  phone,
   sms,
   success
+}
+
+/// Which Firebase Auth flow drives the SMS step. Decided at the moment the
+/// user leaves the `email`/`confirm` stage and persists through `sms` so
+/// `_verifySmsAndFinish` knows how to finalise the account.
+enum _AuthFlow {
+  /// User left email blank — phone is the primary credential. We call
+  /// `verifyPhoneNumber` directly (no MFA session) and complete with
+  /// `signInWithCredential` on the SMS step.
+  phonePrimary,
+
+  /// User supplied email + password — we created (or signed in) an email
+  /// account and enrolled phone as an MFA factor. SMS completes enrollment.
+  emailMfa,
+
+  /// Email was already in use AND had MFA enrolled — Firebase returned a
+  /// resolver; SMS verifies against the existing enrolled phone. Same
+  /// behaviour as before the phone-optional change.
+  existingMfa,
 }
 
 class _ParentRegistrationOverlay extends StatelessWidget {
@@ -71,7 +92,13 @@ class _ParentRegistrationOverlay extends StatelessWidget {
           Positioned.fill(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () => Navigator.of(context).maybePop(),
+              onTap: () {
+                if (kDebugMode) {
+                  debugPrint(
+                      '[phone-auth] overlay → tap-outside-card → maybePop()');
+                }
+                Navigator.of(context).maybePop();
+              },
               child: AnimatedBuilder(
                 animation: animation,
                 builder: (context, _) {
@@ -163,7 +190,9 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
   Map<String, dynamic>? _studentInfo;
   UserModel? _createdParent;
 
-  // SMS MFA state.
+  // SMS state. _authFlow is decided when the user transitions out of email
+  // or confirm and drives both the SMS send and verify-finish paths.
+  _AuthFlow? _authFlow;
   String? _pendingUserId;
   String? _verificationId;
   int? _resendToken;
@@ -225,6 +254,10 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
 
   @override
   void dispose() {
+    if (kDebugMode) {
+      debugPrint(
+          '[phone-auth] modal.dispose → stage=$_stage busy=$_busy authFlow=$_authFlow pendingUserId=$_pendingUserId verificationIdSet=${_verificationId != null} errorMessage=${_errorMessage == null ? "null" : "\"${_errorMessage!.substring(0, _errorMessage!.length.clamp(0, 60))}\""}');
+    }
     _lastNameRevealTimer?.cancel();
     _resendTicker?.cancel();
     _passwordFocusNode.dispose();
@@ -444,15 +477,24 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
   }
 
   void _goBack() {
+    // Phone is now collected before email; sms back-step depends on whether
+    // we took the phone-primary path (back to email) or the email/MFA path
+    // (back to confirm). After the auth session is locked in (_pendingUserId
+    // set, or phone primary verificationId issued) the user can't rewind
+    // past phone — that would orphan the Firebase Auth state.
+    final inEmailMfaFlow = _authFlow == _AuthFlow.emailMfa ||
+        _authFlow == _AuthFlow.existingMfa;
     final prev = switch (_stage) {
       _Stage.code => _Stage.code,
       _Stage.name => _Stage.code,
       _Stage.relationship => _Stage.name,
-      _Stage.email => _Stage.relationship,
+      _Stage.phone => _Stage.relationship,
+      _Stage.email =>
+        _pendingUserId == null ? _Stage.phone : _Stage.email,
       _Stage.password => _Stage.email,
       _Stage.confirm => _Stage.password,
-      _Stage.phone => _pendingUserId == null ? _Stage.confirm : _Stage.phone,
-      _Stage.sms => _Stage.phone,
+      _Stage.sms =>
+        inEmailMfaFlow ? _Stage.confirm : _Stage.email,
       _Stage.success => _Stage.success,
     };
     setState(() {
@@ -461,11 +503,163 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
     });
   }
 
-  /// Resolves the Firebase Auth user (creating a new one or signing in if
-  /// the email already exists) and dispatches the SMS challenge. Handles
-  /// three branches: new account, existing account without MFA, existing
-  /// account with MFA already enrolled.
-  Future<void> _sendPhoneCode() async {
+  /// Phone stage → email stage. Fails fast if the phone is already
+  /// registered (avoids paying for an SMS only to error later).
+  Future<void> _advanceFromPhone() async {
+    if (!_phoneValid) return;
+    setState(() {
+      _busy = true;
+      _errorMessage = null;
+    });
+    try {
+      final exists = await UserSchoolIndexService().phoneExists(_phoneE164);
+      if (!mounted) return;
+      if (exists) {
+        setState(() => _errorMessage =
+            'This phone number is already registered. Please log in instead.');
+        return;
+      }
+      setState(() => _stage = _Stage.email);
+    } catch (_) {
+      // Don't block on a transient index read failure — let the user
+      // continue and surface any real conflict at SMS-send time.
+      if (mounted) setState(() => _stage = _Stage.email);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Confirm stage → SMS via the email + phone MFA flow. Creates the
+  /// Firebase Auth account (or signs in to an existing one) then
+  /// dispatches an SMS enrollment challenge.
+  Future<void> _advanceFromConfirm() async {
+    if (!_confirmValid) return;
+    await _sendEnrollmentSms();
+  }
+
+  /// Routes the SMS-step "Resend" tap back through whichever sender
+  /// dispatched the original code.
+  Future<void> _resendSmsForCurrentFlow() {
+    return switch (_authFlow) {
+      _AuthFlow.phonePrimary => _sendPrimaryPhoneSms(),
+      _AuthFlow.emailMfa => _sendEnrollmentSms(),
+      _AuthFlow.existingMfa => _sendEnrollmentSms(),
+      null => _sendEnrollmentSms(),
+    };
+  }
+
+  /// Phone-primary path: dispatch a regular `verifyPhoneNumber` (no
+  /// multi-factor session). The account is created on `_verifySmsAndFinish`
+  /// via `signInWithCredential`.
+  Future<void> _sendPrimaryPhoneSms() async {
+    if (kDebugMode) {
+      debugPrint(
+          '[phone-auth] modal._sendPrimaryPhoneSms → entry phoneValid=$_phoneValid phone=$_phoneE164 emailEmpty=${_emailController.text.trim().isEmpty}');
+    }
+    if (!_phoneValid) return;
+    setState(() {
+      _busy = true;
+      _errorMessage = null;
+    });
+    try {
+      final handle = await _smsService.sendPrimaryPhoneCode(
+        phoneNumberE164: _phoneE164,
+        forceResendingToken: _resendToken,
+        // Persist + warm-resume happens inside Firebase's codeSent
+        // callback so we can survive an iOS reCAPTCHA modal disposal
+        // mid-await. If the modal is gone by the time this fires,
+        // navigate to the recovery screen via the global router hook.
+        onCodeSentPersist: (h) {
+          final code = _verifiedCode;
+          if (code == null) return;
+          final record = PendingPhoneVerification(
+            verificationId: h.verificationId,
+            resendToken: h.resendToken,
+            phoneE164: _phoneE164,
+            mode: PhoneVerificationMode.phonePrimaryRegistration,
+            contextJson: {
+              'linkCodeId': code.id,
+              'linkCodeValue': code.code,
+              'schoolId': code.schoolId,
+              'studentId': code.studentId,
+              'studentFullName': _studentName,
+              'fullName':
+                  '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'
+                      .trim(),
+              'relationshipLabel': _relationshipLabel,
+            },
+            savedAt: DateTime.now(),
+          );
+          // Fire and forget — Hive write is queued synchronously even
+          // though the Future itself is async, so the record is safe by
+          // the time the next event loop tick happens.
+          unawaited(PhoneVerificationRecoveryService.instance.save(record));
+          if (!mounted) {
+            if (kDebugMode) {
+              debugPrint(
+                  '[phone-auth] modal._sendPrimaryPhoneSms → codeSent fired but modal unmounted → triggering warm-resume navigation');
+            }
+            PhoneVerificationRecoveryService.instance.onRecoveryNeeded
+                ?.call(record);
+          }
+        },
+      );
+      if (!mounted) {
+        if (kDebugMode) {
+          debugPrint(
+              '[phone-auth] modal._sendPrimaryPhoneSms → handle returned but widget unmounted; bailing');
+        }
+        return;
+      }
+      _startResendCountdown();
+      setState(() {
+        _authFlow = _AuthFlow.phonePrimary;
+        _verificationId = handle.verificationId;
+        _resendToken = handle.resendToken;
+        _stage = _Stage.sms;
+      });
+      if (kDebugMode) {
+        debugPrint(
+            '[phone-auth] modal._sendPrimaryPhoneSms → success → stage=sms authFlow=phonePrimary');
+      }
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) {
+        if (kDebugMode) {
+          debugPrint(
+              '[phone-auth] modal._sendPrimaryPhoneSms → FirebaseAuthException but widget unmounted; bailing code=${e.code}');
+        }
+        return;
+      }
+      setState(() => _errorMessage = SmsVerificationService.friendlyError(e));
+      if (kDebugMode) {
+        debugPrint(
+            '[phone-auth] modal._sendPrimaryPhoneSms → FirebaseAuthException code=${e.code} errorMessageSet=${_errorMessage?.substring(0, _errorMessage!.length.clamp(0, 80))}');
+      }
+    } catch (e, st) {
+      if (!mounted) {
+        if (kDebugMode) {
+          debugPrint(
+              '[phone-auth] modal._sendPrimaryPhoneSms → generic error but widget unmounted; bailing e=$e');
+        }
+        return;
+      }
+      setState(() => _errorMessage =
+          'Could not send code: ${e.toString().replaceAll('Exception: ', '')}');
+      if (kDebugMode) {
+        debugPrint(
+            '[phone-auth] modal._sendPrimaryPhoneSms → generic error e=$e');
+      }
+      CrashReportingService.instance
+          .recordError(e, st, reason: 'Parent phone-primary SMS send failed');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Email + phone MFA path: create or sign-in the email user, then
+  /// dispatch an enrollment SMS. Mirrors the previous `_sendPhoneCode`
+  /// behaviour; just lifted out so the phone-primary path can sit next to it.
+  Future<void> _sendEnrollmentSms() async {
     if (!_phoneValid) return;
     final code = _verifiedCode;
     if (code == null) return;
@@ -533,6 +727,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
               );
               if (!mounted) return;
               setState(() {
+                _authFlow = _AuthFlow.existingMfa;
                 _verificationId = loginHandle.verificationId;
                 _resendToken = loginHandle.resendToken;
                 _stage = _Stage.sms;
@@ -580,6 +775,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       if (!mounted) return;
       _startResendCountdown();
       setState(() {
+        _authFlow = _AuthFlow.emailMfa;
         _verificationId = handle.verificationId;
         _resendToken = handle.resendToken;
         _stage = _Stage.sms;
@@ -622,9 +818,20 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
     try {
       String userId;
       String? enrolledPhone;
+      final isPhonePrimary = _authFlow == _AuthFlow.phonePrimary;
+      final hasEmail = email.isNotEmpty;
       final resolver = _loginMfaResolver;
 
-      if (resolver != null) {
+      if (isPhonePrimary) {
+        // Phone-primary branch: signInWithCredential creates the account
+        // (Firebase Auth uses the phone number as the credential).
+        final cred = await _smsService.signInWithPhoneCode(
+          verificationId: verificationId,
+          smsCode: smsCode,
+        );
+        userId = cred.user!.uid;
+        enrolledPhone = phone;
+      } else if (resolver != null) {
         // Existing-MFA branch: resolveSignIn completes the login; phone stays
         // whatever was previously enrolled.
         final cred = await _smsService.resolveLogin(
@@ -635,7 +842,8 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         userId = cred.user!.uid;
         enrolledPhone = null; // not changing the enrolled phone
       } else {
-        // New-user or existing-no-MFA branch: enroll the phone we collected.
+        // Email + MFA branch: enroll the phone we collected as a second
+        // factor on the freshly-created email/password account.
         final user = _auth.currentUser;
         if (user == null) {
           setState(() => _errorMessage =
@@ -663,7 +871,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       if (!existingDoc.exists) {
         final parentUser = UserModel(
           id: userId,
-          email: email,
+          email: hasEmail ? email : null,
           fullName: fullName,
           role: UserRole.parent,
           schoolId: code.schoolId,
@@ -683,31 +891,35 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         } catch (_) {
           // Non-critical; continue.
         }
+      } else {
+        // Existing parent doc — update the mutable fields. Only overwrite
+        // phoneNumber if we just enrolled a new one in this flow.
+        final update = <String, dynamic>{
+          'fullName': fullName,
+          'phoneVerified': true,
+          'linkedChildren': FieldValue.arrayUnion([code.studentId]),
+        };
+        if (hasEmail) update['email'] = email;
+        if (enrolledPhone != null) update['phoneNumber'] = enrolledPhone;
+        if (_relationshipLabel != null) {
+          update['relationshipLabel'] = _relationshipLabel;
+        }
+        await parentRef.update(update);
+      }
+
+      // Index entries. Email index only when the parent supplied one;
+      // phone index always (phone is now mandatory at registration).
+      if (hasEmail) {
         await indexService.createOrUpdateIndex(
           email: email,
           schoolId: code.schoolId,
           userType: 'parent',
           userId: userId,
         );
-      } else {
-        // Existing parent doc — update the mutable fields. Only overwrite
-        // phoneNumber if we just enrolled a new one in this flow.
-        final update = <String, dynamic>{
-          'fullName': fullName,
-          'email': email,
-          'phoneVerified': true,
-          'linkedChildren': FieldValue.arrayUnion([code.studentId]),
-        };
-        if (enrolledPhone != null) {
-          update['phoneNumber'] = enrolledPhone;
-        }
-        // Only overwrite the label if the guardian picked one in this flow.
-        if (_relationshipLabel != null) {
-          update['relationshipLabel'] = _relationshipLabel;
-        }
-        await parentRef.update(update);
-        await indexService.createOrUpdateIndex(
-          email: email,
+      }
+      if (enrolledPhone != null) {
+        await indexService.createOrUpdatePhoneIndex(
+          phoneE164: enrolledPhone,
           schoolId: code.schoolId,
           userType: 'parent',
           userId: userId,
@@ -718,7 +930,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         await _linkingService.linkParentToStudent(
           code: code.code,
           parentUserId: userId,
-          parentEmail: email,
+          parentEmail: hasEmail ? email : null,
         );
       } on AlreadyLinkedException {
         // Treat as success — already linked.
@@ -935,6 +1147,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
 
   List<Widget> _buildCompletedChips() {
     final chips = <Widget>[];
+    final emailEntered = _emailController.text.trim().isNotEmpty;
 
     if (_stage.index >= _Stage.name.index) {
       chips.add(_CompletedChip(
@@ -951,36 +1164,36 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         label: name,
       ));
     }
-    if (_stage.index >= _Stage.email.index && _relationshipLabel != null) {
+    if (_stage.index >= _Stage.phone.index && _relationshipLabel != null) {
       chips.add(_CompletedChip(
         key: const ValueKey('chip_relationship'),
         label: 'Relationship: ${_relationshipLabel!}',
       ));
     }
-    if (_stage.index >= _Stage.password.index) {
-      chips.add(_CompletedChip(
-        key: const ValueKey('chip_email'),
-        label: _emailController.text.trim(),
-      ));
-    }
-    if (_stage.index >= _Stage.confirm.index) {
-      chips.add(const _CompletedChip(
-        key: ValueKey('chip_password'),
-        label: 'Password set',
-      ));
-    }
-    if (_stage.index >= _Stage.phone.index) {
-      chips.add(const _CompletedChip(
-        key: ValueKey('chip_password_confirmed'),
-        label: 'Password confirmed',
-      ));
-    }
-    if (_stage.index >= _Stage.sms.index) {
+    if (_stage.index >= _Stage.email.index) {
       chips.add(_CompletedChip(
         key: const ValueKey('chip_phone'),
         label: _loginMfaResolver != null
             ? 'Verifying existing phone'
             : 'Phone: $_phoneDigits',
+      ));
+    }
+    if (_stage.index >= _Stage.password.index && emailEntered) {
+      chips.add(_CompletedChip(
+        key: const ValueKey('chip_email'),
+        label: _emailController.text.trim(),
+      ));
+    }
+    if (_stage.index >= _Stage.confirm.index && emailEntered) {
+      chips.add(const _CompletedChip(
+        key: ValueKey('chip_password'),
+        label: 'Password set',
+      ));
+    }
+    if (_stage.index >= _Stage.sms.index && emailEntered) {
+      chips.add(const _CompletedChip(
+        key: ValueKey('chip_password_confirmed'),
+        label: 'Password confirmed',
       ));
     }
 
@@ -1168,12 +1381,23 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
   }
 
   Widget _buildEmailInput() {
-    // Progressive reveal: once the email is valid, show the password field
-    // below it without compacting the email. The stage only advances when the
-    // user actually taps into the password field (focus listener fires).
+    // Email is OPTIONAL: phone is the mandatory identifier. We still
+    // recommend an email because it's the only password-reset path. Without
+    // one the parent will sign in via SMS every time.
+    //
+    // Progressive reveal: once a valid email is typed, show the password
+    // field below it without compacting the email. The stage only advances
+    // when the user actually taps into the password field (focus listener).
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Text(
+          'Recommended. We\'ll use this to reset your password if you forget it. Without an email, you\'ll sign in with an SMS code each time.',
+          style: LumiTextStyles.bodySmall(
+            color: AppColors.charcoal.withValues(alpha: 0.7),
+          ),
+        ),
+        const SizedBox(height: 12),
         LumiInput(
           controller: _emailController,
           hintText: 'you@example.com',
@@ -1207,6 +1431,30 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
                 )
               : const SizedBox.shrink(),
         ),
+        // Subtle escape hatch for carers who genuinely don't have an email.
+        // Worded so users with an email don't feel invited to skip — the
+        // copy implies "you don't have one" rather than "skip this step".
+        if (_emailController.text.trim().isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Align(
+              alignment: Alignment.center,
+              child: TextButton(
+                onPressed: _busy ? null : _sendPrimaryPhoneSms,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  'I don\'t have an email',
+                  style: LumiTextStyles.bodySmall(
+                    color: AppColors.charcoal.withValues(alpha: 0.55),
+                  ).copyWith(decoration: TextDecoration.underline),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -1269,7 +1517,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'We\'ll text you a code to confirm your mobile. This becomes your sign-in second factor.',
+          'We\'ll text you a code to confirm your mobile. This is how you\'ll sign in.',
           style: LumiTextStyles.bodySmall(
             color: AppColors.charcoal.withValues(alpha: 0.7),
           ),
@@ -1325,7 +1573,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         Align(
           alignment: Alignment.centerRight,
           child: TextButton(
-            onPressed: _busy || !_canResend ? null : _sendPhoneCode,
+            onPressed: _busy || !_canResend ? null : _resendSmsForCurrentFlow,
             child: Text(
               _canResend ? 'Resend code' : 'Resend in ${_resendRemainingSec}s',
               style: LumiTextStyles.bodySmall(color: AppColors.parentColor),
@@ -1351,11 +1599,19 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       _Stage.relationship => (
           'Next',
           _relationshipValid,
-          () => _advance(_Stage.email),
+          () => _advance(_Stage.phone),
         ),
+      _Stage.phone => (
+          'Next',
+          _phoneValid && !_busy,
+          _advanceFromPhone,
+        ),
+      // Primary "Next" requires a valid email — the "I don't have an email"
+      // text link below the input handles the skip path. This keeps the
+      // primary CTA pointing at the recommended flow.
       _Stage.email => (
           'Next',
-          _emailValid,
+          _emailValid && !_busy,
           () => _advance(_Stage.password),
         ),
       _Stage.password => (
@@ -1364,18 +1620,9 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
           () => _advance(_Stage.confirm),
         ),
       _Stage.confirm => (
-          'Next',
+          'Send verification code',
           _confirmValid && !_busy,
-          () => _advance(_Stage.phone),
-        ),
-      _Stage.phone => (
-          _pendingUserId == null
-              ? 'Send code'
-              : _canResend
-                  ? 'Resend code'
-                  : 'Resend in ${_resendRemainingSec}s',
-          _phoneValid && !_busy && (_pendingUserId == null || _canResend),
-          _sendPhoneCode,
+          _advanceFromConfirm,
         ),
       _Stage.sms => (
           _loginMfaResolver != null
