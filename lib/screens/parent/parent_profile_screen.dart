@@ -11,6 +11,7 @@ import '../../core/theme/lumi_borders.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_card.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
+import 'widgets/add_email_for_recovery_modal.dart';
 import 'widgets/character_picker_sheet.dart';
 import 'widgets/parent_child_switcher.dart';
 import '../../core/widgets/lumi_mascot.dart';
@@ -246,6 +247,10 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
               LumiGap.m,
               _buildInviteCodeCard(),
               LumiGap.m,
+              if ((widget.user.email ?? '').isEmpty) ...[
+                _buildRecoveryCard(),
+                LumiGap.m,
+              ],
               _buildSettingsCard(),
               LumiGap.m,
               LumiTextButton(
@@ -302,7 +307,7 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
                 ),
                 LumiGap.xxs,
                 Text(
-                  widget.user.email,
+                  widget.user.contactIdentifier,
                   style: LumiTextStyles.bodySmall(
                     color: AppColors.white.withValues(alpha: 0.85),
                   ),
@@ -1119,6 +1124,39 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
             Icons.chevron_right,
             color: AppColors.rosePink,
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecoveryCard() {
+    return LumiCard(
+      onTap: () => AddEmailForRecoveryModal.show(
+        context: context,
+        user: widget.user,
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.shield_outlined, color: AppColors.rosePink, size: 24),
+          LumiGap.horizontalS,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Account recovery',
+                  style: LumiTextStyles.bodyMedium(color: AppColors.rosePink),
+                ),
+                Text(
+                  'Add an email so you can get back in if you lose your phone',
+                  style: LumiTextStyles.bodySmall(
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right, color: AppColors.rosePink),
         ],
       ),
     );

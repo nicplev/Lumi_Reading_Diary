@@ -160,6 +160,116 @@ class SmsVerificationService {
     return resolver.resolveSignIn(assertion);
   }
 
+  /// Sends an SMS verification code as a PRIMARY auth challenge — used by
+  /// the phone-only registration path and the "Sign in with phone" login
+  /// branch. Unlike [sendEnrollmentCode], no [multiFactorSession] is attached,
+  /// so the resulting credential signs the user in directly rather than
+  /// enrolling a second factor.
+  /// [onCodeSentPersist] fires synchronously inside Firebase's `codeSent`
+  /// callback — *before* the future returned by this method completes,
+  /// and regardless of whether the original caller widget is still
+  /// mounted. The phone-auth recovery flow uses this hook to persist the
+  /// verification ID + flow context to Hive at the exact moment Firebase
+  /// hands us a usable credential, so iOS reCAPTCHA modal disposal (or
+  /// any other widget teardown mid-flow) can't drop the SMS step on the
+  /// floor.
+  Future<SmsCodeHandle> sendPrimaryPhoneCode({
+    required String phoneNumberE164,
+    int? forceResendingToken,
+    void Function(SmsCodeHandle handle)? onCodeSentPersist,
+  }) async {
+    if (kDebugMode) {
+      debugPrint(
+          '[phone-auth] sendPrimaryPhoneCode → start phone=$phoneNumberE164 resendToken=$forceResendingToken');
+    }
+    final completer = Completer<SmsCodeHandle>();
+
+    await _auth.verifyPhoneNumber(
+      phoneNumber: phoneNumberE164,
+      timeout: _codeTimeout,
+      forceResendingToken: forceResendingToken,
+      verificationCompleted: (_) {
+        if (kDebugMode) {
+          debugPrint(
+              '[phone-auth] sendPrimaryPhoneCode → verificationCompleted (auto-retrieval; ignored — UI waits for manual entry)');
+        }
+        // Android auto-retrieval. Ignore: the calling UI is set up for
+        // manual entry and the test/dev phone numbers don't auto-retrieve.
+      },
+      verificationFailed: (FirebaseAuthException e) {
+        if (kDebugMode) {
+          debugPrint(
+              '[phone-auth] sendPrimaryPhoneCode → verificationFailed code=${e.code} message=${e.message} details=${e.toString()}');
+        }
+        if (!completer.isCompleted) completer.completeError(e);
+      },
+      codeSent: (verificationId, resendToken) {
+        if (kDebugMode) {
+          debugPrint(
+              '[phone-auth] sendPrimaryPhoneCode → codeSent verificationIdLen=${verificationId.length} resendToken=$resendToken');
+        }
+        final handle = SmsCodeHandle(
+          verificationId: verificationId,
+          resendToken: resendToken,
+        );
+        // Persist BEFORE completing the future. If the caller widget is
+        // already gone, the await chain bails on the !mounted check
+        // immediately after — but the recovery record has already been
+        // written by then.
+        if (onCodeSentPersist != null) {
+          try {
+            onCodeSentPersist(handle);
+          } catch (e, st) {
+            if (kDebugMode) {
+              debugPrint(
+                  '[phone-auth] sendPrimaryPhoneCode → onCodeSentPersist threw: $e\n$st');
+            }
+          }
+        }
+        if (!completer.isCompleted) completer.complete(handle);
+      },
+      codeAutoRetrievalTimeout: (_) {
+        if (kDebugMode) {
+          debugPrint(
+              '[phone-auth] sendPrimaryPhoneCode → codeAutoRetrievalTimeout (60s elapsed without auto-retrieval)');
+        }
+      },
+    );
+
+    return completer.future;
+  }
+
+  /// Completes a primary phone sign-in with the SMS code the user typed in.
+  /// Pair with [sendPrimaryPhoneCode]. The returned [UserCredential.user]
+  /// is the signed-in account — same shape as the email/password path.
+  Future<UserCredential> signInWithPhoneCode({
+    required String verificationId,
+    required String smsCode,
+  }) async {
+    if (kDebugMode) {
+      debugPrint(
+          '[phone-auth] signInWithPhoneCode → start verificationIdLen=${verificationId.length} smsCodeLen=${smsCode.length}');
+    }
+    final credential = PhoneAuthProvider.credential(
+      verificationId: verificationId,
+      smsCode: smsCode,
+    );
+    try {
+      final result = await _auth.signInWithCredential(credential);
+      if (kDebugMode) {
+        debugPrint(
+            '[phone-auth] signInWithPhoneCode → success uid=${result.user?.uid} phone=${result.user?.phoneNumber}');
+      }
+      return result;
+    } on FirebaseAuthException catch (e) {
+      if (kDebugMode) {
+        debugPrint(
+            '[phone-auth] signInWithPhoneCode → failed code=${e.code} message=${e.message}');
+      }
+      rethrow;
+    }
+  }
+
   /// Surfaces a human-readable message for the Firebase error codes we see
   /// most often. Falls back to [FirebaseAuthException.message] if unknown.
   /// In debug builds, the underlying error code is appended so we can

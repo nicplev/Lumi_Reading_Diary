@@ -9,32 +9,40 @@ class UserRepository {
   UserRepository({FirebaseFirestore? firestore})
       : _firestore = firestore ?? FirebaseFirestore.instance;
 
-  /// Gets a user by UID, checking school subcollections via the email index,
-  /// then falling back to the top-level users collection.
+  /// Gets a user by UID, checking school subcollections via the email index
+  /// (or phone index for phone-only accounts), then falling back to the
+  /// top-level users collection.
   Future<UserModel?> getUser(String uid) async {
     try {
-      // Get the current user's email for index lookup
       final firebaseUser = FirebaseAuth.instance.currentUser;
+      final indexService = UserSchoolIndexService();
+
+      Map<String, dynamic>? indexResult;
       if (firebaseUser?.email != null) {
-        final indexService = UserSchoolIndexService();
-        final indexResult =
+        indexResult =
             await indexService.lookupSchoolByEmail(firebaseUser!.email!);
+      }
+      // Phone-only fallback: parents who registered without an email don't
+      // have an email-hash record, but they do have a phone-hash record.
+      if (indexResult == null && firebaseUser?.phoneNumber != null) {
+        indexResult = await indexService
+            .lookupSchoolByPhone(firebaseUser!.phoneNumber!);
+      }
 
-        if (indexResult != null) {
-          final schoolId = indexResult['schoolId'] as String;
-          final userType = indexResult['userType'] as String;
-          final collection = userType == 'parent' ? 'parents' : 'users';
+      if (indexResult != null) {
+        final schoolId = indexResult['schoolId'] as String;
+        final userType = indexResult['userType'] as String;
+        final collection = userType == 'parent' ? 'parents' : 'users';
 
-          final doc = await _firestore
-              .collection('schools')
-              .doc(schoolId)
-              .collection(collection)
-              .doc(uid)
-              .get();
+        final doc = await _firestore
+            .collection('schools')
+            .doc(schoolId)
+            .collection(collection)
+            .doc(uid)
+            .get();
 
-          if (doc.exists) {
-            return UserModel.fromFirestore(doc);
-          }
+        if (doc.exists) {
+          return UserModel.fromFirestore(doc);
         }
       }
 

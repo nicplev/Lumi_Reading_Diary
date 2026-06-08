@@ -11,6 +11,7 @@ import '../../services/firebase_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/analytics_service.dart';
 import '../../services/crash_reporting_service.dart';
+import '../../services/phone_verification_recovery_service.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -31,6 +32,18 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     await Future.delayed(const Duration(seconds: 2));
 
     if (!mounted) return;
+
+    // Cold-start recovery: if a phone-auth verification was orphaned on
+    // a previous run (iOS reCAPTCHA modal pop, force-quit, etc.), pick
+    // up where we left off before doing the normal auth resolution.
+    // Stale records (>5 min) are cleared by peek() itself.
+    final pendingPhoneVerification =
+        await PhoneVerificationRecoveryService.instance.peek();
+    if (pendingPhoneVerification != null) {
+      if (!mounted) return;
+      context.go('/auth/phone-verify');
+      return;
+    }
 
     final firebaseService = ref.read(firebaseServiceProvider);
     final firebaseUser = firebaseService.auth.currentUser;

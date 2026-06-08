@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -20,6 +22,7 @@ import '../../core/routing/app_router.dart';
 import '../../data/models/user_model.dart';
 import '../../services/firebase_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/phone_verification_recovery_service.dart';
 import '../../services/sms_verification_service.dart';
 import '../../core/services/user_school_index_service.dart';
 import '../../utils/setup_test_data.dart';
@@ -34,6 +37,10 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
+enum _SignInMode { email, phone }
+
+enum _PhoneStage { enterNumber, enterCode }
+
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormBuilderState>();
   final FirebaseService _firebaseService = FirebaseService.instance;
@@ -42,6 +49,23 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _errorMessage;
+
+  // Phone sign-in sub-flow state. When `_signInMode` is `phone`, the email
+  // form is hidden and a small phone-number + SMS-code panel takes its place.
+  _SignInMode _signInMode = _SignInMode.email;
+  _PhoneStage _phoneStage = _PhoneStage.enterNumber;
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _phoneSmsController = TextEditingController();
+  String? _phoneVerificationId;
+  int? _phoneResendToken;
+
+  static final RegExp _auMobileRegex = RegExp(r'^04\d{8}$');
+  String get _phoneDigits =>
+      _phoneController.text.replaceAll(RegExp(r'\s+'), '');
+  bool get _phoneValid => _auMobileRegex.hasMatch(_phoneDigits);
+  String get _phoneE164 => '+61${_phoneDigits.substring(1)}';
+  bool get _smsCodeValid =>
+      RegExp(r'^\d{6}$').hasMatch(_phoneSmsController.text.trim());
 
   @override
   void initState() {
@@ -54,7 +78,142 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void dispose() {
     _devAccess.removeListener(_onDevAccessChanged);
+    _phoneController.dispose();
+    _phoneSmsController.dispose();
     super.dispose();
+  }
+
+  Future<void> _sendPhoneLoginCode() async {
+    if (!_phoneValid) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final handle = await _smsService.sendPrimaryPhoneCode(
+        phoneNumberE164: _phoneE164,
+        forceResendingToken: _phoneResendToken,
+        // Persist + warm-resume safety net. iOS pops modals more often
+        // than full screens, so this is less likely to fire on the login
+        // surface — but we keep the parity for force-quit / OS-interrupt
+        // cases (incoming call, app switch mid-reCAPTCHA, etc.).
+        onCodeSentPersist: (h) {
+          final record = PendingPhoneVerification(
+            verificationId: h.verificationId,
+            resendToken: h.resendToken,
+            phoneE164: _phoneE164,
+            mode: PhoneVerificationMode.phoneLogin,
+            contextJson: const {},
+            savedAt: DateTime.now(),
+          );
+          unawaited(PhoneVerificationRecoveryService.instance.save(record));
+          if (!mounted) {
+            PhoneVerificationRecoveryService.instance.onRecoveryNeeded
+                ?.call(record);
+          }
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        _phoneVerificationId = handle.verificationId;
+        _phoneResendToken = handle.resendToken;
+        _phoneStage = _PhoneStage.enterCode;
+      });
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _errorMessage = SmsVerificationService.friendlyError(e));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() =>
+          _errorMessage = 'Could not send code. Please check your number.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _verifyPhoneLogin() async {
+    final verificationId = _phoneVerificationId;
+    if (verificationId == null || !_smsCodeValid) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final cred = await _smsService.signInWithPhoneCode(
+        verificationId: verificationId,
+        smsCode: _phoneSmsController.text.trim(),
+      );
+      final uid = cred.user?.uid;
+      if (uid == null) {
+        throw FirebaseAuthException(
+          code: 'no-user',
+          message: 'Sign-in did not return a user.',
+        );
+      }
+
+      final indexService = UserSchoolIndexService();
+      final indexResult = await indexService.lookupSchoolByPhone(_phoneE164);
+      if (indexResult == null) {
+        await _firebaseService.signOut();
+        if (!mounted) return;
+        setState(() => _errorMessage =
+            'We couldn\'t find an account for that phone number. If you\'re new, tap "I have a code" to register.');
+        return;
+      }
+
+      final schoolId = indexResult['schoolId'] as String;
+      final userType = indexResult['userType'] as String;
+      final collection = userType == 'parent' ? 'parents' : 'users';
+      final doc = await _firebaseService.firestore
+          .collection('schools')
+          .doc(schoolId)
+          .collection(collection)
+          .doc(uid)
+          .get();
+      if (!doc.exists) {
+        await _firebaseService.signOut();
+        if (!mounted) return;
+        setState(() => _errorMessage =
+            'Your profile is missing. Please contact your school administrator.');
+        return;
+      }
+      final user = UserModel.fromFirestore(doc);
+
+      await _firebaseService.firestore
+          .collection('schools')
+          .doc(schoolId)
+          .collection(collection)
+          .doc(uid)
+          .update({'lastLoginAt': FieldValue.serverTimestamp()});
+
+      NotificationService.instance.onParentAuthenticated(user);
+
+      if (!mounted) return;
+      _navigateToHome(user);
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _errorMessage = SmsVerificationService.friendlyError(e));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() =>
+          _errorMessage = 'Verification failed. Please try again.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _toggleSignInMode() {
+    setState(() {
+      _errorMessage = null;
+      if (_signInMode == _SignInMode.email) {
+        _signInMode = _SignInMode.phone;
+        _phoneStage = _PhoneStage.enterNumber;
+        _phoneSmsController.clear();
+        _phoneVerificationId = null;
+      } else {
+        _signInMode = _SignInMode.email;
+      }
+    });
   }
 
   void _onDevAccessChanged() {
@@ -566,81 +725,135 @@ class _LoginScreenState extends State<LoginScreen> {
 
               LumiGap.s,
 
-              // Login Form
-              FormBuilder(
-                key: _formKey,
-                child: Column(
-                  children: [
-                    // Email field
-                    FormBuilderTextField(
-                      name: 'email',
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        prefixIcon: Icon(Icons.email_outlined),
-                      ),
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      validator: FormBuilderValidators.compose([
-                        FormBuilderValidators.required(
-                          errorText: 'Email is required',
+              if (_signInMode == _SignInMode.email) ...[
+                // Email + password form
+                FormBuilder(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      FormBuilderTextField(
+                        name: 'email',
+                        decoration: const InputDecoration(
+                          labelText: 'Email',
+                          prefixIcon: Icon(Icons.email_outlined),
                         ),
-                        FormBuilderValidators.email(
-                          errorText: 'Enter a valid email',
-                        ),
-                      ]),
-                    ).animate().fadeIn(delay: 400.ms, duration: 500.ms),
-
-                    LumiGap.s,
-
-                    // Password field
-                    FormBuilderTextField(
-                      name: 'password',
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        prefixIcon: const Icon(Icons.lock_outline),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_off
-                                : Icons.visibility,
-                            color: AppColors.charcoal.withValues(alpha: 0.7),
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        validator: FormBuilderValidators.compose([
+                          FormBuilderValidators.required(
+                            errorText: 'Email is required',
                           ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
+                          FormBuilderValidators.email(
+                            errorText: 'Enter a valid email',
+                          ),
+                        ]),
+                      ).animate().fadeIn(delay: 400.ms, duration: 500.ms),
+                      LumiGap.s,
+                      FormBuilderTextField(
+                        name: 'password',
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              color: AppColors.charcoal.withValues(alpha: 0.7),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              });
+                            },
+                          ),
                         ),
-                      ),
-                      obscureText: _obscurePassword,
-                      textInputAction: TextInputAction.done,
-                      validator: FormBuilderValidators.required(
-                        errorText: 'Password is required',
-                      ),
-                      onSubmitted: (_) => _handleLogin(),
-                    ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
-                  ],
+                        obscureText: _obscurePassword,
+                        textInputAction: TextInputAction.done,
+                        validator: FormBuilderValidators.required(
+                          errorText: 'Password is required',
+                        ),
+                        onSubmitted: (_) => _handleLogin(),
+                      ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
+                    ],
+                  ),
                 ),
-              ),
-
-              LumiGap.m,
-
-              // Login button
-              LumiPrimaryButton(
-                onPressed: _isLoading ? null : _handleLogin,
-                text: 'Log In',
-                isLoading: _isLoading,
-              ).animate().fadeIn(delay: 600.ms, duration: 500.ms),
-
-              LumiGap.xs,
-
-              // Forgot password link (subdued, below primary action)
-              Center(
-                child: LumiTextButton(
-                  onPressed: () => context.push('/auth/forgot-password'),
-                  text: 'Forgot Password?',
-                ).animate().fadeIn(delay: 700.ms, duration: 500.ms),
-              ),
+                LumiGap.m,
+                LumiPrimaryButton(
+                  onPressed: _isLoading ? null : _handleLogin,
+                  text: 'Log In',
+                  isLoading: _isLoading,
+                ).animate().fadeIn(delay: 600.ms, duration: 500.ms),
+                LumiGap.xs,
+                Center(
+                  child: LumiTextButton(
+                    onPressed: () => context.push('/auth/forgot-password'),
+                    text: 'Forgot Password?',
+                  ).animate().fadeIn(delay: 700.ms, duration: 500.ms),
+                ),
+                Center(
+                  child: LumiTextButton(
+                    onPressed: _isLoading ? null : _toggleSignInMode,
+                    text: 'Sign in with phone instead',
+                  ),
+                ),
+              ] else ...[
+                // Phone-primary sub-form
+                TextField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  textInputAction: TextInputAction.done,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[\d\s]')),
+                  ],
+                  decoration: const InputDecoration(
+                    labelText: 'Mobile number',
+                    hintText: '0400 000 000',
+                    helperText: 'Australian mobile only.',
+                    prefixIcon: Icon(Icons.phone_outlined),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                  enabled: _phoneStage == _PhoneStage.enterNumber && !_isLoading,
+                ),
+                if (_phoneStage == _PhoneStage.enterCode) ...[
+                  LumiGap.s,
+                  TextField(
+                    controller: _phoneSmsController,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.done,
+                    maxLength: 6,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: const InputDecoration(
+                      labelText: '6-digit code',
+                      hintText: '123456',
+                      prefixIcon: Icon(Icons.sms_outlined),
+                    ),
+                    onChanged: (_) {
+                      setState(() {});
+                      if (_smsCodeValid && !_isLoading) _verifyPhoneLogin();
+                    },
+                  ),
+                ],
+                LumiGap.m,
+                LumiPrimaryButton(
+                  onPressed: _isLoading
+                      ? null
+                      : (_phoneStage == _PhoneStage.enterNumber
+                          ? (_phoneValid ? _sendPhoneLoginCode : null)
+                          : (_smsCodeValid ? _verifyPhoneLogin : null)),
+                  text: _phoneStage == _PhoneStage.enterNumber
+                      ? 'Send code'
+                      : 'Verify & sign in',
+                  isLoading: _isLoading,
+                ),
+                LumiGap.xs,
+                Center(
+                  child: LumiTextButton(
+                    onPressed: _isLoading ? null : _toggleSignInMode,
+                    text: 'Use email and password instead',
+                  ),
+                ),
+              ],
 
               LumiGap.l,
 

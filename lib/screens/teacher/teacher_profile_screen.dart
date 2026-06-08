@@ -178,7 +178,7 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                                   style: TeacherTypography.bodyLarge.copyWith(
                                       fontWeight: FontWeight.w600)),
                               Text(
-                                widget.user.email,
+                                widget.user.contactIdentifier,
                                 style: TeacherTypography.bodySmall,
                               ),
                             ],

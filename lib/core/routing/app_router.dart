@@ -23,6 +23,7 @@ import '../../screens/auth/login_screen.dart';
 import '../../screens/dev/impersonation_picker_screen.dart';
 import '../config/dev_access.dart';
 import '../../screens/auth/forgot_password_screen.dart';
+import '../../screens/auth/phone_verify_recovery_screen.dart';
 import '../../screens/auth/web_not_available_screen.dart';
 import '../../screens/auth/admin_use_web_portal_screen.dart';
 import '../../screens/parent/parent_home_screen.dart';
@@ -207,6 +208,16 @@ class AppRouter {
         path: '/auth/forgot-password',
         name: 'forgot-password',
         builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+
+      // Recovery screen for in-flight phone-auth verifications that were
+      // orphaned by an iOS reCAPTCHA modal pop (or app relaunch).
+      // [PhoneVerificationRecoveryService] persists the verification ID +
+      // flow context; this screen reads it and completes the SMS step.
+      GoRoute(
+        path: '/auth/phone-verify',
+        name: 'phone-verify-recovery',
+        builder: (context, state) => const PhoneVerifyRecoveryScreen(),
       ),
 
       // ============================================

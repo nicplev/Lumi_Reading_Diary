@@ -8,7 +8,9 @@ enum UserRole {
 
 class UserModel {
   final String id;
-  final String email;
+  // Nullable: parents can register with a phone number only (no email).
+  // Use [contactIdentifier] for display surfaces that need a non-null label.
+  final String? email;
   final String fullName;
   final UserRole role;
   final String? schoolId;
@@ -29,7 +31,7 @@ class UserModel {
 
   UserModel({
     required this.id,
-    required this.email,
+    this.email,
     required this.fullName,
     required this.role,
     this.schoolId,
@@ -50,7 +52,7 @@ class UserModel {
     final data = doc.data() as Map<String, dynamic>;
     return UserModel(
       id: doc.id,
-      email: data['email'] ?? '',
+      email: data['email'] as String?,
       fullName: data['fullName'] ?? '',
       role: UserRole.values.firstWhere(
         (e) => e.toString() == 'UserRole.${data['role']}',
@@ -133,6 +135,12 @@ class UserModel {
       relationshipLabel: relationshipLabel ?? this.relationshipLabel,
     );
   }
+
+  /// Display-safe identifier — prefers the email, then the phone number, then
+  /// a placeholder. Use this in profile / picker / impersonation surfaces so
+  /// phone-only parents don't render an empty cell.
+  String get contactIdentifier =>
+      (email?.isNotEmpty == true ? email : null) ?? phoneNumber ?? '—';
 }
 
 /// Canonical relationship-label options shown in pickers. Stored on the

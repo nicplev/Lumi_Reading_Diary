@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import 'notification_service.dart';
 import 'offline_service.dart';
+import 'phone_verification_recovery_service.dart';
 import 'widget_data_service.dart';
 
 class FirebaseService {
@@ -159,6 +160,9 @@ class FirebaseService {
       await _clearParentScopedDeviceState();
       // Clear offline caches
       await OfflineService.instance.clearAllCaches();
+      // Drop any in-flight phone-verification record so a signed-out
+      // device doesn't auto-route into recovery on next launch.
+      await PhoneVerificationRecoveryService.instance.clear();
       await _auth.signOut();
     } catch (e) {
       debugPrint('Error signing out: $e');

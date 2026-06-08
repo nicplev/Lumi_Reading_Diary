@@ -272,7 +272,7 @@ class ParentLinkingService {
   Future<bool> linkParentToStudent({
     required String code,
     required String parentUserId,
-    required String parentEmail,
+    String? parentEmail,
   }) async {
     assertWritable(
       opLabel: 'parentLinking.linkParentToStudent',
