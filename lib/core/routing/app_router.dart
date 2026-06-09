@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
+import 'package:flutter/foundation.dart'
+    show kDebugMode, kIsWeb, visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -78,6 +79,9 @@ class AppRouter {
     navigatorKey: rootNavigatorKey,
     debugLogDiagnostics: true,
     initialLocation: '/splash',
+    observers: [
+      if (kDebugMode) _RouteDiagnosticObserver(),
+    ],
 
     // Global redirect handler for authentication and authorization
     redirect: (context, state) async {
@@ -982,5 +986,41 @@ class _BookCoverOverlay extends StatelessWidget {
         },
       ),
     );
+  }
+}
+
+/// Debug-only NavigatorObserver that logs every pop/remove/replace event
+/// on the root navigator with the popped route's settings plus a truncated
+/// stack trace of the caller. Wired up to investigate the mid-await
+/// ParentRegistrationModal disposal where the route is already gone by the
+/// time the widget's `deactivate` fires — by the observer ID we can see
+/// *who* called pop.
+class _RouteDiagnosticObserver extends NavigatorObserver {
+  void _log(String event, Route<dynamic>? route, Route<dynamic>? previous) {
+    final name = route?.settings.name ?? route?.runtimeType.toString();
+    final prevName =
+        previous?.settings.name ?? previous?.runtimeType.toString();
+    final trace =
+        StackTrace.current.toString().split('\n').take(8).join(' | ');
+    debugPrint('[router] $event route=$name previous=$prevName');
+    debugPrint('[router] $event stack: $trace');
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _log('didPop', route, previousRoute);
+    super.didPop(route, previousRoute);
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _log('didRemove', route, previousRoute);
+    super.didRemove(route, previousRoute);
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    _log('didReplace(new)', newRoute, oldRoute);
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
   }
 }
