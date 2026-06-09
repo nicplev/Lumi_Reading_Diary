@@ -246,6 +246,8 @@ class _PendingRow extends StatelessWidget {
     switch (type) {
       case SyncType.readingLog:
         return Icons.menu_book_outlined;
+      case SyncType.comprehensionAudioUpload:
+        return Icons.graphic_eq_outlined;
       case SyncType.parentComment:
         return Icons.chat_bubble_outline;
       case SyncType.commentReply:
@@ -263,6 +265,8 @@ class _PendingRow extends StatelessWidget {
     switch (type) {
       case SyncType.readingLog:
         return 'Reading log';
+      case SyncType.comprehensionAudioUpload:
+        return 'Comprehension recording';
       case SyncType.parentComment:
         return 'Parent comment';
       case SyncType.commentReply:

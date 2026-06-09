@@ -318,6 +318,8 @@ String _syncTypeLabel(SyncType type) {
   switch (type) {
     case SyncType.readingLog:
       return 'Reading log';
+    case SyncType.comprehensionAudioUpload:
+      return 'Comprehension recording';
     case SyncType.parentComment:
       return 'Parent comment';
     case SyncType.commentReply:
