@@ -1,6 +1,12 @@
 export interface Parent {
   id: string;
   email: string;
+  /**
+   * Guardian's phone number in E.164 format. Populated when they register
+   * with SMS (phone-mandatory rego), and is the only contact detail for
+   * parents who sign up without an email.
+   */
+  phoneNumber?: string;
   fullName: string;
   schoolId: string;
   linkedChildren: string[];

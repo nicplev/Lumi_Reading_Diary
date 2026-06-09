@@ -32,6 +32,7 @@ export function ParentConnectionsTab() {
     return parents.filter((p) =>
       p.fullName.toLowerCase().includes(q) ||
       p.email.toLowerCase().includes(q) ||
+      (p.phoneNumber ?? '').toLowerCase().includes(q) ||
       p.linkedStudents.some((s) =>
         `${s.firstName} ${s.lastName}`.toLowerCase().includes(q)
       )
@@ -59,8 +60,15 @@ export function ParentConnectionsTab() {
     },
     {
       id: 'email',
-      header: 'Email',
-      accessorFn: (row) => row.email,
+      header: 'Email/Phone',
+      // Prefer email; fall back to phone for parents who registered without one.
+      accessorFn: (row) => row.email || row.phoneNumber || '',
+      cell: (value) =>
+        value ? (
+          <span className="text-sm">{value as string}</span>
+        ) : (
+          <span className="text-sm text-text-secondary">—</span>
+        ),
       sortable: true,
     },
     {
