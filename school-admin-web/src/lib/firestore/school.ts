@@ -6,6 +6,7 @@ export async function updateSchool(
   data: Partial<Pick<School, 'name' | 'displayName' | 'logoUrl' | 'primaryColor' | 'secondaryColor' | 'levelSchema' | 'customLevels' | 'levelColors' | 'timezone' | 'address' | 'contactEmail' | 'contactPhone' | 'quietHours'>> & {
     termDates?: Record<string, string>;
     parentCommentSettings?: { enabled: boolean; freeTextEnabled: boolean; customPresets: { id: string; name: string; chips: string[] }[] };
+    comprehensionRecordingSettings?: { enabled: boolean };
     achievementThresholds?: AchievementThresholds;
     achievementCustomization?: AchievementCustomization;
   }
@@ -26,6 +27,9 @@ export async function updateSchool(
   if (data.quietHours !== undefined) update.quietHours = data.quietHours;
   if (data.parentCommentSettings !== undefined) {
     update['settings.parentComments'] = data.parentCommentSettings;
+  }
+  if (data.comprehensionRecordingSettings !== undefined) {
+    update['settings.comprehensionRecording'] = data.comprehensionRecordingSettings;
   }
   if (data.achievementThresholds !== undefined) {
     update['settings.achievementThresholds'] = data.achievementThresholds;

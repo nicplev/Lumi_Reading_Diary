@@ -15,6 +15,7 @@ import '../../data/models/class_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../data/models/reading_level_option.dart';
+import '../../data/models/school_model.dart';
 import '../../services/firebase_service.dart';
 import '../../services/reading_level_service.dart';
 
@@ -39,6 +40,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
   List<ReadingLevelOption> _readingLevelOptions = const [];
   bool _levelsEnabled = true;
   bool _isLoading = true;
+  bool _comprehensionEnabled = false;
   String _sortBy = 'name';
   final DateTime _selectedPeriod = DateTime.now();
   String _periodType = 'week'; // 'week' or 'month'
@@ -48,6 +50,23 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
     super.initState();
     _loadReadingLevelOptions();
     _loadStudents();
+    _loadComprehensionFlag();
+  }
+
+  Future<void> _loadComprehensionFlag() async {
+    final schoolId = widget.teacher.schoolId;
+    if (schoolId == null || schoolId.isEmpty) return;
+    try {
+      final doc =
+          await _firebaseService.firestore.collection('schools').doc(schoolId).get();
+      if (!mounted || !doc.exists) return;
+      final school = SchoolModel.fromFirestore(doc);
+      setState(() {
+        _comprehensionEnabled = school.comprehensionRecordingSettings.enabled;
+      });
+    } catch (_) {
+      // Default false; tile stays hidden.
+    }
   }
 
   Future<void> _loadReadingLevelOptions({bool forceRefresh = false}) async {
@@ -356,6 +375,57 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
               ],
             ),
           ),
+
+          // Comprehension question tile (gated on the school toggle so we
+          // don't surface a setting that does nothing).
+          if (_comprehensionEnabled)
+            Container(
+              color: AppColors.white,
+              margin: const EdgeInsets.only(top: 1),
+              child: InkWell(
+                onTap: () => context.push(
+                  '/teacher/class-comprehension-question/${widget.classModel.id}',
+                  extra: {
+                    'teacher': widget.teacher,
+                    'classModel': widget.classModel,
+                  },
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(TeacherDimensions.paddingL),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.mic_rounded,
+                          color: AppColors.teacherPrimary),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Comprehension Question',
+                              style: TeacherTypography.bodyMedium.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              widget.classModel.comprehensionQuestion,
+                              style: TeacherTypography.caption.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded,
+                          color: AppColors.textSecondary),
+                    ],
+                  ),
+                ),
+              ),
+            ),
 
           // Period selector
           Container(

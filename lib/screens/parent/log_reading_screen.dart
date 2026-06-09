@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +12,8 @@ import '../../core/widgets/lumi/comment_chips.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/allocation_model.dart';
+import '../../data/models/class_model.dart';
+import '../../data/models/comprehension_recording_settings.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../data/models/school_model.dart';
 import '../../data/models/parent_comment_settings.dart';
@@ -18,6 +21,7 @@ import '../../services/firebase_service.dart';
 import '../../services/isbn_assignment_service.dart';
 import '../../services/offline_service.dart';
 import '../../services/reading_log_service.dart';
+import 'widgets/comprehension_recording_step.dart';
 
 class LogReadingScreen extends StatefulWidget {
   final StudentModel student;
@@ -44,11 +48,27 @@ class _LogReadingScreenState extends State<LogReadingScreen>
 
   int _currentStep = 0;
 
+  // Pre-generated id reused as the storage filename for the comprehension
+  // audio, so the path is stable across wizard, upload, and teacher player.
+  final String _logId = DateTime.now().millisecondsSinceEpoch.toString();
+
   // Parent comment settings (loaded from school doc)
   ParentCommentSettings _commentSettings = ParentCommentSettings.defaults();
 
+  // Comprehension recording settings (school toggle + per-class question)
+  ComprehensionRecordingSettings _comprehensionSettings =
+      ComprehensionRecordingSettings.defaults();
+  String _comprehensionQuestion = ClassModel.defaultComprehensionQuestion;
+  ComprehensionRecordingResult? _comprehensionRecording;
+
   bool get _commentsEnabled => _commentSettings.enabled;
-  int get _totalSteps => _commentsEnabled ? 4 : 3;
+  bool get _comprehensionEnabled => _comprehensionSettings.enabled;
+  int get _totalSteps {
+    var n = 3; // book, feeling, confirm
+    if (_commentsEnabled) n += 1;
+    if (_comprehensionEnabled) n += 1;
+    return n;
+  }
 
   // Step 1: Book selection
   final List<String> _assignedBookTitles = [];
@@ -125,6 +145,8 @@ class _LogReadingScreenState extends State<LogReadingScreen>
         'selectedFeeling': _selectedFeeling?.name,
         'selectedComments': List<String>.from(_selectedComments),
         'notes': _notesController.text,
+        'comprehensionAudioPath': _comprehensionRecording?.localPath,
+        'comprehensionAudioDurationSec': _comprehensionRecording?.durationSec,
         'savedAt': DateTime.now().toIso8601String(),
       };
 
@@ -161,6 +183,15 @@ class _LogReadingScreenState extends State<LogReadingScreen>
         (draft['selectedComments'] as List?)?.whereType<String>().toList() ??
             [];
     _notesController.text = draft['notes'] as String? ?? '';
+
+    final draftAudioPath = draft['comprehensionAudioPath'] as String?;
+    final draftAudioDuration = draft['comprehensionAudioDurationSec'] as int?;
+    if (draftAudioPath != null && draftAudioDuration != null) {
+      _comprehensionRecording = ComprehensionRecordingResult(
+        localPath: draftAudioPath,
+        durationSec: draftAudioDuration,
+      );
+    }
 
     final step = draft['currentStep'] as int? ?? 0;
     _currentStep = step.clamp(0, _totalSteps - 1);
@@ -246,16 +277,33 @@ class _LogReadingScreenState extends State<LogReadingScreen>
 
   Future<void> _loadCommentSettings() async {
     try {
-      final doc = await _firebaseService.firestore
+      final schoolFuture = _firebaseService.firestore
           .collection('schools')
           .doc(widget.parent.schoolId)
           .get();
-      if (doc.exists && mounted) {
-        final school = SchoolModel.fromFirestore(doc);
-        setState(() {
+      final classFuture = widget.student.classId.isNotEmpty
+          ? _firebaseService.firestore
+              .collection('schools')
+              .doc(widget.parent.schoolId)
+              .collection('classes')
+              .doc(widget.student.classId)
+              .get()
+          : Future<DocumentSnapshot<Map<String, dynamic>>?>.value(null);
+      final results = await Future.wait([schoolFuture, classFuture]);
+      if (!mounted) return;
+      final schoolDoc = results[0]!;
+      final classDoc = results[1];
+      setState(() {
+        if (schoolDoc.exists) {
+          final school = SchoolModel.fromFirestore(schoolDoc);
           _commentSettings = school.parentCommentSettings;
-        });
-      }
+          _comprehensionSettings = school.comprehensionRecordingSettings;
+        }
+        if (classDoc != null && classDoc.exists) {
+          _comprehensionQuestion =
+              ClassModel.fromFirestore(classDoc).comprehensionQuestion;
+        }
+      });
     } catch (_) {
       // Defaults are already set; safe to proceed with them.
     }
@@ -314,6 +362,14 @@ class _LogReadingScreenState extends State<LogReadingScreen>
     });
 
     try {
+      final recording = _comprehensionRecording;
+      final storagePath = recording == null
+          ? null
+          : ReadingLogService.comprehensionAudioStoragePath(
+              schoolId: widget.student.schoolId,
+              logId: _logId,
+            );
+
       final result = await ReadingLogService.instance.logReading(
         student: widget.student,
         parent: widget.parent,
@@ -323,7 +379,42 @@ class _LogReadingScreenState extends State<LogReadingScreen>
         feeling: _selectedFeeling,
         commentSelections: List<String>.from(_selectedComments),
         freeText: _notesController.text,
+        id: _logId,
+        comprehensionAudioPath: storagePath,
+        comprehensionAudioDurationSec: recording?.durationSec,
       );
+
+      // Hand the audio file off: directly online, or via the offline queue.
+      // Failures here are swallowed to the queue — the log itself succeeded
+      // and showing a "save failed" screen would mislead the parent.
+      if (recording != null && storagePath != null) {
+        if (result.savedOffline) {
+          await OfflineService.instance.enqueueComprehensionAudioUpload(
+            logId: result.log.id,
+            schoolId: result.log.schoolId,
+            studentId: result.log.studentId,
+            storagePath: storagePath,
+            localFilePath: recording.localPath,
+            durationSec: recording.durationSec,
+          );
+        } else {
+          try {
+            await ReadingLogService.instance.uploadComprehensionAudio(
+              log: result.log,
+              localFilePath: recording.localPath,
+            );
+          } catch (_) {
+            await OfflineService.instance.enqueueComprehensionAudioUpload(
+              logId: result.log.id,
+              schoolId: result.log.schoolId,
+              studentId: result.log.studentId,
+              storagePath: storagePath,
+              localFilePath: recording.localPath,
+              durationSec: recording.durationSec,
+            );
+          }
+        }
+      }
 
       // Rec 5a: a completed log supersedes any saved draft.
       await OfflineService.instance.clearLogDraft(widget.student.id);
@@ -410,6 +501,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
                   _buildStep1BookSelection(),
                   _buildStep2ChildAssessment(),
                   if (_commentsEnabled) _buildStep3ParentComment(),
+                  if (_comprehensionEnabled) _buildStepComprehension(),
                   _buildStep4Confirmation(),
                 ],
               ),
@@ -730,6 +822,21 @@ class _LogReadingScreenState extends State<LogReadingScreen>
           ],
         ],
       ),
+    ).animate().fadeIn();
+  }
+
+  // ─── Optional Step: Comprehension Recording ──────────────
+
+  Widget _buildStepComprehension() {
+    return ComprehensionRecordingStep(
+      key: ValueKey('comprehension_$_logId'),
+      question: _comprehensionQuestion,
+      logId: _logId,
+      initialLocalPath: _comprehensionRecording?.localPath,
+      initialDurationSec: _comprehensionRecording?.durationSec,
+      onRecordingChanged: (result) {
+        setState(() => _comprehensionRecording = result);
+      },
     ).animate().fadeIn();
   }
 

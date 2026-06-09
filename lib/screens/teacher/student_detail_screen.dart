@@ -9,6 +9,7 @@ import '../../core/theme/teacher_constants.dart';
 import '../../core/widgets/lumi/reading_level_history_sheet.dart';
 import '../../core/widgets/lumi/reading_level_picker_sheet.dart';
 import '../../core/widgets/lumi/teacher_book_assignment_card.dart';
+import '../../core/widgets/audio/comprehension_audio_player.dart';
 import '../../core/widgets/lumi/teacher_reading_level_pill.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
 import '../../data/models/achievement_model.dart';
@@ -1139,6 +1140,11 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         parentCommentFreeText:
             (data['parentCommentFreeText'] as String?)?.trim(),
         childFeeling: data['childFeeling'] as String?,
+        comprehensionAudioPath: data['comprehensionAudioPath'] as String?,
+        comprehensionAudioDurationSec:
+            (data['comprehensionAudioDurationSec'] as num?)?.toInt(),
+        comprehensionAudioUploaded:
+            data['comprehensionAudioUploaded'] as bool? ?? false,
       );
     }).toList();
   }
@@ -2027,47 +2033,58 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Left: title + date stacked
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  books,
-                  style: TeacherTypography.bodyMedium,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+          Row(
+            children: [
+              // Left: title + date stacked
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      books,
+                      style: TeacherTypography.bodyMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      dateStr,
+                      style: TeacherTypography.caption.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  dateStr,
-                  style: TeacherTypography.caption.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+              ),
+              const SizedBox(width: 8),
+              // Right: minutes + feeling blob
+              Text(
+                '${minutes}m',
+                style: TeacherTypography.caption.copyWith(
+                  color: AppColors.teacherPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (log.childFeeling != null) ...[
+                const SizedBox(width: 6),
+                Image.asset(
+                  'assets/blobs/blob-${log.childFeeling}.png',
+                  width: 18,
+                  height: 18,
                 ),
               ],
-            ),
+            ],
           ),
-          const SizedBox(width: 8),
-          // Right: minutes + feeling blob
-          Text(
-            '${minutes}m',
-            style: TeacherTypography.caption.copyWith(
-              color: AppColors.teacherPrimary,
-              fontWeight: FontWeight.w700,
+          if (log.hasComprehensionAudio)
+            ComprehensionAudioPlayer(
+              key: ValueKey('audio_${log.id}'),
+              storagePath: log.comprehensionAudioPath!,
+              durationSec: log.comprehensionAudioDurationSec,
             ),
-          ),
-          if (log.childFeeling != null) ...[
-            const SizedBox(width: 6),
-            Image.asset(
-              'assets/blobs/blob-${log.childFeeling}.png',
-              width: 18,
-              height: 18,
-            ),
-          ],
         ],
       ),
     );
@@ -2958,6 +2975,13 @@ class _ReadingLogSnapshot {
   final List<String> parentCommentSelections;
   final String? parentCommentFreeText;
   final String? childFeeling;
+  // Comprehension recording fields denormalized from the reading log doc.
+  // [comprehensionAudioPath] is the Storage object path; the player resolves
+  // a signed URL on demand. The player is only rendered when
+  // [comprehensionAudioUploaded] is true.
+  final String? comprehensionAudioPath;
+  final int? comprehensionAudioDurationSec;
+  final bool comprehensionAudioUploaded;
 
   const _ReadingLogSnapshot({
     required this.id,
@@ -2972,7 +2996,13 @@ class _ReadingLogSnapshot {
     required this.parentCommentSelections,
     required this.parentCommentFreeText,
     required this.childFeeling,
+    this.comprehensionAudioPath,
+    this.comprehensionAudioDurationSec,
+    this.comprehensionAudioUploaded = false,
   });
+
+  bool get hasComprehensionAudio =>
+      comprehensionAudioUploaded && comprehensionAudioPath != null;
 }
 
 class _LatestParentCommentViewData {

@@ -376,6 +376,36 @@ class OfflineService with WidgetsBindingObserver {
     await _enqueueAndPersist(sync);
   }
 
+  /// Queue a comprehension-audio upload composed offline (or that failed
+  /// online and is falling back to the queue). The handler reads the file
+  /// from [localFilePath], pushes it to [storagePath], then patches the
+  /// reading log doc to flip `comprehensionAudioUploaded: true`. Dependency
+  /// on the log create is handled by the drain ordering in [_syncPriority].
+  Future<void> enqueueComprehensionAudioUpload({
+    required String logId,
+    required String schoolId,
+    required String studentId,
+    required String storagePath,
+    required String localFilePath,
+    required int durationSec,
+  }) async {
+    final sync = PendingSync(
+      id: 'audio_$logId',
+      type: SyncType.comprehensionAudioUpload,
+      action: SyncAction.create,
+      data: {
+        'logId': logId,
+        'schoolId': schoolId,
+        'studentId': studentId,
+        'storagePath': storagePath,
+        'localFilePath': localFilePath,
+        'durationSec': durationSec,
+      },
+      createdAt: DateTime.now(),
+    );
+    await _enqueueAndPersist(sync);
+  }
+
   /// Queue a comment-thread reply composed offline. Keyed by `commentId` so
   /// each reply is a distinct queue item (unlike the single `parentComment`
   /// per log). Replays as a batch: the comment doc plus the log's denormalized
@@ -596,7 +626,7 @@ class OfflineService with WidgetsBindingObserver {
         item.contentHash ??= PendingSync.computeContentHash(item.data);
 
         try {
-          await _syncOne(item).timeout(_opTimeout);
+          await _syncOne(item).timeout(_opTimeoutFor(item.type));
           syncedItems.add(item.id);
           anySuccess = true;
           _recordHistory(item, SyncResult.success, null);
@@ -661,6 +691,9 @@ class OfflineService with WidgetsBindingObserver {
       case SyncType.readingLog:
         await _syncReadingLog(item);
         break;
+      case SyncType.comprehensionAudioUpload:
+        await _syncComprehensionAudioUpload(item);
+        break;
       case SyncType.student:
         await _syncStudent(item);
         break;
@@ -680,23 +713,33 @@ class OfflineService with WidgetsBindingObserver {
   }
 
   /// Lower number → drained earlier. Reading-log creates must precede any
-  /// parent-comment updates that target the same log.
+  /// parent-comment updates and audio uploads that target the same log.
   int _syncPriority(SyncType type) {
     switch (type) {
       case SyncType.readingLog:
         return 0;
-      case SyncType.parentComment:
+      case SyncType.comprehensionAudioUpload:
         return 1;
-      case SyncType.commentReply:
+      case SyncType.parentComment:
         return 2;
-      case SyncType.student:
+      case SyncType.commentReply:
         return 3;
-      case SyncType.allocation:
+      case SyncType.student:
         return 4;
-      case SyncType.parentPrefs:
+      case SyncType.allocation:
         return 5;
+      case SyncType.parentPrefs:
+        return 6;
     }
   }
+
+  /// Per-type timeout. Audio uploads can take longer than the default 30s
+  /// on slow uplinks (~480KB file), so they get a 90s ceiling. Everything
+  /// else uses [_opTimeout].
+  Duration _opTimeoutFor(SyncType type) =>
+      type == SyncType.comprehensionAudioUpload
+          ? const Duration(seconds: 90)
+          : _opTimeout;
 
   Future<void> _syncReadingLog(PendingSync pendingSync) async {
     final log = ReadingLogModel.fromLocal(pendingSync.data);
@@ -756,6 +799,82 @@ class OfflineService with WidgetsBindingObserver {
     // No client-side stats recompute needed: writing the synced log to
     // Firestore triggers the aggregateStudentStats Cloud Function, which is
     // the single source of truth for the student's stats.
+  }
+
+  /// Replay a queued comprehension audio upload: push the local m4a to
+  /// Storage, patch the log doc to flip `comprehensionAudioUploaded`, then
+  /// confirm via a server-source read-back. The log create has priority 0
+  /// so by the time this runs the target doc usually exists — if it
+  /// doesn't yet (race or its own retry), we re-throw transient so the
+  /// queue retries instead of quarantining.
+  Future<void> _syncComprehensionAudioUpload(PendingSync pendingSync) async {
+    final data = pendingSync.data;
+    final logId = data['logId'] as String?;
+    final schoolId = data['schoolId'] as String?;
+    final storagePath = data['storagePath'] as String?;
+    final localFilePath = data['localFilePath'] as String?;
+    final durationSec = (data['durationSec'] as num?)?.toInt() ?? 0;
+    final studentId = data['studentId'] as String? ?? '';
+
+    if (logId == null ||
+        schoolId == null ||
+        storagePath == null ||
+        localFilePath == null) {
+      throw Exception('Missing fields for comprehension audio upload sync');
+    }
+
+    final file = File(localFilePath);
+    if (!file.existsSync()) {
+      // Local source vanished — surface to user via needsAttention rather
+      // than retry forever.
+      throw const ComprehensionAudioMissingException();
+    }
+
+    await FirebaseStorage.instance.ref(storagePath).putFile(
+          file,
+          SettableMetadata(
+            contentType: 'audio/mp4',
+            customMetadata: {
+              'uploadedAt': DateTime.now().toUtc().toIso8601String(),
+              'durationSec': '$durationSec',
+              'schoolId': schoolId,
+              'studentId': studentId,
+              // TODO(retention): used by the future term-aware cleanup function.
+            },
+          ),
+        );
+
+    final logRef = _firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('readingLogs')
+        .doc(logId);
+
+    try {
+      await logRef.update({'comprehensionAudioUploaded': true});
+    } on FirebaseException catch (e) {
+      if (e.code == 'not-found') {
+        // The log create hasn't drained yet — re-throw as a generic
+        // Exception so it's classified transient, not permanent.
+        throw Exception('Target log $logId not yet present; will retry');
+      }
+      rethrow;
+    }
+
+    // Receipt confirmation: read back from the SERVER so we know the flag
+    // landed before removing the item from the queue.
+    final receipt = await logRef.get(const GetOptions(source: Source.server));
+    if (!receipt.exists ||
+        receipt.data()?['comprehensionAudioUploaded'] != true) {
+      throw Exception(
+          'Receipt failed: comprehensionAudioUploaded not set on server');
+    }
+
+    // Best-effort temp cleanup — the LAST step so a failure above leaves
+    // the file in place for a retry.
+    try {
+      await file.delete();
+    } catch (_) {}
   }
 
   Future<void> _syncParentComment(PendingSync pendingSync) async {
@@ -987,8 +1106,11 @@ class OfflineService with WidgetsBindingObserver {
     'data-loss',
   };
 
-  bool _isPermanent(Object error) =>
-      error is FirebaseException && _permanentCodes.contains(error.code);
+  bool _isPermanent(Object error) {
+    if (error is ComprehensionAudioMissingException) return true;
+    return error is FirebaseException &&
+        _permanentCodes.contains(error.code);
+  }
 
   String _describeError(Object error) {
     if (error is FirebaseException) {
@@ -1112,6 +1234,7 @@ class OfflineService with WidgetsBindingObserver {
 // Sync models
 enum SyncType {
   readingLog,
+  comprehensionAudioUpload,
   student,
   allocation,
   parentComment,

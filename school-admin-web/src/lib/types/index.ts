@@ -1,4 +1,4 @@
-export type { School, ReadingLevelSchema, CommentPresetCategory, ParentCommentSettings, AchievementThresholds, AchievementTierCustomization, AchievementCustomization } from './school';
+export type { School, ReadingLevelSchema, CommentPresetCategory, ParentCommentSettings, ComprehensionRecordingSettings, AchievementThresholds, AchievementTierCustomization, AchievementCustomization } from './school';
 export { getReadingLevels, DEFAULT_ACHIEVEMENT_THRESHOLDS } from './school';
 export type { SchoolUser, UserRole } from './user';
 export type { Student, StudentStats, ReadingLevelHistory, EnrollmentStatus, GuardianProfile } from './student';
