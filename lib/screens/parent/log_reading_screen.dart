@@ -837,6 +837,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
       onRecordingChanged: (result) {
         setState(() => _comprehensionRecording = result);
       },
+      onSkip: _nextStep,
     ).animate().fadeIn();
   }
 
