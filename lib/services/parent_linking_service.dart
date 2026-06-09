@@ -494,6 +494,11 @@ class ParentLinkingService {
       if (rawReason is String) reason = rawReason;
     }
 
+    if (kDebugMode) {
+      debugPrint(
+          '[linking] FirebaseFunctionsException code=${e.code} kind=$kind reason=$reason message="${e.message ?? ""}" details=$details');
+    }
+
     switch (e.code) {
       case 'failed-precondition':
         switch (kind) {
