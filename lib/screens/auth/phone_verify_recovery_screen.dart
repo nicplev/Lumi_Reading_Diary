@@ -10,7 +10,6 @@ import '../../core/exceptions/linking_exceptions.dart';
 import '../../core/routing/app_router.dart';
 import '../../core/services/user_school_index_service.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/lumi_spacing.dart';
 import '../../core/theme/lumi_text_styles.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../data/models/user_model.dart';
@@ -341,40 +340,161 @@ class _PhoneVerifyRecoveryScreenState extends State<PhoneVerifyRecoveryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Loading and missing-record render a transparent placeholder inside the
+    // same overlay shell so the splash → recovery handoff stays a single
+    // visual transition (no full-screen white flash between loaders).
     if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return const AuthBottomSheetOverlay(
+        debugLabel: 'phone-verify-recovery-overlay',
+        dismissOnTapOutside: false,
+        card: _LoadingCard(),
       );
     }
     final record = _record;
     if (record == null) {
-      // Should never render — _loadRecord routes away if null. Defensive.
-      return const Scaffold(body: SizedBox.shrink());
+      return const AuthBottomSheetOverlay(
+        debugLabel: 'phone-verify-recovery-overlay',
+        dismissOnTapOutside: false,
+        card: SizedBox.shrink(),
+      );
     }
 
-    return Scaffold(
-      backgroundColor: AppColors.offWhite,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+    return AuthBottomSheetOverlay(
+      debugLabel: 'phone-verify-recovery-overlay',
+      // Mid-verify accidental dismiss would lose the verificationId — only
+      // the explicit Cancel button can leave this screen.
+      dismissOnTapOutside: false,
+      card: _PhoneVerifyRecoveryCard(
+        phoneE164: record.phoneE164,
+        codeController: _codeController,
+        busy: _busy,
+        codeValid: _codeValid,
+        resendRemainingSec: _resendRemainingSec,
+        errorMessage: _errorMessage,
+        onCodeChanged: () {
+          setState(() {});
+          if (_codeValid && !_busy) _verify();
+        },
+        onVerify: _verify,
+        onResend: _resend,
+        onCancel: _cancel,
+      ),
+    );
+  }
+}
+
+class _LoadingCard extends StatelessWidget {
+  const _LoadingCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.charcoal.withValues(alpha: 0.18),
+            blurRadius: 40,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 36),
+      child: const Center(child: CircularProgressIndicator()),
+    );
+  }
+}
+
+class _PhoneVerifyRecoveryCard extends StatelessWidget {
+  const _PhoneVerifyRecoveryCard({
+    required this.phoneE164,
+    required this.codeController,
+    required this.busy,
+    required this.codeValid,
+    required this.resendRemainingSec,
+    required this.errorMessage,
+    required this.onCodeChanged,
+    required this.onVerify,
+    required this.onResend,
+    required this.onCancel,
+  });
+
+  final String phoneE164;
+  final TextEditingController codeController;
+  final bool busy;
+  final bool codeValid;
+  final int resendRemainingSec;
+  final String? errorMessage;
+  final VoidCallback onCodeChanged;
+  final VoidCallback onVerify;
+  final VoidCallback onResend;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      // Eat taps on the card itself so the AuthBottomSheetOverlay's
+      // tap-outside (when enabled) doesn't fire from card-area taps.
+      behavior: HitTestBehavior.opaque,
+      onTap: () {},
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.charcoal.withValues(alpha: 0.18),
+              blurRadius: 40,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 12),
-              Text(
-                'Verify your phone',
-                style: LumiTextStyles.h1(),
+              // Header row matches the registration modal's _buildHeader
+              // shape (centered title + close on the right; no back here
+              // because there's nowhere to go back to inside the recovery
+              // flow).
+              Row(
+                children: [
+                  const SizedBox(width: 40, height: 40),
+                  Expanded(
+                    child: Text(
+                      'Verify your phone',
+                      textAlign: TextAlign.center,
+                      style: LumiTextStyles.h3(),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: IconButton(
+                      onPressed: busy ? null : onCancel,
+                      icon: const Icon(Icons.close, size: 22),
+                      color: AppColors.charcoal,
+                      splashRadius: 18,
+                    ),
+                  ),
+                ],
               ),
-              LumiGap.xs,
+              const SizedBox(height: 16),
               Text(
-                'We sent a 6-digit code to ${record.phoneE164}. Enter it below to finish signing in.',
+                'We sent a 6-digit code to $phoneE164. Enter it below to finish signing in.',
+                textAlign: TextAlign.center,
                 style: LumiTextStyles.bodySmall(
                   color: AppColors.charcoal.withValues(alpha: 0.7),
                 ),
               ),
-              LumiGap.l,
+              const SizedBox(height: 16),
               TextField(
-                controller: _codeController,
+                controller: codeController,
                 keyboardType: TextInputType.number,
                 textInputAction: TextInputAction.done,
                 maxLength: 6,
@@ -385,38 +505,35 @@ class _PhoneVerifyRecoveryScreenState extends State<PhoneVerifyRecoveryScreen> {
                   hintText: '123456',
                   prefixIcon: Icon(Icons.sms_outlined),
                 ),
-                onChanged: (_) {
-                  setState(() {});
-                  if (_codeValid && !_busy) _verify();
-                },
+                onChanged: (_) => onCodeChanged(),
               ),
-              if (_errorMessage != null) ...[
-                LumiGap.s,
+              if (errorMessage != null) ...[
+                const SizedBox(height: 8),
                 Text(
-                  _errorMessage!,
+                  errorMessage!,
                   style: LumiTextStyles.bodySmall(color: AppColors.error),
                 ),
               ],
-              LumiGap.l,
+              const SizedBox(height: 20),
               LumiPrimaryButton(
-                onPressed: _busy || !_codeValid ? null : _verify,
+                onPressed: busy || !codeValid ? null : onVerify,
                 text: 'Verify & continue',
-                isLoading: _busy,
+                isLoading: busy,
                 isFullWidth: true,
               ),
-              LumiGap.s,
+              const SizedBox(height: 8),
               Center(
                 child: LumiTextButton(
-                  onPressed: _busy || _resendRemainingSec > 0 ? null : _resend,
-                  text: _resendRemainingSec > 0
-                      ? 'Resend in ${_resendRemainingSec}s'
+                  onPressed: busy || resendRemainingSec > 0 ? null : onResend,
+                  text: resendRemainingSec > 0
+                      ? 'Resend in ${resendRemainingSec}s'
                       : 'Resend code',
                 ),
               ),
-              const Spacer(),
+              const SizedBox(height: 8),
               Center(
                 child: LumiTextButton(
-                  onPressed: _busy ? null : _cancel,
+                  onPressed: busy ? null : onCancel,
                   text: 'Cancel',
                   color: AppColors.charcoal.withValues(alpha: 0.55),
                 ),
