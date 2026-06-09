@@ -186,8 +186,26 @@ export async function deleteStudent(schoolId: string, studentId: string): Promis
     }
   }
 
+  // Revoke any active link codes pointing at this student so the next
+  // parent who tries to redeem one isn't stranded at "student-missing"
+  // inside linkParentToStudent. Mirrors the cascade in the Cloud Function
+  // deleteStudentWithCascade.
+  const activeCodes = await adminDb
+    .collection('studentLinkCodes')
+    .where('studentId', '==', studentId)
+    .where('status', '==', 'active')
+    .get();
+
   const batch = adminDb.batch();
   batch.delete(studentDoc.ref);
+
+  for (const codeDoc of activeCodes.docs) {
+    batch.update(codeDoc.ref, {
+      status: 'revoked',
+      revokedAt: FieldValue.serverTimestamp(),
+      revokeReason: 'student_deleted',
+    });
+  }
 
   if (classId) {
     batch.update(schoolRef.collection('classes').doc(classId), {
@@ -261,11 +279,41 @@ export async function deleteStudents(schoolId: string, studentIds: string[]): Pr
     }
   }
 
+  // Collect all active link codes pointing at the deleted students so we
+  // can revoke them in the same operation. Firestore caps `in` queries at
+  // 30 values; chunk to stay under that.
+  const deletedIds = Array.from(deletedIdSet);
+  const activeCodeRefs: FirebaseFirestore.DocumentReference[] = [];
+  const CODE_QUERY_CHUNK = 30;
+  for (let i = 0; i < deletedIds.length; i += CODE_QUERY_CHUNK) {
+    const chunk = deletedIds.slice(i, i + CODE_QUERY_CHUNK);
+    const snap = await adminDb
+      .collection('studentLinkCodes')
+      .where('studentId', 'in', chunk)
+      .where('status', '==', 'active')
+      .get();
+    for (const doc of snap.docs) activeCodeRefs.push(doc.ref);
+  }
+
   const BATCH_SIZE = 400;
   for (let i = 0; i < existing.length; i += BATCH_SIZE) {
     const batch = adminDb.batch();
     for (const snap of existing.slice(i, i + BATCH_SIZE)) {
       batch.delete(snap.ref);
+    }
+    await batch.commit();
+  }
+
+  // Revoke link codes in their own batched commits so we don't blow past
+  // the 500-write batch ceiling when wiping a large class.
+  for (let i = 0; i < activeCodeRefs.length; i += BATCH_SIZE) {
+    const batch = adminDb.batch();
+    for (const ref of activeCodeRefs.slice(i, i + BATCH_SIZE)) {
+      batch.update(ref, {
+        status: 'revoked',
+        revokedAt: FieldValue.serverTimestamp(),
+        revokeReason: 'student_deleted',
+      });
     }
     await batch.commit();
   }

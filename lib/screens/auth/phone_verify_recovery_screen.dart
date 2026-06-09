@@ -184,6 +184,24 @@ class _PhoneVerifyRecoveryScreenState extends State<PhoneVerifyRecoveryScreen> {
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       setState(() => _errorMessage = SmsVerificationService.friendlyError(e));
+    } on LinkingException catch (e) {
+      // Terminal link-code failures can't be recovered by retrying with
+      // the same code — sign the user back out and clear the recovery
+      // record so a fresh registration attempt starts clean. Transient
+      // failures (TransactionFailedException, NetworkUnavailableException,
+      // ParentDocumentNotFoundException) leave state in place so the user
+      // can tap Verify & continue again.
+      final terminal = e is InvalidCodeException ||
+          e is CodeAlreadyUsedException ||
+          e is CodeExpiredException ||
+          e is CodeRevokedException ||
+          e is StudentNotFoundException;
+      if (terminal) {
+        await _firebaseService.signOut();
+        await PhoneVerificationRecoveryService.instance.clear();
+      }
+      if (!mounted) return;
+      setState(() => _errorMessage = e.userMessage);
     } catch (e) {
       if (!mounted) return;
       setState(() => _errorMessage =
@@ -231,7 +249,13 @@ class _PhoneVerifyRecoveryScreenState extends State<PhoneVerifyRecoveryScreen> {
         phoneVerified: true,
         relationshipLabel: relationshipLabel,
       );
-      await parentRef.set(parentUser.toFirestore());
+      // merge:true so a retry after a downstream linking failure doesn't
+      // clobber server-owned fields (linkedChildren in particular — see
+      // the comment on the update branch below).
+      await parentRef.set(
+        parentUser.toFirestore(),
+        SetOptions(merge: true),
+      );
       try {
         await _firebaseService.firestore
             .collection('schools')

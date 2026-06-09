@@ -95,16 +95,22 @@ class ParentLinkingService {
         .doc(studentId)
         .get();
 
-    Map<String, dynamic>? metadata;
-    if (studentDoc.exists) {
-      final studentData = studentDoc.data()!;
-      metadata = {
-        'studentFirstName': studentData['firstName'],
-        'studentLastName': studentData['lastName'],
-        'studentFullName':
-            '${studentData['firstName']} ${studentData['lastName']}',
-      };
+    // Refuse to issue a code for a non-existent student. Without this check
+    // an orphan code can outlive the student doc, and parents who later try
+    // to use it hit "student-missing" from linkParentToStudent with no
+    // recovery path.
+    if (!studentDoc.exists) {
+      throw StateError(
+          'createLinkCode: student $schoolId/$studentId does not exist');
     }
+
+    final studentData = studentDoc.data()!;
+    final Map<String, dynamic> metadata = {
+      'studentFirstName': studentData['firstName'],
+      'studentLastName': studentData['lastName'],
+      'studentFullName':
+          '${studentData['firstName']} ${studentData['lastName']}',
+    };
 
     final linkCode = StudentLinkCodeModel(
       id: '',
