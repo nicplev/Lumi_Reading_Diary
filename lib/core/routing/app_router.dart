@@ -41,6 +41,7 @@ import '../../screens/parent/reading_success_screen.dart';
 import '../../screens/parent/link_child_screen.dart';
 import '../../screens/teacher/teacher_home_screen.dart';
 import '../../screens/teacher/allocation/allocation_screen.dart';
+import '../../screens/teacher/class_comprehension_question_screen.dart';
 import '../../screens/teacher/class_detail_screen.dart';
 import '../../screens/teacher/reading_groups_screen.dart';
 import '../../screens/teacher/class_report_screen.dart';
@@ -469,6 +470,19 @@ class AppRouter {
           extra: state.extra,
           classIdFromPath: state.pathParameters['classId']!,
           child: (teacher, classModel) => ClassDetailScreen(
+            teacher: teacher,
+            classModel: classModel,
+          ),
+        ),
+      ),
+
+      GoRoute(
+        path: '/teacher/class-comprehension-question/:classId',
+        name: 'class-comprehension-question',
+        builder: (context, state) => _classScopedTeacherRoute(
+          extra: state.extra,
+          classIdFromPath: state.pathParameters['classId']!,
+          child: (teacher, classModel) => ClassComprehensionQuestionScreen(
             teacher: teacher,
             classModel: classModel,
           ),

@@ -354,11 +354,12 @@ void main() {
 
     group('sync types and actions', () {
       test('SyncType enum has all expected values', () {
-        expect(SyncType.values.length, equals(6));
+        expect(SyncType.values.length, equals(7));
         expect(
           SyncType.values,
           containsAll([
             SyncType.readingLog,
+            SyncType.comprehensionAudioUpload,
             SyncType.student,
             SyncType.allocation,
             SyncType.parentComment,

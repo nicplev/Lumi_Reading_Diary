@@ -46,6 +46,13 @@ export interface ParentCommentSettings {
   customPresets: CommentPresetCategory[];
 }
 
+// Stored at `schools/{id}.settings.comprehensionRecording`. Drives the
+// optional voice-recording step at the end of the parent's reading-log
+// wizard. Per-class prompts live on `classes/{id}.settings.comprehensionQuestion`.
+export interface ComprehensionRecordingSettings {
+  enabled: boolean;
+}
+
 export interface AchievementThresholds {
   streak:      [number, number, number, number, number];
   books:       [number, number, number, number, number];

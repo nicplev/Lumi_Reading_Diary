@@ -15,8 +15,9 @@ import { useToast } from '@/components/lumi/toast';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useSchool, useUpdateSchool } from '@/lib/hooks/use-school';
 import { getReadingLevels } from '@/lib/types';
-import type { ReadingLevelSchema, ParentCommentSettings, AchievementCustomization } from '@/lib/types';
+import type { ReadingLevelSchema, ParentCommentSettings, ComprehensionRecordingSettings, AchievementCustomization } from '@/lib/types';
 import { ParentCommentSettingsSection } from './parent-comment-settings';
+import { ComprehensionRecordingSettingsSection } from './comprehension-recording-settings';
 import { AchievementThresholdSettings } from './achievement-threshold-settings';
 import type { AchievementThresholds } from '@/lib/types';
 
@@ -80,6 +81,7 @@ export function SettingsPage() {
   const [savingTerms, setSavingTerms] = useState(false);
   const [savingQuiet, setSavingQuiet] = useState(false);
   const [savingComments, setSavingComments] = useState(false);
+  const [savingComprehension, setSavingComprehension] = useState(false);
   const [savingAchievements, setSavingAchievements] = useState(false);
 
   useEffect(() => {
@@ -185,6 +187,22 @@ export function SettingsPage() {
       toast(error instanceof Error ? error.message : 'Failed to save', 'error');
     } finally {
       setSavingComments(false);
+    }
+  };
+
+  const handleSaveComprehension = async (
+    comprehensionSettings: ComprehensionRecordingSettings,
+  ) => {
+    setSavingComprehension(true);
+    try {
+      await updateSchool.mutateAsync({
+        comprehensionRecordingSettings: comprehensionSettings,
+      });
+      toast('Comprehension recording updated', 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to save', 'error');
+    } finally {
+      setSavingComprehension(false);
     }
   };
 
@@ -445,6 +463,14 @@ export function SettingsPage() {
             isAdmin={isAdmin}
             onSave={handleSaveComments}
             saving={savingComments}
+          />
+
+          {/* Comprehension Recording */}
+          <ComprehensionRecordingSettingsSection
+            settings={school?.settings?.comprehensionRecording as ComprehensionRecordingSettings | undefined}
+            isAdmin={isAdmin}
+            onSave={handleSaveComprehension}
+            saving={savingComprehension}
           />
         </div>
       )}

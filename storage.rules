@@ -24,6 +24,26 @@ service firebase.storage {
       allow delete: if false;
     }
 
+    // Comprehension voice recordings: short m4a clips recorded by children
+    // at the end of the parent's reading-log wizard, played back by
+    // teachers on the student detail screen.
+    //
+    // Read: any authenticated user; role-based access is enforced at the
+    // Firestore layer when reading the corresponding reading-log doc.
+    // Create/update: <2MB, audio/* content type. Role authorization
+    // piggybacks on the parent's Firestore log update (same pattern as
+    // community book covers).
+    match /schools/{schoolId}/comprehension_audio/{fileName} {
+      allow read: if request.auth != null;
+
+      allow create, update: if request.auth != null
+                           && request.resource.size < 2 * 1024 * 1024
+                           && request.resource.contentType.matches('audio/.*');
+
+      // No client deletes — Admin SDK only (future term-aware retention).
+      allow delete: if false;
+    }
+
     // Default deny for all other paths.
     match /{allPaths=**} {
       allow read, write: if false;
