@@ -7,6 +7,7 @@ function toParent(doc: FirebaseFirestore.DocumentSnapshot): Parent {
   return {
     id: doc.id,
     email: data.email ?? '',
+    phoneNumber: data.phoneNumber ?? undefined,
     fullName: data.fullName ?? '',
     schoolId: data.schoolId ?? '',
     linkedChildren: data.linkedChildren ?? [],
