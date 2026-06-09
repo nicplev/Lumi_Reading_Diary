@@ -1554,6 +1554,20 @@ async function getOrCreateLinkCode(
   createdBy: string,
   studentName: string,
 ): Promise<string> {
+  // Defensive: refuse to mint or return a code for a non-existent student.
+  // Without this guard an orphan code can outlive the student doc, and
+  // parents who try to use it later hit "student-missing" from
+  // linkParentToStudent with no way forward.
+  const studentSnap = await db
+    .collection("schools").doc(schoolId)
+    .collection("students").doc(studentId)
+    .get();
+  if (!studentSnap.exists) {
+    throw new Error(
+      `getOrCreateLinkCode: student ${schoolId}/${studentId} does not exist`,
+    );
+  }
+
   // Check for existing active code
   const existing = await db
     .collection("studentLinkCodes")

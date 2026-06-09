@@ -32,6 +32,8 @@ class ServiceStatusController with WidgetsBindingObserver {
     Duration debounce = const Duration(milliseconds: 500),
     Duration minProbeInterval = const Duration(seconds: 5),
     Duration probeTimeout = const Duration(seconds: 3),
+    Duration coldStartProbeTimeout = const Duration(seconds: 10),
+    Duration coldStartRetryDelay = const Duration(seconds: 5),
     Duration degradedThreshold = const Duration(milliseconds: 1500),
     String internetProbeUrl = 'https://1.1.1.1/cdn-cgi/trace',
     String firebaseHealthcheckPath = '_meta/healthcheck',
@@ -42,6 +44,8 @@ class ServiceStatusController with WidgetsBindingObserver {
         _debounce = debounce,
         _minProbeInterval = minProbeInterval,
         _probeTimeout = probeTimeout,
+        _coldStartProbeTimeout = coldStartProbeTimeout,
+        _coldStartRetryDelay = coldStartRetryDelay,
         _degradedThreshold = degradedThreshold,
         _internetProbeUrl = Uri.parse(internetProbeUrl),
         _firebaseHealthcheckPath = firebaseHealthcheckPath;
@@ -86,6 +90,8 @@ class ServiceStatusController with WidgetsBindingObserver {
   final Duration _debounce;
   final Duration _minProbeInterval;
   final Duration _probeTimeout;
+  final Duration _coldStartProbeTimeout;
+  final Duration _coldStartRetryDelay;
   final Duration _degradedThreshold;
   final Uri _internetProbeUrl;
   final String _firebaseHealthcheckPath;
@@ -107,6 +113,15 @@ class ServiceStatusController with WidgetsBindingObserver {
   /// since the last healthy snapshot. We only emit the transition after
   /// two confirming probes so a single flaky read doesn't flash a banner.
   int _consecutiveUnhealthyProbes = 0;
+
+  /// True until the first probe that returns a verdict (healthy or
+  /// otherwise) completes. Used to (a) widen the L3 timeout so a warming
+  /// Firestore SDK doesn't get falsely flagged, and (b) schedule a fast
+  /// re-probe after a suppressed unknown→unhealthy emission so we confirm
+  /// or clear the verdict within seconds rather than waiting 30s for the
+  /// next periodic tick.
+  bool _coldStart = true;
+  Timer? _coldStartRetryTimer;
 
   ServiceStatusSnapshot _current = ServiceStatusSnapshot.unknown();
   ServiceStatusSnapshot get current => _current;
@@ -154,6 +169,7 @@ class ServiceStatusController with WidgetsBindingObserver {
     } else {
       _periodicTimer?.cancel();
       _debounceTimer?.cancel();
+      _coldStartRetryTimer?.cancel();
     }
   }
 
@@ -203,6 +219,15 @@ class ServiceStatusController with WidgetsBindingObserver {
     return future.whenComplete(() {
       _inFlight = null;
       _lastProbeAt = DateTime.now();
+      _coldStart = false;
+    });
+  }
+
+  void _scheduleColdStartRetry() {
+    if (_coldStartRetryTimer?.isActive ?? false) return;
+    _coldStartRetryTimer = Timer(_coldStartRetryDelay, () {
+      if (!_foregrounded) return;
+      unawaited(_runProbe(forced: true));
     });
   }
 
@@ -238,6 +263,11 @@ class ServiceStatusController with WidgetsBindingObserver {
     // consulted when L3 fails so we can tell `offline` from `firebaseDown`.
     // Running L2 concurrently means we never block the happy path on a
     // network that quietly drops 1.1.1.1 traffic.
+    //
+    // First probe gets a wider L3 budget — Firestore's gRPC channel + TLS
+    // handshake regularly take 3–6s on a real device cold start, well
+    // inside healthy territory but past the steady-state 3s timeout.
+    final l3Timeout = _coldStart ? _coldStartProbeTimeout : _probeTimeout;
     final l2Future = _http
         .head(_internetProbeUrl)
         .timeout(_probeTimeout)
@@ -252,7 +282,7 @@ class ServiceStatusController with WidgetsBindingObserver {
       await _firestore
           .doc(_firebaseHealthcheckPath)
           .get(const GetOptions(source: Source.server))
-          .timeout(_probeTimeout);
+          .timeout(l3Timeout);
       l3 = true;
     } on FirebaseException catch (e) {
       // `permission-denied` means Firestore answered — the user just isn't
@@ -337,6 +367,13 @@ class ServiceStatusController with WidgetsBindingObserver {
     if (goingUnhealthy && (fromHealthyAndProbeBased || fromUnknown)) {
       _consecutiveUnhealthyProbes += 1;
       if (_consecutiveUnhealthyProbes < 2) {
+        // Periodic probes are 30s apart, so without intervention the user
+        // waits the full interval before we get the confirming verdict —
+        // long enough for a slow first probe to flash the banner. Run the
+        // confirming probe within seconds instead.
+        if (fromUnknown) {
+          _scheduleColdStartRetry();
+        }
         return;
       }
     }
@@ -358,6 +395,7 @@ class ServiceStatusController with WidgetsBindingObserver {
     await _connectivitySub?.cancel();
     _periodicTimer?.cancel();
     _debounceTimer?.cancel();
+    _coldStartRetryTimer?.cancel();
     _http.close();
     await _output.close();
   }

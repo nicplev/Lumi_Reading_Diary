@@ -78,6 +78,19 @@ export async function createLinkCode(data: {
 }): Promise<{ id: string; code: string }> {
   const db = getAdminDb();
 
+  // Refuse to issue a code for a non-existent student. Without this check
+  // a code can be minted that points to nothing, and parents who try to
+  // use it later hit "student-missing" from linkParentToStudent.
+  const studentSnap = await db
+    .collection("schools").doc(data.schoolId)
+    .collection("students").doc(data.studentId)
+    .get();
+  if (!studentSnap.exists) {
+    throw new Error(
+      `createLinkCode: student ${data.schoolId}/${data.studentId} does not exist`
+    );
+  }
+
   let code = "";
   let isUnique = false;
   let attempts = 0;

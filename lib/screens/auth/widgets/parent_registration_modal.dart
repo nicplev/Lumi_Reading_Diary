@@ -185,10 +185,40 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
   }
 
   @override
+  void deactivate() {
+    // deactivate fires while the widget is still in the tree, so context
+    // queries are valid — by the time dispose runs the route ancestors
+    // have already been torn down. We log here to capture *who popped*
+    // the modal in those mysterious mid-SMS-dispatch teardowns where the
+    // warm-resume net has to take over.
+    if (kDebugMode) {
+      String routeInfo = 'unknown';
+      bool canPop = false;
+      try {
+        final route = ModalRoute.of(context);
+        canPop = Navigator.of(context).canPop();
+        routeInfo =
+            'isCurrent=${route?.isCurrent} isActive=${route?.isActive} settings=${route?.settings.name}';
+      } catch (_) {
+        // context already torn down — nothing useful to log
+      }
+      debugPrint(
+          '[phone-auth] modal.deactivate → stage=$_stage busy=$_busy route=$routeInfo navCanPop=$canPop');
+    }
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
     if (kDebugMode) {
+      // Truncated stack so future repros tell us whether the dispose is
+      // framework-initiated (route pop) or coming from somewhere
+      // unexpected. Frames past 6 are noise.
+      final trace =
+          StackTrace.current.toString().split('\n').take(6).join(' | ');
       debugPrint(
           '[phone-auth] modal.dispose → stage=$_stage busy=$_busy authFlow=$_authFlow pendingUserId=$_pendingUserId verificationIdSet=${_verificationId != null} errorMessage=${_errorMessage == null ? "null" : "\"${_errorMessage!.substring(0, _errorMessage!.length.clamp(0, 60))}\""}');
+      debugPrint('[phone-auth] modal.dispose trace: $trace');
     }
     _lastNameRevealTimer?.cancel();
     _resendTicker?.cancel();
