@@ -61,11 +61,17 @@ class ComprehensionRecordingStep extends StatefulWidget {
   /// via re-record (`result == null`).
   final ValueChanged<ComprehensionRecordingResult?> onRecordingChanged;
 
+  /// Called when the user taps "Skip this step". The recording is an optional
+  /// step, so skipping should advance the wizard past it (the widget itself
+  /// has no navigation). Implementations typically move to the next page.
+  final VoidCallback onSkip;
+
   const ComprehensionRecordingStep({
     super.key,
     required this.question,
     required this.logId,
     required this.onRecordingChanged,
+    required this.onSkip,
     this.initialLocalPath,
     this.initialDurationSec,
   });
@@ -292,6 +298,14 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
     setState(() => _state = _RecordingState.idle);
   }
 
+  /// Skip the optional recording: clear any pending result and advance the
+  /// wizard. Without the [onSkip] navigation the button left the user stuck
+  /// on the recording step (e.g. after a mic-permission denial).
+  void _skip() {
+    widget.onRecordingChanged(null);
+    widget.onSkip();
+  }
+
   void _confirmRecording() {
     final path = _localPath;
     if (path == null) return;
@@ -361,7 +375,7 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
         ),
         const SizedBox(height: 12),
         TextButton(
-          onPressed: () => widget.onRecordingChanged(null),
+          onPressed: _skip,
           child: Text(
             'Skip this step',
             style: LumiTextStyles.bodyMedium(color: AppColors.charcoal),
@@ -566,7 +580,7 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
           ),
           const SizedBox(height: 8),
           TextButton(
-            onPressed: () => widget.onRecordingChanged(null),
+            onPressed: _skip,
             child: Text(
               'Skip this step',
               style: LumiTextStyles.bodyMedium(color: AppColors.charcoal),
