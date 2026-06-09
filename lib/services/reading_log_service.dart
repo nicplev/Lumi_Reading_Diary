@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 
 import '../core/services/service_status_controller.dart';
@@ -88,6 +91,9 @@ class ReadingLogService {
     List<String> commentSelections = const [],
     String? freeText,
     bool quickLog = false,
+    String? id,
+    String? comprehensionAudioPath,
+    int? comprehensionAudioDurationSec,
   }) {
     final now = DateTime.now();
     final target = allocations.isNotEmpty
@@ -99,7 +105,7 @@ class ReadingLogService {
     final commentText = _composeComment(commentSelections, trimmedFreeText);
 
     return ReadingLogModel(
-      id: now.millisecondsSinceEpoch.toString(),
+      id: id ?? now.millisecondsSinceEpoch.toString(),
       studentId: student.id,
       parentId: parent.id,
       schoolId: student.schoolId,
@@ -119,6 +125,10 @@ class ReadingLogService {
       loggedByName: parent.fullName,
       loggedByLabel: parent.relationshipLabel,
       metadata: quickLog ? const {'quickLog': true} : null,
+      comprehensionAudioPath: comprehensionAudioPath,
+      comprehensionAudioDurationSec: comprehensionAudioDurationSec,
+      // Always false at create time; flipped after the Storage upload lands.
+      comprehensionAudioUploaded: false,
     );
   }
 
@@ -149,6 +159,9 @@ class ReadingLogService {
     List<String> commentSelections = const [],
     String? freeText,
     bool quickLog = false,
+    String? id,
+    String? comprehensionAudioPath,
+    int? comprehensionAudioDurationSec,
   }) {
     final log = buildLog(
       student: student,
@@ -160,6 +173,9 @@ class ReadingLogService {
       commentSelections: commentSelections,
       freeText: freeText,
       quickLog: quickLog,
+      id: id,
+      comprehensionAudioPath: comprehensionAudioPath,
+      comprehensionAudioDurationSec: comprehensionAudioDurationSec,
     );
     return writeLog(log, student: student);
   }
@@ -355,6 +371,59 @@ class ReadingLogService {
         .doc(log.schoolId)
         .collection('readingLogs')
         .doc(log.id);
+  }
+
+  /// Builds the canonical Storage path for a comprehension audio recording.
+  /// Filename matches the log id so a teacher viewing the log can resolve
+  /// the audio without an extra lookup.
+  static String comprehensionAudioStoragePath({
+    required String schoolId,
+    required String logId,
+  }) =>
+      'schools/$schoolId/comprehension_audio/$logId.m4a';
+
+  /// Uploads the comprehension recording from [localFilePath] to the Storage
+  /// path on [log], then patches the log doc to set
+  /// `comprehensionAudioUploaded: true`. The temp file is removed after a
+  /// confirmed update (best-effort).
+  ///
+  /// Throws on Storage or Firestore failure — the caller is expected to
+  /// queue the upload via [OfflineService.enqueueComprehensionAudioUpload]
+  /// when this throws so retries happen with backoff.
+  Future<void> uploadComprehensionAudio({
+    required ReadingLogModel log,
+    required String localFilePath,
+  }) async {
+    final storagePath = log.comprehensionAudioPath;
+    if (storagePath == null) {
+      throw StateError('Log has no comprehensionAudioPath set');
+    }
+    final file = File(localFilePath);
+    if (!file.existsSync()) {
+      throw const ComprehensionAudioMissingException();
+    }
+
+    await FirebaseStorage.instance.ref(storagePath).putFile(
+          file,
+          SettableMetadata(
+            contentType: 'audio/mp4',
+            customMetadata: {
+              'uploadedAt': DateTime.now().toUtc().toIso8601String(),
+              'durationSec': '${log.comprehensionAudioDurationSec ?? 0}',
+              'schoolId': log.schoolId,
+              'studentId': log.studentId,
+              // TODO(retention): used by the future term-aware cleanup function.
+            },
+          ),
+        );
+
+    await _logRef(log).update({'comprehensionAudioUploaded': true});
+
+    try {
+      if (file.existsSync()) await file.delete();
+    } catch (_) {
+      // Best-effort: the temp dir gets purged by the OS eventually.
+    }
   }
 
   /// Live comment thread for a log, oldest message first. Powers the in-app

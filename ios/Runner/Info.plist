@@ -49,6 +49,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Lumi needs camera access to scan ISBN barcodes, capture book covers, and attach reading evidence.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Lumi uses the microphone so your child can record a short recap of what they read.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Lumi needs photo library access to choose book covers and attach images to reading logs.</string>
 	<key>UIApplicationSceneManifest</key>

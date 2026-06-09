@@ -43,6 +43,14 @@ export {
   monitorImpersonationAnomalies,
 } from "./impersonation";
 
+// Parent ↔ student linking. Owns parents.linkedChildren and
+// students.parentIds writes via Admin SDK so client rules can keep those
+// fields locked down. See functions/src/parent_linking.ts.
+export {
+  linkParentToStudent,
+  unlinkParentFromStudent,
+} from "./parent_linking";
+
 /**
  * CRITICAL SECURITY: Stats Aggregation
  * Prevents client-side manipulation of student statistics

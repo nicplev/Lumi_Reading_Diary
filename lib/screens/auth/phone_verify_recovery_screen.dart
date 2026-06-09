@@ -19,6 +19,7 @@ import '../../services/notification_service.dart';
 import '../../services/parent_linking_service.dart';
 import '../../services/phone_verification_recovery_service.dart';
 import '../../services/sms_verification_service.dart';
+import 'widgets/auth_bottom_sheet_overlay.dart';
 
 /// Resumes an in-flight Firebase phone verification that was orphaned by
 /// an iOS reCAPTCHA modal-disposal (or any other widget teardown / app
@@ -241,11 +242,11 @@ class _PhoneVerifyRecoveryScreenState extends State<PhoneVerifyRecoveryScreen> {
         // Non-critical; continue.
       }
     } else {
+      // linkedChildren is owned by the linkParentToStudent callable below.
       final update = <String, dynamic>{
         'fullName': fullName,
         'phoneNumber': record.phoneE164,
         'phoneVerified': true,
-        'linkedChildren': FieldValue.arrayUnion([studentId]),
       };
       if (relationshipLabel != null) {
         update['relationshipLabel'] = relationshipLabel;
