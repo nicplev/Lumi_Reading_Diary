@@ -82,11 +82,9 @@ function asOptionalString(value: unknown, field: string): string | null {
   return trimmed.length === 0 ? null : trimmed;
 }
 
-/**
- * Atomic rate-limit check + increment for the calling parent. Mirrors
- * `enforceRateLimit` in impersonation.ts so we get the same hour/day window
- * behaviour. Throws HttpsError('resource-exhausted') if either ceiling is hit.
- */
+// Atomic rate-limit check + increment for the calling parent. Mirrors
+// `enforceRateLimit` in impersonation.ts so we get the same hour/day window
+// behaviour. Throws HttpsError('resource-exhausted') if either ceiling is hit.
 async function enforceRateLimit(uid: string): Promise<void> {
   const ref = db().collection(COLL_RATE).doc(uid);
   await db().runTransaction(async (tx) => {
@@ -177,12 +175,10 @@ function parseCodeDoc(
   };
 }
 
-/**
- * Priority order for picking the best record when multiple codes share the
- * same string. Mirrors `_priorityForCode` in
- * lib/services/parent_linking_service.dart — active wins, then used, then
- * revoked, then expired.
- */
+// Priority order for picking the best record when multiple codes share the
+// same string. Mirrors `_priorityForCode` in
+// lib/services/parent_linking_service.dart — active wins, then used, then
+// revoked, then expired.
 function codePriority(rec: LinkCodeRecord): number {
   const now = new Date();
   const expired = rec.expiresAt !== null && rec.expiresAt < now;
@@ -309,9 +305,9 @@ export const linkParentToStudent = functions
         throw notFound("student-missing", "Student not found.");
       }
 
-      const existingLinked = Array.isArray(parentSnap.data()?.linkedChildren)
-        ? (parentSnap.data()?.linkedChildren as string[])
-        : [];
+      const existingLinked = Array.isArray(parentSnap.data()?.linkedChildren) ?
+        (parentSnap.data()?.linkedChildren as string[]) :
+        [];
       if (existingLinked.includes(fresh.studentId)) {
         throw alreadyExists("already-linked", "Already linked to this student.");
       }
@@ -410,9 +406,9 @@ export const unlinkParentFromStudent = functions
         );
       }
 
-      const parentIds = Array.isArray(studentSnap.data()?.parentIds)
-        ? (studentSnap.data()?.parentIds as string[])
-        : [];
+      const parentIds = Array.isArray(studentSnap.data()?.parentIds) ?
+        (studentSnap.data()?.parentIds as string[]) :
+        [];
       if (!parentIds.includes(parentUserId)) {
         throw failedPrecondition(
           "not-linked",
