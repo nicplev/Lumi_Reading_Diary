@@ -56,6 +56,9 @@ const updateSchema = z.object({
       chips: z.array(z.string().min(1).max(100)).max(20),
     })).max(10),
   }).optional(),
+  comprehensionRecordingSettings: z.object({
+    enabled: z.boolean(),
+  }).optional(),
   achievementCustomization: z.object({
     streak: z.tuple([
       z.object({ name: z.string().max(40).optional(), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional() }),
