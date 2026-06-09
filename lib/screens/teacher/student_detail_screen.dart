@@ -12,7 +12,9 @@ import '../../core/widgets/lumi/teacher_book_assignment_card.dart';
 import '../../core/widgets/audio/comprehension_audio_player.dart';
 import '../../core/widgets/lumi/teacher_reading_level_pill.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
+import '../../core/widgets/feelings/feelings_tracker_card.dart';
 import '../../data/models/achievement_model.dart';
+import '../../data/models/reading_log_model.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/reading_level_option.dart';
 import '../../data/models/student_model.dart';
@@ -1813,6 +1815,10 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             _buildAssignedBooksSection(),
             const SizedBox(height: 20),
 
+            // Reading Feelings tracker
+            _buildFeelingsTrackerSection(),
+            const SizedBox(height: 20),
+
             // Reading History
             _buildReadingHistorySection(),
             const SizedBox(height: 20),
@@ -1932,6 +1938,33 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
           style: TeacherTypography.bodySmall.copyWith(color: color),
         ),
       ],
+    );
+  }
+
+  Widget _buildFeelingsTrackerSection() {
+    // Pull up to ~12 months of logs so the tracker can cover its widest
+    // (all-time) window. Unlike the Recent Reading list this is NOT limited to
+    // 5, and it maps to the full ReadingLogModel so we can read childFeeling.
+    final floor = DateTime.now().subtract(const Duration(days: 366));
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firebaseService.firestore
+          .collection('schools')
+          .doc(widget.student.schoolId)
+          .collection('readingLogs')
+          .where('studentId', isEqualTo: widget.student.id)
+          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(floor))
+          .orderBy('date', descending: true)
+          .limit(400)
+          .snapshots(),
+      builder: (context, snapshot) {
+        // While loading (or on error), render an empty tracker rather than a
+        // spinner so the section never janks the scroll position.
+        final docs = snapshot.data?.docs ?? const [];
+        final logs = docs
+            .map((d) => ReadingLogModel.fromFirestore(d))
+            .toList(growable: false);
+        return FeelingsTrackerCard(logs: logs);
+      },
     );
   }
 
