@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'comprehension_recording_settings.dart';
 import 'parent_comment_settings.dart';
 
 enum ReadingLevelSchema {
@@ -136,6 +137,12 @@ class SchoolModel {
   ParentCommentSettings get parentCommentSettings {
     return ParentCommentSettings.fromMap(
       settings?['parentComments'] as Map<String, dynamic>?,
+    );
+  }
+
+  ComprehensionRecordingSettings get comprehensionRecordingSettings {
+    return ComprehensionRecordingSettings.fromMap(
+      settings?['comprehensionRecording'] as Map<String, dynamic>?,
     );
   }
 

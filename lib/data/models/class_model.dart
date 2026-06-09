@@ -93,6 +93,19 @@ class ClassModel {
     };
   }
 
+  /// Default prompt shown on the parent's comprehension recording step
+  /// when no teacher has set a per-class question.
+  static const String defaultComprehensionQuestion =
+      'Tell us about what you read tonight.';
+
+  /// Per-class comprehension question. Falls back to
+  /// [defaultComprehensionQuestion] when the teacher hasn't set one.
+  /// Stored at `classes/{classId}.settings.comprehensionQuestion`.
+  String get comprehensionQuestion {
+    final raw = (settings?['comprehensionQuestion'] as String?)?.trim();
+    return (raw == null || raw.isEmpty) ? defaultComprehensionQuestion : raw;
+  }
+
   ClassModel copyWith({
     String? id,
     String? schoolId,

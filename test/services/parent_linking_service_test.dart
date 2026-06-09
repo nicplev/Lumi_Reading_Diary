@@ -1,18 +1,145 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lumi_reading_tracker/core/exceptions/linking_exceptions.dart';
+import 'package:lumi_reading_tracker/core/services/impersonation_service.dart';
 import 'package:lumi_reading_tracker/services/parent_linking_service.dart';
+import 'package:mockito/mockito.dart';
+
+/// No-op stand-in for [ImpersonationService] so [assertWritable] short-
+/// circuits in unit tests. The production `ImpersonationService.instance`
+/// getter eagerly accesses `FirebaseAuth.instance`, which throws "no Firebase
+/// app" when Firebase isn't initialized in a unit-test isolate.
+class _NoopImpersonationService extends Mock implements ImpersonationService {
+  @override
+  bool get isActive => false;
+
+  @override
+  void dispose() {}
+
+  @override
+  void addListener(VoidCallback listener) {}
+
+  @override
+  void removeListener(VoidCallback listener) {}
+}
+
+/// Captures every invocation made through the injected
+/// [HttpsCallableInvoker] so tests can assert call args, and replays a
+/// queue of canned responses (data or exceptions) one per call. This is the
+/// substitute for mocking FirebaseFunctions/HttpsCallable, both of which
+/// have concrete bodies that fight with mockito.
+class _RecordingInvoker {
+  final Map<String, List<Map<String, dynamic>>> calls = {};
+  final Map<String, List<Object>> _responses = {};
+
+  void queueSuccess(String name, Object? data) {
+    _responses.putIfAbsent(name, () => <Object>[]).add(_Success(data));
+  }
+
+  void queueFailure(String name, FirebaseFunctionsException error) {
+    _responses.putIfAbsent(name, () => <Object>[]).add(error);
+  }
+
+  HttpsCallableInvoker get invoker => (name, args) async {
+        calls.putIfAbsent(name, () => []).add(args);
+        final queue = _responses[name];
+        if (queue == null || queue.isEmpty) {
+          throw StateError(
+              'No queued response for callable "$name" (call '
+              '#${calls[name]!.length}).');
+        }
+        final next = queue.removeAt(0);
+        if (next is FirebaseFunctionsException) throw next;
+        return (next as _Success).data;
+      };
+}
+
+class _Success {
+  _Success(this.data);
+  final Object? data;
+}
 
 void main() {
+  setUpAll(() {
+    ImpersonationService.debugSetInstance(_NoopImpersonationService());
+  });
+
   group('ParentLinkingService', () {
     late FakeFirebaseFirestore firestore;
+    late _RecordingInvoker invoker;
     late ParentLinkingService service;
 
     setUp(() {
       firestore = FakeFirebaseFirestore();
-      service = ParentLinkingService(firestore: firestore);
+      invoker = _RecordingInvoker();
+      service = ParentLinkingService(
+        firestore: firestore,
+        callableInvoker: invoker.invoker,
+      );
     });
+
+    void stubLinkSuccess({
+      String studentId = 'student_1',
+      String schoolId = 'school_1',
+      List<String> linkedChildren = const ['student_1'],
+    }) {
+      invoker.queueSuccess('linkParentToStudent', <String, dynamic>{
+        'studentId': studentId,
+        'schoolId': schoolId,
+        'linkedChildren': linkedChildren,
+      });
+    }
+
+    void stubLinkFailure({
+      required String code,
+      String? kind,
+      String? reason,
+      String message = 'simulated',
+    }) {
+      invoker.queueFailure(
+        'linkParentToStudent',
+        FirebaseFunctionsException(
+          code: code,
+          message: message,
+          details: <String, Object?>{
+            if (kind != null) 'kind': kind,
+            if (reason != null) 'reason': reason,
+          },
+        ),
+      );
+    }
+
+    void stubUnlinkSuccess({
+      String studentId = 'student_1',
+      String schoolId = 'school_1',
+      String parentUserId = 'parent_1',
+    }) {
+      invoker.queueSuccess('unlinkParentFromStudent', <String, dynamic>{
+        'studentId': studentId,
+        'schoolId': schoolId,
+        'removedParentUid': parentUserId,
+      });
+    }
+
+    void stubUnlinkFailure({
+      required String code,
+      String? kind,
+      String message = 'simulated',
+    }) {
+      invoker.queueFailure(
+        'unlinkParentFromStudent',
+        FirebaseFunctionsException(
+          code: code,
+          message: message,
+          details: <String, Object?>{
+            if (kind != null) 'kind': kind,
+          },
+        ),
+      );
+    }
 
     Future<void> seedStudent({
       String schoolId = 'school_1',
@@ -301,185 +428,171 @@ void main() {
     });
 
     // ── linkParentToStudent ──
+    //
+    // Behaviour now lives in the linkParentToStudent Cloud Function (see
+    // functions/src/parent_linking.ts). These tests cover the client wrapper:
+    // it normalises the code, forwards through httpsCallable, and maps the
+    // server's HttpsError taxonomy back to the local LinkingException types
+    // the UI catches.
 
     group('linkParentToStudent', () {
-      test('marks code used and updates both sides', () async {
-        await seedStudent();
-        await seedLinkCode();
+      test('forwards uppercased, trimmed code and clientInfo to the callable',
+          () async {
+        stubLinkSuccess();
 
         final linked = await service.linkParentToStudent(
-          code: 'QWER5678',
+          code: '  qwer5678  ',
           parentUserId: 'parent_1',
           parentEmail: 'parent@school.test',
         );
 
         expect(linked, isTrue);
-
-        // Student should have parent linked
-        final studentDoc = await firestore
-            .collection('schools')
-            .doc('school_1')
-            .collection('students')
-            .doc('student_1')
-            .get();
-        expect(
-          List<String>.from(studentDoc.data()!['parentIds']),
-          contains('parent_1'),
-        );
-
-        // Parent document should be created/updated
-        final parentDoc = await firestore
-            .collection('schools')
-            .doc('school_1')
-            .collection('parents')
-            .doc('parent_1')
-            .get();
-        expect(
-          List<String>.from(parentDoc.data()!['linkedChildren']),
-          contains('student_1'),
-        );
-        expect(parentDoc.data()!['schoolId'], 'school_1');
-
-        // Code should be marked used
-        final codeDoc =
-            await firestore.collection('studentLinkCodes').doc('code_1').get();
-        expect(codeDoc.data()!['status'], equals('used'));
-        expect(codeDoc.data()!['usedBy'], equals('parent_1'));
+        final captured = invoker.calls['linkParentToStudent']!.single;
+        expect(captured['code'], 'QWER5678');
+        expect(captured['clientInfo'], isA<Map<String, dynamic>>());
       });
 
-      test('handles case insensitive and trimmed code input', () async {
-        await seedStudent();
-        await seedLinkCode(code: 'TRIM1234');
-
+      test('returns true on a successful callable response', () async {
+        stubLinkSuccess();
         final linked = await service.linkParentToStudent(
-          code: '  trim1234  ',
+          code: 'QWER5678',
           parentUserId: 'parent_1',
-          parentEmail: 'parent@test.com',
+          parentEmail: null,
         );
-
         expect(linked, isTrue);
       });
 
-      test('throws AlreadyLinkedException when parent already linked',
+      test('maps failed-precondition/invalid-code to InvalidCodeException',
           () async {
-        await seedStudent(parentIds: ['parent_1']);
-        // The transaction now derives already-linked state from the parent's
-        // own doc (it can't read the student without existing access).
-        await firestore
-            .collection('schools')
-            .doc('school_1')
-            .collection('parents')
-            .doc('parent_1')
-            .set({
-          'linkedChildren': ['student_1'],
-          'schoolId': 'school_1',
-          'role': 'parent',
-        });
-        await seedLinkCode();
+        stubLinkFailure(code: 'failed-precondition', kind: 'invalid-code');
+        await expectLater(
+          () => service.linkParentToStudent(
+            code: 'NOPE0000',
+            parentUserId: 'parent_1',
+          ),
+          throwsA(isA<InvalidCodeException>()),
+        );
+      });
 
+      test('maps failed-precondition/code-used to CodeAlreadyUsedException',
+          () async {
+        stubLinkFailure(code: 'failed-precondition', kind: 'code-used');
+        await expectLater(
+          () => service.linkParentToStudent(
+            code: 'USED0000',
+            parentUserId: 'parent_1',
+          ),
+          throwsA(isA<CodeAlreadyUsedException>()),
+        );
+      });
+
+      test(
+          'maps failed-precondition/code-revoked to CodeRevokedException '
+          'with reason carried through', () async {
+        stubLinkFailure(
+          code: 'failed-precondition',
+          kind: 'code-revoked',
+          reason: 'Student transferred',
+        );
+        try {
+          await service.linkParentToStudent(
+            code: 'REVK0000',
+            parentUserId: 'parent_1',
+          );
+          fail('expected CodeRevokedException');
+        } on CodeRevokedException catch (e) {
+          expect(e.userMessage, contains('Student transferred'));
+        }
+      });
+
+      test('maps failed-precondition/code-expired to CodeExpiredException',
+          () async {
+        stubLinkFailure(code: 'failed-precondition', kind: 'code-expired');
+        await expectLater(
+          () => service.linkParentToStudent(
+            code: 'EXPD0000',
+            parentUserId: 'parent_1',
+          ),
+          throwsA(isA<CodeExpiredException>()),
+        );
+      });
+
+      test(
+          'maps failed-precondition/parent-doc-missing to '
+          'ParentDocumentNotFoundException', () async {
+        stubLinkFailure(
+            code: 'failed-precondition', kind: 'parent-doc-missing');
         await expectLater(
           () => service.linkParentToStudent(
             code: 'QWER5678',
             parentUserId: 'parent_1',
-            parentEmail: 'parent@test.com',
+          ),
+          throwsA(isA<ParentDocumentNotFoundException>()),
+        );
+      });
+
+      test('maps already-exists/already-linked to AlreadyLinkedException',
+          () async {
+        stubLinkFailure(code: 'already-exists', kind: 'already-linked');
+        await expectLater(
+          () => service.linkParentToStudent(
+            code: 'QWER5678',
+            parentUserId: 'parent_1',
           ),
           throwsA(isA<AlreadyLinkedException>()),
         );
       });
 
-      test('links successfully without pre-existing student read access',
+      test('maps not-found/student-missing to StudentNotFoundException',
           () async {
-        // Simulates the production flow: parent doc exists (created in Step 2
-        // of registration) with empty linkedChildren. Under real firestore
-        // rules the parent cannot `get` the student at this point, but the
-        // service no longer reads the student, so linking must still succeed.
-        await seedStudent();
-        await seedLinkCode();
-        await firestore
-            .collection('schools')
-            .doc('school_1')
-            .collection('parents')
-            .doc('parent_1')
-            .set({
-          'linkedChildren': <String>[],
-          'schoolId': 'school_1',
-          'role': 'parent',
-        });
+        stubLinkFailure(code: 'not-found', kind: 'student-missing');
+        await expectLater(
+          () => service.linkParentToStudent(
+            code: 'QWER5678',
+            parentUserId: 'parent_1',
+          ),
+          throwsA(isA<StudentNotFoundException>()),
+        );
+      });
+
+      test('maps resource-exhausted to TransactionFailedException', () async {
+        stubLinkFailure(code: 'resource-exhausted');
+        await expectLater(
+          () => service.linkParentToStudent(
+            code: 'QWER5678',
+            parentUserId: 'parent_1',
+          ),
+          throwsA(isA<TransactionFailedException>()),
+        );
+      });
+
+      test('retries once on unavailable, then succeeds', () async {
+        // First call: unavailable. Second call: success.
+        stubLinkFailure(code: 'unavailable');
+        stubLinkSuccess();
 
         final linked = await service.linkParentToStudent(
           code: 'QWER5678',
           parentUserId: 'parent_1',
-          parentEmail: 'parent@test.com',
         );
 
         expect(linked, isTrue);
-
-        final studentDoc = await firestore
-            .collection('schools')
-            .doc('school_1')
-            .collection('students')
-            .doc('student_1')
-            .get();
-        expect(
-          List<String>.from(studentDoc.data()!['parentIds']),
-          contains('parent_1'),
-        );
-
-        final parentDoc = await firestore
-            .collection('schools')
-            .doc('school_1')
-            .collection('parents')
-            .doc('parent_1')
-            .get();
-        expect(
-          List<String>.from(parentDoc.data()!['linkedChildren']),
-          contains('student_1'),
-        );
-
-        final codeDoc =
-            await firestore.collection('studentLinkCodes').doc('code_1').get();
-        expect(codeDoc.data()!['status'], equals('used'));
-        expect(codeDoc.data()!['usedBy'], equals('parent_1'));
+        expect(invoker.calls['linkParentToStudent']!.length, 2);
       });
 
-      // StudentNotFoundException is surfaced by real Firestore via a
-      // FirebaseException(code: 'not-found') on `transaction.update` at
-      // commit time, which the service's catch maps to StudentNotFoundException.
-      // fake_cloud_firestore's _DummyTransaction does not propagate that
-      // error out of runTransaction, so this scenario can only be covered
-      // by backend integration / emulator tests. Left skipped as a marker.
-      test('throws StudentNotFoundException when student missing', () async {
-        // Only create school but not the student
-        await firestore
-            .collection('schools')
-            .doc('school_1')
-            .set({'name': 'Test'});
-        await seedLinkCode();
+      test(
+          'surfaces NetworkUnavailableException after retry also fails with '
+          'unavailable', () async {
+        stubLinkFailure(code: 'unavailable');
+        stubLinkFailure(code: 'unavailable');
 
         await expectLater(
           () => service.linkParentToStudent(
             code: 'QWER5678',
             parentUserId: 'parent_1',
-            parentEmail: 'parent@test.com',
           ),
-          throwsA(isA<StudentNotFoundException>()),
+          throwsA(isA<NetworkUnavailableException>()),
         );
-      }, skip: 'fake_cloud_firestore cannot propagate transaction.update '
-          'not-found errors; covered only by backend/emulator tests.');
-
-      test('does not create legacy top-level notifications after successful link', () async {
-        await seedStudent();
-        await seedLinkCode();
-
-        await service.linkParentToStudent(
-          code: 'QWER5678',
-          parentUserId: 'parent_1',
-          parentEmail: 'parent@school.test',
-        );
-
-        final notifications =
-            await firestore.collection('notifications').get();
-        expect(notifications.docs, isEmpty);
       });
     });
 
@@ -567,37 +680,15 @@ void main() {
     });
 
     // ── unlinkParentFromStudent ──
+    //
+    // Same shape as the link tests — the wrapper forwards args to the
+    // callable and translates HttpsError codes back to LinkingException
+    // types.
 
     group('unlinkParentFromStudent', () {
-      test('removes link from both student and parent documents', () async {
-        // Set up linked state
-        await firestore
-            .collection('schools')
-            .doc('school_1')
-            .set({'name': 'Test'});
-        await firestore
-            .collection('schools')
-            .doc('school_1')
-            .collection('students')
-            .doc('student_1')
-            .set({
-          'firstName': 'Sam',
-          'lastName': 'Booker',
-          'studentId': 'S-100',
-          'classId': 'class_1',
-          'schoolId': 'school_1',
-          'parentIds': ['parent_1'],
-          'createdAt': Timestamp.now(),
-        });
-        await firestore
-            .collection('schools')
-            .doc('school_1')
-            .collection('parents')
-            .doc('parent_1')
-            .set({
-          'linkedChildren': ['student_1'],
-          'schoolId': 'school_1',
-        });
+      test('forwards schoolId/studentId/parentUserId/reason to the callable',
+          () async {
+        stubUnlinkSuccess();
 
         await service.unlinkParentFromStudent(
           schoolId: 'school_1',
@@ -606,94 +697,77 @@ void main() {
           reason: 'Parent requested',
         );
 
-        final studentDoc = await firestore
-            .collection('schools')
-            .doc('school_1')
-            .collection('students')
-            .doc('student_1')
-            .get();
-        expect(
-          List<String>.from(studentDoc.data()!['parentIds']),
-          isNot(contains('parent_1')),
-        );
-
-        final parentDoc = await firestore
-            .collection('schools')
-            .doc('school_1')
-            .collection('parents')
-            .doc('parent_1')
-            .get();
-        expect(
-          List<String>.from(parentDoc.data()!['linkedChildren']),
-          isNot(contains('student_1')),
-        );
+        final captured = invoker.calls['unlinkParentFromStudent']!.single;
+        expect(captured['schoolId'], 'school_1');
+        expect(captured['studentId'], 'student_1');
+        expect(captured['parentUserId'], 'parent_1');
+        expect(captured['reason'], 'Parent requested');
       });
 
-      test('throws when student does not exist', () async {
-        await firestore
-            .collection('schools')
-            .doc('school_1')
-            .set({'name': 'Test'});
-        await firestore
-            .collection('schools')
-            .doc('school_1')
-            .collection('parents')
-            .doc('parent_1')
-            .set({
-          'linkedChildren': ['student_1'],
-          'schoolId': 'school_1',
-        });
+      test('omits reason when not provided', () async {
+        stubUnlinkSuccess();
 
+        await service.unlinkParentFromStudent(
+          schoolId: 'school_1',
+          studentId: 'student_1',
+          parentUserId: 'parent_1',
+        );
+
+        final captured = invoker.calls['unlinkParentFromStudent']!.single;
+        expect(captured.containsKey('reason'), isFalse);
+      });
+
+      test('maps not-found/student-missing to StudentNotFoundException',
+          () async {
+        stubUnlinkFailure(code: 'not-found', kind: 'student-missing');
         await expectLater(
           () => service.unlinkParentFromStudent(
             schoolId: 'school_1',
             studentId: 'nonexistent',
             parentUserId: 'parent_1',
           ),
-          throwsA(isA<Exception>()),
+          throwsA(isA<StudentNotFoundException>()),
         );
       });
 
-      test('throws when parent is not linked to student', () async {
-        await firestore
-            .collection('schools')
-            .doc('school_1')
-            .set({'name': 'Test'});
-        await firestore
-            .collection('schools')
-            .doc('school_1')
-            .collection('students')
-            .doc('student_1')
-            .set({
-          'firstName': 'Sam',
-          'lastName': 'Booker',
-          'studentId': 'S-100',
-          'classId': 'class_1',
-          'schoolId': 'school_1',
-          'parentIds': [],
-          'createdAt': Timestamp.now(),
-        });
-        await firestore
-            .collection('schools')
-            .doc('school_1')
-            .collection('parents')
-            .doc('parent_1')
-            .set({
-          'linkedChildren': [],
-          'schoolId': 'school_1',
-        });
-
+      test(
+          'maps failed-precondition/parent-doc-missing to '
+          'ParentDocumentNotFoundException', () async {
+        stubUnlinkFailure(
+            code: 'failed-precondition', kind: 'parent-doc-missing');
         await expectLater(
           () => service.unlinkParentFromStudent(
             schoolId: 'school_1',
             studentId: 'student_1',
             parentUserId: 'parent_1',
           ),
-          throwsA(isA<Exception>().having(
-            (e) => e.toString(),
-            'message',
-            contains('not linked'),
-          )),
+          throwsA(isA<ParentDocumentNotFoundException>()),
+        );
+      });
+
+      test(
+          'maps failed-precondition/not-linked to TransactionFailedException',
+          () async {
+        stubUnlinkFailure(code: 'failed-precondition', kind: 'not-linked');
+        await expectLater(
+          () => service.unlinkParentFromStudent(
+            schoolId: 'school_1',
+            studentId: 'student_1',
+            parentUserId: 'parent_1',
+          ),
+          throwsA(isA<TransactionFailedException>()),
+        );
+      });
+
+      test('maps permission-denied to TransactionFailedException', () async {
+        stubUnlinkFailure(code: 'permission-denied');
+        await expectLater(
+          () => service.unlinkParentFromStudent(
+            schoolId: 'school_1',
+            studentId: 'student_1',
+            parentUserId: 'parent_1',
+          ),
+          throwsA(isA<TransactionFailedException>()),
         );
       });
     });

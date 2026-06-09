@@ -143,7 +143,7 @@ export function LinkCodesTab() {
     },
     {
       id: 'type',
-      header: 'Type',
+      header: 'Issuer',
       accessorFn: (row) => row.intendedFor,
       cell: (value) => (
         <Badge variant={value === 'co_parent_invite' ? 'info' : 'default'}>

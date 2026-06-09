@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import '../data/models/student_link_code_model.dart';
 import '../data/models/student_model.dart';
@@ -7,11 +9,35 @@ import '../data/models/user_model.dart';
 import '../core/exceptions/linking_exceptions.dart';
 import '../core/services/assert_writable.dart';
 
+/// Invokes a Cloud Function and returns its `result.data` payload.
+///
+/// Pulled out as an injectable seam so tests can stub the callable without
+/// having to mock the FirebaseFunctions class — whose [httpsCallable] is
+/// concrete and reaches into the FlutterPluginPlatform, which isn't set up
+/// in unit tests.
+typedef HttpsCallableInvoker = Future<Object?> Function(
+  String name,
+  Map<String, dynamic> args,
+);
+
+Future<Object?> _defaultCallableInvoker(
+  String name,
+  Map<String, dynamic> args,
+) async {
+  final callable = FirebaseFunctions.instance.httpsCallable(name);
+  final result = await callable.call<Object?>(args);
+  return result.data;
+}
+
 class ParentLinkingService {
   final FirebaseFirestore _firestore;
+  final HttpsCallableInvoker _invoke;
 
-  ParentLinkingService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+  ParentLinkingService({
+    FirebaseFirestore? firestore,
+    HttpsCallableInvoker? callableInvoker,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _invoke = callableInvoker ?? _defaultCallableInvoker;
 
   // Generate unique 8-character code
   String _generateCode() {
@@ -267,8 +293,17 @@ class ParentLinkingService {
     return 4;
   }
 
-  // Link parent to student using code
-  // Uses Firestore transaction to ensure atomicity and prevent race conditions
+  // Link parent to student using a code.
+  //
+  // Atomicity (parents.linkedChildren + students.parentIds + the code's used
+  // flag) is enforced server-side by the `linkParentToStudent` callable —
+  // firestore.rules forbids client-side writes to parents.linkedChildren and
+  // students.parentIds, so this hop is mandatory. Callable bypasses rules via
+  // Admin SDK and performs the same transaction the rules wouldn't let us run
+  // from the client.
+  //
+  // `parentEmail` is accepted for source compatibility but ignored — the
+  // server derives parent identity from the auth context.
   Future<bool> linkParentToStudent({
     required String code,
     required String parentUserId,
@@ -280,127 +315,14 @@ class ParentLinkingService {
       operation: 'update',
     );
     final normalizedCode = code.toUpperCase().trim();
-    final verifiedCode = await verifyCode(normalizedCode);
-
-    return await _firestore.runTransaction<bool>((transaction) async {
-      try {
-        // 1. Re-read verified code inside transaction to prevent race conditions.
-        final linkCodeRef =
-            _firestore.collection('studentLinkCodes').doc(verifiedCode.id);
-        final freshCodeSnapshot = await transaction.get(linkCodeRef);
-        if (!freshCodeSnapshot.exists) {
-          throw InvalidCodeException();
-        }
-
-        final freshCodeData = freshCodeSnapshot.data()!;
-        final freshStatus = freshCodeData['status'] as String? ?? '';
-        final freshCodeValue =
-            (freshCodeData['code'] as String? ?? '').toUpperCase();
-        if (freshCodeValue != normalizedCode) {
-          throw InvalidCodeException();
-        }
-
-        final dynamic expiresAtRaw =
-            freshCodeData['expiresAt'] ?? freshCodeData['expiryDate'];
-        DateTime? expiresAt;
-        if (expiresAtRaw is Timestamp) {
-          expiresAt = expiresAtRaw.toDate();
-        } else if (expiresAtRaw is DateTime) {
-          expiresAt = expiresAtRaw;
-        } else if (expiresAtRaw is String) {
-          expiresAt = DateTime.tryParse(expiresAtRaw);
-        }
-        if (expiresAt == null) {
-          throw InvalidCodeException();
-        }
-
-        if (freshStatus == 'used') {
-          throw CodeAlreadyUsedException();
-        }
-        if (freshStatus == 'revoked') {
-          throw CodeRevokedException(
-            reason: freshCodeData['revokeReason'] as String?,
-          );
-        }
-        if (freshStatus == 'expired' || DateTime.now().isAfter(expiresAt)) {
-          throw CodeExpiredException();
-        }
-        if (freshStatus != 'active') {
-          throw InvalidCodeException();
-        }
-
-        final schoolId = freshCodeData['schoolId'] as String? ?? '';
-        final studentId = freshCodeData['studentId'] as String? ?? '';
-        if (schoolId.isEmpty || studentId.isEmpty) {
-          throw InvalidCodeException();
-        }
-
-        // 2. Get refs.
-        final parentRef = _firestore
-            .collection('schools')
-            .doc(schoolId)
-            .collection('parents')
-            .doc(parentUserId);
-        final studentRef = _firestore
-            .collection('schools')
-            .doc(schoolId)
-            .collection('students')
-            .doc(studentId);
-
-        // 3. Read parent doc (allowed: user is reading their own parent record).
-        // Derive already-linked state from linkedChildren (bidirectional invariant).
-        // We can't read the student doc here because firestore.rules only grants
-        // parents `get` access to students already in their linkedChildren —
-        // which is exactly the state we're about to create.
-        final parentSnapshot = await transaction.get(parentRef);
-        final existingLinked = parentSnapshot.exists
-            ? List<String>.from(
-                (parentSnapshot.data()?['linkedChildren'] as List?) ?? const [])
-            : <String>[];
-        if (existingLinked.contains(studentId)) {
-          throw AlreadyLinkedException();
-        }
-
-        // 4. ATOMIC WRITES - All operations succeed or all fail.
-
-        // Update student with parent ID
-        transaction.update(studentRef, {
-          'parentIds': FieldValue.arrayUnion([parentUserId]),
-        });
-
-        // Update parent with linked child (upsert for recovery-safe retries).
-        transaction.set(
-            parentRef,
-            {
-              'linkedChildren': FieldValue.arrayUnion([studentId]),
-              'schoolId': schoolId,
-              'updatedAt': FieldValue.serverTimestamp(),
-            },
-            SetOptions(merge: true));
-
-        // Mark code as used
-        transaction.update(linkCodeRef, {
-          'status': LinkCodeStatus.used.toString().split('.').last,
-          'usedBy': parentUserId,
-          'usedAt': FieldValue.serverTimestamp(),
-        });
-
-        return true;
-      } on LinkingException {
-        rethrow;
-      } on FirebaseException catch (e) {
-        debugPrint('[ParentLinkingService] Firestore error during link '
-            'transaction: code=${e.code} message=${e.message}');
-        if (e.code == 'not-found') {
-          throw StudentNotFoundException();
-        }
-        throw TransactionFailedException('${e.code}: ${e.message}');
-      } catch (e, st) {
-        debugPrint('[ParentLinkingService] Unexpected error during link '
-            'transaction: $e\n$st');
-        throw TransactionFailedException(e.toString());
-      }
-    });
+    await _invokeWithRetry(
+      'linkParentToStudent',
+      <String, dynamic>{
+        'code': normalizedCode,
+        'clientInfo': _clientInfo(),
+      },
+    );
+    return true;
   }
 
   // Get active code for a student
@@ -487,7 +409,13 @@ class ParentLinkingService {
     return codes;
   }
 
-  // Unlink parent from student
+  // Unlink parent from student. Routed through a Cloud Function for the same
+  // reason as [linkParentToStudent] — Admin SDK is the only writer permitted
+  // to touch parents.linkedChildren and students.parentIds.
+  //
+  // [unlinkedBy] is accepted for source compatibility but not transmitted;
+  // the server derives the caller from auth and authorizes self-unlink or
+  // teacher/admin-in-school unlink.
   Future<void> unlinkParentFromStudent({
     required String schoolId,
     required String studentId,
@@ -501,55 +429,98 @@ class ParentLinkingService {
       docId: studentId,
       operation: 'update',
     );
-    // Use transaction to ensure atomic updates (both succeed or both fail)
-    await _firestore.runTransaction((transaction) async {
-      final studentRef = _firestore
-          .collection('schools')
-          .doc(schoolId)
-          .collection('students')
-          .doc(studentId);
+    await _invokeWithRetry(
+      'unlinkParentFromStudent',
+      <String, dynamic>{
+        'schoolId': schoolId,
+        'studentId': studentId,
+        'parentUserId': parentUserId,
+        if (reason != null) 'reason': reason,
+      },
+    );
+  }
 
-      final parentRef = _firestore
-          .collection('schools')
-          .doc(schoolId)
-          .collection('parents')
-          .doc(parentUserId);
+  // ── Callable plumbing ──
 
-      // Read student and parent documents to verify they exist
-      final studentSnapshot = await transaction.get(studentRef);
-      final parentSnapshot = await transaction.get(parentRef);
+  Map<String, dynamic> _clientInfo() => <String, dynamic>{
+        'platform': defaultTargetPlatform.name,
+        'appVersion': null,
+      };
 
-      if (!studentSnapshot.exists) {
-        throw Exception('Student not found');
+  /// Invokes [name] once; on `unavailable` waits 1s and retries once before
+  /// surfacing [NetworkUnavailableException]. All other FirebaseFunctions
+  /// failures route through [_mapHttpsError].
+  Future<Object?> _invokeWithRetry(
+    String name,
+    Map<String, dynamic> args,
+  ) async {
+    try {
+      return await _invoke(name, args);
+    } on FirebaseFunctionsException catch (e) {
+      if (e.code == 'unavailable') {
+        await Future<void>.delayed(const Duration(seconds: 1));
+        try {
+          return await _invoke(name, args);
+        } on FirebaseFunctionsException catch (e2) {
+          if (e2.code == 'unavailable') {
+            throw NetworkUnavailableException();
+          }
+          throw _mapHttpsError(e2);
+        }
       }
+      throw _mapHttpsError(e);
+    }
+  }
 
-      if (!parentSnapshot.exists) {
-        throw Exception('Parent not found');
-      }
+  /// Translates the server's structured HttpsError payloads (code +
+  /// details.kind) into the local [LinkingException] hierarchy used by the
+  /// existing UI. See functions/src/parent_linking.ts for the source of these
+  /// kinds.
+  LinkingException _mapHttpsError(FirebaseFunctionsException e) {
+    final details = e.details;
+    String? kind;
+    String? reason;
+    if (details is Map) {
+      final asMap = details.cast<Object?, Object?>();
+      final rawKind = asMap['kind'];
+      if (rawKind is String) kind = rawKind;
+      final rawReason = asMap['reason'];
+      if (rawReason is String) reason = rawReason;
+    }
 
-      // Verify the link exists before unlinking
-      final studentData = studentSnapshot.data()!;
-      final parentIds = List<String>.from(studentData['parentIds'] ?? []);
-
-      if (!parentIds.contains(parentUserId)) {
-        throw Exception('Parent is not linked to this student');
-      }
-
-      // Atomic updates: Remove from both sides
-      transaction.update(studentRef, {
-        'parentIds': FieldValue.arrayRemove([parentUserId]),
-      });
-
-      transaction.update(parentRef, {
-        'linkedChildren': FieldValue.arrayRemove([studentId]),
-      });
-
-      // NOTE: Active link codes are intentionally NOT revoked here. With
-      // multi-guardian support, a student may have a pending co-parent
-      // invite for a different guardian — unlinking one parent must not
-      // clobber it. Code revocation is now an explicit staff/guardian
-      // action, not a side effect of unlinking.
-    });
+    switch (e.code) {
+      case 'failed-precondition':
+        switch (kind) {
+          case 'invalid-code':
+            return InvalidCodeException();
+          case 'code-used':
+            return CodeAlreadyUsedException();
+          case 'code-revoked':
+            return CodeRevokedException(reason: reason);
+          case 'code-expired':
+            return CodeExpiredException();
+          case 'parent-doc-missing':
+            return ParentDocumentNotFoundException();
+          case 'not-linked':
+            return TransactionFailedException(
+                e.message ?? 'Parent is not linked to this student.');
+        }
+        return TransactionFailedException(e.message ?? 'failed-precondition');
+      case 'already-exists':
+        if (kind == 'already-linked') return AlreadyLinkedException();
+        return TransactionFailedException(e.message ?? 'already-exists');
+      case 'not-found':
+        if (kind == 'student-missing') return StudentNotFoundException();
+        return TransactionFailedException(e.message ?? 'not-found');
+      case 'resource-exhausted':
+        return TransactionFailedException(
+            e.message ?? 'Link rate limit reached.');
+      case 'unauthenticated':
+      case 'permission-denied':
+        return TransactionFailedException(e.message ?? e.code);
+      default:
+        return TransactionFailedException('${e.code}: ${e.message ?? ''}');
+    }
   }
 
   // Get parent's linked students

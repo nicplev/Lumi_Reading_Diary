@@ -81,6 +81,14 @@ class ReadingLogModel {
   // ownership rules (parentId == auth.uid) cover create/update/delete.
   final LoggedByRole? loggedByRole;
 
+  // Comprehension voice recording fields. The path is the Storage object key
+  // (NOT a download URL — resolved on demand). `uploaded` gates the teacher
+  // playback UI; the log is created with `uploaded: false`, then patched to
+  // `true` once the audio upload completes (online or via the offline queue).
+  final String? comprehensionAudioPath;
+  final int? comprehensionAudioDurationSec;
+  final bool comprehensionAudioUploaded;
+
   ReadingLogModel({
     required this.id,
     required this.studentId,
@@ -113,11 +121,19 @@ class ReadingLogModel {
     this.loggedByName,
     this.loggedByLabel,
     this.loggedByRole,
+    this.comprehensionAudioPath,
+    this.comprehensionAudioDurationSec,
+    this.comprehensionAudioUploaded = false,
   });
 
   bool get isCompleted => status == LogStatus.completed;
   bool get hasMetTarget => minutesRead >= targetMinutes;
   bool get isTeacherProxy => loggedByRole == LoggedByRole.teacher;
+
+  /// True when this log has an uploaded comprehension audio ready to play.
+  /// Drives the teacher's inline player visibility on the student detail row.
+  bool get hasComprehensionAudio =>
+      comprehensionAudioUploaded && comprehensionAudioPath != null;
 
   /// Whether the viewer [uid] (acting as [role], 'parent' | 'teacher') has an
   /// unseen comment: there's a thread, its newest message is from the other
@@ -188,6 +204,11 @@ class ReadingLogModel {
               orElse: () => LoggedByRole.parent,
             )
           : null,
+      comprehensionAudioPath: data['comprehensionAudioPath'] as String?,
+      comprehensionAudioDurationSec:
+          (data['comprehensionAudioDurationSec'] as num?)?.toInt(),
+      comprehensionAudioUploaded:
+          data['comprehensionAudioUploaded'] as bool? ?? false,
     );
   }
 
@@ -226,6 +247,9 @@ class ReadingLogModel {
       'loggedByName': loggedByName,
       'loggedByLabel': loggedByLabel,
       'loggedByRole': loggedByRole?.toString().split('.').last,
+      'comprehensionAudioPath': comprehensionAudioPath,
+      'comprehensionAudioDurationSec': comprehensionAudioDurationSec,
+      'comprehensionAudioUploaded': comprehensionAudioUploaded,
     };
   }
 
@@ -261,6 +285,9 @@ class ReadingLogModel {
     String? loggedByName,
     String? loggedByLabel,
     LoggedByRole? loggedByRole,
+    String? comprehensionAudioPath,
+    int? comprehensionAudioDurationSec,
+    bool? comprehensionAudioUploaded,
   }) {
     return ReadingLogModel(
       id: id ?? this.id,
@@ -296,6 +323,12 @@ class ReadingLogModel {
       loggedByName: loggedByName ?? this.loggedByName,
       loggedByLabel: loggedByLabel ?? this.loggedByLabel,
       loggedByRole: loggedByRole ?? this.loggedByRole,
+      comprehensionAudioPath:
+          comprehensionAudioPath ?? this.comprehensionAudioPath,
+      comprehensionAudioDurationSec:
+          comprehensionAudioDurationSec ?? this.comprehensionAudioDurationSec,
+      comprehensionAudioUploaded:
+          comprehensionAudioUploaded ?? this.comprehensionAudioUploaded,
     );
   }
 
@@ -334,6 +367,9 @@ class ReadingLogModel {
       'loggedByName': loggedByName,
       'loggedByLabel': loggedByLabel,
       'loggedByRole': loggedByRole?.toString().split('.').last,
+      'comprehensionAudioPath': comprehensionAudioPath,
+      'comprehensionAudioDurationSec': comprehensionAudioDurationSec,
+      'comprehensionAudioUploaded': comprehensionAudioUploaded,
     };
   }
 
@@ -392,10 +428,28 @@ class ReadingLogModel {
               orElse: () => LoggedByRole.parent,
             )
           : null,
+      comprehensionAudioPath: map['comprehensionAudioPath'] as String?,
+      comprehensionAudioDurationSec:
+          (map['comprehensionAudioDurationSec'] as num?)?.toInt(),
+      comprehensionAudioUploaded:
+          map['comprehensionAudioUploaded'] as bool? ?? false,
     );
   }
 
   /// Human-friendly attribution for "Logged by …" surfaces. Prefers the
   /// relationship label, falls back to the name, then a generic term.
   String get loggedByDisplay => loggedByLabel ?? loggedByName ?? 'Guardian';
+}
+
+/// Thrown when a queued comprehension audio upload can't find its local
+/// source file (e.g. user cleared the app cache between recording and
+/// drain). The offline sync queue classifies this as permanent so the
+/// user is surfaced via the existing offline-management UI rather than
+/// the item being retried forever.
+class ComprehensionAudioMissingException implements Exception {
+  const ComprehensionAudioMissingException();
+
+  @override
+  String toString() =>
+      'ComprehensionAudioMissingException: local audio file no longer exists';
 }
