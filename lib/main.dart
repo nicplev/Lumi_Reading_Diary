@@ -154,11 +154,13 @@ class _LumiAppState extends ConsumerState<LumiApp> {
     // Install the warm-resume hook for the phone verification recovery
     // service. When `codeSent` fires while the originating widget (e.g.
     // the registration modal) is unmounted, this hook jumps the user
-    // straight to /auth/phone-verify instead of orphaning them at login.
+    // straight to /auth/login/phone-verify so the recovery sheet sits on
+    // the login screen as its blurred backdrop (the route is nested under
+    // /auth/login for exactly this reason).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final router = ref.read(routerProvider);
       PhoneVerificationRecoveryService.instance.onRecoveryNeeded = (_) {
-        router.go('/auth/phone-verify');
+        router.go('/auth/login/phone-verify');
       };
     });
   }

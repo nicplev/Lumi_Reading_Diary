@@ -41,7 +41,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         await PhoneVerificationRecoveryService.instance.peek();
     if (pendingPhoneVerification != null) {
       if (!mounted) return;
-      context.go('/auth/phone-verify');
+      context.go('/auth/login/phone-verify');
       return;
     }
 
