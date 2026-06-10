@@ -51,6 +51,11 @@ export {
   unlinkParentFromStudent,
 } from "./parent_linking";
 
+// Daily cleanup for comprehension audio. Driven by
+// /platformConfig/comprehensionRetention written from the super-admin portal.
+// See functions/src/comprehension_retention.ts.
+export {cleanupComprehensionAudio} from "./comprehension_retention";
+
 /**
  * CRITICAL SECURITY: Stats Aggregation
  * Prevents client-side manipulation of student statistics
