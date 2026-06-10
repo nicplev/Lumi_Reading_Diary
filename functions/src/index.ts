@@ -1798,6 +1798,7 @@ export const processParentOnboardingEmail = functions
         } catch (err) {
           failedCount++;
           const errMsg = err instanceof Error ? err.message : String(err);
+          functions.logger.error("Parent onboarding email send failed", {parentEmail: email, error: errMsg});
           for (const r of group) {
             r.status = "failed";
             r.error = errMsg;
@@ -1949,6 +1950,7 @@ export const processStaffOnboardingEmail = functions
             sentCount++;
           } catch (err) {
             const errMsg = err instanceof Error ? err.message : String(err);
+            functions.logger.error("Staff onboarding email send failed", {userId, email, error: errMsg});
             recipients.push({userId, email, status: "failed", error: errMsg});
             failedCount++;
           }
