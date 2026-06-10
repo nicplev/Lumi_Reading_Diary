@@ -51,10 +51,16 @@ export {
   unlinkParentFromStudent,
 } from "./parent_linking";
 
-// Daily cleanup for comprehension audio. Driven by
-// /platformConfig/comprehensionRetention written from the super-admin portal.
-// See functions/src/comprehension_retention.ts.
-export {cleanupComprehensionAudio} from "./comprehension_retention";
+// Daily cleanup for comprehension audio + per-row teacher/school-admin
+// trash button. The cron is driven by /platformConfig/comprehensionRetention
+// written from the super-admin portal. deleteComprehensionAudio is the only
+// path through which a non-system principal can delete an audio object —
+// storage.rules denies all client deletes. See
+// functions/src/comprehension_retention.ts.
+export {
+  cleanupComprehensionAudio,
+  deleteComprehensionAudio,
+} from "./comprehension_retention";
 
 /**
  * CRITICAL SECURITY: Stats Aggregation

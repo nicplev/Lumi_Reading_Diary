@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 
+import '../../../services/comprehension_audio_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/lumi_text_styles.dart';
 
@@ -23,10 +25,21 @@ class ComprehensionAudioPlayer extends StatefulWidget {
   /// metadata is loading so the UI doesn't show 0:00 momentarily.
   final int? durationSec;
 
+  /// When non-null, a trash button is shown that calls
+  /// `deleteComprehensionAudio` for this log. The caller passes the school
+  /// and log ids so the callable can scope authorization. `onDeleted` lets
+  /// the parent screen refresh its local view once the server confirms.
+  final String? schoolId;
+  final String? logId;
+  final VoidCallback? onDeleted;
+
   const ComprehensionAudioPlayer({
     super.key,
     required this.storagePath,
     this.durationSec,
+    this.schoolId,
+    this.logId,
+    this.onDeleted,
   });
 
   @override
@@ -47,6 +60,7 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
   bool _loading = true;
   bool _failed = false;
   bool _isPlaying = false;
+  bool _deleting = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
 
@@ -116,6 +130,59 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
     });
     _urlCache.remove(widget.storagePath);
     await _initPlayer();
+  }
+
+  bool get _canDelete =>
+      widget.schoolId != null && widget.logId != null && !_deleting;
+
+  Future<void> _confirmAndDelete() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete recording?'),
+        content: const Text(
+          'The audio file will be permanently removed. The reading log itself '
+          'is kept. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.warmOrange),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deleting = true);
+    try {
+      await _player?.pause();
+      await ComprehensionAudioService().deleteAudio(
+        schoolId: widget.schoolId!,
+        logId: widget.logId!,
+      );
+      _urlCache.remove(widget.storagePath);
+      if (!mounted) return;
+      widget.onDeleted?.call();
+    } on FirebaseFunctionsException catch (e) {
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      messenger.showSnackBar(
+        SnackBar(content: Text(e.message ?? 'Failed to delete recording')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Failed to delete recording')),
+      );
+    }
   }
 
   @override
@@ -228,6 +295,24 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
             ],
           ),
         ),
+        if (widget.schoolId != null && widget.logId != null) ...[
+          const SizedBox(width: 4),
+          _deleting
+              ? const Padding(
+                  padding: EdgeInsets.all(8),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : IconButton(
+                  onPressed: _canDelete ? _confirmAndDelete : null,
+                  icon: const Icon(Icons.delete_outline_rounded,
+                      color: AppColors.charcoal, size: 20),
+                  tooltip: 'Delete recording',
+                ),
+        ],
       ],
     );
   }

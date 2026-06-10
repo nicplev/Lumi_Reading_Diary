@@ -174,3 +174,110 @@ export const cleanupComprehensionAudio = functions
     }
     return null;
   });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// deleteComprehensionAudio: teacher / school-admin per-row trash button.
+//
+// The mobile app cannot delete Storage objects directly (storage.rules denies
+// all client deletes). This callable verifies the caller is a teacher or
+// schoolAdmin at the log's school, then performs the same delete the cron
+// would perform on expiry.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface DeleteOneInput {
+  schoolId?: unknown;
+  logId?: unknown;
+}
+
+type CallerRole = "teacher" | "schoolAdmin";
+
+async function resolveCallerRole(
+  uid: string,
+  schoolId: string
+): Promise<CallerRole | null> {
+  const userSnap = await admin
+    .firestore()
+    .collection("schools")
+    .doc(schoolId)
+    .collection("users")
+    .doc(uid)
+    .get();
+  if (!userSnap.exists) return null;
+  const role = userSnap.data()?.role;
+  if (role === "teacher" || role === "schoolAdmin") return role;
+  return null;
+}
+
+export const deleteComprehensionAudio = functions
+  .runWith({timeoutSeconds: 30, memory: "256MB"})
+  .https.onCall(async (data: DeleteOneInput, context) => {
+    const uid = context.auth?.uid;
+    if (!uid) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "Sign in required"
+      );
+    }
+    const schoolId =
+      typeof data.schoolId === "string" ? data.schoolId.trim() : "";
+    const logId = typeof data.logId === "string" ? data.logId.trim() : "";
+    if (!schoolId || !logId) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "schoolId and logId are required"
+      );
+    }
+
+    const role = await resolveCallerRole(uid, schoolId);
+    if (!role) {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "Only teachers or school admins of this school can delete recordings"
+      );
+    }
+
+    const db = admin.firestore();
+    const logRef = db
+      .collection("schools")
+      .doc(schoolId)
+      .collection("readingLogs")
+      .doc(logId);
+    const snap = await logRef.get();
+    if (!snap.exists) {
+      throw new functions.https.HttpsError("not-found", "Reading log not found");
+    }
+    const logData = snap.data() ?? {};
+    if (logData.comprehensionAudioUploaded !== true) {
+      // Already cleared (by cron, bulk, or a concurrent click). Treat as a
+      // no-op success so the UI's optimistic hide doesn't error.
+      return {deleted: false, reason: "no_audio"};
+    }
+    const storagePath = logData.comprehensionAudioPath as string | undefined;
+    if (storagePath) {
+      await deleteStorageObjectIfExists(storagePath);
+    }
+    await logRef.update({
+      comprehensionAudioPath: admin.firestore.FieldValue.delete(),
+      comprehensionAudioDurationSec: admin.firestore.FieldValue.delete(),
+      comprehensionAudioUploaded: false,
+      comprehensionAudioDeletedAt:
+        admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    const callerEmail = context.auth?.token?.email as string | undefined;
+    await db.collection("adminAuditLog").add({
+      action: "comprehensionAudio.manualDelete",
+      performedBy: uid,
+      performedByEmail: callerEmail ?? null,
+      targetType: "readingLog",
+      targetId: logId,
+      schoolId,
+      metadata: {
+        source: role === "teacher" ? "manualTeacher" : "manualSchoolAdmin",
+        storagePath: storagePath ?? null,
+      },
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return {deleted: true};
+  });
