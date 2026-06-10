@@ -1803,3 +1803,49 @@ test('comments: unauthenticated user cannot read or post', async () => {
   await assertFails(commentRef(db, 'existing').get());
   await assertFails(commentRef(db, 'u1').set({ ...parentComment, authorId: 'anon' }));
 });
+
+// ── platformConfig (platform-wide feature flags) ──────────────────────
+
+const platformFlag = {
+  enabled: false,
+  updatedAt: new Date(),
+  updatedBy: 'super_admin_1',
+  updatedByEmail: 'ops@lumi.app',
+  reason: 'Cost spike investigation',
+};
+
+test('platformConfig: signed-in client can get a flag doc', async () => {
+  await seedData(async (db) => {
+    await db.collection('platformConfig').doc('comprehensionRecording').set(platformFlag);
+  });
+  await assertSucceeds(
+    authDb('parent_1').collection('platformConfig').doc('comprehensionRecording').get(),
+  );
+});
+
+test('platformConfig: unauthenticated client cannot get a flag doc', async () => {
+  await seedData(async (db) => {
+    await db.collection('platformConfig').doc('comprehensionRecording').set(platformFlag);
+  });
+  await assertFails(
+    unauthDb().collection('platformConfig').doc('comprehensionRecording').get(),
+  );
+});
+
+test('platformConfig: listing is denied even when signed in', async () => {
+  await seedData(async (db) => {
+    await db.collection('platformConfig').doc('comprehensionRecording').set(platformFlag);
+  });
+  await assertFails(authDb('parent_1').collection('platformConfig').get());
+});
+
+test('platformConfig: clients cannot create, update, or delete flags', async () => {
+  await seedData(async (db) => {
+    await db.collection('platformConfig').doc('comprehensionRecording').set(platformFlag);
+  });
+  const db = authDb('parent_1');
+  const ref = db.collection('platformConfig').doc('comprehensionRecording');
+  await assertFails(ref.update({ enabled: true }));
+  await assertFails(ref.delete());
+  await assertFails(db.collection('platformConfig').doc('someOtherFlag').set({ enabled: false }));
+});

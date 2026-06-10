@@ -17,6 +17,7 @@ import '../../data/models/reading_log_model.dart';
 import '../../data/models/reading_level_option.dart';
 import '../../data/models/school_model.dart';
 import '../../services/firebase_service.dart';
+import '../../services/platform_config_service.dart';
 import '../../services/reading_level_service.dart';
 
 class ClassDetailScreen extends StatefulWidget {
@@ -57,12 +58,17 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
     final schoolId = widget.teacher.schoolId;
     if (schoolId == null || schoolId.isEmpty) return;
     try {
+      // Platform kill switch fetched alongside; never throws (fails open).
+      final platformEnabledFuture =
+          PlatformConfigService().isComprehensionRecordingEnabled();
       final doc =
           await _firebaseService.firestore.collection('schools').doc(schoolId).get();
+      final platformEnabled = await platformEnabledFuture;
       if (!mounted || !doc.exists) return;
       final school = SchoolModel.fromFirestore(doc);
       setState(() {
-        _comprehensionEnabled = school.comprehensionRecordingSettings.enabled;
+        _comprehensionEnabled =
+            platformEnabled && school.comprehensionRecordingSettings.enabled;
       });
     } catch (_) {
       // Default false; tile stays hidden.

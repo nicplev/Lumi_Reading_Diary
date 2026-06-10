@@ -7,6 +7,7 @@ type SerializedSchool = Omit<School, 'createdAt' | 'subscriptionExpiry' | 'termD
   createdAt: string;
   subscriptionExpiry: string | null;
   termDates: Record<string, string>;
+  platformFlags?: { comprehensionRecordingEnabled: boolean };
 };
 
 export function useSchool() {

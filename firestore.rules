@@ -671,6 +671,17 @@ service cloud.firestore {
       allow list, create, update, delete: if false;
     }
 
+    // ── Platform-wide feature flags ─────────────────────────────────
+    // Written exclusively by the super-admin portal via the Admin SDK
+    // (e.g. the comprehension-recording kill switch at
+    // platformConfig/comprehensionRecording). Signed-in clients may
+    // `get` individual flags to compute effective feature state; a
+    // missing doc means the feature is enabled. Listing is denied.
+    match /platformConfig/{flagId} {
+      allow get: if isSignedIn();
+      allow list, create, update, delete: if false;
+    }
+
     // ── Super-admin allowlist ───────────────────────────────────────
     // Doc ID is the Firebase UID. Presence of a doc grants super-admin
     // power (revoke impersonation sessions, export audit logs). No

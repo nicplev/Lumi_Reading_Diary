@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
 import { getSchool, updateSchool } from '@/lib/firestore/school';
+import { isComprehensionRecordingGloballyEnabled } from '@/lib/firestore/platform-config';
 import { z } from 'zod';
 
 function serializeSchool(s: Record<string, unknown>) {
@@ -24,9 +25,15 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const school = await getSchool(session.schoolId);
+    const [school, comprehensionRecordingEnabled] = await Promise.all([
+      getSchool(session.schoolId),
+      isComprehensionRecordingGloballyEnabled(),
+    ]);
     if (!school) return NextResponse.json({ error: 'School not found' }, { status: 404 });
-    return NextResponse.json(serializeSchool(school as unknown as Record<string, unknown>));
+    return NextResponse.json({
+      ...serializeSchool(school as unknown as Record<string, unknown>),
+      platformFlags: { comprehensionRecordingEnabled },
+    });
   } catch {
     return NextResponse.json({ error: 'Failed to fetch school settings' }, { status: 500 });
   }
@@ -127,6 +134,18 @@ export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
     const data = updateSchema.parse(body);
+    // Platform-wide kill switch (super-admin portal). The UI also locks the
+    // toggle, but this guard is the real enforcement — it closes the race
+    // where the page was loaded before the switch flipped.
+    if (
+      data.comprehensionRecordingSettings?.enabled === true &&
+      !(await isComprehensionRecordingGloballyEnabled())
+    ) {
+      return NextResponse.json(
+        { error: 'Comprehension recording is temporarily disabled platform-wide by Lumi. This setting cannot be enabled right now.' },
+        { status: 409 }
+      );
+    }
     await updateSchool(session.schoolId, data);
     return NextResponse.json({ success: true });
   } catch (error) {

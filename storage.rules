@@ -36,9 +36,15 @@ service firebase.storage {
     match /schools/{schoolId}/comprehension_audio/{fileName} {
       allow read: if request.auth != null;
 
+      // The platformConfig/comprehensionRecording doc is the super-admin
+      // kill switch: while it exists with enabled == false, uploads are
+      // denied even from stale clients that still show the recording step.
+      // Missing doc = feature enabled.
       allow create, update: if request.auth != null
                            && request.resource.size < 2 * 1024 * 1024
-                           && request.resource.contentType.matches('audio/.*');
+                           && request.resource.contentType.matches('audio/.*')
+                           && (!firestore.exists(/databases/(default)/documents/platformConfig/comprehensionRecording)
+                               || firestore.get(/databases/(default)/documents/platformConfig/comprehensionRecording).data.enabled == true);
 
       // No client deletes — Admin SDK only (future term-aware retention).
       allow delete: if false;
