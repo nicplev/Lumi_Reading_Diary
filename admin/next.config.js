@@ -4,6 +4,7 @@
 // every key ("Unrecognized key(s)" warning). CJS `module.exports` is returned
 // by require() verbatim, so the config actually applies in the deployed build.
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- file must stay CJS (see above)
 const path = require("path");
 
 /** @type {import('next').NextConfig} */
