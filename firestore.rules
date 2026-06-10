@@ -436,6 +436,22 @@ service cloud.firestore {
             && request.resource.data.schoolId == schoolId;
         allow update, delete: if false;
       }
+
+      match /staffOnboardingEmails/{emailId} {
+        allow get, list: if isSchoolAdmin(schoolId) || isDevImpersonatingSchool(schoolId);
+        allow create: if isSchoolAdmin(schoolId)
+            && writeAllowedForDev()
+            && request.resource.data.status == 'queued'
+            && request.resource.data.schoolId == schoolId;
+        allow update, delete: if false;
+      }
+
+      // Plaintext temporary passwords for admin-imported staff. Admin-SDK
+      // only (the credentials API and the email Cloud Function) — never
+      // readable by any client, including the staff member themselves.
+      match /staffCredentials/{userId} {
+        allow read, write: if false;
+      }
     }
 
     // ── Community Book Database (global, cross-school) ──────────────
@@ -667,6 +683,17 @@ service cloud.firestore {
     // without exposing who else is on the list. Listing is denied.
     // Writes go exclusively through the super-admin portal (Admin SDK).
     match /devAccessEmails/{emailHash} {
+      allow get: if isSignedIn();
+      allow list, create, update, delete: if false;
+    }
+
+    // ── Platform-wide feature flags ─────────────────────────────────
+    // Written exclusively by the super-admin portal via the Admin SDK
+    // (e.g. the comprehension-recording kill switch at
+    // platformConfig/comprehensionRecording). Signed-in clients may
+    // `get` individual flags to compute effective feature state; a
+    // missing doc means the feature is enabled. Listing is denied.
+    match /platformConfig/{flagId} {
       allow get: if isSignedIn();
       allow list, create, update, delete: if false;
     }

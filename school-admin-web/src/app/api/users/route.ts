@@ -8,6 +8,8 @@ function serializeUser(u: Record<string, unknown>) {
     ...u,
     createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : u.createdAt,
     lastLoginAt: u.lastLoginAt instanceof Date ? u.lastLoginAt.toISOString() : u.lastLoginAt ?? null,
+    tempPasswordCreatedAt:
+      u.tempPasswordCreatedAt instanceof Date ? u.tempPasswordCreatedAt.toISOString() : u.tempPasswordCreatedAt ?? null,
   };
 }
 
