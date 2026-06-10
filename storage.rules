@@ -46,7 +46,9 @@ service firebase.storage {
                            && (!firestore.exists(/databases/(default)/documents/platformConfig/comprehensionRecording)
                                || firestore.get(/databases/(default)/documents/platformConfig/comprehensionRecording).data.enabled == true);
 
-      // No client deletes — Admin SDK only (future term-aware retention).
+      // No client deletes — Admin SDK only. The scheduled cleanup
+      // function `cleanupComprehensionAudio` (functions/src/comprehension_retention.ts)
+      // is the sole writer driven by /platformConfig/comprehensionRetention.
       allow delete: if false;
     }
 
