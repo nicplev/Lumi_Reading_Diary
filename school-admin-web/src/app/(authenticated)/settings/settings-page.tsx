@@ -471,6 +471,7 @@ export function SettingsPage() {
             isAdmin={isAdmin}
             onSave={handleSaveComprehension}
             saving={savingComprehension}
+            globallyDisabled={school?.platformFlags?.comprehensionRecordingEnabled === false}
           />
         </div>
       )}

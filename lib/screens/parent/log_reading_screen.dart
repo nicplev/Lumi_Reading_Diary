@@ -20,6 +20,7 @@ import '../../data/models/parent_comment_settings.dart';
 import '../../services/firebase_service.dart';
 import '../../services/isbn_assignment_service.dart';
 import '../../services/offline_service.dart';
+import '../../services/platform_config_service.dart';
 import '../../services/reading_log_service.dart';
 import 'widgets/comprehension_recording_step.dart';
 
@@ -289,7 +290,11 @@ class _LogReadingScreenState extends State<LogReadingScreen>
               .doc(widget.student.classId)
               .get()
           : Future<DocumentSnapshot<Map<String, dynamic>>?>.value(null);
+      // Platform kill switch fetched alongside; never throws (fails open).
+      final platformEnabledFuture =
+          PlatformConfigService().isComprehensionRecordingEnabled();
       final results = await Future.wait([schoolFuture, classFuture]);
+      final platformEnabled = await platformEnabledFuture;
       if (!mounted) return;
       final schoolDoc = results[0]!;
       final classDoc = results[1];
@@ -297,7 +302,10 @@ class _LogReadingScreenState extends State<LogReadingScreen>
         if (schoolDoc.exists) {
           final school = SchoolModel.fromFirestore(schoolDoc);
           _commentSettings = school.parentCommentSettings;
-          _comprehensionSettings = school.comprehensionRecordingSettings;
+          _comprehensionSettings = ComprehensionRecordingSettings(
+            enabled: platformEnabled &&
+                school.comprehensionRecordingSettings.enabled,
+          );
         }
         if (classDoc != null && classDoc.exists) {
           _comprehensionQuestion =

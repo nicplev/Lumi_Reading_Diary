@@ -7,3 +7,4 @@ export * from "./updateStudentReadingLevel";
 export * from "./createSchool";
 export * from "./manageSchoolUserAuth";
 export * from "./grantDevAccess";
+export * from "./setComprehensionRecordingFlag";

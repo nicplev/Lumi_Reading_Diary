@@ -10,6 +10,8 @@ interface ComprehensionRecordingSettingsSectionProps {
   isAdmin: boolean;
   onSave: (settings: ComprehensionRecordingSettings) => Promise<void>;
   saving: boolean;
+  /** Platform-wide kill switch set from the Lumi super-admin portal. */
+  globallyDisabled: boolean;
 }
 
 /**
@@ -24,6 +26,7 @@ export function ComprehensionRecordingSettingsSection({
   isAdmin,
   onSave,
   saving,
+  globallyDisabled,
 }: ComprehensionRecordingSettingsSectionProps) {
   const [enabled, setEnabled] = useState(false);
 
@@ -46,12 +49,20 @@ export function ComprehensionRecordingSettingsSection({
         per-class prompt inside the teacher app.
       </p>
 
+      {globallyDisabled && (
+        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Comprehension recording is temporarily unavailable platform-wide. It has been
+          disabled by Lumi and cannot be turned on right now. Your saved preference is
+          unchanged and will apply again when the feature is restored.
+        </div>
+      )}
+
       <label className="flex items-center gap-3 mb-6 cursor-pointer select-none">
         <input
           type="checkbox"
-          checked={enabled}
+          checked={globallyDisabled ? false : enabled}
           onChange={(e) => setEnabled(e.target.checked)}
-          disabled={!isAdmin}
+          disabled={!isAdmin || globallyDisabled}
           className="w-5 h-5 rounded border-gray-300 text-rose-400 focus:ring-rose-400 cursor-pointer"
         />
         <div>
@@ -64,7 +75,7 @@ export function ComprehensionRecordingSettingsSection({
         </div>
       </label>
 
-      {isAdmin && (
+      {isAdmin && !globallyDisabled && (
         <div className="flex justify-end">
           <Button onClick={handleSave} loading={saving} disabled={!dirty}>
             Save

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Download, Shield, FileText, Upload, KeyRound, Eye } from "lucide-react";
+import { Download, Shield, FileText, Upload, KeyRound, Eye, Power } from "lucide-react";
 
 export default function OperationsPage() {
   const tools = [
@@ -34,6 +34,12 @@ export default function OperationsPage() {
       description: "Manage emails that can see DEV-only surfaces across the app.",
       href: "/operations/dev-access",
       icon: KeyRound,
+    },
+    {
+      title: "Feature Controls",
+      description: "Platform-wide kill switches for app features.",
+      href: "/operations/feature-controls",
+      icon: Power,
     },
     {
       title: "Impersonation Audit",
