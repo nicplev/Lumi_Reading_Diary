@@ -12,7 +12,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
 
   const { userId } = await params;
   try {
-    const link = await resetUserPassword(userId);
+    const link = await resetUserPassword(userId, session.schoolId);
     return NextResponse.json({ link });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to generate reset link';

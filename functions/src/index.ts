@@ -13,7 +13,7 @@ import {
   normalizeNotificationPermissions,
   validateNotificationAudience,
 } from "./notification_helpers";
-import {buildOnboardingEmail, buildOnboardingQrAttachments} from "./email_templates";
+import {buildOnboardingEmail, buildOnboardingQrAttachments, buildStaffOnboardingEmail} from "./email_templates";
 import {
   computeGentleStreak,
   computeLongestStreak,
@@ -1836,6 +1836,154 @@ export const processParentOnboardingEmail = functions
       );
     } catch (error) {
       functions.logger.error("processParentOnboardingEmail error:", error);
+      await docRef.update({
+        status: "failed",
+        errorSummary: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    return null;
+  });
+
+// URL of the school admin portal (Firebase Hosting "school" target).
+// Override with the STAFF_PORTAL_URL env var if the domain changes.
+const STAFF_PORTAL_URL =
+  process.env.STAFF_PORTAL_URL || "https://lumi-school-admin.web.app";
+
+interface StaffEmailRecipient {
+  userId: string;
+  email: string;
+  status: "sent" | "failed" | "skipped";
+  error?: string;
+  skippedReason?: string;
+}
+
+export const processStaffOnboardingEmail = functions
+  .runWith({timeoutSeconds: 120, memory: "512MB", secrets: [sendgridApiKey, sendgridSenderEmail]})
+  .firestore.document("schools/{schoolId}/staffOnboardingEmails/{emailId}")
+  .onCreate(async (snapshot, context) => {
+    const data = snapshot.data();
+    if (data.status !== "queued") return null;
+
+    const schoolId = context.params.schoolId;
+    const docRef = snapshot.ref;
+
+    // Claim the document
+    await docRef.update({status: "processing"});
+
+    try {
+      const sendgridKey = sendgridApiKey.value();
+      if (!sendgridKey) {
+        await docRef.update({
+          status: "failed",
+          errorSummary: "SendGrid API key not configured",
+        });
+        return null;
+      }
+      sgMail.setApiKey(sendgridKey);
+
+      const schoolSnap = await db.doc(`schools/${schoolId}`).get();
+      const schoolName = schoolSnap.data()?.name ?? "Your School";
+
+      const targetUserIds: string[] = data.targetUserIds ?? [];
+      const customMessage: string | undefined = data.customMessage ?? undefined;
+      const emailSubject = data.emailSubject ?? `Your ${schoolName} staff account on Lumi`;
+      const senderEmail = sendgridSenderEmail.value() || "noreply@lumi-reading.app";
+
+      const recipients: StaffEmailRecipient[] = [];
+      let sentCount = 0;
+      let failedCount = 0;
+      let skippedCount = 0;
+
+      for (const userBatch of chunk(targetUserIds, FIRESTORE_IN_LIMIT)) {
+        const userRefs = userBatch.map((id) => db.doc(`schools/${schoolId}/users/${id}`));
+        const credRefs = userBatch.map((id) => db.doc(`schools/${schoolId}/staffCredentials/${id}`));
+        const [userSnaps, credSnaps] = await Promise.all([
+          db.getAll(...userRefs),
+          db.getAll(...credRefs),
+        ]);
+
+        for (let i = 0; i < userSnaps.length; i++) {
+          const userSnap = userSnaps[i];
+          const credSnap = credSnaps[i];
+          const userId = userBatch[i];
+
+          if (!userSnap.exists) {
+            recipients.push({userId, email: "", status: "skipped", skippedReason: "user_not_found"});
+            skippedCount++;
+            continue;
+          }
+          const user = userSnap.data()!;
+          const email: string = user.email ?? "";
+          const tempPassword: string | undefined = credSnap.exists ? credSnap.data()?.tempPassword : undefined;
+
+          if (!email) {
+            recipients.push({userId, email: "", status: "skipped", skippedReason: "no_email"});
+            skippedCount++;
+            continue;
+          }
+          if (!tempPassword) {
+            recipients.push({userId, email, status: "skipped", skippedReason: "no_temp_password"});
+            skippedCount++;
+            continue;
+          }
+
+          const html = buildStaffOnboardingEmail({
+            schoolName,
+            staffName: user.fullName ?? email,
+            role: user.role === "schoolAdmin" ? "schoolAdmin" : "teacher",
+            loginEmail: email,
+            tempPassword,
+            portalUrl: STAFF_PORTAL_URL,
+            customMessage,
+          });
+
+          try {
+            await sgMail.send({
+              to: email,
+              from: {email: senderEmail, name: `${schoolName} via Lumi`},
+              subject: emailSubject,
+              html,
+            });
+            recipients.push({userId, email, status: "sent"});
+            sentCount++;
+          } catch (err) {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            recipients.push({userId, email, status: "failed", error: errMsg});
+            failedCount++;
+          }
+        }
+      }
+
+      let finalStatus = "failed";
+      if (failedCount === 0 && sentCount > 0) {
+        finalStatus = "sent";
+      } else if (sentCount > 0 && failedCount > 0) {
+        finalStatus = "partial";
+      } else if (sentCount === 0 && skippedCount > 0 && failedCount === 0) {
+        finalStatus = "sent";
+      }
+
+      await docRef.update({
+        status: finalStatus,
+        sentAt: admin.firestore.FieldValue.serverTimestamp(),
+        recipientCount: recipients.length,
+        deliveryCounts: {sent: sentCount, failed: failedCount, skipped: skippedCount},
+        recipients: recipients.map((r) => ({
+          userId: r.userId,
+          email: r.email,
+          status: r.status,
+          ...(r.error && {error: r.error}),
+          ...(r.skippedReason && {skippedReason: r.skippedReason}),
+        })),
+      });
+
+      functions.logger.info(
+        `Staff onboarding emails for school ${schoolId}: ` +
+        `sent=${sentCount}, failed=${failedCount}, skipped=${skippedCount}`
+      );
+    } catch (error) {
+      functions.logger.error("processStaffOnboardingEmail error:", error);
       await docRef.update({
         status: "failed",
         errorSummary: error instanceof Error ? error.message : String(error),

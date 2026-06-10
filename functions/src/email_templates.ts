@@ -328,6 +328,218 @@ export function renderEmailShell(params: EmailShellParams): string {
 </html>`;
 }
 
+// ─── Staff onboarding (temp password + login instructions) ────────────
+
+export function buildStaffOnboardingEmail(params: {
+  schoolName: string;
+  staffName: string;
+  role: "teacher" | "schoolAdmin";
+  loginEmail: string;
+  tempPassword: string;
+  portalUrl: string;
+  appStoreUrl?: string;
+  playStoreUrl?: string;
+  customMessage?: string;
+}): string {
+  const {
+    schoolName,
+    staffName,
+    role,
+    loginEmail,
+    tempPassword,
+    portalUrl,
+    appStoreUrl = "#",
+    playStoreUrl = "#",
+    customMessage,
+  } = params;
+
+  const isAdmin = role === "schoolAdmin";
+  const roleLabel = isAdmin ? "Administrator" : "Teacher";
+  const firstName = staffName.split(" ")[0] || staffName;
+
+  const customMessageBlock = customMessage ?
+    `
+      <tr>
+        <td style="padding: 0 24px 24px 24px;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #FFF8E1; border-radius: 12px;">
+            <tr>
+              <td style="padding: 18px 22px;">
+                <p style="margin: 0 0 6px 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 11px; font-weight: 700; color: #B45309; text-transform: uppercase; letter-spacing: 2px;">
+                  A note from your school
+                </p>
+                <p style="margin: 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #1A1A2E; line-height: 1.65;">
+                  ${customMessage}
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>` :
+    "";
+
+  const credentialCard = `
+      <tr>
+        <td style="padding: 0 24px 8px 24px;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #FFF5F8; background-image: linear-gradient(180deg, #FFF5F8 0%, #FFFFFF 80%); border-radius: 20px; border: 1px solid #FCE4EC;">
+            <tr>
+              <td style="padding: 28px 24px;">
+                <p style="margin: 0 0 4px 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 11px; font-weight: 700; color: #AD1457; text-transform: uppercase; letter-spacing: 2px; text-align: center;">
+                  Your sign-in email
+                </p>
+                <p style="margin: 0 0 20px 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 800; color: #1A1A2E; text-align: center; line-height: 1.3; word-break: break-all;">
+                  ${loginEmail}
+                </p>
+                <p style="margin: 0 0 10px 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 11px; font-weight: 700; color: #AD1457; text-transform: uppercase; letter-spacing: 2px; text-align: center;">
+                  Temporary password
+                </p>
+                <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto;">
+                  <tr>
+                    <td style="background-color: #FFFFFF; border: 2px dashed #E91E63; border-radius: 14px; padding: 18px 30px;">
+                      <span style="font-family: 'Courier New', Courier, monospace; font-size: 26px; font-weight: 700; color: #E91E63; letter-spacing: 3px;">
+                        ${tempPassword}
+                      </span>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin: 16px 0 0 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: #6B7280; text-align: center; line-height: 1.5;">
+                  Please change your password after signing in.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>`;
+
+  const steps = isAdmin ?
+    [
+      renderStep(1, "Open the school portal", "Go to the Lumi school portal in your web browser."),
+      renderStep(2, "Sign in", "Use the email and temporary password above."),
+      renderStep(3, "Set your own password", "Update your password from your profile once you're in."),
+    ].join("\n") :
+    [
+      renderStep(1, "Download the Lumi app", "Available on the App Store and Google Play."),
+      renderStep(2, "Sign in", "Use the email and temporary password above."),
+      renderStep(3, "Set your own password", "Update your password from your profile once you're in."),
+    ].join("\n");
+
+  const ctaBlock = isAdmin ?
+    `
+          <!-- Portal button -->
+          <tr>
+            <td style="padding: 32px 32px 16px; text-align: center;">
+              <a href="${portalUrl}" target="_blank" style="display: inline-block; background-color: #E91E63; background-image: linear-gradient(135deg, #FF4D8D 0%, #E91E63 100%); text-decoration: none; padding: 14px 32px; border-radius: 12px; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 16px; font-weight: 800; color: #FFFFFF;">
+                Open the school portal
+              </a>
+            </td>
+          </tr>` :
+    `
+          <!-- App buttons -->
+          <tr>
+            <td style="padding: 32px 32px 16px; text-align: center;">
+              <p style="margin: 0 0 16px 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 11px; font-weight: 700; color: #AD1457; text-transform: uppercase; letter-spacing: 3px;">
+                Get the app
+              </p>
+              <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto;">
+                <tr>
+                  <td style="padding: 4px;">
+                    <a href="${appStoreUrl}" target="_blank" style="display: inline-block; background-color: #1A1A2E; text-decoration: none; padding: 12px 22px; border-radius: 12px; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; font-weight: 800; color: #FFFFFF;">App Store</a>
+                  </td>
+                  <td style="padding: 4px;">
+                    <a href="${playStoreUrl}" target="_blank" style="display: inline-block; background-color: #1A1A2E; text-decoration: none; padding: 12px 22px; border-radius: 12px; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; font-weight: 800; color: #FFFFFF;">Google Play</a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>`;
+
+  return `<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>Your Lumi staff account</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F4EEF1; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #F4EEF1;">
+    <tr>
+      <td align="center" style="padding: 32px 16px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; width: 100%; background-color: #FFFFFF; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 24px rgba(173,20,87,0.10);">
+
+          <!-- Hero -->
+          <tr>
+            <td style="background-color: #E91E63; background-image: linear-gradient(135deg, #FF4D8D 0%, #E91E63 50%, #AD1457 100%); padding: 52px 32px 44px; text-align: center;">
+              <h1 style="margin: 0 0 10px 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 48px; font-weight: 800; color: #FFFFFF; letter-spacing: 2px; line-height: 1;">
+                Lumi
+              </h1>
+              <p style="margin: 0 0 22px 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 11px; font-weight: 700; color: #FFFFFF; text-transform: uppercase; letter-spacing: 4px; opacity: 0.95;">
+                Reading Diary
+              </p>
+              <p style="margin: 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #FFFFFF; font-weight: 700;">
+                ${schoolName}
+              </p>
+            </td>
+          </tr>
+
+          <!-- Welcome -->
+          <tr>
+            <td style="padding: 44px 32px 12px 32px; text-align: center;">
+              <h2 style="margin: 0 0 12px 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 26px; font-weight: 800; color: #1A1A2E; line-height: 1.25;">
+                Welcome to the team, ${firstName}!
+              </h2>
+              <p style="margin: 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #6B7280; line-height: 1.65;">
+                You've been added to <strong style="color: #E91E63;">${schoolName}</strong> on Lumi as a ${roleLabel}. Here are your sign-in details.
+              </p>
+            </td>
+          </tr>
+
+          ${customMessageBlock}
+
+          ${credentialCard}
+
+          <!-- Section title -->
+          <tr>
+            <td style="padding: 28px 32px 4px;">
+              <h3 style="margin: 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 22px; font-weight: 800; color: #1A1A2E; text-align: center;">
+                How to sign in
+              </h3>
+            </td>
+          </tr>
+
+          <!-- Steps -->
+          <tr>
+            <td style="padding: 20px 32px 0;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                ${steps}
+              </table>
+            </td>
+          </tr>
+
+          ${ctaBlock}
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #FAFAFA; padding: 32px 32px 28px; text-align: center; border-top: 1px solid #F0E8EE;">
+              <p style="margin: 0 0 8px 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 800; color: #1A1A2E;">
+                Need help?
+              </p>
+              <p style="margin: 0 0 20px 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: #6B7280; line-height: 1.65;">
+                This email was sent by <strong style="color: #1A1A2E;">${schoolName}</strong> via Lumi.<br />If you weren't expecting this, please contact your school.
+              </p>
+              <p style="margin: 0; font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 11px; font-weight: 800; color: #AD1457; letter-spacing: 3px;">
+                LUMI READING TRACKER
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
 function renderStep(num: number, title: string, body: string): string {
   return `
                 <tr>

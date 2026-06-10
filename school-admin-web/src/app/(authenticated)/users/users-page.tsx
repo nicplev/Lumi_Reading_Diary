@@ -16,8 +16,18 @@ import { useUsers, useDeactivateUser, useReactivateUser, useResetPassword, useMa
 import { useSchoolCode, useRotateSchoolCode } from '@/lib/hooks/use-school-code';
 import { KebabMenu } from '@/components/lumi/kebab-menu';
 import { CreateUserModal } from './create-user-modal';
+import { BulkImportStaffModal } from './bulk-import-staff-modal';
+import { ViewCredentialsModal } from './view-credentials-modal';
 
 type SerializedUser = NonNullable<ReturnType<typeof useUsers>['data']>[number];
+
+/** A temp password is "pending" while it's been issued and the staff member
+ *  hasn't logged in since — mirrors the server's isTempPasswordPending. */
+function hasPendingTempPassword(u: SerializedUser): boolean {
+  if (!u.tempPasswordCreatedAt) return false;
+  if (!u.lastLoginAt) return true;
+  return new Date(u.lastLoginAt) < new Date(u.tempPasswordCreatedAt);
+}
 
 export function UsersPage() {
   const { toast } = useToast();
@@ -33,6 +43,8 @@ export function UsersPage() {
 
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [credentialsUser, setCredentialsUser] = useState<SerializedUser | null>(null);
   const [deactivateConfirm, setDeactivateConfirm] = useState<string | null>(null);
   const [resetConfirm, setResetConfirm] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<SerializedUser | null>(null);
@@ -139,7 +151,12 @@ export function UsersPage() {
         <div className="flex items-center gap-3">
           <Avatar name={value as string} size="sm" />
           <div>
-            <p className="font-semibold text-charcoal">{value as string}</p>
+            <div className="flex items-center gap-2">
+              <p className="font-semibold text-charcoal">{value as string}</p>
+              {isAdmin && hasPendingTempPassword(row) && (
+                <Badge variant="warning">Temp password</Badge>
+              )}
+            </div>
             <p className="text-xs text-text-secondary">{row.email}</p>
           </div>
         </div>
@@ -202,10 +219,15 @@ export function UsersPage() {
           );
         }
 
+        const credentialsItem = hasPendingTempPassword(row)
+          ? [{ label: 'View login credentials', onClick: () => setCredentialsUser(row) }]
+          : [];
+
         return (
           <KebabMenu
             items={row.isActive
               ? [
+                  ...credentialsItem,
                   { label: 'Reset Password', onClick: () => setResetConfirm(row.id) },
                   { label: 'Deactivate', onClick: () => setDeactivateConfirm(row.id), variant: 'danger' },
                 ]
@@ -229,9 +251,14 @@ export function UsersPage() {
         description="Manage school staff"
         action={
           isAdmin ? (
-            <Button onClick={() => setShowCreate(true)}>
-              Add Staff Member
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setShowImport(true)}>
+                Import Staff
+              </Button>
+              <Button onClick={() => setShowCreate(true)}>
+                Add Staff Member
+              </Button>
+            </div>
           ) : undefined
         }
       />
@@ -283,10 +310,21 @@ export function UsersPage() {
       />
 
       {isAdmin && (
-        <CreateUserModal
-          open={showCreate}
-          onClose={() => setShowCreate(false)}
-        />
+        <>
+          <CreateUserModal
+            open={showCreate}
+            onClose={() => setShowCreate(false)}
+          />
+          <BulkImportStaffModal
+            open={showImport}
+            onClose={() => setShowImport(false)}
+          />
+          <ViewCredentialsModal
+            open={!!credentialsUser}
+            onClose={() => setCredentialsUser(null)}
+            user={credentialsUser ? { id: credentialsUser.id, fullName: credentialsUser.fullName, email: credentialsUser.email } : null}
+          />
+        </>
       )}
 
       <ConfirmDialog

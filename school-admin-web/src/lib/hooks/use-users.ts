@@ -3,10 +3,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { SchoolUser, UserRole } from '@/lib/types';
 
-type SerializedUser = Omit<SchoolUser, 'createdAt' | 'lastLoginAt' | 'scheduledDeletionAt'> & {
+type SerializedUser = Omit<SchoolUser, 'createdAt' | 'lastLoginAt' | 'scheduledDeletionAt' | 'tempPasswordCreatedAt'> & {
   createdAt: string;
   lastLoginAt: string | null;
   scheduledDeletionAt: string | null;
+  tempPasswordCreatedAt: string | null;
 };
 
 export function useUsers(filters?: { role?: UserRole }) {
@@ -142,6 +143,72 @@ export function useUndoDeleteUser() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+}
+
+export interface CreatedStaff {
+  uid: string;
+  email: string;
+  fullName: string;
+  role: 'teacher' | 'schoolAdmin';
+  tempPassword: string;
+}
+
+export interface StaffImportResult {
+  successCount: number;
+  errorCount: number;
+  errors: { row: number; message: string }[];
+  created: CreatedStaff[];
+}
+
+export function useImportStaff() {
+  const queryClient = useQueryClient();
+  return useMutation<StaffImportResult, Error, { rows: Array<{ fullName: string; email: string; role: string }>; customMessage?: string }>({
+    mutationFn: async (data) => {
+      const res = await fetch('/api/users/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to import staff');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+}
+
+export function useResendStaffEmail() {
+  return useMutation<{ id: string; status: string }, Error, { targetUserIds: string[]; customMessage?: string }>({
+    mutationFn: async (data) => {
+      const res = await fetch('/api/staff-onboarding-emails/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to send staff email');
+      }
+      return res.json();
+    },
+  });
+}
+
+export function useFetchStaffCredential() {
+  return useMutation<{ tempPassword: string; createdAt: string }, Error, string>({
+    mutationFn: async (userId: string) => {
+      const res = await fetch(`/api/users/${userId}/credentials`);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to fetch credentials');
+      }
+      return res.json();
     },
   });
 }
