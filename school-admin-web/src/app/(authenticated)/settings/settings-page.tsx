@@ -18,6 +18,7 @@ import { getReadingLevels } from '@/lib/types';
 import type { ReadingLevelSchema, ParentCommentSettings, ComprehensionRecordingSettings, AchievementCustomization } from '@/lib/types';
 import { ParentCommentSettingsSection } from './parent-comment-settings';
 import { ComprehensionRecordingSettingsSection } from './comprehension-recording-settings';
+import { ComprehensionAudioCleanupSection } from './comprehension-audio-cleanup';
 import { AchievementThresholdSettings } from './achievement-threshold-settings';
 import type { AchievementThresholds } from '@/lib/types';
 
@@ -473,6 +474,9 @@ export function SettingsPage() {
             saving={savingComprehension}
             globallyDisabled={school?.platformFlags?.comprehensionRecordingEnabled === false}
           />
+
+          {/* Comprehension Audio Cleanup */}
+          <ComprehensionAudioCleanupSection isAdmin={isAdmin} />
         </div>
       )}
     </div>

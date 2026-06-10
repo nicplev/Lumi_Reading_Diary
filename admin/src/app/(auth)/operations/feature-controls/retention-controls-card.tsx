@@ -20,6 +20,7 @@ import {
   MIN_RETENTION_DAYS,
   MAX_RETENTION_DAYS,
   type ComprehensionRetentionConfig,
+  type RunRetentionNowOutcome,
 } from "@lumi/server-ops";
 
 interface Props {
@@ -31,6 +32,7 @@ export function RetentionControlsCard({ initialConfig }: Props) {
   const [enabled, setEnabled] = useState(initialConfig.enabled);
   const [daysInput, setDaysInput] = useState(String(initialConfig.retentionDays));
   const [saving, setSaving] = useState(false);
+  const [running, setRunning] = useState(false);
 
   const parsedDays = Number(daysInput);
   const daysValid =
@@ -72,6 +74,50 @@ export function RetentionControlsCard({ initialConfig }: Props) {
       toast.error(err instanceof Error ? err.message : "Failed to save");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleRunNow = async () => {
+    if (!config.enabled) {
+      toast.error("Enable scheduled cleanup first");
+      return;
+    }
+    setRunning(true);
+    try {
+      const res = await fetch(
+        "/api/platform-config/comprehension-retention/run-now",
+        { method: "POST" }
+      );
+      const json = (await res.json()) as
+        | RunRetentionNowOutcome
+        | { error?: string };
+      if (!res.ok) {
+        throw new Error(
+          (json as { error?: string }).error ?? "Run failed"
+        );
+      }
+      const outcome = json as RunRetentionNowOutcome;
+      if ("skipped" in outcome && outcome.skipped) {
+        toast.message(`Skipped: ${outcome.reason}`);
+      } else {
+        const stats = outcome as Extract<
+          RunRetentionNowOutcome,
+          { deletedCount: number }
+        >;
+        toast.success(
+          `Run complete — deleted ${stats.deletedCount}, failed ${stats.failedCount}`
+        );
+        // Refresh server-rendered state so lastRun timestamp shows up
+        // without a hard reload.
+        const refreshed = await fetch(
+          "/api/platform-config/comprehension-retention"
+        ).then((r) => r.json() as Promise<ComprehensionRetentionConfig>);
+        setConfig(refreshed);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Run failed");
+    } finally {
+      setRunning(false);
     }
   };
 
@@ -158,7 +204,19 @@ export function RetentionControlsCard({ initialConfig }: Props) {
           {updated && <p>{updated}</p>}
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={handleRunNow}
+            disabled={running || saving || !config.enabled}
+            title={
+              config.enabled
+                ? "Run the same cleanup the daily cron runs, attributed to you"
+                : "Enable scheduled cleanup first"
+            }
+          >
+            {running ? "Running…" : "Run now"}
+          </Button>
           <Button
             onClick={handleSave}
             disabled={saving || !dirty || !daysValid}

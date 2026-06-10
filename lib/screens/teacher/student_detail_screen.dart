@@ -2117,6 +2117,14 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               key: ValueKey('audio_${log.id}'),
               storagePath: log.comprehensionAudioPath!,
               durationSec: log.comprehensionAudioDurationSec,
+              schoolId: widget.student.schoolId,
+              logId: log.id,
+              onDeleted: () {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Recording deleted')),
+                );
+              },
             ),
         ],
       ),
