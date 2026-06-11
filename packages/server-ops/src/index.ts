@@ -8,3 +8,5 @@ export * from "./createSchool";
 export * from "./manageSchoolUserAuth";
 export * from "./grantDevAccess";
 export * from "./setComprehensionRecordingFlag";
+export * from "./setComprehensionRetentionConfig";
+export * from "./comprehensionAudioActions";

@@ -2117,6 +2117,14 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               key: ValueKey('audio_${log.id}'),
               storagePath: log.comprehensionAudioPath!,
               durationSec: log.comprehensionAudioDurationSec,
+              schoolId: widget.student.schoolId,
+              logId: log.id,
+              onDeleted: () {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Recording deleted')),
+                );
+              },
             ),
         ],
       ),
@@ -3201,10 +3209,49 @@ class _BookPickerSheetState extends State<_BookPickerSheet> {
   final _libraryService = SchoolLibraryService();
   String _searchQuery = '';
 
+  final List<BookModel> _books = [];
+  String? _cursor;
+  bool _hasMore = true;
+  bool _isLoading = false;
+  Object? _loadError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNextPage();
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadNextPage() async {
+    if (_isLoading || !_hasMore) return;
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+    try {
+      final page = await _libraryService.fetchBooksPage(
+        widget.schoolId,
+        startAfterDocId: _cursor,
+      );
+      if (!mounted) return;
+      setState(() {
+        _books.addAll(page.books);
+        _cursor = page.lastDocId ?? _cursor;
+        _hasMore = page.hasMore;
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = error;
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -3260,14 +3307,29 @@ class _BookPickerSheetState extends State<_BookPickerSheet> {
               ),
             ),
             Expanded(
-              child: StreamBuilder<List<BookModel>>(
-                stream: _libraryService.booksStream(widget.schoolId),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
+              child: Builder(
+                builder: (context) {
+                  if (_isLoading && _books.isEmpty) {
                     return const Center(child: CircularProgressIndicator());
                   }
+                  if (_loadError != null && _books.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('Could not load library.',
+                              style: TeacherTypography.bodySmall),
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: _loadNextPage,
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
 
-                  var books = snapshot.data!;
+                  var books = _books;
                   if (_searchQuery.isNotEmpty) {
                     books = books.where((b) {
                       final title = b.title.toLowerCase();
@@ -3279,25 +3341,65 @@ class _BookPickerSheetState extends State<_BookPickerSheet> {
 
                   if (books.isEmpty) {
                     return Center(
-                      child: Text(
-                        _searchQuery.isNotEmpty
-                            ? 'No books match "$_searchQuery"'
-                            : 'No books in library yet',
-                        style: TeacherTypography.bodySmall,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _searchQuery.isNotEmpty
+                                ? 'No books match "$_searchQuery"'
+                                : 'No books in library yet',
+                            style: TeacherTypography.bodySmall,
+                          ),
+                          if (_searchQuery.isNotEmpty && _hasMore) ...[
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: _loadNextPage,
+                              child: const Text('Load more books'),
+                            ),
+                          ],
+                        ],
                       ),
                     );
                   }
 
-                  return ListView.separated(
-                    controller: scrollController,
-                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-                    itemCount: books.length,
-                    separatorBuilder: (_, __) => Divider(
-                      height: 1,
-                      color: AppColors.teacherBorder,
-                    ),
-                    itemBuilder: (context, index) {
-                      final book = books[index];
+                  // Auto-load the next page when the user scrolls near the
+                  // bottom of the currently-rendered list. Trips slightly
+                  // before the actual edge so the spinner doesn't flash.
+                  return NotificationListener<ScrollNotification>(
+                    onNotification: (n) {
+                      if (_hasMore &&
+                          !_isLoading &&
+                          n.metrics.extentAfter < 240) {
+                        _loadNextPage();
+                      }
+                      return false;
+                    },
+                    child: ListView.separated(
+                      controller: scrollController,
+                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                      itemCount: books.length + (_hasMore ? 1 : 0),
+                      separatorBuilder: (_, __) => Divider(
+                        height: 1,
+                        color: AppColors.teacherBorder,
+                      ),
+                      itemBuilder: (context, index) {
+                        if (index >= books.length) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            child: Center(
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
+                                    )
+                                  : Text('Loading more…',
+                                      style: TeacherTypography.caption),
+                            ),
+                          );
+                        }
+                        final book = books[index];
                       final hasCover = book.coverImageUrl != null &&
                           book.coverImageUrl!.isNotEmpty &&
                           book.coverImageUrl!.startsWith('http');
@@ -3379,6 +3481,7 @@ class _BookPickerSheetState extends State<_BookPickerSheet> {
                         ),
                       );
                     },
+                    ),
                   );
                 },
               ),

@@ -17,148 +17,139 @@ enum LevelDisplayMode {
   none,
 }
 
+/// Header counts shown on the library screen — kept on a single denormalized
+/// doc at `schools/{id}/libraryMeta/counts` so the library screen doesn't
+/// have to read the entire books collection to render the badges.
+class LibraryCounts {
+  const LibraryCounts({
+    required this.total,
+    required this.decodable,
+  });
+
+  static const empty = LibraryCounts(total: 0, decodable: 0);
+
+  final int total;
+  final int decodable;
+
+  int get library => (total - decodable).clamp(0, total);
+}
+
+/// A page of books plus the cursor needed to fetch the next page.
+class BookPage {
+  const BookPage({
+    required this.books,
+    required this.lastDocId,
+    required this.hasMore,
+  });
+
+  final List<BookModel> books;
+  final String? lastDocId; // null when the first page is empty
+  final bool hasMore;
+}
+
 /// Provides access to the school-wide book library stored at
 /// `schools/{schoolId}/books`.
 ///
 /// Every book scanned by any teacher at the school is automatically added
-/// to this collection by [BookLookupService._cacheBookInFirestore].
-/// This service reads that collection and exposes it for the library UI.
+/// to this collection by `BookLookupService._cacheBookInFirestore`.
+///
+/// **History:** Pre-2026-06 this service merged real-time streams over
+/// the nested `schools/{schoolId}/books` collection AND a legacy top-level
+/// `/books` collection (filtered by `schoolId`). That worked, but each
+/// library-screen open subscribed to the full nested collection (5000+
+/// reads for an established school) and the per-document listener kept
+/// firing on every book change for the lifetime of the StreamBuilder.
+///
+/// The current pipeline:
+///  - paginates the nested collection in 50-doc pages
+///  - drops the legacy `/books` listener entirely (migration complete)
+///  - relies on a denormalized `libraryMeta/counts` doc for header badges,
+///    maintained server-side by the `maintainLibraryCounts` Cloud Function
 class SchoolLibraryService {
   SchoolLibraryService({FirebaseFirestore? firestore})
       : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
 
+  /// Page size for paginated fetches. Picked to keep first-paint snappy on
+  /// large libraries while still loading enough that most filter chips
+  /// surface a handful of results from the initial page.
+  static const int pageSize = 50;
+
   CollectionReference<Map<String, dynamic>> _booksRef(String schoolId) =>
       _firestore.collection('schools').doc(schoolId).collection('books');
 
-  Query<Map<String, dynamic>> _legacyBooksRef(String schoolId) =>
-      _firestore.collection('books').where('schoolId', isEqualTo: schoolId);
+  DocumentReference<Map<String, dynamic>> _countsRef(String schoolId) =>
+      _firestore
+          .collection('schools')
+          .doc(schoolId)
+          .collection('libraryMeta')
+          .doc('counts');
 
-  /// Real-time stream of all books in the school library.
-  /// Placeholders and unresolved stubs are excluded.
+  /// Fetches a paginated page of books, newest first.
   ///
-  /// The app is mid-migration from legacy top-level `/books` documents to the
-  /// nested `schools/{schoolId}/books` collection. Read both sources so older
-  /// schools still render their library while the data is being backfilled.
-  Stream<List<BookModel>> booksStream(String schoolId) {
+  /// Pass `startAfterDocId` from the previous page's [BookPage.lastDocId]
+  /// to fetch the next page. The returned [BookPage.hasMore] is `true`
+  /// when the page is full — call again with the new cursor to continue.
+  Future<BookPage> fetchBooksPage(
+    String schoolId, {
+    int limit = pageSize,
+    String? startAfterDocId,
+  }) async {
     final scopedSchoolId = schoolId.trim();
     if (scopedSchoolId.isEmpty) {
-      return Stream.value(const <BookModel>[]);
+      return const BookPage(books: [], lastDocId: null, hasMore: false);
     }
 
-    late final StreamSubscription<QuerySnapshot<Map<String, dynamic>>>
-        nestedSubscription;
-    late final StreamSubscription<QuerySnapshot<Map<String, dynamic>>>
-        legacySubscription;
+    Query<Map<String, dynamic>> query = _booksRef(scopedSchoolId)
+        .orderBy('createdAt', descending: true)
+        .limit(limit);
 
-    final controller = StreamController<List<BookModel>>();
-    var nestedBooks = const <BookModel>[];
-    var legacyBooks = const <BookModel>[];
-    var nestedSettled = false;
-    var legacySettled = false;
-    var nestedFailed = false;
-    var legacyFailed = false;
-
-    void emitIfReady() {
-      if (!nestedSettled || !legacySettled || controller.isClosed) return;
-
-      if (nestedFailed && legacyFailed) {
-        controller.addError(
-          StateError(
-              'Could not load school library from any Firestore source.'),
-        );
-        return;
+    if (startAfterDocId != null && startAfterDocId.isNotEmpty) {
+      final cursorDoc = await _booksRef(scopedSchoolId)
+          .doc(startAfterDocId)
+          .get(const GetOptions(source: Source.serverAndCache));
+      if (cursorDoc.exists) {
+        query = query.startAfterDocument(cursorDoc);
       }
-
-      controller.add(_mergeBooks(primary: nestedBooks, fallback: legacyBooks));
     }
 
-    controller.onListen = () {
-      nestedSubscription = _booksRef(scopedSchoolId).snapshots().listen(
-        (snapshot) {
-          nestedBooks = _decodeSnapshot(snapshot, sourceLabel: 'nested');
-          nestedSettled = true;
-          nestedFailed = false;
-          emitIfReady();
-        },
-        onError: (Object error, StackTrace stackTrace) {
-          nestedBooks = const <BookModel>[];
-          nestedSettled = true;
-          nestedFailed = true;
-          debugPrint(
-            'SchoolLibraryService: nested books stream failed for '
-            '$scopedSchoolId: $error',
-          );
-          emitIfReady();
-        },
-      );
+    final snapshot = await query
+        .get(const GetOptions(source: Source.serverAndCache));
 
-      legacySubscription = _legacyBooksRef(scopedSchoolId).snapshots().listen(
-        (snapshot) {
-          legacyBooks = _decodeSnapshot(snapshot, sourceLabel: 'legacy');
-          legacySettled = true;
-          legacyFailed = false;
-          emitIfReady();
-        },
-        onError: (Object error, StackTrace stackTrace) {
-          legacyBooks = const <BookModel>[];
-          legacySettled = true;
-          legacyFailed = true;
-          debugPrint(
-            'SchoolLibraryService: legacy books stream failed for '
-            '$scopedSchoolId: $error',
-          );
-          emitIfReady();
-        },
-      );
-    };
-
-    controller.onCancel = () async {
-      await nestedSubscription.cancel();
-      await legacySubscription.cancel();
-    };
-
-    return controller.stream;
-  }
-
-  List<BookModel> _decodeSnapshot(
-    QuerySnapshot<Map<String, dynamic>> snapshot, {
-    required String sourceLabel,
-  }) {
     final books = <BookModel>[];
-
     for (final doc in snapshot.docs) {
       try {
         final book = BookModel.fromFirestore(doc);
         if (_isDisplayable(book)) books.add(book);
       } catch (error) {
         debugPrint(
-          'SchoolLibraryService: skipping malformed $sourceLabel '
-          'book ${doc.id}: $error',
+          'SchoolLibraryService: skipping malformed book ${doc.id}: $error',
         );
       }
     }
 
-    return books;
+    return BookPage(
+      books: books,
+      lastDocId: snapshot.docs.isEmpty ? null : snapshot.docs.last.id,
+      hasMore: snapshot.docs.length >= limit,
+    );
   }
 
-  List<BookModel> _mergeBooks({
-    required List<BookModel> primary,
-    required List<BookModel> fallback,
-  }) {
-    final mergedById = <String, BookModel>{};
+  /// Reads the denormalized counts doc maintained by the
+  /// `maintainLibraryCounts` Cloud Function. Falls back to
+  /// [LibraryCounts.empty] if the doc hasn't been seeded yet.
+  Future<LibraryCounts> fetchCounts(String schoolId) async {
+    final scopedSchoolId = schoolId.trim();
+    if (scopedSchoolId.isEmpty) return LibraryCounts.empty;
 
-    for (final book in fallback) {
-      mergedById[book.id] = book;
-    }
-    for (final book in primary) {
-      mergedById[book.id] = book;
-    }
-
-    final books = mergedById.values.toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return books;
+    final snap = await _countsRef(scopedSchoolId)
+        .get(const GetOptions(source: Source.serverAndCache));
+    final data = snap.data();
+    if (data == null) return LibraryCounts.empty;
+    final total = (data['total'] as num?)?.toInt() ?? 0;
+    final decodable = (data['decodable'] as num?)?.toInt() ?? 0;
+    return LibraryCounts(total: total, decodable: decodable);
   }
 
   static bool _isDisplayable(BookModel book) =>

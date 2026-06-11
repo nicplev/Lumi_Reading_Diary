@@ -20,6 +20,22 @@ import {
   countInWindow,
   localDateString,
 } from "./dateUtils";
+import {
+  applyClassStatsDelta,
+  applyStudentStatsDelta,
+  readIncrementalConfig,
+  runReconcilePass,
+} from "./stats_aggregation";
+
+// Library counts denormalization. Maintains schools/{id}/libraryMeta/counts
+// so the paginated library screen can render header badges without reading
+// the full books collection. See functions/src/library_counts.ts.
+export {maintainLibraryCounts} from "./library_counts";
+
+// Per-phone-number SMS rate-limit gate. Clients call this before
+// invoking verifyPhoneNumber to enforce a daily cap. See
+// functions/src/sms_rate_limit.ts for the policy and rollout notes.
+export {requestSmsVerification} from "./sms_rate_limit";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -51,6 +67,17 @@ export {
   unlinkParentFromStudent,
 } from "./parent_linking";
 
+// Daily cleanup for comprehension audio + per-row teacher/school-admin
+// trash button. The cron is driven by /platformConfig/comprehensionRetention
+// written from the super-admin portal. deleteComprehensionAudio is the only
+// path through which a non-system principal can delete an audio object —
+// storage.rules denies all client deletes. See
+// functions/src/comprehension_retention.ts.
+export {
+  cleanupComprehensionAudio,
+  deleteComprehensionAudio,
+} from "./comprehension_retention";
+
 /**
  * CRITICAL SECURITY: Stats Aggregation
  * Prevents client-side manipulation of student statistics
@@ -63,6 +90,28 @@ export const aggregateStudentStats = functions.firestore
   .document("schools/{schoolId}/readingLogs/{logId}")
   .onWrite(async (change, context) => {
     const schoolId = context.params.schoolId;
+
+    // When the incremental flag is on, dispatch to the O(1)-reads path.
+    // The new path self-heals (falls back to full recompute) if a student's
+    // readingDates array hasn't been seeded yet by the backfill script.
+    const incremental = await readIncrementalConfig();
+    if (incremental.studentStats) {
+      try {
+        await applyStudentStatsDelta(change, schoolId);
+      } catch (err) {
+        functions.logger.error("applyStudentStatsDelta failed", {
+          schoolId,
+          logId: context.params.logId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        throw err;
+      }
+      return null;
+    }
+
+    // Legacy path: full re-aggregation. Retained as the authoritative
+    // implementation behind the flag until the incremental path has been
+    // observed clean for at least one reconciler cycle.
     // On delete, change.after.exists is false; pull studentId from the
     // pre-delete snapshot so we still know which student's stats to recompute.
     const log = change.after.exists ? change.after.data() : change.before.data();
@@ -865,7 +914,10 @@ export const processQueuedNotificationCampaign = functions.firestore
 
 export const dispatchScheduledNotificationCampaigns = functions
   .runWith({timeoutSeconds: 300, memory: "512MB"})
-  .pubsub.schedule("every 1 minutes")
+  // Worst-case scheduling latency: a campaign with scheduledFor=10:01 fires
+  // at 10:05 instead of 10:01. Acceptable for non-urgent broadcasts and
+  // cuts invocations + collectionGroup scans by 80%.
+  .pubsub.schedule("every 5 minutes")
   .timeZone("UTC")
   .onRun(async () => {
     const now = admin.firestore.Timestamp.now();
@@ -1798,6 +1850,7 @@ export const processParentOnboardingEmail = functions
         } catch (err) {
           failedCount++;
           const errMsg = err instanceof Error ? err.message : String(err);
+          functions.logger.error("Parent onboarding email send failed", {parentEmail: email, error: errMsg});
           for (const r of group) {
             r.status = "failed";
             r.error = errMsg;
@@ -1949,6 +2002,7 @@ export const processStaffOnboardingEmail = functions
             sentCount++;
           } catch (err) {
             const errMsg = err instanceof Error ? err.message : String(err);
+            functions.logger.error("Staff onboarding email send failed", {userId, email, error: errMsg});
             recipients.push({userId, email, status: "failed", error: errMsg});
             failedCount++;
           }
@@ -1997,6 +2051,26 @@ export const updateClassStats = functions.firestore
   .document("schools/{schoolId}/readingLogs/{logId}")
   .onWrite(async (change, context) => {
     const schoolId = context.params.schoolId;
+
+    // Incremental path: read the class doc once, apply per-log delta. Old
+    // code reads every counted log for every student in the class on every
+    // write — fine at Pilot scale, catastrophic above. Flag defaults off.
+    const incremental = await readIncrementalConfig();
+    if (incremental.classStats) {
+      try {
+        await applyClassStatsDelta(change, schoolId);
+      } catch (err) {
+        functions.logger.error("applyClassStatsDelta failed", {
+          schoolId,
+          logId: context.params.logId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        throw err;
+      }
+      return null;
+    }
+
+    // Legacy full-recompute path below.
     const log = change.after.exists ? change.after.data() : null;
 
     if (!log) return null;
@@ -2048,6 +2122,36 @@ export const updateClassStats = functions.firestore
       "stats.lastUpdated": admin.firestore.FieldValue.serverTimestamp(),
     });
 
+    return null;
+  });
+
+/**
+ * Weekly safety net for the incremental student + class stats triggers.
+ * Iterates every school and runs the authoritative full-recompute path for
+ * each student and class. Errors per-doc are logged and skipped so a single
+ * bad doc can't halt the pass.
+ *
+ * Budgets keep the run inside the 540s timeout — at Large scale (~100K
+ * students) this only reconciles the first 5K each Sunday; raise the
+ * budgets or shard by school once monitoring tells us drift is rare.
+ */
+export const reconcileStatsScheduled = functions
+  .runWith({timeoutSeconds: 540, memory: "512MB"})
+  .pubsub.schedule("0 3 * * 0") // Sunday 03:00 UTC
+  .timeZone("UTC")
+  .onRun(async () => {
+    try {
+      const result = await runReconcilePass({
+        studentBudget: 5000,
+        classBudget: 1000,
+      });
+      functions.logger.info("Stats reconcile pass complete", result);
+    } catch (err) {
+      functions.logger.error("Stats reconcile pass failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
     return null;
   });
 

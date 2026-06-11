@@ -412,7 +412,6 @@ class ReadingLogService {
               'durationSec': '${log.comprehensionAudioDurationSec ?? 0}',
               'schoolId': log.schoolId,
               'studentId': log.studentId,
-              // TODO(retention): used by the future term-aware cleanup function.
             },
           ),
         );

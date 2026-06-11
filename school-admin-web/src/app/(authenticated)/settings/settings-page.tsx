@@ -19,6 +19,7 @@ import type { ReadingLevelSchema, ParentCommentSettings, ComprehensionRecordingS
 import { ParentCommentSettingsSection, DEFAULT_PRESETS, type CommentPreviewState } from './parent-comment-settings';
 import { FloatingPhonePreview } from './floating-phone-preview';
 import { ComprehensionRecordingSettingsSection } from './comprehension-recording-settings';
+import { ComprehensionAudioCleanupSection } from './comprehension-audio-cleanup';
 import { AchievementThresholdSettings } from './achievement-threshold-settings';
 import type { AchievementThresholds } from '@/lib/types';
 
@@ -489,6 +490,9 @@ export function SettingsPage() {
             saving={savingComprehension}
             globallyDisabled={school?.platformFlags?.comprehensionRecordingEnabled === false}
           />
+
+          {/* Comprehension Audio Cleanup */}
+          <ComprehensionAudioCleanupSection isAdmin={isAdmin} />
 
           <FloatingPhonePreview
             enabled={commentPreview.enabled}

@@ -52,6 +52,24 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
   String _searchQuery = '';
   Set<String> _hiddenBookIds = {};
 
+  // Paginated books — fetched in pages of [SchoolLibraryService.pageSize]
+  // and appended to _books. The legacy real-time listener over the whole
+  // collection was the main scaling problem this screen had — every open
+  // re-subscribed to all 5k+ books and kept the listener live for the
+  // session. The version-bump listener mentioned in the cost report is
+  // intentionally deferred: pull-to-refresh covers the same need without
+  // adding a new Firestore doc to the schema.
+  final List<BookModel> _books = [];
+  String? _cursor;
+  bool _hasMore = true;
+  bool _isLoading = false;
+  Object? _loadError;
+
+  // Header badge counts come from the server-maintained
+  // schools/{id}/libraryMeta/counts doc, so the screen can render
+  // accurate totals without loading every book client-side.
+  LibraryCounts _counts = LibraryCounts.empty;
+
   static const _filters = [
     'All',
     'Decodable',
@@ -69,6 +87,60 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
     _assignmentService =
         widget._assignmentService ?? SchoolLibraryAssignmentService();
     _loadHiddenBooks();
+    _loadCounts();
+    _loadNextPage();
+  }
+
+  Future<void> _loadCounts() async {
+    final schoolId = widget.teacher.schoolId?.trim() ?? '';
+    if (schoolId.isEmpty) return;
+    try {
+      final counts = await _libraryService.fetchCounts(schoolId);
+      if (!mounted) return;
+      setState(() => _counts = counts);
+    } catch (_) {
+      // Counts are non-critical UI — silently leave _counts at empty.
+      // The next refresh / next library-screen open will try again.
+    }
+  }
+
+  Future<void> _loadNextPage() async {
+    if (_isLoading || !_hasMore) return;
+    final schoolId = widget.teacher.schoolId?.trim() ?? '';
+    if (schoolId.isEmpty) return;
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+    try {
+      final page = await _libraryService.fetchBooksPage(
+        schoolId,
+        startAfterDocId: _cursor,
+      );
+      if (!mounted) return;
+      setState(() {
+        _books.addAll(page.books);
+        _cursor = page.lastDocId ?? _cursor;
+        _hasMore = page.hasMore;
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = error;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _books.clear();
+      _cursor = null;
+      _hasMore = true;
+      _loadError = null;
+    });
+    await Future.wait([_loadCounts(), _loadNextPage()]);
   }
 
   Future<void> _loadHiddenBooks() async {
@@ -110,20 +182,27 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
     }
 
     return SafeArea(
-      child: StreamBuilder<List<BookModel>>(
-        stream: _libraryService.booksStream(schoolId),
-        builder: (context, librarySnapshot) {
-          if (librarySnapshot.hasError) {
+      child: Builder(
+        builder: (context) {
+          // Hard error from the first page fetch. Subsequent failures
+          // (mid-pagination) surface as a retry footer instead.
+          if (_loadError != null && _books.isEmpty) {
             return const _ErrorState(
                 message: 'Could not load library. Please try again.');
           }
 
-          final isLoading = !librarySnapshot.hasData;
-          final allBooks = librarySnapshot.data ?? [];
-          final hiddenCount =
-              allBooks.where((b) => _hiddenBookIds.contains(b.id)).length;
+          final isLoading = _isLoading && _books.isEmpty;
+          final allBooks = _books;
 
-          // For the Hidden filter, show hidden books; otherwise exclude them
+          // Hidden count is a property of *the user*, not the library —
+          // it's the size of the SharedPreferences-backed hidden set,
+          // independent of which books are currently loaded. This keeps
+          // the badge stable across pagination.
+          final hiddenCount = _hiddenBookIds.length;
+
+          // For the Hidden filter, show hidden books; otherwise exclude them.
+          // Filters apply over currently-loaded pages — see the Caveats
+          // section of the PR for the UX implications.
           List<BookModel> visibleBooks;
           if (_activeFilter == 'Hidden') {
             visibleBooks =
@@ -146,17 +225,17 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
                   filter: _activeFilter,
                   searchQuery: _searchQuery,
                 );
-          final decodableCount = allBooks
-              .where((b) =>
-                  SchoolLibraryService.isDecodable(b) &&
-                  !_hiddenBookIds.contains(b.id))
-              .length;
-          final visibleCount = allBooks.length - hiddenCount;
-          final libraryCount = allBooks
-              .where((b) =>
-                  !SchoolLibraryService.isDecodable(b) &&
-                  !_hiddenBookIds.contains(b.id))
-              .length;
+
+          // Decodable / library / visible counts come from the
+          // server-maintained libraryMeta/counts doc so they stay accurate
+          // even when only a slice of the books collection is paginated in.
+          // Subtract hidden count under the assumption it's a small set.
+          final decodableCount =
+              (_counts.decodable - _hiddenBookIds.length).clamp(0, _counts.decodable);
+          final libraryCount =
+              (_counts.library - _hiddenBookIds.length).clamp(0, _counts.library);
+          final visibleCount =
+              (_counts.total - hiddenCount).clamp(0, _counts.total);
 
           return StreamBuilder<LibraryAssignmentSnapshot>(
             stream: _assignmentService.summaryStream(schoolId),
@@ -166,7 +245,17 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
 
               return Stack(
                 children: [
-                CustomScrollView(
+                RefreshIndicator(
+                  onRefresh: _refresh,
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: (n) {
+                      if (_hasMore && !_isLoading && n.metrics.extentAfter < 600) {
+                        _loadNextPage();
+                      }
+                      return false;
+                    },
+                    child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   // ── Header ────────────────────────────────────────────────
                   SliverToBoxAdapter(
@@ -251,6 +340,8 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
                   const SliverToBoxAdapter(child: SizedBox(height: 200)),
                 ],
               ),
+                  ),
+                ),
                 // ── Scan FAB ───────────────────────────────────────────
                 Positioned(
                   right: 16,
