@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
@@ -24,8 +25,9 @@ class SmsCodeHandle {
 /// Used for teacher + parent SMS MFA. Admin/school-admin auth lives outside
 /// this file and uses TOTP (Google Authenticator) instead.
 class SmsVerificationService {
-  SmsVerificationService({FirebaseAuth? auth})
-      : _auth = auth ?? FirebaseAuth.instance;
+  SmsVerificationService({FirebaseAuth? auth, FirebaseFunctions? functions})
+      : _auth = auth ?? FirebaseAuth.instance,
+        _functions = functions ?? FirebaseFunctions.instance;
   // NOTE: We do NOT set `appVerificationDisabledForTesting` here. While that
   // flag works for primary phone sign-in, Firebase rejects the resulting
   // session token at the multi-factor enroll endpoint with
@@ -36,6 +38,7 @@ class SmsVerificationService {
   // through the real verification path on the way in.
 
   final FirebaseAuth _auth;
+  final FirebaseFunctions _functions;
 
   static const _codeTimeout = Duration(seconds: 60);
 
@@ -43,6 +46,51 @@ class SmsVerificationService {
   /// will reject anything fully malformed on the wire.
   static bool isValidE164(String value) =>
       RegExp(r'^\+[1-9]\d{7,14}$').hasMatch(value.trim());
+
+  /// Calls the `requestSmsVerification` Cloud Function to check the
+  /// per-phone-number daily rate limit before triggering an actual SMS.
+  ///
+  /// Behaviour:
+  ///  - On `resource-exhausted` from the gate, rethrows as a
+  ///    `FirebaseAuthException(code: 'quota-exceeded')` so the existing
+  ///    [friendlyError] mapping surfaces a clean message to the user.
+  ///  - On any other gate error (network down, server bug, etc.), swallows
+  ///    it and lets the SMS attempt proceed. We never want to lock out
+  ///    legitimate users because our own anti-abuse plumbing is broken.
+  ///  - When [phoneE164] is null or fails E.164 validation, skips the gate
+  ///    entirely (e.g. the MFA login path where the phone may come back
+  ///    masked from the resolver hint).
+  Future<void> _checkRateLimit({
+    required String? phoneE164,
+    required String purpose,
+  }) async {
+    if (phoneE164 == null) return;
+    final trimmed = phoneE164.trim();
+    if (!isValidE164(trimmed)) return;
+    try {
+      final callable = _functions.httpsCallable('requestSmsVerification');
+      await callable.call<Map<String, dynamic>>({
+        'phoneE164': trimmed,
+        'purpose': purpose,
+      });
+    } on FirebaseFunctionsException catch (e) {
+      if (e.code == 'resource-exhausted') {
+        throw FirebaseAuthException(
+          code: 'quota-exceeded',
+          message: e.message ??
+              'SMS quota reached for this number. Please try again later.',
+        );
+      }
+      if (kDebugMode) {
+        debugPrint('[phone-auth] rate-limit gate non-fatal error: '
+            'code=${e.code} message=${e.message}');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[phone-auth] rate-limit gate threw: $e');
+      }
+    }
+  }
 
   /// Sends an SMS enrollment code for [user]. Returns once Firebase confirms
   /// the SMS was dispatched (or throws if it couldn't be).
@@ -54,6 +102,7 @@ class SmsVerificationService {
     required String phoneNumber,
     int? forceResendingToken,
   }) async {
+    await _checkRateLimit(phoneE164: phoneNumber, purpose: 'enrollment');
     final session = await user.multiFactor.getSession();
     final completer = Completer<SmsCodeHandle>();
 
@@ -122,6 +171,10 @@ class SmsVerificationService {
     if (hint is! PhoneMultiFactorInfo) {
       throw StateError('Only phone MFA is supported for parent/teacher login');
     }
+    // PhoneMultiFactorInfo.phoneNumber is E.164 when Firebase has it;
+    // some platforms / privacy modes return a masked value. The gate
+    // handles both cases — invalid E.164 falls through without enforcement.
+    await _checkRateLimit(phoneE164: hint.phoneNumber, purpose: 'login');
 
     final completer = Completer<SmsCodeHandle>();
     await _auth.verifyPhoneNumber(
@@ -182,6 +235,7 @@ class SmsVerificationService {
       debugPrint(
           '[phone-auth] sendPrimaryPhoneCode → start phone=$phoneNumberE164 resendToken=$forceResendingToken');
     }
+    await _checkRateLimit(phoneE164: phoneNumberE164, purpose: 'primary');
     final completer = Completer<SmsCodeHandle>();
 
     await _auth.verifyPhoneNumber(
