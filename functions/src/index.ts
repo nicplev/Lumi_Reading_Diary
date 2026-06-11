@@ -876,7 +876,10 @@ export const processQueuedNotificationCampaign = functions.firestore
 
 export const dispatchScheduledNotificationCampaigns = functions
   .runWith({timeoutSeconds: 300, memory: "512MB"})
-  .pubsub.schedule("every 1 minutes")
+  // Worst-case scheduling latency: a campaign with scheduledFor=10:01 fires
+  // at 10:05 instead of 10:01. Acceptable for non-urgent broadcasts and
+  // cuts invocations + collectionGroup scans by 80%.
+  .pubsub.schedule("every 5 minutes")
   .timeZone("UTC")
   .onRun(async () => {
     const now = admin.firestore.Timestamp.now();
