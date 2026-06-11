@@ -32,6 +32,11 @@ import {
 // the full books collection. See functions/src/library_counts.ts.
 export {maintainLibraryCounts} from "./library_counts";
 
+// Per-phone-number SMS rate-limit gate. Clients call this before
+// invoking verifyPhoneNumber to enforce a daily cap. See
+// functions/src/sms_rate_limit.ts for the policy and rollout notes.
+export {requestSmsVerification} from "./sms_rate_limit";
+
 admin.initializeApp();
 const db = admin.firestore();
 
