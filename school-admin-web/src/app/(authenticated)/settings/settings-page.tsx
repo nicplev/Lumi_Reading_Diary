@@ -16,7 +16,8 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { useSchool, useUpdateSchool } from '@/lib/hooks/use-school';
 import { getReadingLevels } from '@/lib/types';
 import type { ReadingLevelSchema, ParentCommentSettings, ComprehensionRecordingSettings, AchievementCustomization } from '@/lib/types';
-import { ParentCommentSettingsSection } from './parent-comment-settings';
+import { ParentCommentSettingsSection, DEFAULT_PRESETS, type CommentPreviewState } from './parent-comment-settings';
+import { FloatingPhonePreview } from './floating-phone-preview';
 import { ComprehensionRecordingSettingsSection } from './comprehension-recording-settings';
 import { AchievementThresholdSettings } from './achievement-threshold-settings';
 import type { AchievementThresholds } from '@/lib/types';
@@ -75,6 +76,13 @@ export function SettingsPage() {
   const [quietStart, setQuietStart] = useState('');
   const [quietEnd, setQuietEnd] = useState('');
 
+  // Live preview state for the parent-app comment screen (mirrored in the sticky iPhone rail)
+  const [commentPreview, setCommentPreview] = useState<CommentPreviewState>({
+    enabled: true,
+    freeTextEnabled: true,
+    presets: DEFAULT_PRESETS,
+  });
+
   // Per-section saving states
   const [savingInfo, setSavingInfo] = useState(false);
   const [savingLevels, setSavingLevels] = useState(false);
@@ -97,6 +105,13 @@ export function SettingsPage() {
       setTermDates(school.termDates ?? {});
       setQuietStart(school.quietHours?.start ?? '');
       setQuietEnd(school.quietHours?.end ?? '');
+
+      const pc = school.settings?.parentComments as ParentCommentSettings | undefined;
+      setCommentPreview({
+        enabled: pc?.enabled ?? true,
+        freeTextEnabled: pc?.freeTextEnabled ?? true,
+        presets: pc?.customPresets && pc.customPresets.length > 0 ? pc.customPresets : DEFAULT_PRESETS,
+      });
     }
   }, [school]);
 
@@ -427,10 +442,10 @@ export function SettingsPage() {
       {activeTab === 'parent-app' && (
         <div className="space-y-6">
           {/* Quiet Hours */}
-          <Card className="max-w-sm">
-            <h2 className="text-lg font-bold text-charcoal mb-1">Notification Quiet Hours</h2>
+          <Card className="max-w-md">
+            <h2 className="text-lg font-bold text-charcoal mb-1">Parent Notification Quiet Hours</h2>
             <p className="text-sm text-text-secondary mb-4">
-              Notifications will not be sent during these hours.
+              Push notifications to parents are not sent during these hours (school timezone). Teachers are unaffected.
             </p>
             <div className="grid grid-cols-2 gap-4">
               <Input
@@ -463,6 +478,7 @@ export function SettingsPage() {
             isAdmin={isAdmin}
             onSave={handleSaveComments}
             saving={savingComments}
+            onPreviewChange={setCommentPreview}
           />
 
           {/* Comprehension Recording */}
@@ -472,6 +488,12 @@ export function SettingsPage() {
             onSave={handleSaveComprehension}
             saving={savingComprehension}
             globallyDisabled={school?.platformFlags?.comprehensionRecordingEnabled === false}
+          />
+
+          <FloatingPhonePreview
+            enabled={commentPreview.enabled}
+            freeTextEnabled={commentPreview.freeTextEnabled}
+            presets={commentPreview.presets}
           />
         </div>
       )}

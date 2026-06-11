@@ -85,6 +85,11 @@ export function KanbanBoard({ teachers = [] }: KanbanBoardProps) {
     [classes],
   );
 
+  const teacherMap = useMemo(
+    () => new Map(teachers.map((t) => [t.id, t.fullName])),
+    [teachers],
+  );
+
   const pendingStudentIds = useMemo(() => new Set(pendingChanges.keys()), [pendingChanges]);
   const hasPendingChanges = pendingStudentIds.size > 0;
 
@@ -352,6 +357,7 @@ export function KanbanBoard({ teachers = [] }: KanbanBoardProps) {
                 classId={cls.id}
                 className={cls.name}
                 yearLevel={cls.yearLevel}
+                teacherNames={cls.teacherIds.map((id) => teacherMap.get(id) ?? 'Unknown')}
                 studentCount={studentsInClass.length}
                 isOver={overColumnId === cls.id}
                 onAddStudent={() => setAddModalTarget(cls.id)}
