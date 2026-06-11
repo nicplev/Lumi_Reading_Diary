@@ -8,6 +8,7 @@ interface KanbanColumnProps {
   classId: string | null;
   className: string;
   yearLevel?: string;
+  teacherNames?: string[];
   studentCount: number;
   children: React.ReactNode;
   isOver: boolean;
@@ -19,6 +20,7 @@ export function KanbanColumn({
   classId,
   className,
   yearLevel,
+  teacherNames,
   studentCount,
   children,
   isOver,
@@ -38,26 +40,33 @@ export function KanbanColumn({
     >
       {/* Header */}
       <div
-        className={`px-4 py-3 border-b border-divider flex items-center gap-2 ${
+        className={`px-4 py-3 border-b border-divider ${
           isUnassigned ? 'bg-background rounded-t-[var(--radius-lg)]' : ''
         }`}
       >
-        <span className="font-bold text-sm text-charcoal truncate">{className}</span>
-        {yearLevel && <Badge>{yearLevel}</Badge>}
-        <Badge variant="info">{studentCount}</Badge>
-        <div className="flex-1" />
-        {onEditClass && (
-          <Button variant="ghost" size="sm" onClick={onEditClass} className="!px-1.5 !py-1">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path
-                d="M11.33 2.67a1.41 1.41 0 0 1 2 2L5.78 12.22l-2.67.67.67-2.67 7.55-7.55Z"
-                stroke="currentColor"
-                strokeWidth="1.3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </Button>
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-sm text-charcoal truncate">{className}</span>
+          {yearLevel && <Badge>{yearLevel}</Badge>}
+          <Badge variant="info">{studentCount}</Badge>
+          <div className="flex-1" />
+          {onEditClass && (
+            <Button variant="ghost" size="sm" onClick={onEditClass} className="!px-1.5 !py-1">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M11.33 2.67a1.41 1.41 0 0 1 2 2L5.78 12.22l-2.67.67.67-2.67 7.55-7.55Z"
+                  stroke="currentColor"
+                  strokeWidth="1.3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </Button>
+          )}
+        </div>
+        {!isUnassigned && (
+          <p className="mt-1 text-xs text-text-secondary truncate">
+            {teacherNames && teacherNames.length > 0 ? teacherNames.join(', ') : 'No teacher assigned'}
+          </p>
         )}
       </div>
 

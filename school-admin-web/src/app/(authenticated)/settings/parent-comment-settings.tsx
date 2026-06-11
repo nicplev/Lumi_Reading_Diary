@@ -4,21 +4,28 @@ import { useState, useEffect } from 'react';
 import { Card } from '@/components/lumi/card';
 import { Input } from '@/components/lumi/input';
 import { Button } from '@/components/lumi/button';
-import { Badge } from '@/components/lumi/badge';
 import { ConfirmDialog } from '@/components/lumi/confirm-dialog';
 import type { CommentPresetCategory, ParentCommentSettings } from '@/lib/types';
 
-const DEFAULT_PRESETS: CommentPresetCategory[] = [
+export const DEFAULT_PRESETS: CommentPresetCategory[] = [
   { id: 'default-1', name: 'Encouragement', chips: ['Great job!', 'Keep it up!', 'Loved hearing you read!', 'So proud of you!'] },
   { id: 'default-2', name: 'Reading Skills', chips: ['Sounded out words well', 'Good finger tracking', 'Read with expression', 'Used picture clues'] },
   { id: 'default-3', name: 'Comprehension', chips: ['Understood the story well', 'Asked great questions', 'Made predictions', 'Retold the story'] },
 ];
+
+export interface CommentPreviewState {
+  enabled: boolean;
+  freeTextEnabled: boolean;
+  presets: CommentPresetCategory[];
+}
 
 interface ParentCommentSettingsSectionProps {
   settings: ParentCommentSettings | undefined;
   isAdmin: boolean;
   onSave: (settings: ParentCommentSettings) => Promise<void>;
   saving: boolean;
+  /** Broadcasts the live config so a shared preview (e.g. the iPhone mockup) can mirror it. */
+  onPreviewChange?: (state: CommentPreviewState) => void;
 }
 
 export function ParentCommentSettingsSection({
@@ -26,6 +33,7 @@ export function ParentCommentSettingsSection({
   isAdmin,
   onSave,
   saving,
+  onPreviewChange,
 }: ParentCommentSettingsSectionProps) {
   const [enabled, setEnabled] = useState(true);
   const [freeTextEnabled, setFreeTextEnabled] = useState(true);
@@ -94,6 +102,11 @@ export function ParentCommentSettingsSection({
 
   const previewPresets = customPresets.length > 0 ? customPresets : DEFAULT_PRESETS;
 
+  // Keep the shared live preview (iPhone mockup) in sync with the current config.
+  useEffect(() => {
+    onPreviewChange?.({ enabled, freeTextEnabled, presets: previewPresets });
+  }, [enabled, freeTextEnabled, previewPresets, onPreviewChange]);
+
   return (
     <>
       <Card>
@@ -101,10 +114,6 @@ export function ParentCommentSettingsSection({
         <p className="text-sm text-text-secondary mb-4">
           Control how parents leave feedback when logging reading sessions.
         </p>
-
-        <div className={`space-y-6 ${!enabled ? 'opacity-50 pointer-events-none' : ''}`} style={!enabled ? { pointerEvents: 'none' } : undefined}>
-          {/* This toggle is always interactive */}
-        </div>
 
         {/* Enable toggle - always interactive */}
         <label className="flex items-center gap-3 mb-6 cursor-pointer select-none">
@@ -262,33 +271,8 @@ export function ParentCommentSettingsSection({
             )}
           </div>
 
-          {/* Preview */}
-          <div className="border-t border-border pt-4 mt-4">
-            <h3 className="text-sm font-bold text-charcoal mb-1">Preview</h3>
-            <p className="text-xs text-text-secondary mb-3">
-              {customPresets.length > 0
-                ? 'Parents will see your custom presets below.'
-                : 'No custom presets configured \u2014 parents will see these defaults.'}
-            </p>
-            <div className="space-y-3">
-              {previewPresets.map((cat) => (
-                <div key={cat.id}>
-                  <p className="text-xs font-semibold text-text-secondary mb-1.5">{cat.name}</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {cat.chips.map((chip) => (
-                      <Badge key={chip} variant="default">{chip}</Badge>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-            {freeTextEnabled && (
-              <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-dashed border-border">
-                <p className="text-xs text-text-secondary italic">+ Free-text comment field will be shown</p>
-              </div>
-            )}
-          </div>
         </div>
+        {/* end enabled-gated section */}
 
         {isAdmin && (
           <div className="flex justify-end mt-6">
