@@ -20,6 +20,12 @@ import {
   countInWindow,
   localDateString,
 } from "./dateUtils";
+import {
+  applyClassStatsDelta,
+  applyStudentStatsDelta,
+  readIncrementalConfig,
+  runReconcilePass,
+} from "./stats_aggregation";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -74,6 +80,28 @@ export const aggregateStudentStats = functions.firestore
   .document("schools/{schoolId}/readingLogs/{logId}")
   .onWrite(async (change, context) => {
     const schoolId = context.params.schoolId;
+
+    // When the incremental flag is on, dispatch to the O(1)-reads path.
+    // The new path self-heals (falls back to full recompute) if a student's
+    // readingDates array hasn't been seeded yet by the backfill script.
+    const incremental = await readIncrementalConfig();
+    if (incremental.studentStats) {
+      try {
+        await applyStudentStatsDelta(change, schoolId);
+      } catch (err) {
+        functions.logger.error("applyStudentStatsDelta failed", {
+          schoolId,
+          logId: context.params.logId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        throw err;
+      }
+      return null;
+    }
+
+    // Legacy path: full re-aggregation. Retained as the authoritative
+    // implementation behind the flag until the incremental path has been
+    // observed clean for at least one reconciler cycle.
     // On delete, change.after.exists is false; pull studentId from the
     // pre-delete snapshot so we still know which student's stats to recompute.
     const log = change.after.exists ? change.after.data() : change.before.data();
@@ -2013,6 +2041,26 @@ export const updateClassStats = functions.firestore
   .document("schools/{schoolId}/readingLogs/{logId}")
   .onWrite(async (change, context) => {
     const schoolId = context.params.schoolId;
+
+    // Incremental path: read the class doc once, apply per-log delta. Old
+    // code reads every counted log for every student in the class on every
+    // write — fine at Pilot scale, catastrophic above. Flag defaults off.
+    const incremental = await readIncrementalConfig();
+    if (incremental.classStats) {
+      try {
+        await applyClassStatsDelta(change, schoolId);
+      } catch (err) {
+        functions.logger.error("applyClassStatsDelta failed", {
+          schoolId,
+          logId: context.params.logId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        throw err;
+      }
+      return null;
+    }
+
+    // Legacy full-recompute path below.
     const log = change.after.exists ? change.after.data() : null;
 
     if (!log) return null;
@@ -2064,6 +2112,36 @@ export const updateClassStats = functions.firestore
       "stats.lastUpdated": admin.firestore.FieldValue.serverTimestamp(),
     });
 
+    return null;
+  });
+
+/**
+ * Weekly safety net for the incremental student + class stats triggers.
+ * Iterates every school and runs the authoritative full-recompute path for
+ * each student and class. Errors per-doc are logged and skipped so a single
+ * bad doc can't halt the pass.
+ *
+ * Budgets keep the run inside the 540s timeout — at Large scale (~100K
+ * students) this only reconciles the first 5K each Sunday; raise the
+ * budgets or shard by school once monitoring tells us drift is rare.
+ */
+export const reconcileStatsScheduled = functions
+  .runWith({timeoutSeconds: 540, memory: "512MB"})
+  .pubsub.schedule("0 3 * * 0") // Sunday 03:00 UTC
+  .timeZone("UTC")
+  .onRun(async () => {
+    try {
+      const result = await runReconcilePass({
+        studentBudget: 5000,
+        classBudget: 1000,
+      });
+      functions.logger.info("Stats reconcile pass complete", result);
+    } catch (err) {
+      functions.logger.error("Stats reconcile pass failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
     return null;
   });
 
