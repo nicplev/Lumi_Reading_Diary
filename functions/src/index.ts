@@ -21,6 +21,11 @@ import {
   localDateString,
 } from "./dateUtils";
 
+// Library counts denormalization. Maintains schools/{id}/libraryMeta/counts
+// so the paginated library screen can render header badges without reading
+// the full books collection. See functions/src/library_counts.ts.
+export {maintainLibraryCounts} from "./library_counts";
+
 admin.initializeApp();
 const db = admin.firestore();
 
