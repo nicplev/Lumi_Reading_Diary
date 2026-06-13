@@ -1,18 +1,18 @@
 {
   "projects": {
-    "default": "lumi-kakakids"
+    "default": "lumi-ninc-au"
   },
   "targets": {
-    "lumi-kakakids": {
+    "lumi-ninc-au": {
       "hosting": {
         "admin": [
-          "lumi-dev-admin"
+          "lumi-dev-admin-au"
         ],
         "default": [
-          "lumi-kakakids"
+          "lumi-ninc-au"
         ],
         "school": [
-          "lumi-school-admin"
+          "lumi-school-admin-au"
         ]
       }
     }

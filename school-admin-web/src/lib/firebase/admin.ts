@@ -13,7 +13,7 @@ if (getApps().length === 0) {
     app = initializeApp({ credential: cert(serviceAccount) });
   } else {
     // Falls back to GOOGLE_APPLICATION_CREDENTIALS or default credentials
-    app = initializeApp({ projectId: 'lumi-kakakids' });
+    app = initializeApp({ projectId: 'lumi-ninc-au' });
   }
 } else {
   app = getApps()[0];

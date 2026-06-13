@@ -6,6 +6,7 @@ import '../data/models/notification_campaign_model.dart';
 import '../data/models/parent_notification_model.dart';
 import '../data/models/student_model.dart';
 import '../data/models/user_model.dart';
+import '../core/services/functions_instance.dart';
 
 class StaffNotificationException implements Exception {
   final String message;
@@ -22,7 +23,7 @@ class StaffNotificationService {
   static final StaffNotificationService instance = StaffNotificationService._();
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseFunctions _functions = FirebaseFunctions.instance;
+  final FirebaseFunctions _functions = lumiFunctions;
 
   CollectionReference<Map<String, dynamic>> _campaigns(String schoolId) {
     return _firestore

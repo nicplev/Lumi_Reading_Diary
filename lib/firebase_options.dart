@@ -47,28 +47,30 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyB6jyxGJQcnZIama91DdvsryN2l7qt1vTo',
-    appId: '1:432054475733:android:eecbe226fd3f62ed963b5c',
-    messagingSenderId: '432054475733',
-    projectId: 'lumi-kakakids',
-    storageBucket: 'lumi-kakakids.firebasestorage.app',
+    apiKey: 'AIzaSyCHmA2rTie2aII3J5RhYOQlEYvycDPxPTw',
+    appId: '1:3795320704:android:47b629e400e8419c37cb65',
+    messagingSenderId: '3795320704',
+    projectId: 'lumi-ninc-au',
+    storageBucket: 'lumi-ninc-au.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDlGBDLTqqfyifSqZUtd8aZ5RbDXVnkY-Q',
-    appId: '1:432054475733:ios:3e84170b90653be9963b5c',
-    messagingSenderId: '432054475733',
-    projectId: 'lumi-kakakids',
-    storageBucket: 'lumi-kakakids.firebasestorage.app',
+    apiKey: 'AIzaSyCimCarq1UJwUJNStyaWSCiZcoFyErCgaM',
+    appId: '1:3795320704:ios:4067b645d940238137cb65',
+    messagingSenderId: '3795320704',
+    projectId: 'lumi-ninc-au',
+    storageBucket: 'lumi-ninc-au.firebasestorage.app',
     iosBundleId: 'com.lumi.lumiReadingTracker',
   );
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyD40vt-hzfS8E2EIy_OlkKOMGBwlrXTyJs',
-    appId: '1:432054475733:web:503da019d86e3de8963b5c',
-    messagingSenderId: '432054475733',
-    projectId: 'lumi-kakakids',
-    authDomain: 'lumi-kakakids.firebaseapp.com',
-    storageBucket: 'lumi-kakakids.firebasestorage.app',
+    apiKey: 'AIzaSyCkq469oLpYK7mz3SQfZ2-GIM5Oj9ZgN88',
+    appId: '1:3795320704:web:729cb32dab543bd637cb65',
+    messagingSenderId: '3795320704',
+    projectId: 'lumi-ninc-au',
+    authDomain: 'lumi-ninc-au.firebaseapp.com',
+    storageBucket: 'lumi-ninc-au.firebasestorage.app',
+    measurementId: 'G-7NYPR6FEYK',
   );
+
 }

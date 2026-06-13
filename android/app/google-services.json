@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "432054475733",
-    "project_id": "lumi-kakakids",
-    "storage_bucket": "lumi-kakakids.firebasestorage.app"
+    "project_number": "3795320704",
+    "project_id": "lumi-ninc-au",
+    "storage_bucket": "lumi-ninc-au.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:432054475733:android:eecbe226fd3f62ed963b5c",
+        "mobilesdk_app_id": "1:3795320704:android:47b629e400e8419c37cb65",
         "android_client_info": {
           "package_name": "com.lumi.lumi_reading_tracker"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyB6jyxGJQcnZIama91DdvsryN2l7qt1vTo"
+          "current_key": "AIzaSyCHmA2rTie2aII3J5RhYOQlEYvycDPxPTw"
         }
       ],
       "services": {

@@ -11,7 +11,7 @@ const nextConfig = {
       { protocol: 'https', hostname: 'books.google.com' },
       { protocol: 'https', hostname: 'covers.openlibrary.org' },
       { protocol: 'https', hostname: 'firebasestorage.googleapis.com' },
-      { protocol: 'https', hostname: 'lumi-kakakids.firebasestorage.app' },
+      { protocol: 'https', hostname: 'lumi-ninc-au.firebasestorage.app' },
     ],
   },
   // Inline SESSION_SECRET into the Edge Runtime middleware bundle. Without

@@ -1,3 +1,4 @@
+import "./global_options";
 import * as functions from "firebase-functions";
 import {defineSecret} from "firebase-functions/params";
 import * as admin from "firebase-admin";
