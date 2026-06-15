@@ -824,20 +824,15 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
           // Non-critical; continue.
         }
       } else {
-        // Existing parent doc — update the mutable fields. Only overwrite
-        // phoneNumber if we just enrolled a new one in this flow.
-        // linkedChildren is intentionally NOT touched here — the
-        // linkParentToStudent callable below owns that write.
-        final update = <String, dynamic>{
-          'fullName': fullName,
-          'phoneVerified': true,
-        };
-        if (hasEmail) update['email'] = email;
-        if (enrolledPhone != null) update['phoneNumber'] = enrolledPhone;
+        // Existing parent doc — they already registered (e.g. re-entering to
+        // link another child). The security rules only let a parent self-update
+        // `relationshipLabel`; name/email/phone/phoneVerified are locked to
+        // trusted writers (Admin SDK), so client-writing them here previously
+        // failed with permission-denied. Leave the profile as first registered;
+        // the linkParentToStudent callable below owns the new child link.
         if (_relationshipLabel != null) {
-          update['relationshipLabel'] = _relationshipLabel;
+          await parentRef.update({'relationshipLabel': _relationshipLabel});
         }
-        await parentRef.update(update);
       }
 
       // Index entries. Email index only when the parent supplied one;
