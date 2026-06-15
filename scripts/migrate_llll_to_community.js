@@ -35,7 +35,7 @@ const DRY_RUN = process.argv.includes("--dry-run");
 async function main() {
   // Initialize Firebase Admin.
   admin.initializeApp({
-    projectId: "lumi-kakakids",
+    projectId: "lumi-ninc-au",
   });
   const db = admin.firestore();
 

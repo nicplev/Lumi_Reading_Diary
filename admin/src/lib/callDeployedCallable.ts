@@ -1,10 +1,11 @@
 import "server-only";
 import { getAdminAuth } from "./firebase-admin";
 
-// Default region for firebase-functions v1 onCall — no `.region(...)` is set in
-// functions/src/impersonation.ts, so deploys land in us-central1. The
-// FUNCTIONS_REGION env var lets us point at staging/emulator without code edits.
-const FUNCTIONS_REGION = process.env.FUNCTIONS_REGION || "us-central1";
+// Default region for the deployed callables. functions/ pins everything to
+// australia-southeast1 via setGlobalOptions (see functions/src/global_options.ts),
+// co-located with the Firestore database. The FUNCTIONS_REGION env var lets us
+// point at staging/emulator without code edits.
+const FUNCTIONS_REGION = process.env.FUNCTIONS_REGION || "australia-southeast1";
 
 interface CallableEnvelope<T> {
   result?: T;

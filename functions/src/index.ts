@@ -27,6 +27,8 @@ import {
   runReconcilePass,
 } from "./stats_aggregation";
 
+const fns = functions.region("australia-southeast1");
+
 // Library counts denormalization. Maintains schools/{id}/libraryMeta/counts
 // so the paginated library screen can render header badges without reading
 // the full books collection. See functions/src/library_counts.ts.
@@ -86,7 +88,7 @@ export {
  * log doc and relies on this trigger to recompute the student's stats from
  * the remaining logs.
  */
-export const aggregateStudentStats = functions.firestore
+export const aggregateStudentStats = fns.firestore
   .document("schools/{schoolId}/readingLogs/{logId}")
   .onWrite(async (change, context) => {
     const schoolId = context.params.schoolId;
@@ -754,7 +756,7 @@ async function dispatchNotificationCampaign(
   }
 }
 
-export const createNotificationCampaign = functions
+export const createNotificationCampaign = fns
   .runWith({timeoutSeconds: 60, memory: "256MB"})
   .https.onCall(async (rawData: NotificationCampaignPayload, context) => {
     const senderId = context.auth?.uid;
@@ -900,7 +902,7 @@ export const createNotificationCampaign = functions
     }
   });
 
-export const processQueuedNotificationCampaign = functions.firestore
+export const processQueuedNotificationCampaign = fns.firestore
   .document("schools/{schoolId}/notificationCampaigns/{campaignId}")
   .onCreate(async (snapshot, context) => {
     const campaign = snapshot.data() as NotificationCampaignData;
@@ -912,7 +914,7 @@ export const processQueuedNotificationCampaign = functions.firestore
     return null;
   });
 
-export const dispatchScheduledNotificationCampaigns = functions
+export const dispatchScheduledNotificationCampaigns = fns
   .runWith({timeoutSeconds: 300, memory: "512MB"})
   // Worst-case scheduling latency: a campaign with scheduledFor=10:01 fires
   // at 10:05 instead of 10:01. Acceptable for non-urgent broadcasts and
@@ -1165,7 +1167,7 @@ async function processSchool(
  * Firestore reads per school ≈ parents(with token) + unlogged_students + log_checks
  * (NOT all students × all logs like the naive approach)
  */
-export const sendReadingReminders = functions
+export const sendReadingReminders = fns
   .runWith({timeoutSeconds: 300, memory: "512MB"})
   .pubsub.schedule("0 * * * *") // Every hour on the hour
   .timeZone("UTC")
@@ -1260,7 +1262,7 @@ async function pruneStaleTokensForSchool(
  * Weekly sweep to drop FCM tokens that haven't refreshed in 30 days.
  * Runs Mondays at 04:00 UTC — off-peak across LON/NYC/SYD.
  */
-export const pruneStaleFcmTokens = functions
+export const pruneStaleFcmTokens = fns
   .runWith({timeoutSeconds: 540, memory: "512MB"})
   .pubsub.schedule("0 4 * * 1")
   .timeZone("UTC")
@@ -1365,7 +1367,7 @@ const FIRST_LOG_ACHIEVEMENT = {
  * Reads school-level custom thresholds (falls back to defaults if not set).
  * Awards all 19 tier achievements + the first_log special achievement.
  */
-export const detectAchievements = functions.firestore
+export const detectAchievements = fns.firestore
   .document("schools/{schoolId}/students/{studentId}")
   .onUpdate(async (change, context) => {
     const schoolId = context.params.schoolId;
@@ -1490,7 +1492,7 @@ export const detectAchievements = functions.firestore
  * Validate Reading Log
  * Server-side validation before allowing log creation
  */
-export const validateReadingLog = functions.firestore
+export const validateReadingLog = fns.firestore
   .document("schools/{schoolId}/readingLogs/{logId}")
   .onCreate(async (snapshot, context) => {
     const schoolId = context.params.schoolId;
@@ -1544,7 +1546,7 @@ export const validateReadingLog = functions.firestore
  * Clean up expired link codes
  * Runs daily to remove old codes
  */
-export const cleanupExpiredLinkCodes = functions.pubsub
+export const cleanupExpiredLinkCodes = fns.pubsub
   .schedule("0 2 * * *") // 2 AM daily
   .onRun(async () => {
     const now = admin.firestore.Timestamp.now();
@@ -1676,7 +1678,7 @@ interface OnboardingEmailRecipient {
   skippedReason?: string;
 }
 
-export const processParentOnboardingEmail = functions
+export const processParentOnboardingEmail = fns
   .runWith({timeoutSeconds: 120, memory: "512MB", secrets: [sendgridApiKey, sendgridSenderEmail]})
   .firestore.document("schools/{schoolId}/parentOnboardingEmails/{emailId}")
   .onCreate(async (snapshot, context) => {
@@ -1911,7 +1913,7 @@ interface StaffEmailRecipient {
   skippedReason?: string;
 }
 
-export const processStaffOnboardingEmail = functions
+export const processStaffOnboardingEmail = fns
   .runWith({timeoutSeconds: 120, memory: "512MB", secrets: [sendgridApiKey, sendgridSenderEmail]})
   .firestore.document("schools/{schoolId}/staffOnboardingEmails/{emailId}")
   .onCreate(async (snapshot, context) => {
@@ -2047,7 +2049,7 @@ export const processStaffOnboardingEmail = functions
     return null;
   });
 
-export const updateClassStats = functions.firestore
+export const updateClassStats = fns.firestore
   .document("schools/{schoolId}/readingLogs/{logId}")
   .onWrite(async (change, context) => {
     const schoolId = context.params.schoolId;
@@ -2135,7 +2137,7 @@ export const updateClassStats = functions.firestore
  * students) this only reconciles the first 5K each Sunday; raise the
  * budgets or shard by school once monitoring tells us drift is rare.
  */
-export const reconcileStatsScheduled = functions
+export const reconcileStatsScheduled = fns
   .runWith({timeoutSeconds: 540, memory: "512MB"})
   .pubsub.schedule("0 3 * * 0") // Sunday 03:00 UTC
   .timeZone("UTC")
@@ -2162,7 +2164,7 @@ export const reconcileStatsScheduled = functions
  * - Revokes any active link codes for the student
  * - Deletes the student document
  */
-export const deleteStudentWithCascade = functions.https.onCall(
+export const deleteStudentWithCascade = fns.https.onCall(
   async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError(
@@ -2248,7 +2250,7 @@ export const deleteStudentWithCascade = functions.https.onCall(
  * Runs hourly. For each user in pendingUserDeletions whose scheduledDeletionAt has passed,
  * permanently deletes the Firebase Auth account and Firestore user document.
  */
-export const processPendingUserDeletions = functions.pubsub
+export const processPendingUserDeletions = fns.pubsub
   .schedule("0 * * * *") // Every hour on the hour
   .timeZone("UTC")
   .onRun(async () => {
@@ -2316,7 +2318,7 @@ const guardianProjection = (
  * edits, linking, unlinking, and account deletion in one handler. Writes
  * students only — no trigger loop.
  */
-export const syncGuardianProfiles = functions.firestore
+export const syncGuardianProfiles = fns.firestore
   .document("schools/{schoolId}/parents/{parentId}")
   .onWrite(async (change, context) => {
     const schoolId = context.params.schoolId;
@@ -2388,7 +2390,7 @@ export const syncGuardianProfiles = functions.firestore
  * co-parent is added. Loop-safe: writing guardianProfiles does not change
  * parentIds, so the re-trigger sees no change and no-ops.
  */
-export const refreshGuardianProfilesOnLink = functions.firestore
+export const refreshGuardianProfilesOnLink = fns.firestore
   .document("schools/{schoolId}/students/{studentId}")
   .onWrite(async (change, context) => {
     const schoolId = context.params.schoolId;
@@ -2453,7 +2455,7 @@ export const refreshGuardianProfilesOnLink = functions.firestore
  * the given school and writes their projection onto each linked student. Safe
  * to re-run — writes are idempotent.
  */
-export const backfillGuardianProfiles = functions.https.onCall(
+export const backfillGuardianProfiles = fns.https.onCall(
   async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError(
@@ -2533,7 +2535,7 @@ export const backfillGuardianProfiles = functions.https.onCall(
  * parent reply surfaces as an in-app unread badge instead (handled client-side
  * via the log's denormalized `lastComment*` fields).
  */
-export const onCommentCreated = functions.firestore
+export const onCommentCreated = fns.firestore
   .document("schools/{schoolId}/readingLogs/{logId}/comments/{commentId}")
   .onCreate(async (snap, context) => {
     const {schoolId, logId} = context.params as {

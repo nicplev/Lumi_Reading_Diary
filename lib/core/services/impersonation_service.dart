@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 
 import '../exceptions/impersonation_exceptions.dart';
 import '../models/impersonation_session.dart';
+import 'functions_instance.dart';
 
 /// Orchestrates the client-side lifecycle of a developer impersonation session.
 ///
@@ -30,7 +31,7 @@ class ImpersonationService extends ChangeNotifier {
     FirebaseFunctions? functions,
   })  : _auth = auth ?? FirebaseAuth.instance,
         _firestore = firestore ?? FirebaseFirestore.instance,
-        _functions = functions ?? FirebaseFunctions.instance;
+        _functions = functions ?? lumiFunctions;
 
   static ImpersonationService? _instance;
   static ImpersonationService get instance =>

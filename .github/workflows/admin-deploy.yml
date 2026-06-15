@@ -1,6 +1,6 @@
 name: Admin deploy
 
-# Deploys admin/ to Firebase Hosting (site: lumi-dev-admin) via the web
+# Deploys admin/ to Firebase Hosting (site: lumi-dev-admin-au) via the web
 # frameworks experiment. Triggers only on changes that can affect the admin
 # build — Flutter-only commits skip this workflow.
 
@@ -97,10 +97,11 @@ jobs:
           FIREBASE_SERVICE_ACCOUNT_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
         run: |
           {
-            echo "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=lumi-kakakids.firebaseapp.com"
-            echo "NEXT_PUBLIC_FIREBASE_PROJECT_ID=lumi-kakakids"
-            echo "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=lumi-kakakids.firebasestorage.app"
-            echo "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=432054475733"
+            echo "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=lumi-ninc-au.firebaseapp.com"
+            echo "NEXT_PUBLIC_FIREBASE_PROJECT_ID=lumi-ninc-au"
+            echo "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=lumi-ninc-au.firebasestorage.app"
+            echo "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=3795320704"
+            echo "FUNCTIONS_REGION=australia-southeast1"
             echo "SESSION_COOKIE_MAX_AGE=432000"
             echo "NEXT_PUBLIC_FIREBASE_API_KEY=${NEXT_PUBLIC_FIREBASE_API_KEY}"
             echo "NEXT_PUBLIC_FIREBASE_APP_ID=${NEXT_PUBLIC_FIREBASE_APP_ID}"
@@ -118,7 +119,7 @@ jobs:
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_LUMI_KAKAKIDS }}
-          projectId: lumi-kakakids
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_LUMI_NINC_AU }}
+          projectId: lumi-ninc-au
           target: admin
           channelId: live

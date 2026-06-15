@@ -19,7 +19,7 @@ if (typeof window === 'undefined' && typeof globalThis.localStorage !== 'undefin
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const functions = getFunctions(app);
+export const functions = getFunctions(app, 'australia-southeast1');
 
 // App Check — opt-in via NEXT_PUBLIC_APP_CHECK_ENABLED=true. Attestation is
 // silent until the server flips IMPERSONATION_APP_CHECK_ENFORCED on the

@@ -4,6 +4,8 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import '../core/services/functions_instance.dart';
+
 /// Handle returned by [SmsVerificationService.sendEnrollmentCode] and
 /// [SmsVerificationService.sendLoginCode]. [verificationId] is the opaque
 /// token Firebase returns after SMS delivery; [resendToken] is Android-only
@@ -27,7 +29,7 @@ class SmsCodeHandle {
 class SmsVerificationService {
   SmsVerificationService({FirebaseAuth? auth, FirebaseFunctions? functions})
       : _auth = auth ?? FirebaseAuth.instance,
-        _functions = functions ?? FirebaseFunctions.instance;
+        _functions = functions ?? lumiFunctions;
   // NOTE: We do NOT set `appVerificationDisabledForTesting` here. While that
   // flag works for primary phone sign-in, Firebase rejects the resulting
   // session token at the multi-factor enroll endpoint with

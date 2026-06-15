@@ -3,6 +3,8 @@ import * as admin from "firebase-admin";
 import {createHash} from "crypto";
 import {isSuperAdmin} from "./super_admin";
 
+const fns = functions.region("australia-southeast1");
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
@@ -297,7 +299,7 @@ interface StartImpersonationInput {
   clientInfo?: unknown;
 }
 
-export const startImpersonationSession = functions
+export const startImpersonationSession = fns
   .runWith(impersonationRuntime({timeoutSeconds: 30, memory: "256MB"}))
   .https.onCall(async (data: StartImpersonationInput, context) => {
     const {uid: devUid, email: devEmail} = await requireDevAccess(context);
@@ -429,7 +431,7 @@ export const startImpersonationSession = functions
 // Callable: endImpersonationSession
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const endImpersonationSession = functions
+export const endImpersonationSession = fns
   .runWith(impersonationRuntime({timeoutSeconds: 15, memory: "128MB"}))
   .https.onCall(async (data: {sessionId?: unknown}, context) => {
     const {uid} = requireAuthed(context);
@@ -478,7 +480,7 @@ export const endImpersonationSession = functions
 // Callable: revokeImpersonationSession (super-admin only)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const revokeImpersonationSession = functions
+export const revokeImpersonationSession = fns
   .runWith(impersonationRuntime({timeoutSeconds: 15, memory: "128MB"}))
   .https.onCall(async (data: {sessionId?: unknown; reason?: unknown}, context) => {
     const {uid} = await requireSuperAdminAuth(context);
@@ -518,7 +520,7 @@ export const revokeImpersonationSession = functions
 // Callable: reportImpersonationActivity
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const reportImpersonationActivity = functions
+export const reportImpersonationActivity = fns
   .runWith(impersonationRuntime({timeoutSeconds: 10, memory: "128MB"}))
   .https.onCall(
     async (
@@ -593,7 +595,7 @@ export const reportImpersonationActivity = functions
 // Callable: reportBlockedWrite
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const reportBlockedWrite = functions
+export const reportBlockedWrite = fns
   .runWith(impersonationRuntime({timeoutSeconds: 10, memory: "128MB"}))
   .https.onCall(
     async (
@@ -668,7 +670,7 @@ function csvEscape(value: unknown): string {
   return s;
 }
 
-export const exportImpersonationAudit = functions
+export const exportImpersonationAudit = fns
   .runWith(impersonationRuntime({timeoutSeconds: 60, memory: "512MB"}))
   .https.onCall(async (data: ExportInput, context) => {
     const {uid: superUid, email: superEmail} = await requireSuperAdminAuth(context);
@@ -778,7 +780,7 @@ export const exportImpersonationAudit = functions
 // We do NOT widen Firestore rules for devs to list /schools directly — going
 // through a callable keeps the surface area tight.
 
-export const listImpersonableSchools = functions
+export const listImpersonableSchools = fns
   .runWith(impersonationRuntime({timeoutSeconds: 15, memory: "256MB"}))
   .https.onCall(async (_data, context) => {
     await requireDevAccess(context);
@@ -811,7 +813,7 @@ interface ListUsersInput {
   role?: unknown; // 'teacher' | 'schoolAdmin'
 }
 
-export const listImpersonableUsers = functions
+export const listImpersonableUsers = fns
   .runWith(impersonationRuntime({timeoutSeconds: 15, memory: "256MB"}))
   .https.onCall(async (data: ListUsersInput, context) => {
     await requireDevAccess(context);
@@ -846,7 +848,7 @@ export const listImpersonableUsers = functions
 // Scheduled: expireImpersonationSessions
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const expireImpersonationSessions = functions.pubsub
+export const expireImpersonationSessions = fns.pubsub
   .schedule("every 5 minutes")
   .onRun(async () => {
     const now = admin.firestore.Timestamp.now();
@@ -892,7 +894,7 @@ export const expireImpersonationSessions = functions.pubsub
 // Trigger: onDelete(devAccessEmails/{hash}) → revoke active sessions
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const revokeOnDevAccessRemoval = functions.firestore
+export const revokeOnDevAccessRemoval = fns.firestore
   .document("devAccessEmails/{emailHash}")
   .onDelete(async (_snap, context) => {
     const emailHash = context.params.emailHash as string;
@@ -950,7 +952,7 @@ export const revokeOnDevAccessRemoval = functions.firestore
 const ANOMALY_SCHOOLS_PER_HOUR = 5;
 const ANOMALY_SESSIONS_PER_HOUR = 4;
 
-export const monitorImpersonationAnomalies = functions.pubsub
+export const monitorImpersonationAnomalies = fns.pubsub
   .schedule("every 60 minutes")
   .onRun(async () => {
     const oneHourAgo = admin.firestore.Timestamp.fromMillis(

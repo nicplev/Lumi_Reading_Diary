@@ -21,6 +21,8 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 
+const fns = functions.region("australia-southeast1");
+
 const UNRECOGNISED_BOOK_TITLE = "Unrecognised Book";
 
 /**
@@ -91,7 +93,7 @@ async function seedLibraryCounts(schoolId: string): Promise<void> {
     });
 }
 
-export const maintainLibraryCounts = functions.firestore
+export const maintainLibraryCounts = fns.firestore
   .document("schools/{schoolId}/books/{bookId}")
   .onWrite(async (change, context) => {
     const schoolId = context.params.schoolId;

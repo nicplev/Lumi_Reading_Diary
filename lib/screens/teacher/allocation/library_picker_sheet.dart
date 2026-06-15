@@ -31,6 +31,48 @@ class _LibraryPickerSheetState extends State<LibraryPickerSheet> {
   String _query = '';
   final List<BookModel> _sessionSelected = [];
 
+  final List<BookModel> _books = [];
+  bool _loading = true;
+  Object? _loadError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAllBooks();
+  }
+
+  // SchoolLibraryService paginates (50/page) since the legacy /books stream was
+  // dropped. The picker needs the whole list so search covers every book, so
+  // page through to the end once when the sheet opens.
+  Future<void> _loadAllBooks() async {
+    final schoolId = widget.schoolId.trim();
+    if (schoolId.isEmpty) {
+      setState(() => _loading = false);
+      return;
+    }
+    try {
+      String? cursor;
+      var hasMore = true;
+      while (hasMore) {
+        final page = await _libraryService.fetchBooksPage(
+          schoolId,
+          startAfterDocId: cursor,
+        );
+        _books.addAll(page.books);
+        cursor = page.lastDocId ?? cursor;
+        hasMore = page.hasMore;
+      }
+      if (!mounted) return;
+      setState(() => _loading = false);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = error;
+        _loading = false;
+      });
+    }
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -97,17 +139,26 @@ class _LibraryPickerSheetState extends State<LibraryPickerSheet> {
               ),
               const Divider(height: 1),
               Expanded(
-                child: StreamBuilder<List<BookModel>>(
-                  stream: _libraryService.booksStream(widget.schoolId),
-                  builder: (context, snapshot) {
-                    if (!snapshot.hasData) {
+                child: Builder(
+                  builder: (context) {
+                    if (_loading) {
                       return const Center(
                         child: CircularProgressIndicator(
                             color: AppColors.teacherPrimary),
                       );
                     }
+                    if (_loadError != null && _books.isEmpty) {
+                      return Center(
+                        child: Text(
+                          'Could not load the library. Please try again.',
+                          style: TeacherTypography.bodyMedium
+                              .copyWith(color: AppColors.textSecondary),
+                          textAlign: TextAlign.center,
+                        ),
+                      );
+                    }
                     final books = SchoolLibraryService.applyFilter(
-                      books: snapshot.data!,
+                      books: _books,
                       filter: 'All',
                       searchQuery: _query,
                     );

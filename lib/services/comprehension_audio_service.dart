@@ -1,4 +1,4 @@
-import 'package:cloud_functions/cloud_functions.dart';
+import '../core/services/functions_instance.dart';
 
 /// Thin client wrapper around the `deleteComprehensionAudio` callable.
 ///
@@ -12,7 +12,7 @@ typedef ComprehensionAudioCallableInvoker = Future<Object?> Function(
 );
 
 Future<Object?> _defaultInvoker(String name, Map<String, dynamic> args) async {
-  final callable = FirebaseFunctions.instance.httpsCallable(name);
+  final callable = lumiFunctions.httpsCallable(name);
   final res = await callable.call<Object?>(args);
   return res.data;
 }

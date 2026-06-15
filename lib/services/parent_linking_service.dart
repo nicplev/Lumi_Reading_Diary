@@ -8,6 +8,7 @@ import '../data/models/student_model.dart';
 import '../data/models/user_model.dart';
 import '../core/exceptions/linking_exceptions.dart';
 import '../core/services/assert_writable.dart';
+import '../core/services/functions_instance.dart';
 
 /// Invokes a Cloud Function and returns its `result.data` payload.
 ///
@@ -24,7 +25,7 @@ Future<Object?> _defaultCallableInvoker(
   String name,
   Map<String, dynamic> args,
 ) async {
-  final callable = FirebaseFunctions.instance.httpsCallable(name);
+  final callable = lumiFunctions.httpsCallable(name);
   final result = await callable.call<Object?>(args);
   return result.data;
 }

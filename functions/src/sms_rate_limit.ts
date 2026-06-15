@@ -17,6 +17,8 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 
+const fns = functions.region("australia-southeast1");
+
 const RATE_LIMIT_CONFIG_DOC = "platformConfig/smsRateLimits";
 const DEFAULT_MAX_PER_DAY = 5;
 const WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -80,7 +82,7 @@ function phoneToDocId(phoneE164: string): string {
   return encodeURIComponent(phoneE164);
 }
 
-export const requestSmsVerification = functions
+export const requestSmsVerification = fns
   .runWith({timeoutSeconds: 15, memory: "128MB"})
   .https.onCall(async (data, context) => {
     const phone = normalizePhone(data?.phoneE164);
