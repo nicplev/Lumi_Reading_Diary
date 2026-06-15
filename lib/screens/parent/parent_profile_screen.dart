@@ -995,83 +995,11 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
   /// to their own parent doc. The syncGuardianProfiles Cloud Function then
   /// propagates the change to each linked student's guardianProfiles map.
   Future<void> _editRelationship() async {
-    String? choice = _relationshipLabel != null &&
-            GuardianRelationship.presets.contains(_relationshipLabel)
-        ? _relationshipLabel
-        : (_relationshipLabel == null ? null : GuardianRelationship.other);
-    final otherController = TextEditingController(
-      text: choice == GuardianRelationship.other ? _relationshipLabel : '',
-    );
-
     final saved = await showDialog<String>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          final options = [
-            ...GuardianRelationship.presets,
-            GuardianRelationship.other,
-          ];
-          String? resolveLabel() {
-            if (choice == null) return null;
-            if (choice == GuardianRelationship.other) {
-              final t = otherController.text.trim();
-              return t.isEmpty ? null : t;
-            }
-            return choice;
-          }
-
-          return AlertDialog(
-            shape: LumiBorders.shapeLarge,
-            title: Text('Your relationship', style: LumiTextStyles.h3()),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final option in options)
-                      ChoiceChip(
-                        label: Text(option),
-                        selected: choice == option,
-                        selectedColor:
-                            AppColors.rosePink.withValues(alpha: 0.2),
-                        onSelected: (_) =>
-                            setDialogState(() => choice = option),
-                      ),
-                  ],
-                ),
-                if (choice == GuardianRelationship.other) ...[
-                  LumiGap.s,
-                  TextField(
-                    controller: otherController,
-                    autofocus: true,
-                    decoration: const InputDecoration(
-                      hintText: 'e.g. Aunt, Foster carer',
-                    ),
-                    onChanged: (_) => setDialogState(() {}),
-                  ),
-                ],
-              ],
-            ),
-            actions: [
-              LumiTextButton(
-                onPressed: () => Navigator.pop(context),
-                text: 'Cancel',
-              ),
-              LumiTextButton(
-                onPressed: resolveLabel() == null
-                    ? null
-                    : () => Navigator.pop(context, resolveLabel()),
-                text: 'Save',
-              ),
-            ],
-          );
-        },
-      ),
+      builder: (context) =>
+          _RelationshipPicker(initialLabel: _relationshipLabel),
     );
-    otherController.dispose();
 
     if (saved == null || saved == _relationshipLabel) return;
     setState(() => _relationshipLabel = saved);
@@ -1354,6 +1282,105 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Relationship picker dialog. Owns its own [TextEditingController] so it is
+/// disposed when the dialog leaves the tree (after the exit animation) — not
+/// synchronously when `showDialog` returns, which used the controller after
+/// dispose during the close transition.
+class _RelationshipPicker extends StatefulWidget {
+  const _RelationshipPicker({required this.initialLabel});
+
+  final String? initialLabel;
+
+  @override
+  State<_RelationshipPicker> createState() => _RelationshipPickerState();
+}
+
+class _RelationshipPickerState extends State<_RelationshipPicker> {
+  late String? _choice;
+  late final TextEditingController _otherController;
+
+  @override
+  void initState() {
+    super.initState();
+    final label = widget.initialLabel;
+    _choice = label != null && GuardianRelationship.presets.contains(label)
+        ? label
+        : (label == null ? null : GuardianRelationship.other);
+    _otherController = TextEditingController(
+      text: _choice == GuardianRelationship.other ? label : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _otherController.dispose();
+    super.dispose();
+  }
+
+  String? _resolveLabel() {
+    if (_choice == null) return null;
+    if (_choice == GuardianRelationship.other) {
+      final t = _otherController.text.trim();
+      return t.isEmpty ? null : t;
+    }
+    return _choice;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final options = [
+      ...GuardianRelationship.presets,
+      GuardianRelationship.other,
+    ];
+    return AlertDialog(
+      shape: LumiBorders.shapeLarge,
+      title: Text('Your relationship', style: LumiTextStyles.h3()),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final option in options)
+                ChoiceChip(
+                  label: Text(option),
+                  selected: _choice == option,
+                  selectedColor: AppColors.rosePink.withValues(alpha: 0.2),
+                  onSelected: (_) => setState(() => _choice = option),
+                ),
+            ],
+          ),
+          if (_choice == GuardianRelationship.other) ...[
+            LumiGap.s,
+            TextField(
+              controller: _otherController,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: 'e.g. Aunt, Foster carer',
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        LumiTextButton(
+          onPressed: () => Navigator.pop(context),
+          text: 'Cancel',
+        ),
+        LumiTextButton(
+          onPressed: _resolveLabel() == null
+              ? null
+              : () => Navigator.pop(context, _resolveLabel()),
+          text: 'Save',
+        ),
+      ],
     );
   }
 }
