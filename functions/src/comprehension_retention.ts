@@ -10,6 +10,8 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 
+const fns = functions.region("australia-southeast1");
+
 const RETENTION_DOC = "platformConfig/comprehensionRetention";
 const BATCH_SIZE = 500;
 const DAY_MS = 86_400_000;
@@ -158,7 +160,7 @@ async function performCleanup(
   return stats;
 }
 
-export const cleanupComprehensionAudio = functions
+export const cleanupComprehensionAudio = fns
   .runWith({timeoutSeconds: 540, memory: "512MB"})
   .pubsub.schedule("every 24 hours")
   .timeZone("Australia/Sydney")
@@ -208,7 +210,7 @@ async function resolveCallerRole(
   return null;
 }
 
-export const deleteComprehensionAudio = functions
+export const deleteComprehensionAudio = fns
   .runWith({timeoutSeconds: 30, memory: "256MB"})
   .https.onCall(async (data: DeleteOneInput, context) => {
     const uid = context.auth?.uid;

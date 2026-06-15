@@ -1,6 +1,8 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 
+const fns = functions.region("australia-southeast1");
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
@@ -237,7 +239,7 @@ interface LinkParentInput {
   clientInfo?: unknown;
 }
 
-export const linkParentToStudent = functions
+export const linkParentToStudent = fns
   .runWith(parentLinkingRuntime({timeoutSeconds: 30, memory: "256MB"}))
   .https.onCall(async (data: LinkParentInput, context) => {
     const {uid} = requireAuthed(context);
@@ -368,7 +370,7 @@ async function callerCanUnlink(
   return role === "teacher" || role === "schoolAdmin";
 }
 
-export const unlinkParentFromStudent = functions
+export const unlinkParentFromStudent = fns
   .runWith(parentLinkingRuntime({timeoutSeconds: 15, memory: "256MB"}))
   .https.onCall(async (data: UnlinkParentInput, context) => {
     const {uid} = requireAuthed(context);
