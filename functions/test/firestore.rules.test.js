@@ -1708,6 +1708,12 @@ async function seedSchoolForComments() {
       schoolId: 'school_1',
       linkedChildren: ['student_999'],
     });
+    // A second carer linked to the same student who did NOT create the log.
+    await db.collection('schools').doc('school_1').collection('parents').doc('parent_cocarer').set({
+      role: 'parent',
+      schoolId: 'school_1',
+      linkedChildren: ['student_1'],
+    });
     await db.collection('schools').doc('school_1').collection('users').doc('teacher_1').set({
       role: 'teacher',
       schoolId: 'school_1',
@@ -1802,6 +1808,49 @@ test('comments: unauthenticated user cannot read or post', async () => {
   const db = unauthDb();
   await assertFails(commentRef(db, 'existing').get());
   await assertFails(commentRef(db, 'u1').set({ ...parentComment, authorId: 'anon' }));
+});
+
+function logRef(db) {
+  return db.collection('schools').doc('school_1').collection('readingLogs').doc('log_1');
+}
+
+test('commentsViewedAt: log owner can mark their own thread read', async () => {
+  await seedSchoolForComments();
+  const db = authDb('parent_1');
+  await assertSucceeds(logRef(db).update({ 'commentsViewedAt.parent_1': new Date() }));
+});
+
+test('commentsViewedAt: a linked co-carer who did not create the log can mark their own read marker', async () => {
+  await seedSchoolForComments();
+  const db = authDb('parent_cocarer');
+  await assertSucceeds(logRef(db).update({ 'commentsViewedAt.parent_cocarer': new Date() }));
+});
+
+test('commentsViewedAt: a co-carer cannot write another user\'s read marker', async () => {
+  await seedSchoolForComments();
+  const db = authDb('parent_cocarer');
+  await assertFails(logRef(db).update({ 'commentsViewedAt.parent_1': new Date() }));
+});
+
+test('commentsViewedAt: a co-carer cannot piggyback an edit to another field', async () => {
+  await seedSchoolForComments();
+  const db = authDb('parent_cocarer');
+  await assertFails(logRef(db).update({
+    'commentsViewedAt.parent_cocarer': new Date(),
+    minutesRead: 999,
+  }));
+});
+
+test('commentsViewedAt: a non-owner cannot edit log content via this path', async () => {
+  await seedSchoolForComments();
+  const db = authDb('parent_cocarer');
+  await assertFails(logRef(db).update({ minutesRead: 999 }));
+});
+
+test('commentsViewedAt: an unrelated parent cannot mark the thread read', async () => {
+  await seedSchoolForComments();
+  const db = authDb('parent_outsider');
+  await assertFails(logRef(db).update({ 'commentsViewedAt.parent_outsider': new Date() }));
 });
 
 // ── platformConfig (platform-wide feature flags) ──────────────────────
