@@ -502,3 +502,132 @@ Everything is env-gated off today, so none of this blocks the move:
   (`LUMI_APP_CHECK_RECAPTCHA_KEY` dart-define + `NEXT_PUBLIC_APP_CHECK_*` in school-admin-web).
 - Then flip `LUMI_APP_CHECK_ENABLED` / `NEXT_PUBLIC_APP_CHECK_ENABLED` /
   `*_APP_CHECK_ENFORCED` in that order.
+
+---
+
+## Hiccups & corrections (from the actual run, 2026-06-15)
+
+Everything below was discovered while executing this runbook. Folded back so the
+doc matches reality. The migration succeeded; these are the gaps the original
+plan missed.
+
+### Functions are v1 (Gen1), not v2 — Phase 2.1 was wrong
+
+`setGlobalOptions` is **v2-only** and had **zero effect**: every module uses
+`import * as functions from "firebase-functions"` (v1). The first deploy put all
+34 functions in **us-central1**. Fix: per-file builder, not a global option.
+
+```ts
+// at top of each file that DEFINES functions, after the imports:
+const fns = functions.region("australia-southeast1");
+```
+
+Then repoint **only the builder entries** to `fns`: the `= functions` runWith
+chains (`export const x = fns\n  .runWith(...)`), `functions.firestore.document`,
+`functions.pubsub.schedule`, and direct `functions.https.onCall`. **Leave**
+`functions.https.HttpsError`, `functions.https.CallableContext`, and
+`functions.logger` on `functions` — they're error classes / types, not builders.
+Delete the bogus `global_options.ts`. (6 files: index, impersonation,
+parent_linking, sms_rate_limit, comprehension_retention, library_counts.)
+
+### Callable count is 11 in 5 files, not 10 in 4
+
+`lib/services/sms_verification_service.dart` calls `requestSmsVerification` (the
+PR #65 SMS rate-limit callable) — missing from the original list. Also
+`impersonation_service.dart` lives in **`lib/core/services/`**, not
+`lib/services/`. And `Info.plist`'s reCAPTCHA URL scheme is on line ~42, not 38.
+
+### Firestore import is region-locked → needs a middle-hop bucket
+
+`gcloud firestore export` requires the bucket co-located with the **source**
+(us-central1), but `import` requires it co-located with the **destination**
+(australia-southeast1). So the us-central1 export bucket **cannot** be imported
+into the AU database. Real sequence:
+1. Export to `gs://lumi-kakakids-migration` (us-central1).
+2. Create `gs://lumi-ninc-au-migration` (**australia-southeast1**, uniform access).
+3. Grant the new project's Firestore agent `roles/storage.admin` on it
+   (`objectViewer` is NOT enough — import needs `storage.buckets.get`).
+4. `gcloud storage cp -r gs://lumi-kakakids-migration/firestore-export gs://lumi-ninc-au-migration/`
+5. Import from the **AU** bucket.
+
+Do **not** enable uniform bucket-level access on the us-central1 export bucket —
+it strips the creator's ACL read and breaks the cross-region copy.
+
+### auth:export is blind to import-set password hashes — don't trust it
+
+After `auth:import`, re-exporting shows **0 `passwordHash`** for every migrated
+user — but the passwords **work**. Firebase only re-exports natively-created
+hashes, not imported ones (proven by round-trip test). **Verify with a real
+`accounts:signInWithPassword`**, not a re-export. (`--hash-algo` casing didn't
+matter; `uploadAccount` returning 200 with no per-account errors = success.)
+Cleanup gotcha: `accounts:delete?key=` only self-deletes; to delete arbitrary
+users use the admin `accounts:batchDelete` with an `x-goog-user-project` header.
+
+### Gen1 scheduler jobs land in us-central1 and stay there
+
+The 9 scheduled functions' Cloud Scheduler jobs are created in **us-central1**
+regardless of function region (Gen1 ties scheduler location to App Engine).
+**Creating an App Engine app in Sydney does NOT move them** — firebase-tools
+forces us-central1. They work fine (global Pub/Sub; the job name carries the AU
+region; no student data in a cron tick), so this is accepted. The only way to
+relocate them is converting the 9 functions to **v2 `onSchedule`** (Gen2).
+
+### Callable invoker bindings can be missing after a deploy race
+
+A fresh-project first deploy hits a **`gcf-artifacts` Artifact Registry race**:
+some of 36 concurrent Gen1 builds fail with "Repository gcf-artifacts not found"
+— just re-run, the repo exists by then. **But** callables repaired via *update*
+(rather than fresh *create*) don't get the `allUsers` → `roles/cloudfunctions.invoker`
+binding that callables need, so clients get `permission-denied`. Audit all
+callables and add the binding to any that lack it.
+
+### firestore.indexes.json was missing 3 indexes
+
+Three composite indexes existed only on the old project (created out-of-band via
+console prompts, never written back). Diff `firebase firestore:indexes` between
+old and new projects and add the missing ones to the repo file. Symptom: app
+throws `failed-precondition: query requires an index` despite "all indexes READY".
+
+### Extra APIs to enable
+
+Beyond what `firebase deploy` prompts: `firebaseappcheck.googleapis.com`
+(silences the iOS DeviceCheck 403 log spam even with App Check off) and
+`cloudbilling.googleapis.com` (the admin webframeworks **CI** deploy queries
+billing info and 403s without it).
+
+### Deploy SA: skip `firebase init hosting:github`, do it manually
+
+`firebase init hosting:github` mis-resolved to **lumi-kakakids** (a global active
+project overrode `.firebaserc`), then on retry corrupted its SA-name cache, and
+each run rewrote `.firebaserc`/`firebase.json` and dumped agent-skills clutter
+(`.agents/`, `.claude/`, `skills-lock.json`). Instead, create the deploy SA
+manually and grant the **same 10 roles** the old project's `github-actions-admin`
+SA has: `firebasehosting.admin`, `run.admin`, `cloudfunctions.admin`,
+`cloudfunctions.developer`, `artifactregistry.writer`, `cloudbuild.builds.editor`,
+`iam.serviceAccountUser`, `secretmanager.secretAccessor`,
+`serviceusage.serviceUsageConsumer`, `compute.viewer`. Then
+`gh secret set FIREBASE_SERVICE_ACCOUNT_LUMI_NINC_AU < key.json`.
+
+### Pre-existing app bugs the migration surfaced (fixed in the PR)
+
+Independent of the migration but caught during smoke testing:
+- `library_picker_sheet.dart` still called the removed `SchoolLibraryService.booksStream`
+  (PR #64 fallout) → broke the web build. Repointed to paginated `fetchBooksPage`.
+- iOS comprehension recording never worked: Podfile missing `PERMISSION_MICROPHONE=1`
+  (permission_handler returns denied with no prompt) **and** the audio pods
+  (`record_darwin`/`just_audio`/`audio_session`) were absent from `Podfile.lock`.
+
+### Console-only Auth settings the runbook missed
+
+Beyond enabling Phone + test numbers (Phase 1.3): new projects ship with an
+**SMS Region Policy** that denies most regions (anti-toll-fraud). Australia
+(+61) must be explicitly allowed under Authentication → Settings → SMS region
+settings, or phone verification fails with `operation-not-allowed: SMS unable to
+be sent until this region enabled`.
+
+### Environment notes
+
+`gcloud` ran as **nicplevrit7@gmail.com** (owns both projects), distinct from the
+Firebase console account. Local Node was **v25** — too new for firebase-tools
+webframeworks (wants 20/22/24); the admin portal therefore only deploys via CI
+(Node 20), never a local `firebase deploy --only hosting:admin`.
