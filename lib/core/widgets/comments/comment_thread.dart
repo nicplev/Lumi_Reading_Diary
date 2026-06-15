@@ -38,17 +38,33 @@ class _CommentThreadState extends ConsumerState<CommentThread> {
   final _service = ReadingLogService.instance;
   bool _sending = false;
 
+  // Created once and held so the subscription stays stable across rebuilds.
+  // Building the stream inline in build() would hand StreamBuilder a new stream
+  // object on every setState (e.g. the _sending toggle on send), forcing it to
+  // drop its data and resubscribe — which made just-sent comments flicker out.
+  late Stream<List<LogCommentModel>> _commentsStream;
+
   String get _uid => FirebaseAuth.instance.currentUser?.uid ?? '';
 
   @override
   void initState() {
     super.initState();
+    _commentsStream = _service.commentsStream(widget.log);
     // Clear the unread badge once the thread is on screen.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_uid.isNotEmpty) {
         _service.markCommentsRead(widget.log, uid: _uid);
       }
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant CommentThread oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Re-point the stream only when the underlying log actually changes.
+    if (oldWidget.log.id != widget.log.id) {
+      _commentsStream = _service.commentsStream(widget.log);
+    }
   }
 
   @override
@@ -93,9 +109,19 @@ class _CommentThreadState extends ConsumerState<CommentThread> {
       mainAxisSize: MainAxisSize.min,
       children: [
         StreamBuilder<List<LogCommentModel>>(
-          stream: _service.commentsStream(widget.log),
+          stream: _commentsStream,
           builder: (context, snapshot) {
             final comments = snapshot.data ?? const <LogCommentModel>[];
+            if (snapshot.hasError && comments.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  "Couldn't load the conversation. Pull to refresh or try "
+                  'again shortly.',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                ),
+              );
+            }
             if (snapshot.connectionState == ConnectionState.waiting &&
                 comments.isEmpty) {
               return const Padding(

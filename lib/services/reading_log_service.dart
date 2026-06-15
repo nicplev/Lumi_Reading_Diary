@@ -427,12 +427,28 @@ class ReadingLogService {
 
   /// Live comment thread for a log, oldest message first. Powers the in-app
   /// conversation view for both parents and teachers.
+  ///
+  /// The `studentId` equality filter is required, not cosmetic: the comment
+  /// security rule authorizes a parent's `list` only when the query is scoped
+  /// to a `studentId` in their `linkedChildren` (teachers are allowed
+  /// unconditionally). Without it the parent read is silently denied and the
+  /// thread renders empty even though writes succeed. All comments on a log
+  /// share the log's `studentId`, so this never narrows the result set.
+  ///
+  /// Ordering is done client-side instead of via `orderBy('createdAt')` so the
+  /// equality filter doesn't pull in a composite index, and so a just-sent
+  /// comment whose server timestamp hasn't resolved yet (null → now) still
+  /// sorts to the bottom rather than jumping to the top.
   Stream<List<LogCommentModel>> commentsStream(ReadingLogModel log) {
     return _logRef(log)
         .collection('comments')
-        .orderBy('createdAt')
+        .where('studentId', isEqualTo: log.studentId)
         .snapshots()
-        .map((snap) => snap.docs.map(LogCommentModel.fromFirestore).toList());
+        .map((snap) {
+      final comments = snap.docs.map(LogCommentModel.fromFirestore).toList();
+      comments.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      return comments;
+    });
   }
 
   /// Posts a comment to a log's thread and refreshes the denormalized "last
