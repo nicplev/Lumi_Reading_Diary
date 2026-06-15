@@ -1324,6 +1324,9 @@ class _ChildTodayCardState extends State<_ChildTodayCard> {
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day);
 
+    // Broadcast so a StreamBuilder that re-subscribes (rebuild / reinsertion)
+    // doesn't trip "Stream has already been listened to" on this single-
+    // subscription Firestore stream.
     _todayLogsStream = firestore
         .collection('schools')
         .doc(schoolId)
@@ -1331,10 +1334,11 @@ class _ChildTodayCardState extends State<_ChildTodayCard> {
         .where('studentId', isEqualTo: widget.student.id)
         .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
         .orderBy('date', descending: true)
-        .snapshots();
+        .snapshots()
+        .asBroadcastStream();
 
     // Allocations targeting this student specifically …
-    final studentAllocations = firestore
+    Stream<QuerySnapshot> studentAllocations() => firestore
         .collection('schools')
         .doc(schoolId)
         .collection('allocations')
@@ -1343,7 +1347,7 @@ class _ChildTodayCardState extends State<_ChildTodayCard> {
         .snapshots();
 
     // … and whole-class allocations (empty studentIds).
-    final classAllocations = firestore
+    Stream<QuerySnapshot> classAllocations() => firestore
         .collection('schools')
         .doc(schoolId)
         .collection('allocations')
@@ -1415,9 +1419,15 @@ class _ChildTodayCardState extends State<_ChildTodayCard> {
 
 /// Merges two Firestore query streams into one stream that emits the latest
 /// pair whenever either side updates.
+///
+/// Takes stream *factories* (not streams) and exposes a broadcast stream so the
+/// result can be safely re-listened: each fresh subscription opens its own
+/// `.snapshots()` subscriptions. Passing already-created single-subscription
+/// Firestore streams here would throw "Stream has already been listened to" the
+/// moment a StreamBuilder re-subscribes (rebuild / reinsertion).
 Stream<List<QuerySnapshot>> _combineStreams(
-  Stream<QuerySnapshot> stream1,
-  Stream<QuerySnapshot> stream2,
+  Stream<QuerySnapshot> Function() factory1,
+  Stream<QuerySnapshot> Function() factory2,
 ) {
   QuerySnapshot? latest1;
   QuerySnapshot? latest2;
@@ -1425,13 +1435,15 @@ Stream<List<QuerySnapshot>> _combineStreams(
   StreamSubscription? sub1;
   StreamSubscription? sub2;
 
-  controller = StreamController<List<QuerySnapshot>>(
+  controller = StreamController<List<QuerySnapshot>>.broadcast(
     onListen: () {
-      sub1 = stream1.listen((snapshot) {
+      latest1 = null;
+      latest2 = null;
+      sub1 = factory1().listen((snapshot) {
         latest1 = snapshot;
         if (latest2 != null) controller.add([latest1!, latest2!]);
       });
-      sub2 = stream2.listen((snapshot) {
+      sub2 = factory2().listen((snapshot) {
         latest2 = snapshot;
         if (latest1 != null) controller.add([latest1!, latest2!]);
       });
@@ -1439,6 +1451,8 @@ Stream<List<QuerySnapshot>> _combineStreams(
     onCancel: () {
       sub1?.cancel();
       sub2?.cancel();
+      sub1 = null;
+      sub2 = null;
     },
   );
 

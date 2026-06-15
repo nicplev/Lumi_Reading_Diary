@@ -152,7 +152,11 @@ class ReadingLogModel {
       parentId: data['parentId'] ?? '',
       schoolId: data['schoolId'] ?? '',
       classId: data['classId'] ?? '',
-      date: (data['date'] as Timestamp).toDate(),
+      // Defensive: a pending serverTimestamp (or a malformed/legacy doc) can
+      // leave `date` null in a local snapshot — fall back rather than crash.
+      date: (data['date'] as Timestamp?)?.toDate() ??
+          (data['createdAt'] as Timestamp?)?.toDate() ??
+          DateTime.now(),
       minutesRead: data['minutesRead'] ?? 0,
       targetMinutes: data['targetMinutes'] ?? 20,
       status: LogStatus.values.firstWhere(
