@@ -635,9 +635,11 @@ class _TeacherStudentReadingHistoryScreenState
         lastCommentByRole: data['lastCommentByRole'] as String?,
         commentsViewedAt: viewedRaw == null
             ? const {}
-            : viewedRaw.map(
-                (k, v) => MapEntry(k, (v as Timestamp).toDate()),
-              ),
+            : {
+                for (final entry in viewedRaw.entries)
+                  if (entry.value is Timestamp)
+                    entry.key: (entry.value as Timestamp).toDate(),
+              },
       );
     }).toList();
   }

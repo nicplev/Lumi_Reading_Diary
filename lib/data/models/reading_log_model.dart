@@ -193,9 +193,18 @@ class ReadingLogModel {
           ? (data['lastCommentAt'] as Timestamp).toDate()
           : null,
       lastCommentByRole: data['lastCommentByRole'],
-      commentsViewedAt: (data['commentsViewedAt'] as Map<String, dynamic>?)
-              ?.map((k, v) => MapEntry(k, (v as Timestamp).toDate())) ??
-          const {},
+      commentsViewedAt: () {
+        final raw = data['commentsViewedAt'] as Map<String, dynamic>?;
+        if (raw == null) return const <String, DateTime>{};
+        // A freshly-written FieldValue.serverTimestamp() reads back as null in
+        // the local (pending) snapshot until the server resolves it — skip
+        // those entries rather than crashing on the cast.
+        return {
+          for (final entry in raw.entries)
+            if (entry.value is Timestamp)
+              entry.key: (entry.value as Timestamp).toDate(),
+        };
+      }(),
       loggedByName: data['loggedByName'],
       loggedByLabel: data['loggedByLabel'],
       loggedByRole: data['loggedByRole'] != null
