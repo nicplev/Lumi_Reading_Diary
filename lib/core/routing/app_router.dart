@@ -34,7 +34,6 @@ import '../../screens/parent/achievements_screen.dart';
 import '../../screens/parent/offline_management_screen.dart';
 import '../../screens/shared/service_status_screen.dart';
 import '../../screens/parent/student_report_screen.dart';
-import '../../screens/parent/parent_profile_screen.dart';
 import '../../screens/parent/book_browser_screen.dart';
 import '../../screens/parent/parent_notifications_screen.dart';
 import '../../screens/parent/reading_success_screen.dart';
@@ -394,15 +393,6 @@ class AppRouter {
             student: student,
           );
         },
-      ),
-
-      GoRoute(
-        path: '/parent/profile',
-        name: 'parent-profile',
-        builder: (context, state) => _userScopedRoute(
-          extra: state.extra,
-          child: (user) => ParentProfileScreen(user: user),
-        ),
       ),
 
       GoRoute(
