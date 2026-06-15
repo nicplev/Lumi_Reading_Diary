@@ -71,21 +71,30 @@ class UserSchoolIndexService {
   Future<Map<String, dynamic>?> lookupSchoolByEmail(String email) async {
     final emailHash = _hashEmail(email);
 
-    final doc = await _firestore
-        .collection(_collectionName)
-        .doc(emailHash)
-        .get();
+    try {
+      final doc = await _firestore
+          .collection(_collectionName)
+          .doc(emailHash)
+          .get();
 
-    if (!doc.exists) {
-      return null;
+      if (!doc.exists) {
+        return null;
+      }
+
+      final data = doc.data()!;
+      return {
+        'schoolId': data['schoolId'],
+        'userType': data['userType'],
+        'userId': data['userId'],
+      };
+    } on FirebaseException catch (e) {
+      // The userSchoolIndex `get` rule checks `resource.data.userId`, so a doc
+      // that doesn't exist (or isn't ours) returns permission-denied rather
+      // than an empty snapshot. Treat that as a miss so callers route the user
+      // to registration instead of surfacing a hard "Verification failed".
+      if (e.code == 'permission-denied') return null;
+      rethrow;
     }
-
-    final data = doc.data()!;
-    return {
-      'schoolId': data['schoolId'],
-      'userType': data['userType'],
-      'userId': data['userId'],
-    };
   }
 
   /// Deletes an index entry for a user.
@@ -102,11 +111,18 @@ class UserSchoolIndexService {
   /// Useful for preventing duplicate registrations.
   Future<bool> emailExists(String email) async {
     final emailHash = _hashEmail(email);
-    final doc = await _firestore
-        .collection(_collectionName)
-        .doc(emailHash)
-        .get();
-    return doc.exists;
+    try {
+      final doc = await _firestore
+          .collection(_collectionName)
+          .doc(emailHash)
+          .get();
+      return doc.exists;
+    } on FirebaseException catch (e) {
+      // permission-denied on a get means the index doc isn't readable by us —
+      // for a not-yet-registered email that's effectively "doesn't exist".
+      if (e.code == 'permission-denied') return false;
+      rethrow;
+    }
   }
 
   /// Creates or updates an index entry keyed by a hashed phone number.
@@ -139,19 +155,26 @@ class UserSchoolIndexService {
   Future<Map<String, dynamic>?> lookupSchoolByPhone(String phoneE164) async {
     final phoneHash = _hashPhone(phoneE164);
 
-    final doc = await _firestore
-        .collection(_collectionName)
-        .doc(phoneHash)
-        .get();
+    try {
+      final doc = await _firestore
+          .collection(_collectionName)
+          .doc(phoneHash)
+          .get();
 
-    if (!doc.exists) return null;
+      if (!doc.exists) return null;
 
-    final data = doc.data()!;
-    return {
-      'schoolId': data['schoolId'],
-      'userType': data['userType'],
-      'userId': data['userId'],
-    };
+      final data = doc.data()!;
+      return {
+        'schoolId': data['schoolId'],
+        'userType': data['userType'],
+        'userId': data['userId'],
+      };
+    } on FirebaseException catch (e) {
+      // See lookupSchoolByEmail: the index `get` rule denies reads of
+      // non-existent / non-owned docs, so permission-denied means "no match".
+      if (e.code == 'permission-denied') return null;
+      rethrow;
+    }
   }
 
   /// Deletes a phone-keyed index entry. Mirror of [deleteIndex].
