@@ -56,6 +56,13 @@ post_install do |installer|
       unless config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'].include?('PERMISSION_CAMERA=1')
         config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'PERMISSION_CAMERA=1'
       end
+
+      # Comprehension audio recording needs the microphone permission compiled
+      # in; permission_handler only includes permissions whose macro is set, so
+      # without this Permission.microphone.request() returns denied with no prompt.
+      unless config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'].include?('PERMISSION_MICROPHONE=1')
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'PERMISSION_MICROPHONE=1'
+      end
     end
   end
 end
