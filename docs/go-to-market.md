@@ -9,6 +9,11 @@
 > **Caveats:** all dollar figures are **starting proposals to validate**, not final
 > prices. Testimonials and the "hundreds of schools" claim are **placeholders** — replace
 > with real, consented quotes/numbers before publishing.
+> **⚠ Confidential — the KAKA connection is never public.** The public must not learn that
+> KAKA Kids is connected to or runs Lumi. Keep KAKA off **all** public/retail surfaces —
+> landing page, pricing, app stores, social, support. KAKA is named only **internally** and
+> to **existing KAKA customers / qualified wholesale leads**, who alone receive the KAKA
+> connection *and* the wholesale pricing. Publicly, Lumi is a standalone brand.
 
 ---
 
@@ -16,7 +21,8 @@
 
 - Lumi is the **digital replacement for the paper reading diary** (paper sells
   ~$7–15/student/year). **KAKA Kids School Supplies** commissioned it to replace its
-  physical-diary sales; Lumi is a **separate company**.
+  physical-diary sales; Lumi is a **separate, standalone brand** — and the KAKA connection
+  is **kept confidential from the public** (disclosed only to existing KAKA customers; see caveat above).
 - We sell through **two channels** to **two markets**:
   - **Retail (public, self-serve)** — shown on the landing page, transparent pricing.
     Buyers: **schools** *and* **individual parents**.
@@ -55,9 +61,11 @@ practice:
 - **Lumi = the product + the brand + the retail channel.** The public landing page is
   Lumi-branded and self-serve.
 
-> **Open decision (see §11):** whether/how to surface the KAKA heritage publicly (e.g.
-> "from the makers of KAKA reading diaries" as a trust signal), and the commercial terms
-> between Lumi and KAKA (revenue share, who invoices the school on wholesale deals).
+> **Confidentiality (decided — not an open question):** the Lumi–KAKA connection is
+> **never** surfaced publicly. No "from the makers of KAKA diaries," no KAKA name or logo on
+> the landing page, pricing, app stores, or social. KAKA is disclosed only to **existing KAKA
+> customers / qualified wholesale leads**, who also receive the wholesale pricing. *(The
+> Lumi↔KAKA commercial terms — rev share, who invoices — remain open; see §9.)*
 
 ```
                          ┌─────────────────────────────────────┐
@@ -228,6 +236,9 @@ and 80% less admin."*
   pricing →"** → lead form. (This is the wholesale entrance; **no prices shown**.)
 
 **Never show publicly:**
+- **The KAKA connection itself** — that KAKA Kids is connected to or runs Lumi (no name,
+  logo, or "from the makers of…" anywhere public). Disclosed only to existing KAKA
+  customers / qualified wholesale leads.
 - Wholesale per-student rates, KAKA bundle terms, contract/PO terms, internal discounts.
   These live in the sales/CS price card and in quotes.
 
@@ -415,14 +426,12 @@ None block writing/using this doc; each needs a founder/team call before **publi
    GST/tax handling and copy.
 3. **Lumi ↔ KAKA commercial terms** — revenue share, who invoices the school on wholesale,
    how the bundle is priced.
-4. **KAKA heritage on the public page** — surface "from the makers of KAKA reading diaries"
-   as a trust signal, or keep Lumi standalone?
-5. **Trial length** (30 days proposed) and **Families: free tier vs trial**, monthly-first
+4. **Trial length** (30 days proposed) and **Families: free tier vs trial**, monthly-first
    vs annual-first.
-6. **Tax/GST** display (inc/ex), invoicing entity, payment provider.
-7. **Compliance claims** — confirm GDPR/COPPA (and AU Privacy Act / state education
+5. **Tax/GST** display (inc/ex), invoicing entity, payment provider.
+6. **Compliance claims** — confirm GDPR/COPPA (and AU Privacy Act / state education
    data rules) with legal before repeating on the page.
-8. **Substantiate stats** — "80% less admin," "3× more reading," "hundreds of schools":
+7. **Substantiate stats** — "80% less admin," "3× more reading," "hundreds of schools":
    back with data or soften.
 
 ---
