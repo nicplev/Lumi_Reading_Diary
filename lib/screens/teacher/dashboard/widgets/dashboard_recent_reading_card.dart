@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/teacher_constants.dart';
+import '../../../../theme/lumi_tokens.dart';
+import '../../../../theme/lumi_typography.dart';
 import '../../../../core/widgets/lumi/student_avatar.dart';
 import '../../../../data/models/class_model.dart';
 import '../../../../data/models/reading_log_model.dart';
@@ -84,18 +84,10 @@ class _DashboardRecentReadingCardState
         return Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius:
-                BorderRadius.circular(TeacherDimensions.radiusXL),
-            border: Border.all(color: AppColors.teacherBorder),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.charcoal.withValues(alpha: 0.04),
-                blurRadius: 16,
-                spreadRadius: -4,
-                offset: const Offset(0, 4),
-              ),
-            ],
+            color: LumiTokens.paper,
+            borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+            border: Border.all(color: LumiTokens.rule),
+            boxShadow: LumiTokens.shadowCard,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -104,18 +96,18 @@ class _DashboardRecentReadingCardState
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'Recent Reading',
-                    style: TeacherTypography.sectionHeader,
+                    style: LumiType.subhead,
                   ),
                   if (widget.onViewAll != null)
                     GestureDetector(
                       onTap: widget.onViewAll,
                       child: Text(
                         'View all',
-                        style: TeacherTypography.bodySmall.copyWith(
-                          color: AppColors.teacherPrimary,
-                          fontWeight: FontWeight.w600,
+                        style: LumiType.caption.copyWith(
+                          color: LumiTokens.blue,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
@@ -135,8 +127,7 @@ class _DashboardRecentReadingCardState
                       if (index > 0)
                         Divider(
                           height: 1,
-                          color: AppColors.teacherBorder
-                              .withValues(alpha: 0.5),
+                          color: LumiTokens.rule,
                         ),
                       _RecentLogRow(
                         log: log,
@@ -163,14 +154,12 @@ class _DashboardRecentReadingCardState
             Icon(
               Icons.menu_book_rounded,
               size: 28,
-              color: AppColors.textSecondary.withValues(alpha: 0.4),
+              color: LumiTokens.muted.withValues(alpha: 0.4),
             ),
             const SizedBox(height: 8),
             Text(
               'No reading logged yet',
-              style: TeacherTypography.caption.copyWith(
-                color: AppColors.textSecondary,
-              ),
+              style: LumiType.caption,
             ),
           ],
         ),
@@ -202,12 +191,11 @@ class _RecentLogRow extends StatelessWidget {
   });
 
   static const _avatarColors = [
-    Color(0xFFF8BBD0), // pink
-    Color(0xFFBBDEFB), // blue
-    Color(0xFFC8E6C9), // green
-    Color(0xFFFFE0B2), // orange
-    Color(0xFFE1BEE7), // purple
-    Color(0xFFB2EBF2), // cyan
+    LumiTokens.tintRed,
+    LumiTokens.tintBlue,
+    LumiTokens.tintGreen,
+    LumiTokens.tintYellow,
+    LumiTokens.tintOrange,
   ];
 
   @override
@@ -235,9 +223,9 @@ class _RecentLogRow extends StatelessWidget {
             width: 64,
             child: Text(
               studentName,
-              style: TeacherTypography.bodySmall.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppColors.charcoal.withValues(alpha: 0.8),
+              style: LumiType.caption.copyWith(
+                fontWeight: FontWeight.w700,
+                color: LumiTokens.ink,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -248,9 +236,7 @@ class _RecentLogRow extends StatelessWidget {
           Expanded(
             child: Text(
               bookTitle,
-              style: TeacherTypography.bodySmall.copyWith(
-                color: AppColors.textSecondary,
-              ),
+              style: LumiType.caption,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -259,8 +245,8 @@ class _RecentLogRow extends StatelessWidget {
           // Minutes
           Text(
             '${log.minutesRead}m',
-            style: TeacherTypography.bodySmall.copyWith(
-              color: AppColors.teacherPrimary,
+            style: LumiType.caption.copyWith(
+              color: LumiTokens.blue,
               fontWeight: FontWeight.w700,
             ),
           ),

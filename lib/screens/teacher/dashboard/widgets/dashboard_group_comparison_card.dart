@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/teacher_constants.dart';
+import '../../../../theme/lumi_tokens.dart';
+import '../../../../theme/lumi_typography.dart';
 import '../../../../data/models/reading_group_model.dart';
 import '../../../../data/models/reading_log_model.dart';
 
@@ -78,17 +78,10 @@ class DashboardGroupComparisonCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
-        border: Border.all(color: AppColors.teacherBorder),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.charcoal.withValues(alpha: 0.04),
-            blurRadius: 16,
-            spreadRadius: -4,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+        border: Border.all(color: LumiTokens.rule),
+        boxShadow: LumiTokens.shadowCard,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -97,9 +90,8 @@ class DashboardGroupComparisonCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Reading Groups',
-                  style: TeacherTypography.sectionHeader
-                      .copyWith(color: AppColors.teacherPrimary)),
-              Text('This week', style: TeacherTypography.caption),
+                  style: LumiType.subhead.copyWith(color: LumiTokens.blue)),
+              Text('This week', style: LumiType.caption),
             ],
           ),
           const SizedBox(height: 16),
@@ -117,12 +109,11 @@ class DashboardGroupComparisonCard extends StatelessWidget {
           children: [
             Icon(Icons.groups_rounded,
                 size: 32,
-                color: AppColors.textSecondary.withValues(alpha: 0.3)),
+                color: LumiTokens.muted.withValues(alpha: 0.3)),
             const SizedBox(height: 8),
             Text(
               'No reading groups set up yet',
-              style: TeacherTypography.bodySmall
-                  .copyWith(color: AppColors.textSecondary),
+              style: LumiType.caption,
             ),
           ],
         ),
@@ -154,14 +145,16 @@ class DashboardGroupComparisonCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   group.name,
-                  style: TeacherTypography.bodyMedium
-                      .copyWith(fontWeight: FontWeight.w600),
+                  style: LumiType.body.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               Text(
                 '${stats.activeCount}/${stats.totalStudents} active',
-                style: TeacherTypography.caption,
+                style: LumiType.caption,
               ),
             ],
           ),
@@ -172,8 +165,7 @@ class DashboardGroupComparisonCard extends StatelessWidget {
               SizedBox(
                 width: 60,
                 child: Text('Avg min',
-                    style: TeacherTypography.caption
-                        .copyWith(fontSize: 11)),
+                    style: LumiType.caption.copyWith(fontSize: 11)),
               ),
               Expanded(
                 child: ClipRRect(
@@ -181,9 +173,8 @@ class DashboardGroupComparisonCard extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: maxAvg > 0 ? stats.avgMinutes / maxAvg : 0,
                     minHeight: 8,
-                    backgroundColor: color.withValues(alpha: 0.08),
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(color.withValues(alpha: 0.7)),
+                    backgroundColor: LumiTokens.rule,
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
                   ),
                 ),
               ),
@@ -193,9 +184,9 @@ class DashboardGroupComparisonCard extends StatelessWidget {
                 child: Text(
                   '${stats.avgMinutes.round()}',
                   textAlign: TextAlign.right,
-                  style: TeacherTypography.caption.copyWith(
+                  style: LumiType.caption.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: AppColors.charcoal,
+                    color: LumiTokens.ink,
                   ),
                 ),
               ),
@@ -208,8 +199,7 @@ class DashboardGroupComparisonCard extends StatelessWidget {
               SizedBox(
                 width: 60,
                 child: Text('Active %',
-                    style: TeacherTypography.caption
-                        .copyWith(fontSize: 11)),
+                    style: LumiType.caption.copyWith(fontSize: 11)),
               ),
               Expanded(
                 child: ClipRRect(
@@ -217,7 +207,7 @@ class DashboardGroupComparisonCard extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: stats.activePercent / 100,
                     minHeight: 8,
-                    backgroundColor: color.withValues(alpha: 0.08),
+                    backgroundColor: LumiTokens.rule,
                     valueColor: AlwaysStoppedAnimation<Color>(
                         color.withValues(alpha: 0.5)),
                   ),
@@ -229,9 +219,9 @@ class DashboardGroupComparisonCard extends StatelessWidget {
                 child: Text(
                   '${stats.activePercent}%',
                   textAlign: TextAlign.right,
-                  style: TeacherTypography.caption.copyWith(
+                  style: LumiType.caption.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: AppColors.charcoal,
+                    color: LumiTokens.ink,
                   ),
                 ),
               ),
@@ -243,11 +233,11 @@ class DashboardGroupComparisonCard extends StatelessWidget {
   }
 
   Color _parseColor(String? hex) {
-    if (hex == null || hex.isEmpty) return AppColors.teacherPrimary;
+    if (hex == null || hex.isEmpty) return LumiTokens.blue;
     try {
       return Color(int.parse(hex.replaceFirst('#', '0xFF')));
     } catch (_) {
-      return AppColors.teacherPrimary;
+      return LumiTokens.blue;
     }
   }
 }
