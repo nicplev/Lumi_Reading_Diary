@@ -27,6 +27,11 @@ class FirebaseService {
 
   // Current user stream
   Stream<User?> get authStateChanges => _auth.authStateChanges();
+
+  // Fires on sign-in/out AND on profile changes to the *same* user — notably
+  // when a phone-only account later links an email. authStateChanges can't see
+  // that, so anything that must react to an email being added watches this.
+  Stream<User?> get userChanges => _auth.userChanges();
   User? get currentUser => _auth.currentUser;
 
   // Initialize Firebase

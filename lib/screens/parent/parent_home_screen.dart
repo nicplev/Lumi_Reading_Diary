@@ -27,6 +27,7 @@ import '../../data/models/student_model.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../data/models/allocation_model.dart';
 import '../../data/providers/active_child_provider.dart';
+import '../../data/providers/user_provider.dart';
 import '../../services/book_cover_cache_service.dart';
 import '../../services/firebase_service.dart';
 import '../../services/notification_service.dart';
@@ -297,6 +298,16 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     );
   }
 
+  /// Whether the account has an email — either the (possibly stale) model
+  /// email or the live Firebase Auth email, which updates within moments of an
+  /// email being linked. Read during build so the recovery nudge reacts
+  /// without an app restart or re-login.
+  bool get _accountHasEmail {
+    final modelEmail = (widget.user.email ?? '').trim();
+    final liveEmail = (ref.watch(authEmailProvider) ?? '').trim();
+    return modelEmail.isNotEmpty || liveEmail.isNotEmpty;
+  }
+
   Widget _buildRecoveryBanner() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
@@ -413,9 +424,11 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
           const SliverToBoxAdapter(child: ParentChildSwitcher()),
 
           // Quiet recovery nudge for phone-only parents — disappears the
-          // moment they finish the add-email flow.
-          if ((widget.user.email ?? '').isEmpty)
-            SliverToBoxAdapter(child: _buildRecoveryBanner()),
+          // moment they finish the add-email flow. The model email is a stale
+          // one-time read (userProvider doesn't re-fetch when an email is
+          // linked mid-session), so we also watch the live Firebase Auth email
+          // via authEmailProvider; either one being present hides the nudge.
+          if (!_accountHasEmail) SliverToBoxAdapter(child: _buildRecoveryBanner()),
 
           // Content
           SliverPadding(
