@@ -271,6 +271,7 @@ class _RecentLogRow extends StatelessWidget {
               'assets/blobs/blob-${log.childFeeling!.name}.png',
               width: 18,
               height: 18,
+              fit: BoxFit.contain,
               errorBuilder: (_, __, ___) => const SizedBox.shrink(),
             ),
           ],

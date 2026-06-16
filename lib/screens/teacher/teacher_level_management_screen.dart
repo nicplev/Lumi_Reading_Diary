@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
 import '../../core/widgets/lumi/reading_level_picker_sheet.dart';
 import '../../core/widgets/lumi/teacher_reading_level_pill.dart';
+import '../../core/widgets/lumi/student_avatar.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/reading_level_option.dart';
 import '../../data/models/student_model.dart';
@@ -605,13 +606,6 @@ class _TeacherLevelManagementScreenState
     required StudentModel student,
     required bool isSelected,
   }) {
-    final initials = student.fullName
-        .split(' ')
-        .where((part) => part.isNotEmpty)
-        .take(2)
-        .map((part) => part[0].toUpperCase())
-        .join();
-
     return Material(
       color: AppColors.white,
       borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
@@ -653,18 +647,7 @@ class _TeacherLevelManagementScreenState
                   });
                 },
               ),
-              CircleAvatar(
-                radius: 20,
-                backgroundColor:
-                    AppColors.teacherPrimaryLight.withValues(alpha: 0.28),
-                child: Text(
-                  initials.isEmpty ? '?' : initials,
-                  style: TeacherTypography.bodyMedium.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.teacherPrimary,
-                  ),
-                ),
-              ),
+              StudentAvatar.fromStudent(student, size: 40),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

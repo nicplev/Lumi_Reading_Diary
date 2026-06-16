@@ -15,9 +15,11 @@ import '../../core/widgets/lumi_mascot.dart';
 import '../../data/models/student_link_code_model.dart';
 import '../../data/models/user_model.dart';
 import '../../data/providers/active_child_provider.dart';
+import '../../services/firebase_service.dart';
 import '../auth/link_code_scanner_screen.dart';
+import 'widgets/character_grid.dart';
 
-enum _LinkStage { code, confirm, success }
+enum _LinkStage { code, confirm, character, success }
 
 /// In-app flow that links another child to an already-signed-in parent.
 ///
@@ -43,6 +45,7 @@ class _LinkChildScreenState extends ConsumerState<LinkChildScreen> {
   bool _busy = false;
   String? _errorMessage;
   StudentLinkCodeModel? _verifiedCode;
+  String? _selectedCharacterId;
 
   @override
   void initState() {
@@ -133,7 +136,8 @@ class _LinkChildScreenState extends ConsumerState<LinkChildScreen> {
       // the switcher updates immediately even on a flaky connection.
       ref.read(activeChildIdProvider.notifier).select(code.studentId);
       ref.invalidate(parentChildrenProvider);
-      setState(() => _stage = _LinkStage.success);
+      // Linked — let the parent pick a character before the success screen.
+      setState(() => _stage = _LinkStage.character);
     } on LinkingException catch (e) {
       if (!mounted) return;
       setState(() => _errorMessage = e.userMessage);
@@ -172,6 +176,7 @@ class _LinkChildScreenState extends ConsumerState<LinkChildScreen> {
           child: switch (_stage) {
             _LinkStage.code => _buildCodeStage(),
             _LinkStage.confirm => _buildConfirmStage(),
+            _LinkStage.character => _buildCharacterStage(),
             _LinkStage.success => _buildSuccessStage(),
           },
         ),
@@ -297,6 +302,87 @@ class _LinkChildScreenState extends ConsumerState<LinkChildScreen> {
         LumiTextButton(
           onPressed: _busy ? null : _resetToCode,
           text: 'Use a different code',
+        ),
+      ],
+    );
+  }
+
+  /// Persists the chosen character to the just-linked student, then advances
+  /// to the success stage. Picking is optional — see [_skipCharacter].
+  Future<void> _saveCharacter() async {
+    final code = _verifiedCode;
+    final selected = _selectedCharacterId;
+    if (code == null || selected == null || _busy) return;
+    setState(() {
+      _busy = true;
+      _errorMessage = null;
+    });
+    try {
+      await FirebaseService.instance.firestore
+          .collection('schools')
+          .doc(code.schoolId)
+          .collection('students')
+          .doc(code.studentId)
+          .update({'characterId': selected});
+      if (!mounted) return;
+      // Re-fetch children so the new character shows on the switcher/home.
+      ref.invalidate(parentChildrenProvider);
+      setState(() => _stage = _LinkStage.success);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _errorMessage =
+          'Could not save the character. You can set it later from your profile.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _skipCharacter() {
+    setState(() {
+      _errorMessage = null;
+      _stage = _LinkStage.success;
+    });
+  }
+
+  Widget _buildCharacterStage() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LumiGap.m,
+        Text(
+          'Pick a character for $_studentFirstName',
+          style: LumiTextStyles.h2(color: AppColors.charcoal),
+          textAlign: TextAlign.center,
+        ),
+        LumiGap.xs,
+        Text(
+          "They'll see this character in the app. You can change it anytime.",
+          style: LumiTextStyles.bodyLarge(
+            color: AppColors.charcoal.withValues(alpha: 0.7),
+          ),
+          textAlign: TextAlign.center,
+        ),
+        LumiGap.l,
+        CharacterGrid(
+          selectedId: _selectedCharacterId,
+          onSelect: (id) => setState(() => _selectedCharacterId = id),
+        ),
+        if (_errorMessage != null) ...[
+          LumiGap.s,
+          _ErrorBanner(message: _errorMessage!),
+        ],
+        LumiGap.l,
+        LumiPrimaryButton(
+          onPressed:
+              _busy || _selectedCharacterId == null ? null : _saveCharacter,
+          text: 'Save & continue',
+          isLoading: _busy,
+          isFullWidth: true,
+        ),
+        LumiGap.xs,
+        LumiTextButton(
+          onPressed: _busy ? null : _skipCharacter,
+          text: 'Skip for now',
         ),
       ],
     );

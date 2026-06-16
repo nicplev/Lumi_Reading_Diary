@@ -1,29 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
-import '../../../core/characters/lumi_character.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/lumi_text_styles.dart';
 import '../../../core/theme/lumi_spacing.dart';
+import '../../../core/widgets/lumi/lumi_buttons.dart';
 import '../../../data/models/student_model.dart';
 import '../../../services/firebase_service.dart';
+import 'character_grid.dart';
 
 /// Bottom sheet that lets a parent choose a Lumi character for their child.
 ///
-/// Shows the full [LumiCharacters.all] catalogue as a 4-column grid.
-/// On selection, writes [characterId] to the student's Firestore document and
-/// calls [onChanged] with the updated [StudentModel].
+/// Shows the full [LumiCharacters.all] catalogue via [CharacterGrid]. On save,
+/// writes [characterId] to the student's Firestore document and calls
+/// [onChanged] with the updated [StudentModel].
 ///
 /// Usage:
 /// ```dart
-/// showCharacterPicker(context, student: child, schoolId: schoolId,
+/// showCharacterPicker(context, student: child,
 ///   onChanged: (updated) => setState(() => _child = updated));
 /// ```
 Future<void> showCharacterPicker(
   BuildContext context, {
   required StudentModel student,
-  required String schoolId,
   required void Function(StudentModel updated) onChanged,
 }) {
   return showModalBottomSheet(
@@ -32,7 +31,6 @@ Future<void> showCharacterPicker(
     backgroundColor: Colors.transparent,
     builder: (_) => CharacterPickerSheet(
       student: student,
-      schoolId: schoolId,
       onChanged: onChanged,
     ),
   );
@@ -40,13 +38,11 @@ Future<void> showCharacterPicker(
 
 class CharacterPickerSheet extends StatefulWidget {
   final StudentModel student;
-  final String schoolId;
   final void Function(StudentModel updated) onChanged;
 
   const CharacterPickerSheet({
     super.key,
     required this.student,
-    required this.schoolId,
     required this.onChanged,
   });
 
@@ -74,7 +70,11 @@ class _CharacterPickerSheetState extends State<CharacterPickerSheet> {
     HapticFeedback.lightImpact();
 
     try {
+      // Student docs live in a per-school subcollection; source the schoolId
+      // from the student itself so the write targets the right path.
       await FirebaseService.instance.firestore
+          .collection('schools')
+          .doc(widget.student.schoolId)
           .collection('students')
           .doc(widget.student.id)
           .update({'characterId': _selected});
@@ -97,8 +97,12 @@ class _CharacterPickerSheetState extends State<CharacterPickerSheet> {
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).viewInsets.bottom +
         MediaQuery.of(context).padding.bottom;
+    final maxHeight = MediaQuery.of(context).size.height * 0.85;
+    final canSave =
+        !_saving && _selected != null && _selected != widget.student.characterId;
 
     return Container(
+      constraints: BoxConstraints(maxHeight: maxHeight),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -109,7 +113,7 @@ class _CharacterPickerSheetState extends State<CharacterPickerSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Handle
+          // Drag handle
           Center(
             child: Container(
               width: 36,
@@ -122,11 +126,11 @@ class _CharacterPickerSheetState extends State<CharacterPickerSheet> {
             ),
           ),
           Text(
-            'Choose a character for ${widget.student.firstName}',
-            style: LumiTextStyles.h3(),
+            "Choose ${widget.student.firstName}'s character",
+            style: LumiTextStyles.h2(),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: LumiSpacing.s),
+          const SizedBox(height: LumiSpacing.xs),
           Text(
             'Your child will see this character in the app.',
             style: LumiTextStyles.bodySmall(
@@ -135,77 +139,21 @@ class _CharacterPickerSheetState extends State<CharacterPickerSheet> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: LumiSpacing.m),
-          // Character grid
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
+          // Character grid (scrolls within the sheet if it overflows)
+          Flexible(
+            child: SingleChildScrollView(
+              child: CharacterGrid(
+                selectedId: _selected,
+                onSelect: (id) => setState(() => _selected = id),
+              ),
             ),
-            itemCount: LumiCharacters.all.length,
-            itemBuilder: (context, index) {
-              final character = LumiCharacters.all[index];
-              final isSelected = _selected == character.id;
-
-              return GestureDetector(
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  setState(() => _selected = character.id);
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isSelected
-                          ? AppColors.rosePink
-                          : Colors.transparent,
-                      width: 3,
-                    ),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: AppColors.rosePink.withValues(alpha: 0.3),
-                              blurRadius: 10,
-                              spreadRadius: 2,
-                            )
-                          ]
-                        : [],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: SvgPicture.asset(character.assetPath),
-                  ),
-                ),
-              );
-            },
           ),
           const SizedBox(height: LumiSpacing.m),
-          // Save button
-          FilledButton(
-            onPressed: _saving || _selected == null ? null : _save,
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.rosePink,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
-            child: _saving
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : Text(
-                    'Save',
-                    style: LumiTextStyles.bodyMedium(color: Colors.white),
-                  ),
+          LumiPrimaryButton(
+            onPressed: canSave ? _save : null,
+            text: 'Save character',
+            isLoading: _saving,
+            isFullWidth: true,
           ),
         ],
       ),

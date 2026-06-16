@@ -476,13 +476,15 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
                   onTap: () => showCharacterPicker(
                     context,
                     student: child,
-                    schoolId: widget.user.schoolId ?? '',
                     onChanged: (updated) {
                       setState(() {
                         final idx = _linkedChildren
                             .indexWhere((c) => c.id == updated.id);
                         if (idx != -1) _linkedChildren[idx] = updated;
                       });
+                      // Re-fetch children so the character also refreshes the
+                      // switcher / home cards (which read parentChildrenProvider).
+                      ref.invalidate(parentChildrenProvider);
                     },
                   ),
                   child: Stack(

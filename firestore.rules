@@ -284,6 +284,14 @@ service cloud.firestore {
             request.resource.data.parentIds.hasAll(resource.data.parentIds) &&
             request.auth.uid in request.resource.data.parentIds;
 
+        // Profile character: a linked parent can set only their child's
+        // characterId (the profile mascot they pick in-app).
+        allow update: if isSignedIn() &&
+            writeAllowedForDev() &&
+            getUserData(schoolId).linkedChildren != null &&
+            studentId in getUserData(schoolId).linkedChildren &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['characterId']);
+
         match /readingLevelEvents/{eventId} {
           allow get, list: if isSchoolAdmin(schoolId) ||
               isTeacher(schoolId) ||
