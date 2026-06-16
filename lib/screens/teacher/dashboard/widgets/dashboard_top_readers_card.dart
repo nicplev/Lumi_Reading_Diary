@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/teacher_constants.dart';
+import '../../../../theme/lumi_tokens.dart';
+import '../../../../theme/lumi_typography.dart';
 import '../../../../core/widgets/lumi/student_avatar.dart';
 import '../../../../data/models/reading_log_model.dart';
 import '../../../../data/models/student_model.dart';
@@ -39,17 +39,10 @@ class DashboardTopReadersCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
-        border: Border.all(color: AppColors.teacherBorder),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.charcoal.withValues(alpha: 0.04),
-            blurRadius: 16,
-            spreadRadius: -4,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+        border: Border.all(color: LumiTokens.rule),
+        boxShadow: LumiTokens.shadowCard,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -59,9 +52,8 @@ class DashboardTopReadersCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Top Readers',
-                  style: TeacherTypography.sectionHeader
-                      .copyWith(color: AppColors.teacherPrimary)),
-              Text('This week', style: TeacherTypography.caption),
+                  style: LumiType.subhead.copyWith(color: LumiTokens.blue)),
+              Text('This week', style: LumiType.caption),
             ],
           ),
           const SizedBox(height: 16),
@@ -91,10 +83,10 @@ class DashboardTopReadersCard extends StatelessWidget {
     required double fraction,
   }) {
     final rankColor = switch (rank) {
-      1 => const Color(0xFFFFB300), // deep amber-gold — readable
-      2 => const Color(0xFF9E9E9E), // medium grey
-      3 => const Color(0xFFBF7E45), // warm bronze
-      _ => AppColors.textSecondary.withValues(alpha: 0.45),
+      1 => LumiTokens.yellow, // gold
+      2 => LumiTokens.muted,
+      3 => LumiTokens.muted,
+      _ => LumiTokens.muted.withValues(alpha: 0.45),
     };
     final isTopThree = rank <= 3;
     final name = student?.firstName ?? 'Unknown';
@@ -109,7 +101,7 @@ class DashboardTopReadersCard extends StatelessWidget {
             child: Text(
               '$rank',
               textAlign: TextAlign.center,
-              style: TeacherTypography.caption.copyWith(
+              style: LumiType.caption.copyWith(
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
                 color: rankColor,
@@ -123,7 +115,7 @@ class DashboardTopReadersCard extends StatelessWidget {
               : StudentAvatar(
                   characterId: null,
                   initial: '?',
-                  avatarColor: AppColors.teacherSurfaceTint,
+                  avatarColor: LumiTokens.tintBlue,
                   size: 32,
                 ),
           const SizedBox(width: 10),
@@ -137,16 +129,18 @@ class DashboardTopReadersCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         name,
-                        style: TeacherTypography.bodyMedium
-                            .copyWith(fontWeight: FontWeight.w600),
+                        style: LumiType.body.copyWith(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     Text(
                       '${minutes}m',
-                      style: TeacherTypography.bodySmall.copyWith(
+                      style: LumiType.caption.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: AppColors.teacherPrimary,
+                        color: LumiTokens.blue,
                       ),
                     ),
                   ],
@@ -157,12 +151,11 @@ class DashboardTopReadersCard extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: fraction,
                     minHeight: 7,
-                    backgroundColor:
-                        AppColors.teacherBorder.withValues(alpha: 0.4),
+                    backgroundColor: LumiTokens.rule,
                     valueColor: AlwaysStoppedAnimation<Color>(
                       isTopThree
-                          ? AppColors.teacherPrimary
-                          : AppColors.teacherAccent,
+                          ? LumiTokens.blue
+                          : LumiTokens.blue.withValues(alpha: 0.55),
                     ),
                   ),
                 ),
@@ -182,12 +175,11 @@ class DashboardTopReadersCard extends StatelessWidget {
           children: [
             Icon(Icons.emoji_events_rounded,
                 size: 32,
-                color: AppColors.textSecondary.withValues(alpha: 0.3)),
+                color: LumiTokens.muted.withValues(alpha: 0.3)),
             const SizedBox(height: 8),
             Text(
               'No reading logged yet this week',
-              style: TeacherTypography.bodySmall
-                  .copyWith(color: AppColors.textSecondary),
+              style: LumiType.caption,
             ),
           ],
         ),
