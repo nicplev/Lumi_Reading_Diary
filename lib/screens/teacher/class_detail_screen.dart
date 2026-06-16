@@ -10,6 +10,7 @@ import 'dart:io' if (dart.library.html) '../../utils/io_stub.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
+import '../../core/widgets/comments/teacher_comments_sheet.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/class_model.dart';
@@ -383,9 +384,27 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
             ),
           ),
 
-          // Comprehension question tile (gated on the school toggle so we
-          // don't surface a setting that does nothing).
-          if (_comprehensionEnabled)
+          // Class settings — currently just the comprehension question.
+          // Gated on the school toggle so we don't surface a setting that does
+          // nothing; the section label makes it discoverable rather than a
+          // blank row lost among the others.
+          if (_comprehensionEnabled) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                TeacherDimensions.paddingL,
+                TeacherDimensions.paddingL,
+                TeacherDimensions.paddingL,
+                TeacherDimensions.paddingS,
+              ),
+              child: Text(
+                'CLASS SETTINGS',
+                style: TeacherTypography.caption.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.6,
+                ),
+              ),
+            ),
             Container(
               color: AppColors.white,
               margin: const EdgeInsets.only(top: 1),
@@ -401,8 +420,15 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                   padding: const EdgeInsets.all(TeacherDimensions.paddingL),
                   child: Row(
                     children: [
-                      const Icon(Icons.mic_rounded,
-                          color: AppColors.teacherPrimary),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.teacherPrimaryLight,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.mic_rounded,
+                            size: 20, color: AppColors.teacherPrimary),
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -433,6 +459,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                 ),
               ),
             ),
+          ],
 
           // Period selector
           Container(
@@ -579,9 +606,35 @@ class _StudentCard extends StatelessWidget {
             border: Border.all(color: AppColors.teacherBorder, width: 1),
             boxShadow: TeacherDimensions.cardShadow,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+          child: StreamBuilder<QuerySnapshot>(
+            // Canonical path — logs and recordings live under the school
+            // subcollection. The previous top-level `readingLogs` query read an
+            // empty collection, so these per-student stats were always zero.
+            stream: FirebaseService.instance.firestore
+                .collection('schools')
+                .doc(student.schoolId)
+                .collection('readingLogs')
+                .where('studentId', isEqualTo: student.id)
+                .where('date',
+                    isGreaterThanOrEqualTo: Timestamp.fromDate(periodStart))
+                .where('date',
+                    isLessThanOrEqualTo: Timestamp.fromDate(periodEnd))
+                .snapshots(),
+            builder: (context, snapshot) {
+              final logs = snapshot.data?.docs
+                      .map((doc) => ReadingLogModel.fromFirestore(doc))
+                      .toList() ??
+                  [];
+              final hasRecording = logs
+                  .any((l) => (l.comprehensionAudioPath ?? '').isNotEmpty);
+              final daysCompleted = logs.length;
+              final totalMinutes = logs.fold<int>(
+                  0, (minutes, log) => minutes + log.minutesRead);
+              final averageMinutes =
+                  logs.isEmpty ? 0 : totalMinutes ~/ logs.length;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
               Row(
                 children: [
                   StudentAvatar.fromStudent(student, size: 50),
@@ -653,60 +706,45 @@ class _StudentCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                  // Mic badge when the student has a recording in this period
+                  // (muted while it's still uploading).
+                  if (hasRecording) ...[
+                    const RecordingAffordance(),
+                    const SizedBox(width: 6),
+                  ],
                   Icon(Icons.chevron_right,
                       size: 20, color: AppColors.textSecondary),
                 ],
               ),
 
               const SizedBox(height: TeacherDimensions.paddingM),
-              // Period stats
-              StreamBuilder<QuerySnapshot>(
-                stream: FirebaseService.instance.firestore
-                    .collection('readingLogs')
-                    .where('studentId', isEqualTo: student.id)
-                    .where('date',
-                        isGreaterThanOrEqualTo: Timestamp.fromDate(periodStart))
-                    .where('date',
-                        isLessThanOrEqualTo: Timestamp.fromDate(periodEnd))
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  final logs = snapshot.data?.docs
-                          .map((doc) => ReadingLogModel.fromFirestore(doc))
-                          .toList() ??
-                      [];
-
-                  final daysCompleted = logs.length;
-                  final totalMinutes = logs.fold<int>(
-                      0, (minutes, log) => minutes + log.minutesRead);
-                  final averageMinutes =
-                      logs.isEmpty ? 0 : totalMinutes ~/ logs.length;
-
-                  return Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _StatItem(
-                        label: 'Days',
-                        value: '$daysCompleted',
-                        icon: Icons.calendar_today,
-                        color: AppColors.teacherPrimary,
-                      ),
-                      _StatItem(
-                        label: 'Total Min',
-                        value: '$totalMinutes',
-                        icon: Icons.timer,
-                        color: AppColors.mintGreen,
-                      ),
-                      _StatItem(
-                        label: 'Avg Min',
-                        value: '$averageMinutes',
-                        icon: Icons.trending_up,
-                        color: AppColors.warmOrange,
-                      ),
-                    ],
-                  );
-                },
+              // Period stats (computed from the hoisted stream above).
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _StatItem(
+                    label: 'Days',
+                    value: '$daysCompleted',
+                    icon: Icons.calendar_today,
+                    color: AppColors.teacherPrimary,
+                  ),
+                  _StatItem(
+                    label: 'Total Min',
+                    value: '$totalMinutes',
+                    icon: Icons.timer,
+                    color: AppColors.mintGreen,
+                  ),
+                  _StatItem(
+                    label: 'Avg Min',
+                    value: '$averageMinutes',
+                    icon: Icons.trending_up,
+                    color: AppColors.warmOrange,
+                  ),
+                ],
               ),
-            ],
+                ],
+              );
+            },
           ),
         ),
       ),

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -156,23 +155,18 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
     setState(() => _isLoading = true);
 
     try {
-      final studentIds = widget.selectedClass!.studentIds;
-      final students = <StudentModel>[];
-
-      // Batch load in chunks of 30 (Firestore whereIn limit)
-      for (var i = 0; i < studentIds.length; i += 30) {
-        final chunk = studentIds.sublist(
-          i,
-          i + 30 > studentIds.length ? studentIds.length : i + 30,
-        );
-        final snapshot = await _firebaseService.firestore
-            .collection('schools')
-            .doc(widget.teacher.schoolId)
-            .collection('students')
-            .where(FieldPath.documentId, whereIn: chunk)
-            .get();
-        students.addAll(snapshot.docs.map(StudentModel.fromFirestore));
-      }
+      // Load the class roster from the source of truth — each student doc's
+      // `classId` — rather than the ClassModel.studentIds denormalized cache,
+      // which can be empty/stale and made "Whole Class" show 0 even when the
+      // class had students. Mirrors the roster query in TeacherClassroomScreen.
+      final studentsSnapshot = await _firebaseService.firestore
+          .collection('schools')
+          .doc(widget.teacher.schoolId)
+          .collection('students')
+          .where('classId', isEqualTo: widget.selectedClass!.id)
+          .get();
+      final students =
+          studentsSnapshot.docs.map(StudentModel.fromFirestore).toList();
 
       // Load reading groups for this class in parallel
       final groupsSnapshot = await _firebaseService.firestore

@@ -54,13 +54,19 @@ class _Tile extends StatelessWidget {
                 : _blob(feeling),
           ),
           const SizedBox(height: 6),
-          Text(
-            feeling == null ? '—' : '${bucket.value!.round()}',
-            style: TeacherTypography.caption.copyWith(
-              fontWeight: FontWeight.w700,
-              color: feeling == null
-                  ? AppColors.textSecondary.withValues(alpha: 0.6)
-                  : AppColors.charcoal,
+          // Feeling word (e.g. "Good") rather than its 1–5 number. scaleDown
+          // keeps the longest label ("Tricky") from overflowing the narrow
+          // per-day tile.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              feeling?.label ?? '—',
+              style: TeacherTypography.caption.copyWith(
+                fontWeight: FontWeight.w700,
+                color: feeling == null
+                    ? AppColors.textSecondary.withValues(alpha: 0.6)
+                    : AppColors.charcoal,
+              ),
             ),
           ),
         ],
