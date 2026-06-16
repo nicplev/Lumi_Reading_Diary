@@ -1,15 +1,16 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
+import '../../core/widgets/comments/teacher_comments_sheet.dart';
 import '../../core/widgets/lumi/reading_level_history_sheet.dart';
 import '../../core/widgets/lumi/reading_level_picker_sheet.dart';
 import '../../core/widgets/lumi/teacher_book_assignment_card.dart';
-import '../../core/widgets/audio/comprehension_audio_player.dart';
 import '../../core/widgets/lumi/teacher_reading_level_pill.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
 import '../../core/widgets/feelings/feelings_tracker_card.dart';
@@ -1126,14 +1127,19 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       final data = doc.data() as Map<String, dynamic>;
       final dateTimestamp = data['date'] as Timestamp?;
       final commentSelections = data['parentCommentSelections'];
+      final viewedRaw = data['commentsViewedAt'] as Map<String, dynamic>?;
       return _ReadingLogSnapshot(
         id: doc.id,
         date: dateTimestamp?.toDate() ?? DateTime.fromMillisecondsSinceEpoch(0),
+        createdAt: (data['createdAt'] as Timestamp?)?.toDate() ??
+            dateTimestamp?.toDate() ??
+            DateTime.fromMillisecondsSinceEpoch(0),
         allocationId: data['allocationId'] as String?,
         bookTitles: List<String>.from(data['bookTitles'] ?? const []),
         status: (data['status'] as String?) ?? '',
         minutesRead: (data['minutesRead'] as num?)?.toInt() ?? 0,
         targetMinutes: (data['targetMinutes'] as num?)?.toInt() ?? 0,
+        notes: (data['notes'] as String?)?.trim(),
         parentId: data['parentId'] as String?,
         parentComment: (data['parentComment'] as String?)?.trim(),
         parentCommentSelections: commentSelections is List
@@ -1147,6 +1153,15 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             (data['comprehensionAudioDurationSec'] as num?)?.toInt(),
         comprehensionAudioUploaded:
             data['comprehensionAudioUploaded'] as bool? ?? false,
+        lastCommentAt: (data['lastCommentAt'] as Timestamp?)?.toDate(),
+        lastCommentByRole: data['lastCommentByRole'] as String?,
+        commentsViewedAt: viewedRaw == null
+            ? const {}
+            : {
+                for (final entry in viewedRaw.entries)
+                  if (entry.value is Timestamp)
+                    entry.key: (entry.value as Timestamp).toDate(),
+              },
       );
     }).toList();
   }
@@ -1523,6 +1538,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       if (!hasChips && !hasFreeText) continue;
 
       return _LatestParentCommentViewData(
+        log: log,
         parentId: log.parentId,
         commentText: freeText,
         date: log.date,
@@ -1531,6 +1547,43 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       );
     }
     return null;
+  }
+
+  /// Builds a full [ReadingLogModel] from a row snapshot, carrying the ids and
+  /// denormalized comment state the [CommentThread] needs to read and post.
+  ReadingLogModel _toReadingLogModel(_ReadingLogSnapshot snap) {
+    return ReadingLogModel(
+      id: snap.id,
+      studentId: _currentStudent.id,
+      parentId: snap.parentId ?? '',
+      schoolId: _currentStudent.schoolId,
+      classId: _currentStudent.classId,
+      date: snap.date,
+      minutesRead: snap.minutesRead,
+      targetMinutes: snap.targetMinutes,
+      status: LogStatus.values.firstWhere(
+        (e) => e.toString() == 'LogStatus.${snap.status}',
+        orElse: () => LogStatus.pending,
+      ),
+      bookTitles: snap.bookTitles,
+      notes: snap.notes,
+      createdAt: snap.createdAt,
+      comprehensionAudioPath: snap.comprehensionAudioPath,
+      comprehensionAudioDurationSec: snap.comprehensionAudioDurationSec,
+      comprehensionAudioUploaded: snap.comprehensionAudioUploaded,
+      lastCommentAt: snap.lastCommentAt,
+      lastCommentByRole: snap.lastCommentByRole,
+      commentsViewedAt: snap.commentsViewedAt,
+    );
+  }
+
+  /// Opens the comment thread for [snap]'s log in the shared teacher sheet.
+  void _openLogComments(_ReadingLogSnapshot snap) {
+    openTeacherCommentsSheet(
+      context,
+      log: _toReadingLogModel(snap),
+      studentName: _currentStudent.fullName,
+    );
   }
 
   /// Returns only the parent's typed free-text comment, excluding chip
@@ -2063,8 +2116,11 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         ? log.bookTitles.join(', ')
         : 'Free reading';
     final minutes = log.minutesRead;
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
-    return Padding(
+    return InkWell(
+      onTap: () => _openLogComments(log),
+      child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2110,23 +2166,18 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                   height: 18,
                 ),
               ],
+              // Mic badge when the log has a recording (muted while it's still
+              // uploading). The player itself opens in the tap-through sheet.
+              if (log.comprehensionAudioPath != null) ...[
+                const SizedBox(width: 8),
+                RecordingAffordance(pending: !log.comprehensionAudioUploaded),
+              ],
+              const SizedBox(width: 10),
+              CommentAffordance(hasUnread: log.hasUnreadForTeacher(uid)),
             ],
           ),
-          if (log.hasComprehensionAudio)
-            ComprehensionAudioPlayer(
-              key: ValueKey('audio_${log.id}'),
-              storagePath: log.comprehensionAudioPath!,
-              durationSec: log.comprehensionAudioDurationSec,
-              schoolId: widget.student.schoolId,
-              logId: log.id,
-              onDeleted: () {
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Recording deleted')),
-                );
-              },
-            ),
         ],
+      ),
       ),
     );
   }
@@ -2746,7 +2797,11 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               future: _getParentName(latest.parentId),
               builder: (context, parentSnapshot) {
                 final parentName = parentSnapshot.data ?? 'Parent';
-                return Container(
+                return InkWell(
+                  onTap: () => _openLogComments(latest.log),
+                  borderRadius:
+                      BorderRadius.circular(TeacherDimensions.radiusL),
+                  child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                   decoration: BoxDecoration(
@@ -2864,6 +2919,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                         ),
                       ),
                     ],
+                  ),
                   ),
                   ),
                 );
@@ -3006,11 +3062,13 @@ class _CachedBookCover {
 class _ReadingLogSnapshot {
   final String id;
   final DateTime date;
+  final DateTime createdAt;
   final String? allocationId;
   final List<String> bookTitles;
   final String status;
   final int minutesRead;
   final int targetMinutes;
+  final String? notes;
   final String? parentId;
   final String? parentComment;
   final List<String> parentCommentSelections;
@@ -3023,10 +3081,16 @@ class _ReadingLogSnapshot {
   final String? comprehensionAudioPath;
   final int? comprehensionAudioDurationSec;
   final bool comprehensionAudioUploaded;
+  // Denormalized comment-thread state, so a row can open the thread and show an
+  // unread dot without an extra read.
+  final DateTime? lastCommentAt;
+  final String? lastCommentByRole;
+  final Map<String, DateTime> commentsViewedAt;
 
   const _ReadingLogSnapshot({
     required this.id,
     required this.date,
+    required this.createdAt,
     required this.allocationId,
     required this.bookTitles,
     required this.status,
@@ -3037,16 +3101,30 @@ class _ReadingLogSnapshot {
     required this.parentCommentSelections,
     required this.parentCommentFreeText,
     required this.childFeeling,
+    this.notes,
     this.comprehensionAudioPath,
     this.comprehensionAudioDurationSec,
     this.comprehensionAudioUploaded = false,
+    this.lastCommentAt,
+    this.lastCommentByRole,
+    this.commentsViewedAt = const {},
   });
 
   bool get hasComprehensionAudio =>
       comprehensionAudioUploaded && comprehensionAudioPath != null;
+
+  /// Whether the teacher [uid] has an unseen reply: the newest comment is from
+  /// a parent and postdates this teacher's last view of the thread.
+  bool hasUnreadForTeacher(String uid) {
+    if (lastCommentAt == null || lastCommentByRole == 'teacher') return false;
+    final viewed = commentsViewedAt[uid];
+    return viewed == null || viewed.isBefore(lastCommentAt!);
+  }
 }
 
 class _LatestParentCommentViewData {
+  /// The log this comment belongs to, so tapping the card can open its thread.
+  final _ReadingLogSnapshot log;
   final String? parentId;
   final String commentText;
   final DateTime date;
@@ -3054,6 +3132,7 @@ class _LatestParentCommentViewData {
   final String? feeling;
 
   const _LatestParentCommentViewData({
+    required this.log,
     required this.parentId,
     required this.commentText,
     required this.date,

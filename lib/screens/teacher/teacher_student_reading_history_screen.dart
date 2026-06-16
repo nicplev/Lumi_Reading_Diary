@@ -4,10 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
-import '../../core/widgets/comments/comment_thread.dart';
+import '../../core/widgets/comments/teacher_comments_sheet.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
 import '../../core/widgets/lumi/teacher_filter_chip.dart';
-import '../../data/models/log_comment_model.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../data/models/student_model.dart';
 import '../../services/firebase_service.dart';
@@ -466,8 +465,12 @@ class _TeacherStudentReadingHistoryScreenState
                   height: 18,
                 ),
               ],
+              if (log.hasRecording) ...[
+                const SizedBox(width: 8),
+                RecordingAffordance(pending: !log.comprehensionAudioUploaded),
+              ],
               const SizedBox(width: 8),
-              _CommentAffordance(hasUnread: hasUnread),
+              CommentAffordance(hasUnread: hasUnread),
               ],
             ),
           ),
@@ -584,6 +587,9 @@ class _TeacherStudentReadingHistoryScreenState
       bookTitles: snap.bookTitles,
       notes: snap.notes,
       createdAt: snap.createdAt,
+      comprehensionAudioPath: snap.comprehensionAudioPath,
+      comprehensionAudioDurationSec: snap.comprehensionAudioDurationSec,
+      comprehensionAudioUploaded: snap.comprehensionAudioUploaded,
       lastCommentAt: snap.lastCommentAt,
       lastCommentByRole: snap.lastCommentByRole,
       commentsViewedAt: snap.commentsViewedAt,
@@ -591,15 +597,10 @@ class _TeacherStudentReadingHistoryScreenState
   }
 
   void _openCommentsSheet(_ReadingLogSnapshot snap) {
-    final log = _toReadingLogModel(snap);
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _TeacherCommentsSheet(
-        log: log,
-        studentName: widget.student.fullName,
-      ),
+    openTeacherCommentsSheet(
+      context,
+      log: _toReadingLogModel(snap),
+      studentName: widget.student.fullName,
     );
   }
 
@@ -629,6 +630,11 @@ class _TeacherStudentReadingHistoryScreenState
         parentCommentFreeText:
             (data['parentCommentFreeText'] as String?)?.trim(),
         childFeeling: data['childFeeling'] as String?,
+        comprehensionAudioPath: data['comprehensionAudioPath'] as String?,
+        comprehensionAudioDurationSec:
+            (data['comprehensionAudioDurationSec'] as num?)?.toInt(),
+        comprehensionAudioUploaded:
+            data['comprehensionAudioUploaded'] as bool? ?? false,
         loggedByName: (data['loggedByName'] as String?)?.trim(),
         loggedByLabel: (data['loggedByLabel'] as String?)?.trim(),
         lastCommentAt: (data['lastCommentAt'] as Timestamp?)?.toDate(),
@@ -767,125 +773,6 @@ class _BlobFilterChip extends StatelessWidget {
 
 /// Trailing comment icon on a log row, with an accent dot when the teacher has
 /// an unseen parent reply.
-class _CommentAffordance extends StatelessWidget {
-  final bool hasUnread;
-
-  const _CommentAffordance({required this.hasUnread});
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Icon(
-          Icons.mode_comment_outlined,
-          size: 18,
-          color: hasUnread ? AppColors.teacherPrimary : AppColors.textSecondary,
-        ),
-        if (hasUnread)
-          Positioned(
-            top: -3,
-            right: -3,
-            child: Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: AppColors.teacherPrimary,
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.white, width: 1.5),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-/// Bottom sheet hosting a reading log's comment thread for a teacher, with a
-/// composer that lifts above the keyboard.
-class _TeacherCommentsSheet extends StatelessWidget {
-  final ReadingLogModel log;
-  final String studentName;
-
-  const _TeacherCommentsSheet({
-    required this.log,
-    required this.studentName,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final books =
-        log.bookTitles.isNotEmpty ? log.bookTitles.join(', ') : 'Free reading';
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: AppColors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 8),
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.teacherBorder,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                child: Row(
-                  children: [
-                    Icon(Icons.mode_comment_outlined,
-                        size: 20, color: AppColors.teacherPrimary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Comments', style: TeacherTypography.h3),
-                          Text(
-                            '$studentName · $books',
-                            style: TeacherTypography.caption
-                                .copyWith(color: AppColors.textSecondary),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Divider(height: 1, color: AppColors.teacherBorder),
-              Expanded(
-                child: ListView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    CommentThread(
-                      log: log,
-                      authorRole: CommentAuthorRole.teacher,
-                      accentColor: AppColors.teacherPrimary,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 // ─── Data Classes ─────────────────────────────────────────────────────────────
 
 class _ReadingLogSnapshot {
@@ -905,6 +792,9 @@ class _ReadingLogSnapshot {
   final String? childFeeling;
   final String? loggedByName;
   final String? loggedByLabel;
+  final String? comprehensionAudioPath;
+  final int? comprehensionAudioDurationSec;
+  final bool comprehensionAudioUploaded;
   final DateTime? lastCommentAt;
   final String? lastCommentByRole;
   final Map<String, DateTime> commentsViewedAt;
@@ -926,6 +816,9 @@ class _ReadingLogSnapshot {
     this.notes,
     this.loggedByName,
     this.loggedByLabel,
+    this.comprehensionAudioPath,
+    this.comprehensionAudioDurationSec,
+    this.comprehensionAudioUploaded = false,
     this.lastCommentAt,
     this.lastCommentByRole,
     this.commentsViewedAt = const {},
@@ -933,6 +826,10 @@ class _ReadingLogSnapshot {
 
   /// "Logged by …" attribution, or null if this is a legacy log.
   String? get loggedByDisplay => loggedByLabel ?? loggedByName;
+
+  /// Whether this log has a comprehension recording on it (uploaded or not).
+  bool get hasRecording =>
+      comprehensionAudioPath != null && comprehensionAudioPath!.isNotEmpty;
 
   /// Whether the teacher [uid] has an unseen reply: the newest comment is from
   /// a parent and postdates this teacher's last view of the thread.
