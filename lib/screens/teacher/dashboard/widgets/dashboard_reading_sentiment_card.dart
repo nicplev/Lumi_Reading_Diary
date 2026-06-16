@@ -131,6 +131,7 @@ class DashboardReadingSentimentCard extends StatelessWidget {
                       'assets/blobs/blob-${mostCommon.name}.png',
                       width: 18,
                       height: 18,
+                      fit: BoxFit.contain,
                       errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                     ),
                     const SizedBox(width: 6),
@@ -168,6 +169,7 @@ class DashboardReadingSentimentCard extends StatelessWidget {
             height: 24,
             child: Image.asset(
               'assets/blobs/blob-${feeling.name}.png',
+              fit: BoxFit.contain,
               errorBuilder: (_, __, ___) => Icon(
                 Icons.sentiment_neutral_rounded,
                 size: 20,

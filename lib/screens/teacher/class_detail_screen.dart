@@ -10,6 +10,7 @@ import 'dart:io' if (dart.library.html) '../../utils/io_stub.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
+import '../../core/widgets/lumi/student_avatar.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/student_model.dart';
@@ -583,15 +584,7 @@ class _StudentCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  CircleAvatar(
-                    radius: 25,
-                    backgroundColor: AppColors.teacherPrimaryLight,
-                    child: Text(
-                      student.firstName[0].toUpperCase(),
-                      style: TeacherTypography.h3
-                          .copyWith(color: AppColors.teacherPrimary),
-                    ),
-                  ),
+                  StudentAvatar.fromStudent(student, size: 50),
                   const SizedBox(width: TeacherDimensions.paddingM),
                   Expanded(
                     child: Column(

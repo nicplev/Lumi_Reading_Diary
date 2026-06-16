@@ -8,6 +8,7 @@ import '../../services/firebase_service.dart';
 import '../../services/reading_level_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
+import '../../core/widgets/lumi/student_avatar.dart';
 
 /// Screen for managing reading groups within a class
 /// Allows teachers to organize students by ability level or interest
@@ -231,18 +232,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          CircleAvatar(
-                            radius: 12,
-                            backgroundColor:
-                                AppColors.warmOrange.withValues(alpha: 0.2),
-                            child: Text(
-                              student.firstName[0].toUpperCase(),
-                              style: TeacherTypography.caption.copyWith(
-                                color: AppColors.warmOrange,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ),
+                          StudentAvatar.fromStudent(student, size: 24),
                           const SizedBox(width: 6),
                           Text(
                             student.fullName,
@@ -535,18 +525,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          CircleAvatar(
-                            radius: 10,
-                            backgroundColor:
-                                color.withValues(alpha: 0.15),
-                            child: Text(
-                              student.firstName[0].toUpperCase(),
-                              style: TeacherTypography.caption.copyWith(
-                                color: color,
-                                fontSize: 10,
-                              ),
-                            ),
-                          ),
+                          StudentAvatar.fromStudent(student, size: 20),
                           const SizedBox(width: 5),
                           Text(
                             student.firstName,
@@ -940,22 +919,7 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
                               student.stats?.currentStreak ?? 0;
                           return Row(
                             children: [
-                              CircleAvatar(
-                                radius: 18,
-                                backgroundColor:
-                                    groupColor.withValues(alpha: 0.12),
-                                child: Text(
-                                  student.firstName.isNotEmpty
-                                      ? student.firstName[0].toUpperCase()
-                                      : '?',
-                                  style: TextStyle(
-                                    fontFamily: 'Nunito',
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: groupColor,
-                                  ),
-                                ),
-                              ),
+                              StudentAvatar.fromStudent(student, size: 36),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Column(

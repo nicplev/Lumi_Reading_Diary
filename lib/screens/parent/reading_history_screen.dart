@@ -2409,6 +2409,7 @@ class _SessionDetailSheet extends StatelessWidget {
                           _feelingAsset(log.childFeeling!),
                           width: 36,
                           height: 36,
+                          fit: BoxFit.contain,
                         ),
                         LumiGap.horizontalS,
                         Text(

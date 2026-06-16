@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/teacher_constants.dart';
 import '../../../../core/widgets/lumi/animated_count_text.dart';
 import '../../../../core/widgets/lumi/engagement_ring_painter.dart';
+import '../../../../core/widgets/lumi/student_avatar.dart';
 import '../../../../data/models/class_model.dart';
 import '../../../../data/models/reading_log_model.dart';
 import '../../../../data/models/student_model.dart';
@@ -303,20 +304,7 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Row(
                     children: [
-                      CircleAvatar(
-                        radius: 14,
-                        backgroundColor: AppColors.teacherSurfaceTint,
-                        child: Text(
-                          student.firstName.isNotEmpty
-                              ? student.firstName[0].toUpperCase()
-                              : '?',
-                          style: TeacherTypography.caption.copyWith(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.teacherPrimary,
-                          ),
-                        ),
-                      ),
+                      StudentAvatar.fromStudent(student, size: 28),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
