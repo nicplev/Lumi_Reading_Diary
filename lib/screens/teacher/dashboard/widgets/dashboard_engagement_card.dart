@@ -1,10 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/teacher_constants.dart';
+import '../../../../theme/lumi_tokens.dart';
+import '../../../../theme/lumi_typography.dart';
 import '../../../../core/widgets/lumi/animated_count_text.dart';
 import '../../../../core/widgets/lumi/engagement_ring_painter.dart';
+import '../../../../core/widgets/lumi/student_avatar.dart';
 import '../../../../data/models/class_model.dart';
 import '../../../../data/models/reading_log_model.dart';
 import '../../../../data/models/student_model.dart';
@@ -195,22 +196,14 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
           padding: const EdgeInsets.all(20),
           clipBehavior: Clip.hardEdge,
           decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius:
-                BorderRadius.circular(TeacherDimensions.radiusXL),
+            color: LumiTokens.paper,
+            borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
             border: Border.all(
               color: isAllRead
-                  ? AppColors.success.withValues(alpha: 0.2)
-                  : AppColors.teacherBorder,
+                  ? LumiTokens.green.withValues(alpha: 0.30)
+                  : LumiTokens.rule,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.charcoal.withValues(alpha: 0.04),
-                blurRadius: 16,
-                spreadRadius: -4,
-                offset: const Offset(0, 4),
-              ),
-            ],
+            boxShadow: LumiTokens.shadowCard,
           ),
           child: AnimatedBuilder(
             animation: _flipController,
@@ -273,18 +266,15 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
                 child: Icon(
                   Icons.chevron_left_rounded,
                   size: 22,
-                  color: AppColors.textSecondary,
+                  color: LumiTokens.muted,
                 ),
               ),
             ),
-            Icon(Icons.schedule_rounded,
-                size: 16, color: AppColors.warmOrange),
+            Icon(Icons.schedule_rounded, size: 16, color: LumiTokens.yellow),
             const SizedBox(width: 6),
             Text(
               '${pendingStudents.length} haven\'t read yet',
-              style: TeacherTypography.bodyMedium.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: LumiType.subhead.copyWith(fontSize: 15),
             ),
           ],
         ),
@@ -303,27 +293,12 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Row(
                     children: [
-                      CircleAvatar(
-                        radius: 14,
-                        backgroundColor: AppColors.teacherSurfaceTint,
-                        child: Text(
-                          student.firstName.isNotEmpty
-                              ? student.firstName[0].toUpperCase()
-                              : '?',
-                          style: TeacherTypography.caption.copyWith(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.teacherPrimary,
-                          ),
-                        ),
-                      ),
+                      StudentAvatar.fromStudent(student, size: 28),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           student.fullName,
-                          style: TeacherTypography.bodySmall.copyWith(
-                            color: AppColors.charcoal,
-                          ),
+                          style: LumiType.body.copyWith(fontSize: 14),
                         ),
                       ),
                     ],
@@ -348,8 +323,8 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
     required int teacherLoggedCount,
   }) {
     final ringColors = isAllRead
-        ? [const Color(0xFF28A745), const Color(0xFF66BB6A)]
-        : [AppColors.teacherPrimary, AppColors.teacherAccent];
+        ? [LumiTokens.green, LumiTokens.green]
+        : [LumiTokens.blue, LumiTokens.blue];
 
     return Column(
       children: [
@@ -383,10 +358,9 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
                       child: AnimatedCountText(
                         value: engagementPercent,
                         suffix: '%',
-                        style: TeacherTypography.statValue.copyWith(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.charcoal.withValues(alpha: 0.7),
+                        style: LumiType.numberLarge.copyWith(
+                          fontSize: 24,
+                          color: LumiTokens.ink,
                         ),
                       ),
                     ),
@@ -395,9 +369,7 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
                 const SizedBox(height: 6),
                 Text(
                   'read today',
-                  style: TeacherTypography.caption.copyWith(
-                    fontSize: 11,
-                  ),
+                  style: LumiType.caption.copyWith(fontSize: 11),
                 ),
               ],
             ),
@@ -409,8 +381,8 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
                   _StatRow(
                     icon: Icons.menu_book_rounded,
                     dotColor: readCount > 0
-                        ? AppColors.success
-                        : AppColors.textSecondary,
+                        ? LumiTokens.green
+                        : LumiTokens.muted,
                     value: '$readCount / $totalStudents',
                     label: 'read',
                   ),
@@ -419,10 +391,7 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
                       padding: const EdgeInsets.only(left: 22, top: 2),
                       child: Text(
                         '$teacherLoggedCount logged by teacher',
-                        style: TeacherTypography.caption.copyWith(
-                          fontSize: 10,
-                          color: AppColors.textSecondary,
-                        ),
+                        style: LumiType.caption.copyWith(fontSize: 10),
                       ),
                     ),
                   const SizedBox(height: 14),
@@ -432,13 +401,13 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
                     child: notReadCount > 0
                         ? _StatRow(
                             icon: Icons.schedule_rounded,
-                            dotColor: AppColors.warmOrange,
+                            dotColor: LumiTokens.yellow,
                             value: '$notReadCount',
                             label: 'pending',
                           )
                         : _StatRow(
                             icon: Icons.schedule_rounded,
-                            dotColor: AppColors.textSecondary,
+                            dotColor: LumiTokens.muted,
                             value: '0',
                             label: 'pending',
                             isMuted: true,
@@ -448,8 +417,8 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
                   _StatRow(
                     icon: Icons.local_fire_department_rounded,
                     dotColor: onStreakCount > 0
-                        ? AppColors.warmOrange
-                        : AppColors.textSecondary,
+                        ? LumiTokens.red
+                        : LumiTokens.muted,
                     value: '$onStreakCount',
                     label: 'on streak',
                     isMuted: onStreakCount == 0,
@@ -465,14 +434,12 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: AppColors.teacherSurfaceTint,
-              borderRadius: BorderRadius.circular(12),
+              color: LumiTokens.tintBlue,
+              borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
             ),
             child: Text(
               '$totalMinutes min read today',
-              style: TeacherTypography.caption.copyWith(
-                color: AppColors.charcoal,
-              ),
+              style: LumiType.caption.copyWith(color: LumiTokens.ink),
               textAlign: TextAlign.center,
             ),
           ),
@@ -499,9 +466,7 @@ class _StatRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final valueColor = isMuted
-        ? AppColors.textSecondary
-        : AppColors.charcoal.withValues(alpha: 0.7);
+    final valueColor = isMuted ? LumiTokens.muted : LumiTokens.ink;
 
     return Row(
       children: [
@@ -519,17 +484,15 @@ class _StatRow extends StatelessWidget {
         const SizedBox(width: 10),
         Text(
           value,
-          style: TextStyle(
-            fontFamily: 'Nunito',
+          style: LumiType.subhead.copyWith(
             fontSize: 15,
-            fontWeight: FontWeight.w600,
             color: valueColor,
           ),
         ),
         const SizedBox(width: 6),
         Text(
           label,
-          style: TeacherTypography.caption,
+          style: LumiType.caption,
         ),
       ],
     );

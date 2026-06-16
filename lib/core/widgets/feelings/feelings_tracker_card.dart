@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../data/models/reading_log_model.dart';
 import '../../feelings/feeling_aggregator.dart';
+import '../../../theme/lumi_tokens.dart';
+import '../../../theme/lumi_typography.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/teacher_constants.dart';
 import 'feelings_glance_row.dart';
@@ -32,7 +34,7 @@ class FeelingsTrackerCard extends StatefulWidget {
   const FeelingsTrackerCard({
     super.key,
     required this.logs,
-    this.accentColor = AppColors.success,
+    this.accentColor = LumiTokens.green,
     this.now,
   });
 
@@ -75,8 +77,7 @@ class _FeelingsTrackerCardState extends State<FeelingsTrackerCard> {
               children: [
                 Text(
                   'This Week at a Glance',
-                  style: TeacherTypography.sectionHeader
-                      .copyWith(color: AppColors.teacherPrimary),
+                  style: LumiType.subhead.copyWith(color: widget.accentColor),
                 ),
                 const SizedBox(height: 16),
                 FeelingsGlanceRow(buckets: series.buckets),
@@ -95,8 +96,7 @@ class _FeelingsTrackerCardState extends State<FeelingsTrackerCard> {
         Flexible(
           child: Text(
             'Reading Feelings',
-            style: TeacherTypography.sectionHeader
-                .copyWith(color: AppColors.teacherPrimary),
+            style: LumiType.subhead.copyWith(color: widget.accentColor),
           ),
         ),
         _periodSelector(),
@@ -149,18 +149,18 @@ class _FeelingsTrackerCardState extends State<FeelingsTrackerCard> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: AppColors.teacherBackground,
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
-          border: Border.all(color: AppColors.teacherBorder),
+          color: LumiTokens.cream,
+          borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+          border: Border.all(color: LumiTokens.rule),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               _period.label,
-              style: TeacherTypography.caption.copyWith(
+              style: LumiType.caption.copyWith(
                 fontWeight: FontWeight.w600,
-                color: AppColors.charcoal,
+                color: LumiTokens.ink,
               ),
             ),
             const SizedBox(width: 4),
@@ -180,13 +180,12 @@ class _FeelingsTrackerCardState extends State<FeelingsTrackerCard> {
             Icon(
               Icons.sentiment_satisfied_alt_rounded,
               size: 32,
-              color: AppColors.textSecondary.withValues(alpha: 0.3),
+              color: LumiTokens.muted.withValues(alpha: 0.3),
             ),
             const SizedBox(height: 8),
             Text(
               'No reading feelings recorded yet',
-              style: TeacherTypography.bodySmall
-                  .copyWith(color: AppColors.textSecondary),
+              style: LumiType.caption,
               textAlign: TextAlign.center,
             ),
           ],
@@ -200,17 +199,10 @@ class _FeelingsTrackerCardState extends State<FeelingsTrackerCard> {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
-        border: Border.all(color: AppColors.teacherBorder),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.charcoal.withValues(alpha: 0.04),
-            blurRadius: 16,
-            spreadRadius: -4,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+        border: Border.all(color: LumiTokens.rule),
+        boxShadow: LumiTokens.shadowCard,
       ),
       child: child,
     );

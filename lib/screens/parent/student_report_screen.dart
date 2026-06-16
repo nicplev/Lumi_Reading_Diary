@@ -12,6 +12,7 @@ import '../../core/theme/lumi_spacing.dart';
 import '../../core/theme/lumi_borders.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_card.dart';
+import '../../core/widgets/lumi/student_avatar.dart';
 
 /// Screen for generating and sharing student progress reports
 /// Used by both parents and teachers
@@ -77,16 +78,7 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
           LumiGap.xs,
           Row(
             children: [
-              CircleAvatar(
-                radius: 30,
-                backgroundColor: AppColors.rosePink.withValues(alpha: 0.1),
-                child: Text(
-                  widget.student.firstName[0].toUpperCase(),
-                  style: LumiTextStyles.h2(
-                    color: AppColors.rosePink,
-                  ),
-                ),
-              ),
+              StudentAvatar.fromStudent(widget.student, size: 60),
               LumiGap.horizontalS,
               Expanded(
                 child: Column(

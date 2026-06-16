@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
 import '../../core/widgets/lumi/teacher_filter_chip.dart';
 import '../../core/widgets/lumi/teacher_settings_item.dart';
+import '../../core/widgets/lumi/student_avatar.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/notification_campaign_model.dart';
 import '../../data/models/student_model.dart';
@@ -871,23 +872,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                                 horizontal: 20, vertical: 14),
                             child: Row(
                               children: [
-                                CircleAvatar(
-                                  radius: 20,
-                                  backgroundColor: AppColors
-                                      .teacherAccent
-                                      .withValues(alpha: 0.3),
-                                  child: Text(
-                                    student.fullName.isNotEmpty
-                                        ? student.fullName[0]
-                                            .toUpperCase()
-                                        : '?',
-                                    style: TeacherTypography.bodyLarge
-                                        .copyWith(
-                                      color: AppColors.teacherPrimary,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
+                                StudentAvatar.fromStudent(student, size: 40),
                                 const SizedBox(width: 14),
                                 Expanded(
                                   child: Column(

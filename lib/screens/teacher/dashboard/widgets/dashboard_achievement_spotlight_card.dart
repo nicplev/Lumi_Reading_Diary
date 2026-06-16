@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/teacher_constants.dart';
+import '../../../../theme/lumi_tokens.dart';
+import '../../../../theme/lumi_typography.dart';
 import '../../../../data/models/achievement_model.dart';
 import '../models/student_achievement.dart';
 
@@ -27,17 +27,10 @@ class DashboardAchievementSpotlightCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
-        border: Border.all(color: AppColors.teacherBorder),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.charcoal.withValues(alpha: 0.04),
-            blurRadius: 16,
-            spreadRadius: -4,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+        border: Border.all(color: LumiTokens.rule),
+        boxShadow: LumiTokens.shadowCard,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -46,23 +39,22 @@ class DashboardAchievementSpotlightCard extends StatelessWidget {
           Row(
             children: [
               Text('Achievement Spotlight',
-                  style: TeacherTypography.sectionHeader
-                      .copyWith(color: AppColors.teacherPrimary)),
+                  style: LumiType.subhead.copyWith(color: LumiTokens.blue)),
               const Spacer(),
               if (thisWeekCount > 0)
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: AppColors.teacherPrimary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(999),
+                    color: LumiTokens.tintBlue,
+                    borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
                   ),
                   child: Text(
                     '$thisWeekCount this week',
-                    style: TeacherTypography.caption.copyWith(
+                    style: LumiType.caption.copyWith(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.teacherPrimary,
+                      color: LumiTokens.blue,
                     ),
                   ),
                 ),
@@ -111,14 +103,16 @@ class DashboardAchievementSpotlightCard extends StatelessWidget {
               children: [
                 Text(
                   a.name,
-                  style: TeacherTypography.bodyMedium
-                      .copyWith(fontWeight: FontWeight.w600),
+                  style: LumiType.body.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Text(
                   '${sa.studentFirstName} · $timeLabel',
-                  style: TeacherTypography.caption,
+                  style: LumiType.caption,
                 ),
               ],
             ),
@@ -133,7 +127,7 @@ class DashboardAchievementSpotlightCard extends StatelessWidget {
             ),
             child: Text(
               a.rarity.displayName,
-              style: TeacherTypography.caption.copyWith(
+              style: LumiType.caption.copyWith(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
                 color: rarityColor,
@@ -168,12 +162,11 @@ class DashboardAchievementSpotlightCard extends StatelessWidget {
           children: [
             Icon(Icons.military_tech_rounded,
                 size: 32,
-                color: AppColors.textSecondary.withValues(alpha: 0.3)),
+                color: LumiTokens.muted.withValues(alpha: 0.3)),
             const SizedBox(height: 8),
             Text(
               "No achievements earned yet — they'll appear here!",
-              style: TeacherTypography.bodySmall
-                  .copyWith(color: AppColors.textSecondary),
+              style: LumiType.caption,
               textAlign: TextAlign.center,
             ),
           ],

@@ -26,6 +26,11 @@ class DashboardWidgetDefinition {
   final Set<WidgetDataDependency> dataDependencies;
   final Widget Function(DashboardWidgetContext ctx) builder;
 
+  /// Optional predicate. When it returns false the dashboard skips rendering
+  /// this widget entirely — including its surrounding spacing — so a card with
+  /// nothing to show doesn't leave a doubled gap. Defaults to always visible.
+  final bool Function(DashboardWidgetContext ctx)? isVisible;
+
   const DashboardWidgetDefinition({
     required this.id,
     required this.displayName,
@@ -33,6 +38,7 @@ class DashboardWidgetDefinition {
     required this.icon,
     required this.dataDependencies,
     required this.builder,
+    this.isVisible,
   });
 }
 

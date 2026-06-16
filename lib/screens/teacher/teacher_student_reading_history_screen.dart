@@ -463,6 +463,8 @@ class _TeacherStudentReadingHistoryScreenState
                   'assets/blobs/blob-${log.childFeeling}.png',
                   width: 18,
                   height: 18,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                 ),
               ],
               if (log.hasRecording) ...[

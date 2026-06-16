@@ -10,6 +10,9 @@ import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/teacher_constants.dart';
+import '../../../theme/lumi_tokens.dart';
+import '../../../theme/lumi_typography.dart';
+import '../../../theme/section_theme.dart';
 import '../../../data/models/achievement_model.dart';
 import '../../../data/models/class_model.dart';
 import '../../../data/models/reading_group_model.dart';
@@ -499,7 +502,9 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
         .whereType<DashboardWidgetDefinition>()
         .toList();
 
-    return RawGestureDetector(
+    return LumiSectionScope(
+      section: LumiSectionTheme.dashboard,
+      child: RawGestureDetector(
       behavior: HitTestBehavior.translucent,
       gestures: <Type, GestureRecognizerFactory>{
         TapGestureRecognizer:
@@ -578,6 +583,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
           const SliverToBoxAdapter(child: SizedBox(height: 200)),
         ],
       ),
+      ),
     );
   }
 
@@ -594,12 +600,13 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
     // jump up the page when overscrolling at the bottom. The dashboard has a
     // small fixed widget count, so eager build is cheap and the extent stays
     // exact.
-    final children = <Widget>[];
-    for (var i = 0; i < defs.length; i++) {
-      if (i > 0) children.add(const SizedBox(height: 24));
-      final def = defs[i];
-
-      // Skip widgets whose shared data hasn't loaded yet
+    // First pass: keep only widgets that have loaded their data AND opt in to
+    // rendering. Skipping here — rather than inserting a zero-height placeholder
+    // — means a hidden card consumes no separator space, so a conditional widget
+    // that renders nothing (e.g. Priority Nudges with no items) doesn't leave a
+    // doubled gap between its neighbours.
+    final visible = <DashboardWidgetDefinition>[];
+    for (final def in defs) {
       final isLoading = (def.dataDependencies
                   .contains(WidgetDataDependency.students) &&
               !_studentsLoaded) ||
@@ -608,13 +615,16 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
           (def.dataDependencies
                   .contains(WidgetDataDependency.readingGroups) &&
               !_readingGroupsLoaded);
-      if (isLoading) {
-        children.add(const SizedBox.shrink());
-        continue;
-      }
+      if (isLoading) continue;
+      if (def.isVisible != null && !def.isVisible!(ctx)) continue;
+      visible.add(def);
+    }
 
+    final children = <Widget>[];
+    for (var i = 0; i < visible.length; i++) {
+      if (i > 0) children.add(const SizedBox(height: 24));
       children.add(
-        def
+        visible[i]
             .builder(ctx)
             .animate()
             .fadeIn(
@@ -832,21 +842,10 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
       decoration: BoxDecoration(
-        gradient: AppColors.teacherGradient,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
+        color: LumiSectionTheme.dashboard.accent,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
       ),
-      child: Stack(
-        children: [
-          // Decorative circles
-          Positioned(
-            right: -20,
-            top: -30,
-            child: CustomPaint(
-              size: const Size(140, 140),
-              painter: _DecorativeCirclesPainter(),
-            ),
-          ),
-          Column(
+      child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
@@ -858,8 +857,8 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
                       children: [
                         Text(
                           '$greeting, $firstName',
-                          style: TeacherTypography.h2.copyWith(
-                            color: AppColors.white,
+                          style: LumiType.heading.copyWith(
+                            color: LumiSectionTheme.dashboard.onAccent,
                           ),
                         ).animate().fadeIn(duration: 400.ms).slideY(
                               begin: -0.1,
@@ -870,17 +869,18 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
                         const SizedBox(height: 4),
                         Text(
                           DateFormat('EEEE, MMMM d').format(DateTime.now()),
-                          style: TeacherTypography.bodyMedium.copyWith(
-                            color: AppColors.white.withValues(alpha: 0.8),
+                          style: LumiType.body.copyWith(
+                            color: LumiSectionTheme.dashboard.onAccent
+                                .withValues(alpha: 0.75),
                           ),
                         ),
                         if (_dailyInsight != null) ...[
                           const SizedBox(height: 4),
                           Text(
                             _dailyInsight!,
-                            style: TeacherTypography.bodySmall.copyWith(
-                              color: AppColors.white.withValues(alpha: 0.85),
-                              fontWeight: FontWeight.w500,
+                            style: LumiType.caption.copyWith(
+                              color: LumiSectionTheme.dashboard.onAccent,
+                              fontWeight: FontWeight.w600,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -902,8 +902,6 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
               ),
             ],
           ),
-        ],
-      ),
     );
   }
 
@@ -913,13 +911,15 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
     final labelRow = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.class_outlined, size: 18, color: AppColors.white),
+        Icon(Icons.class_outlined,
+            size: 18, color: LumiSectionTheme.dashboard.onAccent),
         const SizedBox(width: 8),
         Text(
           label,
-          style: TeacherTypography.bodyMedium.copyWith(
-            color: AppColors.white,
+          style: LumiType.subhead.copyWith(
+            color: LumiSectionTheme.dashboard.onAccent,
             fontWeight: FontWeight.w700,
+            fontSize: 16,
           ),
         ),
         if (_momentumDiff != null) ...[
@@ -929,15 +929,13 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
                 ? Icons.trending_up_rounded
                 : Icons.trending_down_rounded,
             size: 16,
-            color: _momentumDiff! > 0
-                ? const Color(0xFFB9F6CA)
-                : const Color(0xFFFFCDD2),
+            color: _momentumDiff! > 0 ? LumiTokens.green : LumiTokens.red,
           ),
         ],
         if (widget.classes.length > 1) ...[
           const SizedBox(width: 6),
-          const Icon(Icons.keyboard_arrow_down,
-              size: 18, color: AppColors.white),
+          Icon(Icons.keyboard_arrow_down,
+              size: 18, color: LumiSectionTheme.dashboard.onAccent),
         ],
       ],
     );
@@ -952,8 +950,8 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
 
     // Multiple classes: interactive pill with dropdown affordance
     return Material(
-      color: AppColors.white.withValues(alpha: 0.18),
-      borderRadius: BorderRadius.circular(999),
+      color: LumiSectionTheme.dashboard.onAccent.withValues(alpha: 0.10),
+      borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
       child: InkWell(
         onTap: () => _showClassSelectorBottomSheet(context),
         onLongPress: () {
@@ -985,11 +983,11 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: AppColors.white.withValues(alpha: 0.16),
-          borderRadius: BorderRadius.circular(12),
+          color: LumiSectionTheme.dashboard.onAccent.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
         ),
-        child: const Icon(Icons.notifications_outlined,
-                size: 20, color: AppColors.white)
+        child: Icon(Icons.notifications_outlined,
+                size: 20, color: LumiSectionTheme.dashboard.onAccent)
             .animate(
                 key: ValueKey(_bellAnimCount), autoPlay: _bellAnimCount > 0)
             .scale(
@@ -1091,20 +1089,4 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
       ),
     );
   }
-}
-
-/// Decorative overlapping circles for the hero section.
-class _DecorativeCirclesPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.04)
-      ..style = PaintingStyle.fill;
-
-    canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.3), 60, paint);
-    canvas.drawCircle(Offset(size.width * 0.3, size.height * 0.6), 80, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
