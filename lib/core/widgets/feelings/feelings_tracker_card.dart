@@ -109,9 +109,42 @@ class _FeelingsTrackerCardState extends State<FeelingsTrackerCard> {
       initialValue: _period,
       onSelected: (p) => setState(() => _period = p),
       tooltip: 'Change period',
+      // Match the app's rounded, bordered surfaces instead of the default
+      // Material menu.
+      color: AppColors.white,
+      surfaceTintColor: AppColors.white,
+      elevation: 3,
+      position: PopupMenuPosition.under,
+      offset: const Offset(0, 6),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+        side: const BorderSide(color: AppColors.teacherBorder),
+      ),
       itemBuilder: (_) => [
         for (final p in FeelingPeriod.values)
-          PopupMenuItem(value: p, child: Text(p.label)),
+          PopupMenuItem(
+            value: p,
+            height: 42,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    p.label,
+                    style: TeacherTypography.caption.copyWith(
+                      fontWeight:
+                          p == _period ? FontWeight.w700 : FontWeight.w500,
+                      color: p == _period
+                          ? AppColors.teacherPrimary
+                          : AppColors.charcoal,
+                    ),
+                  ),
+                ),
+                if (p == _period)
+                  const Icon(Icons.check_rounded,
+                      size: 16, color: AppColors.teacherPrimary),
+              ],
+            ),
+          ),
       ],
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),

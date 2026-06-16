@@ -31,7 +31,11 @@ class FeelingsLineChart extends StatelessWidget {
 
     return SizedBox(
       height: 200,
-      child: LineChart(
+      // Right inset so the last x-axis label (e.g. "Sun") isn't clipped at the
+      // card edge — the plot otherwise ran flush to the right.
+      child: Padding(
+        padding: const EdgeInsets.only(right: 10),
+        child: LineChart(
         LineChartData(
           minX: 0,
           maxX: (buckets.length - 1).toDouble(),
@@ -66,7 +70,7 @@ class FeelingsLineChart extends StatelessWidget {
               sideTitles: SideTitles(
                 showTitles: true,
                 interval: 1,
-                reservedSize: 56,
+                reservedSize: 46,
                 getTitlesWidget: _leftTitle,
               ),
             ),
@@ -96,33 +100,28 @@ class FeelingsLineChart extends StatelessWidget {
           ),
         ),
       ),
+      ),
     );
   }
 
   Widget _leftTitle(double value, TitleMeta meta) {
-    final tier = feelingTierByValue[value.toInt()];
+    // Only label exact gridline values. fl_chart also samples the padded
+    // min/max edges (e.g. 5.25), whose toInt() rounded to 5 and rendered a
+    // duplicate 'Great' overlapping the top label.
+    final v = value.round();
+    if ((value - v).abs() > 0.001) return const SizedBox.shrink();
+    final tier = feelingTierByValue[v];
     if (tier == null) return const SizedBox.shrink();
+    // Feelings are categorical, so the description alone is clearer than a
+    // 1–5 numeral — the number is dropped entirely.
     return Padding(
-      padding: const EdgeInsets.only(right: 6),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
-            '${value.toInt()}',
-            style: TeacherTypography.caption.copyWith(
-              fontWeight: FontWeight.w700,
-              color: AppColors.charcoal,
-            ),
-          ),
-          Text(
-            tier,
-            style: TeacherTypography.caption.copyWith(
-              fontSize: 10,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
+      padding: const EdgeInsets.only(right: 8),
+      child: Text(
+        tier,
+        textAlign: TextAlign.right,
+        style: TeacherTypography.caption.copyWith(
+          color: AppColors.textSecondary,
+        ),
       ),
     );
   }
