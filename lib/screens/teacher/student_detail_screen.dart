@@ -5,7 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/teacher_constants.dart';
+import '../../theme/lumi_tokens.dart';
+import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/reading_level_history_sheet.dart';
 import '../../core/widgets/lumi/reading_level_picker_sheet.dart';
 import '../../core/widgets/lumi/teacher_book_assignment_card.dart';
@@ -342,9 +343,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         decoration: const BoxDecoration(
-          color: AppColors.white,
+          color: LumiTokens.paper,
           borderRadius: BorderRadius.vertical(
-            top: Radius.circular(TeacherDimensions.radiusXL),
+            top: Radius.circular(LumiTokens.radiusXL),
           ),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
@@ -355,12 +356,12 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               width: 44,
               height: 5,
               decoration: BoxDecoration(
-                color: AppColors.teacherBorder,
+                color: LumiTokens.rule,
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
             const SizedBox(height: 16),
-            Text(book.title, style: TeacherTypography.h3),
+            Text(book.title, style: LumiType.subhead),
             const SizedBox(height: 16),
             _buildSheetAction(
               icon: Icons.swap_horiz_rounded,
@@ -399,19 +400,19 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     required VoidCallback onTap,
     bool isDestructive = false,
   }) {
-    final color = isDestructive ? AppColors.error : AppColors.charcoal;
+    final color = isDestructive ? AppColors.error : LumiTokens.ink;
     return ListTile(
       leading: Icon(icon, color: color, size: 22),
       title: Text(
         label,
-        style: TeacherTypography.bodyMedium.copyWith(
+        style: LumiType.body.copyWith(
           color: color,
           fontWeight: FontWeight.w600,
         ),
       ),
       onTap: onTap,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 8),
       visualDensity: const VisualDensity(vertical: -1),
@@ -582,9 +583,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         decoration: const BoxDecoration(
-          color: AppColors.white,
+          color: LumiTokens.paper,
           borderRadius: BorderRadius.vertical(
-            top: Radius.circular(TeacherDimensions.radiusXL),
+            top: Radius.circular(LumiTokens.radiusXL),
           ),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
@@ -595,12 +596,12 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               width: 44,
               height: 5,
               decoration: BoxDecoration(
-                color: AppColors.teacherBorder,
+                color: LumiTokens.rule,
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
             const SizedBox(height: 16),
-            Text('Swap Book', style: TeacherTypography.h3),
+            Text('Swap Book', style: LumiType.subhead),
             const SizedBox(height: 16),
             _buildSwapMethodTile(
               icon: Icons.menu_book_rounded,
@@ -653,11 +654,11 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     required VoidCallback onTap,
   }) {
     return Material(
-      color: AppColors.teacherBackground,
-      borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+      color: LumiTokens.cream,
+      borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
@@ -666,11 +667,11 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: AppColors.teacherPrimaryLight,
+                  color: LumiTokens.tintRed,
                   borderRadius:
-                      BorderRadius.circular(TeacherDimensions.radiusS),
+                      BorderRadius.circular(LumiTokens.radiusSmall),
                 ),
-                child: Icon(icon, size: 18, color: AppColors.teacherPrimary),
+                child: Icon(icon, size: 18, color: LumiTokens.red),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -679,17 +680,17 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                   children: [
                     Text(
                       label,
-                      style: TeacherTypography.bodyMedium
+                      style: LumiType.body
                           .copyWith(fontWeight: FontWeight.w600),
                     ),
-                    Text(subtitle, style: TeacherTypography.caption),
+                    Text(subtitle, style: LumiType.caption),
                   ],
                 ),
               ),
               Icon(
                 Icons.chevron_right_rounded,
                 size: 20,
-                color: AppColors.textSecondary.withValues(alpha: 0.4),
+                color: LumiTokens.muted.withValues(alpha: 0.4),
               ),
             ],
           ),
@@ -846,7 +847,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     return showModalBottomSheet<_AssignmentEditScope>(
       context: context,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(TeacherDimensions.radiusL)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(LumiTokens.radiusLarge)),
       ),
       builder: (context) =>
           _buildActionScopeSheetBody(actionLabel: actionLabel),
@@ -893,18 +894,18 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: AppColors.teacherPrimaryLight,
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusS),
+          color: LumiTokens.tintRed,
+          borderRadius: BorderRadius.circular(LumiTokens.radiusSmall),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: AppColors.teacherPrimary),
+            Icon(icon, size: 14, color: LumiTokens.red),
             const SizedBox(width: 4),
             Text(
               label,
-              style: TeacherTypography.caption.copyWith(
-                color: AppColors.teacherPrimary,
+              style: LumiType.caption.copyWith(
+                color: LumiTokens.red,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -918,7 +919,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     return Row(
       children: [
         Expanded(
-          child: Text('Assigned Books', style: TeacherTypography.h3),
+          child: Text('Assigned Books', style: LumiType.subhead),
         ),
         _buildActionHeaderButton(
           icon: Icons.edit_note_rounded,
@@ -1004,7 +1005,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(TeacherDimensions.radiusL)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(LumiTokens.radiusLarge)),
       ),
       builder: (context) => _RenewBooksSheet(items: currentItems),
     );
@@ -1052,7 +1053,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               height: 4,
               margin: const EdgeInsets.only(bottom: 14),
               decoration: BoxDecoration(
-                color: AppColors.divider,
+                color: LumiTokens.rule,
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
@@ -1060,7 +1061,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               alignment: Alignment.centerLeft,
               child: Text(
                 '$actionLabel scope',
-                style: TeacherTypography.h3,
+                style: LumiType.subhead,
               ),
             ),
             const SizedBox(height: 6),
@@ -1068,7 +1069,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               alignment: Alignment.centerLeft,
               child: Text(
                 'Choose where this change should apply.',
-                style: TeacherTypography.bodySmall,
+                style: LumiType.caption,
               ),
             ),
             const SizedBox(height: 12),
@@ -1698,7 +1699,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
           didUpdate ? 'Reading level updated' : 'No reading level change saved',
         ),
         backgroundColor:
-            didUpdate ? AppColors.success : AppColors.textSecondary,
+            didUpdate ? AppColors.success : LumiTokens.muted,
       ),
     );
   }
@@ -1764,17 +1765,17 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.teacherBackground,
+      backgroundColor: LumiTokens.cream,
       appBar: AppBar(
-        backgroundColor: AppColors.white,
-        foregroundColor: AppColors.charcoal,
+        backgroundColor: LumiTokens.paper,
+        foregroundColor: LumiTokens.ink,
         elevation: 0,
-        surfaceTintColor: AppColors.white,
+        surfaceTintColor: LumiTokens.paper,
         title: Row(
           children: [
             StudentAvatar.fromStudent(_currentStudent, size: 32),
             const SizedBox(width: 10),
-            Text(_currentStudent.fullName, style: TeacherTypography.h3),
+            Text(_currentStudent.fullName, style: LumiType.subhead),
           ],
         ),
         actions: [
@@ -1851,14 +1852,14 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               final groupColor = group.color != null
                   ? Color(
                       int.parse(group.color!.replaceFirst('#', '0xFF')))
-                  : AppColors.teacherPrimary;
+                  : LumiTokens.red;
               return Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: groupColor.withValues(alpha: 0.1),
                   borderRadius:
-                      BorderRadius.circular(TeacherDimensions.radiusRound),
+                      BorderRadius.circular(LumiTokens.radiusPill),
                   border: Border.all(
                     color: groupColor.withValues(alpha: 0.3),
                     width: 1,
@@ -1878,7 +1879,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                     const SizedBox(width: 6),
                     Text(
                       group.name,
-                      style: TeacherTypography.caption.copyWith(
+                      style: LumiType.caption.copyWith(
                         color: groupColor,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1900,7 +1901,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
     if (lastRead == null) {
       label = 'No reading logged yet';
-      color = AppColors.textSecondary;
+      color = LumiTokens.muted;
     } else {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
@@ -1912,7 +1913,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         color = AppColors.success;
       } else if (diff == 1) {
         label = 'Last read yesterday';
-        color = AppColors.teacherPrimary;
+        color = LumiTokens.red;
       } else if (diff < 7) {
         label = 'Last read $diff days ago';
         color = AppColors.warmOrange;
@@ -1935,7 +1936,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         const SizedBox(width: 8),
         Text(
           label,
-          style: TeacherTypography.bodySmall.copyWith(color: color),
+          style: LumiType.caption.copyWith(color: color),
         ),
       ],
     );
@@ -1963,7 +1964,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         final logs = docs
             .map((d) => ReadingLogModel.fromFirestore(d))
             .toList(growable: false);
-        return FeelingsTrackerCard(logs: logs);
+        return FeelingsTrackerCard(logs: logs, accentColor: LumiTokens.red);
       },
     );
   }
@@ -1975,7 +1976,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Recent Reading', style: TeacherTypography.h3),
+            Text('Recent Reading', style: LumiType.subhead),
             GestureDetector(
               onTap: () => context.push(
                 '/teacher/student-reading-history/${widget.student.id}',
@@ -1983,8 +1984,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               ),
               child: Text(
                 'View all',
-                style: TeacherTypography.bodySmall.copyWith(
-                  color: AppColors.teacherPrimary,
+                style: LumiType.caption.copyWith(
+                  color: LumiTokens.red,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -2015,15 +2016,15 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 20),
                 decoration: BoxDecoration(
-                  color: AppColors.white,
+                  color: LumiTokens.paper,
                   borderRadius:
-                      BorderRadius.circular(TeacherDimensions.radiusL),
-                  border: Border.all(color: AppColors.teacherBorder),
+                      BorderRadius.circular(LumiTokens.radiusLarge),
+                  border: Border.all(color: LumiTokens.rule),
                 ),
                 child: Center(
                   child: Text(
                     'No reading history yet',
-                    style: TeacherTypography.bodySmall,
+                    style: LumiType.caption,
                   ),
                 ),
               );
@@ -2031,10 +2032,10 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
             return Container(
               decoration: BoxDecoration(
-                color: AppColors.white,
+                color: LumiTokens.paper,
                 borderRadius:
-                    BorderRadius.circular(TeacherDimensions.radiusL),
-                border: Border.all(color: AppColors.teacherBorder),
+                    BorderRadius.circular(LumiTokens.radiusLarge),
+                border: Border.all(color: LumiTokens.rule),
               ),
               child: Column(
                 children: [
@@ -2043,7 +2044,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                     if (i < logs.length - 1)
                       Divider(
                         height: 1,
-                        color: AppColors.teacherBorder,
+                        color: LumiTokens.rule,
                         indent: 14,
                         endIndent: 14,
                       ),
@@ -2079,15 +2080,15 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                   children: [
                     Text(
                       books,
-                      style: TeacherTypography.bodyMedium,
+                      style: LumiType.body,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
                     Text(
                       dateStr,
-                      style: TeacherTypography.caption.copyWith(
-                        color: AppColors.textSecondary,
+                      style: LumiType.caption.copyWith(
+                        color: LumiTokens.muted,
                       ),
                     ),
                   ],
@@ -2097,8 +2098,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               // Right: minutes + feeling blob
               Text(
                 '${minutes}m',
-                style: TeacherTypography.caption.copyWith(
-                  color: AppColors.teacherPrimary,
+                style: LumiType.caption.copyWith(
+                  color: LumiTokens.red,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -2151,13 +2152,13 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       duration: const Duration(milliseconds: 200),
       width: double.infinity,
       decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
-        border: Border.all(color: AppColors.teacherBorder),
-        boxShadow: TeacherDimensions.cardShadow,
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+        border: Border.all(color: LumiTokens.rule),
+        boxShadow: LumiTokens.shadowCard,
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2173,7 +2174,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                 ),
                 child: Row(
                   children: [
-                    Text('Reading Level', style: TeacherTypography.h3),
+                    Text('Reading Level', style: LumiType.subhead),
                     const SizedBox(width: 8),
                     TeacherReadingLevelPill(
                       label: _readingLevelCompactLabel(_currentStudent),
@@ -2187,7 +2188,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                       child: Icon(
                         Icons.keyboard_arrow_down_rounded,
                         size: 20,
-                        color: AppColors.textSecondary,
+                        color: LumiTokens.muted,
                       ),
                     ),
                   ],
@@ -2197,7 +2198,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
             // ── Expanded content ─────────────────────────────────────────
             if (_readingLevelExpanded) ...[
-              Divider(height: 1, color: AppColors.teacherBorder),
+              Divider(height: 1, color: LumiTokens.rule),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
                 child: Column(
@@ -2208,14 +2209,14 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                       children: [
                         Text(
                           _readingLevelDisplayLabel(_currentStudent),
-                          style: TeacherTypography.bodyMedium.copyWith(
-                            color: AppColors.textSecondary,
+                          style: LumiType.body.copyWith(
+                            color: LumiTokens.muted,
                           ),
                         ),
                         if (_currentStudent.readingLevelUpdatedAt != null) ...[
                           Text(
                             '  ·  Updated ${_formatCommentDate(_currentStudent.readingLevelUpdatedAt!)}',
-                            style: TeacherTypography.bodySmall,
+                            style: LumiType.caption,
                           ),
                         ],
                       ],
@@ -2232,15 +2233,15 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                         ),
                         decoration: BoxDecoration(
                           color: AppColors.error.withValues(alpha: 0.07),
-                          borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
                           border: Border.all(
                             color: AppColors.error.withValues(alpha: 0.18),
                           ),
                         ),
                         child: Text(
                           'Legacy level — pick a new level to fix.',
-                          style: TeacherTypography.bodySmall.copyWith(
-                            color: AppColors.charcoal,
+                          style: LumiType.caption.copyWith(
+                            color: LumiTokens.ink,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -2271,7 +2272,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                         TextButton(
                           onPressed: _showReadingLevelHistory,
                           style: TextButton.styleFrom(
-                            foregroundColor: AppColors.textSecondary,
+                            foregroundColor: LumiTokens.muted,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 10,
                               vertical: 6,
@@ -2280,7 +2281,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                               horizontal: -2,
                               vertical: -2,
                             ),
-                            textStyle: TeacherTypography.bodySmall,
+                            textStyle: LumiType.caption,
                           ),
                           child: const Text('History'),
                         ),
@@ -2288,8 +2289,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                         ElevatedButton(
                           onPressed: _showReadingLevelPicker,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.teacherPrimary,
-                            foregroundColor: AppColors.white,
+                            backgroundColor: LumiTokens.red,
+                            foregroundColor: LumiTokens.paper,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
                               vertical: 6,
@@ -2299,11 +2300,11 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                               horizontal: -2,
                               vertical: -2,
                             ),
-                            textStyle: TeacherTypography.bodySmall.copyWith(
+                            textStyle: LumiType.caption.copyWith(
                               fontWeight: FontWeight.w600,
                             ),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                              borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
                             ),
                           ),
                           child: const Text('Change Level'),
@@ -2331,20 +2332,20 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       label: Text(label),
       style: OutlinedButton.styleFrom(
         foregroundColor: onPressed != null
-            ? AppColors.teacherPrimary
-            : AppColors.textSecondary,
+            ? LumiTokens.red
+            : LumiTokens.muted,
         side: BorderSide(
           color: onPressed != null
-              ? AppColors.teacherPrimary.withValues(alpha: 0.35)
-              : AppColors.divider,
+              ? LumiTokens.red.withValues(alpha: 0.35)
+              : LumiTokens.rule,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
-        textStyle: TeacherTypography.bodySmall.copyWith(
+        textStyle: LumiType.caption.copyWith(
           fontWeight: FontWeight.w600,
         ),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
         ),
       ),
     );
@@ -2376,14 +2377,14 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Reading Stats', style: TeacherTypography.h3),
+        Text('Reading Stats', style: LumiType.subhead),
         const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
           decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
-            border: Border.all(color: AppColors.teacherBorder),
+            color: LumiTokens.paper,
+            borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+            border: Border.all(color: LumiTokens.rule),
           ),
           child: Row(
             children: [
@@ -2419,10 +2420,10 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     String label, {
     required IconData icon,
     double iconSize = 18,
-    Color iconColor = AppColors.teacherPrimary,
+    Color iconColor = LumiTokens.red,
     Color? circleColor,
   }) {
-    final bg = circleColor ?? AppColors.teacherPrimaryLight;
+    final bg = circleColor ?? LumiTokens.tintRed;
     return Expanded(
       child: Column(
         children: [
@@ -2439,15 +2440,15 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               fontFamily: 'Nunito',
               fontSize: 20,
               fontWeight: FontWeight.w700,
-              color: AppColors.charcoal,
+              color: LumiTokens.ink,
               height: 1,
             ),
           ),
           const SizedBox(height: 2),
           Text(
             label,
-            style: TeacherTypography.caption.copyWith(
-              color: AppColors.textSecondary,
+            style: LumiType.caption.copyWith(
+              color: LumiTokens.muted,
             ),
             overflow: TextOverflow.ellipsis,
           ),
@@ -2460,7 +2461,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     return Container(
       width: 1,
       margin: const EdgeInsets.symmetric(horizontal: 12),
-      color: AppColors.divider,
+      color: LumiTokens.rule,
     );
   }
 
@@ -2579,7 +2580,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Achievements', style: TeacherTypography.h3),
+                Text('Achievements', style: LumiType.subhead),
                 if (achievements.isNotEmpty)
                   GestureDetector(
                     onTap: () => context.push(
@@ -2588,8 +2589,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                     ),
                     child: Text(
                       'View all',
-                      style: TeacherTypography.bodySmall.copyWith(
-                        color: AppColors.teacherPrimary,
+                      style: LumiType.caption.copyWith(
+                        color: LumiTokens.red,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -2602,18 +2603,18 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
                 decoration: BoxDecoration(
-                  color: AppColors.white,
-                  borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
-                  border: Border.all(color: AppColors.divider),
+                  color: LumiTokens.paper,
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+                  border: Border.all(color: LumiTokens.rule),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.emoji_events_outlined, size: 24, color: AppColors.textSecondary),
+                    const Icon(Icons.emoji_events_outlined, size: 24, color: LumiTokens.muted),
                     const SizedBox(width: 10),
                     Text(
                       'No achievements yet',
-                      style: TeacherTypography.bodySmall.copyWith(
-                        color: AppColors.textSecondary,
+                      style: LumiType.caption.copyWith(
+                        color: LumiTokens.muted,
                       ),
                     ),
                   ],
@@ -2636,8 +2637,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                       child: Container(
                         width: 72,
                         decoration: BoxDecoration(
-                          color: AppColors.white,
-                          borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                          color: LumiTokens.paper,
+                          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
                           border: Border.all(
                             color: Color(a.effectiveColor).withValues(alpha: 0.5),
                             width: 1.5,
@@ -2659,7 +2660,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                               padding: const EdgeInsets.symmetric(horizontal: 4),
                               child: Text(
                                 a.name,
-                                style: TeacherTypography.caption.copyWith(fontSize: 9),
+                                style: LumiType.caption.copyWith(fontSize: 9),
                                 textAlign: TextAlign.center,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
@@ -2682,7 +2683,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Latest Parent Comment', style: TeacherTypography.h3),
+        Text('Latest Parent Comment', style: LumiType.subhead),
         const SizedBox(height: 8),
         StreamBuilder<QuerySnapshot>(
           stream: _firebaseService.firestore
@@ -2713,28 +2714,28 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             if (latest == null) {
               return ClipRRect(
                 borderRadius:
-                    BorderRadius.circular(TeacherDimensions.radiusL),
+                    BorderRadius.circular(LumiTokens.radiusLarge),
                 child: Container(
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    color: AppColors.white,
+                    color: LumiTokens.paper,
                     borderRadius:
-                        BorderRadius.circular(TeacherDimensions.radiusL),
-                    border: Border.all(color: AppColors.teacherBorder),
+                        BorderRadius.circular(LumiTokens.radiusLarge),
+                    border: Border.all(color: LumiTokens.rule),
                   ),
                   child: Row(
                     children: [
-                      Container(width: 4, height: 48, color: AppColors.divider),
+                      Container(width: 4, height: 48, color: LumiTokens.rule),
                       const SizedBox(width: 12),
                       Icon(
                         Icons.chat_bubble_outline_rounded,
                         size: 16,
-                        color: AppColors.textSecondary.withValues(alpha: 0.5),
+                        color: LumiTokens.muted.withValues(alpha: 0.5),
                       ),
                       const SizedBox(width: 8),
                       Text(
                         'No parent comments yet',
-                        style: TeacherTypography.bodySmall,
+                        style: LumiType.caption,
                       ),
                     ],
                   ),
@@ -2750,10 +2751,10 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                   decoration: BoxDecoration(
-                    color: AppColors.white,
+                    color: LumiTokens.paper,
                     borderRadius:
-                        BorderRadius.circular(TeacherDimensions.radiusL),
-                    border: Border.all(color: AppColors.teacherBorder),
+                        BorderRadius.circular(LumiTokens.radiusLarge),
+                    border: Border.all(color: LumiTokens.rule),
                     // Left accent via a gradient trick won't work with
                     // Border.all, so we overlay it below.
                   ),
@@ -2765,7 +2766,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                       Container(
                         width: 4,
                         decoration: BoxDecoration(
-                          color: AppColors.teacherPrimary,
+                          color: LumiTokens.red,
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -2775,13 +2776,13 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                         width: 28,
                         height: 28,
                         decoration: BoxDecoration(
-                          color: AppColors.teacherPrimaryLight,
+                          color: LumiTokens.tintRed,
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
                           Icons.chat_bubble_outline_rounded,
                           size: 14,
-                          color: AppColors.teacherPrimary,
+                          color: LumiTokens.red,
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -2807,16 +2808,16 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                                       ),
                                       decoration: BoxDecoration(
                                         color:
-                                            AppColors.teacherPrimaryLight,
+                                            LumiTokens.tintRed,
                                         borderRadius:
                                             BorderRadius.circular(
-                                                TeacherDimensions.radiusS),
+                                                LumiTokens.radiusSmall),
                                       ),
                                       child: Text(
                                         chip,
-                                        style: TeacherTypography.caption
+                                        style: LumiType.caption
                                             .copyWith(
-                                          color: AppColors.teacherPrimary,
+                                          color: LumiTokens.red,
                                         ),
                                       ),
                                     );
@@ -2836,7 +2837,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                                               latest.feeling!
                                                   .substring(1),
                                           style:
-                                              TeacherTypography.caption,
+                                              LumiType.caption,
                                         ),
                                       ],
                                     ),
@@ -2849,16 +2850,16 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                               Text(
                                 latest.commentText,
                                 style:
-                                    TeacherTypography.bodyMedium.copyWith(
+                                    LumiType.body.copyWith(
                                   fontStyle: FontStyle.italic,
-                                  color: AppColors.textSecondary,
+                                  color: LumiTokens.muted,
                                 ),
                               ),
                             ],
                             const SizedBox(height: 6),
                             Text(
                               '— $parentName · ${_formatCommentDate(latest.date)}',
-                              style: TeacherTypography.caption,
+                              style: LumiType.caption,
                             ),
                           ],
                         ),
@@ -2880,14 +2881,14 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
-        boxShadow: TeacherDimensions.cardShadow,
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+        boxShadow: LumiTokens.shadowCard,
       ),
       child: Text(
         message,
-        style: TeacherTypography.bodyMedium.copyWith(
-          color: isError ? AppColors.error : AppColors.textSecondary,
+        style: LumiType.body.copyWith(
+          color: isError ? AppColors.error : LumiTokens.muted,
         ),
       ),
     );
@@ -2916,13 +2917,13 @@ class _ScopeOptionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+      borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
       child: Ink(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
-          border: Border.all(color: AppColors.divider),
-          color: AppColors.white,
+          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+          border: Border.all(color: LumiTokens.rule),
+          color: LumiTokens.paper,
         ),
         child: Row(
           children: [
@@ -2930,10 +2931,10 @@ class _ScopeOptionTile extends StatelessWidget {
               width: 34,
               height: 34,
               decoration: BoxDecoration(
-                color: AppColors.teacherPrimaryLight.withValues(alpha: 0.35),
-                borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                color: LumiTokens.tintRed.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
               ),
-              child: Icon(icon, color: AppColors.teacherPrimary, size: 18),
+              child: Icon(icon, color: LumiTokens.red, size: 18),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -2942,21 +2943,21 @@ class _ScopeOptionTile extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: TeacherTypography.bodyMedium.copyWith(
+                    style: LumiType.body.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: TeacherTypography.bodySmall,
+                    style: LumiType.caption,
                   ),
                 ],
               ),
             ),
             const Icon(
               Icons.chevron_right_rounded,
-              color: AppColors.textSecondary,
+              color: LumiTokens.muted,
             ),
           ],
         ),
@@ -3110,7 +3111,7 @@ class _RenewBooksSheetState extends State<_RenewBooksSheet> {
               height: 4,
               margin: const EdgeInsets.only(bottom: 14),
               decoration: BoxDecoration(
-                color: AppColors.divider,
+                color: LumiTokens.rule,
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
@@ -3118,7 +3119,7 @@ class _RenewBooksSheetState extends State<_RenewBooksSheet> {
               alignment: Alignment.centerLeft,
               child: Text(
                 'Keep books for next week',
-                style: TeacherTypography.h3,
+                style: LumiType.subhead,
               ),
             ),
             const SizedBox(height: 4),
@@ -3126,7 +3127,7 @@ class _RenewBooksSheetState extends State<_RenewBooksSheet> {
               alignment: Alignment.centerLeft,
               child: Text(
                 'Uncheck books being returned',
-                style: TeacherTypography.bodySmall,
+                style: LumiType.caption,
               ),
             ),
             const SizedBox(height: 12),
@@ -3137,10 +3138,10 @@ class _RenewBooksSheetState extends State<_RenewBooksSheet> {
               return CheckboxListTile(
                 title: Text(
                   title,
-                  style: TeacherTypography.bodyMedium,
+                  style: LumiType.body,
                 ),
                 value: _selected.contains(i),
-                activeColor: AppColors.teacherPrimary,
+                activeColor: LumiTokens.red,
                 contentPadding: EdgeInsets.zero,
                 controlAffinity: ListTileControlAffinity.leading,
                 onChanged: (checked) {
@@ -3167,19 +3168,19 @@ class _RenewBooksSheetState extends State<_RenewBooksSheet> {
                       }
                     : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.teacherPrimary,
-                  foregroundColor: AppColors.white,
+                  backgroundColor: LumiTokens.red,
+                  foregroundColor: LumiTokens.paper,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+                    borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
                   ),
                 ),
                 child: Text(
                   selectedCount > 0
                       ? 'Keep $selectedCount book(s) for next week'
                       : 'Select books to keep',
-                  style: TeacherTypography.bodyMedium.copyWith(
-                    color: AppColors.white,
+                  style: LumiType.body.copyWith(
+                    color: LumiTokens.paper,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -3262,9 +3263,9 @@ class _BookPickerSheetState extends State<_BookPickerSheet> {
       maxChildSize: 0.95,
       builder: (context, scrollController) => Container(
         decoration: const BoxDecoration(
-          color: AppColors.white,
+          color: LumiTokens.paper,
           borderRadius: BorderRadius.vertical(
-            top: Radius.circular(TeacherDimensions.radiusXL),
+            top: Radius.circular(LumiTokens.radiusXL),
           ),
         ),
         child: Column(
@@ -3277,12 +3278,12 @@ class _BookPickerSheetState extends State<_BookPickerSheet> {
                     width: 44,
                     height: 5,
                     decoration: BoxDecoration(
-                      color: AppColors.teacherBorder,
+                      color: LumiTokens.rule,
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
                   const SizedBox(height: 14),
-                  Text('Choose a Book', style: TeacherTypography.h3),
+                  Text('Choose a Book', style: LumiType.subhead),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _searchController,
@@ -3292,10 +3293,10 @@ class _BookPickerSheetState extends State<_BookPickerSheet> {
                       hintText: 'Search by title or author...',
                       prefixIcon: const Icon(Icons.search, size: 20),
                       filled: true,
-                      fillColor: AppColors.teacherBackground,
+                      fillColor: LumiTokens.cream,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(
-                            TeacherDimensions.radiusM),
+                            LumiTokens.radiusMedium),
                         borderSide: BorderSide.none,
                       ),
                       contentPadding:
@@ -3318,7 +3319,7 @@ class _BookPickerSheetState extends State<_BookPickerSheet> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text('Could not load library.',
-                              style: TeacherTypography.bodySmall),
+                              style: LumiType.caption),
                           const SizedBox(height: 8),
                           TextButton(
                             onPressed: _loadNextPage,
@@ -3348,7 +3349,7 @@ class _BookPickerSheetState extends State<_BookPickerSheet> {
                             _searchQuery.isNotEmpty
                                 ? 'No books match "$_searchQuery"'
                                 : 'No books in library yet',
-                            style: TeacherTypography.bodySmall,
+                            style: LumiType.caption,
                           ),
                           if (_searchQuery.isNotEmpty && _hasMore) ...[
                             const SizedBox(height: 8),
@@ -3380,7 +3381,7 @@ class _BookPickerSheetState extends State<_BookPickerSheet> {
                       itemCount: books.length + (_hasMore ? 1 : 0),
                       separatorBuilder: (_, __) => Divider(
                         height: 1,
-                        color: AppColors.teacherBorder,
+                        color: LumiTokens.rule,
                       ),
                       itemBuilder: (context, index) {
                         if (index >= books.length) {
@@ -3395,7 +3396,7 @@ class _BookPickerSheetState extends State<_BookPickerSheet> {
                                           strokeWidth: 2),
                                     )
                                   : Text('Loading more…',
-                                      style: TeacherTypography.caption),
+                                      style: LumiType.caption),
                             ),
                           );
                         }
@@ -3450,11 +3451,8 @@ class _BookPickerSheetState extends State<_BookPickerSheet> {
                                   children: [
                                     Text(
                                       book.title,
-                                      style: TeacherTypography
-                                          .bodyMedium
-                                          .copyWith(
-                                              fontWeight:
-                                                  FontWeight.w600),
+                                      style: LumiType.body.copyWith(
+                                          fontWeight: FontWeight.w600),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -3462,7 +3460,7 @@ class _BookPickerSheetState extends State<_BookPickerSheet> {
                                       Text(
                                         book.author!,
                                         style:
-                                            TeacherTypography.caption,
+                                            LumiType.caption,
                                         maxLines: 1,
                                         overflow:
                                             TextOverflow.ellipsis,
@@ -3473,7 +3471,7 @@ class _BookPickerSheetState extends State<_BookPickerSheet> {
                               Icon(
                                 Icons.chevron_right_rounded,
                                 size: 18,
-                                color: AppColors.textSecondary
+                                color: LumiTokens.muted
                                     .withValues(alpha: 0.4),
                               ),
                             ],
@@ -3587,10 +3585,10 @@ class _SwapScannerScreenState extends State<_SwapScannerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.charcoal,
+      backgroundColor: LumiTokens.ink,
       appBar: AppBar(
-        backgroundColor: AppColors.charcoal,
-        foregroundColor: AppColors.white,
+        backgroundColor: LumiTokens.ink,
+        foregroundColor: LumiTokens.paper,
         elevation: 0,
         title: const Text(
           'Scan Replacement Book',
@@ -3617,7 +3615,7 @@ class _SwapScannerScreenState extends State<_SwapScannerScreen> {
           right: 0,
           child: Container(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
-            color: AppColors.charcoal.withValues(alpha: 0.85),
+            color: LumiTokens.ink.withValues(alpha: 0.85),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -3630,7 +3628,7 @@ class _SwapScannerScreenState extends State<_SwapScannerScreen> {
                         height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: AppColors.white,
+                          color: LumiTokens.paper,
                         ),
                       ),
                       SizedBox(width: 10),
@@ -3638,7 +3636,7 @@ class _SwapScannerScreenState extends State<_SwapScannerScreen> {
                         'Looking up book...',
                         style: TextStyle(
                           fontFamily: 'Nunito',
-                          color: AppColors.white,
+                          color: LumiTokens.paper,
                           fontSize: 14,
                         ),
                       ),
@@ -3659,7 +3657,7 @@ class _SwapScannerScreenState extends State<_SwapScannerScreen> {
                     'Point camera at an ISBN barcode',
                     style: TextStyle(
                       fontFamily: 'Nunito',
-                      color: AppColors.white,
+                      color: LumiTokens.paper,
                       fontSize: 14,
                     ),
                   ),
@@ -3678,14 +3676,14 @@ class _SwapScannerScreenState extends State<_SwapScannerScreen> {
         book.coverImageUrl!.startsWith('http');
 
     return Container(
-      color: AppColors.teacherBackground,
+      color: LumiTokens.cream,
       padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           ClipRRect(
             borderRadius:
-                BorderRadius.circular(TeacherDimensions.radiusM),
+                BorderRadius.circular(LumiTokens.radiusMedium),
             child: SizedBox(
               width: 120,
               height: 170,
@@ -3694,35 +3692,35 @@ class _SwapScannerScreenState extends State<_SwapScannerScreen> {
                       imageUrl: book.coverImageUrl!,
                       fit: BoxFit.cover,
                       fallback: Container(
-                        color: AppColors.teacherPrimaryLight,
+                        color: LumiTokens.tintRed,
                         child: const Icon(Icons.menu_book,
-                            size: 40, color: AppColors.teacherPrimary),
+                            size: 40, color: LumiTokens.red),
                       ),
                     )
                   : Container(
-                      color: AppColors.teacherPrimaryLight,
+                      color: LumiTokens.tintRed,
                       child: const Icon(Icons.menu_book,
-                          size: 40, color: AppColors.teacherPrimary),
+                          size: 40, color: LumiTokens.red),
                     ),
             ),
           ),
           const SizedBox(height: 20),
           Text(
             book.title,
-            style: TeacherTypography.h2,
+            style: LumiType.heading,
             textAlign: TextAlign.center,
           ),
           if (book.author != null) ...[
             const SizedBox(height: 4),
             Text(
               book.author!,
-              style: TeacherTypography.bodySmall,
+              style: LumiType.caption,
               textAlign: TextAlign.center,
             ),
           ],
           if (book.isbn != null) ...[
             const SizedBox(height: 8),
-            Text('ISBN ${book.isbn}', style: TeacherTypography.caption),
+            Text('ISBN ${book.isbn}', style: LumiType.caption),
           ],
           const SizedBox(height: 32),
           SizedBox(
@@ -3731,11 +3729,11 @@ class _SwapScannerScreenState extends State<_SwapScannerScreen> {
             child: ElevatedButton(
               onPressed: () => Navigator.pop(context, book),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.teacherPrimary,
-                foregroundColor: AppColors.white,
+                backgroundColor: LumiTokens.red,
+                foregroundColor: LumiTokens.paper,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(
-                      TeacherDimensions.radiusM),
+                      LumiTokens.radiusMedium),
                 ),
               ),
               child: const Text(
@@ -3759,8 +3757,8 @@ class _SwapScannerScreenState extends State<_SwapScannerScreen> {
             },
             child: Text(
               'Scan a different book',
-              style: TeacherTypography.bodyMedium.copyWith(
-                color: AppColors.teacherPrimary,
+              style: LumiType.body.copyWith(
+                color: LumiTokens.red,
                 fontWeight: FontWeight.w600,
               ),
             ),
