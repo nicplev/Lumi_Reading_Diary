@@ -9,7 +9,9 @@ class LumiTokens {
   /// Class (teacher) / Home (parent). Also the mascot's default colour.
   static const Color red    = Color(0xFFEC4544);
   /// Library section, achievements, rest-day indicators.
-  static const Color yellow = Color(0xFFFFCB05);
+  /// Deepened slightly from the guide's #FFCB05 so it reads as a foreground
+  /// colour (nav icons, leaderboard rank) against near-white surfaces.
+  static const Color yellow = Color(0xFFF2B705);
   /// Settings section, confirmation states.
   static const Color green  = Color(0xFF51BA65);
   /// Dashboard (teacher only), data viz and analytics.
@@ -31,8 +33,8 @@ class LumiTokens {
   static const Color tintOrange = Color(0xFFFED8A8);
 
   // ─── Neutrals ─────────────────────────────────────────────────────
-  /// Primary background. Warm, paperback-page feel.
-  static const Color cream    = Color(0xFFF7F5F0);
+  /// Primary background. Soft warm white — sits gently under white cards.
+  static const Color cream    = Color(0xFFFBFAF6);
   /// Card and surface fill on cream.
   static const Color paper    = Color(0xFFFFFFFF);
   /// Primary text. Never pure black.
