@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../theme/app_colors.dart';
+import '../../../theme/lumi_tokens.dart';
 
 class TeacherReadingLevelPill extends StatelessWidget {
   const TeacherReadingLevelPill({
@@ -67,19 +67,21 @@ class TeacherReadingLevelPill extends StatelessWidget {
   }
 
   _PillColors _colors() {
+    // Attention states keep a meaningful colour; a set level keeps its tier
+    // colour; the ordinary resolved state is a calm neutral outline.
     if (isUnresolved) {
       return _PillColors(
-        background: AppColors.error.withValues(alpha: 0.08),
-        border: AppColors.error.withValues(alpha: 0.18),
-        foreground: AppColors.error,
+        background: LumiTokens.red.withValues(alpha: 0.08),
+        border: LumiTokens.red.withValues(alpha: 0.20),
+        foreground: LumiTokens.red,
       );
     }
 
     if (isUnset) {
       return _PillColors(
-        background: AppColors.warmOrange.withValues(alpha: 0.10),
-        border: AppColors.warmOrange.withValues(alpha: 0.18),
-        foreground: AppColors.warmOrange,
+        background: LumiTokens.yellow.withValues(alpha: 0.12),
+        border: LumiTokens.yellow.withValues(alpha: 0.30),
+        foreground: LumiTokens.ink,
       );
     }
 
@@ -92,9 +94,9 @@ class TeacherReadingLevelPill extends StatelessWidget {
     }
 
     return _PillColors(
-      background: AppColors.teacherSurfaceTint,
-      border: AppColors.teacherBorder,
-      foreground: AppColors.teacherPrimary,
+      background: LumiTokens.paper,
+      border: LumiTokens.rule,
+      foreground: LumiTokens.ink,
     );
   }
 }

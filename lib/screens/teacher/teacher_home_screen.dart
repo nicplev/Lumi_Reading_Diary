@@ -334,12 +334,12 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
     ];
 
     // Active tab adopts its section's colour:
-    // Dashboard = blue, Class = red, Library = yellow, Settings = green.
+    // Dashboard = blue, Class = green, Library = yellow, Settings = red.
     const sectionColors = [
       LumiTokens.blue,
-      LumiTokens.red,
-      LumiTokens.yellow,
       LumiTokens.green,
+      LumiTokens.yellow,
+      LumiTokens.red,
     ];
 
     return DecoratedBox(

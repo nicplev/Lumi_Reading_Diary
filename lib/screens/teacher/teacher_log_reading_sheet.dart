@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/teacher_constants.dart';
+import '../../theme/lumi_tokens.dart';
+import '../../theme/lumi_typography.dart';
 import '../../data/models/allocation_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/user_model.dart';
@@ -30,10 +30,10 @@ class TeacherLogReadingSheet extends StatefulWidget {
     return showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.white,
+      backgroundColor: LumiTokens.paper,
       shape: const RoundedRectangleBorder(
         borderRadius:
-            BorderRadius.vertical(top: Radius.circular(TeacherDimensions.radiusL)),
+            BorderRadius.vertical(top: Radius.circular(LumiTokens.radiusLarge)),
       ),
       builder: (ctx) => TeacherLogReadingSheet(teacher: teacher, student: student),
     );
@@ -248,7 +248,7 @@ class _TeacherLogReadingSheetState extends State<TeacherLogReadingSheet> {
             width: 36,
             height: 4,
             decoration: BoxDecoration(
-              color: AppColors.teacherBorder,
+              color: LumiTokens.rule,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -261,33 +261,34 @@ class _TeacherLogReadingSheetState extends State<TeacherLogReadingSheet> {
   Widget _buildDateRow() {
     return InkWell(
       onTap: _pickDate,
-      borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+      borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: AppColors.teacherSurfaceTint,
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+          color: LumiTokens.cream,
+          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+          border: Border.all(color: LumiTokens.rule),
         ),
         child: Row(
           children: [
             const Icon(Icons.calendar_today_rounded,
-                size: 18, color: AppColors.teacherPrimary),
+                size: 18, color: LumiTokens.muted),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Reading date',
-                      style: TeacherTypography.caption.copyWith(
-                        color: AppColors.textSecondary,
+                      style: LumiType.caption.copyWith(
+                        color: LumiTokens.muted,
                       )),
                   Text(_relativeDateLabel(_date),
-                      style: TeacherTypography.bodyLarge),
+                      style: LumiType.bodyL),
                 ],
               ),
             ),
             const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textSecondary),
+                color: LumiTokens.muted),
           ],
         ),
       ),
@@ -298,7 +299,7 @@ class _TeacherLogReadingSheetState extends State<TeacherLogReadingSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('What did they read?', style: TeacherTypography.h3),
+        Text('What did they read?', style: LumiType.subhead),
         const SizedBox(height: 8),
         if (_isLoadingAllocations)
           const Padding(
@@ -309,18 +310,18 @@ class _TeacherLogReadingSheetState extends State<TeacherLogReadingSheet> {
           ..._assignedBooks.map((book) => CheckboxListTile(
                 value: _selectedAssignedTitles.contains(book.title),
                 onChanged: (v) => _toggleAssignedTitle(book, v == true),
-                title: Text(book.title, style: TeacherTypography.bodyMedium),
+                title: Text(book.title, style: LumiType.body),
                 contentPadding: EdgeInsets.zero,
                 controlAffinity: ListTileControlAffinity.leading,
                 dense: true,
-                activeColor: AppColors.teacherPrimary,
+                activeColor: LumiTokens.green,
               )),
         ],
         const SizedBox(height: 8),
         Text(
           _assignedBooks.isEmpty ? 'Add a book' : 'Or add another title',
-          style: TeacherTypography.caption.copyWith(
-            color: AppColors.textSecondary,
+          style: LumiType.caption.copyWith(
+            color: LumiTokens.muted,
           ),
         ),
         const SizedBox(height: 6),
@@ -341,7 +342,7 @@ class _TeacherLogReadingSheetState extends State<TeacherLogReadingSheet> {
             IconButton(
               onPressed: _addCustomTitle,
               icon: const Icon(Icons.add_circle),
-              color: AppColors.teacherPrimary,
+              color: LumiTokens.green,
             ),
           ],
         ),
@@ -369,7 +370,7 @@ class _TeacherLogReadingSheetState extends State<TeacherLogReadingSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Minutes read', style: TeacherTypography.h3),
+        Text('Minutes read', style: LumiType.subhead),
         const SizedBox(height: 8),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -379,7 +380,7 @@ class _TeacherLogReadingSheetState extends State<TeacherLogReadingSheet> {
                   ? () => setState(() => _minutes -= 5)
                   : null,
               icon: const Icon(Icons.remove_circle_outline),
-              color: AppColors.teacherPrimary,
+              color: LumiTokens.green,
               iconSize: 28,
             ),
             SizedBox(
@@ -387,8 +388,7 @@ class _TeacherLogReadingSheetState extends State<TeacherLogReadingSheet> {
               child: Center(
                 child: Text(
                   '$_minutes min',
-                  style: TeacherTypography.h1
-                      .copyWith(color: AppColors.teacherPrimary),
+                  style: LumiType.heading.copyWith(color: LumiTokens.ink),
                   maxLines: 1,
                 ),
               ),
@@ -398,7 +398,7 @@ class _TeacherLogReadingSheetState extends State<TeacherLogReadingSheet> {
                   ? () => setState(() => _minutes += 5)
                   : null,
               icon: const Icon(Icons.add_circle_outline),
-              color: AppColors.teacherPrimary,
+              color: LumiTokens.green,
               iconSize: 28,
             ),
           ],
@@ -417,9 +417,9 @@ class _TeacherLogReadingSheetState extends State<TeacherLogReadingSheet> {
                 onSelected: (v) {
                   if (v) setState(() => _minutes = m);
                 },
-                selectedColor: AppColors.teacherPrimary,
+                selectedColor: LumiTokens.green,
                 labelStyle: TextStyle(
-                  color: selected ? AppColors.white : AppColors.charcoal,
+                  color: selected ? LumiTokens.paper : LumiTokens.ink,
                   fontWeight: selected ? FontWeight.bold : FontWeight.normal,
                 ),
               );
@@ -434,7 +434,7 @@ class _TeacherLogReadingSheetState extends State<TeacherLogReadingSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Note (optional)', style: TeacherTypography.h3),
+        Text('Note (optional)', style: LumiType.subhead),
         const SizedBox(height: 8),
         TextField(
           controller: _notesController,
@@ -452,9 +452,9 @@ class _TeacherLogReadingSheetState extends State<TeacherLogReadingSheet> {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: LumiTokens.paper,
         border: Border(
-          top: BorderSide(color: AppColors.teacherBorder.withValues(alpha: 0.5)),
+          top: BorderSide(color: LumiTokens.rule.withValues(alpha: 0.5)),
         ),
       ),
       child: Row(
@@ -462,6 +462,9 @@ class _TeacherLogReadingSheetState extends State<TeacherLogReadingSheet> {
           Expanded(
             child: TextButton(
               onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
+              style: TextButton.styleFrom(
+                foregroundColor: LumiTokens.muted,
+              ),
               child: const Text('Cancel'),
             ),
           ),
@@ -471,11 +474,11 @@ class _TeacherLogReadingSheetState extends State<TeacherLogReadingSheet> {
             child: FilledButton(
               onPressed: _canSave ? _save : null,
               style: FilledButton.styleFrom(
-                backgroundColor: AppColors.teacherPrimary,
+                backgroundColor: LumiTokens.green,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius:
-                      BorderRadius.circular(TeacherDimensions.radiusM),
+                      BorderRadius.circular(LumiTokens.radiusMedium),
                 ),
               ),
               child: _isSaving
@@ -484,7 +487,7 @@ class _TeacherLogReadingSheetState extends State<TeacherLogReadingSheet> {
                       height: 18,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: AppColors.white,
+                        color: LumiTokens.paper,
                       ),
                     )
                   : const Text('Save log'),

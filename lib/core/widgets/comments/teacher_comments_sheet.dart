@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../theme/app_colors.dart';
-import '../../theme/teacher_constants.dart';
+import '../../../theme/lumi_tokens.dart';
+import '../../../theme/lumi_typography.dart';
 import '../../../data/models/log_comment_model.dart';
 import '../../../data/models/reading_log_model.dart';
 import '../audio/comprehension_audio_player.dart';
@@ -22,7 +22,7 @@ class CommentAffordance extends StatelessWidget {
         Icon(
           Icons.mode_comment_outlined,
           size: 18,
-          color: hasUnread ? AppColors.teacherPrimary : AppColors.textSecondary,
+          color: hasUnread ? LumiTokens.green : LumiTokens.muted,
         ),
         if (hasUnread)
           Positioned(
@@ -32,9 +32,9 @@ class CommentAffordance extends StatelessWidget {
               width: 10,
               height: 10,
               decoration: BoxDecoration(
-                color: AppColors.teacherPrimary,
+                color: LumiTokens.green,
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.white, width: 1.5),
+                border: Border.all(color: LumiTokens.paper, width: 1.5),
               ),
             ),
           ),
@@ -58,8 +58,8 @@ class RecordingAffordance extends StatelessWidget {
       pending ? Icons.mic_none_rounded : Icons.mic_rounded,
       size: 18,
       color: pending
-          ? AppColors.textSecondary.withValues(alpha: 0.5)
-          : AppColors.teacherPrimary,
+          ? LumiTokens.muted.withValues(alpha: 0.5)
+          : LumiTokens.muted,
     );
   }
 }
@@ -74,20 +74,20 @@ class _RecordingPendingNote extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.teacherBackground,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
-        border: Border.all(color: AppColors.teacherBorder),
+        color: LumiTokens.cream,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+        border: Border.all(color: LumiTokens.rule),
       ),
       child: Row(
         children: [
           Icon(Icons.mic_none_rounded,
-              size: 18, color: AppColors.textSecondary),
+              size: 18, color: LumiTokens.muted),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               "Recording is still uploading — it'll appear here once it lands.",
-              style: TeacherTypography.caption
-                  .copyWith(color: AppColors.textSecondary),
+              style: LumiType.caption
+                  .copyWith(color: LumiTokens.muted),
             ),
           ),
         ],
@@ -137,7 +137,7 @@ class TeacherCommentsSheet extends StatelessWidget {
         expand: false,
         builder: (context, scrollController) => Container(
           decoration: const BoxDecoration(
-            color: AppColors.white,
+            color: LumiTokens.paper,
             borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
           ),
           child: Column(
@@ -147,7 +147,7 @@ class TeacherCommentsSheet extends StatelessWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AppColors.teacherBorder,
+                  color: LumiTokens.rule,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -156,17 +156,17 @@ class TeacherCommentsSheet extends StatelessWidget {
                 child: Row(
                   children: [
                     Icon(Icons.mode_comment_outlined,
-                        size: 20, color: AppColors.teacherPrimary),
+                        size: 20, color: LumiTokens.green),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Comments', style: TeacherTypography.h3),
+                          Text('Comments', style: LumiType.subhead),
                           Text(
                             '$studentName · $books',
-                            style: TeacherTypography.caption
-                                .copyWith(color: AppColors.textSecondary),
+                            style: LumiType.caption
+                                .copyWith(color: LumiTokens.muted),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -176,7 +176,7 @@ class TeacherCommentsSheet extends StatelessWidget {
                   ],
                 ),
               ),
-              Divider(height: 1, color: AppColors.teacherBorder),
+              Divider(height: 1, color: LumiTokens.rule),
               Expanded(
                 child: ListView(
                   controller: scrollController,
@@ -200,7 +200,7 @@ class TeacherCommentsSheet extends StatelessWidget {
                     CommentThread(
                       log: log,
                       authorRole: CommentAuthorRole.teacher,
-                      accentColor: AppColors.teacherPrimary,
+                      accentColor: LumiTokens.green,
                     ),
                   ],
                 ),

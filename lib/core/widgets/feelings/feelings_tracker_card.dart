@@ -4,8 +4,6 @@ import '../../../data/models/reading_log_model.dart';
 import '../../feelings/feeling_aggregator.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/teacher_constants.dart';
 import 'feelings_glance_row.dart';
 import 'feelings_line_chart.dart';
 
@@ -50,42 +48,30 @@ class _FeelingsTrackerCardState extends State<FeelingsTrackerCard> {
     final series =
         aggregateFeelings(widget.logs, period: _period, now: widget.now);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _card(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _header(),
-              const SizedBox(height: 16),
-              if (!series.hasAnyFeeling)
-                _emptyState()
-              else
-                FeelingsLineChart(
-                  buckets: series.buckets,
-                  lineColor: widget.accentColor,
-                ),
-            ],
-          ),
-        ),
-        if (series.showGlance && series.hasAnyFeeling) ...[
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _header(),
           const SizedBox(height: 16),
-          _card(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'This Week at a Glance',
-                  style: LumiType.subhead.copyWith(color: widget.accentColor),
-                ),
-                const SizedBox(height: 16),
-                FeelingsGlanceRow(buckets: series.buckets),
-              ],
+          if (!series.hasAnyFeeling)
+            _emptyState()
+          else ...[
+            FeelingsLineChart(
+              buckets: series.buckets,
+              lineColor: widget.accentColor,
             ),
-          ),
+            // Per-day feeling blobs live in the same card, under the trend —
+            // one card instead of two near-duplicate ones.
+            if (series.showGlance) ...[
+              const SizedBox(height: 16),
+              const Divider(height: 1, color: LumiTokens.rule),
+              const SizedBox(height: 16),
+              FeelingsGlanceRow(buckets: series.buckets),
+            ],
+          ],
         ],
-      ],
+      ),
     );
   }
 
@@ -96,7 +82,7 @@ class _FeelingsTrackerCardState extends State<FeelingsTrackerCard> {
         Flexible(
           child: Text(
             'Reading Feelings',
-            style: LumiType.subhead.copyWith(color: widget.accentColor),
+            style: LumiType.subhead,
           ),
         ),
         _periodSelector(),
@@ -111,14 +97,14 @@ class _FeelingsTrackerCardState extends State<FeelingsTrackerCard> {
       tooltip: 'Change period',
       // Match the app's rounded, bordered surfaces instead of the default
       // Material menu.
-      color: AppColors.white,
-      surfaceTintColor: AppColors.white,
+      color: LumiTokens.paper,
+      surfaceTintColor: LumiTokens.paper,
       elevation: 3,
       position: PopupMenuPosition.under,
       offset: const Offset(0, 6),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
-        side: const BorderSide(color: AppColors.teacherBorder),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+        side: const BorderSide(color: LumiTokens.rule),
       ),
       itemBuilder: (_) => [
         for (final p in FeelingPeriod.values)
@@ -130,18 +116,18 @@ class _FeelingsTrackerCardState extends State<FeelingsTrackerCard> {
                 Expanded(
                   child: Text(
                     p.label,
-                    style: TeacherTypography.caption.copyWith(
+                    style: LumiType.caption.copyWith(
                       fontWeight:
                           p == _period ? FontWeight.w700 : FontWeight.w500,
                       color: p == _period
-                          ? AppColors.teacherPrimary
-                          : AppColors.charcoal,
+                          ? LumiTokens.ink
+                          : LumiTokens.muted,
                     ),
                   ),
                 ),
                 if (p == _period)
                   const Icon(Icons.check_rounded,
-                      size: 16, color: AppColors.teacherPrimary),
+                      size: 16, color: LumiTokens.ink),
               ],
             ),
           ),
