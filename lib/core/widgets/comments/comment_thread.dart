@@ -7,7 +7,7 @@ import '../../../data/models/log_comment_model.dart';
 import '../../../data/models/reading_log_model.dart';
 import '../../../data/providers/user_provider.dart';
 import '../../../services/reading_log_service.dart';
-import '../../theme/app_colors.dart';
+import '../../../theme/lumi_tokens.dart';
 import '../../theme/lumi_spacing.dart';
 
 /// A threaded comment conversation attached to a reading log, shared by the
@@ -118,7 +118,7 @@ class _CommentThreadState extends ConsumerState<CommentThread> {
                 child: Text(
                   "Couldn't load the conversation. Pull to refresh or try "
                   'again shortly.',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  style: TextStyle(color: LumiTokens.muted, fontSize: 13),
                 ),
               );
             }
@@ -140,7 +140,7 @@ class _CommentThreadState extends ConsumerState<CommentThread> {
                 padding: EdgeInsets.symmetric(vertical: 12),
                 child: Text(
                   'No comments yet. Start the conversation.',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  style: TextStyle(color: LumiTokens.muted, fontSize: 13),
                 ),
               );
             }
@@ -184,7 +184,7 @@ class _CommentBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bubbleColor =
-        isMine ? accentColor.withValues(alpha: 0.16) : AppColors.divider;
+        isMine ? accentColor.withValues(alpha: 0.16) : LumiTokens.rule;
     final meta =
         '${comment.authorName} · ${DateFormat.jm().format(comment.createdAt)}';
 
@@ -211,7 +211,7 @@ class _CommentBubble extends StatelessWidget {
             child: Text(
               comment.body,
               style: const TextStyle(
-                color: AppColors.charcoal,
+                color: LumiTokens.ink,
                 fontSize: 14,
                 height: 1.35,
               ),
@@ -222,7 +222,7 @@ class _CommentBubble extends StatelessWidget {
             child: Text(
               meta,
               style: const TextStyle(
-                color: AppColors.textSecondary,
+                color: LumiTokens.muted,
                 fontSize: 11,
               ),
             ),
@@ -264,14 +264,14 @@ class _Composer extends StatelessWidget {
             minLines: 1,
             maxLines: 4,
             textCapitalization: TextCapitalization.sentences,
-            style: const TextStyle(fontSize: 14, color: AppColors.charcoal),
+            style: const TextStyle(fontSize: 14, color: LumiTokens.ink),
             decoration: InputDecoration(
               hintText: 'Write a comment…',
               isDense: true,
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              enabledBorder: borderOf(AppColors.divider),
-              border: borderOf(AppColors.divider),
+              enabledBorder: borderOf(LumiTokens.rule),
+              border: borderOf(LumiTokens.rule),
               focusedBorder: borderOf(accentColor),
             ),
             onSubmitted: (_) => onSend(),

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/teacher_constants.dart';
+import '../../../theme/lumi_tokens.dart';
 
 /// Lumi Design System - Teacher Filter Chip
 ///
@@ -24,22 +23,22 @@ class TeacherFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveColor = activeColor ?? AppColors.teacherPrimary;
+    final effectiveColor = activeColor ?? LumiTokens.blue;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: isActive ? effectiveColor : AppColors.white,
-            borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
+            color: isActive ? effectiveColor : LumiTokens.paper,
+            borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
             border: Border.all(
               color:
-                  isActive ? effectiveColor : AppColors.teacherBorder,
+                  isActive ? effectiveColor : LumiTokens.rule,
               width: 1.2,
             ),
             boxShadow: isActive
@@ -62,8 +61,8 @@ class TeacherFilterChip extends StatelessWidget {
                     icon,
                     size: 14,
                     color: isActive
-                        ? AppColors.white
-                        : AppColors.textSecondary,
+                        ? LumiTokens.paper
+                        : LumiTokens.muted,
                   ),
                   const SizedBox(width: 5),
                 ],
@@ -74,7 +73,7 @@ class TeacherFilterChip extends StatelessWidget {
                     fontFamily: 'Nunito',
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: isActive ? AppColors.white : AppColors.textSecondary,
+                    color: isActive ? LumiTokens.paper : LumiTokens.muted,
                   ),
                 ),
               ],
