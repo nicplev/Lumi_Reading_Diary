@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/lumi_text_styles.dart';
-import '../../core/theme/lumi_spacing.dart';
-import '../../core/theme/lumi_borders.dart';
+import '../../theme/lumi_tokens.dart';
+import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/lumi_input.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../services/firebase_service.dart';
 
@@ -20,22 +18,28 @@ class ForgotPasswordScreen extends StatefulWidget {
 }
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
-  final _formKey = GlobalKey<FormBuilderState>();
+  final _formKey = GlobalKey<FormState>();
   final FirebaseService _firebaseService = FirebaseService.instance;
+  final TextEditingController _emailController = TextEditingController();
   bool _isLoading = false;
   bool _emailSent = false;
   String? _errorMessage;
   String? _successEmail;
 
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
+
   Future<void> _handlePasswordReset() async {
-    if (_formKey.currentState?.saveAndValidate() ?? false) {
+    if (_formKey.currentState?.validate() ?? false) {
       setState(() {
         _isLoading = true;
         _errorMessage = null;
       });
 
-      final values = _formKey.currentState!.value;
-      final email = values['email'] as String;
+      final email = _emailController.text.trim();
 
       try {
         await _firebaseService.auth.sendPasswordResetEmail(email: email);
@@ -76,18 +80,19 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.offWhite,
+      backgroundColor: LumiTokens.cream,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.charcoal),
+          icon: const Icon(Icons.arrow_back, color: LumiTokens.ink),
           onPressed: () => Navigator.pop(context),
         ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: LumiPadding.allM,
+          padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -105,78 +110,71 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 ),
               ),
 
-              LumiGap.l,
+              const SizedBox(height: 32),
 
               // Title
               Text(
                 _emailSent ? 'Email Sent!' : 'Reset Password',
-                style: LumiTextStyles.h1(color: AppColors.charcoal),
+                style: LumiType.heading.copyWith(fontSize: 32),
                 textAlign: TextAlign.center,
               ).animate().fadeIn(delay: 200.ms, duration: 500.ms),
 
-              LumiGap.s,
+              const SizedBox(height: 16),
 
               // Description
               if (!_emailSent)
                 Text(
                   "Enter your email address and we'll send you instructions to reset your password.",
-                  style: LumiTextStyles.body(
-                    color: AppColors.charcoal.withValues(alpha: 0.7),
-                  ),
+                  style: LumiType.body.copyWith(color: LumiTokens.muted),
                   textAlign: TextAlign.center,
                 ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
 
               if (_emailSent) ...[
                 Container(
-                  padding: LumiPadding.allS,
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppColors.success.withValues(alpha: 0.1),
-                    borderRadius: LumiBorders.medium,
-                    border: Border.all(
-                      color: AppColors.success,
-                      width: 1,
-                    ),
+                    color: LumiTokens.green.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+                    border: Border.all(color: LumiTokens.green, width: 1),
                   ),
                   child: Column(
                     children: [
                       const Icon(
                         Icons.mark_email_read_outlined,
-                        color: AppColors.success,
+                        color: LumiTokens.green,
                         size: 48,
                       ),
-                      LumiGap.s,
+                      const SizedBox(height: 16),
                       Text(
                         'Password reset email sent to:',
-                        style: LumiTextStyles.bodyMedium(color: AppColors.charcoal),
+                        style: LumiType.body,
                       ),
-                      LumiGap.xxs,
+                      const SizedBox(height: 4),
                       Text(
                         _successEmail ?? '',
-                        style: LumiTextStyles.h3(color: AppColors.rosePink),
+                        style: LumiType.subhead.copyWith(color: LumiTokens.green),
+                        textAlign: TextAlign.center,
                       ),
-                      LumiGap.s,
+                      const SizedBox(height: 16),
                       Text(
                         'Please check your inbox (and spam folder) for instructions on how to reset your password.',
-                        style: LumiTextStyles.bodySmall(
-                          color: AppColors.charcoal.withValues(alpha: 0.7),
-                        ),
+                        style: LumiType.caption,
                         textAlign: TextAlign.center,
                       ),
                     ],
                   ),
                 ).animate().fadeIn(delay: 300.ms, duration: 500.ms).scale(),
 
-                LumiGap.m,
+                const SizedBox(height: 24),
 
                 // Return to login button
                 LumiPrimaryButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
+                  onPressed: () => Navigator.pop(context),
                   text: 'Back to Login',
+                  color: LumiTokens.red,
                 ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
 
-                LumiGap.s,
+                const SizedBox(height: 16),
 
                 // Resend email button
                 LumiTextButton(
@@ -187,65 +185,47 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     });
                   },
                   text: "Didn't receive the email? Try again",
+                  color: LumiTokens.red,
                 ).animate().fadeIn(delay: 600.ms, duration: 500.ms),
               ],
 
               if (!_emailSent) ...[
-                LumiGap.l,
+                const SizedBox(height: 32),
 
                 // Error message
                 if (_errorMessage != null)
                   Container(
-                    padding: LumiPadding.allXS,
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: AppColors.error.withValues(alpha: 0.1),
-                      borderRadius: LumiBorders.small,
-                      border: Border.all(color: AppColors.error, width: 1),
+                      color: LumiTokens.red.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(LumiTokens.radiusSmall),
+                      border: Border.all(color: LumiTokens.red, width: 1),
                     ),
                     child: Row(
                       children: [
-                        const Icon(
-                          Icons.error_outline,
-                          color: AppColors.error,
-                          size: 20,
-                        ),
-                        LumiGap.xs,
+                        const Icon(Icons.error_outline,
+                            color: LumiTokens.red, size: 20),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             _errorMessage!,
-                            style: LumiTextStyles.bodySmall(color: AppColors.error),
+                            style: LumiType.caption.copyWith(color: LumiTokens.red),
                           ),
                         ),
                       ],
                     ),
                   ).animate().fadeIn().shake(),
 
-                LumiGap.s,
+                const SizedBox(height: 16),
 
                 // Email form
-                FormBuilder(
+                Form(
                   key: _formKey,
-                  child: FormBuilderTextField(
-                    name: 'email',
-                    decoration: InputDecoration(
-                      labelText: 'Email Address',
-                      labelStyle: LumiTextStyles.body(
-                        color: AppColors.charcoal.withValues(alpha: 0.7),
-                      ),
-                      prefixIcon: const Icon(Icons.email_outlined),
-                      hintText: 'Enter your registered email',
-                      border: OutlineInputBorder(
-                        borderRadius: LumiBorders.medium,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: LumiBorders.medium,
-                        borderSide: const BorderSide(
-                          color: AppColors.rosePink,
-                          width: 2,
-                        ),
-                      ),
-                      errorStyle: LumiTextStyles.bodySmall(color: AppColors.error),
-                    ),
+                  child: LumiInput(
+                    controller: _emailController,
+                    label: 'Email Address',
+                    hintText: 'Enter your registered email',
+                    prefixIcon: const Icon(Icons.email_outlined),
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.done,
                     validator: FormBuilderValidators.compose([
@@ -256,48 +236,48 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         errorText: 'Enter a valid email',
                       ),
                     ]),
-                    onSubmitted: (_) => _handlePasswordReset(),
                   ).animate().fadeIn(delay: 400.ms, duration: 500.ms),
                 ),
 
-                LumiGap.l,
+                const SizedBox(height: 32),
 
                 // Submit button
                 LumiPrimaryButton(
                   onPressed: _isLoading ? null : _handlePasswordReset,
                   text: 'Send Reset Email',
                   isLoading: _isLoading,
+                  color: LumiTokens.red,
                 ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
 
-                LumiGap.m,
+                const SizedBox(height: 24),
 
                 // Additional help
                 Container(
-                  padding: LumiPadding.allS,
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppColors.info.withValues(alpha: 0.1),
-                    borderRadius: LumiBorders.medium,
+                    color: LumiTokens.blue.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
                   ),
                   child: Row(
                     children: [
-                      const Icon(
-                        Icons.info_outline,
-                        color: AppColors.info,
-                        size: 20,
-                      ),
-                      LumiGap.xs,
+                      const Icon(Icons.info_outline,
+                          color: LumiTokens.blue, size: 20),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Need help?',
-                              style: LumiTextStyles.label(color: AppColors.info),
+                              style: LumiType.body.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: LumiTokens.blue,
+                              ),
                             ),
-                            LumiGap.xxs,
+                            const SizedBox(height: 4),
                             Text(
                               'If you continue to have trouble, please contact your school administrator.',
-                              style: LumiTextStyles.bodySmall(color: AppColors.charcoal),
+                              style: LumiType.caption,
                             ),
                           ],
                         ),

@@ -6,17 +6,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/config/dev_access.dart';
 import '../../core/services/dev_access_service.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/lumi_text_styles.dart';
-import '../../core/theme/lumi_spacing.dart';
-import '../../core/theme/lumi_borders.dart';
+import '../../theme/lumi_tokens.dart';
+import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/lumi_input.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../core/routing/app_router.dart';
 import '../../data/models/user_model.dart';
@@ -42,12 +40,13 @@ enum _SignInMode { email, phone }
 enum _PhoneStage { enterNumber, enterCode }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _formKey = GlobalKey<FormBuilderState>();
+  final _formKey = GlobalKey<FormState>();
   final FirebaseService _firebaseService = FirebaseService.instance;
   final DevAccessService _devAccess = DevAccessService.instance;
   final SmsVerificationService _smsService = SmsVerificationService();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
-  bool _obscurePassword = true;
   String? _errorMessage;
 
   // Phone sign-in sub-flow state. When `_signInMode` is `phone`, the email
@@ -78,6 +77,8 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void dispose() {
     _devAccess.removeListener(_onDevAccessChanged);
+    _emailController.dispose();
+    _passwordController.dispose();
     _phoneController.dispose();
     _phoneSmsController.dispose();
     super.dispose();
@@ -231,15 +232,14 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
-    if (_formKey.currentState?.saveAndValidate() ?? false) {
+    if (_formKey.currentState?.validate() ?? false) {
       setState(() {
         _isLoading = true;
         _errorMessage = null;
       });
 
-      final values = _formKey.currentState!.value;
-      final email = (values['email'] as String).trim().toLowerCase();
-      final password = values['password'] as String;
+      final email = _emailController.text.trim().toLowerCase();
+      final password = _passwordController.text;
 
       try {
         final indexService = UserSchoolIndexService();
@@ -551,33 +551,29 @@ class _LoginScreenState extends State<LoginScreen> {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+        ),
         title: const Text('Create Admin Account'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               'Use a real email you can verify.',
-              style: LumiTextStyles.bodySmall().copyWith(
-                color: AppColors.charcoal.withValues(alpha: 0.7),
-              ),
+              style: LumiType.caption,
             ),
-            LumiGap.s,
-            TextField(
+            const SizedBox(height: 16),
+            LumiInput(
               controller: emailController,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                hintText: 'your.email@example.com',
-              ),
+              label: 'Email',
+              hintText: 'your.email@example.com',
               keyboardType: TextInputType.emailAddress,
             ),
-            LumiGap.xs,
-            TextField(
+            const SizedBox(height: 8),
+            LumiPasswordInput(
               controller: passwordController,
-              decoration: const InputDecoration(
-                labelText: 'Password',
-                hintText: 'Min 8 chars, mixed case + number',
-              ),
-              obscureText: true,
+              label: 'Password',
+              hintText: 'Min 8 chars, mixed case + number',
             ),
           ],
         ),
@@ -628,353 +624,317 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.offWhite,
+      backgroundColor: LumiTokens.cream,
       body: SafeArea(
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () => FocusScope.of(context).unfocus(),
           child: SingleChildScrollView(
-            padding: LumiPadding.allM,
+            padding: const EdgeInsets.all(24),
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              LumiGap.l,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 32),
 
-              // Lumi Mascot (long-press reveals DEV-only surface)
-              Center(
-                child: Animate(
-                  effects: const [
-                    FadeEffect(duration: Duration(milliseconds: 500)),
-                  ],
-                  child: RawGestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    gestures: <Type, GestureRecognizerFactory>{
-                      LongPressGestureRecognizer:
-                          GestureRecognizerFactoryWithHandlers<
-                              LongPressGestureRecognizer>(
-                        () => LongPressGestureRecognizer(
-                          duration: const Duration(seconds: 5),
+                // Lumi Mascot (long-press reveals DEV-only surface)
+                Center(
+                  child: Animate(
+                    effects: const [
+                      FadeEffect(duration: Duration(milliseconds: 500)),
+                    ],
+                    child: RawGestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      gestures: <Type, GestureRecognizerFactory>{
+                        LongPressGestureRecognizer:
+                            GestureRecognizerFactoryWithHandlers<
+                                LongPressGestureRecognizer>(
+                          () => LongPressGestureRecognizer(
+                            duration: const Duration(seconds: 5),
+                          ),
+                          (LongPressGestureRecognizer instance) {
+                            instance.onLongPress = _handleDevAccessGesture;
+                          },
                         ),
-                        (LongPressGestureRecognizer instance) {
-                          instance.onLongPress = _handleDevAccessGesture;
-                        },
+                      },
+                      child: const LumiMascot(
+                        variant: LumiVariant.login,
+                        size: 120,
+                        message: 'Welcome back!',
                       ),
-                    },
-                    child: const LumiMascot(
-                      variant: LumiVariant.login,
-                      size: 120,
-                      message: 'Welcome back!',
                     ),
                   ),
                 ),
-              ),
 
-              LumiGap.l,
+                const SizedBox(height: 32),
 
-              // Title
-              Text(
-                'Log In',
-                style: LumiTextStyles.display().copyWith(
-                  color: AppColors.charcoal,
-                ),
-                textAlign: TextAlign.center,
-              ).animate().fadeIn(delay: 200.ms, duration: 500.ms),
+                // Title
+                Text(
+                  'Log In',
+                  style: LumiType.displayL,
+                  textAlign: TextAlign.center,
+                ).animate().fadeIn(delay: 200.ms, duration: 500.ms),
 
-              LumiGap.xs,
+                const SizedBox(height: 8),
 
-              // Subtitle
-              Text(
-                'Enter your credentials to continue',
-                style: LumiTextStyles.body().copyWith(
-                  color: AppColors.charcoal.withValues(alpha: 0.7),
-                ),
-                textAlign: TextAlign.center,
-              ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
+                // Subtitle
+                Text(
+                  'Enter your credentials to continue',
+                  style: LumiType.body.copyWith(color: LumiTokens.muted),
+                  textAlign: TextAlign.center,
+                ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
 
-              LumiGap.l,
+                const SizedBox(height: 32),
 
-              // Error message
-              if (_errorMessage != null)
-                Container(
-                  padding: LumiPadding.allS,
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.1),
-                    borderRadius: LumiBorders.small,
-                    border: Border.all(color: AppColors.error, width: 1),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        color: AppColors.error,
-                        size: 20,
-                      ),
-                      LumiGap.horizontalXS,
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style: LumiTextStyles.bodySmall().copyWith(
-                            color: AppColors.error,
+                // Error message
+                if (_errorMessage != null)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: LumiTokens.red.withValues(alpha: 0.1),
+                      borderRadius:
+                          BorderRadius.circular(LumiTokens.radiusSmall),
+                      border: Border.all(color: LumiTokens.red, width: 1),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline,
+                            color: LumiTokens.red, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _errorMessage!,
+                            style: LumiType.caption
+                                .copyWith(color: LumiTokens.red),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ).animate().fadeIn().shake(),
+                      ],
+                    ),
+                  ).animate().fadeIn().shake(),
 
-              LumiGap.s,
+                const SizedBox(height: 16),
 
-              if (_signInMode == _SignInMode.email) ...[
-                // Email + password form
-                FormBuilder(
-                  key: _formKey,
-                  child: Column(
-                    children: [
-                      FormBuilderTextField(
-                        name: 'email',
-                        decoration: const InputDecoration(
-                          labelText: 'Email',
-                          prefixIcon: Icon(Icons.email_outlined),
-                        ),
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
-                        validator: FormBuilderValidators.compose([
-                          FormBuilderValidators.required(
-                            errorText: 'Email is required',
-                          ),
-                          FormBuilderValidators.email(
-                            errorText: 'Enter a valid email',
-                          ),
-                        ]),
-                      ).animate().fadeIn(delay: 400.ms, duration: 500.ms),
-                      LumiGap.s,
-                      FormBuilderTextField(
-                        name: 'password',
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility_off
-                                  : Icons.visibility,
-                              color: AppColors.charcoal.withValues(alpha: 0.7),
+                if (_signInMode == _SignInMode.email) ...[
+                  // Email + password form
+                  Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        LumiInput(
+                          controller: _emailController,
+                          label: 'Email',
+                          hintText: 'you@example.com',
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          prefixIcon: const Icon(Icons.email_outlined),
+                          validator: FormBuilderValidators.compose([
+                            FormBuilderValidators.required(
+                              errorText: 'Email is required',
                             ),
-                            onPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
-                            },
+                            FormBuilderValidators.email(
+                              errorText: 'Enter a valid email',
+                            ),
+                          ]),
+                        ).animate().fadeIn(delay: 400.ms, duration: 500.ms),
+                        const SizedBox(height: 16),
+                        LumiPasswordInput(
+                          controller: _passwordController,
+                          label: 'Password',
+                          textInputAction: TextInputAction.done,
+                          validator: FormBuilderValidators.required(
+                            errorText: 'Password is required',
                           ),
-                        ),
-                        obscureText: _obscurePassword,
-                        textInputAction: TextInputAction.done,
-                        validator: FormBuilderValidators.required(
-                          errorText: 'Password is required',
-                        ),
-                        onSubmitted: (_) => _handleLogin(),
-                      ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
-                    ],
+                        ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
+                      ],
+                    ),
                   ),
-                ),
-                LumiGap.m,
-                LumiPrimaryButton(
-                  onPressed: _isLoading ? null : _handleLogin,
-                  text: 'Log In',
-                  isLoading: _isLoading,
-                ).animate().fadeIn(delay: 600.ms, duration: 500.ms),
-                LumiGap.xs,
-                Center(
-                  child: LumiTextButton(
-                    onPressed: () => context.push('/auth/forgot-password'),
-                    text: 'Forgot Password?',
-                  ).animate().fadeIn(delay: 700.ms, duration: 500.ms),
-                ),
-                Center(
-                  child: LumiTextButton(
-                    onPressed: _isLoading ? null : _toggleSignInMode,
-                    text: 'Sign in with phone instead',
+                  const SizedBox(height: 24),
+                  LumiPrimaryButton(
+                    onPressed: _isLoading ? null : _handleLogin,
+                    text: 'Log In',
+                    isLoading: _isLoading,
+                    color: LumiTokens.red,
+                  ).animate().fadeIn(delay: 600.ms, duration: 500.ms),
+                  const SizedBox(height: 8),
+                  Center(
+                    child: LumiTextButton(
+                      onPressed: () => context.push('/auth/forgot-password'),
+                      text: 'Forgot Password?',
+                      color: LumiTokens.red,
+                    ).animate().fadeIn(delay: 700.ms, duration: 500.ms),
                   ),
-                ),
-              ] else ...[
-                // Phone-primary sub-form
-                TextField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  textInputAction: TextInputAction.done,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'[\d\s]')),
-                  ],
-                  decoration: const InputDecoration(
-                    labelText: 'Mobile number',
+                  Center(
+                    child: LumiTextButton(
+                      onPressed: _isLoading ? null : _toggleSignInMode,
+                      text: 'Sign in with phone instead',
+                      color: LumiTokens.red,
+                    ),
+                  ),
+                ] else ...[
+                  // Phone-primary sub-form
+                  LumiInput(
+                    controller: _phoneController,
+                    label: 'Mobile number',
                     hintText: '0400 000 000',
                     helperText: 'Australian mobile only.',
-                    prefixIcon: Icon(Icons.phone_outlined),
-                  ),
-                  onChanged: (_) => setState(() {}),
-                  enabled: _phoneStage == _PhoneStage.enterNumber && !_isLoading,
-                ),
-                if (_phoneStage == _PhoneStage.enterCode) ...[
-                  LumiGap.s,
-                  TextField(
-                    controller: _phoneSmsController,
-                    keyboardType: TextInputType.number,
+                    keyboardType: TextInputType.phone,
                     textInputAction: TextInputAction.done,
-                    maxLength: 6,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: const InputDecoration(
-                      labelText: '6-digit code',
+                    prefixIcon: const Icon(Icons.phone_outlined),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[\d\s]')),
+                    ],
+                    enabled:
+                        _phoneStage == _PhoneStage.enterNumber && !_isLoading,
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  if (_phoneStage == _PhoneStage.enterCode) ...[
+                    const SizedBox(height: 16),
+                    LumiInput(
+                      controller: _phoneSmsController,
+                      label: '6-digit code',
                       hintText: '123456',
-                      prefixIcon: Icon(Icons.sms_outlined),
-                    ),
-                    onChanged: (_) {
-                      setState(() {});
-                      if (_smsCodeValid && !_isLoading) _verifyPhoneLogin();
-                    },
-                  ),
-                ],
-                LumiGap.m,
-                LumiPrimaryButton(
-                  onPressed: _isLoading
-                      ? null
-                      : (_phoneStage == _PhoneStage.enterNumber
-                          ? (_phoneValid ? _sendPhoneLoginCode : null)
-                          : (_smsCodeValid ? _verifyPhoneLogin : null)),
-                  text: _phoneStage == _PhoneStage.enterNumber
-                      ? 'Send code'
-                      : 'Verify & sign in',
-                  isLoading: _isLoading,
-                ),
-                LumiGap.xs,
-                Center(
-                  child: LumiTextButton(
-                    onPressed: _isLoading ? null : _toggleSignInMode,
-                    text: 'Use email and password instead',
-                  ),
-                ),
-              ],
-
-              LumiGap.l,
-
-              // "New to Lumi?" section divider
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 1,
-                      color: AppColors.charcoal.withValues(alpha: 0.08),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(
-                      'New to Lumi?',
-                      style: LumiTextStyles.bodySmall().copyWith(
-                        color: AppColors.charcoal.withValues(alpha: 0.55),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Container(
-                      height: 1,
-                      color: AppColors.charcoal.withValues(alpha: 0.08),
-                    ),
-                  ),
-                ],
-              ).animate().fadeIn(delay: 800.ms, duration: 500.ms),
-
-              LumiGap.s,
-
-              // Role picker: three cards in a row, one per audience
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: _RegisterRoleCard(
-                        icon: Icons.family_restroom,
-                        title: 'Parent',
-                        subtitle: 'Student code',
-                        accent: AppColors.parentColor,
-                        onTap: () => showParentRegistrationModal(context),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _RegisterRoleCard(
-                        icon: Icons.school_rounded,
-                        title: 'Teacher',
-                        subtitle: 'School code',
-                        accent: AppColors.teacherColor,
-                        onTap: () => showTeacherRegistrationModal(context),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _RegisterRoleCard(
-                        icon: Icons.apartment_rounded,
-                        title: 'School',
-                        subtitle: 'Request a demo',
-                        accent: AppColors.warmOrange,
-                        onTap: () => context.push('/onboarding/demo'),
-                      ),
+                      keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.done,
+                      prefixIcon: const Icon(Icons.sms_outlined),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(6),
+                      ],
+                      onChanged: (_) {
+                        setState(() {});
+                        if (_smsCodeValid && !_isLoading) _verifyPhoneLogin();
+                      },
                     ),
                   ],
-                ),
-              ).animate().fadeIn(delay: 900.ms, duration: 500.ms),
-
-              if (hasDevAccess()) ...[
-                LumiGap.l,
-                // DEV ONLY: Create admin account button
-                Container(
-                  padding: LumiPadding.allS,
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.1),
-                    borderRadius: LumiBorders.small,
-                    border: Border.all(
-                      color: Colors.orange.withValues(alpha: 0.3),
+                  const SizedBox(height: 24),
+                  LumiPrimaryButton(
+                    onPressed: _isLoading
+                        ? null
+                        : (_phoneStage == _PhoneStage.enterNumber
+                            ? (_phoneValid ? _sendPhoneLoginCode : null)
+                            : (_smsCodeValid ? _verifyPhoneLogin : null)),
+                    text: _phoneStage == _PhoneStage.enterNumber
+                        ? 'Send code'
+                        : 'Verify & sign in',
+                    isLoading: _isLoading,
+                    color: LumiTokens.red,
+                  ),
+                  const SizedBox(height: 8),
+                  Center(
+                    child: LumiTextButton(
+                      onPressed: _isLoading ? null : _toggleSignInMode,
+                      text: 'Use email and password instead',
+                      color: LumiTokens.red,
                     ),
                   ),
-                  child: Column(
+                ],
+
+                const SizedBox(height: 32),
+
+                // "New to Lumi?" section divider
+                Row(
+                  children: [
+                    const Expanded(child: Divider(color: LumiTokens.rule)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text('New to Lumi?', style: LumiType.caption),
+                    ),
+                    const Expanded(child: Divider(color: LumiTokens.rule)),
+                  ],
+                ).animate().fadeIn(delay: 800.ms, duration: 500.ms),
+
+                const SizedBox(height: 16),
+
+                // Role picker: three cards in a row, one per audience
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        'DEV ONLY',
-                        style: LumiTextStyles.bodySmall().copyWith(
-                          color: Colors.orange,
-                          fontWeight: FontWeight.bold,
+                      Expanded(
+                        child: _RegisterRoleCard(
+                          icon: Icons.family_restroom,
+                          title: 'Parent',
+                          subtitle: 'Student code',
+                          accent: LumiTokens.red,
+                          onTap: () => showParentRegistrationModal(context),
                         ),
                       ),
-                      LumiGap.xs,
-                      LumiTextButton(
-                        onPressed: () => _showCreateAdminDialog(),
-                        text: 'Create Admin Account',
-                        icon: Icons.admin_panel_settings,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _RegisterRoleCard(
+                          icon: Icons.school_rounded,
+                          title: 'Teacher',
+                          subtitle: 'School code',
+                          accent: LumiTokens.green,
+                          onTap: () => showTeacherRegistrationModal(context),
+                        ),
                       ),
-                      LumiGap.xs,
-                      LumiTextButton(
-                        onPressed: () {
-                          if (_firebaseService.auth.currentUser == null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Sign in to your dev account first.',
-                                ),
-                              ),
-                            );
-                            return;
-                          }
-                          context.push('/dev/impersonate');
-                        },
-                        text: 'Impersonate School (read-only)',
-                        icon: Icons.shield_outlined,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _RegisterRoleCard(
+                          icon: Icons.apartment_rounded,
+                          title: 'School',
+                          subtitle: 'Request a demo',
+                          accent: LumiTokens.blue,
+                          onTap: () => context.push('/onboarding/demo'),
+                        ),
                       ),
                     ],
                   ),
-                ),
+                ).animate().fadeIn(delay: 900.ms, duration: 500.ms),
+
+                if (hasDevAccess()) ...[
+                  const SizedBox(height: 32),
+                  // DEV ONLY: Create admin account button
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.1),
+                      borderRadius:
+                          BorderRadius.circular(LumiTokens.radiusSmall),
+                      border: Border.all(
+                        color: Colors.orange.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          'DEV ONLY',
+                          style: LumiType.caption.copyWith(
+                            color: Colors.orange,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        LumiTextButton(
+                          onPressed: () => _showCreateAdminDialog(),
+                          text: 'Create Admin Account',
+                          icon: Icons.admin_panel_settings,
+                        ),
+                        const SizedBox(height: 8),
+                        LumiTextButton(
+                          onPressed: () {
+                            if (_firebaseService.auth.currentUser == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Sign in to your dev account first.',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+                            context.push('/dev/impersonate');
+                          },
+                          text: 'Impersonate School (read-only)',
+                          icon: Icons.shield_outlined,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
-            ],
-          ),
+            ),
           ),
         ),
       ),
@@ -999,22 +959,20 @@ class _RegisterRoleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(LumiTokens.radiusMedium);
     return Material(
-      color: AppColors.white,
-      borderRadius: LumiBorders.medium,
+      color: LumiTokens.paper,
+      borderRadius: radius,
       child: InkWell(
         onTap: onTap,
-        borderRadius: LumiBorders.medium,
+        borderRadius: radius,
         splashColor: accent.withValues(alpha: 0.12),
         highlightColor: accent.withValues(alpha: 0.06),
         child: Ink(
           decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius: LumiBorders.medium,
-            border: Border.all(
-              color: AppColors.charcoal.withValues(alpha: 0.1),
-              width: 1,
-            ),
+            color: LumiTokens.paper,
+            borderRadius: radius,
+            border: Border.all(color: LumiTokens.rule, width: 1),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
@@ -1034,18 +992,14 @@ class _RegisterRoleCard extends StatelessWidget {
                 Text(
                   title,
                   textAlign: TextAlign.center,
-                  style: LumiTextStyles.label().copyWith(
-                    color: AppColors.charcoal,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style:
+                      LumiType.body.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
                   textAlign: TextAlign.center,
-                  style: LumiTextStyles.bodySmall().copyWith(
-                    color: AppColors.charcoal.withValues(alpha: 0.6),
-                  ),
+                  style: LumiType.caption,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1093,29 +1047,26 @@ class _MfaCodeDialogState extends State<_MfaCodeDialog> {
         ? 'Enter the 6-digit code sent to ${widget.phoneHint}.'
         : 'Enter the 6-digit code we just sent to your phone.';
     return AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+      ),
       title: const Text('Verify it\'s you'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            subtitle,
-            style: LumiTextStyles.bodySmall().copyWith(
-              color: AppColors.charcoal.withValues(alpha: 0.7),
-            ),
-          ),
-          LumiGap.s,
-          TextField(
+          Text(subtitle, style: LumiType.caption),
+          const SizedBox(height: 16),
+          LumiInput(
             controller: _codeController,
+            label: 'SMS code',
             keyboardType: TextInputType.number,
-            maxLength: 6,
             autofocus: true,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(6),
+            ],
             onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
-              labelText: 'SMS code',
-              counterText: '',
-            ),
           ),
           Align(
             alignment: Alignment.centerRight,
@@ -1130,10 +1081,8 @@ class _MfaCodeDialogState extends State<_MfaCodeDialog> {
                         if (mounted) setState(() => _resending = false);
                       }
                     },
-              child: Text(
-                _resending ? 'Sending…' : 'Resend code',
-                style: LumiTextStyles.bodySmall(),
-              ),
+              child: Text(_resending ? 'Sending…' : 'Resend code',
+                  style: LumiType.caption),
             ),
           ),
         ],
