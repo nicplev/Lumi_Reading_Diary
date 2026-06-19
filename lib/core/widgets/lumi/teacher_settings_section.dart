@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/teacher_constants.dart';
+import '../../../theme/lumi_tokens.dart';
+import '../../../theme/lumi_typography.dart';
 
 /// Lumi Design System - Teacher Settings Section
 ///
-/// Grouped settings with gray header bar (uppercase) and items below.
-/// Per spec: 16px radius, gray bg header, uppercase 13px title.
+/// Grouped settings: a muted uppercase label above a paper card of rows.
 class TeacherSettingsSection extends StatelessWidget {
   final String title;
   final List<Widget> items;
@@ -25,15 +24,15 @@ class TeacherSettingsSection extends StatelessWidget {
           padding: const EdgeInsets.only(left: 4, bottom: 10),
           child: Text(
             title.toUpperCase(),
-            style: TeacherTypography.sectionHeader,
+            style: LumiType.sectionLabel,
           ),
         ),
         Container(
           decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
-            border: Border.all(color: AppColors.teacherBorder),
-            boxShadow: TeacherDimensions.cardShadow,
+            color: LumiTokens.paper,
+            borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+            border: Border.all(color: LumiTokens.rule),
+            boxShadow: LumiTokens.shadowCard,
           ),
           clipBehavior: Clip.antiAlias,
           child: Column(
@@ -42,11 +41,11 @@ class TeacherSettingsSection extends StatelessWidget {
               for (int i = 0; i < items.length; i++) ...[
                 items[i],
                 if (i < items.length - 1)
-                  Divider(
+                  const Divider(
                     height: 1,
                     indent: 20,
                     endIndent: 20,
-                    color: AppColors.teacherBorder.withValues(alpha: 0.9),
+                    color: LumiTokens.rule,
                   ),
               ],
             ],
