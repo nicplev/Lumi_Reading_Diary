@@ -77,6 +77,46 @@ class ServiceStatusScreen extends ConsumerWidget {
             _DiagnosticsTile(snapshot: snapshot, pending: pending),
             const SizedBox(height: 24),
           ],
+          // Plain-language "fix stale data" lever — where someone lands when
+          // something looks wrong. Safe: keeps anything still waiting to sync.
+          _section(
+            title: 'Troubleshooting',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Seeing out-of-date information? Clear the locally stored '
+                  'copy so the app re-downloads it fresh from the cloud. '
+                  'Anything still waiting to sync is kept and will upload as '
+                  'normal.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.4,
+                    color: AppColors.charcoal.withValues(alpha: 0.7),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _confirmClearCache(context),
+                    icon: const Icon(Icons.cleaning_services_outlined,
+                        size: 18),
+                    label: const Text('Clear cached data'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: LumiTokens.ink,
+                      side: const BorderSide(color: LumiTokens.rule),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: FilledButton(
@@ -186,6 +226,67 @@ class ServiceStatusScreen extends ConsumerWidget {
     if (delta.inMinutes < 60) return '${delta.inMinutes}m ago';
     if (delta.inHours < 24) return '${delta.inHours}h ago';
     return '${delta.inDays}d ago';
+  }
+
+  /// Safe reset: drops only the cloud-mirror caches (re-downloaded fresh) and
+  /// keeps the pending-sync queue + drafts, then kicks off a re-sync.
+  Future<void> _confirmClearCache(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: LumiTokens.paper,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+        ),
+        title: const Text(
+          'Clear cached data?',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: AppColors.charcoal,
+          ),
+        ),
+        content: const Text(
+          'This removes the local copy of your reading data and re-downloads '
+          'it from the cloud. Any changes waiting to sync are kept and will '
+          'still upload.',
+          style: TextStyle(fontSize: 14, height: 1.4, color: AppColors.charcoal),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: AppColors.charcoal.withValues(alpha: 0.6),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: LumiTokens.green,
+              foregroundColor: AppColors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    await OfflineService.instance.clearCachedData();
+    await OfflineService.instance.triggerSync();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Cached data cleared — re-downloading from the cloud.'),
+      ),
+    );
   }
 }
 

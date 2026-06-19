@@ -186,54 +186,6 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
     );
   }
 
-  Future<void> _handleClearCache() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
-        ),
-        title: const Text('Clear Cache', style: TeacherTypography.h3),
-        content: const Text(
-          'This will remove locally cached data older than 30 days. '
-          'Your data is safely stored in the cloud.',
-          style: TeacherTypography.bodyLarge,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel',
-                style: TeacherTypography.buttonText
-                    .copyWith(color: AppColors.textSecondary)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('Clear',
-                style: TeacherTypography.buttonText
-                    .copyWith(color: AppColors.teacherPrimary)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true && mounted) {
-      try {
-        await OfflineService.instance.clearOldData();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Cache cleared successfully.')),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to clear cache.')),
-          );
-        }
-      }
-    }
-  }
-
   void _showAboutDialog() {
     showDialog(
       context: context,
@@ -500,12 +452,6 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
             TeacherSettingsSection(
               title: 'Data & Storage',
               items: [
-                TeacherSettingsItem(
-                  icon: Icons.cached,
-                  iconBgColor: AppColors.teacherAccent,
-                  label: 'Clear Cache',
-                  onTap: _handleClearCache,
-                ),
                 TeacherSettingsItem(
                   icon: Icons.sync,
                   iconBgColor: AppColors.libraryGreen,
