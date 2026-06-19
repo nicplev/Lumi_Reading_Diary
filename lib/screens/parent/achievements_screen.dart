@@ -2,16 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lumi_reading_tracker/data/models/achievement_model.dart';
 import 'package:lumi_reading_tracker/data/models/student_model.dart';
-import 'package:lumi_reading_tracker/core/theme/app_colors.dart';
-import 'package:lumi_reading_tracker/core/theme/lumi_text_styles.dart';
-import 'package:lumi_reading_tracker/core/theme/lumi_spacing.dart';
-import 'package:lumi_reading_tracker/core/theme/lumi_borders.dart';
-import 'package:lumi_reading_tracker/core/widgets/lumi/lumi_buttons.dart';
+import 'package:lumi_reading_tracker/theme/lumi_tokens.dart';
+import 'package:lumi_reading_tracker/theme/lumi_typography.dart';
+import 'package:lumi_reading_tracker/theme/section_theme.dart';
+import 'package:lumi_reading_tracker/core/widgets/lumi/lumi_card.dart';
 import 'package:lumi_reading_tracker/core/widgets/glass/glass_achievement_card.dart';
-import 'package:lumi_reading_tracker/core/widgets/lumi/rhythm_calendar.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 
-/// Achievements screen showing earned and locked achievements
+/// Achievements screen — a calm, grouped view of every badge a child can earn.
+///
+/// Earned badges light up in their rarity colour; locked badges sit quietly
+/// with an inline progress hint. Streak badges are intentionally absent: the
+/// reward engine no longer awards them (see [AchievementTemplates] and
+/// detectAchievements in functions/src/index.ts), so showing un-earnable
+/// badges would be misleading. The 30-night rhythm grid lives on the Progress
+/// screen, not here.
 class AchievementsScreen extends StatefulWidget {
   final String studentId;
   final String schoolId;
@@ -26,17 +30,21 @@ class AchievementsScreen extends StatefulWidget {
   State<AchievementsScreen> createState() => _AchievementsScreenState();
 }
 
-class _AchievementsScreenState extends State<AchievementsScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  AchievementCategory? _selectedCategory;
+/// Display order + labels for the badge groups. Streak is deliberately omitted.
+const _groups = <({AchievementCategory category, String label, String emoji})>[
+  (category: AchievementCategory.readingDays, label: 'Reading Nights', emoji: '🌙'),
+  (category: AchievementCategory.books, label: 'Books', emoji: '📚'),
+  (category: AchievementCategory.minutes, label: 'Reading Time', emoji: '⏰'),
+  (category: AchievementCategory.special, label: 'Special', emoji: '⭐'),
+];
+
+class _AchievementsScreenState extends State<AchievementsScreen> {
   AchievementThresholds _thresholds = AchievementThresholds.defaults;
   AchievementCustomization _customization = AchievementCustomization.empty;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     _loadThresholds();
   }
 
@@ -47,563 +55,419 @@ class _AchievementsScreenState extends State<AchievementsScreen>
           .doc(widget.schoolId)
           .get();
       final settings = schoolDoc.data()?['settings'] as Map<String, dynamic>?;
-      final rawThresholds    = settings?['achievementThresholds']    as Map<String, dynamic>?;
+      final rawThresholds = settings?['achievementThresholds'] as Map<String, dynamic>?;
       final rawCustomization = settings?['achievementCustomization'] as Map<String, dynamic>?;
       if (mounted) {
         setState(() {
-          if (rawThresholds    != null) _thresholds     = AchievementThresholds.fromMap(rawThresholds);
-          if (rawCustomization != null) _customization  = AchievementCustomization.fromMap(rawCustomization);
+          if (rawThresholds != null) _thresholds = AchievementThresholds.fromMap(rawThresholds);
+          if (rawCustomization != null) {
+            _customization = AchievementCustomization.fromMap(rawCustomization);
+          }
         });
       }
     } catch (_) {
-      // Fall back to defaults silently
+      // Fall back to defaults silently — thresholds always have a safe default.
     }
   }
 
   @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+  Widget build(BuildContext context) {
+    return LumiSectionScope(
+      section: LumiSectionTheme.library,
+      child: Scaffold(
+        backgroundColor: LumiTokens.cream,
+        appBar: AppBar(
+          backgroundColor: LumiTokens.cream,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: LumiTokens.ink),
+          title: Text('Achievements', style: LumiType.subhead),
+        ),
+        body: StreamBuilder<DocumentSnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('schools')
+              .doc(widget.schoolId)
+              .collection('students')
+              .doc(widget.studentId)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) return _ErrorState(snapshot.error.toString());
+            if (!snapshot.hasData) return const _LoadingState();
+            if (!snapshot.data!.exists) {
+              return const _ErrorState('Student data not found');
+            }
+
+            final student = StudentModel.fromFirestore(snapshot.data!);
+            final stats = student.stats;
+
+            final raw = (snapshot.data!.data() as Map<String, dynamic>?)?['achievements']
+                    as List<dynamic>? ??
+                const [];
+            final earnedById = <String, AchievementModel>{
+              for (final a in raw)
+                (a['id'] as String? ?? ''):
+                    AchievementModel.fromMap(Map<String, dynamic>.from(a)),
+            };
+
+            // Build displayable templates (streak excluded — never awarded).
+            final templates = AchievementTemplates
+                .generateTemplates(_thresholds, customization: _customization)
+                .where((t) => t.category != AchievementCategory.streak)
+                .toList();
+
+            final earnedCount =
+                templates.where((t) => earnedById.containsKey(t.id)).length;
+
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              children: [
+                _HeroCard(earned: earnedCount, total: templates.length),
+                const SizedBox(height: 20),
+                for (final group in _groups) ...[
+                  ..._buildGroup(group, templates, earnedById, stats),
+                ],
+              ],
+            );
+          },
+        ),
+      ),
+    );
   }
+
+  List<Widget> _buildGroup(
+    ({AchievementCategory category, String label, String emoji}) group,
+    List<AchievementModel> templates,
+    Map<String, AchievementModel> earnedById,
+    StudentStats? stats,
+  ) {
+    final items = templates.where((t) => t.category == group.category).toList();
+    if (items.isEmpty) return const [];
+
+    final earnedInGroup = items.where((t) => earnedById.containsKey(t.id)).length;
+
+    return [
+      Padding(
+        padding: const EdgeInsets.only(bottom: 12, top: 4),
+        child: Row(
+          children: [
+            Text(group.emoji, style: const TextStyle(fontSize: 18)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                group.label,
+                style: LumiType.subhead.copyWith(fontSize: 18),
+              ),
+            ),
+            Text('$earnedInGroup/${items.length}', style: LumiType.caption),
+          ],
+        ),
+      ),
+      GridView.count(
+        crossAxisCount: 3,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 0.78,
+        children: [
+          for (final t in items)
+            _BadgeTile(
+              template: t,
+              earned: earnedById[t.id],
+              progress: _progressFor(t, stats),
+              onTap: () => _onTapBadge(t, earnedById[t.id], stats),
+            ),
+        ],
+      ),
+      const SizedBox(height: 24),
+    ];
+  }
+
+  /// Current / required for the badge's requirement type. Streak is never
+  /// reached here because streak badges aren't displayed.
+  ({int current, int required}) _progressFor(
+      AchievementModel t, StudentStats? stats) {
+    final current = switch (t.requirementType) {
+      'books' => stats?.totalBooksRead ?? 0,
+      'minutes' => stats?.totalMinutesRead ?? 0,
+      'days' => stats?.totalReadingDays ?? 0,
+      _ => 0,
+    };
+    return (current: current, required: t.requiredValue);
+  }
+
+  void _onTapBadge(
+      AchievementModel template, AchievementModel? earned, StudentStats? stats) {
+    if (earned != null) {
+      // Enrich with the live template name/colour, then celebrate.
+      showDialog(
+        context: context,
+        builder: (_) => AchievementUnlockPopup(
+          achievement: earned.copyWith(
+            name: template.name,
+            customColor: template.customColor,
+          ),
+        ),
+      );
+      return;
+    }
+    _showLockedSheet(template, _progressFor(template, stats));
+  }
+
+  void _showLockedSheet(AchievementModel t, ({int current, int required}) p) {
+    final fraction =
+        p.required <= 0 ? 0.0 : (p.current / p.required).clamp(0.0, 1.0);
+    final accent = context.sectionTheme.accent;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: LumiTokens.paper,
+      shape: const RoundedRectangleBorder(
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(LumiTokens.radiusXL)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: LumiTokens.rule,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Opacity(
+                  opacity: 0.45,
+                  child: Text(t.icon, style: const TextStyle(fontSize: 40)),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(t.name, style: LumiType.heading.copyWith(fontSize: 22)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(t.description, style: LumiType.body),
+            const SizedBox(height: 20),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: fraction,
+                minHeight: 10,
+                backgroundColor: LumiTokens.rule,
+                valueColor: AlwaysStoppedAnimation(accent),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${p.current} of ${p.required} • ${(fraction * 100).round()}%',
+              style: LumiType.caption,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Top-of-screen summary. Doubles as the empty state when nothing is earned.
+class _HeroCard extends StatelessWidget {
+  final int earned;
+  final int total;
+
+  const _HeroCard({required this.earned, required this.total});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.offWhite,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildAppBar(),
-            _buildCategoryFilter(),
-            _buildRhythmBanner(),
-            _buildTabs(),
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildEarnedAchievements(),
-                  _buildAllAchievements(),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+    final accent = context.sectionTheme.accent;
+    final fraction = total <= 0 ? 0.0 : (earned / total).clamp(0.0, 1.0);
+    final subtitle = earned == 0
+        ? 'Keep reading to unlock your first badge! 📚'
+        : earned >= total
+            ? 'Every badge unlocked — amazing! 🎉'
+            : 'Nicely done — keep the nights rolling.';
 
-  Widget _buildAppBar() {
-    return Padding(
-      padding: LumiPadding.allS,
+    return LumiCard(
       child: Row(
         children: [
-          LumiIconButton(
-            icon: Icons.arrow_back,
-            onPressed: () => Navigator.pop(context),
-          ),
-          LumiGap.horizontalXS,
-          Text(
-            '🏆 Achievements',
-            style: LumiTextStyles.h2(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCategoryFilter() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: LumiPadding.horizontalS,
-      child: Row(
-        children: [
-          _buildCategoryChip('All', null, _selectedCategory == null),
-          LumiGap.horizontalXS,
-          ...AchievementCategory.values.map((category) {
-            return Padding(
-              padding: EdgeInsets.only(right: LumiSpacing.xs),
-              child: _buildCategoryChip(
-                category.displayName,
-                category,
-                _selectedCategory == category,
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCategoryChip(String label, AchievementCategory? category, bool selected) {
-    return FilterChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (value) {
-        setState(() {
-          _selectedCategory = selected ? null : category;
-        });
-      },
-      backgroundColor: AppColors.white,
-      selectedColor: AppColors.skyBlue,
-      checkmarkColor: AppColors.rosePink,
-      labelStyle: LumiTextStyles.label(
-        color: selected ? AppColors.rosePink : AppColors.charcoal,
-      ).copyWith(
-        fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-      ),
-      side: BorderSide(
-        color: selected
-            ? AppColors.rosePink
-            : AppColors.charcoal.withValues(alpha: 0.3),
-      ),
-    );
-  }
-
-  /// Forgiving 30-day rhythm grid above the badge tabs. Hidden until the child
-  /// has read at least once in the window so a new account isn't shown an empty
-  /// grid. Derives the read-day set from the last 30 days of logs.
-  Widget _buildRhythmBanner() {
-    final now = DateTime.now();
-    final windowStart = DateTime(now.year, now.month, now.day)
-        .subtract(const Duration(days: 29));
-
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('schools')
-          .doc(widget.schoolId)
-          .collection('readingLogs')
-          .where('studentId', isEqualTo: widget.studentId)
-          .where('date',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(windowStart))
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const SizedBox.shrink();
-
-        final readDays = <DateTime>{};
-        for (final doc in snapshot.data!.docs) {
-          final data = doc.data() as Map<String, dynamic>;
-          final ts = data['date'];
-          if (ts is Timestamp) {
-            final d = ts.toDate();
-            readDays.add(DateTime(d.year, d.month, d.day));
-          }
-        }
-        if (readDays.isEmpty) return const SizedBox.shrink();
-
-        return Container(
-          margin: LumiPadding.horizontalS,
-          padding: LumiPadding.allM,
-          decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius: LumiBorders.large,
-          ),
-          child: RhythmCalendar(readDays: readDays, windowDays: 30),
-        );
-      },
-    );
-  }
-
-  Widget _buildTabs() {
-    return Container(
-      margin: LumiPadding.allS,
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: LumiBorders.large,
-        border: Border.all(color: AppColors.charcoal.withValues(alpha: 0.2)),
-      ),
-      child: TabBar(
-        controller: _tabController,
-        indicator: BoxDecoration(
-          color: AppColors.skyBlue,
-          borderRadius: LumiBorders.large,
-        ),
-        labelColor: AppColors.rosePink,
-        labelStyle: LumiTextStyles.label(),
-        unselectedLabelColor: AppColors.charcoal.withValues(alpha: 0.6),
-        tabs: const [
-          Tab(text: 'Earned'),
-          Tab(text: 'All Achievements'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEarnedAchievements() {
-    return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('schools')
-          .doc(widget.schoolId)
-          .collection('students')
-          .doc(widget.studentId)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) return _buildErrorState(snapshot.error.toString());
-        if (!snapshot.hasData) return _buildLoadingState();
-
-        final studentData = snapshot.data!.data() as Map<String, dynamic>?;
-        if (studentData == null) return _buildEmptyState('Student data not found');
-
-        final achievementsData = studentData['achievements'] as List<dynamic>? ?? [];
-
-        if (achievementsData.isEmpty) {
-          return _buildEmptyState('No achievements yet!\nKeep reading to unlock them! 📚');
-        }
-
-        // Build a template map to enrich earned achievements with custom colors/names
-        final allTemplates = AchievementTemplates.generateTemplates(_thresholds, customization: _customization);
-        final templatesById = {for (final t in allTemplates) t.id: t};
-
-        final achievements = achievementsData
-            .map((data) => AchievementModel.fromMap(Map<String, dynamic>.from(data)))
-            .map((a) {
-              final template = templatesById[a.id];
-              if (template == null) return a;
-              return a.copyWith(
-                name: template.name,
-                customColor: template.customColor,
-              );
-            })
-            .toList();
-
-        final filtered = _selectedCategory == null
-            ? achievements
-            : achievements.where((a) => a.category == _selectedCategory).toList();
-
-        if (filtered.isEmpty) {
-          return _buildEmptyState('No achievements in this category yet!');
-        }
-
-        filtered.sort((a, b) => b.earnedAt.compareTo(a.earnedAt));
-
-        return ListView.builder(
-          padding: EdgeInsets.symmetric(vertical: LumiSpacing.xs),
-          itemCount: filtered.length,
-          itemBuilder: (context, index) => _buildAchievementCard(
-            filtered[index],
-            animate: index < 5,
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildAllAchievements() {
-    return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('schools')
-          .doc(widget.schoolId)
-          .collection('students')
-          .doc(widget.studentId)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) return _buildErrorState(snapshot.error.toString());
-        if (!snapshot.hasData) return _buildLoadingState();
-
-        final student = StudentModel.fromFirestore(snapshot.data!);
-        final earnedIds = ((snapshot.data!.data() as Map<String, dynamic>?)?['achievements']
-                as List<dynamic>?)
-            ?.map<String>((a) => a['id'] as String)
-            .toList() ??
-            [];
-
-        // Generate templates using school-configured thresholds and customization
-        var templates = AchievementTemplates.generateTemplates(_thresholds, customization: _customization);
-
-        if (_selectedCategory != null) {
-          templates = templates.where((t) => t.category == _selectedCategory).toList();
-        }
-
-        return GridView.builder(
-          padding: LumiPadding.allS,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            crossAxisSpacing: LumiSpacing.listItemSpacing,
-            mainAxisSpacing: LumiSpacing.listItemSpacing,
-            childAspectRatio: 0.8,
-          ),
-          itemCount: templates.length,
-          itemBuilder: (context, index) {
-            final template = templates[index];
-            final isEarned = earnedIds.contains(template.id);
-            return _buildAchievementBadge(
-              template,
-              isEarned,
-              () => _showAchievementProgress(template, student, isEarned),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(color: AppColors.rosePink),
-          LumiGap.s,
-          Text(
-            'Loading achievements...',
-            style: LumiTextStyles.body(color: AppColors.charcoal.withValues(alpha: 0.8)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorState(String error) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.error_outline, size: 64, color: AppColors.error),
-          LumiGap.s,
-          Text('Error loading achievements', style: LumiTextStyles.h3(color: AppColors.charcoal)),
-          LumiGap.xs,
-          Text(
-            error,
-            style: LumiTextStyles.bodySmall(color: AppColors.charcoal.withValues(alpha: 0.7)),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(String message) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text('🏆', style: LumiTextStyles.display().copyWith(fontSize: 64))
-              .animate(onPlay: (controller) => controller.repeat())
-              .shimmer(duration: 2000.ms)
-              .shake(hz: 2, rotation: 0.05),
-          LumiGap.s,
-          Text(
-            message,
-            style: LumiTextStyles.h3(color: AppColors.charcoal),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAchievementCard(AchievementModel achievement, {bool animate = false}) {
-    return GestureDetector(
-      onTap: () => _showAchievementDetail(achievement),
-      child: Container(
-        margin: EdgeInsets.symmetric(horizontal: LumiSpacing.s, vertical: LumiSpacing.xs),
-        padding: LumiPadding.allM,
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: LumiBorders.large,
-          border: Border.all(
-            color: AppColors.rosePink,
-            width: 2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.rosePink.withValues(alpha: 0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
             ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                color: AppColors.rosePink.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(achievement.icon, style: const TextStyle(fontSize: 32)),
-              ),
-            ),
-            SizedBox(width: LumiSpacing.s),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(achievement.name, style: LumiTextStyles.h3(color: AppColors.charcoal)),
-                  SizedBox(height: LumiSpacing.xxs),
-                  Text(
-                    achievement.description,
-                    style: LumiTextStyles.bodySmall(
-                      color: AppColors.charcoal.withValues(alpha: 0.7),
-                    ),
+            child: const Center(child: Text('🏆', style: TextStyle(fontSize: 32))),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(text: '$earned', style: LumiType.heading),
+                      TextSpan(
+                        text: ' of $total unlocked',
+                        style: LumiType.body.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ],
                   ),
-                  SizedBox(height: LumiSpacing.xxs),
-                  Text(
-                    'Earned ${_formatDate(achievement.earnedAt)}',
-                    style: LumiTextStyles.label(color: AppColors.rosePink),
+                ),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: fraction,
+                    minHeight: 8,
+                    backgroundColor: LumiTokens.rule,
+                    valueColor: AlwaysStoppedAnimation(accent),
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 8),
+                Text(subtitle, style: LumiType.caption),
+              ],
             ),
-            const Icon(Icons.check_circle, color: AppColors.rosePink, size: 24),
-          ],
-        ),
+          ),
+        ],
       ),
-    ).animate(
-      effects: animate
-          ? [
-              FadeEffect(duration: 300.ms, delay: (50 * (achievement.id.hashCode % 5)).ms),
-              SlideEffect(begin: const Offset(0, 0.1), end: Offset.zero, duration: 300.ms),
-            ]
-          : [],
     );
   }
+}
 
-  Widget _buildAchievementBadge(
-    AchievementModel achievement,
-    bool isEarned,
-    VoidCallback onTap,
-  ) {
+/// A single badge in the grid — lit up when earned, quietly progressing when not.
+class _BadgeTile extends StatelessWidget {
+  final AchievementModel template;
+  final AchievementModel? earned;
+  final ({int current, int required}) progress;
+  final VoidCallback onTap;
+
+  const _BadgeTile({
+    required this.template,
+    required this.earned,
+    required this.progress,
+    required this.onTap,
+  });
+
+  static const _lockedBg = Color(0xFFF1EFE9);
+
+  @override
+  Widget build(BuildContext context) {
+    final isEarned = earned != null;
+    final color = Color(template.effectiveColor);
+    final fraction = progress.required <= 0
+        ? 0.0
+        : (progress.current / progress.required).clamp(0.0, 1.0);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
         decoration: BoxDecoration(
-          color: isEarned ? AppColors.white : AppColors.charcoal.withValues(alpha: 0.05),
-          borderRadius: LumiBorders.large,
+          color: isEarned ? LumiTokens.paper : _lockedBg,
+          borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
           border: Border.all(
-            color: isEarned ? AppColors.rosePink : AppColors.charcoal.withValues(alpha: 0.2),
-            width: isEarned ? 2 : 1,
+            color: isEarned ? color.withValues(alpha: 0.5) : LumiTokens.rule,
+            width: isEarned ? 1.5 : 1,
           ),
-          boxShadow: isEarned
-              ? [
-                  BoxShadow(
-                    color: AppColors.rosePink.withValues(alpha: 0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
+          boxShadow: isEarned ? LumiTokens.shadowCard : null,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Opacity(
-              opacity: isEarned ? 1.0 : 0.3,
-              child: Text(achievement.icon, style: const TextStyle(fontSize: 48)),
+              opacity: isEarned ? 1.0 : 0.35,
+              child: Text(template.icon, style: const TextStyle(fontSize: 40)),
             ),
-            LumiGap.xs,
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: LumiSpacing.xs),
-              child: Text(
-                achievement.name,
-                style: LumiTextStyles.bodySmall(
-                  color: isEarned
-                      ? AppColors.charcoal
-                      : AppColors.charcoal.withValues(alpha: 0.5),
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+            const SizedBox(height: 8),
+            Text(
+              template.name,
+              style: LumiType.caption.copyWith(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isEarned ? LumiTokens.ink : LumiTokens.muted,
               ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-            if (!isEarned) ...[
-              LumiGap.xxs,
-              Icon(Icons.lock, size: 16, color: AppColors.charcoal.withValues(alpha: 0.4)),
-            ],
-            if (isEarned) ...[
-              LumiGap.xxs,
-              const Icon(Icons.check_circle, size: 16, color: AppColors.rosePink),
-            ],
+            const SizedBox(height: 6),
+            if (isEarned)
+              Icon(Icons.check_circle_rounded, size: 16, color: color)
+            else
+              _MiniProgress(fraction: fraction, accent: context.sectionTheme.accent),
           ],
         ),
       ),
     );
   }
+}
 
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-    if (difference.inDays == 0) return 'today';
-    if (difference.inDays == 1) return 'yesterday';
-    if (difference.inDays < 7) return '${difference.inDays} days ago';
-    if (difference.inDays < 30) return '${(difference.inDays / 7).floor()} weeks ago';
-    return '${date.day}/${date.month}/${date.year}';
-  }
+/// Slim progress bar shown under locked badges.
+class _MiniProgress extends StatelessWidget {
+  final double fraction;
+  final Color accent;
 
-  void _showAchievementDetail(AchievementModel achievement) {
-    showDialog(
-      context: context,
-      builder: (context) => AchievementUnlockPopup(achievement: achievement),
+  const _MiniProgress({required this.fraction, required this.accent});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 44,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(999),
+        child: LinearProgressIndicator(
+          value: fraction,
+          minHeight: 5,
+          backgroundColor: LumiTokens.rule,
+          valueColor: AlwaysStoppedAnimation(accent.withValues(alpha: 0.55)),
+        ),
+      ),
     );
   }
+}
 
-  void _showAchievementProgress(
-    AchievementModel template,
-    StudentModel student,
-    bool isEarned,
-  ) {
-    if (isEarned) {
-      _showAchievementDetail(template);
-      return;
-    }
+class _LoadingState extends StatelessWidget {
+  const _LoadingState();
 
-    int currentValue = 0;
-    String unit = '';
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: CircularProgressIndicator(color: context.sectionTheme.accent),
+    );
+  }
+}
 
-    switch (template.requirementType) {
-      case 'streak':
-        currentValue = student.stats?.currentStreak ?? 0;
-        unit = 'day${currentValue == 1 ? '' : 's'}';
-        break;
-      case 'books':
-        currentValue = student.stats?.totalBooksRead ?? 0;
-        unit = 'book${currentValue == 1 ? '' : 's'}';
-        break;
-      case 'minutes':
-        currentValue = student.stats?.totalMinutesRead ?? 0;
-        unit = 'minute${currentValue == 1 ? '' : 's'}';
-        break;
-      case 'days':
-        currentValue = student.stats?.totalReadingDays ?? 0;
-        unit = 'day${currentValue == 1 ? '' : 's'}';
-        break;
-    }
+class _ErrorState extends StatelessWidget {
+  final String message;
+  const _ErrorState(this.message);
 
-    final progress = (currentValue / template.requiredValue).clamp(0.0, 1.0);
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: LumiBorders.shapeLarge,
-        title: Row(
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(template.icon),
-            LumiGap.horizontalXS,
-            Expanded(child: Text(template.name, style: LumiTextStyles.h3())),
+            const Icon(Icons.error_outline, size: 56, color: LumiTokens.muted),
+            const SizedBox(height: 12),
+            Text('Couldn’t load achievements',
+                style: LumiType.subhead, textAlign: TextAlign.center),
+            const SizedBox(height: 6),
+            Text(message, style: LumiType.caption, textAlign: TextAlign.center),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(template.description, style: LumiTextStyles.body()),
-            LumiGap.s,
-            LinearProgressIndicator(
-              value: progress,
-              backgroundColor: AppColors.charcoal.withValues(alpha: 0.3),
-              color: Color(template.effectiveColor),
-            ),
-            LumiGap.xs,
-            Text(
-              '$currentValue / ${template.requiredValue} $unit (${(progress * 100).toStringAsFixed(0)}%)',
-              style: LumiTextStyles.bodyLarge(),
-            ),
-          ],
-        ),
-        actions: [
-          LumiTextButton(onPressed: () => Navigator.pop(context), text: 'Close'),
-        ],
       ),
     );
   }
