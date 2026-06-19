@@ -358,7 +358,7 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
                       // it sits below the headline rather than dominating it.
                       if (_currentStreak > 0)
                         _StatPill(
-                          emoji: '🔥',
+                          icon: Icons.local_fire_department_rounded,
                           label: '$_currentStreak day streak',
                           color: LumiTokens.red,
                         ).animate().fadeIn(delay: 600.ms).slideY(begin: 0.3),
@@ -368,7 +368,7 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
                       if (widget.restDayApplied) ...[
                         const SizedBox(height: 10),
                         _StatPill(
-                          emoji: '🌙',
+                          icon: Icons.bedtime_rounded,
                           label: 'Rest day — your streak keeps going!',
                           color: LumiTokens.blue,
                         ).animate().fadeIn(delay: 700.ms).slideY(begin: 0.3),
@@ -378,10 +378,15 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
                       // count that never resets.
                       if (_last30Nights > 0) ...[
                         const SizedBox(height: 12),
-                        Text(
-                          '🌙 $_last30Nights of the last 30 nights',
-                          style: LumiType.caption,
-                          textAlign: TextAlign.center,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.bedtime_outlined,
+                                size: 15, color: LumiTokens.blue),
+                            const SizedBox(width: 6),
+                            Text('$_last30Nights of the last 30 nights',
+                                style: LumiType.caption),
+                          ],
                         ).animate().fadeIn(delay: 750.ms),
                       ],
 
@@ -390,7 +395,7 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
                       // Badge earned notification
                       if (_earnedBadge != null) ...[
                         _StatPill(
-                          emoji: '🏆',
+                          icon: Icons.emoji_events_rounded,
                           label: 'Badge earned: $_earnedBadge!',
                           color: LumiTokens.yellow,
                           filled: true,
@@ -431,7 +436,8 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
                             ),
                             child: Row(
                               children: [
-                                const Text('💚', style: TextStyle(fontSize: 18)),
+                                const Icon(Icons.favorite_rounded,
+                                    size: 18, color: LumiTokens.green),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(_detailedMilestone!,
@@ -576,13 +582,13 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
 /// with a coloured icon by default; [filled] uses a stronger tint for the
 /// badge-earned moment.
 class _StatPill extends StatelessWidget {
-  final String emoji;
+  final IconData icon;
   final String label;
   final Color color;
   final bool filled;
 
   const _StatPill({
-    required this.emoji,
+    required this.icon,
     required this.label,
     required this.color,
     this.filled = false,
@@ -600,7 +606,7 @@ class _StatPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 22)),
+          Icon(icon, color: color, size: 22),
           const SizedBox(width: 8),
           Flexible(
             child: Text(
