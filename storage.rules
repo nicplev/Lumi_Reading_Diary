@@ -33,18 +33,20 @@ service firebase.storage {
     // Create/update: <2MB, audio/* content type. Role authorization
     // piggybacks on the parent's Firestore log update (same pattern as
     // community book covers).
+    //
+    // The platformConfig/comprehensionRecording kill switch is enforced
+    // app-side via PlatformConfigService.isComprehensionRecordingEnabled().
+    // Storage-rules cross-service Firestore calls were also enforcing it
+    // here, but those silently failed under lumi-ninc-au (no comprehension
+    // audio ever uploaded after the AU migration) — every upload returned
+    // firebase_storage/unauthorized. App-side enforcement is the source of
+    // truth; the storage rule trusts auth + size + contentType.
     match /schools/{schoolId}/comprehension_audio/{fileName} {
       allow read: if request.auth != null;
 
-      // The platformConfig/comprehensionRecording doc is the super-admin
-      // kill switch: while it exists with enabled == false, uploads are
-      // denied even from stale clients that still show the recording step.
-      // Missing doc = feature enabled.
       allow create, update: if request.auth != null
                            && request.resource.size < 2 * 1024 * 1024
-                           && request.resource.contentType.matches('audio/.*')
-                           && (!firestore.exists(/databases/(default)/documents/platformConfig/comprehensionRecording)
-                               || firestore.get(/databases/(default)/documents/platformConfig/comprehensionRecording).data.enabled == true);
+                           && request.resource.contentType.matches('audio/.*');
 
       // No client deletes — Admin SDK only. The scheduled cleanup
       // function `cleanupComprehensionAudio` (functions/src/comprehension_retention.ts)
