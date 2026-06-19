@@ -14,10 +14,17 @@ class SinglePageDocumentScanner: NSObject, VNDocumentCameraViewControllerDelegat
     private var viewController: VNDocumentCameraViewController?
     private var jpgCompressionQuality: Double = 0.92
 
-    static func register(with controller: FlutterViewController) {
+    /// Registered via `FlutterPluginRegistrar` rather than a `FlutterViewController`
+    /// because in scene-based apps (this app has the WidgetKit extension, which
+    /// triggers UIScene lifecycle) `window?.rootViewController` is nil during
+    /// `didFinishLaunchingWithOptions`, so a controller-based registration was
+    /// silently skipped — every channel call then returned MissingPluginException.
+    /// The registrar gets its messenger from the engine, which is wired before
+    /// the window is created.
+    static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(
             name: "lumi/single_page_document_scanner",
-            binaryMessenger: controller.binaryMessenger
+            binaryMessenger: registrar.messenger()
         )
         let instance = SinglePageDocumentScanner()
         channel.setMethodCallHandler(instance.handle)
