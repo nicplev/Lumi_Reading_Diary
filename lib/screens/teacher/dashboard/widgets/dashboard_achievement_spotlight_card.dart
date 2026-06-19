@@ -39,7 +39,7 @@ class DashboardAchievementSpotlightCard extends StatelessWidget {
           Row(
             children: [
               Text('Achievement Spotlight',
-                  style: LumiType.subhead.copyWith(color: LumiTokens.blue)),
+                  style: LumiType.subhead),
               const Spacer(),
               if (thisWeekCount > 0)
                 Container(

@@ -20,6 +20,7 @@ import '../../../data/models/reading_log_model.dart';
 import '../../../data/models/student_model.dart';
 import '../../../data/models/user_model.dart';
 import '../../../services/firebase_service.dart';
+import '../../../services/staff_notification_service.dart';
 import 'models/student_achievement.dart';
 import 'models/dashboard_widget_config.dart';
 import 'models/dashboard_widget_context.dart';
@@ -840,7 +841,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
         : 'Teacher';
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
       decoration: BoxDecoration(
         color: LumiSectionTheme.dashboard.accent,
         borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
@@ -859,6 +860,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
                           '$greeting, $firstName',
                           style: LumiType.heading.copyWith(
                             color: LumiSectionTheme.dashboard.onAccent,
+                            fontSize: 22,
                           ),
                         ).animate().fadeIn(duration: 400.ms).slideY(
                               begin: -0.1,
@@ -866,12 +868,13 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
                               duration: 400.ms,
                               curve: Curves.easeOut,
                             ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Text(
                           DateFormat('EEEE, MMMM d').format(DateTime.now()),
-                          style: LumiType.body.copyWith(
+                          style: LumiType.caption.copyWith(
                             color: LumiSectionTheme.dashboard.onAccent
-                                .withValues(alpha: 0.75),
+                                .withValues(alpha: 0.85),
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                         if (_dailyInsight != null) ...[
@@ -892,7 +895,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
                   _buildBellButton(context),
                 ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
               Row(
                 children: [
                   _buildClassChip()
@@ -968,43 +971,87 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
   }
 
   Widget _buildBellButton(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        setState(() => _bellAnimCount++);
-        final nav = GoRouter.of(context);
-        Future.delayed(const Duration(milliseconds: 400), () {
-          if (mounted) {
-            nav.push('/teacher/notifications');
-          }
-        });
+    return StreamBuilder<int>(
+      stream: StaffNotificationService.instance
+          .watchUnreadParentNotificationCount(widget.user),
+      builder: (context, snapshot) {
+        final unread = snapshot.data ?? 0;
+        return GestureDetector(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            setState(() => _bellAnimCount++);
+            final nav = GoRouter.of(context);
+            Future.delayed(const Duration(milliseconds: 400), () {
+              if (mounted) {
+                nav.push('/teacher/notifications');
+              }
+            });
+          },
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: LumiSectionTheme.dashboard.onAccent
+                      .withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+                ),
+                child: Icon(Icons.notifications_outlined,
+                        size: 20, color: LumiSectionTheme.dashboard.onAccent)
+                    .animate(
+                        key: ValueKey(_bellAnimCount),
+                        autoPlay: _bellAnimCount > 0)
+                    .scale(
+                      begin: const Offset(1.0, 1.0),
+                      end: const Offset(1.18, 1.18),
+                      duration: 200.ms,
+                      curve: Curves.easeOut,
+                    )
+                    .then()
+                    .scale(
+                      begin: const Offset(1.18, 1.18),
+                      end: const Offset(1.0, 1.0),
+                      duration: 200.ms,
+                      curve: Curves.easeIn,
+                    )
+                    .shake(duration: 350.ms, hz: 4, rotation: 0.05),
+              ),
+              // Unread badge — red count that punches out of the hero.
+              if (unread > 0)
+                Positioned(
+                  top: -4,
+                  right: -4,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    constraints:
+                        const BoxConstraints(minWidth: 18, minHeight: 18),
+                    decoration: BoxDecoration(
+                      color: LumiTokens.red,
+                      borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+                      border: Border.all(
+                        color: LumiSectionTheme.dashboard.accent,
+                        width: 2,
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        unread > 9 ? '9+' : '$unread',
+                        style: LumiType.caption.copyWith(
+                          color: LumiTokens.paper,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 10,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
       },
-      child: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: LumiSectionTheme.dashboard.onAccent.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
-        ),
-        child: Icon(Icons.notifications_outlined,
-                size: 20, color: LumiSectionTheme.dashboard.onAccent)
-            .animate(
-                key: ValueKey(_bellAnimCount), autoPlay: _bellAnimCount > 0)
-            .scale(
-              begin: const Offset(1.0, 1.0),
-              end: const Offset(1.18, 1.18),
-              duration: 200.ms,
-              curve: Curves.easeOut,
-            )
-            .then()
-            .scale(
-              begin: const Offset(1.18, 1.18),
-              end: const Offset(1.0, 1.0),
-              duration: 200.ms,
-              curve: Curves.easeIn,
-            )
-            .shake(duration: 350.ms, hz: 4, rotation: 0.05),
-      ),
     );
   }
 

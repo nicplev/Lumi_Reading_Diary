@@ -73,6 +73,7 @@ class DashboardWidgetRegistry {
         classModel: ctx.classModel,
         schoolId: ctx.schoolId,
         students: ctx.students,
+        teacher: ctx.teacher,
         onViewAll: ctx.onViewAllReading,
       ),
     ),

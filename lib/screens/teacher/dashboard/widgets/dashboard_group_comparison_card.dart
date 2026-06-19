@@ -22,7 +22,6 @@ class DashboardGroupComparisonCard extends StatelessWidget {
 
     // Compute stats per group
     final groupStats = <String, _GroupStats>{};
-    double maxAvg = 0;
 
     for (final group in readingGroups) {
       final groupLogs = weeklyLogs
@@ -50,8 +49,6 @@ class DashboardGroupComparisonCard extends StatelessWidget {
       final activePercent =
           totalStudents > 0 ? (activeCount / totalStudents * 100).round() : 0;
 
-      if (avgMinutes > maxAvg) maxAvg = avgMinutes;
-
       groupStats[group.id] = _GroupStats(
         avgMinutes: avgMinutes,
         activePercent: activePercent,
@@ -67,7 +64,7 @@ class DashboardGroupComparisonCard extends StatelessWidget {
           ...readingGroups.map((group) {
             final stats = groupStats[group.id];
             if (stats == null) return const SizedBox.shrink();
-            return _buildGroupRow(group, stats, maxAvg);
+            return _buildGroupRow(group, stats);
           }),
         ],
       ),
@@ -90,7 +87,7 @@ class DashboardGroupComparisonCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Reading Groups',
-                  style: LumiType.subhead.copyWith(color: LumiTokens.blue)),
+                  style: LumiType.subhead),
               Text('This week', style: LumiType.caption),
             ],
           ),
@@ -121,25 +118,22 @@ class DashboardGroupComparisonCard extends StatelessWidget {
     );
   }
 
-  Widget _buildGroupRow(
-      ReadingGroupModel group, _GroupStats stats, double maxAvg) {
+  Widget _buildGroupRow(ReadingGroupModel group, _GroupStats stats) {
     final color = _parseColor(group.color);
+    final hasActivity = stats.activeCount > 0;
+    final avgMin = stats.avgMinutes.round();
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Group name + dot
           Row(
             children: [
               Container(
                 width: 10,
                 height: 10,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                ),
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -152,81 +146,35 @@ class DashboardGroupComparisonCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Text(
-                '${stats.activeCount}/${stats.totalStudents} active',
-                style: LumiType.caption,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // Avg minutes bar
-          Row(
-            children: [
-              SizedBox(
-                width: 60,
-                child: Text('Avg min',
-                    style: LumiType.caption.copyWith(fontSize: 11)),
-              ),
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: maxAvg > 0 ? stats.avgMinutes / maxAvg : 0,
-                    minHeight: 8,
-                    backgroundColor: LumiTokens.rule,
-                    valueColor: AlwaysStoppedAnimation<Color>(color),
-                  ),
-                ),
-              ),
               const SizedBox(width: 8),
-              SizedBox(
-                width: 36,
-                child: Text(
-                  '${stats.avgMinutes.round()}',
-                  textAlign: TextAlign.right,
-                  style: LumiType.caption.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: LumiTokens.ink,
-                  ),
-                ),
+              Text(
+                '${stats.activeCount} of ${stats.totalStudents} active',
+                style: LumiType.caption.copyWith(color: LumiTokens.muted),
               ),
             ],
           ),
           const SizedBox(height: 6),
-          // Active % bar
-          Row(
-            children: [
-              SizedBox(
-                width: 60,
-                child: Text('Active %',
-                    style: LumiType.caption.copyWith(fontSize: 11)),
+          // Only show a bar when there's activity — an empty bar says nothing.
+          if (hasActivity) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: stats.activePercent / 100,
+                minHeight: 7,
+                backgroundColor: LumiTokens.rule,
+                valueColor: AlwaysStoppedAnimation<Color>(color),
               ),
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: stats.activePercent / 100,
-                    minHeight: 8,
-                    backgroundColor: LumiTokens.rule,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                        color.withValues(alpha: 0.5)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 36,
-                child: Text(
-                  '${stats.activePercent}%',
-                  textAlign: TextAlign.right,
-                  style: LumiType.caption.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: LumiTokens.ink,
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'avg $avgMin min · ${stats.activePercent}% active',
+              style: LumiType.caption.copyWith(color: LumiTokens.muted),
+            ),
+          ] else
+            Text(
+              'No reading logged this week',
+              style: LumiType.caption.copyWith(color: LumiTokens.muted),
+            ),
         ],
       ),
     );
