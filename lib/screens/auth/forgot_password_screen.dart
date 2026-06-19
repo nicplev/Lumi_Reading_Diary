@@ -229,6 +229,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         color: LumiTokens.ink),
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.done,
+                    autofillHints: const [AutofillHints.email],
+                    onSubmitted: (_) =>
+                        _isLoading ? null : _handlePasswordReset(),
                     validator: FormBuilderValidators.compose([
                       FormBuilderValidators.required(
                         errorText: 'Email is required',

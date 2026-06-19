@@ -33,12 +33,17 @@ class LumiInput extends StatefulWidget {
   final Widget? prefixIcon;
   final Widget? suffixIcon;
   final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
   final VoidCallback? onTap;
   final FormFieldValidator<String>? validator;
   final List<TextInputFormatter>? inputFormatters;
   final TextInputAction? textInputAction;
   final FocusNode? focusNode;
   final bool autofocus;
+
+  /// OS credential autofill hints (e.g. [AutofillHints.email]). Drives the
+  /// keyboard's QuickType suggestions and the "save password?" prompt.
+  final List<String>? autofillHints;
 
   /// Minimal, borderless style: no box outline or fill, the [label] (or
   /// [hintText]) becomes the inline placeholder, and the prefix icon leads
@@ -60,6 +65,7 @@ class LumiInput extends StatefulWidget {
     this.prefixIcon,
     this.suffixIcon,
     this.onChanged,
+    this.onSubmitted,
     this.onTap,
     this.validator,
     this.inputFormatters,
@@ -67,6 +73,7 @@ class LumiInput extends StatefulWidget {
     this.focusNode,
     this.autofocus = false,
     this.borderless = false,
+    this.autofillHints,
   });
 
   @override
@@ -75,39 +82,19 @@ class LumiInput extends StatefulWidget {
 
 class _LumiInputState extends State<LumiInput> {
   late FocusNode _focusNode;
-  bool _isFocused = false;
 
   @override
   void initState() {
     super.initState();
     _focusNode = widget.focusNode ?? FocusNode();
-    _focusNode.addListener(_onFocusChange);
   }
 
   @override
   void dispose() {
     if (widget.focusNode == null) {
       _focusNode.dispose();
-    } else {
-      _focusNode.removeListener(_onFocusChange);
     }
     super.dispose();
-  }
-
-  void _onFocusChange() {
-    setState(() {
-      _isFocused = _focusNode.hasFocus;
-    });
-  }
-
-  Color get _borderColor {
-    if (widget.errorText != null) {
-      return AppColors.error;
-    }
-    if (_isFocused) {
-      return AppColors.rosePink;
-    }
-    return AppColors.charcoal.withOpacity(0.2);
   }
 
   @override
@@ -140,11 +127,13 @@ class _LumiInputState extends State<LumiInput> {
           maxLines: widget.maxLines,
           maxLength: widget.maxLength,
           onChanged: widget.onChanged,
+          onFieldSubmitted: widget.onSubmitted,
           onTap: widget.onTap,
           validator: widget.validator,
           inputFormatters: widget.inputFormatters,
           textInputAction: widget.textInputAction,
           autofocus: widget.autofocus,
+          autofillHints: widget.autofillHints,
           style: LumiTextStyles.body(),
           decoration: InputDecoration(
             hintText: hintText,
@@ -286,12 +275,14 @@ class LumiPasswordInput extends StatefulWidget {
   final String? errorText;
   final TextEditingController? controller;
   final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
   final FormFieldValidator<String>? validator;
   final FocusNode? focusNode;
   final bool autofocus;
   final TextInputAction? textInputAction;
   final Widget? prefixIcon;
   final bool borderless;
+  final List<String>? autofillHints;
 
   const LumiPasswordInput({
     super.key,
@@ -301,12 +292,14 @@ class LumiPasswordInput extends StatefulWidget {
     this.errorText,
     this.controller,
     this.onChanged,
+    this.onSubmitted,
     this.validator,
     this.focusNode,
     this.autofocus = false,
     this.textInputAction,
     this.prefixIcon,
     this.borderless = false,
+    this.autofillHints,
   });
 
   @override
@@ -332,6 +325,7 @@ class _LumiPasswordInputState extends State<LumiPasswordInput> {
       controller: widget.controller,
       obscureText: _obscureText,
       onChanged: widget.onChanged,
+      onSubmitted: widget.onSubmitted,
       validator: widget.validator,
       focusNode: widget.focusNode,
       autofocus: widget.autofocus,
@@ -339,6 +333,7 @@ class _LumiPasswordInputState extends State<LumiPasswordInput> {
       keyboardType: TextInputType.visiblePassword,
       borderless: widget.borderless,
       prefixIcon: widget.prefixIcon,
+      autofillHints: widget.autofillHints,
       suffixIcon: IconButton(
         icon: Icon(
           _obscureText ? Icons.visibility : Icons.visibility_off,

@@ -714,41 +714,51 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 16),
 
                 if (_signInMode == _SignInMode.email) ...[
-                  // Email + password form
-                  Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        LumiInput(
-                          controller: _emailController,
-                          hintText: 'Email',
-                          borderless: true,
-                          keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.next,
-                          prefixIcon: const Icon(Icons.email_outlined,
-                              color: LumiTokens.ink),
-                          validator: FormBuilderValidators.compose([
-                            FormBuilderValidators.required(
-                              errorText: 'Email is required',
+                  // Email + password form. AutofillGroup ties the pair so the
+                  // OS can fill saved credentials and offer to save on submit.
+                  AutofillGroup(
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        children: [
+                          LumiInput(
+                            controller: _emailController,
+                            hintText: 'Email',
+                            borderless: true,
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
+                            autofillHints: const [
+                              AutofillHints.username,
+                              AutofillHints.email,
+                            ],
+                            prefixIcon: const Icon(Icons.email_outlined,
+                                color: LumiTokens.ink),
+                            validator: FormBuilderValidators.compose([
+                              FormBuilderValidators.required(
+                                errorText: 'Email is required',
+                              ),
+                              FormBuilderValidators.email(
+                                errorText: 'Enter a valid email',
+                              ),
+                            ]),
+                          ).animate().fadeIn(delay: 400.ms, duration: 500.ms),
+                          const SizedBox(height: 8),
+                          LumiPasswordInput(
+                            controller: _passwordController,
+                            hintText: 'Password',
+                            borderless: true,
+                            prefixIcon: const Icon(Icons.lock_outline,
+                                color: LumiTokens.ink),
+                            textInputAction: TextInputAction.done,
+                            autofillHints: const [AutofillHints.password],
+                            onSubmitted: (_) =>
+                                _isLoading ? null : _handleLogin(),
+                            validator: FormBuilderValidators.required(
+                              errorText: 'Password is required',
                             ),
-                            FormBuilderValidators.email(
-                              errorText: 'Enter a valid email',
-                            ),
-                          ]),
-                        ).animate().fadeIn(delay: 400.ms, duration: 500.ms),
-                        const SizedBox(height: 8),
-                        LumiPasswordInput(
-                          controller: _passwordController,
-                          hintText: 'Password',
-                          borderless: true,
-                          prefixIcon: const Icon(Icons.lock_outline,
-                              color: LumiTokens.ink),
-                          textInputAction: TextInputAction.done,
-                          validator: FormBuilderValidators.required(
-                            errorText: 'Password is required',
-                          ),
-                        ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
-                      ],
+                          ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -786,6 +796,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     borderless: true,
                     keyboardType: TextInputType.phone,
                     textInputAction: TextInputAction.done,
+                    autofillHints: const [AutofillHints.telephoneNumber],
                     prefixIcon: const Icon(Icons.phone_outlined,
                         color: LumiTokens.ink),
                     inputFormatters: [
@@ -803,6 +814,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderless: true,
                       keyboardType: TextInputType.number,
                       textInputAction: TextInputAction.done,
+                      autofillHints: const [AutofillHints.oneTimeCode],
                       prefixIcon: const Icon(Icons.sms_outlined,
                           color: LumiTokens.ink),
                       inputFormatters: [
@@ -1040,6 +1052,7 @@ class _MfaCodeDialogState extends State<_MfaCodeDialog> {
             label: 'SMS code',
             keyboardType: TextInputType.number,
             autofocus: true,
+            autofillHints: const [AutofillHints.oneTimeCode],
             inputFormatters: [
               FilteringTextInputFormatter.digitsOnly,
               LengthLimitingTextInputFormatter(6),
