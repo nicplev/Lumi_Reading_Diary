@@ -228,7 +228,8 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
       try {
         await ReadingLogService.instance.attachComment(
           widget.readingLog,
-          selections: _selectedComments,
+          selections:
+              _selectedComments.take(kMaxParentCommentChips).toList(),
           freeText: _noteController.text,
         );
         _commentSaved = true;
