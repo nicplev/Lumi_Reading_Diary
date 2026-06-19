@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/config/dev_access.dart';
 import '../../core/services/dev_access_service.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/teacher_constants.dart';
+import '../../theme/lumi_tokens.dart';
+import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/feedback_widget.dart';
 import '../../core/widgets/lumi/teacher_settings_section.dart';
 import '../../core/widgets/lumi/teacher_settings_item.dart';
@@ -137,7 +137,7 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
-          top: Radius.circular(TeacherDimensions.radiusXL),
+          top: Radius.circular(LumiTokens.radiusXL),
         ),
       ),
       builder: (context) {
@@ -151,7 +151,7 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 20, vertical: 8),
                   child: Text('Select a Class',
-                      style: TeacherTypography.h3),
+                      style: LumiType.subhead),
                 ),
                 const SizedBox(height: 8),
                 ..._classes.map(
@@ -161,18 +161,18 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
                       height: 40,
                       decoration: BoxDecoration(
                         color:
-                            AppColors.teacherPrimary.withValues(alpha: 0.14),
+                            LumiTokens.muted.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(Icons.class_,
-                          color: AppColors.teacherPrimary, size: 20),
+                          color: LumiTokens.ink, size: 20),
                     ),
                     title: Text(cls.name,
-                        style: TeacherTypography.bodyLarge
+                        style: LumiType.body
                             .copyWith(fontWeight: FontWeight.w600)),
                     subtitle: cls.room != null
                         ? Text('Room ${cls.room}',
-                            style: TeacherTypography.caption)
+                            style: LumiType.caption)
                         : null,
                     onTap: () => Navigator.pop(context, cls),
                   ),
@@ -186,60 +186,13 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
     );
   }
 
-  Future<void> _handleClearCache() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
-        ),
-        title: const Text('Clear Cache', style: TeacherTypography.h3),
-        content: const Text(
-          'This will remove locally cached data older than 30 days. '
-          'Your data is safely stored in the cloud.',
-          style: TeacherTypography.bodyLarge,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel',
-                style: TeacherTypography.buttonText
-                    .copyWith(color: AppColors.textSecondary)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('Clear',
-                style: TeacherTypography.buttonText
-                    .copyWith(color: AppColors.teacherPrimary)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true && mounted) {
-      try {
-        await OfflineService.instance.clearOldData();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Cache cleared successfully.')),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to clear cache.')),
-          );
-        }
-      }
-    }
-  }
 
   void _showAboutDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
+          borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
         ),
         title: Row(
           children: [
@@ -247,14 +200,14 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: AppColors.teacherPrimary.withValues(alpha: 0.14),
+                color: LumiTokens.red.withValues(alpha: 0.14),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(Icons.auto_stories,
-                  color: AppColors.teacherPrimary, size: 22),
+                  color: LumiTokens.red, size: 22),
             ),
             const SizedBox(width: 12),
-            const Text('Lumi', style: TeacherTypography.h3),
+            Text('Lumi', style: LumiType.subhead),
           ],
         ),
         content: Column(
@@ -262,19 +215,18 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Version 1.0.0',
-                style: TeacherTypography.bodyLarge
-                    .copyWith(color: AppColors.textSecondary)),
+                style: LumiType.body
+                    .copyWith(color: LumiTokens.muted)),
             const SizedBox(height: 8),
-            const Text('Reading Tracker for Schools',
-                style: TeacherTypography.bodyLarge),
+            Text('Reading Tracker for Schools', style: LumiType.body),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text('Close',
-                style: TeacherTypography.buttonText
-                    .copyWith(color: AppColors.teacherPrimary)),
+                style: LumiType.button
+                    .copyWith(color: LumiTokens.red)),
           ),
         ],
       ),
@@ -286,25 +238,25 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
+          borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
         ),
-        title: const Text('Sign Out', style: TeacherTypography.h3),
-        content: const Text(
+        title: Text('Sign Out', style: LumiType.subhead),
+        content: Text(
           'Are you sure you want to sign out?',
-          style: TeacherTypography.bodyLarge,
+          style: LumiType.body,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text('Cancel',
-                style: TeacherTypography.buttonText
-                    .copyWith(color: AppColors.textSecondary)),
+                style: LumiType.button
+                    .copyWith(color: LumiTokens.muted)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: Text('Sign Out',
-                style: TeacherTypography.buttonText
-                    .copyWith(color: AppColors.error)),
+                style: LumiType.button
+                    .copyWith(color: LumiTokens.red)),
           ),
         ],
       ),
@@ -327,19 +279,19 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
     switch (status) {
       case SyncStatus.synced:
         label = 'All synced';
-        color = AppColors.libraryGreen;
+        color = LumiTokens.green;
         break;
       case SyncStatus.syncing:
         label = 'Syncing...';
-        color = AppColors.teacherPrimary;
+        color = LumiTokens.ink;
         break;
       case SyncStatus.pending:
         label = '$pendingCount pending';
-        color = AppColors.warmOrange;
+        color = LumiTokens.yellow;
         break;
       case SyncStatus.offline:
         label = 'Offline';
-        color = AppColors.textSecondary;
+        color = LumiTokens.muted;
         break;
     }
 
@@ -367,17 +319,17 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
   Widget _buildLogOutCard() {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
-        border: Border.all(color: AppColors.teacherBorder),
-        boxShadow: TeacherDimensions.cardShadow,
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+        border: Border.all(color: LumiTokens.rule),
+        boxShadow: LumiTokens.shadowCard,
       ),
       child: InkWell(
         onTap: _handleSignOut,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
         child: Padding(
           padding: const EdgeInsets.symmetric(
-            horizontal: TeacherDimensions.paddingL,
+            horizontal: 16,
             vertical: 9,
           ),
           child: Row(
@@ -386,11 +338,11 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: AppColors.error.withValues(alpha: 0.10),
+                  color: LumiTokens.red.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(Icons.logout_rounded,
-                    size: 18, color: AppColors.error),
+                    size: 18, color: LumiTokens.red),
               ),
               const SizedBox(width: 14),
               Text(
@@ -399,7 +351,7 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
                   fontFamily: 'Nunito',
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.error,
+                  color: LumiTokens.red,
                 ),
               ),
             ],
@@ -418,8 +370,8 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
       child: Center(
         child: Text(
           'Lumi v1.0.0',
-          style: TeacherTypography.caption.copyWith(
-            color: AppColors.textSecondary.withValues(alpha: 0.5),
+          style: LumiType.caption.copyWith(
+            color: LumiTokens.muted.withValues(alpha: 0.5),
           ),
         ),
       ),
@@ -428,13 +380,15 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
+    return ColoredBox(
+      color: LumiTokens.cream,
+      child: SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 200),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Settings', style: TeacherTypography.h1)
+            Text('Settings', style: LumiType.heading)
                 .animate()
                 .fadeIn(duration: 400.ms)
                 .slideY(begin: -0.05, end: 0, curve: Curves.easeOutCubic),
@@ -448,14 +402,14 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
                 if (_levelsEnabled)
                   TeacherSettingsItem(
                     icon: Icons.auto_stories,
-                    iconBgColor: AppColors.decodableBlue,
+                    iconBgColor: LumiTokens.muted,
                     label: 'Reading Levels',
                     onTap: () =>
                         _navigateWithClass('/teacher/level-management'),
                   ),
                 TeacherSettingsItem(
                   icon: Icons.groups,
-                  iconBgColor: AppColors.teacherAccent,
+                  iconBgColor: LumiTokens.muted,
                   label: 'Reading Groups',
                   onTap: () => _navigateWithClass('/teacher/reading-groups'),
                 ),
@@ -464,7 +418,7 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
                 if (hasDevAccess())
                   TeacherSettingsItem(
                     icon: Icons.assessment,
-                    iconBgColor: AppColors.libraryGreen,
+                    iconBgColor: LumiTokens.muted,
                     label: 'Class Reports',
                     onTap: () => _navigateWithClass('/teacher/class-report'),
                   ),
@@ -482,7 +436,7 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
               items: [
                 TeacherSettingsItem(
                   icon: Icons.campaign,
-                  iconBgColor: AppColors.skyBlue,
+                  iconBgColor: LumiTokens.muted,
                   label: 'Parent/Guardian Notifications',
                   onTap: () {
                     context.push('/teacher/notifications');
@@ -501,20 +455,14 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
               title: 'Data & Storage',
               items: [
                 TeacherSettingsItem(
-                  icon: Icons.cached,
-                  iconBgColor: AppColors.teacherAccent,
-                  label: 'Clear Cache',
-                  onTap: _handleClearCache,
-                ),
-                TeacherSettingsItem(
                   icon: Icons.sync,
-                  iconBgColor: AppColors.libraryGreen,
+                  iconBgColor: LumiTokens.muted,
                   label: 'Sync Status',
                   trailing: _buildSyncStatusTrailing(),
                 ),
                 TeacherSettingsItem(
                   icon: Icons.network_check,
-                  iconBgColor: AppColors.skyBlue,
+                  iconBgColor: LumiTokens.muted,
                   label: 'Connection status',
                   onTap: () => context.push('/settings/service-status'),
                 ),
@@ -532,7 +480,7 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
               items: [
                 TeacherSettingsItem(
                   icon: Icons.feedback_outlined,
-                  iconBgColor: AppColors.teacherPrimary,
+                  iconBgColor: LumiTokens.muted,
                   label: 'Send Feedback',
                   onTap: () {
                     showFeedbackSheet(
@@ -544,7 +492,7 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
                 ),
                 TeacherSettingsItem(
                   icon: Icons.info_outline,
-                  iconBgColor: AppColors.skyBlue,
+                  iconBgColor: LumiTokens.muted,
                   label: 'About',
                   onTap: _showAboutDialog,
                 ),
@@ -565,6 +513,7 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
             _buildVersionFooter(),
           ],
         ),
+      ),
       ),
     );
   }
