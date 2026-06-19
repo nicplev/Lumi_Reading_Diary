@@ -220,16 +220,20 @@ class OfflineService with WidgetsBindingObserver {
   }
 
   /// Troubleshooting reset: clears the local *mirror* of cloud data (reading
-  /// logs, students, allocations) so the app re-downloads it fresh. Preserves
-  /// the pending-sync queue and local drafts, so unsynced work is never lost.
+  /// logs, students, allocations) so the app re-downloads it fresh. Crucially
+  /// it preserves the pending-sync queue and local drafts, so any unsynced work
+  /// is never lost — it will still upload on the next sync.
   Future<void> clearCachedData() async {
-    if (!_initialized) return;
+    if (!_initialized) {
+      debugPrint('Offline service not initialized, skipping cached-data clear');
+      return;
+    }
     try {
       await _readingLogsBox.clear();
       await _studentsBox.clear();
       await _allocationsBox.clear();
-      debugPrint('Cleared cached cloud data '
-          '(kept ${_syncQueue.length} pending writes + drafts)');
+      debugPrint(
+          'Cleared cached cloud data (kept ${_syncQueue.length} pending writes + drafts)');
     } catch (e) {
       debugPrint('Error clearing cached data: $e');
     }
