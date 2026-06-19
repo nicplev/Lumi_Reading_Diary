@@ -33,31 +33,51 @@ class DashboardPriorityNudges extends StatelessWidget {
   Widget build(BuildContext context) {
     final weekday = DateTime.now().weekday;
     final suppressInactivity = weekday <= 2; // Mon = 1, Tue = 2
-
     final nudges = _nudgeItemsFor(students, suppressInactivity);
+
+    // Compact single-row card when there's nothing to act on.
+    if (nudges.isEmpty) {
+      return _card(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Text('Needs attention', style: LumiType.subhead),
+            const Spacer(),
+            const Icon(Icons.check_circle_rounded,
+                size: 18, color: LumiTokens.green),
+            const SizedBox(width: 6),
+            Text('All caught up',
+                style: LumiType.caption.copyWith(color: LumiTokens.muted)),
+          ],
+        ),
+      );
+    }
+
     final displayNudges = nudges.take(3).toList();
     final remaining = nudges.length - 3;
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: LumiTokens.paper,
-        borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
-        border: Border.all(color: LumiTokens.rule),
-        boxShadow: LumiTokens.shadowCard,
-      ),
+    return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Needs attention', style: LumiType.subhead),
+          Row(
+            children: [
+              Text('Needs attention', style: LumiType.subhead),
+              const Spacer(),
+              Text(
+                nudges.length == 1 ? '1 student' : '${nudges.length} students',
+                style: LumiType.caption.copyWith(
+                  color: LumiTokens.muted,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 16),
-          if (nudges.isEmpty)
-            _buildEmptyState()
-          else
-            ...displayNudges.map((nudge) => _NudgeRow(
-                  nudge: nudge,
-                  onTap: () => _navigateToStudent(context, nudge.student),
-                )),
+          ...displayNudges.map((nudge) => _NudgeRow(
+                nudge: nudge,
+                onTap: () => _navigateToStudent(context, nudge.student),
+              )),
           if (remaining > 0)
             Padding(
               padding: const EdgeInsets.only(top: 4),
@@ -80,31 +100,16 @@ class DashboardPriorityNudges extends StatelessWidget {
     );
   }
 
-  Widget _buildEmptyState() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Center(
-        child: Column(
-          children: [
-            Icon(Icons.check_circle_rounded,
-                size: 32, color: LumiTokens.green.withValues(alpha: 0.7)),
-            const SizedBox(height: 10),
-            Text(
-              "You're all caught up",
-              style: LumiType.body.copyWith(
-                fontWeight: FontWeight.w700,
-                fontSize: 15,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              'No students need a nudge right now',
-              style: LumiType.caption,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+  Widget _card({required Widget child, EdgeInsetsGeometry? padding}) {
+    return Container(
+      padding: padding ?? const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+        border: Border.all(color: LumiTokens.rule),
+        boxShadow: LumiTokens.shadowCard,
       ),
+      child: child,
     );
   }
 

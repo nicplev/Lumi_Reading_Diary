@@ -51,11 +51,14 @@ class DashboardTopReadersCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Top Readers',
-                  style: LumiType.subhead.copyWith(color: LumiTokens.blue)),
-              Text('This week', style: LumiType.caption),
+              Text('Top Readers', style: LumiType.subhead),
+              Text('This week',
+                  style: LumiType.caption.copyWith(color: LumiTokens.muted)),
             ],
           ),
+          const SizedBox(height: 2),
+          Text('Ranked by minutes read',
+              style: LumiType.caption.copyWith(color: LumiTokens.muted)),
           const SizedBox(height: 16),
 
           if (top.isEmpty)
@@ -137,10 +140,10 @@ class DashboardTopReadersCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '${minutes}m',
+                      '$minutes min',
                       style: LumiType.caption.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: LumiTokens.blue,
+                        color: LumiTokens.ink,
                       ),
                     ),
                   ],

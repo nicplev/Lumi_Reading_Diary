@@ -133,13 +133,15 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
             children: [
               Text('Weekly Reading Activity', style: LumiType.subhead),
               Text(
-                'This Week',
-                style: LumiType.caption.copyWith(
-                  color: LumiTokens.blue,
-                  fontWeight: FontWeight.w700,
-                ),
+                'This week',
+                style: LumiType.caption.copyWith(color: LumiTokens.muted),
               ),
             ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Students who logged reading each day',
+            style: LumiType.caption.copyWith(color: LumiTokens.muted),
           ),
           const SizedBox(height: 16),
           StreamBuilder<QuerySnapshot>(
@@ -189,9 +191,6 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
               final daysElapsed = todayIndex + 1;
               final avgPerDay =
                   daysElapsed > 0 ? (totalWeek / daysElapsed).round() : 0;
-              final avgPercent = totalStudents > 0
-                  ? (avgPerDay / totalStudents * 100).round()
-                  : 0;
 
               return Column(
                 children: [
@@ -288,7 +287,7 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  _buildFooter(avgPerDay, totalStudents, avgPercent),
+                  _buildFooter(avgPerDay, totalStudents),
                 ],
               );
             },
@@ -386,8 +385,9 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
     );
   }
 
-  Widget _buildFooter(int avgPerDay, int totalStudents, int avgPercent) {
-    // Compute week-over-week trend
+  Widget _buildFooter(int avgPerDay, int totalStudents) {
+    // Week-over-week trend in students, not a percentage — a % on small class
+    // sizes overstates tiny changes (0.75 → 1 student reads as "+33%").
     String? trendText;
     Color? trendColor;
     IconData? trendIcon;
@@ -396,16 +396,16 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
       final lastAvg = _lastWeekDayCount! > 0
           ? (_lastWeekTotal! / _lastWeekDayCount!).round()
           : 0;
-      final lastPercent = totalStudents > 0
-          ? (lastAvg / totalStudents * 100).round()
-          : 0;
-      final diff = avgPercent - lastPercent;
+      final diff = avgPerDay - lastAvg;
       if (diff > 0) {
-        trendText = '+$diff% vs last week';
+        trendText =
+            diff == 1 ? '1 more than last week' : '$diff more than last week';
         trendColor = LumiTokens.green;
         trendIcon = Icons.trending_up_rounded;
       } else if (diff < 0) {
-        trendText = '$diff% vs last week';
+        final n = diff.abs();
+        trendText =
+            n == 1 ? '1 fewer than last week' : '$n fewer than last week';
         trendColor = LumiTokens.red;
         trendIcon = Icons.trending_down_rounded;
       }
@@ -422,8 +422,8 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            'Avg $avgPerDay/$totalStudents per night',
-            style: LumiType.caption,
+            'Avg $avgPerDay of $totalStudents per night',
+            style: LumiType.caption.copyWith(color: LumiTokens.muted),
           ),
           if (trendText != null)
             Row(

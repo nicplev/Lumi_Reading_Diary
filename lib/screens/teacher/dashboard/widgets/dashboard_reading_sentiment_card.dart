@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../../../theme/lumi_tokens.dart';
@@ -54,8 +53,6 @@ class DashboardReadingSentimentCard extends StatelessWidget {
       }
     }
     final totalWithFeeling = counts.values.fold<int>(0, (a, b) => a + b);
-    final maxCount =
-        counts.values.fold<int>(0, (a, b) => math.max(a, b));
 
     // Find most common feeling
     ReadingFeeling? mostCommon;
@@ -64,6 +61,9 @@ class DashboardReadingSentimentCard extends StatelessWidget {
           .reduce((a, b) => a.value >= b.value ? a : b)
           .key;
     }
+    // Struggling entries worth a teacher's eye.
+    final needReview = (counts[ReadingFeeling.tricky] ?? 0) +
+        (counts[ReadingFeeling.hard] ?? 0);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -80,11 +80,17 @@ class DashboardReadingSentimentCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Reading Sentiment',
-                  style: LumiType.subhead.copyWith(color: LumiTokens.blue)),
+              Text('Reading Sentiment', style: LumiType.subhead),
               Text('This week', style: LumiType.caption),
             ],
           ),
+          if (totalWithFeeling > 0) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Based on $totalWithFeeling ${totalWithFeeling == 1 ? 'entry' : 'entries'}',
+              style: LumiType.caption.copyWith(color: LumiTokens.muted),
+            ),
+          ],
           const SizedBox(height: 16),
 
           if (totalWithFeeling == 0)
@@ -93,40 +99,30 @@ class DashboardReadingSentimentCard extends StatelessWidget {
             ..._feelingOrder.map((f) => _buildBar(
                   feeling: f,
                   count: counts[f] ?? 0,
-                  maxCount: maxCount,
+                  total: totalWithFeeling,
                 )),
-            const SizedBox(height: 12),
-            // Footer: most common
+            const SizedBox(height: 6),
+            // Footer: a plain, actionable insight line (no decorative pill).
             if (mostCommon != null)
-              Container(
-                width: double.infinity,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: _feelingColor(mostCommon).withValues(alpha: 0.12),
-                  borderRadius:
-                      BorderRadius.circular(LumiTokens.radiusSmall),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Image.asset(
-                      'assets/blobs/blob-${mostCommon.name}.png',
-                      width: 18,
-                      height: 18,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              Row(
+                children: [
+                  Image.asset(
+                    'assets/blobs/blob-${mostCommon.name}.png',
+                    width: 18,
+                    height: 18,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      needReview > 0
+                          ? '${_feelingLabel(mostCommon)} most common · $needReview may need review'
+                          : '${_feelingLabel(mostCommon)} most common',
+                      style: LumiType.caption.copyWith(color: LumiTokens.ink),
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Most common: ${_feelingLabel(mostCommon)}',
-                      style: LumiType.caption.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: LumiTokens.ink,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
           ],
         ],
@@ -137,9 +133,10 @@ class DashboardReadingSentimentCard extends StatelessWidget {
   Widget _buildBar({
     required ReadingFeeling feeling,
     required int count,
-    required int maxCount,
+    required int total,
   }) {
-    final fraction = maxCount > 0 ? count / maxCount : 0.0;
+    final fraction = total > 0 ? count / total : 0.0;
+    final pct = total > 0 ? (count / total * 100).round() : 0;
     final color = _feelingColor(feeling);
 
     return Padding(
@@ -192,16 +189,26 @@ class DashboardReadingSentimentCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          // Count
+          // Count + percentage of total
           SizedBox(
-            width: 24,
-            child: Text(
-              '$count',
-              textAlign: TextAlign.right,
-              style: LumiType.caption.copyWith(
-                fontWeight: FontWeight.w700,
-                color: LumiTokens.ink,
+            width: 54,
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: '$count',
+                    style: LumiType.caption.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: LumiTokens.ink,
+                    ),
+                  ),
+                  TextSpan(
+                    text: '  $pct%',
+                    style: LumiType.caption.copyWith(color: LumiTokens.muted),
+                  ),
+                ],
               ),
+              textAlign: TextAlign.right,
             ),
           ),
         ],

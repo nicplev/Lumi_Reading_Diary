@@ -9,9 +9,9 @@ class DashboardWidgetConfig {
   static const int currentVersion = 1;
   static const List<String> defaultWidgetIds = [
     'engagement',
+    'priority_nudges',
     'recent_reading',
     'weekly_chart',
-    'priority_nudges',
   ];
 
   const DashboardWidgetConfig({
