@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/teacher_constants.dart';
-import '../../../core/widgets/lumi/lumi_card.dart';
+import '../../../theme/lumi_tokens.dart';
+import '../../../theme/lumi_typography.dart';
 import '../../../data/models/allocation_model.dart';
 
 class AllocationCard extends StatelessWidget {
@@ -27,44 +26,44 @@ class AllocationCard extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: LumiCard(
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: LumiTokens.paper,
+          borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+          border: Border.all(color: LumiTokens.rule),
+          boxShadow: LumiTokens.shadowCard,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Type badge + title
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Type pill
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.teacherPrimaryLight,
-                    borderRadius: BorderRadius.circular(
-                        TeacherDimensions.radiusRound),
-                  ),
-                  child: Text(
-                    _typeLabel,
-                    style: TeacherTypography.caption.copyWith(
-                      color: AppColors.teacherPrimary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+            // Type pill
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: LumiTokens.green.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+              ),
+              child: Text(
+                _typeLabel,
+                style: LumiType.caption.copyWith(
+                  color: LumiTokens.green,
+                  fontWeight: FontWeight.w700,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  _title,
-                  style: TeacherTypography.h3,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${allocation.targetMinutes} min · $_cadenceLabel',
-                  style: TeacherTypography.bodySmall,
-                ),
-              ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _title,
+              style: LumiType.subhead,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${allocation.targetMinutes} min · $_cadenceLabel',
+              style: LumiType.caption,
             ),
             const SizedBox(height: 12),
 
@@ -73,31 +72,27 @@ class AllocationCard extends StatelessWidget {
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: isExpiring
-                    ? AppColors.warning.withValues(alpha: 0.08)
-                    : AppColors.background,
-                borderRadius:
-                    BorderRadius.circular(TeacherDimensions.radiusS),
-                border: isExpiring
-                    ? Border.all(
-                        color: AppColors.warning.withValues(alpha: 0.3))
-                    : null,
+                    ? LumiTokens.orange.withValues(alpha: 0.08)
+                    : LumiTokens.cream,
+                borderRadius: BorderRadius.circular(LumiTokens.radiusSmall),
+                border: Border.all(
+                  color: isExpiring
+                      ? LumiTokens.orange.withValues(alpha: 0.3)
+                      : LumiTokens.rule,
+                ),
               ),
               child: Row(
                 children: [
                   Icon(
                     Icons.calendar_today,
                     size: 16,
-                    color: isExpiring
-                        ? AppColors.warning
-                        : AppColors.textSecondary,
+                    color: isExpiring ? LumiTokens.orange : LumiTokens.muted,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     '${DateFormat('MMM dd').format(allocation.startDate)} – ${DateFormat('MMM dd').format(allocation.endDate)}',
-                    style: TeacherTypography.bodySmall.copyWith(
-                      color: isExpiring
-                          ? AppColors.warning
-                          : AppColors.textSecondary,
+                    style: LumiType.caption.copyWith(
+                      color: isExpiring ? LumiTokens.orange : LumiTokens.muted,
                       fontWeight:
                           isExpiring ? FontWeight.w700 : FontWeight.w500,
                     ),
@@ -108,14 +103,14 @@ class AllocationCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppColors.warning,
-                        borderRadius: BorderRadius.circular(
-                            TeacherDimensions.radiusRound),
+                        color: LumiTokens.orange,
+                        borderRadius:
+                            BorderRadius.circular(LumiTokens.radiusPill),
                       ),
                       child: Text(
                         'Expires soon',
-                        style: TeacherTypography.caption.copyWith(
-                          color: AppColors.white,
+                        style: LumiType.caption.copyWith(
+                          color: LumiTokens.paper,
                           fontWeight: FontWeight.w700,
                           fontSize: 11,
                         ),
@@ -130,14 +125,13 @@ class AllocationCard extends StatelessWidget {
             // Students row
             Row(
               children: [
-                Icon(Icons.groups,
-                    size: 16, color: AppColors.textSecondary),
+                const Icon(Icons.groups, size: 16, color: LumiTokens.muted),
                 const SizedBox(width: 8),
                 Text(
                   allocation.isForWholeClass
                       ? 'Whole class'
                       : '${allocation.studentIds.length} ${allocation.studentIds.length == 1 ? 'student' : 'students'}',
-                  style: TeacherTypography.bodySmall,
+                  style: LumiType.caption,
                 ),
               ],
             ),
@@ -152,13 +146,13 @@ class AllocationCard extends StatelessWidget {
                     icon: const Icon(Icons.edit_outlined, size: 16),
                     label: const Text('Edit'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.teacherPrimary,
-                      side: BorderSide(color: AppColors.teacherBorder),
+                      foregroundColor: LumiTokens.green,
+                      side: const BorderSide(color: LumiTokens.rule),
                       minimumSize: const Size(0, 40),
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(
-                            TeacherDimensions.radiusM),
+                        borderRadius:
+                            BorderRadius.circular(LumiTokens.radiusMedium),
                       ),
                     ),
                   ),
@@ -170,7 +164,7 @@ class AllocationCard extends StatelessWidget {
                     icon: const Icon(Icons.delete_outline, size: 16),
                     label: const Text('Delete'),
                     style: TextButton.styleFrom(
-                      foregroundColor: AppColors.error,
+                      foregroundColor: LumiTokens.red,
                       minimumSize: const Size(0, 40),
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                     ),

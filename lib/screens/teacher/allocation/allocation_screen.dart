@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_colors.dart';
+import '../../../theme/lumi_tokens.dart';
+import '../../../theme/lumi_typography.dart';
 import '../../../data/models/user_model.dart';
 import '../../../data/models/class_model.dart';
 import '../../../data/models/allocation_model.dart';
@@ -66,24 +67,20 @@ class _AllocationScreenState extends State<AllocationScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.teacherBackground,
+      backgroundColor: LumiTokens.cream,
       appBar: AppBar(
-        title: const Text(
-          'Reading Allocation',
-          style: TextStyle(
-            fontFamily: 'Nunito',
-            fontWeight: FontWeight.w700,
-            color: AppColors.charcoal,
-          ),
+        title: Text(
+          'Assign Books',
+          style: LumiType.subhead,
         ),
-        backgroundColor: AppColors.white,
-        foregroundColor: AppColors.charcoal,
+        backgroundColor: LumiTokens.cream,
+        foregroundColor: LumiTokens.ink,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
           child: Container(
-            color: AppColors.white,
+            color: LumiTokens.cream,
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: _buildPillTabBar(),
           ),
@@ -118,13 +115,13 @@ class _AllocationScreenState extends State<AllocationScreen>
         return Container(
           height: 40,
           decoration: BoxDecoration(
-            color: AppColors.teacherPrimaryLight,
-            borderRadius: BorderRadius.circular(28),
+            color: LumiTokens.green.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
           ),
           child: Row(
             children: [
-              _buildPillTab('New Allocation', 0, currentIndex),
-              _buildPillTab('Active Allocations', 1, currentIndex),
+              _buildPillTab('New', 0, currentIndex),
+              _buildPillTab('Active', 1, currentIndex),
             ],
           ),
         );
@@ -141,12 +138,12 @@ class _AllocationScreenState extends State<AllocationScreen>
           duration: const Duration(milliseconds: 200),
           margin: const EdgeInsets.all(3),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.white : AppColors.teacherPrimaryLight,
-            borderRadius: BorderRadius.circular(25),
+            color: isSelected ? LumiTokens.paper : Colors.transparent,
+            borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: AppColors.charcoal.withValues(alpha: 0.08),
+                      color: LumiTokens.ink.withValues(alpha: 0.08),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -156,14 +153,9 @@ class _AllocationScreenState extends State<AllocationScreen>
           child: Center(
             child: Text(
               label,
-              style: TextStyle(
-                fontFamily: 'Nunito',
-                fontSize: 13,
-                fontWeight:
-                    isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected
-                    ? AppColors.teacherPrimary
-                    : AppColors.textSecondary,
+              style: LumiType.caption.copyWith(
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? LumiTokens.green : LumiTokens.muted,
               ),
             ),
           ),

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/teacher_constants.dart';
+import '../../../theme/lumi_tokens.dart';
+import '../../../theme/lumi_typography.dart';
 import '../../../core/widgets/lumi/lumi_buttons.dart';
-import '../../../core/widgets/lumi/lumi_card.dart';
 import '../../../data/models/allocation_model.dart';
+import 'widgets/allocation_form_common.dart';
 
 /// Bottom sheet shown before saving an allocation. Displays a summary
 /// of the allocation for teacher confirmation.
@@ -69,9 +69,9 @@ class AllocationPreviewSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(
-            top: Radius.circular(TeacherDimensions.radiusXL)),
+        color: LumiTokens.paper,
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(LumiTokens.radiusXL)),
       ),
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       child: SafeArea(
@@ -80,31 +80,27 @@ class AllocationPreviewSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Handle
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.textSecondary.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
+            const Center(child: AllocationSheetGrabber()),
             const SizedBox(height: 16),
             Text(
               isEditing ? 'Update Allocation' : 'Confirm Allocation',
-              style: TeacherTypography.h2,
+              style: LumiType.subhead,
             ),
             const SizedBox(height: 4),
             Text(
               'Review the details before saving.',
-              style: TeacherTypography.bodySmall,
+              style: LumiType.caption,
             ),
             const SizedBox(height: 16),
 
             // Summary card
-            LumiCard(
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: LumiTokens.cream,
+                borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+                border: Border.all(color: LumiTokens.rule),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -123,7 +119,7 @@ class AllocationPreviewSheet extends StatelessWidget {
                       'Level Range',
                       formatLevelRange(levelStart, levelEnd),
                     ),
-                  const Divider(height: 20),
+                  const Divider(height: 20, color: LumiTokens.rule),
                   _summaryRow(
                     Icons.schedule,
                     'Schedule',
@@ -134,7 +130,7 @@ class AllocationPreviewSheet extends StatelessWidget {
                     'Dates',
                     '${DateFormat('MMM dd').format(startDate)} – ${DateFormat('MMM dd').format(endDate)}',
                   ),
-                  const Divider(height: 20),
+                  const Divider(height: 20, color: LumiTokens.rule),
                   _summaryRow(
                     Icons.groups,
                     'Students',
@@ -155,14 +151,14 @@ class AllocationPreviewSheet extends StatelessWidget {
               },
               text: isEditing ? 'Update Allocation' : 'Create Allocation',
               isFullWidth: true,
-              color: AppColors.teacherPrimary,
+              color: LumiTokens.green,
             ),
             const SizedBox(height: 8),
             Center(
               child: LumiTextButton(
                 onPressed: () => Navigator.of(context).pop(),
                 text: 'Back to Edit',
-                color: AppColors.textSecondary,
+                color: LumiTokens.muted,
               ),
             ),
             const SizedBox(height: 12),
@@ -177,20 +173,19 @@ class AllocationPreviewSheet extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: AppColors.teacherPrimary),
+          Icon(icon, size: 18, color: LumiTokens.green),
           const SizedBox(width: 10),
           SizedBox(
             width: 80,
-            child: Text(
-              label,
-              style: TeacherTypography.bodySmall,
-            ),
+            child: Text(label, style: LumiType.caption),
           ),
           Expanded(
             child: Text(
               value,
-              style: TeacherTypography.bodyMedium
-                  .copyWith(fontWeight: FontWeight.w600),
+              style: LumiType.body.copyWith(
+                color: LumiTokens.ink,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
