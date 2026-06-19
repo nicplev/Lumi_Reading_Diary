@@ -4,7 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/app_colors.dart';
+import '../../theme/lumi_tokens.dart';
 import '../../core/routing/app_router.dart';
 import '../../data/providers/user_provider.dart';
 import '../../services/firebase_service.dart';
@@ -125,7 +125,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.offWhite,
+      backgroundColor: LumiTokens.cream,
       body: Stack(
         children: [
           Positioned.fill(
