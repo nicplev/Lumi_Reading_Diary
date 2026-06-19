@@ -223,9 +223,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   key: _formKey,
                   child: LumiInput(
                     controller: _emailController,
-                    label: 'Email Address',
-                    hintText: 'Enter your registered email',
-                    prefixIcon: const Icon(Icons.email_outlined),
+                    hintText: 'Email Address',
+                    borderless: true,
+                    prefixIcon: const Icon(Icons.email_outlined,
+                        color: LumiTokens.ink),
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.done,
                     validator: FormBuilderValidators.compose([

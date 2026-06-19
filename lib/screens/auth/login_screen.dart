@@ -722,11 +722,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       children: [
                         LumiInput(
                           controller: _emailController,
-                          label: 'Email',
-                          hintText: 'you@example.com',
+                          hintText: 'Email',
+                          borderless: true,
                           keyboardType: TextInputType.emailAddress,
                           textInputAction: TextInputAction.next,
-                          prefixIcon: const Icon(Icons.email_outlined),
+                          prefixIcon: const Icon(Icons.email_outlined,
+                              color: LumiTokens.ink),
                           validator: FormBuilderValidators.compose([
                             FormBuilderValidators.required(
                               errorText: 'Email is required',
@@ -736,10 +737,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ]),
                         ).animate().fadeIn(delay: 400.ms, duration: 500.ms),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 8),
                         LumiPasswordInput(
                           controller: _passwordController,
-                          label: 'Password',
+                          hintText: 'Password',
+                          borderless: true,
+                          prefixIcon: const Icon(Icons.lock_outline,
+                              color: LumiTokens.ink),
                           textInputAction: TextInputAction.done,
                           validator: FormBuilderValidators.required(
                             errorText: 'Password is required',
@@ -774,12 +778,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Phone-primary sub-form
                   LumiInput(
                     controller: _phoneController,
-                    label: 'Mobile number',
-                    hintText: '0400 000 000',
-                    helperText: 'Australian mobile only.',
+                    hintText: 'Mobile number',
+                    helperText: 'Australian mobile, e.g. 0400 000 000',
+                    borderless: true,
                     keyboardType: TextInputType.phone,
                     textInputAction: TextInputAction.done,
-                    prefixIcon: const Icon(Icons.phone_outlined),
+                    prefixIcon: const Icon(Icons.phone_outlined,
+                        color: LumiTokens.ink),
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'[\d\s]')),
                     ],
@@ -788,14 +793,15 @@ class _LoginScreenState extends State<LoginScreen> {
                     onChanged: (_) => setState(() {}),
                   ),
                   if (_phoneStage == _PhoneStage.enterCode) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
                     LumiInput(
                       controller: _phoneSmsController,
-                      label: '6-digit code',
-                      hintText: '123456',
+                      hintText: '6-digit code',
+                      borderless: true,
                       keyboardType: TextInputType.number,
                       textInputAction: TextInputAction.done,
-                      prefixIcon: const Icon(Icons.sms_outlined),
+                      prefixIcon: const Icon(Icons.sms_outlined,
+                          color: LumiTokens.ink),
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
                         LengthLimitingTextInputFormatter(6),
