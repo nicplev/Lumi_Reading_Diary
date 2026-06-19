@@ -635,9 +635,10 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
 
-                // Lumi Mascot (long-press reveals DEV-only surface)
+                // Lumi mascot — small, no message pill. Long-press (5s)
+                // reveals the DEV-only surface.
                 Center(
                   child: Animate(
                     effects: const [
@@ -659,32 +660,30 @@ class _LoginScreenState extends State<LoginScreen> {
                       },
                       child: const LumiMascot(
                         variant: LumiVariant.login,
-                        size: 120,
-                        message: 'Welcome back!',
+                        size: 88,
                       ),
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 32),
+                const SizedBox(height: 16),
 
-                // Title
+                // One heading + one supporting line (no duplicated greeting).
                 Text(
-                  'Log In',
-                  style: LumiType.displayL,
+                  'Welcome back',
+                  style: LumiType.heading,
                   textAlign: TextAlign.center,
-                ).animate().fadeIn(delay: 200.ms, duration: 500.ms),
+                ).animate().fadeIn(delay: 150.ms, duration: 500.ms),
 
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
 
-                // Subtitle
                 Text(
-                  'Enter your credentials to continue',
+                  'Use your Lumi account to continue.',
                   style: LumiType.body.copyWith(color: LumiTokens.muted),
                   textAlign: TextAlign.center,
-                ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
+                ).animate().fadeIn(delay: 250.ms, duration: 500.ms),
 
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
 
                 // Error message
                 if (_errorMessage != null)
@@ -752,26 +751,30 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 4),
+                  // Forgot password — quiet, sits with the password field.
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: LumiTextButton(
+                      onPressed: () => context.push('/auth/forgot-password'),
+                      text: 'Forgot password?',
+                      color: LumiTokens.ink,
+                    ).animate().fadeIn(delay: 600.ms, duration: 500.ms),
+                  ),
+                  const SizedBox(height: 12),
                   LumiPrimaryButton(
                     onPressed: _isLoading ? null : _handleLogin,
                     text: 'Log In',
                     isLoading: _isLoading,
                     color: LumiTokens.red,
-                  ).animate().fadeIn(delay: 600.ms, duration: 500.ms),
+                  ).animate().fadeIn(delay: 650.ms, duration: 500.ms),
                   const SizedBox(height: 8),
-                  Center(
-                    child: LumiTextButton(
-                      onPressed: () => context.push('/auth/forgot-password'),
-                      text: 'Forgot Password?',
-                      color: LumiTokens.red,
-                    ).animate().fadeIn(delay: 700.ms, duration: 500.ms),
-                  ),
+                  // Quiet secondary: phone sign-in alternative.
                   Center(
                     child: LumiTextButton(
                       onPressed: _isLoading ? null : _toggleSignInMode,
-                      text: 'Sign in with phone instead',
-                      color: LumiTokens.red,
+                      text: 'Use phone number instead',
+                      color: LumiTokens.muted,
                     ),
                   ),
                 ] else ...[
@@ -830,64 +833,57 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: LumiTextButton(
                       onPressed: _isLoading ? null : _toggleSignInMode,
                       text: 'Use email and password instead',
-                      color: LumiTokens.red,
+                      color: LumiTokens.muted,
                     ),
                   ),
                 ],
 
-                const SizedBox(height: 32),
+                const SizedBox(height: 28),
 
-                // "New to Lumi?" section divider
-                Row(
-                  children: [
-                    const Expanded(child: Divider(color: LumiTokens.rule)),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Text('New to Lumi?', style: LumiType.caption),
-                    ),
-                    const Expanded(child: Divider(color: LumiTokens.rule)),
-                  ],
-                ).animate().fadeIn(delay: 800.ms, duration: 500.ms),
+                // "New to Lumi?" — compact role rows, not a second onboarding.
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('New to Lumi?', style: LumiType.caption),
+                ).animate().fadeIn(delay: 750.ms, duration: 500.ms),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
 
-                // Role picker: three cards in a row, one per audience
-                IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                Container(
+                  decoration: BoxDecoration(
+                    color: LumiTokens.paper,
+                    borderRadius:
+                        BorderRadius.circular(LumiTokens.radiusLarge),
+                    border: Border.all(color: LumiTokens.rule),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
                     children: [
-                      Expanded(
-                        child: _RegisterRoleCard(
-                          icon: Icons.family_restroom,
-                          title: 'Parent',
-                          subtitle: 'Student code',
-                          accent: LumiTokens.red,
-                          onTap: () => showParentRegistrationModal(context),
-                        ),
+                      _RoleRow(
+                        icon: Icons.family_restroom,
+                        accent: LumiTokens.red,
+                        title: 'Parent',
+                        subtitle: 'Join with student code',
+                        onTap: () => showParentRegistrationModal(context),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _RegisterRoleCard(
-                          icon: Icons.school_rounded,
-                          title: 'Teacher',
-                          subtitle: 'School code',
-                          accent: LumiTokens.green,
-                          onTap: () => showTeacherRegistrationModal(context),
-                        ),
+                      const Divider(height: 1, color: LumiTokens.rule),
+                      _RoleRow(
+                        icon: Icons.school_rounded,
+                        accent: LumiTokens.green,
+                        title: 'Teacher',
+                        subtitle: 'Join with school code',
+                        onTap: () => showTeacherRegistrationModal(context),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _RegisterRoleCard(
-                          icon: Icons.apartment_rounded,
-                          title: 'School',
-                          subtitle: 'Request a demo',
-                          accent: LumiTokens.blue,
-                          onTap: () => context.push('/onboarding/demo'),
-                        ),
+                      const Divider(height: 1, color: LumiTokens.rule),
+                      _RoleRow(
+                        icon: Icons.apartment_rounded,
+                        accent: LumiTokens.blue,
+                        title: 'School',
+                        subtitle: 'Request a demo',
+                        onTap: () => context.push('/onboarding/demo'),
                       ),
                     ],
                   ),
-                ).animate().fadeIn(delay: 900.ms, duration: 500.ms),
+                ).animate().fadeIn(delay: 850.ms, duration: 500.ms),
 
                 if (hasDevAccess()) ...[
                   const SizedBox(height: 32),
@@ -948,70 +944,46 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-class _RegisterRoleCard extends StatelessWidget {
+/// Compact registration row: small semantic icon, title + subtitle, chevron.
+/// Three of these stack inside one grouped card under "New to Lumi?".
+class _RoleRow extends StatelessWidget {
   final IconData icon;
+  final Color accent;
   final String title;
   final String subtitle;
-  final Color accent;
   final VoidCallback onTap;
 
-  const _RegisterRoleCard({
+  const _RoleRow({
     required this.icon,
+    required this.accent,
     required this.title,
     required this.subtitle,
-    required this.accent,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(LumiTokens.radiusMedium);
-    return Material(
-      color: LumiTokens.paper,
-      borderRadius: radius,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: radius,
-        splashColor: accent.withValues(alpha: 0.12),
-        highlightColor: accent.withValues(alpha: 0.06),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: LumiTokens.paper,
-            borderRadius: radius,
-            border: Border.all(color: LumiTokens.rule, width: 1),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, color: accent, size: 22),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style:
-                      LumiType.body.copyWith(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  textAlign: TextAlign.center,
-                  style: LumiType.caption,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, color: accent, size: 22),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: LumiType.body
+                          .copyWith(fontWeight: FontWeight.w700)),
+                  Text(subtitle, style: LumiType.caption),
+                ],
+              ),
             ),
-          ),
+            const Icon(Icons.chevron_right_rounded, color: LumiTokens.muted),
+          ],
         ),
       ),
     );
