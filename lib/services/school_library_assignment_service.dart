@@ -225,7 +225,9 @@ class LibraryAssignmentSnapshot {
   final Map<String, Set<String>> studentIdsByIsbn;
   final Map<String, Set<String>> studentIdsByNormalizedTitle;
 
-  int currentAssignedCountForBook(BookModel book) {
+  /// The set of student IDs currently assigned this book (across the whole
+  /// school), matched by bookId, ISBN, or normalized title.
+  Set<String> assignedStudentIdsForBook(BookModel book) {
     final studentIds = <String>{};
 
     final bookId = book.id.trim();
@@ -248,6 +250,9 @@ class LibraryAssignmentSnapshot {
       );
     }
 
-    return studentIds.length;
+    return studentIds;
   }
+
+  int currentAssignedCountForBook(BookModel book) =>
+      assignedStudentIdsForBook(book).length;
 }

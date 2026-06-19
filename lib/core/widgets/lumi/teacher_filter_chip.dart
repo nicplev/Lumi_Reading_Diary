@@ -12,6 +12,11 @@ class TeacherFilterChip extends StatelessWidget {
   final IconData? icon;
   final Color? activeColor;
 
+  /// Foreground (icon + label) colour when active. Defaults to paper/white;
+  /// pass [LumiTokens.ink] for light accents like yellow where white fails
+  /// contrast.
+  final Color? activeForegroundColor;
+
   const TeacherFilterChip({
     super.key,
     required this.label,
@@ -19,11 +24,13 @@ class TeacherFilterChip extends StatelessWidget {
     this.onTap,
     this.icon,
     this.activeColor,
+    this.activeForegroundColor,
   });
 
   @override
   Widget build(BuildContext context) {
     final effectiveColor = activeColor ?? LumiTokens.blue;
+    final activeFg = activeForegroundColor ?? LumiTokens.paper;
 
     return Material(
       color: Colors.transparent,
@@ -60,9 +67,7 @@ class TeacherFilterChip extends StatelessWidget {
                   Icon(
                     icon,
                     size: 14,
-                    color: isActive
-                        ? LumiTokens.paper
-                        : LumiTokens.muted,
+                    color: isActive ? activeFg : LumiTokens.muted,
                   ),
                   const SizedBox(width: 5),
                 ],
@@ -73,7 +78,7 @@ class TeacherFilterChip extends StatelessWidget {
                     fontFamily: 'Nunito',
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: isActive ? LumiTokens.paper : LumiTokens.muted,
+                    color: isActive ? activeFg : LumiTokens.muted,
                   ),
                 ),
               ],

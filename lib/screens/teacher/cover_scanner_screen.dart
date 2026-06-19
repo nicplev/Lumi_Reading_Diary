@@ -18,6 +18,8 @@ import '../../core/models/decodable_grading.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/teacher_constants.dart';
+import '../../theme/lumi_tokens.dart';
+import '../../theme/lumi_typography.dart';
 import '../../data/models/user_model.dart';
 import '../../services/book_lookup_service.dart';
 import '../../services/community_book_service.dart';
@@ -899,20 +901,28 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
 
   Widget _buildCoverCaptureView() {
     if (_coverCaptureFailure == null) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(color: AppColors.teacherPrimary),
-            SizedBox(height: 16),
-            Text('Opening cover scanner...',
-                style: TeacherTypography.bodyLarge),
+            const CircularProgressIndicator(color: LumiTokens.yellow),
+            const SizedBox(height: 16),
+            Text('Opening cover scanner...', style: LumiType.body),
           ],
         ),
       );
     }
 
     final failure = _coverCaptureFailure!;
+    final filledYellow = FilledButton.styleFrom(
+      backgroundColor: LumiTokens.yellow,
+      foregroundColor: LumiTokens.ink,
+      minimumSize: const Size.fromHeight(52),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+      ),
+      textStyle: LumiType.button.copyWith(color: LumiTokens.ink),
+    );
 
     return Center(
       child: SingleChildScrollView(
@@ -926,27 +936,25 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  color: AppColors.teacherPrimaryLight,
+                  color: LumiTokens.yellow.withValues(alpha: 0.14),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
-                  Icons.document_scanner_outlined,
+                  Icons.document_scanner_rounded,
                   size: 36,
-                  color: AppColors.teacherPrimary,
+                  color: LumiTokens.yellow,
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 'Cover Capture Unavailable',
-                style: TeacherTypography.h3,
+                style: LumiType.subhead,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
               Text(
                 failure.message,
-                style: TeacherTypography.bodyMedium.copyWith(
-                  color: AppColors.charcoal.withValues(alpha: 0.8),
-                ),
+                style: LumiType.body.copyWith(color: LumiTokens.muted),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
@@ -956,6 +964,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                   child: FilledButton.icon(
                     onPressed:
                         _isOpeningCoverCapture ? null : _startCoverCapture,
+                    style: filledYellow,
                     icon: const Icon(Icons.refresh_rounded),
                     label: const Text('Try Document Scanner Again'),
                   ),
@@ -966,6 +975,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                   width: double.infinity,
                   child: FilledButton.icon(
                     onPressed: _openCameraSettings,
+                    style: filledYellow,
                     icon: const Icon(Icons.settings_outlined),
                     label: const Text('Open App Settings'),
                   ),
@@ -979,7 +989,19 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                     onPressed: _isOpeningCoverCapture
                         ? null
                         : _pickCoverWithStandardCamera,
-                    icon: const Icon(Icons.camera_alt_outlined),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: LumiTokens.ink,
+                      minimumSize: const Size.fromHeight(52),
+                      side: const BorderSide(
+                          color: LumiTokens.yellow, width: 1.5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(LumiTokens.radiusPill),
+                      ),
+                      textStyle: LumiType.button.copyWith(color: LumiTokens.ink),
+                    ),
+                    icon: const Icon(Icons.camera_alt_outlined,
+                        color: LumiTokens.yellow),
                     label: const Text('Take Photo Instead'),
                   ),
                 ),
@@ -991,7 +1013,13 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                   child: TextButton.icon(
                     onPressed:
                         _isOpeningCoverCapture ? null : _pickCoverFromLibrary,
-                    icon: const Icon(Icons.photo_library_outlined),
+                    style: TextButton.styleFrom(
+                      foregroundColor: LumiTokens.ink,
+                      minimumSize: const Size.fromHeight(44),
+                      textStyle: LumiType.button.copyWith(color: LumiTokens.ink),
+                    ),
+                    icon: const Icon(Icons.photo_library_outlined,
+                        color: LumiTokens.yellow),
                     label: const Text('Choose From Library'),
                   ),
                 ),
