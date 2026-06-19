@@ -24,7 +24,12 @@ class BookLookupService {
   final http.Client _httpClient;
   final String _googleBooksApiKey;
 
-  static const _httpTimeout = Duration(seconds: 5);
+  // External book APIs (Google Books US, Open Library US/Internet Archive)
+  // routinely take 3–6s from AU on cellular before the first byte. The
+  // previous 5s budget caused near-every lookup to time out after the AU
+  // migration; 12s gives realistic headroom while still failing fast enough
+  // that the user isn't stuck if both providers are genuinely down.
+  static const _httpTimeout = Duration(seconds: 12);
   bool _firestoreCacheReadEnabled = true;
   bool _firestoreCacheWriteEnabled = true;
   bool _didLogReadPermissionDenial = false;
