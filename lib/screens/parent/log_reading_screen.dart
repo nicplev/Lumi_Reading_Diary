@@ -418,7 +418,10 @@ class _LogReadingScreenState extends State<LogReadingScreen>
               log: result.log,
               localFilePath: recording.localPath,
             );
-          } catch (_) {
+          } catch (e, st) {
+            debugPrint(
+                '[CompAudioSync] step=direct_upload failed logId=${result.log.id} '
+                'type=${e.runtimeType} err=$e\n$st');
             await OfflineService.instance.enqueueComprehensionAudioUpload(
               logId: result.log.id,
               schoolId: result.log.schoolId,

@@ -207,37 +207,57 @@ class _PendingRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final attention = item.needsAttention;
+    final err = item.lastError;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            attention ? Icons.error_outline : _iconFor(item.type),
-            size: 16,
-            color: attention
-                ? AppColors.error
-                : AppColors.charcoal.withValues(alpha: 0.6),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              attention
-                  ? "${_labelFor(item.type)} · couldn't sync"
-                  : _labelFor(item.type),
-              style: TextStyle(
-                fontSize: 13,
-                color: attention ? AppColors.error : AppColors.charcoal,
+          Row(
+            children: [
+              Icon(
+                attention ? Icons.error_outline : _iconFor(item.type),
+                size: 16,
+                color: attention
+                    ? AppColors.error
+                    : AppColors.charcoal.withValues(alpha: 0.6),
               ),
-              overflow: TextOverflow.ellipsis,
-            ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  attention
+                      ? "${_labelFor(item.type)} · couldn't sync"
+                      : _labelFor(item.type),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: attention ? AppColors.error : AppColors.charcoal,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Text(
+                _formatRelative(item.createdAt),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.charcoal.withValues(alpha: 0.6),
+                ),
+              ),
+            ],
           ),
-          Text(
-            _formatRelative(item.createdAt),
-            style: TextStyle(
-              fontSize: 11,
-              color: AppColors.charcoal.withValues(alpha: 0.6),
+          if (err != null && err.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 26, top: 2),
+              child: Text(
+                err,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: (attention ? AppColors.error : AppColors.charcoal)
+                      .withValues(alpha: 0.7),
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-          ),
         ],
       ),
     );
