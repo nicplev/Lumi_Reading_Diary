@@ -851,7 +851,14 @@ class OfflineService with WidgetsBindingObserver {
         .doc(logId);
 
     try {
-      await logRef.update({'comprehensionAudioUploaded': true});
+      // Stamp the path + duration alongside the uploaded flag. Idempotent for
+      // the full flow (the log create already set them); required for logs that
+      // attached comprehension after the fact while offline.
+      await logRef.update({
+        'comprehensionAudioPath': storagePath,
+        'comprehensionAudioDurationSec': durationSec,
+        'comprehensionAudioUploaded': true,
+      });
     } on FirebaseException catch (e) {
       if (e.code == 'not-found') {
         // The log create hasn't drained yet — re-throw as a generic

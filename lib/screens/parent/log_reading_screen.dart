@@ -21,6 +21,7 @@ import '../../services/firebase_service.dart';
 import '../../services/isbn_assignment_service.dart';
 import '../../services/offline_service.dart';
 import '../../services/platform_config_service.dart';
+import '../../services/logging_engagement_service.dart';
 import '../../services/reading_log_service.dart';
 import 'widgets/comprehension_recording_step.dart';
 
@@ -431,6 +432,10 @@ class _LogReadingScreenState extends State<LogReadingScreen>
 
       // Rec 5a: a completed log supersedes any saved draft.
       await OfflineService.instance.clearLogDraft(widget.student.id);
+
+      // Recognise the richer logging path (powers the occasional nudge +
+      // positive recognition). Best-effort — never blocks the success screen.
+      await LoggingEngagementService.instance.recordDetailedLog();
 
       if (mounted) {
         context.go('/parent/reading-success', extra: {

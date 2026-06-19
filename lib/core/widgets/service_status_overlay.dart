@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import 'service_status_banner.dart';
 
-/// Wraps the routed app with a top-of-screen [ServiceStatusBanner]. The
-/// banner self-hides when status is healthy, so this overlay is a no-op
-/// on the happy path.
+/// Floats a [ServiceStatusBanner] over the top of the routed app. Using a
+/// [Stack] (not a Column) means the banner overlays the content instead of
+/// pushing the whole screen down — and the app's own background fills behind it,
+/// so the status-bar area is never a bare black strip. The banner self-hides
+/// when status is healthy, so this overlay is a no-op on the happy path.
 class ServiceStatusOverlay extends StatelessWidget {
   const ServiceStatusOverlay({super.key, required this.child});
 
@@ -12,12 +14,15 @@ class ServiceStatusOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.max,
+    return Stack(
       children: [
-        const ServiceStatusBanner(),
-        Expanded(child: child),
+        child,
+        const Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: ServiceStatusBanner(),
+        ),
       ],
     );
   }
