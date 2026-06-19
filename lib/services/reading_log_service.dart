@@ -425,6 +425,58 @@ class ReadingLogService {
     }
   }
 
+  /// Attaches a comprehension recording to an already-saved log — the
+  /// success-screen progressive-disclosure path for one-tap logs, mirroring
+  /// [attachFeeling] / [attachComment]. Stamps the Storage path + duration onto
+  /// the doc, then uploads the audio. Falls back to the offline upload queue on
+  /// failure (or when Firebase isn't writable) so a recording is never lost.
+  Future<void> attachComprehension(
+    ReadingLogModel log, {
+    required String localFilePath,
+    required int durationSec,
+  }) async {
+    final storagePath = comprehensionAudioStoragePath(
+      schoolId: log.schoolId,
+      logId: log.id,
+    );
+
+    Future<void> queue() =>
+        OfflineService.instance.enqueueComprehensionAudioUpload(
+          logId: log.id,
+          schoolId: log.schoolId,
+          studentId: log.studentId,
+          storagePath: storagePath,
+          localFilePath: localFilePath,
+          durationSec: durationSec,
+        );
+
+    // Offline: the drain stamps the path + duration and flips the uploaded
+    // flag once it lands, so just preserve the recording in the queue.
+    if (!ServiceStatusController.instance.current.canWriteToFirebase) {
+      await queue();
+      return;
+    }
+
+    // Stamp the path + duration so a teacher sees the recording is on its way,
+    // then upload. Queue on failure so retries happen with backoff.
+    await _logRef(log).update({
+      'comprehensionAudioPath': storagePath,
+      'comprehensionAudioDurationSec': durationSec,
+      'comprehensionAudioUploaded': false,
+    });
+
+    final patched = log.copyWith(
+      comprehensionAudioPath: storagePath,
+      comprehensionAudioDurationSec: durationSec,
+      comprehensionAudioUploaded: false,
+    );
+    try {
+      await uploadComprehensionAudio(log: patched, localFilePath: localFilePath);
+    } catch (_) {
+      await queue();
+    }
+  }
+
   /// Live comment thread for a log, oldest message first. Powers the in-app
   /// conversation view for both parents and teachers.
   ///
@@ -539,15 +591,22 @@ class ReadingLogService {
         const <String>[];
     if (cleaned.isNotEmpty) return cleaned;
 
+    // No explicit selection (the one-tap quick path): attribute the night to
+    // every assigned book, deduped, rather than just the first. The log is
+    // flagged `quickLog` so teachers can see the books were inferred, not
+    // parent-confirmed.
+    final seen = <String>{};
+    final titles = <String>[];
     for (final allocation in allocations) {
       for (final item
           in allocation.effectiveAssignmentItemsForStudent(student.id)) {
         final title = item.title.trim();
-        if (title.isNotEmpty) {
-          return [IsbnAssignmentService.sanitizeDisplayTitle(title)];
-        }
+        if (title.isEmpty) continue;
+        if (!seen.add(title.toLowerCase())) continue;
+        titles.add(IsbnAssignmentService.sanitizeDisplayTitle(title));
       }
     }
+    if (titles.isNotEmpty) return titles;
     return const ['Reading'];
   }
 

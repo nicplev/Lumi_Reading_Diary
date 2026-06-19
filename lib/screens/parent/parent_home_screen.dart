@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -8,17 +9,16 @@ import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/lumi_text_styles.dart';
+import '../../theme/lumi_tokens.dart';
+import '../../theme/lumi_typography.dart';
+import '../../theme/section_theme.dart';
 import '../../core/theme/lumi_spacing.dart';
 import '../../core/theme/lumi_borders.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_card.dart';
-import '../../core/widgets/lumi/stats_card.dart';
 import '../../core/widgets/lumi/week_progress_bar.dart';
-import '../../core/widgets/lumi/progress_ring.dart';
-import '../../core/widgets/lumi/rhythm_calendar.dart';
 import '../../core/widgets/lumi/lumi_book_card.dart';
+import '../../core/widgets/lumi/student_avatar.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../core/services/navigation_state_service.dart';
 import '../../data/models/achievement_model.dart';
@@ -35,11 +35,16 @@ import '../../services/reading_log_service.dart';
 import '../../services/widget_data_service.dart';
 import '../../services/isbn_assignment_service.dart';
 import '../../services/staff_notification_service.dart';
+import '../../services/logging_engagement_service.dart';
 import 'reading_history_screen.dart';
 import 'parent_profile_screen.dart';
 import 'widgets/add_email_for_recovery_modal.dart';
 import 'widgets/parent_child_switcher.dart';
 import 'widgets/widget_undo_banner.dart';
+
+/// Vertical space the floating glass nav occupies above the safe-area inset.
+/// Scroll content reserves this so the last item clears the bar.
+const double _kNavBarClearance = 92;
 
 class ParentHomeScreen extends ConsumerStatefulWidget {
   final UserModel user;
@@ -153,108 +158,156 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
 
     return ref.watch(parentChildrenProvider).when(
           loading: () => const Scaffold(
-            backgroundColor: AppColors.offWhite,
+            backgroundColor: LumiTokens.cream,
             body: Center(
-              child: CircularProgressIndicator(color: AppColors.rosePink),
+              child: CircularProgressIndicator(color: LumiTokens.red),
             ),
           ),
           error: (_, __) => Scaffold(
-            backgroundColor: AppColors.offWhite,
+            backgroundColor: LumiTokens.cream,
             body: _buildErrorView(),
           ),
           data: (children) {
             if (children.isEmpty) {
               return Scaffold(
-                backgroundColor: AppColors.offWhite,
+                backgroundColor: LumiTokens.cream,
                 body: _buildNoChildrenView(),
               );
             }
             final activeChild =
                 ref.watch(activeChildProvider).value ?? children.first;
             return Scaffold(
-              backgroundColor: AppColors.offWhite,
-              body: Column(
+              backgroundColor: LumiTokens.cream,
+              body: Stack(
                 children: [
-                  // In-app undo banner — Layer 2 of the widget undo flow.
-                  // Self-hides when no recent widget commit is in window.
-                  // Sits above the IndexedStack so it's visible on every
-                  // parent tab during the ~5-minute undo window.
-                  const SafeArea(
-                    bottom: false,
-                    child: WidgetUndoBanner(),
-                  ),
-                  Expanded(
-                    child: IndexedStack(
-                      index: _selectedIndex,
-                      children: [
-                        _buildHomeView(activeChild, children),
-                        ReadingHistoryScreen(
-                          // Re-key on the active child so a switch rebuilds the
-                          // Bookshelf with fresh state instead of stale data.
-                          key: ValueKey(activeChild.id),
-                          studentId: activeChild.id,
-                          parentId: widget.user.id,
-                          schoolId: widget.user.schoolId!,
+                  Column(
+                    children: [
+                      // In-app undo banner — Layer 2 of the widget undo flow.
+                      // Self-hides when no recent widget commit is in window.
+                      // Sits above the IndexedStack so it's visible on every
+                      // parent tab during the ~5-minute undo window.
+                      const SafeArea(
+                        bottom: false,
+                        child: WidgetUndoBanner(),
+                      ),
+                      Expanded(
+                        child: IndexedStack(
+                          index: _selectedIndex,
+                          children: [
+                            // Home section (red). Its scroll content adds its
+                            // own bottom clearance so it scrolls behind the
+                            // floating glass nav.
+                            LumiSectionScope(
+                              section: LumiSectionTheme.home,
+                              child: _buildHomeView(activeChild, children),
+                            ),
+                            // Library + Settings tabs are still legacy screens
+                            // whose scroll views don't honour a bottom inset, so
+                            // reserve clearance below them until they're migrated
+                            // and can scroll behind the glass like Home does.
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                bottom: _kNavBarClearance,
+                              ),
+                              child: ReadingHistoryScreen(
+                                // Re-key on the active child so a switch rebuilds
+                                // the Bookshelf with fresh state, not stale data.
+                                key: ValueKey(activeChild.id),
+                                studentId: activeChild.id,
+                                parentId: widget.user.id,
+                                schoolId: widget.user.schoolId!,
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                bottom: _kNavBarClearance,
+                              ),
+                              child: ParentProfileScreen(user: widget.user),
+                            ),
+                          ],
                         ),
-                        ParentProfileScreen(user: widget.user),
-                      ],
+                      ),
+                    ],
+                  ),
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: 0,
+                    child: SafeArea(
+                      top: false,
+                      minimum: const EdgeInsets.only(bottom: 8),
+                      child: _buildBottomNav(),
                     ),
                   ),
                 ],
               ),
-              bottomNavigationBar: _buildBottomNav(),
             );
           },
         );
   }
 
   Widget _buildBottomNav() {
-    return Container(
+    // The parent app has three sections (design guide A1):
+    // Home = red, Library = yellow, Settings = green. The active tab adopts
+    // its section's colour. Floating glassmorphic bar matching the teacher app.
+    const navItems = <({IconData icon, String label, Color color})>[
+      (icon: Icons.home_outlined, label: 'Home', color: LumiTokens.red),
+      (
+        icon: Icons.auto_stories_outlined,
+        label: 'Library',
+        color: LumiTokens.yellow
+      ),
+      (icon: Icons.settings_outlined, label: 'Settings', color: LumiTokens.green),
+    ];
+
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(24),
-        ),
+        borderRadius: BorderRadius.circular(36),
         boxShadow: [
           BoxShadow(
-            color: AppColors.charcoal.withValues(alpha: 0.08),
+            color: LumiTokens.ink.withValues(alpha: 0.08),
+            blurRadius: 28,
+            spreadRadius: -8,
+            offset: const Offset(0, 12),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 16,
-            offset: const Offset(0, -4),
+            spreadRadius: -6,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(24),
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: (index) => setState(() => _selectedIndex = index),
-          backgroundColor: AppColors.white,
-          selectedItemColor: AppColors.rosePink,
-          unselectedItemColor: AppColors.textSecondary,
-          elevation: 0,
-          type: BottomNavigationBarType.fixed,
-          selectedLabelStyle: LumiTextStyles.caption(color: AppColors.rosePink)
-              .copyWith(fontWeight: FontWeight.w600),
-          unselectedLabelStyle: LumiTextStyles.caption(),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: 'Home',
+        borderRadius: BorderRadius.circular(36),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            decoration: BoxDecoration(
+              color: LumiTokens.paper.withValues(alpha: 0.65),
+              borderRadius: BorderRadius.circular(36),
+              border: Border.all(
+                color: LumiTokens.paper.withValues(alpha: 0.55),
+                width: 1,
+              ),
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.auto_stories_outlined),
-              activeIcon: Icon(Icons.auto_stories),
-              label: 'Bookshelf',
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            child: Row(
+              children: [
+                for (int i = 0; i < navItems.length; i++)
+                  Expanded(
+                    child: _ParentNavItem(
+                      icon: navItems[i].icon,
+                      label: navItems[i].label,
+                      isSelected: _selectedIndex == i,
+                      onTap: () => setState(() => _selectedIndex = i),
+                      selectedColor: navItems[i].color,
+                      unselectedColor: LumiTokens.muted,
+                    ),
+                  ),
+              ],
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: 'Profile',
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -270,20 +323,18 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
             const Icon(
               Icons.cloud_off,
               size: 56,
-              color: AppColors.textSecondary,
+              color: LumiTokens.muted,
             ),
             LumiGap.s,
             Text(
               'Couldn\'t load your children',
-              style: LumiTextStyles.h3(color: AppColors.charcoal),
+              style: LumiType.subhead,
               textAlign: TextAlign.center,
             ),
             LumiGap.xs,
             Text(
               'Please check your connection and try again.',
-              style: LumiTextStyles.bodyLarge(
-                color: AppColors.charcoal.withValues(alpha: 0.7),
-              ),
+              style: LumiType.bodyL.copyWith(color: LumiTokens.muted),
               textAlign: TextAlign.center,
             ),
             LumiGap.m,
@@ -291,6 +342,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
               onPressed: () => ref.invalidate(parentChildrenProvider),
               text: 'Retry',
               icon: Icons.refresh,
+              color: LumiTokens.red,
             ),
           ],
         ),
@@ -312,10 +364,10 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
       child: Material(
-        color: AppColors.rosePink.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(14),
+        color: LumiTokens.red.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
         child: InkWell(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
           onTap: () =>
               AddEmailForRecoveryModal.show(context: context, user: widget.user),
           child: Padding(
@@ -324,18 +376,19 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
               children: [
                 Icon(Icons.shield_outlined,
                     size: 18,
-                    color: AppColors.rosePink.withValues(alpha: 0.9)),
+                    color: LumiTokens.red.withValues(alpha: 0.9)),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     'Add an email so you can get back in if you lose your phone',
-                    style: LumiTextStyles.bodySmall(
-                      color: AppColors.charcoal.withValues(alpha: 0.85),
+                    style: LumiType.body.copyWith(
+                      fontSize: 14,
+                      color: LumiTokens.ink.withValues(alpha: 0.85),
                     ),
                   ),
                 ),
                 Icon(Icons.chevron_right_rounded,
-                    color: AppColors.charcoal.withValues(alpha: 0.5)),
+                    color: LumiTokens.ink.withValues(alpha: 0.5)),
               ],
             ),
           ),
@@ -356,23 +409,14 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
             floating: true,
             backgroundColor: Colors.transparent,
             elevation: 0,
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Hello, ${widget.user.fullName.isNotEmpty ? widget.user.fullName.split(' ').first : 'Parent'}!',
-                  style: LumiTextStyles.h3(
-                    color: AppColors.charcoal.withValues(alpha: 0.7),
-                  ),
-                ),
-                Text(
-                  selectedChild.firstName,
-                  style: LumiTextStyles.h2(color: AppColors.charcoal),
-                ),
-              ],
+            title: Text(
+              'Hello, ${widget.user.fullName.isNotEmpty ? widget.user.fullName.split(' ').first : 'Parent'}',
+              style: LumiType.heading,
             ),
             actions: [
-              StreamBuilder<int>(
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: StreamBuilder<int>(
                 stream: StaffNotificationService.instance
                     .watchUnreadParentNotificationCount(widget.user),
                 builder: (context, snapshot) {
@@ -402,20 +446,23 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.rosePink,
-                              borderRadius: BorderRadius.circular(999),
+                              color: LumiTokens.red,
+                              borderRadius:
+                                  BorderRadius.circular(LumiTokens.radiusPill),
                             ),
                             child: Text(
                               unreadCount > 99 ? '99+' : '$unreadCount',
-                              style: LumiTextStyles.caption(
-                                color: AppColors.white,
-                              ).copyWith(fontWeight: FontWeight.w700),
+                              style: LumiType.caption.copyWith(
+                                color: LumiTokens.paper,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ),
                     ],
                   );
                 },
+                ),
               ),
             ],
           ),
@@ -435,63 +482,38 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
             padding: LumiPadding.allS,
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                // Rec 5b: one Today card per child so a multi-child parent
-                // can log every child without switching context. Each card
-                // owns its own log + allocation streams (see _ChildTodayCard).
+                // Occasional, purpose-framed nudge toward the richer flow.
+                // Self-hides unless it's a good moment (cadence-limited).
+                const _FullFlowNudge(),
+
+                // Tonight — the one thing to do. A single child gets the clear
+                // big-button card; a multi-child parent gets one card with a
+                // tap-to-log row per child, so every child can be logged
+                // without switching context.
                 if (children.length == 1)
                   _ChildTodayCard(
                     student: children.first,
                     parent: widget.user,
                   ).animate().fadeIn().scale()
                 else
-                  for (final child in children) ...[
-                    _ChildTodayCard(
-                      student: child,
-                      parent: widget.user,
-                      showChildName: true,
-                    ).animate().fadeIn(),
-                    LumiGap.s,
-                  ],
+                  _TonightMultiCard(
+                    children: children,
+                    parent: widget.user,
+                  ).animate().fadeIn(),
 
                 LumiGap.m,
 
-                // Progress Ring + Weekly Progress
-                _ProgressAndWeekSection(
-                  studentId: selectedChild.id,
-                  schoolId: widget.user.schoolId!,
+                // One calm momentum card for the active child. Taps through to
+                // the full Progress screen (stats, rhythm, achievements).
+                _MomentumCard(
+                  student: selectedChild,
                 ).animate().fadeIn(delay: 100.ms),
-
-                LumiGap.m,
-
-                // Reading Stats
-                StreamBuilder<StudentStats?>(
-                  stream: _getStudentStats(selectedChild.id),
-                  builder: (context, snapshot) {
-                    final stats = snapshot.data;
-                    return StatsCard(
-                      currentStreak: stats?.currentStreak ?? 0,
-                      bestStreak: stats?.longestStreak ?? 0,
-                      totalNights: stats?.totalReadingDays ?? 0,
-                      restDaysRemaining: stats?.restDaysRemaining,
-                    ).animate().fadeIn(delay: 300.ms);
-                  },
-                ),
-
-                LumiGap.m,
-
-                // 30-day reading rhythm (forgiving "X of last 30 nights")
-                _RhythmSection(
-                  studentId: selectedChild.id,
-                  schoolId: widget.user.schoolId!,
-                ).animate().fadeIn(delay: 350.ms),
-
-                // Achievement near-miss nudge
-                _AchievementNearMissCard(
-                  studentId: selectedChild.id,
-                  schoolId: widget.user.schoolId!,
-                ).animate().fadeIn(delay: 400.ms),
               ]),
             ),
+          ),
+          // Clearance so the last card scrolls clear of the floating nav.
+          const SliverToBoxAdapter(
+            child: SizedBox(height: _kNavBarClearance),
           ),
         ],
       ),
@@ -512,14 +534,12 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
             LumiGap.m,
             Text(
               'No Children Linked',
-              style: LumiTextStyles.h2(color: AppColors.charcoal),
+              style: LumiType.heading,
             ),
             LumiGap.xs,
             Text(
               'Please ask your teacher for an invite code to link your children.',
-              style: LumiTextStyles.bodyLarge(
-                color: AppColors.charcoal.withValues(alpha: 0.7),
-              ),
+              style: LumiType.bodyL.copyWith(color: LumiTokens.muted),
               textAlign: TextAlign.center,
             ),
             LumiGap.l,
@@ -527,6 +547,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
               onPressed: () => context.push('/parent/link-child'),
               text: 'Enter Invite Code',
               icon: Icons.qr_code,
+              color: LumiTokens.red,
             ),
           ],
         ),
@@ -534,278 +555,6 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     );
   }
 
-  Stream<StudentStats?> _getStudentStats(String studentId) {
-    final firebaseService = ref.read(firebaseServiceProvider);
-    return firebaseService.firestore
-        .collection('schools')
-        .doc(widget.user.schoolId!)
-        .collection('students')
-        .doc(studentId)
-        .snapshots()
-        .map((doc) {
-      if (doc.exists) {
-        final student = StudentModel.fromFirestore(doc);
-        return student.stats;
-      }
-      return null;
-    });
-  }
-}
-
-/// Near-miss achievement nudge card.
-/// Shown only when the student is ≥80% toward their next unearned achievement.
-/// Hidden entirely when no near-miss exists.
-class _AchievementNearMissCard extends StatefulWidget {
-  final String studentId;
-  final String schoolId;
-
-  const _AchievementNearMissCard({
-    required this.studentId,
-    required this.schoolId,
-  });
-
-  @override
-  State<_AchievementNearMissCard> createState() => _AchievementNearMissCardState();
-}
-
-class _AchievementNearMissCardState extends State<_AchievementNearMissCard> {
-  AchievementThresholds _thresholds = AchievementThresholds.defaults;
-  AchievementCustomization _customization = AchievementCustomization.empty;
-
-  // Cached so transient Firestore re-emits (waiting state, no-data flicker)
-  // don't collapse the card's height mid-scroll, which can cause an
-  // overscroll-bounce / SliverAppBar(floating) feedback loop on the home page.
-  ({
-    AchievementModel achievement,
-    double progress,
-    int current,
-    StudentModel student,
-  })? _lastResult;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadThresholds();
-  }
-
-  Future<void> _loadThresholds() async {
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('schools')
-          .doc(widget.schoolId)
-          .get();
-      final settings = doc.data()?['settings'] as Map<String, dynamic>?;
-      final rawThresholds    = settings?['achievementThresholds']    as Map<String, dynamic>?;
-      final rawCustomization = settings?['achievementCustomization'] as Map<String, dynamic>?;
-      if (mounted) {
-        setState(() {
-          if (rawThresholds    != null) _thresholds    = AchievementThresholds.fromMap(rawThresholds);
-          if (rawCustomization != null) _customization = AchievementCustomization.fromMap(rawCustomization);
-        });
-      }
-    } catch (_) {}
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('schools')
-          .doc(widget.schoolId)
-          .collection('students')
-          .doc(widget.studentId)
-          .snapshots(),
-      builder: (context, snapshot) {
-        StudentStats? stats;
-        List<String> earnedIds = const [];
-        StudentModel? student;
-
-        if (snapshot.hasData) {
-          final data = snapshot.data!.data() as Map<String, dynamic>?;
-          if (data != null) {
-            student = StudentModel.fromFirestore(snapshot.data!);
-            stats = student.stats;
-            earnedIds = (data['achievements'] as List<dynamic>? ?? [])
-                .map((a) => a['id'] as String? ?? '')
-                .where((id) => id.isNotEmpty)
-                .toList();
-          }
-        }
-
-        // Recompute only when we have fresh stats; otherwise fall back to the
-        // last result so a transient empty snapshot doesn't change the card's
-        // height mid-scroll.
-        ({
-          AchievementModel achievement,
-          double progress,
-          int current,
-          StudentModel student,
-        })? result;
-        if (stats != null && student != null) {
-          // Rec 7: prefer a consistency-based near-miss (streak / days); fall
-          // back to volume-based (books / minutes) only when none is close.
-          final raw = AchievementTemplates.nearestUnearned(
-                currentStreak: stats.currentStreak,
-                totalBooksRead: stats.totalBooksRead,
-                totalMinutesRead: stats.totalMinutesRead,
-                totalReadingDays: stats.totalReadingDays,
-                earnedAchievementIds: earnedIds,
-                thresholds: _thresholds,
-                customization: _customization,
-                minProgress: 0.8,
-                // Consistency-first nudge: cumulative nights only (streaks earn
-                // no rewards). Falls back to all reward types below.
-                requirementTypes: const {'days'},
-              ) ??
-              AchievementTemplates.nearestUnearned(
-                currentStreak: stats.currentStreak,
-                totalBooksRead: stats.totalBooksRead,
-                totalMinutesRead: stats.totalMinutesRead,
-                totalReadingDays: stats.totalReadingDays,
-                earnedAchievementIds: earnedIds,
-                thresholds: _thresholds,
-                customization: _customization,
-                minProgress: 0.8,
-              );
-          if (raw != null) {
-            final int current;
-            switch (raw.achievement.requirementType) {
-              case 'streak':
-                current = stats.currentStreak;
-                break;
-              case 'books':
-                current = stats.totalBooksRead;
-                break;
-              case 'minutes':
-                current = stats.totalMinutesRead;
-                break;
-              case 'days':
-              default:
-                current = stats.totalReadingDays;
-                break;
-            }
-            result = (
-              achievement: raw.achievement,
-              progress: raw.progress,
-              current: current,
-              student: student,
-            );
-            _lastResult = result;
-          } else {
-            result = null;
-            _lastResult = null;
-          }
-        } else {
-          result = _lastResult;
-        }
-
-        if (result == null) return const SizedBox.shrink();
-
-        final achievement = result.achievement;
-        final progress = result.progress;
-        final current = result.current;
-        final cardStudent = result.student;
-        final rarityColor = Color(achievement.effectiveColor);
-
-        final remaining = achievement.requiredValue - current;
-        final unit = remaining == 1
-            ? achievement.requirementType == 'books' ? 'book' : 'day'
-            : achievement.requirementType == 'books' ? 'books' : 'days';
-
-        return GestureDetector(
-          onTap: () => context.push(
-            '/parent/achievements',
-            extra: {'student': cardStudent},
-          ),
-          child: Container(
-            margin: EdgeInsets.only(top: LumiSpacing.m),
-            padding: LumiPadding.allM,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  rarityColor.withValues(alpha: 0.08),
-                  AppColors.white,
-                ],
-              ),
-              borderRadius: LumiBorders.large,
-              border: Border.all(
-                color: rarityColor.withValues(alpha: 0.3),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: rarityColor.withValues(alpha: 0.08),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(achievement.icon, style: const TextStyle(fontSize: 24)),
-                    LumiGap.horizontalXS,
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Almost there!',
-                            style: LumiTextStyles.label(color: rarityColor)
-                                .copyWith(fontWeight: FontWeight.bold),
-                          ),
-                          RichText(
-                            text: TextSpan(
-                              style: LumiTextStyles.bodySmall(
-                                color: AppColors.charcoal.withValues(alpha: 0.8),
-                              ),
-                              children: [
-                                TextSpan(text: '$remaining more $unit to earn '),
-                                TextSpan(
-                                  text: achievement.name,
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      color: rarityColor.withValues(alpha: 0.6),
-                      size: 20,
-                    ),
-                  ],
-                ),
-                LumiGap.xs,
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 6,
-                    backgroundColor: rarityColor.withValues(alpha: 0.15),
-                    valueColor: AlwaysStoppedAnimation<Color>(rarityColor),
-                  ),
-                ),
-                LumiGap.xxs,
-                Text(
-                  '$current / ${achievement.requiredValue} (${(progress * 100).toStringAsFixed(0)}%)',
-                  style: LumiTextStyles.caption(
-                    color: AppColors.charcoal.withValues(alpha: 0.5),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 }
 
 class _TodayCard extends StatefulWidget {
@@ -815,10 +564,6 @@ class _TodayCard extends StatefulWidget {
   final String? Function(String title)? coverUrlResolver;
   final bool hasLoggedToday;
   final List<ReadingLogModel> todayLogs;
-
-  /// When true the heading names the child — used when several Today cards
-  /// are stacked for a multi-child parent (Rec 5b).
-  final bool showChildName;
 
   /// Opens the full detail wizard ("Add detail" / "Log another session").
   final VoidCallback? onTap;
@@ -830,7 +575,6 @@ class _TodayCard extends StatefulWidget {
     this.coverUrlResolver,
     required this.hasLoggedToday,
     this.todayLogs = const [],
-    this.showChildName = false,
     this.onTap,
   });
 
@@ -847,7 +591,6 @@ class _TodayCardState extends State<_TodayCard> {
   List<ReadingLogModel> get todayLogs => widget.todayLogs;
   String? Function(String title)? get coverUrlResolver =>
       widget.coverUrlResolver;
-  bool get showChildName => widget.showChildName;
   VoidCallback? get onTap => widget.onTap;
 
   int get _targetMinutes => activeAllocations.isNotEmpty
@@ -922,20 +665,21 @@ class _TodayCardState extends State<_TodayCard> {
                     vertical: LumiSpacing.xxs,
                   ),
                   decoration: BoxDecoration(
-                    // Rec 10: white-on-#FF8698 fails WCAG AA. Use the
-                    // accessible rose for the unread badge, and charcoal
-                    // text on the light mint "logged" badge.
+                    // Logged = soft green tint with ink text; not-yet-logged =
+                    // the Home red accent with white text. Both clear WCAG AA.
                     color: hasLoggedToday
-                        ? AppColors.mintGreen
-                        : AppColors.rosePinkAccessible,
+                        ? LumiTokens.tintGreen
+                        : LumiTokens.red,
                     borderRadius: LumiBorders.circular,
                   ),
                   child: Text(
                     DateFormat('EEEE, MMM d').format(DateTime.now()),
-                    style: LumiTextStyles.label(
+                    style: LumiType.caption.copyWith(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
                       color: hasLoggedToday
-                          ? AppColors.charcoal
-                          : AppColors.white,
+                          ? LumiTokens.ink
+                          : LumiTokens.paper,
                     ),
                   ),
                 ),
@@ -943,21 +687,17 @@ class _TodayCardState extends State<_TodayCard> {
                 if (hasLoggedToday)
                   const Icon(
                     Icons.check_circle,
-                    color: AppColors.mintGreen,
+                    color: LumiTokens.green,
                     size: 32,
                   ),
               ],
             ),
             LumiGap.m,
             Text(
-              showChildName
-                  ? (hasLoggedToday
-                      ? '${student.firstName} — all done!'
-                      : "${student.firstName}'s reading")
-                  : (hasLoggedToday
-                      ? 'Reading Complete!'
-                      : "Today's Reading"),
-              style: LumiTextStyles.h2(color: AppColors.charcoal),
+              hasLoggedToday
+                  ? '${student.firstName} — all done!'
+                  : "${student.firstName}'s reading",
+              style: LumiType.subhead,
             ),
             LumiGap.s,
             if (hasLoggedToday) ...[
@@ -1017,8 +757,9 @@ class _TodayCardState extends State<_TodayCard> {
                   children: [
                     Text(
                       "Tonight's Books",
-                      style: LumiTextStyles.bodyMedium(
-                        color: AppColors.charcoal.withValues(alpha: 0.7),
+                      style: LumiType.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: LumiTokens.muted,
                       ),
                     ),
                     LumiGap.xs,
@@ -1069,6 +810,7 @@ class _TodayCardState extends State<_TodayCard> {
                   onPressed: onTap,
                   text: 'Log Another Session',
                   icon: Icons.add_circle_outline,
+                  color: LumiTokens.red,
                 ),
               )
             else ...[
@@ -1076,8 +818,8 @@ class _TodayCardState extends State<_TodayCard> {
               // the parent exactly what a single tap will record.
               Text(
                 'One tap logs $_quickLogSummary',
-                style: LumiTextStyles.caption(
-                  color: AppColors.charcoal.withValues(alpha: 0.6),
+                style: LumiType.caption.copyWith(
+                  color: LumiTokens.ink.withValues(alpha: 0.6),
                 ),
               ),
               LumiGap.xs,
@@ -1087,6 +829,7 @@ class _TodayCardState extends State<_TodayCard> {
                 isFullWidth: true,
                 text: 'Did ${student.firstName} read today?',
                 icon: Icons.check_circle_outline,
+                color: LumiTokens.red,
               ),
               LumiGap.xxs,
               Center(
@@ -1094,6 +837,7 @@ class _TodayCardState extends State<_TodayCard> {
                   onPressed: _isQuickLogging ? null : onTap,
                   text: 'Add detail',
                   icon: Icons.tune,
+                  color: LumiTokens.red,
                 ),
               ),
             ],
@@ -1109,13 +853,13 @@ class _TodayCardState extends State<_TodayCard> {
         Icon(
           icon,
           size: 20,
-          color: AppColors.charcoal.withValues(alpha: 0.7),
+          color: LumiTokens.muted,
         ),
         LumiGap.horizontalXS,
         Expanded(
           child: Text(
             text,
-            style: LumiTextStyles.bodyLarge(color: AppColors.charcoal),
+            style: LumiType.bodyL,
           ),
         ),
       ],
@@ -1134,177 +878,6 @@ int _nextNightsGoal(int totalNights) {
   return ((totalNights ~/ 100) + 1) * 100;
 }
 
-/// Forgiving 30-day "rhythm" calendar: an X-of-last-30-nights dot grid that
-/// slides forward each day instead of resetting. Streams the last 30 days of
-/// logs and derives the read-day set; hidden until the child has read at least
-/// once so a brand-new account isn't greeted by an empty grid.
-class _RhythmSection extends ConsumerWidget {
-  final String studentId;
-  final String schoolId;
-
-  const _RhythmSection({
-    required this.studentId,
-    required this.schoolId,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final firebaseService = ref.read(firebaseServiceProvider);
-    final now = DateTime.now();
-    final windowStart = DateTime(now.year, now.month, now.day)
-        .subtract(const Duration(days: 29));
-
-    return StreamBuilder<QuerySnapshot>(
-      stream: firebaseService.firestore
-          .collection('schools')
-          .doc(schoolId)
-          .collection('readingLogs')
-          .where('studentId', isEqualTo: studentId)
-          .where('date',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(windowStart))
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const SizedBox.shrink();
-
-        final readDays = <DateTime>{};
-        for (final doc in snapshot.data!.docs) {
-          final log = ReadingLogModel.fromFirestore(doc);
-          readDays.add(DateTime(log.date.year, log.date.month, log.date.day));
-        }
-        if (readDays.isEmpty) return const SizedBox.shrink();
-
-        return LumiCard(
-          child: RhythmCalendar(readDays: readDays, windowDays: 30),
-        );
-      },
-    );
-  }
-}
-
-class _ProgressAndWeekSection extends ConsumerWidget {
-  final String studentId;
-  final String schoolId;
-
-  const _ProgressAndWeekSection({
-    required this.studentId,
-    required this.schoolId,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final startOfWeek = DateTime.now().subtract(
-      Duration(days: DateTime.now().weekday - 1),
-    );
-    final firebaseService = ref.read(firebaseServiceProvider);
-
-    return StreamBuilder<QuerySnapshot>(
-      stream: firebaseService.firestore
-          .collection('schools')
-          .doc(schoolId)
-          .collection('readingLogs')
-          .where('studentId', isEqualTo: studentId)
-          .where('date',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeek))
-          .snapshots(),
-      builder: (context, snapshot) {
-        final logs = <ReadingLogModel>[];
-        if (snapshot.hasData) {
-          logs.addAll(
-            snapshot.data!.docs
-                .map((doc) => ReadingLogModel.fromFirestore(doc)),
-          );
-        }
-
-        final completedDays = <int>{};
-        for (final log in logs) {
-          final dayOfWeek = log.date.weekday; // 1=Mon, 7=Sun
-          completedDays.add(dayOfWeek);
-        }
-
-        final todayComplete = completedDays.contains(DateTime.now().weekday);
-
-        return Column(
-          children: [
-            // Progress Ring Card
-            StreamBuilder<DocumentSnapshot>(
-              stream: firebaseService.firestore
-                  .collection('schools')
-                  .doc(schoolId)
-                  .collection('students')
-                  .doc(studentId)
-                  .snapshots(),
-              builder: (context, studentSnapshot) {
-                int totalNights = 0;
-                int currentStreak = 0;
-                if (studentSnapshot.hasData && studentSnapshot.data!.exists) {
-                  final student =
-                      StudentModel.fromFirestore(studentSnapshot.data!);
-                  totalNights = student.stats?.totalReadingDays ?? 0;
-                  currentStreak = student.stats?.currentStreak ?? 0;
-                }
-
-                return LumiCard(
-                  child: Column(
-                    children: [
-                      ProgressRing(
-                        totalNights: totalNights,
-                        totalNightsGoal: _nextNightsGoal(totalNights),
-                        weeklyProgress: completedDays.length,
-                        todayComplete: todayComplete,
-                      ),
-                      LumiGap.s,
-                      // Streak is a gentle, secondary signal — small and muted,
-                      // so cumulative nights (the ring centre) stays the hero.
-                      if (currentStreak > 0)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.local_fire_department,
-                              color: AppColors.warmOrange.withValues(alpha: 0.8),
-                              size: 16,
-                            ),
-                            LumiGap.horizontalXXS,
-                            Text(
-                              '$currentStreak day streak',
-                              style: LumiTextStyles.caption(
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
-                );
-              },
-            ),
-
-            LumiGap.m,
-
-            // Week Progress Card
-            LumiCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'This Week',
-                    style: LumiTextStyles.h2(color: AppColors.charcoal),
-                  ),
-                  LumiGap.m,
-                  WeekProgressBar(
-                    completedDays: completedDays,
-                    currentDay: DateTime.now().weekday,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
 /// Owns the per-child Today card and its Firestore streams (today's logs +
 /// active allocations). Encapsulating the streams here lets ParentHomeScreen
 /// render one card per child (Rec 5b) without the build method juggling 3N
@@ -1313,12 +886,10 @@ class _ProgressAndWeekSection extends ConsumerWidget {
 class _ChildTodayCard extends StatefulWidget {
   final StudentModel student;
   final UserModel parent;
-  final bool showChildName;
 
   const _ChildTodayCard({
     required this.student,
     required this.parent,
-    this.showChildName = false,
   });
 
   @override
@@ -1413,7 +984,6 @@ class _ChildTodayCardState extends State<_ChildTodayCard> {
               coverUrlResolver: BookCoverCacheService.instance.resolveCoverUrl,
               hasLoggedToday: hasLoggedToday,
               todayLogs: todayLogs,
-              showChildName: widget.showChildName,
               onTap: () {
                 NavigationStateService().setTempData({
                   'parent': widget.parent,
@@ -1426,6 +996,584 @@ class _ChildTodayCardState extends State<_ChildTodayCard> {
           },
         );
       },
+    );
+  }
+}
+
+/// One calm momentum card for the active child: cumulative nights (the hero),
+/// a gentle streak chip (only when positive — cheer, don't shame), the week at
+/// a glance, and forward progress to the next badge. Taps through to the full
+/// Progress screen. Replaces the old ring + stats + rhythm + near-miss stack.
+class _MomentumCard extends StatelessWidget {
+  final StudentModel student;
+
+  const _MomentumCard({required this.student});
+
+  @override
+  Widget build(BuildContext context) {
+    final firestore = FirebaseService.instance.firestore;
+    final accent = context.sectionTheme.accent;
+    final now = DateTime.now();
+    final startOfWeek = DateTime(now.year, now.month, now.day)
+        .subtract(Duration(days: now.weekday - 1));
+
+    return GestureDetector(
+      onTap: () =>
+          context.push('/parent/progress', extra: {'student': student}),
+      child: LumiCard(
+        child: StreamBuilder<DocumentSnapshot>(
+          stream: firestore
+              .collection('schools')
+              .doc(student.schoolId)
+              .collection('students')
+              .doc(student.id)
+              .snapshots(),
+          builder: (context, studentSnap) {
+            int totalNights = 0;
+            int currentStreak = 0;
+            if (studentSnap.hasData && studentSnap.data!.exists) {
+              final stats =
+                  StudentModel.fromFirestore(studentSnap.data!).stats;
+              totalNights = stats?.totalReadingDays ?? 0;
+              currentStreak = stats?.currentStreak ?? 0;
+            }
+            final nextGoal = _nextNightsGoal(totalNights);
+            final remaining = (nextGoal - totalNights).clamp(0, nextGoal);
+            final progress =
+                nextGoal == 0 ? 0.0 : (totalNights / nextGoal).clamp(0.0, 1.0);
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text('$totalNights', style: LumiType.numberLarge),
+                    const SizedBox(width: 6),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        totalNights == 1 ? 'night' : 'nights',
+                        style: LumiType.body.copyWith(color: LumiTokens.muted),
+                      ),
+                    ),
+                    const Spacer(),
+                    // Streak is gentle and secondary — and only shows when it's
+                    // something to celebrate (never a sad "0").
+                    if (currentStreak > 0) ...[
+                      Icon(
+                        Icons.local_fire_department,
+                        color: LumiTokens.orange.withValues(alpha: 0.85),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '$currentStreak-day',
+                        style: LumiType.body
+                            .copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    const Icon(Icons.chevron_right_rounded,
+                        color: LumiTokens.muted),
+                  ],
+                ),
+                LumiGap.m,
+                // This week, at a glance.
+                StreamBuilder<QuerySnapshot>(
+                  stream: firestore
+                      .collection('schools')
+                      .doc(student.schoolId)
+                      .collection('readingLogs')
+                      .where('studentId', isEqualTo: student.id)
+                      .where('date',
+                          isGreaterThanOrEqualTo:
+                              Timestamp.fromDate(startOfWeek))
+                      .snapshots(),
+                  builder: (context, weekSnap) {
+                    final completedDays = <int>{};
+                    if (weekSnap.hasData) {
+                      for (final doc in weekSnap.data!.docs) {
+                        completedDays
+                            .add(ReadingLogModel.fromFirestore(doc).date.weekday);
+                      }
+                    }
+                    return WeekProgressBar(
+                      completedDays: completedDays,
+                      currentDay: now.weekday,
+                    );
+                  },
+                ),
+                LumiGap.m,
+                // Forward progress to the next badge — the only goal we surface.
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 8,
+                    backgroundColor: accent.withValues(alpha: 0.15),
+                    valueColor: AlwaysStoppedAnimation<Color>(accent),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  remaining <= 0
+                      ? 'Next badge unlocked'
+                      : '$remaining ${remaining == 1 ? 'night' : 'nights'} to your next badge',
+                  style: LumiType.caption.copyWith(color: LumiTokens.muted),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// Tonight, for a multi-child parent: one card, a tap-to-log row per child so
+/// every child can be logged without switching context.
+class _TonightMultiCard extends StatelessWidget {
+  final List<StudentModel> children;
+  final UserModel parent;
+
+  const _TonightMultiCard({required this.children, required this.parent});
+
+  @override
+  Widget build(BuildContext context) {
+    return LumiCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: LumiSpacing.xs,
+              vertical: LumiSpacing.xxs,
+            ),
+            decoration: BoxDecoration(
+              color: LumiTokens.red,
+              borderRadius: LumiBorders.circular,
+            ),
+            child: Text(
+              DateFormat('EEEE, MMM d').format(DateTime.now()),
+              style: LumiType.caption.copyWith(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: LumiTokens.paper,
+              ),
+            ),
+          ),
+          LumiGap.s,
+          for (int i = 0; i < children.length; i++) ...[
+            if (i > 0) const Divider(height: 1, color: LumiTokens.rule),
+            _TonightRow(student: children[i], parent: parent),
+          ],
+          LumiGap.xs,
+          // Teach both gestures: the row opens the richer flow, the circle is
+          // the one-tap shortcut.
+          Row(
+            children: [
+              Icon(Icons.touch_app_outlined,
+                  size: 14, color: LumiTokens.muted.withValues(alpha: 0.8)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Tap a name to add how it went · tap the circle to log fast',
+                  style: LumiType.caption.copyWith(
+                    color: LumiTokens.muted,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A single child's tap-to-log row. Owns its own today-logs + allocations
+/// streams (mirrors [_ChildTodayCard]); tap the circle to one-tap log, tap the
+/// row to open the full detail flow.
+class _TonightRow extends StatefulWidget {
+  final StudentModel student;
+  final UserModel parent;
+
+  const _TonightRow({required this.student, required this.parent});
+
+  @override
+  State<_TonightRow> createState() => _TonightRowState();
+}
+
+class _TonightRowState extends State<_TonightRow> {
+  late final Stream<QuerySnapshot> _todayLogsStream;
+  late final Stream<List<QuerySnapshot>> _allocationsStream;
+  bool _isQuickLogging = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final firestore = FirebaseService.instance.firestore;
+    final schoolId = widget.parent.schoolId;
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+
+    _todayLogsStream = firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('readingLogs')
+        .where('studentId', isEqualTo: widget.student.id)
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+        .orderBy('date', descending: true)
+        .snapshots()
+        .asBroadcastStream();
+
+    Stream<QuerySnapshot> studentAllocations() => firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('allocations')
+        .where('studentIds', arrayContains: widget.student.id)
+        .where('isActive', isEqualTo: true)
+        .snapshots();
+
+    Stream<QuerySnapshot> classAllocations() => firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('allocations')
+        .where('classId', isEqualTo: widget.student.classId)
+        .where('studentIds', isEqualTo: [])
+        .where('isActive', isEqualTo: true)
+        .snapshots();
+
+    _allocationsStream = _combineStreams(studentAllocations, classAllocations);
+  }
+
+  List<AllocationModel> _activeFrom(
+      AsyncSnapshot<List<QuerySnapshot>> snapshot) {
+    final result = <AllocationModel>[];
+    if (snapshot.hasData) {
+      final now = DateTime.now();
+      final seen = <String>{};
+      for (final doc in snapshot.data!.expand((qs) => qs.docs)) {
+        if (!seen.add(doc.id)) continue;
+        final candidate = AllocationModel.fromFirestore(doc);
+        if (candidate.startDate.isBefore(now) &&
+            candidate.endDate.isAfter(now)) {
+          result.add(candidate);
+        }
+      }
+    }
+    return result;
+  }
+
+  String _summary(List<AllocationModel> allocations) {
+    final target =
+        allocations.isNotEmpty ? allocations.first.targetMinutes : 20;
+    String? book;
+    for (final allocation in allocations) {
+      for (final item
+          in allocation.effectiveAssignmentItemsForStudent(widget.student.id)) {
+        final title = item.title.trim();
+        if (title.isNotEmpty) {
+          book = IsbnAssignmentService.sanitizeDisplayTitle(title);
+          break;
+        }
+      }
+      if (book != null) break;
+    }
+    return book != null ? '$target min · $book' : '$target min · Any book';
+  }
+
+  Future<void> _quickLog(List<AllocationModel> allocations) async {
+    if (_isQuickLogging) return;
+    setState(() => _isQuickLogging = true);
+    try {
+      final result = await ReadingLogService.instance.logReading(
+        student: widget.student,
+        parent: widget.parent,
+        allocations: allocations,
+        quickLog: true,
+      );
+      if (!mounted) return;
+      context.go('/parent/reading-success', extra: {
+        'student': widget.student,
+        'parent': widget.parent,
+        'readingLog': result.log,
+        'updatedStats': result.updatedStats,
+        'restDayApplied': result.restDayApplied,
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isQuickLogging = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Couldn't log reading. Please try again."),
+        ),
+      );
+    }
+  }
+
+  void _openDetail(List<AllocationModel> allocations) {
+    NavigationStateService().setTempData({
+      'parent': widget.parent,
+      'student': widget.student,
+      'allocations': allocations,
+    });
+    context.push('/parent/log-reading');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _todayLogsStream,
+      builder: (context, logSnapshot) {
+        final todayLogs = logSnapshot.hasData
+            ? logSnapshot.data!.docs
+                .map((doc) => ReadingLogModel.fromFirestore(doc))
+                .toList()
+            : <ReadingLogModel>[];
+        final hasLoggedToday = todayLogs.isNotEmpty;
+
+        return StreamBuilder<List<QuerySnapshot>>(
+          stream: _allocationsStream,
+          builder: (context, allocationSnapshot) {
+            final allocations = _activeFrom(allocationSnapshot);
+            BookCoverCacheService.instance.primeFromAllocations(
+              allocations,
+              FirebaseService.instance.firestore,
+            );
+            // A "full" entry: feeling, a recording, or a note was added —
+            // earns a gentle mark (positive recognition; quick logs are never
+            // penalised for its absence).
+            final hasDetail = todayLogs.any((log) =>
+                log.childFeeling != null ||
+                log.comprehensionAudioPath != null ||
+                (log.parentComment != null && log.parentComment!.isNotEmpty));
+
+            return InkWell(
+              onTap:
+                  _isQuickLogging ? null : () => _openDetail(allocations),
+              borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Row(
+                  children: [
+                    StudentAvatar.fromStudent(widget.student, size: 44),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.student.firstName,
+                            style: LumiType.body
+                                .copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              if (hasLoggedToday && hasDetail) ...[
+                                const Icon(Icons.auto_awesome,
+                                    size: 12, color: LumiTokens.green),
+                                const SizedBox(width: 4),
+                              ],
+                              Flexible(
+                                child: Text(
+                                  hasLoggedToday
+                                      ? '${todayLogs.fold<int>(0, (total, log) => total + log.minutesRead)} min read today'
+                                      : _summary(allocations),
+                                  style: LumiType.caption
+                                      .copyWith(color: LumiTokens.muted),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Chevron signals the row opens the full detail flow —
+                    // the richer path. The circle beside it is the shortcut.
+                    const Icon(Icons.chevron_right_rounded,
+                        color: LumiTokens.muted, size: 20),
+                    const SizedBox(width: 6),
+                    _LogCircle(
+                      done: hasLoggedToday,
+                      loading: _isQuickLogging,
+                      onTap: hasLoggedToday || _isQuickLogging
+                          ? null
+                          : () => _quickLog(allocations),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+/// The tap target on a Tonight row: a hollow red ring before logging, a filled
+/// green check once done, a spinner mid-log.
+class _LogCircle extends StatelessWidget {
+  final bool done;
+  final bool loading;
+  final VoidCallback? onTap;
+
+  const _LogCircle({
+    required this.done,
+    required this.loading,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget inner;
+    if (loading) {
+      inner = const SizedBox(
+        width: 22,
+        height: 22,
+        child: CircularProgressIndicator(
+          strokeWidth: 2.5,
+          color: LumiTokens.red,
+        ),
+      );
+    } else if (done) {
+      inner = Container(
+        width: 40,
+        height: 40,
+        decoration: const BoxDecoration(
+          color: LumiTokens.green,
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(Icons.check_rounded,
+            color: LumiTokens.paper, size: 24),
+      );
+    } else {
+      inner = Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: LumiTokens.red, width: 2),
+        ),
+        child: Icon(Icons.check_rounded,
+            color: LumiTokens.red.withValues(alpha: 0.35), size: 22),
+      );
+    }
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(width: 44, height: 44, child: Center(child: inner)),
+    );
+  }
+}
+
+/// An occasional, dismissible nudge toward the richer logging flow. Decides
+/// once on init whether this is a good moment (weekend / been-a-while, and not
+/// nudged recently) and self-hides otherwise — it must never feel like nagging.
+class _FullFlowNudge extends StatefulWidget {
+  const _FullFlowNudge();
+
+  @override
+  State<_FullFlowNudge> createState() => _FullFlowNudgeState();
+}
+
+class _FullFlowNudgeState extends State<_FullFlowNudge> {
+  bool _show = false;
+
+  @override
+  void initState() {
+    super.initState();
+    LoggingEngagementService.instance.shouldShowFullFlowNudge().then((show) {
+      if (!mounted || !show) return;
+      LoggingEngagementService.instance.markNudgeShown();
+      setState(() => _show = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_show) return const SizedBox.shrink();
+    return Container(
+      margin: EdgeInsets.only(bottom: LumiSpacing.s),
+      padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+      decoration: BoxDecoration(
+        color: LumiTokens.red.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+        border: Border.all(color: LumiTokens.red.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.favorite_outline_rounded,
+              size: 18, color: LumiTokens.red.withValues(alpha: 0.9)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              "Got a minute tonight? Adding how the reading went helps your "
+              "child's teacher see how it's going.",
+              style: LumiType.caption.copyWith(
+                fontSize: 13,
+                color: LumiTokens.ink.withValues(alpha: 0.85),
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => setState(() => _show = false),
+            behavior: HitTestBehavior.opaque,
+            child: const Padding(
+              padding: EdgeInsets.all(6),
+              child: Icon(Icons.close_rounded,
+                  size: 18, color: LumiTokens.muted),
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn();
+  }
+}
+
+/// A single item in the floating glass bottom nav. Mirrors the teacher app's
+/// nav item: icon + caption, tinted with the section colour when active.
+class _ParentNavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final Color selectedColor;
+  final Color unselectedColor;
+
+  const _ParentNavItem({
+    required this.icon,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+    required this.selectedColor,
+    required this.unselectedColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isSelected ? selectedColor : unselectedColor;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 28,
+            height: 28,
+            child: Center(child: Icon(icon, size: 24, color: color)),
+          ),
+          const SizedBox(height: 1),
+          Text(label, style: LumiType.caption.copyWith(color: color)),
+        ],
+      ),
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
@@ -15,10 +16,15 @@ import '../../data/models/student_model.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../data/models/achievement_model.dart';
 import '../../data/models/school_model.dart';
+import '../../data/models/class_model.dart';
 import '../../data/models/parent_comment_settings.dart';
+import '../../data/models/comprehension_recording_settings.dart';
 import '../../services/analytics_service.dart';
 import '../../services/firebase_service.dart';
 import '../../services/reading_log_service.dart';
+import '../../services/platform_config_service.dart';
+import '../../services/logging_engagement_service.dart';
+import 'widgets/comprehension_recording_step.dart';
 
 /// Celebration screen shown after a reading log is successfully saved.
 /// Displays confetti, night count, streak info, and badge notifications.
@@ -60,6 +66,18 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
   bool get _showFollowUp =>
       _isQuickLog && widget.readingLog.childFeeling == null;
 
+  /// Running total of detailed logs (loaded for non-quick logs only), used for
+  /// gentle milestone recognition.
+  int? _detailedLogCount;
+
+  /// A milestone affirmation message, or null when this isn't a milestone.
+  String? get _detailedMilestone {
+    final count = _detailedLogCount;
+    if (count == null || count <= 0 || count % 5 != 0) return null;
+    return "You've shared $count reading notes — "
+        "${widget.student.firstName}'s teacher can see how it's going.";
+  }
+
   ReadingFeeling? _pickedFeeling;
 
   ParentCommentSettings? _commentSettings;
@@ -67,6 +85,17 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
   List<String> _selectedComments = [];
   final TextEditingController _noteController = TextEditingController();
   bool _commentSaved = false;
+
+  // Comprehension recording — the highest-value teacher data, offered here as
+  // an optional add-on to a one-tap log (when the school enables it).
+  ComprehensionRecordingSettings _comprehensionSettings =
+      ComprehensionRecordingSettings.defaults();
+  String _comprehensionQuestion = ClassModel.defaultComprehensionQuestion;
+  ComprehensionRecordingResult? _comprehensionRecording;
+  bool _comprehensionExpanded = false;
+  bool _comprehensionSaved = false;
+
+  bool get _comprehensionEnabled => _comprehensionSettings.enabled;
 
   int get _totalNights =>
       widget.updatedStats?['totalReadingDays'] ??
@@ -110,28 +139,60 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
     )..forward();
     _logAnalytics();
     if (_showFollowUp) {
-      // Quick log: offer the optional feeling/comment prompt and let the
-      // parent leave on their own terms — no rushed auto-navigation.
-      _loadCommentSettings();
+      // Quick log: offer the optional feeling / comment / comprehension prompt
+      // and let the parent leave on their own terms — no rushed navigation.
+      _loadFollowUpSettings();
     } else {
-      _autoNavigateTimer = Timer(const Duration(seconds: 3), _goHome);
+      // Detailed log: recognise the effort with an occasional affirmation, and
+      // give a touch longer to read it before returning home.
+      LoggingEngagementService.instance.detailedLogCount().then((value) {
+        if (mounted) setState(() => _detailedLogCount = value);
+      });
+      _autoNavigateTimer = Timer(const Duration(seconds: 4), _goHome);
     }
   }
 
-  Future<void> _loadCommentSettings() async {
+  /// Loads the optional follow-up settings: parent-comment presets plus the
+  /// comprehension toggle (school + platform kill switch) and per-class
+  /// question — mirroring the full logging flow.
+  Future<void> _loadFollowUpSettings() async {
     try {
-      final doc = await FirebaseService.instance.firestore
-          .collection('schools')
-          .doc(widget.readingLog.schoolId)
-          .get();
-      if (doc.exists && mounted) {
-        setState(() {
-          _commentSettings =
-              SchoolModel.fromFirestore(doc).parentCommentSettings;
-        });
-      }
+      final firestore = FirebaseService.instance.firestore;
+      final schoolId = widget.readingLog.schoolId;
+      final schoolFuture =
+          firestore.collection('schools').doc(schoolId).get();
+      final classFuture = widget.student.classId.isNotEmpty
+          ? firestore
+              .collection('schools')
+              .doc(schoolId)
+              .collection('classes')
+              .doc(widget.student.classId)
+              .get()
+          : Future<DocumentSnapshot<Map<String, dynamic>>?>.value(null);
+      // Platform kill switch fetched alongside; never throws (fails open).
+      final platformEnabledFuture =
+          PlatformConfigService().isComprehensionRecordingEnabled();
+      final results = await Future.wait([schoolFuture, classFuture]);
+      final platformEnabled = await platformEnabledFuture;
+      if (!mounted) return;
+      final schoolDoc = results[0]!;
+      final classDoc = results[1];
+      setState(() {
+        if (schoolDoc.exists) {
+          final school = SchoolModel.fromFirestore(schoolDoc);
+          _commentSettings = school.parentCommentSettings;
+          _comprehensionSettings = ComprehensionRecordingSettings(
+            enabled: platformEnabled &&
+                school.comprehensionRecordingSettings.enabled,
+          );
+        }
+        if (classDoc != null && classDoc.exists) {
+          _comprehensionQuestion =
+              ClassModel.fromFirestore(classDoc).comprehensionQuestion;
+        }
+      });
     } catch (_) {
-      // Optional UI — safe to proceed without comment settings.
+      // Optional UI — safe to proceed with defaults.
     }
   }
 
@@ -161,6 +222,20 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
         _commentSaved = true;
       } catch (_) {
         // Non-critical — proceed home regardless.
+      }
+    }
+
+    final recording = _comprehensionRecording;
+    if (recording != null && !_comprehensionSaved) {
+      try {
+        await ReadingLogService.instance.attachComprehension(
+          widget.readingLog,
+          localFilePath: recording.localPath,
+          durationSec: recording.durationSec,
+        );
+        _comprehensionSaved = true;
+      } catch (_) {
+        // Non-critical — the recording is queued for retry on failure.
       }
     }
     _goHome();
@@ -430,7 +505,35 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
                     // comment prompt instead of auto-navigating away.
                     if (_showFollowUp)
                       _buildFollowUp().animate().fadeIn(delay: 900.ms)
-                    else
+                    else ...[
+                      // Gentle, occasional recognition for the richer flow.
+                      if (_detailedMilestone != null) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 14),
+                          decoration: BoxDecoration(
+                            color: AppColors.mintGreen.withValues(alpha: 0.35),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Row(
+                            children: [
+                              const Text('💚', style: TextStyle(fontSize: 18)),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  _detailedMilestone!,
+                                  style: LumiTextStyles.bodySmall(
+                                    color: AppColors.charcoal
+                                        .withValues(alpha: 0.8),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ).animate().fadeIn(delay: 700.ms),
+                        const SizedBox(height: 16),
+                      ],
                       // Auto-returning indicator (tappable to skip)
                       GestureDetector(
                         onTap: _goHome,
@@ -457,6 +560,7 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
                           ],
                         ),
                       ).animate().fadeIn(delay: 1200.ms),
+                    ],
                   ],
                 ),
               ),
@@ -526,6 +630,50 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
                       ),
                     ),
                   ],
+                ],
+              ),
+            ),
+        ],
+        // Comprehension recording — the richest signal for teachers. Optional,
+        // collapsed by default so the one-tap parent isn't slowed down.
+        if (_comprehensionEnabled) ...[
+          const SizedBox(height: 12),
+          if (_comprehensionRecording == null && !_comprehensionExpanded)
+            LumiTextButton(
+              onPressed: () => setState(() => _comprehensionExpanded = true),
+              text: 'Record ${widget.student.firstName} reading',
+              icon: Icons.mic_none_rounded,
+            )
+          else
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.offWhite,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "A quick recording lets ${widget.student.firstName}'s teacher hear how the reading is going.",
+                    style: LumiTextStyles.bodySmall(
+                      color: AppColors.charcoal.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ComprehensionRecordingStep(
+                    question: _comprehensionQuestion,
+                    logId: widget.readingLog.id,
+                    initialLocalPath: _comprehensionRecording?.localPath,
+                    initialDurationSec: _comprehensionRecording?.durationSec,
+                    onRecordingChanged: (r) =>
+                        setState(() => _comprehensionRecording = r),
+                    onSkip: () => setState(() {
+                      _comprehensionExpanded = false;
+                      _comprehensionRecording = null;
+                    }),
+                  ),
                 ],
               ),
             ),

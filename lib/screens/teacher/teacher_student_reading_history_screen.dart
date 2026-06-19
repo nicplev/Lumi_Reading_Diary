@@ -426,11 +426,33 @@ class _TeacherStudentReadingHistoryScreenState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        books,
-                        style: LumiType.body,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              books,
+                              style: LumiType.body,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          // Subtle one-tap marker: the books were inferred from
+                          // the child's assignments, not confirmed by the parent.
+                          if (log.isQuickLog) ...[
+                            const SizedBox(width: 6),
+                            Tooltip(
+                              message:
+                                  'Quick log — books inferred from assignments, '
+                                  'not confirmed by the parent',
+                              triggerMode: TooltipTriggerMode.tap,
+                              child: Icon(
+                                Icons.bolt,
+                                size: 15,
+                                color: LumiTokens.muted.withValues(alpha: 0.8),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -634,6 +656,8 @@ class _TeacherStudentReadingHistoryScreenState
             (data['comprehensionAudioDurationSec'] as num?)?.toInt(),
         comprehensionAudioUploaded:
             data['comprehensionAudioUploaded'] as bool? ?? false,
+        isQuickLog:
+            (data['metadata'] as Map<String, dynamic>?)?['quickLog'] == true,
         loggedByName: (data['loggedByName'] as String?)?.trim(),
         loggedByLabel: (data['loggedByLabel'] as String?)?.trim(),
         lastCommentAt: (data['lastCommentAt'] as Timestamp?)?.toDate(),
@@ -794,6 +818,7 @@ class _ReadingLogSnapshot {
   final String? comprehensionAudioPath;
   final int? comprehensionAudioDurationSec;
   final bool comprehensionAudioUploaded;
+  final bool isQuickLog;
   final DateTime? lastCommentAt;
   final String? lastCommentByRole;
   final Map<String, DateTime> commentsViewedAt;
@@ -818,6 +843,7 @@ class _ReadingLogSnapshot {
     this.comprehensionAudioPath,
     this.comprehensionAudioDurationSec,
     this.comprehensionAudioUploaded = false,
+    this.isQuickLog = false,
     this.lastCommentAt,
     this.lastCommentByRole,
     this.commentsViewedAt = const {},

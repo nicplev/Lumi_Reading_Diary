@@ -1260,6 +1260,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             (data['comprehensionAudioDurationSec'] as num?)?.toInt(),
         comprehensionAudioUploaded:
             data['comprehensionAudioUploaded'] as bool? ?? false,
+        isQuickLog:
+            (data['metadata'] as Map<String, dynamic>?)?['quickLog'] == true,
         lastCommentAt: (data['lastCommentAt'] as Timestamp?)?.toDate(),
         lastCommentByRole: data['lastCommentByRole'] as String?,
         commentsViewedAt: viewedRaw == null
@@ -2294,11 +2296,33 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    books,
-                    style: LumiType.body,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          books,
+                          style: LumiType.body,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      // Subtle one-tap marker: books inferred from assignments,
+                      // not parent-confirmed.
+                      if (group.any((l) => l.isQuickLog)) ...[
+                        const SizedBox(width: 6),
+                        Tooltip(
+                          message:
+                              'Quick log — books inferred from assignments, '
+                              'not confirmed by the parent',
+                          triggerMode: TooltipTriggerMode.tap,
+                          child: Icon(
+                            Icons.bolt,
+                            size: 15,
+                            color: LumiTokens.muted.withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -3255,6 +3279,8 @@ class _ReadingLogSnapshot {
   final String? comprehensionAudioPath;
   final int? comprehensionAudioDurationSec;
   final bool comprehensionAudioUploaded;
+  // One-tap log: books inferred from assignments, not parent-confirmed.
+  final bool isQuickLog;
   // Denormalized comment-thread state, so a row can open the thread and show an
   // unread dot without an extra read.
   final DateTime? lastCommentAt;
@@ -3279,6 +3305,7 @@ class _ReadingLogSnapshot {
     this.comprehensionAudioPath,
     this.comprehensionAudioDurationSec,
     this.comprehensionAudioUploaded = false,
+    this.isQuickLog = false,
     this.lastCommentAt,
     this.lastCommentByRole,
     this.commentsViewedAt = const {},

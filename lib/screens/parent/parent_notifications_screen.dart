@@ -3,10 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/theme/app_colors.dart';
+import '../../theme/lumi_tokens.dart';
+import '../../theme/lumi_typography.dart';
+import '../../theme/section_theme.dart';
 import '../../core/theme/lumi_borders.dart';
 import '../../core/theme/lumi_spacing.dart';
-import '../../core/theme/lumi_text_styles.dart';
 import '../../data/models/parent_notification_model.dart';
 import '../../data/models/user_model.dart';
 import '../../services/staff_notification_service.dart';
@@ -54,19 +55,21 @@ class _ParentNotificationsScreenState
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Clear all notifications?'),
-        content: const Text("This can't be undone."),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+        ),
+        title: Text('Clear all notifications?', style: LumiType.subhead),
+        content: Text("This can't be undone.", style: LumiType.body),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text('Cancel',
+                style: LumiType.button.copyWith(color: LumiTokens.muted)),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              'Clear all',
-              style: TextStyle(color: AppColors.error),
-            ),
+            child: Text('Clear all',
+                style: LumiType.button.copyWith(color: LumiTokens.red)),
           ),
         ],
       ),
@@ -78,80 +81,80 @@ class _ParentNotificationsScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.offWhite,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Text(
-          'Notifications',
-          style: LumiTextStyles.h2(color: AppColors.charcoal),
-        ),
-        actions: [
-          if (_notifications.isNotEmpty)
-            TextButton(
-              onPressed: _confirmClearAll,
-              child: Text(
-                'Clear all',
-                style: LumiTextStyles.body(
-                  color: AppColors.charcoal.withValues(alpha: 0.5),
+    return LumiSectionScope(
+      section: LumiSectionTheme.home,
+      child: Scaffold(
+        backgroundColor: LumiTokens.cream,
+        appBar: AppBar(
+          backgroundColor: LumiTokens.cream,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: LumiTokens.ink),
+          title: Text('Notifications', style: LumiType.subhead),
+          actions: [
+            if (_notifications.isNotEmpty)
+              TextButton(
+                onPressed: _confirmClearAll,
+                child: Text(
+                  'Clear all',
+                  style: LumiType.body.copyWith(color: LumiTokens.muted),
                 ),
               ),
-            ),
-        ],
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _notifications.isEmpty
-              ? Center(
-                  child: Text(
-                    'No notifications yet.',
-                    style: LumiTextStyles.body(
-                      color: AppColors.charcoal.withValues(alpha: 0.7),
+          ],
+        ),
+        body: _loading
+            ? const Center(
+                child: CircularProgressIndicator(color: LumiTokens.red),
+              )
+            : _notifications.isEmpty
+                ? Center(
+                    child: Text(
+                      'No notifications yet.',
+                      style: LumiType.body.copyWith(color: LumiTokens.muted),
                     ),
-                  ),
-                )
-              : ListView.separated(
-                  padding: LumiPadding.allM,
-                  itemCount: _notifications.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final notification = _notifications[index];
-                    return Dismissible(
-                      key: ValueKey(notification.id),
-                      direction: DismissDirection.endToStart,
-                      background: Container(
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 20),
-                        decoration: BoxDecoration(
-                          color: AppColors.error.withValues(alpha: 0.1),
-                          borderRadius: LumiBorders.large,
+                  )
+                : ListView.separated(
+                    padding: LumiPadding.allM,
+                    itemCount: _notifications.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final notification = _notifications[index];
+                      return Dismissible(
+                        key: ValueKey(notification.id),
+                        direction: DismissDirection.endToStart,
+                        background: Container(
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 20),
+                          decoration: BoxDecoration(
+                            color: LumiTokens.red.withValues(alpha: 0.1),
+                            borderRadius: LumiBorders.large,
+                          ),
+                          child: const Icon(
+                            Icons.delete_outline_rounded,
+                            color: LumiTokens.red,
+                          ),
                         ),
-                        child: Icon(
-                          Icons.delete_outline_rounded,
-                          color: AppColors.error,
-                        ),
-                      ),
-                      onDismissed: (_) {
-                        _service.deleteParentNotification(
-                          user: widget.user,
-                          notificationId: notification.id,
-                        );
-                      },
-                      child: _NotificationCard(
-                        notification: notification,
-                        onTap: () async {
-                          if (!notification.isRead) {
-                            await _service.markParentNotificationRead(
-                              user: widget.user,
-                              notificationId: notification.id,
-                            );
-                          }
+                        onDismissed: (_) {
+                          _service.deleteParentNotification(
+                            user: widget.user,
+                            notificationId: notification.id,
+                          );
                         },
-                      ),
-                    );
-                  },
-                ),
+                        child: _NotificationCard(
+                          notification: notification,
+                          onTap: () async {
+                            if (!notification.isRead) {
+                              await _service.markParentNotificationRead(
+                                user: widget.user,
+                                notificationId: notification.id,
+                              );
+                            }
+                          },
+                        ),
+                      );
+                    },
+                  ),
+      ),
     );
   }
 }
@@ -167,102 +170,70 @@ class _NotificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accent = context.sectionTheme.accent;
+    final isUnread = !notification.isRead;
     final deliveredLabel = notification.deliveredAt == null
         ? 'Just now'
-        : DateFormat('EEE, d MMM • h:mm a').format(notification.deliveredAt!);
+        : DateFormat("EEE, d MMM 'at' h:mm a").format(notification.deliveredAt!);
+    final category = notification.messageType.replaceAll('_', ' ').toUpperCase();
+    final meta = 'From ${notification.senderName}  ·  $deliveredLabel';
 
     return Material(
-      color: AppColors.white,
-      borderRadius: LumiBorders.large,
+      color: isUnread ? accent.withValues(alpha: 0.04) : LumiTokens.paper,
+      borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
       child: InkWell(
         onTap: () {
           onTap();
         },
-        borderRadius: LumiBorders.large,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
         child: Container(
-          padding: LumiPadding.allM,
+          padding: const EdgeInsets.all(LumiTokens.space5),
           decoration: BoxDecoration(
-            borderRadius: LumiBorders.large,
-            border: Border.all(
-              color: notification.isRead
-                  ? AppColors.divider
-                  : AppColors.rosePink.withValues(alpha: 0.5),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.charcoal.withValues(alpha: 0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+            border: Border.all(color: LumiTokens.rule),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: Text(
-                      notification.title,
-                      style: LumiTextStyles.body(
-                        color: AppColors.charcoal,
-                      ).copyWith(fontWeight: FontWeight.w700),
+                      category,
+                      style: LumiType.sectionLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (!notification.isRead)
+                  if (isUnread)
                     Container(
-                      width: 10,
-                      height: 10,
-                      decoration: const BoxDecoration(
-                        color: AppColors.rosePink,
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: accent,
                         shape: BoxShape.circle,
                       ),
                     ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: LumiTokens.space2),
+              Text(
+                notification.title,
+                style: LumiType.subhead,
+              ),
+              const SizedBox(height: LumiTokens.space1),
               Text(
                 notification.body,
-                style: LumiTextStyles.body(
-                  color: AppColors.charcoal.withValues(alpha: 0.8),
-                ),
+                style: LumiType.body.copyWith(color: LumiTokens.muted),
               ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _Tag(label: notification.messageType.replaceAll('_', ' ')),
-                  _Tag(label: 'From ${notification.senderName}'),
-                  _Tag(label: deliveredLabel),
-                ],
+              const SizedBox(height: LumiTokens.space3),
+              Text(
+                meta,
+                style: LumiType.caption.copyWith(color: LumiTokens.muted),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _Tag extends StatelessWidget {
-  const _Tag({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.rosePink.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: LumiTextStyles.caption(color: AppColors.rosePink)
-            .copyWith(fontWeight: FontWeight.w700),
       ),
     );
   }
