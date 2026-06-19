@@ -215,10 +215,10 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                                 schoolId: widget.user.schoolId!,
                               ),
                             ),
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                bottom: _kNavBarClearance,
-                              ),
+                            // Settings section (green). Owns its bottom
+                            // clearance so it scrolls behind the glass nav.
+                            LumiSectionScope(
+                              section: LumiSectionTheme.settings,
                               child: ParentProfileScreen(user: widget.user),
                             ),
                           ],

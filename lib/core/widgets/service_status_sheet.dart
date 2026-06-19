@@ -5,6 +5,7 @@ import '../../data/providers/service_status_provider.dart';
 import '../../services/offline_service.dart';
 import '../models/service_status.dart';
 import '../theme/app_colors.dart';
+import '../../theme/lumi_tokens.dart';
 
 /// Bottom sheet opened when the user taps [ServiceStatusBanner].
 ///
@@ -26,7 +27,7 @@ class ServiceStatusSheet extends ConsumerWidget {
       expand: false,
       builder: (context, scrollController) => Container(
         decoration: const BoxDecoration(
-          color: AppColors.white,
+          color: LumiTokens.paper,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: ListView(
@@ -38,7 +39,7 @@ class ServiceStatusSheet extends ConsumerWidget {
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AppColors.divider,
+                  color: LumiTokens.rule,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -101,7 +102,7 @@ class _LayersCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.background,
+        color: LumiTokens.cream,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -168,7 +169,7 @@ class _LayerRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final dotColor = neutral
         ? AppColors.charcoal.withValues(alpha: 0.4)
-        : (ok ? AppColors.libraryGreen : AppColors.warmOrange);
+        : (ok ? LumiTokens.green : LumiTokens.orange);
     return Row(
       children: [
         Container(
@@ -307,7 +308,7 @@ class _SyncButtonState extends ConsumerState<_SyncButton> {
       child: FilledButton(
         onPressed: _busy ? null : _trigger,
         style: FilledButton.styleFrom(
-          backgroundColor: AppColors.rosePinkAccessible,
+          backgroundColor: LumiTokens.green,
           padding: const EdgeInsets.symmetric(vertical: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),

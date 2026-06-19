@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../core/characters/lumi_character.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/lumi_text_styles.dart';
+import '../../../theme/lumi_tokens.dart';
 
 /// Reusable grid of selectable Lumi characters.
 ///
@@ -74,7 +75,7 @@ class _CharacterTile extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: AnimatedScale(
-        scale: isSelected ? 1.08 : 1.0,
+        scale: isSelected ? 1.04 : 1.0,
         duration: const Duration(milliseconds: 150),
         curve: Curves.easeOut,
         child: Column(
@@ -82,7 +83,10 @@ class _CharacterTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
+              // clipBehavior: none keeps the inset badge fully visible even at
+              // the grid's edge columns.
               child: Stack(
+                clipBehavior: Clip.none,
                 fit: StackFit.expand,
                 children: [
                   // Image is centered within the full cell width by BoxFit.contain.
@@ -95,17 +99,20 @@ class _CharacterTile extends StatelessWidget {
                     ),
                   ),
                   if (isSelected)
-                    Align(
-                      alignment: Alignment.topRight,
+                    Positioned(
+                      top: 4,
+                      right: 6,
                       child: Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: const BoxDecoration(
-                          color: AppColors.rosePinkAccessible,
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: LumiTokens.green,
                           shape: BoxShape.circle,
+                          border:
+                              Border.all(color: LumiTokens.paper, width: 1.5),
                         ),
                         child: const Icon(
                           Icons.check_rounded,
-                          size: 14,
+                          size: 12,
                           color: Colors.white,
                         ),
                       ),
@@ -121,7 +128,7 @@ class _CharacterTile extends StatelessWidget {
               textAlign: TextAlign.center,
               style: LumiTextStyles.bodySmall(
                 color: isSelected
-                    ? AppColors.rosePinkAccessible
+                    ? LumiTokens.green
                     : AppColors.charcoal.withValues(alpha: 0.75),
               ).copyWith(
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,

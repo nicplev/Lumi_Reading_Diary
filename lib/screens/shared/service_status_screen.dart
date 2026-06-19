@@ -6,6 +6,7 @@ import '../../core/config/dev_access.dart';
 import '../../core/models/remote_message.dart';
 import '../../core/models/service_status.dart';
 import '../../core/theme/app_colors.dart';
+import '../../theme/lumi_tokens.dart';
 import '../../data/providers/remote_message_provider.dart';
 import '../../data/providers/service_status_provider.dart';
 import '../../services/offline_service.dart';
@@ -24,10 +25,11 @@ class ServiceStatusScreen extends ConsumerWidget {
     final showDevDetails = hasDevAccess();
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: LumiTokens.cream,
       appBar: AppBar(
         title: const Text('Connection status'),
-        backgroundColor: AppColors.white,
+        backgroundColor: LumiTokens.cream,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         foregroundColor: AppColors.charcoal,
       ),
@@ -79,7 +81,7 @@ class ServiceStatusScreen extends ConsumerWidget {
             width: double.infinity,
             child: FilledButton(
               style: FilledButton.styleFrom(
-                backgroundColor: AppColors.rosePinkAccessible,
+                backgroundColor: LumiTokens.green,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -108,7 +110,7 @@ class ServiceStatusScreen extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: LumiTokens.paper,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -201,7 +203,7 @@ class _RemoteSection extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: LumiTokens.paper,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -265,7 +267,7 @@ class _DiagnosticsTileState extends State<_DiagnosticsTile> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: LumiTokens.paper,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Theme(

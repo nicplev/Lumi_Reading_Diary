@@ -196,26 +196,11 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
         children: [
           Text('Reading', style: LumiType.heading),
           const SizedBox(height: LumiTokens.space3),
-          Container(
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEFEDE6),
-              borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
-            ),
-            child: Row(
-              children: [
-                _SegmentButton(
-                  label: 'Activity',
-                  selected: _tab == _LibraryTab.activity,
-                  onTap: () => setState(() => _tab = _LibraryTab.activity),
-                ),
-                _SegmentButton(
-                  label: 'Bookshelf',
-                  selected: _tab == _LibraryTab.books,
-                  onTap: () => setState(() => _tab = _LibraryTab.books),
-                ),
-              ],
-            ),
+          _SegmentedTabs(
+            selectedIndex: _tab.index,
+            labels: const ['Activity', 'Bookshelf'],
+            onChanged: (i) =>
+                setState(() => _tab = _LibraryTab.values[i]),
           ),
         ],
       ),
@@ -648,40 +633,77 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
 // Shared small widgets
 // ─────────────────────────────────────────────────────────────────────────
 
-class _SegmentButton extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
+/// Two-up segmented control with a single yellow pill that slides between
+/// segments — avoids the per-segment colour cross-fade that muddied to grey
+/// mid-transition. Only the pill moves; labels stay put and recolour.
+class _SegmentedTabs extends StatelessWidget {
+  final int selectedIndex;
+  final List<String> labels;
+  final ValueChanged<int> onChanged;
 
-  const _SegmentButton({
-    required this.label,
-    required this.selected,
-    required this.onTap,
+  const _SegmentedTabs({
+    required this.selectedIndex,
+    required this.labels,
+    required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOut,
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: selected ? LumiTokens.tintYellow : Colors.transparent,
-            borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
-          ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: LumiType.body.copyWith(
-              fontSize: 14,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-              color: selected ? LumiTokens.ink : LumiTokens.muted,
-            ),
-          ),
+    const height = 40.0;
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFEDE6),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+      ),
+      child: SizedBox(
+        height: height,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final segWidth = constraints.maxWidth / labels.length;
+            return Stack(
+              children: [
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 240),
+                  curve: Curves.easeOutCubic,
+                  left: selectedIndex * segWidth,
+                  top: 0,
+                  bottom: 0,
+                  width: segWidth,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: LumiTokens.tintYellow,
+                      borderRadius:
+                          BorderRadius.circular(LumiTokens.radiusPill),
+                    ),
+                  ),
+                ),
+                Row(
+                  children: List.generate(labels.length, (i) {
+                    final selected = i == selectedIndex;
+                    return Expanded(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => onChanged(i),
+                        child: Center(
+                          child: AnimatedDefaultTextStyle(
+                            duration: const Duration(milliseconds: 200),
+                            style: LumiType.body.copyWith(
+                              fontSize: 14,
+                              fontWeight:
+                                  selected ? FontWeight.w700 : FontWeight.w600,
+                              color: selected ? LumiTokens.ink : LumiTokens.muted,
+                            ),
+                            child: Text(labels[i]),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

@@ -1,38 +1,31 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/lumi_text_styles.dart';
-import '../../core/theme/lumi_spacing.dart';
-import '../../core/theme/lumi_borders.dart';
-import '../../core/widgets/lumi/lumi_buttons.dart';
-import '../../core/widgets/lumi/lumi_card.dart';
+import '../../theme/lumi_tokens.dart';
+import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
-import 'widgets/add_email_for_recovery_modal.dart';
-import 'widgets/character_picker_sheet.dart';
-import 'widgets/parent_child_switcher.dart';
+import '../../core/widgets/lumi/feedback_widget.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
-import '../../data/models/student_link_code_model.dart';
 import '../../data/providers/active_child_provider.dart';
 import '../../core/services/service_status_controller.dart';
 import '../../services/firebase_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/offline_service.dart';
-import '../../services/parent_linking_service.dart';
-import '../../core/widgets/lumi/feedback_widget.dart';
+import 'widgets/add_email_for_recovery_modal.dart';
+import 'settings/child_manage_sheet.dart';
+
+/// Vertical space the floating glass nav occupies; scroll content reserves this
+/// so the last item clears the bar (mirrors Home/Library).
+const double _kNavClearance = 92;
 
 class ParentProfileScreen extends ConsumerStatefulWidget {
   final UserModel user;
 
-  const ParentProfileScreen({
-    super.key,
-    required this.user,
-  });
+  const ParentProfileScreen({super.key, required this.user});
 
   @override
   ConsumerState<ParentProfileScreen> createState() =>
@@ -41,16 +34,12 @@ class ParentProfileScreen extends ConsumerStatefulWidget {
 
 class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
   final FirebaseService _firebaseService = FirebaseService.instance;
-  final ScrollController _scrollController = ScrollController();
-  final GlobalKey _settingsKey = GlobalKey();
+
   bool _notificationsEnabled = true;
   TimeOfDay _reminderTime = const TimeOfDay(hour: 19, minute: 0);
   // Selected weekdays (1=Mon..7=Sun). Empty = every day.
   List<int> _reminderDays = [];
-  bool _isLoading = false;
   List<StudentModel> _linkedChildren = [];
-  bool _settingsExpanded = false;
-  final _linkingService = ParentLinkingService();
   // Local copy of the parent's relationship label so edits reflect immediately
   // without needing the upstream UserModel to refresh.
   String? _relationshipLabel;
@@ -62,54 +51,33 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
   void initState() {
     super.initState();
     _relationshipLabel = widget.user.relationshipLabel;
-    // Seed from any value the provider has already resolved. The build-time
-    // ref.listen only fires on *changes*, so without this we miss the data
-    // when another widget (e.g. ParentChildSwitcher) already warmed the stream.
     _linkedChildren =
         ref.read(parentChildrenProvider).value ?? const <StudentModel>[];
     _loadPreferences();
   }
 
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadPreferences() async {
+  void _loadPreferences() {
     final preferences = widget.user.preferences;
-    if (preferences != null) {
-      setState(() {
-        _notificationsEnabled = preferences['notificationsEnabled'] ?? true;
-        if (preferences['reminderTime'] != null) {
-          final timeString = preferences['reminderTime'] as String;
-          if (timeString.contains(':')) {
-            final parts = timeString.split(':');
-            if (parts.length >= 2) {
-              _reminderTime = TimeOfDay(
-                hour: int.tryParse(parts[0]) ?? 19,
-                minute: int.tryParse(parts[1]) ?? 0,
-              );
-            }
-          }
+    if (preferences == null) return;
+    setState(() {
+      _notificationsEnabled = preferences['notificationsEnabled'] ?? true;
+      final timeString = preferences['reminderTime'] as String?;
+      if (timeString != null && timeString.contains(':')) {
+        final parts = timeString.split(':');
+        if (parts.length >= 2) {
+          _reminderTime = TimeOfDay(
+            hour: int.tryParse(parts[0]) ?? 19,
+            minute: int.tryParse(parts[1]) ?? 0,
+          );
         }
-        // Load selected days (empty = every day)
-        if (preferences['reminderDays'] != null) {
-          _reminderDays = List<int>.from(preferences['reminderDays']);
-        }
-      });
-    }
-
-    // Preferences are the source of truth for the server-side reminder cron
-    // (`sendReadingReminders`). Writes to Firestore in [_updatePreferences]
-    // are picked up on the next hourly tick — nothing client-side to schedule.
+      }
+      if (preferences['reminderDays'] != null) {
+        _reminderDays = List<int>.from(preferences['reminderDays']);
+      }
+    });
   }
 
   Future<void> _updatePreferences() async {
-    setState(() {
-      _isLoading = true;
-    });
-
     final prefs = <String, dynamic>{
       'notificationsEnabled': _notificationsEnabled,
       'reminderTime': '${_reminderTime.hour}:${_reminderTime.minute}',
@@ -126,16 +94,12 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
             .doc(widget.user.id)
             .update({'preferences': prefs});
       } else if (schoolId != null) {
-        // Queue for sync — the parent's choice is local-first, so the
-        // notification reschedule below still happens and the value
-        // lands in Firestore the moment Firebase is reachable again.
         await OfflineService.instance.enqueueParentPrefs(
           parentId: widget.user.id,
           schoolId: schoolId,
           preferences: prefs,
         );
       }
-
       if (mounted) {
         final queued =
             !ServiceStatusController.instance.current.canWriteToFirebase;
@@ -153,10 +117,6 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
           const SnackBar(content: Text('Failed to update preferences')),
         );
       }
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
     }
   }
 
@@ -164,20 +124,24 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: LumiBorders.shapeLarge,
-        title: Text('Sign Out', style: LumiTextStyles.h3()),
-        content: Text(
-          'Are you sure you want to sign out?',
-          style: LumiTextStyles.body(),
+        backgroundColor: LumiTokens.paper,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
         ),
+        title: Text('Sign out', style: LumiType.subhead),
+        content: Text('Are you sure you want to sign out?',
+            style: LumiType.body),
         actions: [
-          LumiTextButton(
+          TextButton(
             onPressed: () => Navigator.pop(context, false),
-            text: 'Cancel',
+            child: Text('Cancel',
+                style: LumiType.body.copyWith(color: LumiTokens.muted)),
           ),
-          LumiTextButton(
+          TextButton(
             onPressed: () => Navigator.pop(context, true),
-            text: 'Sign Out',
+            child: Text('Sign out',
+                style: LumiType.body
+                    .copyWith(color: LumiTokens.red, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -185,32 +149,13 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
 
     if (confirm == true) {
       await _firebaseService.signOut();
-      if (mounted) {
-        context.go('/auth/login');
-      }
+      if (mounted) context.go('/auth/login');
     }
-  }
-
-  void _scrollToSettings() {
-    setState(() {
-      _settingsExpanded = true;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final context = _settingsKey.currentContext;
-      if (context != null) {
-        Scrollable.ensureVisible(
-          context,
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeInOut,
-        );
-      }
-    });
   }
 
   @override
   Widget build(BuildContext context) {
-    // Keep the local children list in sync with the live provider so the
-    // "Your Children" card and reminder preview reflect in-app links at once.
+    // Keep the local children list in sync with the live provider.
     ref.listen<AsyncValue<List<StudentModel>>>(
       parentChildrenProvider,
       (_, next) {
@@ -220,616 +165,347 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
             children.every(
               (c) => _linkedChildren.any((existing) => existing.id == c.id),
             );
-        if (!sameSet) {
-          setState(() => _linkedChildren = children);
-        }
+        if (!sameSet) setState(() => _linkedChildren = children);
       },
     );
 
     return Scaffold(
-      backgroundColor: AppColors.offWhite,
+      backgroundColor: LumiTokens.cream,
       body: SafeArea(
-        child: SingleChildScrollView(
-          controller: _scrollController,
-          padding: LumiPadding.allS,
-          child: Column(
-            children: [
-              const ParentChildSwitcher(
-                padding: EdgeInsets.only(bottom: LumiSpacing.s),
-              ),
-              _buildProfileHeader(),
-              LumiGap.m,
-              _buildRelationshipCard(),
-              LumiGap.m,
-              _buildLinkedChildrenCard(),
-              LumiGap.m,
-              _buildNotificationsCard(),
-              LumiGap.m,
-              _buildInviteCodeCard(),
-              LumiGap.m,
-              if ((widget.user.email ?? '').isEmpty) ...[
-                _buildRecoveryCard(),
-                LumiGap.m,
-              ],
-              _buildSettingsCard(),
-              LumiGap.m,
-              LumiTextButton(
-                onPressed: _handleSignOut,
-                text: 'Sign Out',
-                color: AppColors.charcoal.withValues(alpha: 0.5),
-              ),
-              LumiGap.xs,
-              Text(
-                'Version 1.0.0',
-                style: LumiTextStyles.caption(),
-              ),
-              LumiGap.l,
-            ],
+        bottom: false,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(
+            LumiTokens.space4,
+            LumiTokens.space2,
+            LumiTokens.space4,
+            _kNavClearance,
           ),
+          children: [
+            _buildHeader(),
+            const SizedBox(height: LumiTokens.space6),
+            _buildYouSection(),
+            const SizedBox(height: LumiTokens.space5),
+            _buildChildrenSection(),
+            const SizedBox(height: LumiTokens.space5),
+            _buildRemindersCard(),
+            const SizedBox(height: LumiTokens.space5),
+            _buildAboutSection(),
+            const SizedBox(height: LumiTokens.space5),
+            _buildSignOut(),
+            const SizedBox(height: LumiTokens.space3),
+            Center(
+              child: Text('Version 1.0.0', style: LumiType.caption),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildProfileHeader() {
-    // Compute aggregate streak from linked children
-    final childCount = _linkedChildren.length;
+  // ── Compact header ──
 
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: AppColors.primaryGradient,
-        borderRadius: LumiBorders.large,
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.rosePink.withValues(alpha: 0.3),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Stack(
+  Widget _buildHeader() {
+    final childCount = _linkedChildren.length;
+    return Padding(
+      padding: const EdgeInsets.only(top: LumiTokens.space2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              LumiSpacing.m,
-              LumiSpacing.m,
-              LumiSpacing.m,
-              LumiSpacing.m,
-            ),
-            child: Column(
-              children: [
-                const LumiMascot(variant: LumiVariant.welcome, size: 80),
-                LumiGap.s,
-                Text(
-                  widget.user.fullName,
-                  style: LumiTextStyles.h2(color: AppColors.white),
+          Text('Settings', style: LumiType.heading),
+          const SizedBox(height: LumiTokens.space4),
+          Row(
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: const BoxDecoration(
+                  color: LumiTokens.tintGreen,
+                  shape: BoxShape.circle,
                 ),
-                LumiGap.xxs,
-                Text(
-                  widget.user.contactIdentifier,
-                  style: LumiTextStyles.bodySmall(
-                    color: AppColors.white.withValues(alpha: 0.85),
-                  ),
-                ),
-                LumiGap.s,
-                // Stat chips row
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                padding: const EdgeInsets.all(8),
+                child: const LumiMascot(variant: LumiVariant.parent, size: 48),
+              ),
+              const SizedBox(width: LumiTokens.space4),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildStatChip(
-                      Icons.people_outline,
-                      '$childCount ${childCount == 1 ? 'child' : 'children'}',
+                    Text(
+                      widget.user.fullName,
+                      style: LumiType.subhead,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    LumiGap.horizontalS,
-                    // Aggregate streak chip
-                    StreamBuilder<List<DocumentSnapshot>>(
-                      stream: _linkedChildren.isNotEmpty
-                          ? _buildAggregateStreakStream()
-                          : const Stream.empty(),
-                      builder: (context, snapshot) {
-                        int totalStreak = 0;
-                        if (snapshot.hasData) {
-                          for (final doc in snapshot.data!) {
-                            final data = doc.data() as Map<String, dynamic>?;
-                            final stats =
-                                data?['stats'] as Map<String, dynamic>?;
-                            totalStreak +=
-                                (stats?['currentStreak'] ?? 0) as int;
-                          }
-                        }
-                        return _buildStatChip(
-                          Icons.local_fire_department,
-                          '$totalStreak day streak',
-                        );
-                      },
+                    const SizedBox(height: 2),
+                    Text(
+                      widget.user.contactIdentifier,
+                      style: LumiType.caption,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: LumiTokens.space2),
+                    _HeaderChip(
+                      icon: Icons.people_outline,
+                      label:
+                          '$childCount ${childCount == 1 ? 'child' : 'children'}',
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          // Settings gear icon at top-right
-          Positioned(
-            top: LumiSpacing.xs,
-            right: LumiSpacing.xs,
-            child: LumiIconButton(
-              onPressed: _scrollToSettings,
-              icon: Icons.settings_outlined,
-              iconColor: AppColors.white,
-            ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Stream<List<DocumentSnapshot>> _buildAggregateStreakStream() {
-    final streams = _linkedChildren.map((child) {
-      return _firebaseService.firestore
+  // ── "You" ──
+
+  Widget _buildYouSection() {
+    final label = _relationshipLabel;
+    return _Section(
+      title: 'You',
+      child: _SettingsGroup(
+        rows: [
+          _SettingsRow(
+            icon: Icons.diversity_1_outlined,
+            title: 'Relationship',
+            value: label == null || label.isEmpty ? 'Set' : label,
+            onTap: _editRelationship,
+          ),
+          if ((widget.user.email ?? '').isEmpty)
+            _SettingsRow(
+              icon: Icons.shield_outlined,
+              title: 'Add recovery email',
+              subtitle: 'Get back in if you lose your phone',
+              onTap: () => AddEmailForRecoveryModal.show(
+                context: context,
+                user: widget.user,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ── "Children" ──
+
+  Widget _buildChildrenSection() {
+    return _Section(
+      title: 'Children',
+      child: _SettingsGroup(
+        rows: [
+          ..._linkedChildren.map(_buildChildRow),
+          _SettingsRow(
+            icon: Icons.qr_code_scanner,
+            title: 'Link a new child',
+            subtitle: 'Enter an invite code',
+            accent: true,
+            onTap: () => context.push('/parent/link-child'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChildRow(StudentModel child) {
+    return InkWell(
+      onTap: () => showChildManageSheet(
+        context,
+        user: widget.user,
+        child: child,
+        onChanged: (updated) {
+          setState(() {
+            final idx = _linkedChildren.indexWhere((c) => c.id == updated.id);
+            if (idx != -1) _linkedChildren[idx] = updated;
+          });
+          ref.invalidate(parentChildrenProvider);
+        },
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(LumiTokens.space4),
+        child: Row(
+          children: [
+            StudentAvatar.fromStudent(child, size: 40),
+            const SizedBox(width: LumiTokens.space3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    child.fullName,
+                    style: LumiType.body.copyWith(fontWeight: FontWeight.w600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    'Level: ${child.currentReadingLevel ?? 'Not set'}',
+                    style: LumiType.caption,
+                  ),
+                ],
+              ),
+            ),
+            _buildChildStreakBadge(child),
+            const SizedBox(width: LumiTokens.space2),
+            const Icon(Icons.chevron_right_rounded,
+                size: 20, color: LumiTokens.muted),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChildStreakBadge(StudentModel child) {
+    return StreamBuilder<DocumentSnapshot>(
+      stream: _firebaseService.firestore
           .collection('schools')
           .doc(widget.user.schoolId)
           .collection('students')
           .doc(child.id)
-          .snapshots();
-    }).toList();
-
-    return streams.first.asyncExpand((firstDoc) {
-      if (streams.length == 1) {
-        return Stream.value([firstDoc]);
-      }
-      // Combine all streams
-      return _combineStreams(streams);
-    });
-  }
-
-  Stream<List<DocumentSnapshot>> _combineStreams(
-      List<Stream<DocumentSnapshot>> streams) {
-    final latest = List<DocumentSnapshot?>.filled(streams.length, null);
-    return Stream.multi((controller) {
-      for (int i = 0; i < streams.length; i++) {
-        final index = i;
-        streams[index].listen(
-          (doc) {
-            latest[index] = doc;
-            if (latest.every((d) => d != null)) {
-              controller.add(latest.cast<DocumentSnapshot>());
-            }
-          },
-          onError: controller.addError,
-        );
-      }
-    });
-  }
-
-  Widget _buildStatChip(IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: LumiSpacing.xs + 4,
-        vertical: LumiSpacing.xxs + 2,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.white.withValues(alpha: 0.2),
-        borderRadius: LumiBorders.circular,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: AppColors.white),
-          LumiGap.horizontalXXS,
-          Text(
-            label,
-            style: LumiTextStyles.label(color: AppColors.white),
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox.shrink();
+        final data = snapshot.data!.data() as Map<String, dynamic>?;
+        final stats = data?['stats'] as Map<String, dynamic>?;
+        final streak = (stats?['currentStreak'] ?? 0) as int;
+        if (streak <= 0) return const SizedBox.shrink();
+        return Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: LumiTokens.space2,
+            vertical: 3,
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLinkedChildrenCard() {
-    if (_linkedChildren.isEmpty) {
-      return LumiEmptyCard(
-        icon: Icons.family_restroom,
-        title: 'No children linked',
-        message: 'Link a child to start tracking their reading progress.',
-        actionText: 'Add Child',
-        onAction: () => context.push('/parent/link-child'),
-      );
-    }
-
-    return LumiCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Section title inside the card
-          Row(
+          decoration: BoxDecoration(
+            color: LumiTokens.tintOrange,
+            borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.family_restroom,
-                  size: 20, color: AppColors.charcoal.withValues(alpha: 0.7)),
-              LumiGap.horizontalXS,
-              Text('Your Children', style: LumiTextStyles.h3()),
+              const Icon(Icons.local_fire_department,
+                  size: 14, color: LumiTokens.orange),
+              const SizedBox(width: 3),
+              Text(
+                '$streak',
+                style: LumiType.caption.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: LumiTokens.ink,
+                ),
+              ),
             ],
           ),
-          LumiGap.s,
-          // Child rows
-          ..._linkedChildren.map(_buildChildEntry),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildChildEntry(StudentModel child) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: LumiSpacing.xs),
+  // ── Reminders ──
+
+  Widget _buildRemindersCard() {
+    return _Section(
+      title: 'Reminders',
       child: Container(
-        padding: const EdgeInsets.all(LumiSpacing.xs + 4),
+        padding: const EdgeInsets.all(LumiTokens.space4),
         decoration: BoxDecoration(
-          color: AppColors.offWhite,
-          borderRadius: LumiBorders.medium,
+          color: LumiTokens.paper,
+          borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+          boxShadow: LumiTokens.shadowCard,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                GestureDetector(
-                  onTap: () => showCharacterPicker(
-                    context,
-                    student: child,
-                    onChanged: (updated) {
-                      setState(() {
-                        final idx = _linkedChildren
-                            .indexWhere((c) => c.id == updated.id);
-                        if (idx != -1) _linkedChildren[idx] = updated;
-                      });
-                      // Re-fetch children so the character also refreshes the
-                      // switcher / home cards (which read parentChildrenProvider).
-                      ref.invalidate(parentChildrenProvider);
-                    },
-                  ),
-                  child: Stack(
-                    children: [
-                      StudentAvatar.fromStudent(child, size: 40),
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          width: 16,
-                          height: 16,
-                          decoration: BoxDecoration(
-                            color: AppColors.rosePink,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 1.5),
-                          ),
-                          child: const Icon(Icons.edit,
-                              size: 9, color: Colors.white),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                LumiGap.horizontalS,
+                const Icon(Icons.notifications_outlined,
+                    size: 20, color: LumiTokens.green),
+                const SizedBox(width: LumiTokens.space3),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(child.fullName, style: LumiTextStyles.bodyMedium()),
-                      Text(
-                        'Level: ${child.currentReadingLevel ?? "Not set"}',
-                        style: LumiTextStyles.bodySmall(
-                          color: AppColors.charcoal.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    'Reading reminders',
+                    style:
+                        LumiType.body.copyWith(fontWeight: FontWeight.w600),
                   ),
                 ),
-                StreamBuilder<DocumentSnapshot>(
-                  stream: _firebaseService.firestore
-                      .collection('schools')
-                      .doc(widget.user.schoolId)
-                      .collection('students')
-                      .doc(child.id)
-                      .snapshots(),
-                  builder: (context, snapshot) {
-                    if (!snapshot.hasData) return const SizedBox();
-                    final data = snapshot.data!.data() as Map<String, dynamic>?;
-                    final stats = data?['stats'] as Map<String, dynamic>?;
-                    final streak = stats?['currentStreak'] ?? 0;
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: LumiSpacing.xs,
-                        vertical: LumiSpacing.xxs,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.warmOrange.withValues(alpha: 0.1),
-                        borderRadius: LumiBorders.medium,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.local_fire_department,
-                            size: 16,
-                            color: AppColors.warmOrange,
-                          ),
-                          LumiGap.horizontalXXS,
-                          Text(
-                            '$streak',
-                            style: LumiTextStyles.label(
-                              color: AppColors.warmOrange,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
+                Switch.adaptive(
+                  value: _notificationsEnabled,
+                  activeTrackColor: LumiTokens.green,
+                  onChanged: (value) {
+                    setState(() => _notificationsEnabled = value);
+                    _updatePreferences();
                   },
                 ),
               ],
             ),
-            _buildGuardiansSection(child),
+            if (_notificationsEnabled)
+              _buildReminderDetails()
+            else
+              Padding(
+                padding: const EdgeInsets.only(top: LumiTokens.space2),
+                child: Text('Reminders are off', style: LumiType.caption),
+              ),
           ],
         ),
       ),
     );
   }
 
-  /// Co-parents linked to [child], shown name-only with relationship labels,
-  /// plus an action to invite another guardian. Hidden entirely when the
-  /// student has no denormalized guardian data yet.
-  Widget _buildGuardiansSection(StudentModel child) {
-    final entries = child.guardianProfiles.entries.toList();
-
+  Widget _buildReminderDetails() {
     return Padding(
-      padding: const EdgeInsets.only(top: LumiSpacing.xs),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (entries.length > 1) ...[
-            Divider(
-              height: LumiSpacing.s,
-              color: AppColors.charcoal.withValues(alpha: 0.06),
-            ),
-            Text(
-              'Guardians',
-              style: LumiTextStyles.label(
-                color: AppColors.charcoal.withValues(alpha: 0.6),
-              ),
-            ),
-            LumiGap.xxs,
-            ...entries.map((e) {
-              final isMe = e.key == widget.user.id;
-              final profile = e.value;
-              final label = profile.relationshipLabel;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 2),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.person_outline,
-                      size: 14,
-                      color: AppColors.charcoal.withValues(alpha: 0.5),
-                    ),
-                    LumiGap.horizontalXXS,
-                    Expanded(
-                      child: Text(
-                        [
-                          profile.name,
-                          if (label != null && label.isNotEmpty) '($label)',
-                          if (isMe) '— You',
-                        ].join(' '),
-                        style: LumiTextStyles.bodySmall(
-                          color: AppColors.charcoal.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-          ],
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => _inviteCoParent(child),
-              icon: const Icon(Icons.person_add_alt_1, size: 16),
-              label: const Text('Invite another guardian'),
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.rosePink,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: LumiSpacing.xs,
-                  vertical: LumiSpacing.xxs,
-                ),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                textStyle: LumiTextStyles.bodySmall(),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Generates a co-parent invite code for [child] and shows it for sharing.
-  Future<void> _inviteCoParent(StudentModel child) async {
-    StudentLinkCodeModel? code;
-    Object? error;
-    try {
-      code = await _linkingService.createCoParentInviteCode(
-        studentId: child.id,
-        schoolId: child.schoolId,
-        parentUserId: widget.user.id,
-      );
-    } catch (e) {
-      error = e;
-    }
-    if (!mounted) return;
-
-    if (code == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not create invite: $error')),
-      );
-      return;
-    }
-
-    final inviteCode = code.code;
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: LumiBorders.shapeLarge,
-        title: Text('Invite a guardian', style: LumiTextStyles.h3()),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Share this code with another guardian of ${child.firstName}. '
-              'They enter it when registering for the Lumi app.',
-              style: LumiTextStyles.body(),
-            ),
-            LumiGap.m,
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(LumiSpacing.s),
-              decoration: BoxDecoration(
-                color: AppColors.rosePink.withValues(alpha: 0.08),
-                borderRadius: LumiBorders.medium,
-              ),
-              child: Text(
-                inviteCode,
-                textAlign: TextAlign.center,
-                style: LumiTextStyles.h2(color: AppColors.rosePink).copyWith(
-                  letterSpacing: 4,
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          LumiTextButton(
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: inviteCode));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Code copied')),
-              );
-            },
-            text: 'Copy code',
-          ),
-          LumiTextButton(
-            onPressed: () => Navigator.pop(context),
-            text: 'Done',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNotificationsCard() {
-    return LumiCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header row with toggle
-          Row(
-            children: [
-              Icon(Icons.notifications_outlined,
-                  size: 20, color: AppColors.charcoal.withValues(alpha: 0.7)),
-              LumiGap.horizontalXS,
-              Text('Reminders', style: LumiTextStyles.h3()),
-              const Spacer(),
-              Switch.adaptive(
-                value: _notificationsEnabled,
-                onChanged: (value) {
-                  setState(() {
-                    _notificationsEnabled = value;
-                  });
-                  _updatePreferences();
-                },
-                activeTrackColor: AppColors.rosePink,
-              ),
-            ],
-          ),
-          // Content when enabled or disabled
-          AnimatedCrossFade(
-            firstChild: _buildNotificationDetails(),
-            secondChild: Padding(
-              padding: const EdgeInsets.only(top: LumiSpacing.xs),
-              child: Text(
-                'Reminders are off',
-                style: LumiTextStyles.bodySmall(
-                  color: AppColors.charcoal.withValues(alpha: 0.5),
-                ),
-              ),
-            ),
-            crossFadeState: _notificationsEnabled
-                ? CrossFadeState.showFirst
-                : CrossFadeState.showSecond,
-            duration: const Duration(milliseconds: 250),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNotificationDetails() {
-    return Padding(
-      padding: const EdgeInsets.only(top: LumiSpacing.s),
+      padding: const EdgeInsets.only(top: LumiTokens.space3),
       child: Container(
-        padding: const EdgeInsets.all(LumiSpacing.s),
+        padding: const EdgeInsets.all(LumiTokens.space4),
         decoration: BoxDecoration(
-          color: AppColors.rosePink.withValues(alpha: 0.06),
-          borderRadius: LumiBorders.medium,
+          color: LumiTokens.cream,
+          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Time row
+            // Time row.
             Row(
               children: [
-                Icon(Icons.access_time,
-                    size: 18, color: AppColors.charcoal.withValues(alpha: 0.7)),
-                LumiGap.horizontalXS,
-                Text('Remind me at', style: LumiTextStyles.bodySmall()),
-                LumiGap.horizontalXS,
+                const Icon(Icons.access_time,
+                    size: 18, color: LumiTokens.muted),
+                const SizedBox(width: LumiTokens.space2),
+                Text('Remind me at', style: LumiType.body),
+                const SizedBox(width: LumiTokens.space3),
                 GestureDetector(
                   onTap: () async {
-                    final TimeOfDay? picked = await showTimePicker(
+                    final picked = await showTimePicker(
                       context: context,
                       initialTime: _reminderTime,
                     );
                     if (picked != null && picked != _reminderTime) {
-                      setState(() {
-                        _reminderTime = picked;
-                      });
+                      setState(() => _reminderTime = picked);
                       _updatePreferences();
                     }
                   },
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: LumiSpacing.xs + 4,
-                      vertical: LumiSpacing.xxs,
+                      horizontal: LumiTokens.space3,
+                      vertical: LumiTokens.space1,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.rosePink,
-                      borderRadius: LumiBorders.circular,
+                      color: LumiTokens.green,
+                      borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
                     ),
                     child: Text(
                       _reminderTime.format(context),
-                      style: LumiTextStyles.label(color: AppColors.white),
+                      style: LumiType.caption.copyWith(
+                        color: LumiTokens.paper,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
               ],
             ),
-            LumiGap.s,
-            // Day chips row
+            const SizedBox(height: LumiTokens.space4),
             Text(
-              _reminderDays.isEmpty
-                  ? 'On these days (every day)'
-                  : 'On these days',
-              style: LumiTextStyles.bodySmall(),
+              _reminderDays.isEmpty ? 'On these days (every day)' : 'On these days',
+              style: LumiType.caption,
             ),
-            LumiGap.xs,
+            const SizedBox(height: LumiTokens.space2),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: List.generate(7, (index) {
@@ -840,69 +516,51 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
                   onTap: () {
                     setState(() {
                       if (_reminderDays.isEmpty) {
-                        _reminderDays = List.from(_dayValues);
-                        _reminderDays.remove(day);
+                        _reminderDays = List.from(_dayValues)..remove(day);
                       } else if (_reminderDays.contains(day)) {
                         _reminderDays.remove(day);
-                        if (_reminderDays.isEmpty) {
-                          _reminderDays = [];
-                        }
                       } else {
                         _reminderDays.add(day);
                         _reminderDays.sort();
-                        if (_reminderDays.length == 7) {
-                          _reminderDays = [];
-                        }
+                        if (_reminderDays.length == 7) _reminderDays = [];
                       }
                     });
                     _updatePreferences();
                   },
                   child: Container(
-                    width: 40,
-                    height: 40,
+                    width: 38,
+                    height: 38,
+                    alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: isSelected
-                          ? AppColors.rosePink
-                          : AppColors.rosePink.withValues(alpha: 0.1),
+                      color: isSelected ? LumiTokens.green : LumiTokens.tintGreen,
                       shape: BoxShape.circle,
                     ),
-                    alignment: Alignment.center,
                     child: Text(
                       _dayLabels[index],
-                      style: LumiTextStyles.label(
-                        color:
-                            isSelected ? AppColors.white : AppColors.rosePink,
+                      style: LumiType.caption.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: isSelected ? LumiTokens.paper : LumiTokens.ink,
                       ),
                     ),
                   ),
                 );
               }),
             ),
-            LumiGap.s,
-            // Reminder preview
+            const SizedBox(height: LumiTokens.space4),
             _buildReminderPreview(),
-            LumiGap.xs,
-            // Test notification button
+            const SizedBox(height: LumiTokens.space2),
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(
-                onPressed: () =>
-                    NotificationService.instance.testNotification(),
-                icon: Icon(
-                  Icons.send_outlined,
-                  size: 16,
-                  color: AppColors.charcoal.withValues(alpha: 0.5),
-                ),
-                label: Text(
-                  'Send test',
-                  style: LumiTextStyles.bodySmall(
-                    color: AppColors.charcoal.withValues(alpha: 0.5),
-                  ),
-                ),
+                onPressed: () => NotificationService.instance.testNotification(),
+                icon: const Icon(Icons.send_outlined,
+                    size: 16, color: LumiTokens.muted),
+                label: Text('Send test',
+                    style: LumiType.caption.copyWith(color: LumiTokens.muted)),
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: LumiSpacing.xs,
-                    vertical: LumiSpacing.xxs,
+                    horizontal: LumiTokens.space2,
+                    vertical: 2,
                   ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -931,28 +589,24 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
 
     return Container(
       padding: const EdgeInsets.symmetric(
-        horizontal: LumiSpacing.s,
-        vertical: LumiSpacing.xs,
+        horizontal: LumiTokens.space3,
+        vertical: LumiTokens.space3,
       ),
       decoration: BoxDecoration(
-        color: AppColors.charcoal.withValues(alpha: 0.04),
-        borderRadius: LumiBorders.medium,
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+        border: Border.all(color: LumiTokens.rule),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.notifications_active_outlined,
-            size: 15,
-            color: AppColors.charcoal.withValues(alpha: 0.4),
-          ),
-          LumiGap.horizontalXXS,
+          const Icon(Icons.notifications_active_outlined,
+              size: 15, color: LumiTokens.muted),
+          const SizedBox(width: LumiTokens.space2),
           Expanded(
             child: Text(
               '"Don\'t forget to log $exampleName\'s reading today!"$suffix',
-              style: LumiTextStyles.bodySmall(
-                color: AppColors.charcoal.withValues(alpha: 0.55),
-              ).copyWith(fontStyle: FontStyle.italic),
+              style: LumiType.caption.copyWith(fontStyle: FontStyle.italic),
             ),
           ),
         ],
@@ -960,49 +614,61 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
     );
   }
 
-  Widget _buildRelationshipCard() {
-    final label = _relationshipLabel;
-    return LumiCard(
-      onTap: _editRelationship,
-      child: Row(
-        children: [
-          Icon(Icons.family_restroom, color: AppColors.rosePink, size: 24),
-          LumiGap.horizontalS,
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Your relationship',
-                  style: LumiTextStyles.bodyMedium(),
-                ),
-                Text(
-                  label == null || label.isEmpty
-                      ? 'Tap to set how you\'re related'
-                      : label,
-                  style: LumiTextStyles.bodySmall(
-                    color: AppColors.charcoal.withValues(alpha: 0.7),
-                  ),
-                ),
-              ],
+  // ── About & support ──
+
+  Widget _buildAboutSection() {
+    return _Section(
+      title: 'About & support',
+      child: _SettingsGroup(
+        rows: [
+          _SettingsRow(
+            icon: Icons.feedback_outlined,
+            title: 'Send feedback',
+            onTap: () => showFeedbackSheet(
+              context,
+              userId: widget.user.id,
+              userRole: widget.user.role.name,
             ),
           ),
-          Icon(Icons.edit_outlined, size: 20, color: AppColors.rosePink),
+          _SettingsRow(
+            icon: Icons.network_check,
+            title: 'Connection status',
+            subtitle: 'Diagnostics for Lumi service & sync',
+            onTap: () => context.push('/settings/service-status'),
+          ),
+          _SettingsRow(
+            icon: Icons.info_outline,
+            title: 'About Lumi',
+            onTap: _showAboutDialog,
+          ),
         ],
       ),
     );
   }
 
-  /// Opens a picker to set the parent's relationship label, then persists it
-  /// to their own parent doc. The syncGuardianProfiles Cloud Function then
-  /// propagates the change to each linked student's guardianProfiles map.
+  Widget _buildSignOut() {
+    return _SettingsGroup(
+      rows: [
+        _SettingsRow(
+          icon: Icons.logout_rounded,
+          title: 'Sign out',
+          tint: LumiTokens.tintRed,
+          iconColor: LumiTokens.red,
+          titleColor: LumiTokens.red,
+          hideChevron: true,
+          onTap: _handleSignOut,
+        ),
+      ],
+    );
+  }
+
+  // ── Dialogs ──
+
   Future<void> _editRelationship() async {
     final saved = await showDialog<String>(
       context: context,
-      builder: (context) =>
-          _RelationshipPicker(initialLabel: _relationshipLabel),
+      builder: (context) => _RelationshipPicker(initialLabel: _relationshipLabel),
     );
-
     if (saved == null || saved == _relationshipLabel) return;
     setState(() => _relationshipLabel = saved);
     try {
@@ -1026,259 +692,37 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
     }
   }
 
-  Widget _buildInviteCodeCard() {
-    return LumiCard(
-      onTap: () => context.push('/parent/link-child'),
-      child: Row(
-        children: [
-          Icon(Icons.qr_code_scanner, color: AppColors.rosePink, size: 24),
-          LumiGap.horizontalS,
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Enter Invite Code',
-                  style: LumiTextStyles.bodyMedium(color: AppColors.rosePink),
-                ),
-                Text(
-                  'Link a new child to your account',
-                  style: LumiTextStyles.bodySmall(
-                    color: AppColors.charcoal.withValues(alpha: 0.7),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Icon(
-            Icons.chevron_right,
-            color: AppColors.rosePink,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRecoveryCard() {
-    return LumiCard(
-      onTap: () => AddEmailForRecoveryModal.show(
-        context: context,
-        user: widget.user,
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.shield_outlined, color: AppColors.rosePink, size: 24),
-          LumiGap.horizontalS,
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Account recovery',
-                  style: LumiTextStyles.bodyMedium(color: AppColors.rosePink),
-                ),
-                Text(
-                  'Add an email so you can get back in if you lose your phone',
-                  style: LumiTextStyles.bodySmall(
-                    color: AppColors.charcoal.withValues(alpha: 0.7),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Icon(Icons.chevron_right, color: AppColors.rosePink),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSettingsCard() {
-    return LumiCard(
-      key: _settingsKey,
-      child: Column(
-        children: [
-          // Header row — always visible
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                _settingsExpanded = !_settingsExpanded;
-              });
-            },
-            behavior: HitTestBehavior.opaque,
-            child: Row(
-              children: [
-                Icon(Icons.settings_outlined,
-                    size: 20, color: AppColors.charcoal.withValues(alpha: 0.7)),
-                LumiGap.horizontalXS,
-                Text('Settings', style: LumiTextStyles.h3()),
-                const Spacer(),
-                AnimatedRotation(
-                  turns: _settingsExpanded ? 0.5 : 0.0,
-                  duration: const Duration(milliseconds: 250),
-                  child: const Icon(Icons.expand_more),
-                ),
-              ],
-            ),
-          ),
-          // Expandable content
-          AnimatedCrossFade(
-            firstChild: const SizedBox.shrink(),
-            secondChild: Padding(
-              padding: const EdgeInsets.only(top: LumiSpacing.s),
-              child: Column(
-                children: [
-                  _buildSettingsRow(
-                    Icons.language,
-                    'Language',
-                    subtitle: 'English',
-                    onTap: () {
-                      // Navigate to language settings
-                    },
-                  ),
-                  _buildSettingsRow(
-                    Icons.help_outline,
-                    'Help & Support',
-                    onTap: () {
-                      // Navigate to help
-                    },
-                  ),
-                  _buildSettingsRow(
-                    Icons.feedback_outlined,
-                    'Send Feedback',
-                    color: AppColors.rosePink,
-                    onTap: () {
-                      showFeedbackSheet(
-                        context,
-                        userId: widget.user.id,
-                        userRole: widget.user.role.name,
-                      );
-                    },
-                  ),
-                  _buildSettingsRow(
-                    Icons.network_check,
-                    'Connection status',
-                    subtitle: 'Diagnostics for Lumi service & sync',
-                    onTap: () => context.push('/settings/service-status'),
-                  ),
-                  _buildSettingsRow(
-                    Icons.privacy_tip_outlined,
-                    'Privacy Policy',
-                    onTap: () {
-                      // Navigate to privacy policy
-                    },
-                  ),
-                  _buildSettingsRow(
-                    Icons.info_outline,
-                    'About Lumi',
-                    onTap: _showAboutDialog,
-                    showDivider: false,
-                  ),
-                ],
-              ),
-            ),
-            crossFadeState: _settingsExpanded
-                ? CrossFadeState.showSecond
-                : CrossFadeState.showFirst,
-            duration: const Duration(milliseconds: 250),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSettingsRow(
-    IconData icon,
-    String title, {
-    String? subtitle,
-    Color? color,
-    VoidCallback? onTap,
-    bool showDivider = true,
-  }) {
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: onTap,
-          behavior: HitTestBehavior.opaque,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: LumiSpacing.xs + 2),
-            child: Row(
-              children: [
-                Icon(icon,
-                    size: 20,
-                    color: color ?? AppColors.charcoal.withValues(alpha: 0.7)),
-                LumiGap.horizontalS,
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: LumiTextStyles.bodyMedium(color: color),
-                      ),
-                      if (subtitle != null)
-                        Text(
-                          subtitle,
-                          style: LumiTextStyles.bodySmall(
-                            color: AppColors.charcoal.withValues(alpha: 0.5),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.chevron_right,
-                  size: 20,
-                  color: color ?? AppColors.charcoal.withValues(alpha: 0.4),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (showDivider)
-          Divider(
-            height: 1,
-            color: AppColors.charcoal.withValues(alpha: 0.06),
-          ),
-      ],
-    );
-  }
-
   void _showAboutDialog() {
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        shape: LumiBorders.shapeLarge,
-        child: Container(
-          padding: LumiPadding.allM,
+        backgroundColor: LumiTokens.paper,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(LumiTokens.space5),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const LumiMascot(
-                variant: LumiVariant.parent,
-                size: 100,
-              ),
-              LumiGap.s,
+              const LumiMascot(variant: LumiVariant.parent, size: 96),
+              const SizedBox(height: LumiTokens.space4),
+              Text('Lumi Reading Diary', style: LumiType.subhead),
+              const SizedBox(height: LumiTokens.space1),
+              Text('Version 1.0.0', style: LumiType.caption),
+              const SizedBox(height: LumiTokens.space3),
               Text(
-                'Lumi Reading Diary',
-                style: LumiTextStyles.h2(),
-              ),
-              LumiGap.xs,
-              Text(
-                'Version 1.0.0',
-                style: LumiTextStyles.bodySmall(
-                  color: AppColors.charcoal.withValues(alpha: 0.7),
-                ),
-              ),
-              LumiGap.s,
-              Text(
-                'Making reading fun and trackable for every child. Lumi helps families build consistent reading habits together.',
+                'Making reading fun and trackable for every child. Lumi helps '
+                'families build consistent reading habits together.',
                 textAlign: TextAlign.center,
-                style: LumiTextStyles.body(),
+                style: LumiType.body,
               ),
-              LumiGap.m,
-              LumiTextButton(
+              const SizedBox(height: LumiTokens.space4),
+              TextButton(
                 onPressed: () => Navigator.pop(context),
-                text: 'Close',
+                child: Text('Close',
+                    style: LumiType.body.copyWith(
+                        color: LumiTokens.green, fontWeight: FontWeight.w700)),
               ),
             ],
           ),
@@ -1288,10 +732,187 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Section + grouped-list widgets
+// ─────────────────────────────────────────────────────────────────────────
+
+class _Section extends StatelessWidget {
+  final String title;
+  final Widget child;
+
+  const _Section({required this.title, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: LumiTokens.space2),
+          child: Text(
+            title.toUpperCase(),
+            style: LumiType.caption.copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.6,
+              color: LumiTokens.muted,
+            ),
+          ),
+        ),
+        child,
+      ],
+    );
+  }
+}
+
+/// A paper card whose rows are separated by inset dividers.
+class _SettingsGroup extends StatelessWidget {
+  final List<Widget> rows;
+
+  const _SettingsGroup({required this.rows});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+        boxShadow: LumiTokens.shadowCard,
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0)
+              const Divider(
+                height: 1,
+                thickness: 1,
+                indent: LumiTokens.space4,
+                endIndent: LumiTokens.space4,
+                color: LumiTokens.rule,
+              ),
+            rows[i],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final String? value;
+  final Color tint;
+  final Color iconColor;
+  final Color? titleColor;
+  final bool accent;
+  final bool hideChevron;
+  final VoidCallback onTap;
+
+  const _SettingsRow({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+    this.subtitle,
+    this.value,
+    this.tint = LumiTokens.tintGreen,
+    this.iconColor = LumiTokens.green,
+    this.titleColor,
+    this.accent = false,
+    this.hideChevron = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(LumiTokens.space4),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: tint,
+                borderRadius: BorderRadius.circular(LumiTokens.radiusSmall),
+              ),
+              child: Icon(icon, size: 18, color: iconColor),
+            ),
+            const SizedBox(width: LumiTokens.space3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: LumiType.body.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: titleColor ??
+                          (accent ? LumiTokens.green : LumiTokens.ink),
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 1),
+                    Text(subtitle!, style: LumiType.caption),
+                  ],
+                ],
+              ),
+            ),
+            if (value != null) ...[
+              const SizedBox(width: LumiTokens.space2),
+              Text(value!, style: LumiType.caption),
+            ],
+            if (!hideChevron) ...[
+              const SizedBox(width: LumiTokens.space2),
+              const Icon(Icons.chevron_right_rounded,
+                  size: 20, color: LumiTokens.muted),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _HeaderChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: LumiTokens.space3,
+        vertical: LumiTokens.space1,
+      ),
+      decoration: BoxDecoration(
+        color: LumiTokens.tintGreen,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: LumiTokens.green),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: LumiType.caption.copyWith(
+              color: LumiTokens.ink,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Relationship picker dialog. Owns its own [TextEditingController] so it is
-/// disposed when the dialog leaves the tree (after the exit animation) — not
-/// synchronously when `showDialog` returns, which used the controller after
-/// dispose during the close transition.
+/// disposed when the dialog leaves the tree (after the exit animation).
 class _RelationshipPicker extends StatefulWidget {
   const _RelationshipPicker({required this.initialLabel});
 
@@ -1334,13 +955,13 @@ class _RelationshipPickerState extends State<_RelationshipPicker> {
 
   @override
   Widget build(BuildContext context) {
-    final options = [
-      ...GuardianRelationship.presets,
-      GuardianRelationship.other,
-    ];
+    final options = [...GuardianRelationship.presets, GuardianRelationship.other];
     return AlertDialog(
-      shape: LumiBorders.shapeLarge,
-      title: Text('Your relationship', style: LumiTextStyles.h3()),
+      backgroundColor: LumiTokens.paper,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+      ),
+      title: Text('Your relationship', style: LumiType.subhead),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1353,18 +974,34 @@ class _RelationshipPickerState extends State<_RelationshipPicker> {
                 ChoiceChip(
                   label: Text(option),
                   selected: _choice == option,
-                  selectedColor: AppColors.rosePink.withValues(alpha: 0.2),
+                  selectedColor: LumiTokens.tintGreen,
                   onSelected: (_) => setState(() => _choice = option),
                 ),
             ],
           ),
           if (_choice == GuardianRelationship.other) ...[
-            LumiGap.s,
+            const SizedBox(height: LumiTokens.space3),
             TextField(
               controller: _otherController,
               autofocus: true,
-              decoration: const InputDecoration(
+              style: LumiType.body,
+              decoration: InputDecoration(
                 hintText: 'e.g. Aunt, Foster carer',
+                hintStyle: LumiType.body.copyWith(color: LumiTokens.muted),
+                filled: true,
+                fillColor: LumiTokens.cream,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: LumiTokens.space3,
+                  vertical: LumiTokens.space3,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+                  borderSide: const BorderSide(color: LumiTokens.rule),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+                  borderSide: const BorderSide(color: LumiTokens.green, width: 2),
+                ),
               ),
               onChanged: (_) => setState(() {}),
             ),
@@ -1372,15 +1009,18 @@ class _RelationshipPickerState extends State<_RelationshipPicker> {
         ],
       ),
       actions: [
-        LumiTextButton(
+        TextButton(
           onPressed: () => Navigator.pop(context),
-          text: 'Cancel',
+          child: Text('Cancel',
+              style: LumiType.body.copyWith(color: LumiTokens.muted)),
         ),
-        LumiTextButton(
+        TextButton(
           onPressed: _resolveLabel() == null
               ? null
               : () => Navigator.pop(context, _resolveLabel()),
-          text: 'Save',
+          child: Text('Save',
+              style: LumiType.body.copyWith(
+                  color: LumiTokens.green, fontWeight: FontWeight.w700)),
         ),
       ],
     );
