@@ -12,7 +12,14 @@ import FirebaseAuth
     if let controller = window?.rootViewController as? FlutterViewController {
       if #available(iOS 13.0, *) {
         SinglePageDocumentScanner.register(with: controller)
+        NSLog("[CoverScanner] SinglePageDocumentScanner registered on controller=%@",
+              String(describing: type(of: controller)))
+      } else {
+        NSLog("[CoverScanner] skipping native scanner registration (iOS < 13)")
       }
+    } else {
+      NSLog("[CoverScanner] SKIPPED registration: window.rootViewController is not a FlutterViewController (got %@)",
+            String(describing: window?.rootViewController))
     }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
