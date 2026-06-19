@@ -201,14 +201,11 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                               section: LumiSectionTheme.home,
                               child: _buildHomeView(activeChild, children),
                             ),
-                            // Library + Settings tabs are still legacy screens
-                            // whose scroll views don't honour a bottom inset, so
-                            // reserve clearance below them until they're migrated
-                            // and can scroll behind the glass like Home does.
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                bottom: _kNavBarClearance,
-                              ),
+                            // Library section (yellow). Its scroll views add
+                            // their own bottom clearance so it scrolls behind
+                            // the floating glass nav, just like Home.
+                            LumiSectionScope(
+                              section: LumiSectionTheme.library,
                               child: ReadingHistoryScreen(
                                 // Re-key on the active child so a switch rebuilds
                                 // the Bookshelf with fresh state, not stale data.
