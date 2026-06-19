@@ -45,6 +45,8 @@ class OfflineManagementScreen extends ConsumerWidget {
             LumiGap.s,
             const _SyncHistoryCard(),
             LumiGap.s,
+            _TroubleshootingCard(),
+            LumiGap.s,
             _CacheCard(),
             LumiGap.s,
             LumiCard(
@@ -242,6 +244,83 @@ class _PendingCard extends ConsumerWidget {
     if (delta.inHours < 1) return '${delta.inMinutes}m ago';
     if (delta.inDays < 1) return '${delta.inHours}h ago';
     return DateFormat('MMM dd').format(t);
+  }
+}
+
+/// Safe "out-of-date data?" reset. Unlike [_CacheCard], this drops only the
+/// local mirror of cloud data and keeps the pending-sync queue + drafts, then
+/// kicks off a fresh download.
+class _TroubleshootingCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return LumiCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.cleaning_services_outlined,
+                  color: AppColors.rosePink),
+              LumiGap.horizontalXS,
+              Text('Troubleshooting', style: LumiTextStyles.h3()),
+            ],
+          ),
+          LumiGap.xs,
+          Text(
+            'Seeing out-of-date information? Clear the locally stored copy so '
+            'the app re-downloads it fresh from the cloud. Anything still '
+            'waiting to sync is kept and will upload as normal.',
+            style: LumiTextStyles.bodySmall(
+              color: AppColors.charcoal.withValues(alpha: 0.7),
+            ),
+          ),
+          LumiGap.s,
+          SizedBox(
+            width: double.infinity,
+            child: LumiSecondaryButton(
+              onPressed: () => _confirmClearCache(context),
+              text: 'Clear cached data',
+              icon: Icons.cleaning_services_outlined,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmClearCache(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: LumiBorders.shapeLarge,
+        title: Text('Clear cached data?', style: LumiTextStyles.h3()),
+        content: Text(
+          'This removes the local copy of your reading data and re-downloads '
+          'it from the cloud. Any changes waiting to sync are kept and will '
+          'still upload.',
+          style: LumiTextStyles.body(),
+        ),
+        actions: [
+          LumiTextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            text: 'Cancel',
+          ),
+          LumiTextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            text: 'Clear',
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    await OfflineService.instance.clearCachedData();
+    await OfflineService.instance.triggerSync();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Cached data cleared — re-downloading from the cloud.'),
+      ),
+    );
   }
 }
 
