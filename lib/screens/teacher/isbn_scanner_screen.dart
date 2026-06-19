@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/teacher_constants.dart';
+import '../../theme/lumi_tokens.dart';
+import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/persistent_cached_image.dart';
 import '../../data/models/book_model.dart';
 import '../../data/models/class_model.dart';
@@ -52,6 +54,9 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
   int _totalAssignedBooks = 0;
   late String _sessionId;
 
+  // Bumped each time a scan is accepted — drives the reticle flash + haptic.
+  int _scanFlashTick = 0;
+
   // --- Batch queue state ---
   late final List<StudentModel> _queue;
   int _currentQueueIndex = 0;
@@ -90,7 +95,7 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
         : _weekStart == nextWeekStart
             ? 'Next week'
             : null;
-    final range = '${fmt.format(_weekStart)}\u2013${fmt.format(_weekEnd)}';
+    final range = '${fmt.format(_weekStart)}–${fmt.format(_weekEnd)}';
     return prefix != null ? '$prefix ($range)' : range;
   }
 
@@ -146,6 +151,14 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
     } catch (_) {
       // Non-critical — badge just won't show
     }
+  }
+
+  Future<void> _retryCamera() async {
+    await Permission.camera.request();
+    try {
+      await _scannerController.start();
+    } catch (_) {}
+    if (mounted) setState(() {});
   }
 
   // ---- Barcode detection & interactive assignment ----
@@ -281,7 +294,10 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
 
       final isNew = result.newlyAssignedBooks.isNotEmpty;
       if (!mounted) return;
+      // Confirm the scan landed with a haptic tick + reticle flash.
+      if (isNew) HapticFeedback.mediumImpact();
       setState(() {
+        if (isNew) _scanFlashTick++;
         _statusMessage = isNew
             ? 'Assigned "${book.title}" for this week.'
             : 'Already assigned this week.';
@@ -306,7 +322,7 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
       builder: (sheetContext) {
         return Container(
           decoration: const BoxDecoration(
-            color: AppColors.white,
+            color: LumiTokens.paper,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
@@ -319,7 +335,7 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppColors.textSecondary.withValues(alpha: 0.3),
+                    color: LumiTokens.rule,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -330,29 +346,27 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: AppColors.warmOrange.withValues(alpha: 0.12),
+                  color: LumiTokens.orange.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.search_off_rounded,
-                  color: AppColors.warmOrange,
+                  color: LumiTokens.orange,
                   size: 24,
                 ),
               ),
               const SizedBox(height: 16),
-              Text('Book Not Found', style: TeacherTypography.h3),
+              Text('Book not found', style: LumiType.subhead),
               const SizedBox(height: 8),
               Text(
                 'ISBN $isbn wasn\'t found in any book database.',
-                style: TeacherTypography.bodySmall
-                    .copyWith(color: AppColors.textSecondary),
+                style: LumiType.caption,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 4),
               Text(
                 'You can add it to the Lumi community library by taking a photo of the front cover.',
-                style: TeacherTypography.bodySmall
-                    .copyWith(color: AppColors.textSecondary),
+                style: LumiType.caption,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
@@ -362,17 +376,16 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
                 child: FilledButton.icon(
                   onPressed: () => Navigator.pop(sheetContext, 'add'),
                   icon: const Icon(Icons.add_a_photo_outlined, size: 18),
-                  label: const Text('Add Book'),
+                  label: const Text('Add book'),
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.teacherPrimary,
+                    backgroundColor: LumiTokens.green,
+                    foregroundColor: LumiTokens.paper,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius:
-                          BorderRadius.circular(TeacherDimensions.radiusM),
+                          BorderRadius.circular(LumiTokens.radiusMedium),
                     ),
-                    textStyle: TeacherTypography.bodyMedium.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                    textStyle: LumiType.button,
                   ),
                 ),
               ),
@@ -386,16 +399,13 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius:
-                          BorderRadius.circular(TeacherDimensions.radiusM),
+                          BorderRadius.circular(LumiTokens.radiusMedium),
                     ),
-                    side: const BorderSide(color: AppColors.teacherBorder),
+                    side: const BorderSide(color: LumiTokens.rule),
                   ),
                   child: Text(
-                    'Discard This Scan',
-                    style: TeacherTypography.bodyMedium.copyWith(
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    'Discard this scan',
+                    style: LumiType.button.copyWith(color: LumiTokens.muted),
                   ),
                 ),
               ),
@@ -564,12 +574,9 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
         foregroundColor: Colors.white,
         title: Text(
           _isBatchMode
-              ? 'Scan ISBN \u2022 $studentName (${_currentQueueIndex + 1}/${_queue.length})'
-              : 'Scan ISBN \u2022 ${_currentStudent.fullName}',
-          style: TeacherTypography.bodyLarge.copyWith(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
-          ),
+              ? 'Scan ISBN • $studentName (${_currentQueueIndex + 1}/${_queue.length})'
+              : 'Scan ISBN • ${_currentStudent.fullName}',
+          style: LumiType.subhead.copyWith(color: Colors.white),
         ),
         actions: [
           IconButton(
@@ -622,7 +629,7 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
               value: (_currentQueueIndex + 1) / _queue.length,
               backgroundColor: Colors.white12,
               valueColor:
-                  const AlwaysStoppedAnimation<Color>(AppColors.teacherPrimary),
+                  const AlwaysStoppedAnimation<Color>(LumiTokens.green),
               minHeight: 3,
             ),
 
@@ -638,47 +645,28 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
                 MobileScanner(
                   controller: _scannerController,
                   onDetect: _onDetect,
-                  errorBuilder: (context, error) {
-                    return ColoredBox(
-                      color: Colors.black,
-                      child: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(
-                            'Camera unavailable. Please enable camera permissions.',
-                            style: TeacherTypography.bodyMedium.copyWith(
-                              color: Colors.white,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
+                  errorBuilder: (context, error) => _buildCameraError(),
                 ),
-                Center(
-                  child: Container(
-                    width: 260,
-                    height: 180,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: AppColors.teacherPrimaryLight,
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                ),
+                Center(child: _ReticleOverlay(flashTick: _scanFlashTick)),
                 Positioned(
                   left: 16,
                   right: 16,
                   bottom: 18,
-                  child: Text(
-                    'Point camera at ISBN/EAN barcodes. Multiple in one frame are supported.',
-                    style: TeacherTypography.bodySmall.copyWith(
-                      color: Colors.white.withValues(alpha: 0.9),
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.55),
+                        borderRadius:
+                            BorderRadius.circular(LumiTokens.radiusPill),
+                      ),
+                      child: Text(
+                        'Point at ISBN/EAN barcodes — scan several in one frame.',
+                        style: LumiType.caption.copyWith(color: Colors.white),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
-                    textAlign: TextAlign.center,
                   ),
                 ),
               ],
@@ -691,8 +679,8 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
             child: Container(
               width: double.infinity,
               decoration: const BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                color: LumiTokens.cream,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -702,19 +690,19 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
                     child: Row(
                       children: [
                         _InfoChip(
-                          icon: Icons.qr_code,
+                          icon: Icons.qr_code_rounded,
                           label: '${_sessionBooks.length} scanned',
                         ),
                         const SizedBox(width: 8),
                         if (_isBatchMode)
                           _InfoChip(
-                            icon: Icons.people,
+                            icon: Icons.people_alt_rounded,
                             label:
                                 '$_completedStudentCount/${_queue.length} students',
                           )
                         else
                           _InfoChip(
-                            icon: Icons.menu_book,
+                            icon: Icons.menu_book_rounded,
                             label: '$_totalAssignedBooks total this week',
                           ),
                         const Spacer(),
@@ -722,7 +710,11 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
                           const SizedBox(
                             width: 16,
                             height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(LumiTokens.green),
+                            ),
                           ),
                       ],
                     ),
@@ -732,9 +724,7 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
                         _statusMessage!,
-                        style: TeacherTypography.bodySmall.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
+                        style: LumiType.caption,
                       ),
                     ),
                   const SizedBox(height: 8),
@@ -743,9 +733,8 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
                         ? Center(
                             child: Text(
                               'No ISBN scanned yet',
-                              style: TeacherTypography.bodyMedium.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
+                              style: LumiType.body
+                                  .copyWith(color: LumiTokens.muted),
                             ),
                           )
                         : ListView.builder(
@@ -766,6 +755,60 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
     );
   }
 
+  Widget _buildCameraError() {
+    return ColoredBox(
+      color: Colors.black,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.no_photography_rounded,
+                  color: Colors.white70, size: 40),
+              const SizedBox(height: 16),
+              Text(
+                'Camera unavailable',
+                style: LumiType.subhead.copyWith(color: Colors.white),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Enable camera access for Lumi to scan book barcodes.',
+                style: LumiType.body.copyWith(color: Colors.white70),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: openAppSettings,
+                icon: const Icon(Icons.settings_outlined, size: 18),
+                label: const Text('Open settings'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: LumiTokens.green,
+                  foregroundColor: LumiTokens.paper,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 22, vertical: 13),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+                  ),
+                  textStyle: LumiType.button,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: _retryCamera,
+                child: Text(
+                  'Retry',
+                  style: LumiType.button.copyWith(color: Colors.white70),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildWeekSelector() {
     return Container(
       color: Colors.white.withValues(alpha: 0.08),
@@ -781,7 +824,7 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
           ),
           Text(
             _weekLabel,
-            style: TeacherTypography.bodySmall.copyWith(
+            style: LumiType.caption.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.w600,
             ),
@@ -804,9 +847,10 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: TeacherDimensions.cardShadow,
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+        border: Border.all(color: LumiTokens.rule),
+        boxShadow: LumiTokens.shadowCard,
       ),
       child: Row(
         children: [
@@ -824,8 +868,8 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
                       ? Icons.check_circle
                       : Icons.info_outline,
                   color: book.resolvedFromCatalog
-                      ? Colors.green
-                      : AppColors.warmOrange,
+                      ? LumiTokens.green
+                      : LumiTokens.orange,
                   size: 18,
                 ),
               ),
@@ -836,8 +880,8 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
                   ? Icons.check_circle
                   : Icons.info_outline,
               color: book.resolvedFromCatalog
-                  ? Colors.green
-                  : AppColors.warmOrange,
+                  ? LumiTokens.green
+                  : LumiTokens.orange,
               size: 18,
             ),
           const SizedBox(width: 10),
@@ -847,7 +891,8 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
               children: [
                 Text(
                   book.title,
-                  style: TeacherTypography.bodyMedium.copyWith(
+                  style: LumiType.body.copyWith(
+                    color: LumiTokens.ink,
                     fontWeight: FontWeight.w600,
                   ),
                   maxLines: 1,
@@ -857,9 +902,7 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
                   const SizedBox(height: 2),
                   Text(
                     book.author!,
-                    style: TeacherTypography.caption.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+                    style: LumiType.caption,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -867,25 +910,21 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
                 const SizedBox(height: 2),
                 Row(
                   children: [
-                    Text(
-                      'ISBN ${book.isbn}',
-                      style: TeacherTypography.caption,
-                    ),
+                    Text('ISBN ${book.isbn}', style: LumiType.caption),
                     if (studentCount > 1) ...[
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 1),
                         decoration: BoxDecoration(
-                          color: AppColors.teacherPrimaryLight
-                              .withValues(alpha: 0.3),
+                          color: LumiTokens.green.withValues(alpha: 0.12),
                           borderRadius:
-                              BorderRadius.circular(TeacherDimensions.radiusS),
+                              BorderRadius.circular(LumiTokens.radiusSmall),
                         ),
                         child: Text(
                           '$studentCount students',
-                          style: TeacherTypography.caption.copyWith(
-                            color: AppColors.teacherPrimary,
+                          style: LumiType.caption.copyWith(
+                            color: LumiTokens.green,
                             fontWeight: FontWeight.w700,
                             fontSize: 10,
                           ),
@@ -917,18 +956,19 @@ class _InfoChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(20),
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+        border: Border.all(color: LumiTokens.rule),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: AppColors.teacherPrimary),
+          Icon(icon, size: 14, color: LumiTokens.green),
           const SizedBox(width: 6),
           Text(
             label,
-            style: TeacherTypography.caption.copyWith(
-              color: AppColors.charcoal,
+            style: LumiType.caption.copyWith(
+              color: LumiTokens.ink,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -936,6 +976,88 @@ class _InfoChip extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Scan reticle — green corner brackets that flash brighter on each accepted
+/// scan (driven by [flashTick]).
+class _ReticleOverlay extends StatelessWidget {
+  const _ReticleOverlay({required this.flashTick});
+
+  final int flashTick;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(flashTick),
+      tween: Tween<double>(begin: flashTick == 0 ? 0.0 : 1.0, end: 0.0),
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeOut,
+      builder: (context, flash, _) {
+        return SizedBox(
+          width: 260,
+          height: 180,
+          child: CustomPaint(painter: _ReticlePainter(flash: flash)),
+        );
+      },
+    );
+  }
+}
+
+class _ReticlePainter extends CustomPainter {
+  _ReticlePainter({required this.flash});
+
+  /// 0 = resting, 1 = just scanned.
+  final double flash;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const armLength = 28.0;
+    final rect = Offset.zero & size;
+    final color = Color.lerp(
+      LumiTokens.green.withValues(alpha: 0.9),
+      LumiTokens.paper,
+      flash,
+    )!;
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 3 + flash * 1.5
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+
+    _corner(canvas, paint, rect.topLeft, 1, 1, armLength);
+    _corner(canvas, paint, rect.topRight, -1, 1, armLength);
+    _corner(canvas, paint, rect.bottomLeft, 1, -1, armLength);
+    _corner(canvas, paint, rect.bottomRight, -1, -1, armLength);
+
+    if (flash > 0) {
+      final fill = Paint()
+        ..color = LumiTokens.green.withValues(alpha: 0.12 * flash);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, const Radius.circular(14)),
+        fill,
+      );
+    }
+  }
+
+  void _corner(
+    Canvas canvas,
+    Paint paint,
+    Offset corner,
+    int dx,
+    int dy,
+    double len,
+  ) {
+    final path = Path()
+      ..moveTo(corner.dx + dx * len, corner.dy)
+      ..lineTo(corner.dx, corner.dy)
+      ..lineTo(corner.dx, corner.dy + dy * len);
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_ReticlePainter oldDelegate) =>
+      oldDelegate.flash != flash;
 }
 
 class _PreviouslyReadWarningSheet extends StatelessWidget {
@@ -953,7 +1075,7 @@ class _PreviouslyReadWarningSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: AppColors.white,
+        color: LumiTokens.paper,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
@@ -966,7 +1088,7 @@ class _PreviouslyReadWarningSheet extends StatelessWidget {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.textSecondary.withValues(alpha: 0.3),
+                color: LumiTokens.rule,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -977,26 +1099,25 @@ class _PreviouslyReadWarningSheet extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF8E1),
+              color: LumiTokens.orange.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: const Icon(
               Icons.history_edu_rounded,
-              color: Color(0xFFFFA000),
+              color: LumiTokens.orange,
               size: 24,
             ),
           ),
           const SizedBox(height: 16),
           Text(
             '$studentName has read this before',
-            style: TeacherTypography.h3,
+            style: LumiType.subhead,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
             '"$bookTitle" may already be in $studentName\'s reading history.',
-            style: TeacherTypography.bodySmall
-                .copyWith(color: AppColors.textSecondary),
+            style: LumiType.caption,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
@@ -1005,16 +1126,15 @@ class _PreviouslyReadWarningSheet extends StatelessWidget {
             child: FilledButton(
               onPressed: () => Navigator.pop(context, true),
               style: FilledButton.styleFrom(
-                backgroundColor: AppColors.teacherPrimary,
+                backgroundColor: LumiTokens.green,
+                foregroundColor: LumiTokens.paper,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(TeacherDimensions.radiusM),
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
                 ),
-                textStyle: TeacherTypography.bodyMedium
-                    .copyWith(fontWeight: FontWeight.w700),
+                textStyle: LumiType.button,
               ),
-              child: const Text('Assign Anyway'),
+              child: const Text('Assign anyway'),
             ),
           ),
           const SizedBox(height: 10),
@@ -1024,22 +1144,14 @@ class _PreviouslyReadWarningSheet extends StatelessWidget {
               onPressed: () => Navigator.pop(context, false),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                side: BorderSide(
-                  color: AppColors.textSecondary.withValues(alpha: 0.4),
-                ),
+                side: const BorderSide(color: LumiTokens.rule),
                 shape: RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(TeacherDimensions.radiusM),
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
                 ),
-                textStyle: TeacherTypography.bodyMedium
-                    .copyWith(fontWeight: FontWeight.w600),
               ),
               child: Text(
-                'Skip Book',
-                style: TeacherTypography.bodyMedium.copyWith(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w600,
-                ),
+                'Skip book',
+                style: LumiType.button.copyWith(color: LumiTokens.muted),
               ),
             ),
           ),

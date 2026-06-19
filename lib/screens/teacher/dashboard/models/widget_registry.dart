@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import '../widgets/dashboard_achievement_spotlight_card.dart';
 import '../widgets/dashboard_engagement_card.dart';
 import '../widgets/dashboard_group_comparison_card.dart';
+import '../widgets/dashboard_reading_calendar_card.dart';
 import '../widgets/dashboard_reading_sentiment_card.dart';
 import '../widgets/dashboard_recent_reading_card.dart';
 import '../widgets/dashboard_top_readers_card.dart';
+import '../widgets/dashboard_unread_comments_card.dart';
 import '../widgets/dashboard_weekly_chart.dart';
 import '../widgets/dashboard_priority_nudges.dart';
 import 'dashboard_widget_context.dart';
@@ -133,6 +135,30 @@ class DashboardWidgetRegistry {
       dataDependencies: {WidgetDataDependency.students},
       builder: (ctx) => DashboardAchievementSpotlightCard(
         recentAchievements: ctx.recentAchievements,
+      ),
+    ),
+    'unread_comments': DashboardWidgetDefinition(
+      id: 'unread_comments',
+      displayName: 'Parent Comments',
+      description: 'Unread replies from parents awaiting you',
+      icon: Icons.mark_chat_unread_rounded,
+      dataDependencies: {WidgetDataDependency.students},
+      builder: (ctx) => DashboardUnreadCommentsCard(
+        classModel: ctx.classModel,
+        schoolId: ctx.schoolId,
+        students: ctx.students,
+      ),
+    ),
+    'reading_calendar': DashboardWidgetDefinition(
+      id: 'reading_calendar',
+      displayName: 'Reading Calendar',
+      description: 'Heatmap of daily reading over the last 12 weeks',
+      icon: Icons.calendar_month_rounded,
+      dataDependencies: {WidgetDataDependency.students},
+      builder: (ctx) => DashboardReadingCalendarCard(
+        classModel: ctx.classModel,
+        schoolId: ctx.schoolId,
+        students: ctx.students,
       ),
     ),
     'group_comparison': DashboardWidgetDefinition(

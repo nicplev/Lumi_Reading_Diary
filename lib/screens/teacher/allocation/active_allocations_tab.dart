@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/teacher_constants.dart';
+import '../../../theme/lumi_tokens.dart';
+import '../../../theme/lumi_typography.dart';
 import '../../../core/widgets/lumi/lumi_card.dart';
 import '../../../data/models/user_model.dart';
 import '../../../data/models/class_model.dart';
@@ -73,27 +73,25 @@ class _ActiveAllocationsTabState extends State<ActiveAllocationsTab> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: LumiTokens.paper,
         shape: RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.circular(TeacherDimensions.radiusXL),
+          borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
         ),
-        title: Text('Delete Allocation', style: TeacherTypography.h3),
+        title: Text('Delete Allocation', style: LumiType.subhead),
         content: Text(
           'Are you sure you want to delete this allocation? This cannot be undone.',
-          style: TeacherTypography.bodyMedium,
+          style: LumiType.body.copyWith(color: LumiTokens.ink),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text('Cancel',
-                style: TeacherTypography.bodyMedium
-                    .copyWith(color: AppColors.textSecondary)),
+                style: LumiType.button.copyWith(color: LumiTokens.muted)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: Text('Delete',
-                style: TeacherTypography.bodyMedium
-                    .copyWith(color: AppColors.error)),
+                style: LumiType.button.copyWith(color: LumiTokens.red)),
           ),
         ],
       ),
@@ -117,7 +115,7 @@ class _ActiveAllocationsTabState extends State<ActiveAllocationsTab> {
           icon: Icons.class_,
           title: 'No class selected',
           message: 'Please select a class from the dashboard.',
-          accentColor: AppColors.teacherPrimary,
+          accentColor: LumiTokens.green,
         ),
       );
     }
@@ -138,15 +136,14 @@ class _ActiveAllocationsTabState extends State<ActiveAllocationsTab> {
               icon: Icons.error_outline,
               title: 'Error loading allocations',
               message: snapshot.error.toString(),
-              accentColor: AppColors.error,
+              accentColor: LumiTokens.red,
             ),
           );
         }
 
         if (!snapshot.hasData) {
           return const Center(
-            child: CircularProgressIndicator(
-                color: AppColors.teacherPrimary),
+            child: CircularProgressIndicator(color: LumiTokens.green),
           );
         }
 
@@ -163,7 +160,7 @@ class _ActiveAllocationsTabState extends State<ActiveAllocationsTab> {
               title: 'No active allocations',
               message:
                   'Create a new allocation to assign reading to your students.',
-              accentColor: AppColors.teacherPrimary,
+              accentColor: LumiTokens.green,
             ),
           );
         }

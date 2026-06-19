@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/teacher_constants.dart';
+import '../../../theme/lumi_tokens.dart';
+import '../../../theme/lumi_typography.dart';
 import '../../../core/widgets/lumi/lumi_input.dart';
 import '../../../core/widgets/lumi/lumi_buttons.dart';
 import '../../../data/models/book_model.dart';
 import '../../../services/school_library_service.dart';
+import 'widgets/allocation_form_common.dart';
 
 /// Bottom sheet that lets teachers browse the school library and select
 /// multiple books for an allocation. Stays open until the teacher taps "Done".
@@ -104,30 +105,20 @@ class _LibraryPickerSheetState extends State<LibraryPickerSheet> {
       builder: (context, scrollController) {
         return Container(
           decoration: const BoxDecoration(
-            color: AppColors.white,
-            borderRadius:
-                BorderRadius.vertical(top: Radius.circular(TeacherDimensions.radiusXL)),
+            color: LumiTokens.paper,
+            borderRadius: BorderRadius.vertical(
+                top: Radius.circular(LumiTokens.radiusXL)),
           ),
           child: Column(
             children: [
-              // Handle
-              Center(
-                child: Container(
-                  margin: const EdgeInsets.only(top: 10, bottom: 8),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.textSecondary.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
+              const SizedBox(height: 10),
+              const Center(child: AllocationSheetGrabber()),
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Browse School Library', style: TeacherTypography.h2),
+                    Text('Browse School Library', style: LumiType.subhead),
                     const SizedBox(height: 10),
                     LumiSearchInput(
                       controller: _searchController,
@@ -137,22 +128,21 @@ class _LibraryPickerSheetState extends State<LibraryPickerSheet> {
                   ],
                 ),
               ),
-              const Divider(height: 1),
+              const Divider(height: 1, color: LumiTokens.rule),
               Expanded(
                 child: Builder(
                   builder: (context) {
                     if (_loading) {
                       return const Center(
                         child: CircularProgressIndicator(
-                            color: AppColors.teacherPrimary),
+                            color: LumiTokens.green),
                       );
                     }
                     if (_loadError != null && _books.isEmpty) {
                       return Center(
                         child: Text(
                           'Could not load the library. Please try again.',
-                          style: TeacherTypography.bodyMedium
-                              .copyWith(color: AppColors.textSecondary),
+                          style: LumiType.body.copyWith(color: LumiTokens.muted),
                           textAlign: TextAlign.center,
                         ),
                       );
@@ -168,8 +158,7 @@ class _LibraryPickerSheetState extends State<LibraryPickerSheet> {
                           _query.isEmpty
                               ? 'No books in library yet.\nScan ISBNs to add books.'
                               : 'No books match "$_query".',
-                          style: TeacherTypography.bodyMedium
-                              .copyWith(color: AppColors.textSecondary),
+                          style: LumiType.body.copyWith(color: LumiTokens.muted),
                           textAlign: TextAlign.center,
                         ),
                       );
@@ -179,7 +168,8 @@ class _LibraryPickerSheetState extends State<LibraryPickerSheet> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 8),
                       itemCount: books.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      separatorBuilder: (_, __) =>
+                          const Divider(height: 1, color: LumiTokens.rule),
                       itemBuilder: (context, i) {
                         final book = books[i];
                         final wasAlreadyAdded =
@@ -210,7 +200,8 @@ class _LibraryPickerSheetState extends State<LibraryPickerSheet> {
                           ),
                           title: Text(
                             book.title,
-                            style: TeacherTypography.bodyMedium.copyWith(
+                            style: LumiType.body.copyWith(
+                              color: LumiTokens.ink,
                               fontWeight: FontWeight.w600,
                             ),
                             maxLines: 1,
@@ -219,8 +210,7 @@ class _LibraryPickerSheetState extends State<LibraryPickerSheet> {
                           subtitle: book.author?.isNotEmpty == true
                               ? Text(
                                   book.author!,
-                                  style: TeacherTypography.caption
-                                      .copyWith(color: AppColors.textSecondary),
+                                  style: LumiType.caption,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 )
@@ -229,13 +219,13 @@ class _LibraryPickerSheetState extends State<LibraryPickerSheet> {
                               ? Icon(
                                   Icons.check_circle,
                                   color: wasAlreadyAdded
-                                      ? AppColors.textSecondary
-                                      : AppColors.teacherPrimary,
+                                      ? LumiTokens.muted
+                                      : LumiTokens.green,
                                   size: 22,
                                 )
-                              : Icon(
+                              : const Icon(
                                   Icons.add_circle_outline,
-                                  color: AppColors.teacherPrimary,
+                                  color: LumiTokens.green,
                                   size: 22,
                                 ),
                         );
@@ -248,11 +238,9 @@ class _LibraryPickerSheetState extends State<LibraryPickerSheet> {
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppColors.white,
-                  border: Border(
-                    top: BorderSide(color: AppColors.teacherBorder),
-                  ),
+                decoration: const BoxDecoration(
+                  color: LumiTokens.paper,
+                  border: Border(top: BorderSide(color: LumiTokens.rule)),
                 ),
                 child: SafeArea(
                   top: false,
@@ -262,7 +250,7 @@ class _LibraryPickerSheetState extends State<LibraryPickerSheet> {
                         ? 'Done'
                         : 'Done (${_sessionSelected.length} selected)',
                     isFullWidth: true,
-                    color: AppColors.teacherPrimary,
+                    color: LumiTokens.green,
                   ),
                 ),
               ),
@@ -276,7 +264,7 @@ class _LibraryPickerSheetState extends State<LibraryPickerSheet> {
   Widget _bookIcon(BookModel book) {
     final color = SchoolLibraryService.isDecodable(book)
         ? Color(SchoolLibraryService.stageColor(book.readingLevel ?? ''))
-        : AppColors.libraryGreen;
+        : LumiTokens.green;
     return Container(
       color: color.withValues(alpha: 0.15),
       child: Icon(Icons.menu_book, color: color, size: 18),

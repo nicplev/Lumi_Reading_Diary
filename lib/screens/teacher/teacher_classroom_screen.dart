@@ -274,20 +274,40 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     ).isBefore(_startOfWeek());
   }
 
-  String _lastActivityLabel(StudentModel student) {
+  /// Days since the student last read, or null if they never have.
+  int? _daysSinceLastRead(StudentModel student) {
     final lastRead = student.stats?.lastReadingDate;
-    if (lastRead == null) return 'No reading yet';
-
+    if (lastRead == null) return null;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final yesterday = today.subtract(const Duration(days: 1));
     final lastDay = DateTime(lastRead.year, lastRead.month, lastRead.day);
+    return today.difference(lastDay).inDays;
+  }
 
-    if (lastDay.isAtSameMomentAs(today)) return 'Read today';
-    if (lastDay.isAtSameMomentAs(yesterday)) return 'Read yesterday';
-    if (_hasReadThisWeek(student.stats)) return 'Active this week';
+  String _lastActivityLabel(StudentModel student) {
+    final days = _daysSinceLastRead(student);
+    if (days == null) return 'No reading logged';
+    if (days <= 0) return 'Read today';
+    if (days == 1) return 'Read yesterday';
+    return 'Last read $days days ago';
+  }
 
-    return 'No reading this week';
+  /// Reading-status colour for the row's left bar: green (recent) → amber
+  /// (becoming stale) → red (overdue) → grey (no data).
+  Color _recencyColor(StudentModel student) {
+    final days = _daysSinceLastRead(student);
+    if (days == null) return LumiTokens.muted.withValues(alpha: 0.45);
+    if (days <= 1) return LumiTokens.green;
+    if (days <= 4) return LumiTokens.yellow;
+    return LumiTokens.red.withValues(alpha: 0.8);
+  }
+
+  /// The student's first reading group, or null if ungrouped.
+  ReadingGroupModel? _studentGroup(StudentModel student) {
+    for (final g in _groups) {
+      if (g.studentIds.contains(student.id)) return g;
+    }
+    return null;
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> _studentsStream(
@@ -487,14 +507,13 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                 Positioned(
                   right: 16,
                   bottom: MediaQuery.viewPaddingOf(context).bottom + 84,
-                  child: FloatingActionButton(
+                  child: FloatingActionButton.extended(
                     onPressed: () => _showStudentScannerPicker(selectedClass),
                     backgroundColor: LumiTokens.green,
+                    foregroundColor: LumiTokens.paper,
                     elevation: 4,
-                    child: const Icon(
-                      Icons.qr_code_scanner_rounded,
-                      color: LumiTokens.paper,
-                    ),
+                    icon: const Icon(Icons.qr_code_scanner_rounded),
+                    label: Text('Scan', style: LumiType.button),
                   ),
                 ),
               ],
@@ -568,7 +587,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                         size: 14, color: LumiTokens.green),
                     const SizedBox(width: 5),
                     Text(
-                      'Allocate',
+                      'Assign books',
                       style: LumiType.caption.copyWith(
                         color: LumiTokens.green,
                         fontWeight: FontWeight.w700,
@@ -647,32 +666,40 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
       children: [
         Text(
           'Students',
-          style: LumiType.subhead.copyWith(
-            letterSpacing: 0.3,
-            color: LumiTokens.muted,
-          ),
+          style: LumiType.subhead.copyWith(letterSpacing: 0.3),
         ),
         const Spacer(),
-        // Sort button
+        // Sort button — a bordered pill so it clearly reads as tappable.
         GestureDetector(
           key: const ValueKey('classroom_sort_button'),
           onTap: () {
             FocusScope.of(context).unfocus();
             _showSortByBottomSheet(context);
           },
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.swap_vert_rounded,
-                  size: 16, color: LumiTokens.muted),
-              const SizedBox(width: 4),
-              Text(
-                _sortChipLabel(),
-                style: LumiType.caption.copyWith(
-                  color: LumiTokens.muted,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+              border: Border.all(color: LumiTokens.rule),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.swap_vert_rounded,
+                    size: 14, color: LumiTokens.muted),
+                const SizedBox(width: 4),
+                Text(
+                  _sortChipLabel(),
+                  style: LumiType.caption.copyWith(
+                    color: LumiTokens.ink,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 2),
+                Icon(Icons.keyboard_arrow_down_rounded,
+                    size: 16, color: LumiTokens.muted),
+              ],
+            ),
           ),
         ),
       ],
@@ -995,12 +1022,21 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
       _StudentBookAssignmentState.unknown => 'Assignment status unavailable',
     };
 
-    // Build single-line meta: "Level 3 · Read yesterday"
+    // Build single-line meta: "Read yesterday · Test 1"
     final metaParts = <String>[];
     if (_levelsEnabled) {
       metaParts.add(_readingLevelLabel(student));
     }
     metaParts.add(activityLabel);
+
+    // Group (with its colour dot) shown when viewing all groups — redundant
+    // once a group filter is active.
+    final showGroup = _groups.isNotEmpty && _selectedGroupFilter == null;
+    final group = showGroup ? _studentGroup(student) : null;
+    final groupName = showGroup ? (group?.name ?? 'Ungrouped') : null;
+    final groupColor = group != null
+        ? (_parseGroupColor(group.color) ?? LumiTokens.muted)
+        : LumiTokens.muted.withValues(alpha: 0.5);
 
     // Next achievement goal for this student
     final stats = student.stats;
@@ -1070,11 +1106,11 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
           child: IntrinsicHeight(
             child: Row(
               children: [
-                // Section accent bar
+                // Reading-status bar (recency: green / amber / red / grey)
                 Container(
                   width: 4,
                   decoration: BoxDecoration(
-                    color: LumiTokens.green,
+                    color: _recencyColor(student),
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(12),
                       bottomLeft: Radius.circular(12),
@@ -1124,13 +1160,41 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                 ],
                               ),
                               const SizedBox(height: 3),
-                              Text(
-                                metaParts.join(' · '),
-                                style: LumiType.caption.copyWith(
-                                  color: LumiTokens.muted,
-                                  fontWeight: FontWeight.w400,
-                                ),
-                                overflow: TextOverflow.ellipsis,
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      metaParts.join(' · '),
+                                      style: LumiType.caption.copyWith(
+                                        color: LumiTokens.muted,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (showGroup) ...[
+                                    Text('  ·  ',
+                                        style: LumiType.caption.copyWith(
+                                            color: LumiTokens.muted)),
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: BoxDecoration(
+                                        color: groupColor,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(
+                                        groupName!,
+                                        style: LumiType.caption.copyWith(
+                                          color: LumiTokens.muted,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                               if (nextAchievementLabel != null) ...[
                                 const SizedBox(height: 2),
@@ -1996,7 +2060,7 @@ class _ClassroomSearchBarState extends State<_ClassroomSearchBar>
               decoration: InputDecoration(
                 hintText: 'Find a student...',
                 hintStyle: LumiType.body.copyWith(
-                  color: LumiTokens.green.withValues(alpha: 0.5),
+                  color: LumiTokens.muted,
                 ),
                 prefixIcon: Icon(
                   Icons.search_rounded,
