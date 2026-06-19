@@ -391,7 +391,8 @@ class _LogReadingScreenState extends State<LogReadingScreen>
         minutesRead: _selectedMinutes,
         bookTitles: _finalBookTitles,
         feeling: _selectedFeeling,
-        commentSelections: List<String>.from(_selectedComments),
+        commentSelections:
+            _selectedComments.take(kMaxParentCommentChips).toList(),
         freeText: _notesController.text,
         id: _logId,
         comprehensionAudioPath: storagePath,
