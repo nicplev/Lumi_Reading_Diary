@@ -6,8 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/lumi_text_styles.dart';
+import '../../theme/lumi_tokens.dart';
+import '../../theme/lumi_typography.dart';
+import '../../theme/section_theme.dart';
+import '../../core/widgets/lumi/lumi_card.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/blob_selector.dart';
 import '../../core/widgets/lumi/comment_chips.dart';
@@ -128,6 +130,16 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
       if (_totalNights < t) return t;
     }
     return ((_totalNights ~/ 100) + 1) * 100;
+  }
+
+  /// The threshold the child has already passed — the floor of the current
+  /// band, so the progress bar fills within [prev, next] rather than from 0.
+  int get _prevMilestone {
+    int prev = 0;
+    for (final t in AchievementThresholds.defaults.readingDays) {
+      if (_totalNights >= t) prev = t;
+    }
+    return prev;
   }
 
   @override
@@ -278,294 +290,190 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.white,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            // Confetti overlay
-            _ConfettiOverlay(controller: _confettiController),
+    return LumiSectionScope(
+      section: LumiSectionTheme.home,
+      child: Scaffold(
+        backgroundColor: LumiTokens.cream,
+        body: SafeArea(
+          child: Stack(
+            children: [
+              // Confetti overlay
+              _ConfettiOverlay(controller: _confettiController),
 
-            // Main content
-            Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Checkmark circle
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF4CAF50), Color(0xFF66BB6A)],
-                        ),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF4CAF50).withValues(alpha: 0.3),
-                            blurRadius: 20,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.check,
-                        color: AppColors.white,
-                        size: 40,
-                      ),
-                    )
-                        .animate()
-                        .scale(
-                          begin: const Offset(0, 0),
-                          end: const Offset(1, 1),
-                          duration: 500.ms,
-                          curve: Curves.elasticOut,
-                        )
-                        .fadeIn(duration: 300.ms),
-
-                    const SizedBox(height: 24),
-
-                    // Title
-                    Text(
-                      'Reading Logged!',
-                      style: LumiTextStyles.h1(color: AppColors.charcoal),
-                    ).animate().fadeIn(delay: 300.ms),
-
-                    const SizedBox(height: 12),
-
-                    // Night count
-                    Text(
-                      'Night $_totalNights complete',
-                      style: LumiTextStyles.bodyLarge(
-                        color: AppColors.charcoal.withValues(alpha: 0.7),
-                      ),
-                    ).animate().fadeIn(delay: 400.ms),
-
-                    const SizedBox(height: 32),
-
-                    // Streak badge
-                    if (_currentStreak > 0)
+              // Main content
+              Center(
+                child: SingleChildScrollView(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Checkmark circle — green is the universal "confirmed".
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
+                        width: 84,
+                        height: 84,
                         decoration: BoxDecoration(
-                          color: AppColors.rosePink.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: AppColors.rosePink.withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.local_fire_department, color: AppColors.rosePink, size: 28),
-                            const SizedBox(width: 8),
-                            Text(
-                              '$_currentStreak Day Streak',
-                              style: LumiTextStyles.h3(color: AppColors.rosePink),
+                          color: LumiTokens.green,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: LumiTokens.green.withValues(alpha: 0.3),
+                              blurRadius: 24,
+                              offset: const Offset(0, 8),
                             ),
                           ],
                         ),
-                      ).animate().fadeIn(delay: 600.ms).slideY(begin: 0.3),
-
-                    // Shame-free framing — a missed night is absorbed by a rest
-                    // day, so the streak simply keeps going (never "lost").
-                    if (widget.restDayApplied) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.skyBlue.withValues(alpha: 0.35),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: AppColors.skyBlue),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text('🌙', style: TextStyle(fontSize: 22)),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                'Rest day — your streak keeps going!',
-                                style: LumiTextStyles.bodyMedium(
-                                  color: AppColors.charcoal,
-                                ).copyWith(fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ).animate().fadeIn(delay: 700.ms).slideY(begin: 0.3),
-                    ],
-
-                    // Forgiving rhythm: how many of the last 30 nights — a
-                    // sliding count that never resets.
-                    if (_last30Nights > 0) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        '🌙 $_last30Nights of the last 30 nights',
-                        style: LumiTextStyles.bodySmall(
-                          color: AppColors.textSecondary,
-                        ),
-                        textAlign: TextAlign.center,
-                      ).animate().fadeIn(delay: 750.ms),
-                    ],
-
-                    const SizedBox(height: 16),
-
-                    // Badge earned notification
-                    if (_earnedBadge != null) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.softYellow.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: AppColors.softYellow,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text('🏆', style: TextStyle(fontSize: 24)),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Badge Earned: $_earnedBadge!',
-                              style: LumiTextStyles.h3(color: AppColors.charcoal),
-                            ),
-                          ],
-                        ),
+                        child: const Icon(Icons.check_rounded,
+                            color: LumiTokens.paper, size: 44),
                       )
                           .animate()
-                          .fadeIn(delay: 800.ms)
-                          .slideY(begin: 0.3)
-                          .then()
-                          .shake(hz: 2, duration: 500.ms),
+                          .scale(
+                            begin: const Offset(0, 0),
+                            end: const Offset(1, 1),
+                            duration: 500.ms,
+                            curve: Curves.elasticOut,
+                          )
+                          .fadeIn(duration: 300.ms),
+
+                      const SizedBox(height: 24),
+
+                      // Title
+                      Text(
+                        'Reading Logged!',
+                        style: LumiType.heading.copyWith(fontSize: 32),
+                        textAlign: TextAlign.center,
+                      ).animate().fadeIn(delay: 300.ms),
+
+                      const SizedBox(height: 8),
+
+                      // Night count
+                      Text(
+                        'Night $_totalNights complete',
+                        style: LumiType.bodyL.copyWith(color: LumiTokens.muted),
+                      ).animate().fadeIn(delay: 400.ms),
+
+                      const SizedBox(height: 28),
+
+                      // Streak — motivational only (streaks earn no badge), so
+                      // it sits below the headline rather than dominating it.
+                      if (_currentStreak > 0)
+                        _StatPill(
+                          icon: Icons.local_fire_department_rounded,
+                          label: '$_currentStreak day streak',
+                          color: LumiTokens.red,
+                        ).animate().fadeIn(delay: 600.ms).slideY(begin: 0.3),
+
+                      // Shame-free framing — a missed night is absorbed by a
+                      // rest day, so the streak simply keeps going.
+                      if (widget.restDayApplied) ...[
+                        const SizedBox(height: 10),
+                        _StatPill(
+                          icon: Icons.bedtime_rounded,
+                          label: 'Rest day — your streak keeps going!',
+                          color: LumiTokens.blue,
+                        ).animate().fadeIn(delay: 700.ms).slideY(begin: 0.3),
+                      ],
+
+                      // Forgiving rhythm: nights in the last 30 — a sliding
+                      // count that never resets.
+                      if (_last30Nights > 0) ...[
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.bedtime_outlined,
+                                size: 15, color: LumiTokens.blue),
+                            const SizedBox(width: 6),
+                            Text('$_last30Nights of the last 30 nights',
+                                style: LumiType.caption),
+                          ],
+                        ).animate().fadeIn(delay: 750.ms),
+                      ],
+
                       const SizedBox(height: 16),
-                    ],
 
-                    // Progress to next milestone
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: AppColors.offWhite,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            '${_nextMilestone - _totalNights} nights to next badge',
-                            style: LumiTextStyles.bodySmall(
-                              color: AppColors.charcoal.withValues(alpha: 0.6),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              value: _totalNights / _nextMilestone,
-                              backgroundColor:
-                                  AppColors.charcoal.withValues(alpha: 0.1),
-                              valueColor: const AlwaysStoppedAnimation<Color>(
-                                AppColors.rosePink,
-                              ),
-                              minHeight: 8,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                '$_totalNights',
-                                style: LumiTextStyles.caption(),
-                              ),
-                              Text(
-                                '$_nextMilestone',
-                                style: LumiTextStyles.caption(),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ).animate().fadeIn(delay: 1000.ms),
-
-                    const SizedBox(height: 32),
-
-                    // Rec 2: for a quick log, offer the optional feeling /
-                    // comment prompt instead of auto-navigating away.
-                    if (_showFollowUp)
-                      _buildFollowUp().animate().fadeIn(delay: 900.ms)
-                    else ...[
-                      // Gentle, occasional recognition for the richer flow.
-                      if (_detailedMilestone != null) ...[
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 14),
-                          decoration: BoxDecoration(
-                            color: AppColors.mintGreen.withValues(alpha: 0.35),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Row(
-                            children: [
-                              const Text('💚', style: TextStyle(fontSize: 18)),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  _detailedMilestone!,
-                                  style: LumiTextStyles.bodySmall(
-                                    color: AppColors.charcoal
-                                        .withValues(alpha: 0.8),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ).animate().fadeIn(delay: 700.ms),
+                      // Badge earned notification
+                      if (_earnedBadge != null) ...[
+                        _StatPill(
+                          icon: Icons.emoji_events_rounded,
+                          label: 'Badge earned: $_earnedBadge!',
+                          color: LumiTokens.yellow,
+                          filled: true,
+                        )
+                            .animate()
+                            .fadeIn(delay: 800.ms)
+                            .slideY(begin: 0.3)
+                            .then()
+                            .shake(hz: 2, duration: 500.ms),
                         const SizedBox(height: 16),
                       ],
-                      // Auto-returning indicator (tappable to skip)
-                      GestureDetector(
-                        onTap: _goHome,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color:
-                                    AppColors.charcoal.withValues(alpha: 0.4),
-                              ),
+
+                      // Progress to next milestone (nights-read ladder).
+                      _MilestoneCard(
+                        prev: _prevMilestone,
+                        next: _nextMilestone,
+                        total: _totalNights,
+                        accent: LumiTokens.yellow,
+                      ).animate().fadeIn(delay: 1000.ms),
+
+                      const SizedBox(height: 32),
+
+                      // Rec 2: for a quick log, offer the optional feeling /
+                      // comment prompt instead of auto-navigating away.
+                      if (_showFollowUp)
+                        _buildFollowUp().animate().fadeIn(delay: 900.ms)
+                      else ...[
+                        // Gentle, occasional recognition for the richer flow.
+                        if (_detailedMilestone != null) ...[
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: LumiTokens.tintGreen.withValues(alpha: 0.5),
+                              borderRadius:
+                                  BorderRadius.circular(LumiTokens.radiusMedium),
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Returning home...',
-                              style: LumiTextStyles.bodySmall(
-                                color:
-                                    AppColors.charcoal.withValues(alpha: 0.5),
-                              ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.favorite_rounded,
+                                    size: 18, color: LumiTokens.green),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(_detailedMilestone!,
+                                      style: LumiType.caption),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ).animate().fadeIn(delay: 1200.ms),
+                          ).animate().fadeIn(delay: 700.ms),
+                          const SizedBox(height: 16),
+                        ],
+                        // Auto-returning indicator (tappable to skip)
+                        GestureDetector(
+                          onTap: _goHome,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: LumiTokens.muted,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text('Returning home…', style: LumiType.caption),
+                            ],
+                          ),
+                        ).animate().fadeIn(delay: 1200.ms),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -580,13 +488,7 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
     return Column(
       children: [
         // Feeling prompt — BlobSelector carries its own heading + helper text.
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-          decoration: BoxDecoration(
-            color: AppColors.offWhite,
-            borderRadius: BorderRadius.circular(20),
-          ),
+        LumiCard(
           child: BlobSelector(
             selectedFeeling: _pickedFeeling,
             onFeelingSelected: _onFeelingSelected,
@@ -601,13 +503,7 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
               icon: Icons.edit_note,
             )
           else
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.offWhite,
-                borderRadius: BorderRadius.circular(20),
-              ),
+            LumiCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -645,21 +541,13 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
               icon: Icons.mic_none_rounded,
             )
           else
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.offWhite,
-                borderRadius: BorderRadius.circular(20),
-              ),
+            LumiCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     "A quick recording lets ${widget.student.firstName}'s teacher hear how the reading is going.",
-                    style: LumiTextStyles.bodySmall(
-                      color: AppColors.charcoal.withValues(alpha: 0.7),
-                    ),
+                    style: LumiType.caption,
                   ),
                   const SizedBox(height: 12),
                   ComprehensionRecordingStep(
@@ -686,6 +574,102 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
           icon: Icons.check,
         ),
       ],
+    );
+  }
+}
+
+/// A single rounded stat pill (streak / rest-day / badge). Soft tinted fill
+/// with a coloured icon by default; [filled] uses a stronger tint for the
+/// badge-earned moment.
+class _StatPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool filled;
+
+  const _StatPill({
+    required this.icon,
+    required this.label,
+    required this.color,
+    this.filled = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: filled ? 0.18 : 0.1),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 22),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              label,
+              style: LumiType.subhead.copyWith(fontSize: 17),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Progress within the current nights-read band [prev, next]. Fills from the
+/// last threshold the child passed, so the bar reflects real distance to the
+/// next badge rather than starting from zero each time.
+class _MilestoneCard extends StatelessWidget {
+  final int prev;
+  final int next;
+  final int total;
+  final Color accent;
+
+  const _MilestoneCard({
+    required this.prev,
+    required this.next,
+    required this.total,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final span = (next - prev).clamp(1, 1 << 30);
+    final fraction = ((total - prev) / span).clamp(0.0, 1.0);
+    final remaining = (next - total).clamp(0, 1 << 30);
+
+    return LumiCard(
+      child: Column(
+        children: [
+          Text(
+            '$remaining ${remaining == 1 ? 'night' : 'nights'} to your next badge',
+            style: LumiType.body.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: fraction,
+              backgroundColor: LumiTokens.rule,
+              valueColor: AlwaysStoppedAnimation(accent),
+              minHeight: 8,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('$prev', style: LumiType.caption),
+              Text('$next', style: LumiType.caption),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -720,11 +704,11 @@ class _ConfettiPainter extends CustomPainter {
       speed: 0.3 + _random.nextDouble() * 0.7,
       size: 4 + _random.nextDouble() * 6,
       color: [
-        AppColors.rosePink,
-        AppColors.mintGreen,
-        AppColors.softYellow,
-        AppColors.skyBlue,
-        AppColors.warmOrange,
+        LumiTokens.red,
+        LumiTokens.green,
+        LumiTokens.yellow,
+        LumiTokens.blue,
+        LumiTokens.orange,
       ][_random.nextInt(5)],
       wobble: _random.nextDouble() * 2 * pi,
     ),
