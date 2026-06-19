@@ -5,13 +5,13 @@ import '../../../theme/section_theme.dart';
 
 /// Lumi Design System - Week Progress Bar
 ///
-/// 7 circles (M T W T F S S) showing daily reading completion.
-/// States:
-/// - Completed (past): soft green fill with checkmark (a confirmation state)
-/// - Today (done): section-accent fill with checkmark
-/// - Today (not done): 2px section-accent border outline only
-/// - Future: warm-grey fill
-/// - Missed: unfilled with warm-grey outline
+/// 7 circles with a weekday label beneath each (M T W T F S S) showing daily
+/// reading completion. The label always shows so completed days keep their
+/// weekday; the circle carries the state:
+/// - Read (incl. today): soft green fill with checkmark (a confirmation state)
+/// - Today (not done): section-accent ring — a gentle nudge; label is accent
+/// - Future: empty warm-grey ring
+/// - Missed: empty warm-grey ring (same as future, but in the past)
 class WeekProgressBar extends StatelessWidget {
   /// Set of weekday indices (1=Monday through 7=Sunday) that are completed
   final Set<int> completedDays;
@@ -63,51 +63,54 @@ class _DayCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color backgroundColor;
+    Color backgroundColor = Colors.transparent;
     Color? borderColor;
     double borderWidth = 0;
-    Widget child;
+    Widget? child;
+    Color labelColor = LumiTokens.muted;
 
-    final labelStyle = LumiType.caption.copyWith(fontWeight: FontWeight.w700);
-
-    if (isCompleted && isToday) {
-      // Today completed: section-accent fill with checkmark.
-      backgroundColor = accent;
-      child = const Icon(Icons.check, color: LumiTokens.paper, size: 18);
-    } else if (isCompleted) {
-      // Past completed: soft green (confirmation) fill with checkmark.
+    if (isCompleted) {
+      // Read (incl. today): soft green confirmation fill with checkmark.
       backgroundColor = LumiTokens.tintGreen;
       child = Icon(Icons.check,
           color: LumiTokens.ink.withValues(alpha: 0.6), size: 18);
+      labelColor = isToday ? accent : LumiTokens.ink;
     } else if (isToday) {
-      // Today not done: section-accent outline only.
-      backgroundColor = Colors.transparent;
+      // Today not done: section-accent ring nudge.
       borderColor = accent;
       borderWidth = 2;
-      child = Text(label, style: labelStyle.copyWith(color: accent));
-    } else if (isFuture) {
-      // Future: warm-grey fill.
-      backgroundColor = LumiTokens.rule;
-      child = Text(label, style: labelStyle.copyWith(color: LumiTokens.muted));
+      labelColor = accent;
     } else {
-      // Past missed: warm-grey outline.
-      backgroundColor = Colors.transparent;
+      // Future or missed: empty warm-grey ring.
       borderColor = LumiTokens.rule;
       borderWidth = 1.5;
-      child = Text(label, style: labelStyle.copyWith(color: LumiTokens.muted));
+      labelColor = LumiTokens.muted;
     }
 
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        shape: BoxShape.circle,
-        border: borderWidth > 0
-            ? Border.all(color: borderColor!, width: borderWidth)
-            : null,
-      ),
-      child: Center(child: child),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            shape: BoxShape.circle,
+            border: borderWidth > 0
+                ? Border.all(color: borderColor!, width: borderWidth)
+                : null,
+          ),
+          child: child == null ? null : Center(child: child),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          style: LumiType.caption.copyWith(
+            fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
+            color: labelColor,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/lumi_text_styles.dart';
-import '../../theme/lumi_spacing.dart';
+import '../../../theme/lumi_tokens.dart';
+import '../../../theme/lumi_typography.dart';
 
 /// Lumi Design System - Stats Card
 ///
-/// 3-column layout with vertical dividers. Total Nights (cumulative, the hero
-/// metric) is foregrounded; the streaks are gentle secondary signals.
+/// Three headline metrics for a child's reading: cumulative nights, the current
+/// streak, and total read time. Each sits on a soft tinted icon tile with a
+/// semantic colour (nights = blue/moon, streak = orange/flame, time =
+/// green/clock) so the meaning reads at a glance.
 class StatsCard extends StatelessWidget {
   final int currentStreak;
-  final int bestStreak;
   final int totalNights;
+  final int totalMinutes;
 
   /// Rest days remaining in the current streak (0–2). When exactly one has been
   /// used, a small footer reassures the parent the streak is still protected.
@@ -19,58 +20,60 @@ class StatsCard extends StatelessWidget {
   const StatsCard({
     super.key,
     required this.currentStreak,
-    required this.bestStreak,
     required this.totalNights,
+    required this.totalMinutes,
     this.restDaysRemaining,
   });
+
+  static String _formatTime(int minutes) {
+    if (minutes < 60) return '${minutes}m';
+    final hours = minutes ~/ 60;
+    return '${hours}h';
+  }
 
   @override
   Widget build(BuildContext context) {
     final restDays = restDaysRemaining ?? 2;
+
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.charcoal.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+        boxShadow: LumiTokens.shadowCard,
       ),
       child: Column(
         children: [
           IntrinsicHeight(
             child: Row(
               children: [
-                // Hero: cumulative nights read — the number that only ever grows.
                 Expanded(
                   child: _StatColumn(
-                    icon: Icons.menu_book,
-                    iconColor: AppColors.rosePink,
+                    icon: Icons.nightlight_round,
+                    tint: LumiTokens.tintBlue,
+                    iconColor: LumiTokens.blue,
                     value: totalNights.toString(),
-                    label: 'Total\nNights',
-                    prominent: true,
+                    label: 'Nights',
                   ),
                 ),
-                Container(width: 1, color: AppColors.divider),
+                const _StatDivider(),
                 Expanded(
                   child: _StatColumn(
-                    icon: Icons.local_fire_department,
-                    iconColor: AppColors.warmOrange,
+                    icon: Icons.local_fire_department_rounded,
+                    tint: LumiTokens.tintOrange,
+                    iconColor: LumiTokens.orange,
                     value: currentStreak.toString(),
                     label: 'Streak',
                   ),
                 ),
-                Container(width: 1, color: AppColors.divider),
+                const _StatDivider(),
                 Expanded(
                   child: _StatColumn(
-                    icon: Icons.emoji_events,
-                    iconColor: AppColors.gold,
-                    value: bestStreak.toString(),
-                    label: 'Best\nStreak',
+                    icon: Icons.schedule_rounded,
+                    tint: LumiTokens.tintGreen,
+                    iconColor: LumiTokens.green,
+                    value: _formatTime(totalMinutes),
+                    label: 'Read time',
                   ),
                 ),
               ],
@@ -80,17 +83,14 @@ class StatsCard extends StatelessWidget {
             const SizedBox(height: 14),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                vertical: 8,
-                horizontal: 12,
-              ),
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
               decoration: BoxDecoration(
-                color: AppColors.skyBlue.withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(12),
+                color: LumiTokens.tintGreen,
+                borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
               ),
               child: Text(
                 '🌙 1 rest day left — your streak is safe',
-                style: LumiTextStyles.caption(color: AppColors.charcoal),
+                style: LumiType.caption.copyWith(color: LumiTokens.ink),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -101,21 +101,27 @@ class StatsCard extends StatelessWidget {
   }
 }
 
+class _StatDivider extends StatelessWidget {
+  const _StatDivider();
+
+  @override
+  Widget build(BuildContext context) =>
+      const VerticalDivider(width: 1, thickness: 1, color: LumiTokens.rule);
+}
+
 class _StatColumn extends StatelessWidget {
   final IconData icon;
+  final Color tint;
   final Color iconColor;
   final String value;
   final String label;
 
-  /// When true the value is rendered larger to foreground the hero metric.
-  final bool prominent;
-
   const _StatColumn({
     required this.icon,
+    required this.tint,
     required this.iconColor,
     required this.value,
     required this.label,
-    this.prominent = false,
   });
 
   @override
@@ -123,23 +129,16 @@ class _StatColumn extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: iconColor, size: prominent ? 32 : 26),
-        const SizedBox(height: LumiSpacing.xs),
-        Text(
-          value,
-          style: prominent
-              ? LumiTextStyles.display(color: AppColors.charcoal)
-                  .copyWith(fontSize: 30)
-              : LumiTextStyles.h2(
-                  color: AppColors.charcoal.withValues(alpha: 0.85),
-                ),
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(color: tint, shape: BoxShape.circle),
+          child: Icon(icon, color: iconColor, size: 22),
         ),
-        const SizedBox(height: LumiSpacing.xxs),
-        Text(
-          label,
-          style: LumiTextStyles.caption(),
-          textAlign: TextAlign.center,
-        ),
+        const SizedBox(height: LumiTokens.space2),
+        Text(value, style: LumiType.numberLarge.copyWith(fontSize: 30)),
+        const SizedBox(height: 2),
+        Text(label, style: LumiType.caption, textAlign: TextAlign.center),
       ],
     );
   }

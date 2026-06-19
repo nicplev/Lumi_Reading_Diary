@@ -57,9 +57,9 @@ class ProgressScreen extends StatelessWidget {
                   stats = StudentModel.fromFirestore(snap.data!).stats;
                 }
                 return StatsCard(
-                  currentStreak: stats?.currentStreak ?? 0,
-                  bestStreak: stats?.longestStreak ?? 0,
                   totalNights: stats?.totalReadingDays ?? 0,
+                  currentStreak: stats?.currentStreak ?? 0,
+                  totalMinutes: stats?.totalMinutesRead ?? 0,
                   restDaysRemaining: stats?.restDaysRemaining,
                 );
               },
@@ -101,6 +101,13 @@ class ProgressScreen extends StatelessWidget {
                           WeekProgressBar(
                             completedDays: completedDays,
                             currentDay: now.weekday,
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            completedDays.isEmpty
+                                ? 'No reading logged yet this week'
+                                : '${completedDays.length} ${completedDays.length == 1 ? 'night' : 'nights'} read this week',
+                            style: LumiType.caption,
                           ),
                         ],
                       ),
