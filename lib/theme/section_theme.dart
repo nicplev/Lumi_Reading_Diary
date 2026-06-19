@@ -45,8 +45,8 @@ class LumiSectionTheme extends ThemeExtension<LumiSectionTheme> {
 
   static const LumiSectionTheme settings = LumiSectionTheme(
     section: LumiSection.settings,
-    accent: LumiTokens.red,
-    accentTint: LumiTokens.tintRed,
+    accent: LumiTokens.green,
+    accentTint: LumiTokens.tintGreen,
     onAccent: LumiTokens.paper,
   );
 

@@ -12,6 +12,7 @@ import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_card.dart';
 import '../../core/widgets/lumi/lumi_input.dart';
 import '../../core/widgets/lumi_mascot.dart';
+import '../../theme/lumi_tokens.dart';
 import '../../data/models/student_link_code_model.dart';
 import '../../data/models/user_model.dart';
 import '../../data/providers/active_child_provider.dart';
@@ -162,9 +163,10 @@ class _LinkChildScreenState extends ConsumerState<LinkChildScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.offWhite,
+      backgroundColor: LumiTokens.cream,
       appBar: AppBar(
-        backgroundColor: AppColors.offWhite,
+        backgroundColor: LumiTokens.cream,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
         iconTheme: const IconThemeData(color: AppColors.charcoal),
@@ -236,6 +238,7 @@ class _LinkChildScreenState extends ConsumerState<LinkChildScreen> {
           text: 'Verify code',
           isLoading: _busy,
           isFullWidth: true,
+          color: LumiTokens.green,
         ),
       ],
     );
@@ -260,11 +263,11 @@ class _LinkChildScreenState extends ConsumerState<LinkChildScreen> {
               Container(
                 width: 48,
                 height: 48,
-                decoration: BoxDecoration(
-                  color: AppColors.rosePink.withValues(alpha: 0.12),
+                decoration: const BoxDecoration(
+                  color: LumiTokens.tintGreen,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.child_care, color: AppColors.rosePink),
+                child: const Icon(Icons.child_care, color: LumiTokens.green),
               ),
               LumiGap.horizontalS,
               Expanded(
@@ -297,11 +300,13 @@ class _LinkChildScreenState extends ConsumerState<LinkChildScreen> {
           text: 'Link $_studentFirstName',
           isLoading: _busy,
           isFullWidth: true,
+          color: LumiTokens.green,
         ),
         LumiGap.xs,
         LumiTextButton(
           onPressed: _busy ? null : _resetToCode,
           text: 'Use a different code',
+          color: LumiTokens.green,
         ),
       ],
     );
@@ -378,11 +383,13 @@ class _LinkChildScreenState extends ConsumerState<LinkChildScreen> {
           text: 'Save & continue',
           isLoading: _busy,
           isFullWidth: true,
+          color: LumiTokens.green,
         ),
         LumiGap.xs,
         LumiTextButton(
           onPressed: _busy ? null : _skipCharacter,
           text: 'Skip for now',
+          color: LumiTokens.green,
         ),
       ],
     );
@@ -427,6 +434,7 @@ class _LinkChildScreenState extends ConsumerState<LinkChildScreen> {
           onPressed: () => context.pop(),
           text: 'Done',
           isFullWidth: true,
+          color: LumiTokens.green,
         ),
       ],
     );

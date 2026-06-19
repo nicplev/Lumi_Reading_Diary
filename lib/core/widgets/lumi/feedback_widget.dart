@@ -5,6 +5,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/lumi_text_styles.dart';
 import '../../theme/lumi_spacing.dart';
 import '../../theme/lumi_borders.dart';
+import '../../../theme/lumi_tokens.dart';
 import '../lumi/lumi_buttons.dart';
 import '../../../services/firebase_service.dart';
 import '../../../services/analytics_service.dart';
@@ -161,13 +162,13 @@ class _FeedbackSheetState extends State<_FeedbackSheet> {
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? AppColors.rosePink.withValues(alpha: 0.1)
-                            : AppColors.background,
+                            ? LumiTokens.tintGreen
+                            : LumiTokens.cream,
                         borderRadius: LumiBorders.medium,
                         border: Border.all(
                           color: isSelected
-                              ? AppColors.rosePink
-                              : AppColors.divider,
+                              ? LumiTokens.green
+                              : LumiTokens.rule,
                         ),
                       ),
                       child: Column(
@@ -176,16 +177,16 @@ class _FeedbackSheetState extends State<_FeedbackSheet> {
                             cat.icon,
                             size: 20,
                             color: isSelected
-                                ? AppColors.rosePink
-                                : AppColors.textSecondary,
+                                ? LumiTokens.green
+                                : LumiTokens.muted,
                           ),
                           const SizedBox(height: 4),
                           Text(
                             cat.label,
                             style: LumiTextStyles.caption(
                               color: isSelected
-                                  ? AppColors.rosePink
-                                  : AppColors.textSecondary,
+                                  ? LumiTokens.green
+                                  : LumiTokens.muted,
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -206,20 +207,20 @@ class _FeedbackSheetState extends State<_FeedbackSheet> {
               maxLines: 4,
               decoration: InputDecoration(
                 hintText: 'Tell us what happened or what you\'d like to see...',
-                hintStyle: LumiTextStyles.bodySmall(color: AppColors.textSecondary),
+                hintStyle: LumiTextStyles.bodySmall(color: LumiTokens.muted),
                 filled: true,
-                fillColor: AppColors.background,
+                fillColor: LumiTokens.cream,
                 border: OutlineInputBorder(
                   borderRadius: LumiBorders.medium,
-                  borderSide: BorderSide(color: AppColors.divider),
+                  borderSide: const BorderSide(color: LumiTokens.rule),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: LumiBorders.medium,
-                  borderSide: BorderSide(color: AppColors.divider),
+                  borderSide: const BorderSide(color: LumiTokens.rule),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: LumiBorders.medium,
-                  borderSide: const BorderSide(color: AppColors.rosePink),
+                  borderSide: const BorderSide(color: LumiTokens.green, width: 2),
                 ),
               ),
             ),
@@ -231,6 +232,7 @@ class _FeedbackSheetState extends State<_FeedbackSheet> {
               text: _isSubmitting ? 'Submitting...' : 'Submit Feedback',
               icon: Icons.send,
               isFullWidth: true,
+              color: LumiTokens.green,
             ),
             const SizedBox(height: LumiSpacing.s),
           ],

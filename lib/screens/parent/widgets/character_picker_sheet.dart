@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/lumi_text_styles.dart';
 import '../../../core/theme/lumi_spacing.dart';
 import '../../../core/widgets/lumi/lumi_buttons.dart';
+import '../../../theme/lumi_tokens.dart';
 import '../../../data/models/student_model.dart';
 import '../../../services/firebase_service.dart';
 import 'character_grid.dart';
@@ -154,6 +155,7 @@ class _CharacterPickerSheetState extends State<CharacterPickerSheet> {
             text: 'Save character',
             isLoading: _saving,
             isFullWidth: true,
+            color: LumiTokens.green,
           ),
         ],
       ),
