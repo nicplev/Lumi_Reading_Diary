@@ -33,12 +33,22 @@ class LumiInput extends StatefulWidget {
   final Widget? prefixIcon;
   final Widget? suffixIcon;
   final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
   final VoidCallback? onTap;
   final FormFieldValidator<String>? validator;
   final List<TextInputFormatter>? inputFormatters;
   final TextInputAction? textInputAction;
   final FocusNode? focusNode;
   final bool autofocus;
+
+  /// OS credential autofill hints (e.g. [AutofillHints.email]). Drives the
+  /// keyboard's QuickType suggestions and the "save password?" prompt.
+  final List<String>? autofillHints;
+
+  /// Minimal, borderless style: no box outline or fill, the [label] (or
+  /// [hintText]) becomes the inline placeholder, and the prefix icon leads
+  /// the field. Used by the auth screens for a clean, modern look.
+  final bool borderless;
 
   const LumiInput({
     super.key,
@@ -55,12 +65,15 @@ class LumiInput extends StatefulWidget {
     this.prefixIcon,
     this.suffixIcon,
     this.onChanged,
+    this.onSubmitted,
     this.onTap,
     this.validator,
     this.inputFormatters,
     this.textInputAction,
     this.focusNode,
     this.autofocus = false,
+    this.borderless = false,
+    this.autofillHints,
   });
 
   @override
@@ -69,47 +82,36 @@ class LumiInput extends StatefulWidget {
 
 class _LumiInputState extends State<LumiInput> {
   late FocusNode _focusNode;
-  bool _isFocused = false;
 
   @override
   void initState() {
     super.initState();
     _focusNode = widget.focusNode ?? FocusNode();
-    _focusNode.addListener(_onFocusChange);
   }
 
   @override
   void dispose() {
     if (widget.focusNode == null) {
       _focusNode.dispose();
-    } else {
-      _focusNode.removeListener(_onFocusChange);
     }
     super.dispose();
   }
 
-  void _onFocusChange() {
-    setState(() {
-      _isFocused = _focusNode.hasFocus;
-    });
-  }
-
-  Color get _borderColor {
-    if (widget.errorText != null) {
-      return AppColors.error;
-    }
-    if (_isFocused) {
-      return AppColors.rosePink;
-    }
-    return AppColors.charcoal.withOpacity(0.2);
-  }
-
   @override
   Widget build(BuildContext context) {
+    final borderless = widget.borderless;
+    // In borderless mode the label becomes the inline placeholder.
+    final hintText = borderless ? (widget.hintText ?? widget.label) : widget.hintText;
+
+    InputBorder outline(Color color, double width) => OutlineInputBorder(
+          borderRadius: LumiBorders.medium,
+          borderSide: BorderSide(color: color, width: width),
+        );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (widget.label != null) ...[
+        if (widget.label != null && !borderless) ...[
           Text(
             widget.label!,
             style: LumiTextStyles.label(),
@@ -125,66 +127,34 @@ class _LumiInputState extends State<LumiInput> {
           maxLines: widget.maxLines,
           maxLength: widget.maxLength,
           onChanged: widget.onChanged,
+          onFieldSubmitted: widget.onSubmitted,
           onTap: widget.onTap,
           validator: widget.validator,
           inputFormatters: widget.inputFormatters,
           textInputAction: widget.textInputAction,
           autofocus: widget.autofocus,
+          autofillHints: widget.autofillHints,
           style: LumiTextStyles.body(),
           decoration: InputDecoration(
-            hintText: widget.hintText,
+            hintText: hintText,
             hintStyle: LumiTextStyles.body(
               color: AppColors.charcoal.withOpacity(0.5),
             ),
             prefixIcon: widget.prefixIcon,
             suffixIcon: widget.suffixIcon,
-            filled: true,
+            filled: !borderless,
             fillColor: widget.enabled
                 ? AppColors.white
                 : AppColors.charcoal.withOpacity(0.05),
-            contentPadding: LumiPadding.input,
-            border: OutlineInputBorder(
-              borderRadius: LumiBorders.medium,
-              borderSide: BorderSide(
-                color: AppColors.charcoal.withOpacity(0.2),
-                width: 1.5,
-              ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: LumiBorders.medium,
-              borderSide: BorderSide(
-                color: AppColors.charcoal.withOpacity(0.2),
-                width: 1.5,
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: LumiBorders.medium,
-              borderSide: const BorderSide(
-                color: AppColors.rosePink,
-                width: 2.0,
-              ),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: LumiBorders.medium,
-              borderSide: const BorderSide(
-                color: AppColors.error,
-                width: 1.5,
-              ),
-            ),
-            focusedErrorBorder: OutlineInputBorder(
-              borderRadius: LumiBorders.medium,
-              borderSide: const BorderSide(
-                color: AppColors.error,
-                width: 2.0,
-              ),
-            ),
-            disabledBorder: OutlineInputBorder(
-              borderRadius: LumiBorders.medium,
-              borderSide: BorderSide(
-                color: AppColors.charcoal.withOpacity(0.1),
-                width: 1.5,
-              ),
-            ),
+            contentPadding: borderless
+                ? const EdgeInsets.symmetric(vertical: 14)
+                : LumiPadding.input,
+            border: borderless ? InputBorder.none : outline(AppColors.charcoal.withOpacity(0.2), 1.5),
+            enabledBorder: borderless ? InputBorder.none : outline(AppColors.charcoal.withOpacity(0.2), 1.5),
+            focusedBorder: borderless ? InputBorder.none : outline(AppColors.rosePink, 2.0),
+            errorBorder: borderless ? InputBorder.none : outline(AppColors.error, 1.5),
+            focusedErrorBorder: borderless ? InputBorder.none : outline(AppColors.error, 2.0),
+            disabledBorder: borderless ? InputBorder.none : outline(AppColors.charcoal.withOpacity(0.1), 1.5),
             errorText: widget.errorText,
             errorStyle: LumiTextStyles.error(),
           ),
@@ -305,10 +275,14 @@ class LumiPasswordInput extends StatefulWidget {
   final String? errorText;
   final TextEditingController? controller;
   final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
   final FormFieldValidator<String>? validator;
   final FocusNode? focusNode;
   final bool autofocus;
   final TextInputAction? textInputAction;
+  final Widget? prefixIcon;
+  final bool borderless;
+  final List<String>? autofillHints;
 
   const LumiPasswordInput({
     super.key,
@@ -318,10 +292,14 @@ class LumiPasswordInput extends StatefulWidget {
     this.errorText,
     this.controller,
     this.onChanged,
+    this.onSubmitted,
     this.validator,
     this.focusNode,
     this.autofocus = false,
     this.textInputAction,
+    this.prefixIcon,
+    this.borderless = false,
+    this.autofillHints,
   });
 
   @override
@@ -347,11 +325,15 @@ class _LumiPasswordInputState extends State<LumiPasswordInput> {
       controller: widget.controller,
       obscureText: _obscureText,
       onChanged: widget.onChanged,
+      onSubmitted: widget.onSubmitted,
       validator: widget.validator,
       focusNode: widget.focusNode,
       autofocus: widget.autofocus,
       textInputAction: widget.textInputAction,
       keyboardType: TextInputType.visiblePassword,
+      borderless: widget.borderless,
+      prefixIcon: widget.prefixIcon,
+      autofillHints: widget.autofillHints,
       suffixIcon: IconButton(
         icon: Icon(
           _obscureText ? Icons.visibility : Icons.visibility_off,

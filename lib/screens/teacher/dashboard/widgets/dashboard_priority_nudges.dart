@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/teacher_constants.dart';
+import '../../../../theme/lumi_tokens.dart';
+import '../../../../theme/lumi_typography.dart';
 import '../../../../core/widgets/lumi/student_avatar.dart';
 import '../../../../data/models/class_model.dart';
 import '../../../../data/models/student_model.dart';
@@ -33,53 +33,88 @@ class DashboardPriorityNudges extends StatelessWidget {
   Widget build(BuildContext context) {
     final weekday = DateTime.now().weekday;
     final suppressInactivity = weekday <= 2; // Mon = 1, Tue = 2
+    final nudges = _nudgeItemsFor(students, suppressInactivity);
 
-    final nudges = _buildNudgeItems(suppressInactivity);
-    if (nudges.isEmpty) return const SizedBox.shrink();
+    // Compact single-row card when there's nothing to act on.
+    if (nudges.isEmpty) {
+      return _card(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Text('Needs attention', style: LumiType.subhead),
+            const Spacer(),
+            const Icon(Icons.check_circle_rounded,
+                size: 18, color: LumiTokens.green),
+            const SizedBox(width: 6),
+            Text('All caught up',
+                style: LumiType.caption.copyWith(color: LumiTokens.muted)),
+          ],
+        ),
+      );
+    }
 
     final displayNudges = nudges.take(3).toList();
     final remaining = nudges.length - 3;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 12),
-          child: Text('Needs attention', style: TeacherTypography.sectionHeader),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Column(
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              ...displayNudges.map((nudge) => _NudgeRow(
-                    nudge: nudge,
-                    onTap: () => _navigateToStudent(context, nudge.student),
-                  )),
-              if (remaining > 0)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: GestureDetector(
-                    onTap: onSeeAll,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Text(
-                        '+ $remaining more',
-                        style: TeacherTypography.bodySmall.copyWith(
-                          color: AppColors.teacherPrimary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+              Text('Needs attention', style: LumiType.subhead),
+              const Spacer(),
+              Text(
+                nudges.length == 1 ? '1 student' : '${nudges.length} students',
+                style: LumiType.caption.copyWith(
+                  color: LumiTokens.muted,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...displayNudges.map((nudge) => _NudgeRow(
+                nudge: nudge,
+                onTap: () => _navigateToStudent(context, nudge.student),
+              )),
+          if (remaining > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: GestureDetector(
+                onTap: onSeeAll,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    '+ $remaining more',
+                    style: LumiType.caption.copyWith(
+                      color: LumiTokens.blue,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
-            ],
-          ),
-        ),
-      ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 
-  List<_NudgeItem> _buildNudgeItems(bool suppressInactivity) {
+  Widget _card({required Widget child, EdgeInsetsGeometry? padding}) {
+    return Container(
+      padding: padding ?? const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+        border: Border.all(color: LumiTokens.rule),
+        boxShadow: LumiTokens.shadowCard,
+      ),
+      child: child,
+    );
+  }
+
+  static List<_NudgeItem> _nudgeItemsFor(
+      List<StudentModel> students, bool suppressInactivity) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final List<_NudgeItem> nudges = [];
@@ -190,12 +225,10 @@ class _NudgeRow extends StatelessWidget {
     final student = nudge.student;
     final isMilestone = nudge.type == _NudgeType.milestone;
 
-    final avatarColor = isMilestone
-        ? const Color(0xFFFFF8E1)
-        : AppColors.teacherPrimaryLight;
+    final avatarColor =
+        isMilestone ? LumiTokens.tintYellow : LumiTokens.tintBlue;
 
-    final messageColor =
-        nudge.isUrgent ? AppColors.warmOrange : AppColors.textSecondary;
+    final messageColor = nudge.isUrgent ? LumiTokens.red : LumiTokens.muted;
 
     final initials =
         '${student.firstName.isNotEmpty ? student.firstName[0] : ''}${student.lastName.isNotEmpty ? student.lastName[0] : ''}'
@@ -205,7 +238,7 @@ class _NudgeRow extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
           children: [
             StudentAvatar(
@@ -221,13 +254,14 @@ class _NudgeRow extends StatelessWidget {
                 children: [
                   Text(
                     student.firstName,
-                    style: TeacherTypography.bodyMedium.copyWith(
-                      fontWeight: FontWeight.w600,
+                    style: LumiType.body.copyWith(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
                     ),
                   ),
                   Text(
                     nudge.message,
-                    style: TeacherTypography.caption.copyWith(
+                    style: LumiType.caption.copyWith(
                       color: messageColor,
                     ),
                   ),
@@ -237,7 +271,7 @@ class _NudgeRow extends StatelessWidget {
             Icon(
               Icons.chevron_right_rounded,
               size: 18,
-              color: AppColors.textSecondary.withValues(alpha: 0.5),
+              color: LumiTokens.muted.withValues(alpha: 0.5),
             ),
           ],
         ),

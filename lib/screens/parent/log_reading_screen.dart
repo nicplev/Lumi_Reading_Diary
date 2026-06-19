@@ -21,6 +21,7 @@ import '../../services/firebase_service.dart';
 import '../../services/isbn_assignment_service.dart';
 import '../../services/offline_service.dart';
 import '../../services/platform_config_service.dart';
+import '../../services/logging_engagement_service.dart';
 import '../../services/reading_log_service.dart';
 import 'widgets/comprehension_recording_step.dart';
 
@@ -327,6 +328,10 @@ class _LogReadingScreenState extends State<LogReadingScreen>
   }
 
   void _nextStep() {
+    // Drop the keyboard before moving on, otherwise a field focused on an
+    // earlier step (book title, parent comment) keeps it up across the rest
+    // of the flow — including steps with no text field at all.
+    FocusScope.of(context).unfocus();
     if (_currentStep == 0 &&
         _selectedBookTitles.isEmpty &&
         _customBookTitles.isEmpty) {
@@ -346,6 +351,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
   }
 
   void _previousStep() {
+    FocusScope.of(context).unfocus();
     if (_currentStep > 0) {
       setState(() {
         _currentStep--;
@@ -427,6 +433,10 @@ class _LogReadingScreenState extends State<LogReadingScreen>
       // Rec 5a: a completed log supersedes any saved draft.
       await OfflineService.instance.clearLogDraft(widget.student.id);
 
+      // Recognise the richer logging path (powers the occasional nudge +
+      // positive recognition). Best-effort — never blocks the success screen.
+      await LoggingEngagementService.instance.recordDetailedLog();
+
       if (mounted) {
         context.go('/parent/reading-success', extra: {
           'student': widget.student,
@@ -460,7 +470,12 @@ class _LogReadingScreenState extends State<LogReadingScreen>
           onPressed: _handleClose,
         ),
       ),
-      body: SafeArea(
+      // Tap anywhere outside a field to dismiss the keyboard — the comment and
+      // book-title fields otherwise had no way to close it.
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        behavior: HitTestBehavior.opaque,
+        child: SafeArea(
         child: Column(
           children: [
             // Step indicator
@@ -545,6 +560,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
             // Navigation buttons
             _buildNavigationButtons(),
           ],
+        ),
         ),
       ),
     );

@@ -130,6 +130,12 @@ class ReadingLogModel {
   bool get hasMetTarget => minutesRead >= targetMinutes;
   bool get isTeacherProxy => loggedByRole == LoggedByRole.teacher;
 
+  /// True for a one-tap "quick" log: minutes defaulted and the books were
+  /// inferred from the child's assignments, not manually confirmed by the
+  /// parent. Teacher views surface this subtly so attribution is read with the
+  /// right confidence.
+  bool get isQuickLog => metadata?['quickLog'] == true;
+
   /// True when this log has an uploaded comprehension audio ready to play.
   /// Drives the teacher's inline player visibility on the student detail row.
   bool get hasComprehensionAudio =>
@@ -152,7 +158,11 @@ class ReadingLogModel {
       parentId: data['parentId'] ?? '',
       schoolId: data['schoolId'] ?? '',
       classId: data['classId'] ?? '',
-      date: (data['date'] as Timestamp).toDate(),
+      // Defensive: a pending serverTimestamp (or a malformed/legacy doc) can
+      // leave `date` null in a local snapshot — fall back rather than crash.
+      date: (data['date'] as Timestamp?)?.toDate() ??
+          (data['createdAt'] as Timestamp?)?.toDate() ??
+          DateTime.now(),
       minutesRead: data['minutesRead'] ?? 0,
       targetMinutes: data['targetMinutes'] ?? 20,
       status: LogStatus.values.firstWhere(

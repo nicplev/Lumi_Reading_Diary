@@ -2,12 +2,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/teacher_constants.dart';
-import '../../core/widgets/comments/comment_thread.dart';
+import '../../theme/lumi_tokens.dart';
+import '../../theme/lumi_typography.dart';
+import '../../core/widgets/comments/teacher_comments_sheet.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
 import '../../core/widgets/lumi/teacher_filter_chip.dart';
-import '../../data/models/log_comment_model.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../data/models/student_model.dart';
 import '../../services/firebase_service.dart';
@@ -116,17 +115,17 @@ class _TeacherStudentReadingHistoryScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.teacherBackground,
+      backgroundColor: LumiTokens.cream,
       appBar: AppBar(
-        backgroundColor: AppColors.white,
-        foregroundColor: AppColors.charcoal,
+        backgroundColor: LumiTokens.paper,
+        foregroundColor: LumiTokens.ink,
         elevation: 0,
-        surfaceTintColor: AppColors.white,
+        surfaceTintColor: LumiTokens.paper,
         title: Row(
           children: [
             StudentAvatar.fromStudent(widget.student, size: 32),
             const SizedBox(width: 10),
-            Text(widget.student.fullName, style: TeacherTypography.h3),
+            Text(widget.student.fullName, style: LumiType.subhead),
           ],
         ),
         actions: [
@@ -158,10 +157,10 @@ class _TeacherStudentReadingHistoryScreenState
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.menu_book_outlined,
-                      size: 48, color: AppColors.textSecondary),
+                      size: 48, color: LumiTokens.muted),
                   const SizedBox(height: 12),
                   Text('No reading history yet',
-                      style: TeacherTypography.bodySmall),
+                      style: LumiType.caption),
                 ],
               ),
             );
@@ -187,10 +186,10 @@ class _TeacherStudentReadingHistoryScreenState
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.filter_list_off,
-                            size: 40, color: AppColors.textSecondary),
+                            size: 40, color: LumiTokens.muted),
                         const SizedBox(height: 10),
                         Text('No logs match your filters',
-                            style: TeacherTypography.bodySmall),
+                            style: LumiType.caption),
                       ],
                     ),
                   ),
@@ -238,9 +237,9 @@ class _TeacherStudentReadingHistoryScreenState
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
-        border: Border.all(color: AppColors.teacherBorder),
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+        border: Border.all(color: LumiTokens.rule),
       ),
       child: Column(
         children: [
@@ -249,10 +248,10 @@ class _TeacherStudentReadingHistoryScreenState
               children: [
                 _buildStatCell('$totalNights', 'Nights logged'),
                 VerticalDivider(
-                    width: 1, thickness: 1, color: AppColors.teacherBorder),
+                    width: 1, thickness: 1, color: LumiTokens.rule),
                 _buildStatCell('$totalMinutes', 'Total minutes'),
                 VerticalDivider(
-                    width: 1, thickness: 1, color: AppColors.teacherBorder),
+                    width: 1, thickness: 1, color: LumiTokens.rule),
                 _buildStatCell('$booksRead', 'Books read'),
               ],
             ),
@@ -261,8 +260,8 @@ class _TeacherStudentReadingHistoryScreenState
             const SizedBox(height: 8),
             Text(
               'Showing $filteredCount of $totalNights sessions',
-              style: TeacherTypography.caption
-                  .copyWith(color: AppColors.textSecondary),
+              style: LumiType.caption
+                  .copyWith(color: LumiTokens.muted),
             ),
           ],
         ],
@@ -274,12 +273,12 @@ class _TeacherStudentReadingHistoryScreenState
     return Expanded(
       child: Column(
         children: [
-          Text(value, style: TeacherTypography.h2),
+          Text(value, style: LumiType.heading),
           const SizedBox(height: 2),
           Text(
             label,
-            style: TeacherTypography.caption
-                .copyWith(color: AppColors.textSecondary),
+            style: LumiType.caption
+                .copyWith(color: LumiTokens.muted),
             textAlign: TextAlign.center,
           ),
         ],
@@ -297,30 +296,30 @@ class _TeacherStudentReadingHistoryScreenState
           margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
           decoration: BoxDecoration(
-            color: AppColors.white,
+            color: LumiTokens.paper,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.teacherBorder),
+            border: Border.all(color: LumiTokens.rule),
           ),
           child: Row(
             children: [
-              Icon(Icons.search, size: 18, color: AppColors.textSecondary),
+              Icon(Icons.search, size: 18, color: LumiTokens.muted),
               const SizedBox(width: 8),
               Expanded(
                 child: TextField(
                   controller: _searchController,
                   onChanged: (v) => setState(() => _searchQuery = v),
-                  style: TeacherTypography.bodyMedium,
+                  style: LumiType.body,
                   decoration: InputDecoration(
                     hintText: 'Search by book name...',
-                    hintStyle: TeacherTypography.bodyMedium
-                        .copyWith(color: AppColors.textSecondary),
+                    hintStyle: LumiType.body
+                        .copyWith(color: LumiTokens.muted),
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(vertical: 10),
                   ),
-                  cursorColor: AppColors.teacherPrimary,
+                  cursorColor: LumiTokens.green,
                 ),
               ),
               if (_searchQuery.isNotEmpty)
@@ -330,7 +329,7 @@ class _TeacherStudentReadingHistoryScreenState
                     setState(() => _searchQuery = '');
                   },
                   child: Icon(Icons.close,
-                      size: 16, color: AppColors.textSecondary),
+                      size: 16, color: LumiTokens.muted),
                 ),
             ],
           ),
@@ -346,12 +345,14 @@ class _TeacherStudentReadingHistoryScreenState
                 TeacherFilterChip(
                   label: 'All time',
                   isActive: _dateFilter == _DateFilter.all,
+                  activeColor: LumiTokens.green,
                   onTap: () => setState(() => _dateFilter = _DateFilter.all),
                 ),
                 const SizedBox(width: 8),
                 TeacherFilterChip(
                   label: 'Last week',
                   isActive: _dateFilter == _DateFilter.lastWeek,
+                  activeColor: LumiTokens.green,
                   onTap: () =>
                       setState(() => _dateFilter = _DateFilter.lastWeek),
                 ),
@@ -359,11 +360,12 @@ class _TeacherStudentReadingHistoryScreenState
                 TeacherFilterChip(
                   label: 'This month',
                   isActive: _dateFilter == _DateFilter.thisMonth,
+                  activeColor: LumiTokens.green,
                   onTap: () =>
                       setState(() => _dateFilter = _DateFilter.thisMonth),
                 ),
                 const SizedBox(width: 12),
-                Container(width: 1, height: 24, color: AppColors.teacherBorder),
+                Container(width: 1, height: 24, color: LumiTokens.rule),
                 const SizedBox(width: 12),
                 for (final feeling in const [
                   'hard',
@@ -402,72 +404,94 @@ class _TeacherStudentReadingHistoryScreenState
     final dateStr = _formatCommentDate(log.date);
     final books =
         log.bookTitles.isNotEmpty ? log.bookTitles.join(', ') : 'Free reading';
-    final minutes = log.minutesRead;
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final hasUnread = uid.isNotEmpty && log.hasUnreadForTeacher(uid);
+    // Date, duration and logger collapse into one muted meta line so the row
+    // reads title-first instead of cramming everything across.
+    final meta = [
+      dateStr,
+      '${log.minutesRead} min',
+      if (log.loggedByDisplay != null) 'Logged by ${log.loggedByDisplay}',
+    ].join(' · ');
 
     return Column(
       children: [
         InkWell(
           onTap: () => _openCommentsSheet(log),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
-              SizedBox(
-                width: 70,
-                child: Text(dateStr, style: TeacherTypography.caption),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      books,
-                      style: TeacherTypography.bodyMedium,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (log.loggedByDisplay != null)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              books,
+                              style: LumiType.body,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          // Subtle one-tap marker: the books were inferred from
+                          // the child's assignments, not confirmed by the parent.
+                          if (log.isQuickLog) ...[
+                            const SizedBox(width: 6),
+                            Tooltip(
+                              message:
+                                  'Quick log — books inferred from assignments, '
+                                  'not confirmed by the parent',
+                              triggerMode: TooltipTriggerMode.tap,
+                              child: Icon(
+                                Icons.bolt,
+                                size: 15,
+                                color: LumiTokens.muted.withValues(alpha: 0.8),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 2),
                       Text(
-                        'Logged by ${log.loggedByDisplay}',
-                        style: TeacherTypography.caption.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
+                        meta,
+                        style:
+                            LumiType.caption.copyWith(color: LumiTokens.muted),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '${minutes}m',
-                style: TeacherTypography.caption.copyWith(
-                  color: AppColors.teacherPrimary,
-                  fontWeight: FontWeight.w700,
+                const SizedBox(width: 8),
+                // Status dot (completed / partial / skipped)
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: _statusColor(log.status),
+                    shape: BoxShape.circle,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: _statusColor(log.status),
-                  shape: BoxShape.circle,
-                ),
-              ),
-              if (log.childFeeling != null) ...[
-                const SizedBox(width: 6),
-                Image.asset(
-                  'assets/blobs/blob-${log.childFeeling}.png',
-                  width: 18,
-                  height: 18,
-                ),
-              ],
-              const SizedBox(width: 8),
-              _CommentAffordance(hasUnread: hasUnread),
+                if (log.childFeeling != null) ...[
+                  const SizedBox(width: 8),
+                  Image.asset(
+                    'assets/blobs/blob-${log.childFeeling}.png',
+                    width: 18,
+                    height: 18,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+                ],
+                if (log.hasRecording) ...[
+                  const SizedBox(width: 8),
+                  RecordingAffordance(
+                      pending: !log.comprehensionAudioUploaded),
+                ],
+                const SizedBox(width: 8),
+                CommentAffordance(hasUnread: hasUnread),
               ],
             ),
           ),
@@ -475,7 +499,7 @@ class _TeacherStudentReadingHistoryScreenState
         if (showDivider)
           Divider(
             height: 1,
-            color: AppColors.teacherBorder,
+            color: LumiTokens.rule,
             indent: 14,
             endIndent: 14,
           ),
@@ -511,15 +535,15 @@ class _TeacherStudentReadingHistoryScreenState
                   children: [
                     Text(
                       book.title,
-                      style: TeacherTypography.bodyMedium,
+                      style: LumiType.body,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 3),
                     Text(
                       '${book.sessionCount} ${book.sessionCount == 1 ? 'session' : 'sessions'}  ·  ${book.totalMinutes} min  ·  $dateRange',
-                      style: TeacherTypography.caption
-                          .copyWith(color: AppColors.textSecondary),
+                      style: LumiType.caption
+                          .copyWith(color: LumiTokens.muted),
                     ),
                   ],
                 ),
@@ -547,7 +571,7 @@ class _TeacherStudentReadingHistoryScreenState
         if (showDivider)
           Divider(
             height: 1,
-            color: AppColors.teacherBorder,
+            color: LumiTokens.rule,
             indent: 14,
             endIndent: 14,
           ),
@@ -558,10 +582,10 @@ class _TeacherStudentReadingHistoryScreenState
   // ─── Helpers ─────────────────────────────────────────────────────────────────
 
   Color _statusColor(String status) => switch (status) {
-        'completed' => AppColors.success,
-        'partial' => AppColors.warmOrange,
-        'skipped' => AppColors.error,
-        _ => AppColors.textSecondary,
+        'completed' => LumiTokens.green,
+        'partial' => LumiTokens.yellow,
+        'skipped' => LumiTokens.red,
+        _ => LumiTokens.muted,
       };
 
   /// Builds a full [ReadingLogModel] from the lightweight snapshot plus the
@@ -584,6 +608,9 @@ class _TeacherStudentReadingHistoryScreenState
       bookTitles: snap.bookTitles,
       notes: snap.notes,
       createdAt: snap.createdAt,
+      comprehensionAudioPath: snap.comprehensionAudioPath,
+      comprehensionAudioDurationSec: snap.comprehensionAudioDurationSec,
+      comprehensionAudioUploaded: snap.comprehensionAudioUploaded,
       lastCommentAt: snap.lastCommentAt,
       lastCommentByRole: snap.lastCommentByRole,
       commentsViewedAt: snap.commentsViewedAt,
@@ -591,15 +618,10 @@ class _TeacherStudentReadingHistoryScreenState
   }
 
   void _openCommentsSheet(_ReadingLogSnapshot snap) {
-    final log = _toReadingLogModel(snap);
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _TeacherCommentsSheet(
-        log: log,
-        studentName: widget.student.fullName,
-      ),
+    openTeacherCommentsSheet(
+      context,
+      log: _toReadingLogModel(snap),
+      studentName: widget.student.fullName,
     );
   }
 
@@ -629,6 +651,13 @@ class _TeacherStudentReadingHistoryScreenState
         parentCommentFreeText:
             (data['parentCommentFreeText'] as String?)?.trim(),
         childFeeling: data['childFeeling'] as String?,
+        comprehensionAudioPath: data['comprehensionAudioPath'] as String?,
+        comprehensionAudioDurationSec:
+            (data['comprehensionAudioDurationSec'] as num?)?.toInt(),
+        comprehensionAudioUploaded:
+            data['comprehensionAudioUploaded'] as bool? ?? false,
+        isQuickLog:
+            (data['metadata'] as Map<String, dynamic>?)?['quickLog'] == true,
         loggedByName: (data['loggedByName'] as String?)?.trim(),
         loggedByLabel: (data['loggedByLabel'] as String?)?.trim(),
         lastCommentAt: (data['lastCommentAt'] as Timestamp?)?.toDate(),
@@ -669,8 +698,8 @@ class _ViewToggle extends StatelessWidget {
       height: 34,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.teacherBorder),
-        color: AppColors.white,
+        border: Border.all(color: LumiTokens.rule),
+        color: LumiTokens.paper,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -681,7 +710,7 @@ class _ViewToggle extends StatelessWidget {
             isLeft: true,
             onTap: () => onChanged(_ViewMode.logs),
           ),
-          Container(width: 1, color: AppColors.teacherBorder),
+          Container(width: 1, color: LumiTokens.rule),
           _toggleSide(
             icon: Icons.menu_book_outlined,
             active: mode == _ViewMode.books,
@@ -705,7 +734,7 @@ class _ViewToggle extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         width: 36,
         decoration: BoxDecoration(
-          color: active ? AppColors.teacherPrimary : AppColors.white,
+          color: active ? LumiTokens.green : LumiTokens.paper,
           borderRadius: BorderRadius.only(
             topLeft: isLeft ? const Radius.circular(7) : Radius.zero,
             bottomLeft: isLeft ? const Radius.circular(7) : Radius.zero,
@@ -717,7 +746,7 @@ class _ViewToggle extends StatelessWidget {
           child: Icon(
             icon,
             size: 18,
-            color: active ? AppColors.white : AppColors.textSecondary,
+            color: active ? LumiTokens.paper : LumiTokens.muted,
           ),
         ),
       ),
@@ -745,11 +774,11 @@ class _BlobFilterChip extends StatelessWidget {
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: isActive ? AppColors.teacherPrimaryLight : AppColors.white,
+          color: isActive ? LumiTokens.tintGreen : LumiTokens.paper,
           shape: BoxShape.circle,
           border: Border.all(
             color:
-                isActive ? AppColors.teacherPrimary : AppColors.teacherBorder,
+                isActive ? LumiTokens.green : LumiTokens.rule,
             width: isActive ? 1.5 : 1.0,
           ),
         ),
@@ -767,125 +796,6 @@ class _BlobFilterChip extends StatelessWidget {
 
 /// Trailing comment icon on a log row, with an accent dot when the teacher has
 /// an unseen parent reply.
-class _CommentAffordance extends StatelessWidget {
-  final bool hasUnread;
-
-  const _CommentAffordance({required this.hasUnread});
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Icon(
-          Icons.mode_comment_outlined,
-          size: 18,
-          color: hasUnread ? AppColors.teacherPrimary : AppColors.textSecondary,
-        ),
-        if (hasUnread)
-          Positioned(
-            top: -3,
-            right: -3,
-            child: Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: AppColors.teacherPrimary,
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.white, width: 1.5),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-/// Bottom sheet hosting a reading log's comment thread for a teacher, with a
-/// composer that lifts above the keyboard.
-class _TeacherCommentsSheet extends StatelessWidget {
-  final ReadingLogModel log;
-  final String studentName;
-
-  const _TeacherCommentsSheet({
-    required this.log,
-    required this.studentName,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final books =
-        log.bookTitles.isNotEmpty ? log.bookTitles.join(', ') : 'Free reading';
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: AppColors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 8),
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.teacherBorder,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                child: Row(
-                  children: [
-                    Icon(Icons.mode_comment_outlined,
-                        size: 20, color: AppColors.teacherPrimary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Comments', style: TeacherTypography.h3),
-                          Text(
-                            '$studentName · $books',
-                            style: TeacherTypography.caption
-                                .copyWith(color: AppColors.textSecondary),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Divider(height: 1, color: AppColors.teacherBorder),
-              Expanded(
-                child: ListView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    CommentThread(
-                      log: log,
-                      authorRole: CommentAuthorRole.teacher,
-                      accentColor: AppColors.teacherPrimary,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 // ─── Data Classes ─────────────────────────────────────────────────────────────
 
 class _ReadingLogSnapshot {
@@ -905,6 +815,10 @@ class _ReadingLogSnapshot {
   final String? childFeeling;
   final String? loggedByName;
   final String? loggedByLabel;
+  final String? comprehensionAudioPath;
+  final int? comprehensionAudioDurationSec;
+  final bool comprehensionAudioUploaded;
+  final bool isQuickLog;
   final DateTime? lastCommentAt;
   final String? lastCommentByRole;
   final Map<String, DateTime> commentsViewedAt;
@@ -926,6 +840,10 @@ class _ReadingLogSnapshot {
     this.notes,
     this.loggedByName,
     this.loggedByLabel,
+    this.comprehensionAudioPath,
+    this.comprehensionAudioDurationSec,
+    this.comprehensionAudioUploaded = false,
+    this.isQuickLog = false,
     this.lastCommentAt,
     this.lastCommentByRole,
     this.commentsViewedAt = const {},
@@ -933,6 +851,10 @@ class _ReadingLogSnapshot {
 
   /// "Logged by …" attribution, or null if this is a legacy log.
   String? get loggedByDisplay => loggedByLabel ?? loggedByName;
+
+  /// Whether this log has a comprehension recording on it (uploaded or not).
+  bool get hasRecording =>
+      comprehensionAudioPath != null && comprehensionAudioPath!.isNotEmpty;
 
   /// Whether the teacher [uid] has an unseen reply: the newest comment is from
   /// a parent and postdates this teacher's last view of the thread.

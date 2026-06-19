@@ -5,8 +5,8 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/teacher_constants.dart';
+import '../../../../theme/lumi_tokens.dart';
+import '../../../../theme/lumi_typography.dart';
 import '../../../../core/widgets/lumi_mascot.dart';
 import '../../../../data/models/class_model.dart';
 import '../../../../data/models/reading_log_model.dart';
@@ -120,17 +120,10 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
-        border: Border.all(color: AppColors.teacherBorder),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.charcoal.withValues(alpha: 0.04),
-            blurRadius: 16,
-            spreadRadius: -4,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+        border: Border.all(color: LumiTokens.rule),
+        boxShadow: LumiTokens.shadowCard,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,14 +131,17 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Weekly Reading Activity', style: TeacherTypography.h3),
+              Text('Weekly Reading Activity', style: LumiType.subhead),
               Text(
-                'This Week',
-                style: TeacherTypography.caption.copyWith(
-                  color: AppColors.teacherPrimary,
-                ),
+                'This week',
+                style: LumiType.caption.copyWith(color: LumiTokens.muted),
               ),
             ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Students who logged reading each day',
+            style: LumiType.caption.copyWith(color: LumiTokens.muted),
           ),
           const SizedBox(height: 16),
           StreamBuilder<QuerySnapshot>(
@@ -195,9 +191,6 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
               final daysElapsed = todayIndex + 1;
               final avgPerDay =
                   daysElapsed > 0 ? (totalWeek / daysElapsed).round() : 0;
-              final avgPercent = totalStudents > 0
-                  ? (avgPerDay / totalStudents * 100).round()
-                  : 0;
 
               return Column(
                 children: [
@@ -221,8 +214,7 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
                           horizontalInterval:
                               max((totalStudents / 3).ceilToDouble(), 1),
                           getDrawingHorizontalLine: (_) => FlLine(
-                            color: AppColors.teacherBorder
-                                .withValues(alpha: 0.5),
+                            color: LumiTokens.rule,
                             strokeWidth: 0.5,
                             dashArray: [4, 4],
                           ),
@@ -232,8 +224,7 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
                             // Ghost benchmark line at total students
                             HorizontalLine(
                               y: totalStudents.toDouble(),
-                              color: AppColors.teacherBorder
-                                  .withValues(alpha: 0.6),
+                              color: LumiTokens.rule,
                               strokeWidth: 1,
                               dashArray: [6, 4],
                             ),
@@ -249,8 +240,9 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
                           },
                           touchTooltipData: BarTouchTooltipData(
                             getTooltipColor: (_) =>
-                                AppColors.charcoal.withValues(alpha: 0.9),
-                            tooltipBorderRadius: BorderRadius.circular(12),
+                                LumiTokens.ink.withValues(alpha: 0.9),
+                            tooltipBorderRadius:
+                                BorderRadius.circular(LumiTokens.radiusMedium),
                             tooltipPadding: const EdgeInsets.symmetric(
                                 horizontal: 14, vertical: 10),
                             getTooltipItem:
@@ -270,16 +262,16 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
                                   : 0;
                               return BarTooltipItem(
                                 '${days[groupIndex]}\n',
-                                TeacherTypography.caption.copyWith(
-                                  color: AppColors.white,
+                                LumiType.caption.copyWith(
+                                  color: LumiTokens.paper,
                                   fontWeight: FontWeight.w700,
                                 ),
                                 children: [
                                   TextSpan(
                                     text:
                                         '$count/$totalStudents read · $pct%',
-                                    style: TeacherTypography.caption.copyWith(
-                                      color: AppColors.white
+                                    style: LumiType.caption.copyWith(
+                                      color: LumiTokens.paper
                                           .withValues(alpha: 0.8),
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -295,7 +287,7 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  _buildFooter(avgPerDay, totalStudents, avgPercent),
+                  _buildFooter(avgPerDay, totalStudents),
                 ],
               );
             },
@@ -322,25 +314,11 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
             toY: isFuture ? 0.3 : count,
             width: 24,
             borderRadius: BorderRadius.circular(6),
-            gradient: isFuture
-                ? null
-                : LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: isToday
-                        ? [
-                            AppColors.teacherPrimary
-                                .withValues(alpha: 0.7),
-                            AppColors.teacherPrimary
-                                .withValues(alpha: 0.07),
-                          ]
-                        : [
-                            AppColors.teacherPrimary,
-                            AppColors.teacherPrimary
-                                .withValues(alpha: 0.10),
-                          ],
-                  ),
-            color: isFuture ? const Color(0xFFF0F4F8) : null,
+            color: isFuture
+                ? LumiTokens.rule
+                : isToday
+                    ? LumiTokens.blue
+                    : LumiTokens.blue.withValues(alpha: 0.55),
           ),
         ],
         showingTooltipIndicators: [],
@@ -363,13 +341,12 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 days[index],
-                style: TeacherTypography.caption.copyWith(
+                style: LumiType.caption.copyWith(
                   color: isToday
-                      ? AppColors.teacherPrimary
+                      ? LumiTokens.blue
                       : isFuture
-                          ? AppColors.textSecondary
-                              .withValues(alpha: 0.4)
-                          : AppColors.textSecondary,
+                          ? LumiTokens.muted.withValues(alpha: 0.4)
+                          : LumiTokens.muted,
                   fontWeight: isToday ? FontWeight.w700 : FontWeight.w600,
                 ),
               ),
@@ -392,10 +369,7 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
               padding: const EdgeInsets.only(bottom: 4),
               child: Text(
                 '$count',
-                style: TeacherTypography.caption.copyWith(
-                  fontSize: 11,
-                  color: AppColors.textSecondary,
-                ),
+                style: LumiType.caption.copyWith(fontSize: 11),
                 textAlign: TextAlign.center,
               ),
             );
@@ -411,8 +385,9 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
     );
   }
 
-  Widget _buildFooter(int avgPerDay, int totalStudents, int avgPercent) {
-    // Compute week-over-week trend
+  Widget _buildFooter(int avgPerDay, int totalStudents) {
+    // Week-over-week trend in students, not a percentage — a % on small class
+    // sizes overstates tiny changes (0.75 → 1 student reads as "+33%").
     String? trendText;
     Color? trendColor;
     IconData? trendIcon;
@@ -421,17 +396,17 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
       final lastAvg = _lastWeekDayCount! > 0
           ? (_lastWeekTotal! / _lastWeekDayCount!).round()
           : 0;
-      final lastPercent = totalStudents > 0
-          ? (lastAvg / totalStudents * 100).round()
-          : 0;
-      final diff = avgPercent - lastPercent;
+      final diff = avgPerDay - lastAvg;
       if (diff > 0) {
-        trendText = '+$diff% vs last week';
-        trendColor = AppColors.success;
+        trendText =
+            diff == 1 ? '1 more than last week' : '$diff more than last week';
+        trendColor = LumiTokens.green;
         trendIcon = Icons.trending_up_rounded;
       } else if (diff < 0) {
-        trendText = '$diff% vs last week';
-        trendColor = AppColors.warmOrange;
+        final n = diff.abs();
+        trendText =
+            n == 1 ? '1 fewer than last week' : '$n fewer than last week';
+        trendColor = LumiTokens.red;
         trendIcon = Icons.trending_down_rounded;
       }
     }
@@ -440,17 +415,15 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.teacherBackground,
-        borderRadius: BorderRadius.circular(12),
+        color: LumiTokens.cream,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            'Avg $avgPerDay/$totalStudents per night',
-            style: TeacherTypography.caption.copyWith(
-              color: AppColors.textSecondary,
-            ),
+            'Avg $avgPerDay of $totalStudents per night',
+            style: LumiType.caption.copyWith(color: LumiTokens.muted),
           ),
           if (trendText != null)
             Row(
@@ -460,7 +433,7 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
                 const SizedBox(width: 3),
                 Text(
                   trendText,
-                  style: TeacherTypography.caption.copyWith(
+                  style: LumiType.caption.copyWith(
                     color: trendColor,
                     fontWeight: FontWeight.w700,
                   ),
@@ -483,9 +456,9 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
         const SizedBox(height: 8),
         Text(
           "Your class's reading week starts here",
-          style: TeacherTypography.bodyMedium.copyWith(
+          style: LumiType.body.copyWith(
             fontWeight: FontWeight.w600,
-            color: AppColors.charcoal,
+            fontSize: 15,
           ),
           textAlign: TextAlign.center,
         ),
@@ -504,17 +477,15 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
                     width: 24,
                     height: maxBarHeight * ghostHeights[index],
                     decoration: BoxDecoration(
-                      color:
-                          AppColors.teacherPrimary.withValues(alpha: 0.06),
+                      color: LumiTokens.blue.withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(6),
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     ['M', 'T', 'W', 'T', 'F', 'S', 'S'][index],
-                    style: TeacherTypography.caption.copyWith(
-                      color:
-                          AppColors.textSecondary.withValues(alpha: 0.4),
+                    style: LumiType.caption.copyWith(
+                      color: LumiTokens.muted.withValues(alpha: 0.4),
                     ),
                   ),
                 ],
@@ -530,10 +501,10 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFE9F7EF),
-        borderRadius: BorderRadius.circular(12),
+        color: LumiTokens.tintGreen,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
         border: Border.all(
-          color: AppColors.success.withValues(alpha: 0.2),
+          color: LumiTokens.green.withValues(alpha: 0.30),
         ),
       ),
       child: Row(
@@ -541,8 +512,8 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
         children: [
           Text(
             "Everyone's read this week",
-            style: TeacherTypography.caption.copyWith(
-              color: AppColors.success,
+            style: LumiType.caption.copyWith(
+              color: LumiTokens.green,
               fontWeight: FontWeight.w700,
             ),
           ),

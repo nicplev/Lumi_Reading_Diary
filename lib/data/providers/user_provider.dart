@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/impersonation_session.dart';
@@ -15,6 +16,27 @@ final userRepositoryProvider = Provider<UserRepository>((ref) {
 final authStateChangesProvider = StreamProvider<String?>((ref) {
   final firebaseService = ref.watch(firebaseServiceProvider);
   return firebaseService.authStateChanges.map((user) => user?.uid);
+});
+
+/// Live view of the signed-in Firebase Auth user, re-emitting whenever that
+/// user's profile changes — crucially when a phone-only account links an
+/// email. [authStateChangesProvider] only fires on sign-in/out, so it can't
+/// observe an email being added to an existing session.
+final firebaseUserChangesProvider = StreamProvider<User?>((ref) {
+  final firebaseService = ref.watch(firebaseServiceProvider);
+  return firebaseService.userChanges;
+});
+
+/// The signed-in account's email as a live value (empty/null when none),
+/// sourced from Firebase Auth via [firebaseUserChangesProvider] so it updates
+/// within moments of an email being linked — no app restart or re-login.
+///
+/// Returns null during a developer impersonation session: the live auth user
+/// is the developer, not the impersonated parent, so callers should fall back
+/// to the impersonated [UserModel]'s own email instead.
+final authEmailProvider = Provider<String?>((ref) {
+  if (ref.watch(impersonationSessionProvider).value != null) return null;
+  return ref.watch(firebaseUserChangesProvider).value?.email;
 });
 
 /// Exposes the [ImpersonationService] singleton so Riverpod-aware code can

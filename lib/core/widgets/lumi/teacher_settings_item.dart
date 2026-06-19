@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/teacher_constants.dart';
+import '../../../theme/lumi_tokens.dart';
 
 /// Lumi Design System - Teacher Settings Item
 ///
-/// 36x36 icon box + label + trailing (arrow or toggle).
-/// Per spec: 10px icon box radius, 18px icon, 15px label.
+/// 36x36 soft icon tile + label + trailing (a muted chevron by default, or a
+/// supplied widget like a status badge or toggle).
 class TeacherSettingsItem extends StatelessWidget {
   final IconData icon;
   final Color iconBgColor;
@@ -28,12 +27,9 @@ class TeacherSettingsItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+      borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
       child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: TeacherDimensions.paddingL,
-          vertical: 9,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
         child: Row(
           children: [
             Container(
@@ -41,7 +37,7 @@ class TeacherSettingsItem extends StatelessWidget {
               height: 36,
               decoration: BoxDecoration(
                 color: iconBgColor.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(LumiTokens.radiusSmall),
               ),
               child: Icon(
                 icon,
@@ -57,23 +53,15 @@ class TeacherSettingsItem extends StatelessWidget {
                   fontFamily: 'Nunito',
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.charcoal,
+                  color: LumiTokens.ink,
                 ),
               ),
             ),
             trailing ??
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: AppColors.teacherSurfaceTint,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.chevron_right,
-                    size: 18,
-                    color: AppColors.teacherPrimary,
-                  ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 22,
+                  color: LumiTokens.muted,
                 ),
           ],
         ),

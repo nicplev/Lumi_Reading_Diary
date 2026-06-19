@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 
 import '../../feelings/feeling_aggregator.dart';
 import '../../feelings/feeling_scale.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/teacher_constants.dart';
+import '../../../theme/lumi_tokens.dart';
+import '../../../theme/lumi_typography.dart';
 
 /// Line chart of average daily feeling on a fixed 1–5 scale.
 ///
@@ -17,7 +17,7 @@ class FeelingsLineChart extends StatelessWidget {
   const FeelingsLineChart({
     super.key,
     required this.buckets,
-    this.lineColor = AppColors.success,
+    this.lineColor = LumiTokens.ink,
   });
 
   @override
@@ -31,7 +31,11 @@ class FeelingsLineChart extends StatelessWidget {
 
     return SizedBox(
       height: 200,
-      child: LineChart(
+      // Right inset so the last x-axis label (e.g. "Sun") isn't clipped at the
+      // card edge — the plot otherwise ran flush to the right.
+      child: Padding(
+        padding: const EdgeInsets.only(right: 10),
+        child: LineChart(
         LineChartData(
           minX: 0,
           maxX: (buckets.length - 1).toDouble(),
@@ -50,15 +54,13 @@ class FeelingsLineChart extends StatelessWidget {
                 show: true,
                 getDotPainter: (spot, percent, barData, index) =>
                     FlDotCirclePainter(
-                  radius: spot.y.isNaN ? 0 : 4,
-                  color: lineColor,
-                  strokeWidth: 0,
+                  radius: spot.y.isNaN ? 0 : 6,
+                  color: _dotColor(spot.y),
+                  strokeWidth: 2,
+                  strokeColor: LumiTokens.paper,
                 ),
               ),
-              belowBarData: BarAreaData(
-                show: true,
-                color: lineColor.withValues(alpha: 0.1),
-              ),
+              belowBarData: BarAreaData(show: false),
             ),
           ],
           titlesData: FlTitlesData(
@@ -90,39 +92,46 @@ class FeelingsLineChart extends StatelessWidget {
             horizontalInterval: 1,
             checkToShowHorizontalLine: (v) => v >= 1 && v <= 5,
             getDrawingHorizontalLine: (v) => FlLine(
-              color: AppColors.teacherBorder.withValues(alpha: 0.6),
+              color: LumiTokens.rule,
               strokeWidth: 1,
+              dashArray: const [4, 4],
             ),
           ),
         ),
       ),
+      ),
     );
   }
 
+  /// Each marker carries its feeling's canonical colour (matching the blobs),
+  /// while the connecting line stays neutral — so colour reads as meaning.
+  Color _dotColor(double y) {
+    if (y.isNaN) return lineColor;
+    final feeling = feelingFromValue(y.round().clamp(1, 5));
+    return feeling?.color ?? lineColor;
+  }
+
   Widget _leftTitle(double value, TitleMeta meta) {
-    final tier = feelingTierByValue[value.toInt()];
+    // Only label exact gridline values. fl_chart also samples the padded
+    // min/max edges (e.g. 5.25), whose toInt() rounded to 5 and rendered a
+    // duplicate 'Great' overlapping the top label.
+    final v = value.round();
+    if ((value - v).abs() > 0.001) return const SizedBox.shrink();
+    final tier = feelingTierByValue[v];
     if (tier == null) return const SizedBox.shrink();
+    // Feelings are categorical, so the description alone is clearer than a
+    // 1–5 numeral — the number is dropped entirely.
     return Padding(
-      padding: const EdgeInsets.only(right: 6),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
-            '${value.toInt()}',
-            style: TeacherTypography.caption.copyWith(
-              fontWeight: FontWeight.w700,
-              color: AppColors.charcoal,
-            ),
-          ),
-          Text(
-            tier,
-            style: TeacherTypography.caption.copyWith(
-              fontSize: 10,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
+      padding: const EdgeInsets.only(right: 8),
+      child: Text(
+        tier,
+        textAlign: TextAlign.right,
+        maxLines: 1,
+        softWrap: false,
+        overflow: TextOverflow.visible,
+        style: LumiType.caption.copyWith(
+          color: LumiTokens.muted,
+        ),
       ),
     );
   }
@@ -136,8 +145,8 @@ class FeelingsLineChart extends StatelessWidget {
       padding: const EdgeInsets.only(top: 6),
       child: Text(
         buckets[i].label,
-        style: TeacherTypography.caption.copyWith(
-          color: AppColors.textSecondary,
+        style: LumiType.caption.copyWith(
+          color: LumiTokens.muted,
         ),
       ),
     );

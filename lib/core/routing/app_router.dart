@@ -31,6 +31,7 @@ import '../../screens/parent/log_reading_screen.dart';
 import '../../screens/parent/reading_history_screen.dart';
 import '../../screens/parent/student_goals_screen.dart';
 import '../../screens/parent/achievements_screen.dart';
+import '../../screens/parent/progress_screen.dart';
 import '../../screens/parent/offline_management_screen.dart';
 import '../../screens/shared/service_status_screen.dart';
 import '../../screens/parent/student_report_screen.dart';
@@ -364,6 +365,17 @@ class AppRouter {
             studentId: student.id,
             schoolId: student.schoolId,
           );
+        },
+      ),
+
+      GoRoute(
+        path: '/parent/progress',
+        name: 'parent-progress',
+        builder: (context, state) {
+          final params = state.extra as Map<String, dynamic>?;
+          final student = params?['student'] as StudentModel?;
+          if (student == null) return const LoginScreen();
+          return ProgressScreen(student: student);
         },
       ),
 

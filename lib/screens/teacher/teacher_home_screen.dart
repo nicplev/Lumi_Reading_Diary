@@ -5,9 +5,9 @@ import 'package:go_router/go_router.dart';
 import 'package:rive/rive.dart' hide Animation;
 
 
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/theme/teacher_constants.dart';
+import '../../theme/lumi_tokens.dart';
+import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_skeleton.dart';
 import '../../core/widgets/lumi_mascot.dart';
@@ -118,12 +118,12 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
+          borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
         ),
-        title: const Text('Sign Out', style: TeacherTypography.h3),
-        content: const Text(
+        title: Text('Sign Out', style: LumiType.subhead),
+        content: Text(
           'Are you sure you want to sign out?',
-          style: TeacherTypography.bodyLarge,
+          style: LumiType.body,
         ),
         actions: [
           TextButton(
@@ -132,9 +132,9 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
+            child: Text(
               'Sign Out',
-              style: TextStyle(color: AppColors.error),
+              style: LumiType.button.copyWith(color: LumiTokens.red),
             ),
           ),
         ],
@@ -158,20 +158,20 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
   Widget _buildBody() {
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: AppColors.teacherBackground,
+        backgroundColor: LumiTokens.cream,
         body: _buildLoadingView(),
       );
     }
 
     if (_classes.isEmpty) {
       return Scaffold(
-        backgroundColor: AppColors.teacherBackground,
+        backgroundColor: LumiTokens.cream,
         body: _buildNoClassesView(),
       );
     }
 
     return Scaffold(
-      backgroundColor: AppColors.teacherBackground,
+      backgroundColor: LumiTokens.cream,
       body: Stack(
         children: [
           PageView(
@@ -254,9 +254,8 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
               decoration: BoxDecoration(
-                gradient: AppColors.teacherGradient,
-                borderRadius:
-                    BorderRadius.circular(TeacherDimensions.radiusXL),
+                color: LumiTokens.blue,
+                borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
               ),
               child: const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -278,10 +277,9 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: AppColors.white,
-                borderRadius:
-                    BorderRadius.circular(TeacherDimensions.radiusXL),
-                border: Border.all(color: AppColors.teacherBorder),
+                color: LumiTokens.paper,
+                borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+                border: Border.all(color: LumiTokens.rule),
               ),
               child: Row(
                 children: [
@@ -335,12 +333,21 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
       const _NavItemSpec.icon(icon: Icons.settings_outlined, label: 'Settings'),
     ];
 
+    // Active tab adopts its section's colour:
+    // Dashboard = blue, Class = green, Library = yellow, Settings = red.
+    const sectionColors = [
+      LumiTokens.blue,
+      LumiTokens.green,
+      LumiTokens.yellow,
+      LumiTokens.red,
+    ];
+
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(36),
         boxShadow: [
           BoxShadow(
-            color: AppColors.teacherPrimary.withValues(alpha: 0.10),
+            color: LumiTokens.ink.withValues(alpha: 0.08),
             blurRadius: 28,
             spreadRadius: -8,
             offset: const Offset(0, 12),
@@ -359,10 +366,10 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
           filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Container(
             decoration: BoxDecoration(
-              color: AppColors.white.withValues(alpha: 0.65),
+              color: LumiTokens.paper.withValues(alpha: 0.65),
               borderRadius: BorderRadius.circular(36),
               border: Border.all(
-                color: AppColors.white.withValues(alpha: 0.55),
+                color: LumiTokens.paper.withValues(alpha: 0.55),
                 width: 1,
               ),
             ),
@@ -377,8 +384,8 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                         label: label,
                         isSelected: _selectedIndex == i,
                         onTap: () => _onTabTapped(i),
-                        selectedColor: AppColors.teacherPrimary,
-                        unselectedColor: AppColors.textSecondary,
+                        selectedColor: sectionColors[i],
+                        unselectedColor: LumiTokens.muted,
                       ),
                     _IconNavSpec(:final icon, :final label, :final size) =>
                       _IconNavItem(
@@ -387,8 +394,8 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                         size: size,
                         isSelected: _selectedIndex == i,
                         onTap: () => _onTabTapped(i),
-                        selectedColor: AppColors.teacherPrimary,
-                        unselectedColor: AppColors.textSecondary,
+                        selectedColor: sectionColors[i],
+                        unselectedColor: LumiTokens.muted,
                       ),
                   },
                 ),
@@ -413,7 +420,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
             Align(
               alignment: Alignment.centerLeft,
               child: Material(
-                color: AppColors.white,
+                color: LumiTokens.paper,
                 borderRadius: BorderRadius.circular(16),
                 child: InkWell(
                   onTap: _handleSignOut,
@@ -421,7 +428,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                   child: const SizedBox(
                     width: 44,
                     height: 44,
-                    child: Icon(Icons.arrow_back, color: AppColors.charcoal),
+                    child: Icon(Icons.arrow_back, color: LumiTokens.ink),
                   ),
                 ),
               ),
@@ -432,10 +439,10 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(28),
                   decoration: BoxDecoration(
-                    color: AppColors.white,
+                    color: LumiTokens.paper,
                     borderRadius: BorderRadius.circular(28),
-                    border: Border.all(color: AppColors.teacherBorder),
-                    boxShadow: TeacherDimensions.cardShadow,
+                    border: Border.all(color: LumiTokens.rule),
+                    boxShadow: LumiTokens.shadowCard,
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -444,7 +451,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                         width: 92,
                         height: 92,
                         decoration: BoxDecoration(
-                          color: AppColors.teacherSurfaceTint,
+                          color: LumiTokens.tintBlue,
                           borderRadius: BorderRadius.circular(28),
                         ),
                         child: const Center(
@@ -457,22 +464,21 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                       const SizedBox(height: 24),
                       Text(
                         'No Classes Assigned',
-                        style: TeacherTypography.h1,
+                        style: LumiType.heading,
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 10),
                       Text(
                         'Your dashboard is ready, but you need an active class before classroom and library workflows become useful.',
-                        style: TeacherTypography.bodyLarge.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
+                        style: LumiType.body.copyWith(color: LumiTokens.muted),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 12),
                       Text(
                         'Ask your school administrator to assign you to a class, then refresh here.',
-                        style: TeacherTypography.bodyMedium.copyWith(
-                          color: AppColors.textSecondary,
+                        style: LumiType.body.copyWith(
+                          color: LumiTokens.muted,
+                          fontSize: 14,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -480,7 +486,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                       LumiPrimaryButton(
                         onPressed: _loadClasses,
                         text: 'Refresh Classes',
-                        color: AppColors.teacherPrimary,
+                        color: LumiTokens.blue,
                         isFullWidth: true,
                         borderRadius: BorderRadius.circular(18),
                       ),
@@ -586,7 +592,7 @@ class _IconNavItem extends StatelessWidget {
           const SizedBox(height: 1),
           Text(
             label,
-            style: TeacherTypography.caption.copyWith(color: color),
+            style: LumiType.caption.copyWith(color: color),
           ),
         ],
       ),
@@ -737,7 +743,7 @@ class _RiveNavItemState extends State<_RiveNavItem> {
           const SizedBox(height: 1),
           Text(
             widget.label,
-            style: TeacherTypography.caption.copyWith(
+            style: LumiType.caption.copyWith(
               color: widget.isSelected
                   ? widget.selectedColor
                   : widget.unselectedColor,

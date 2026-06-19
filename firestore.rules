@@ -284,6 +284,14 @@ service cloud.firestore {
             request.resource.data.parentIds.hasAll(resource.data.parentIds) &&
             request.auth.uid in request.resource.data.parentIds;
 
+        // Profile character: a linked parent can set only their child's
+        // characterId (the profile mascot they pick in-app).
+        allow update: if isSignedIn() &&
+            writeAllowedForDev() &&
+            getUserData(schoolId).linkedChildren != null &&
+            studentId in getUserData(schoolId).linkedChildren &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['characterId']);
+
         match /readingLevelEvents/{eventId} {
           allow get, list: if isSchoolAdmin(schoolId) ||
               isTeacher(schoolId) ||
@@ -352,6 +360,21 @@ service cloud.firestore {
               isSchoolAdmin(schoolId) ||
               isTeacher(schoolId)
             );
+
+        // A linked parent who didn't create the log (a co-carer, or someone
+        // viewing a teacher-proxy log for their child) may still clear their
+        // own unread badge. Scoped tightly: the only field they can touch is
+        // `commentsViewedAt`, and within it only their own uid key — so a
+        // non-owner can't edit log content or another carer's read marker.
+        allow update: if writeAllowedForDev() &&
+            isSignedIn() &&
+            getUserData(schoolId).linkedChildren != null &&
+            resource.data.studentId in getUserData(schoolId).linkedChildren &&
+            request.resource.data.diff(resource.data)
+                .affectedKeys().hasOnly(['commentsViewedAt']) &&
+            request.resource.data.commentsViewedAt
+                .diff(resource.data.get('commentsViewedAt', {}))
+                .affectedKeys().hasOnly([request.auth.uid]);
 
         // Parent can delete a log they created (powers the widget-undo
         // banner). Stats are reconciled by the aggregateStudentStats Cloud

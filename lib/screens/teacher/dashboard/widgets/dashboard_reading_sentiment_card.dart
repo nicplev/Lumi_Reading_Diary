@@ -1,8 +1,7 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/teacher_constants.dart';
+import '../../../../theme/lumi_tokens.dart';
+import '../../../../theme/lumi_typography.dart';
 import '../../../../data/models/reading_log_model.dart';
 
 /// Shows the distribution of child reading feelings (hard → great) this week.
@@ -22,24 +21,15 @@ class DashboardReadingSentimentCard extends StatelessWidget {
     ReadingFeeling.hard,
   ];
 
+  // Each feeling's bar hue echoes its blob art: red(great) → orange(good) →
+  // yellow(okay) → green(tricky) → blue(hard). Matches feeling_scale.dart order.
   static Color _feelingColor(ReadingFeeling f) {
     return switch (f) {
-      ReadingFeeling.great => AppColors.success,
-      ReadingFeeling.good => AppColors.mintGreen,
-      ReadingFeeling.okay => const Color(0xFFE0C85A),
-      ReadingFeeling.tricky => AppColors.warmOrange,
-      ReadingFeeling.hard => AppColors.error,
-    };
-  }
-
-  // Darker text-safe versions of each feeling color for readable labels
-  static Color _feelingTextColor(ReadingFeeling f) {
-    return switch (f) {
-      ReadingFeeling.great => AppColors.success,
-      ReadingFeeling.good => const Color(0xFF4A8A3A),
-      ReadingFeeling.okay => const Color(0xFF9A8220),
-      ReadingFeeling.tricky => AppColors.warmOrange,
-      ReadingFeeling.hard => AppColors.error,
+      ReadingFeeling.great => LumiTokens.red,
+      ReadingFeeling.good => LumiTokens.orange,
+      ReadingFeeling.okay => LumiTokens.yellow,
+      ReadingFeeling.tricky => LumiTokens.green,
+      ReadingFeeling.hard => LumiTokens.blue,
     };
   }
 
@@ -63,8 +53,6 @@ class DashboardReadingSentimentCard extends StatelessWidget {
       }
     }
     final totalWithFeeling = counts.values.fold<int>(0, (a, b) => a + b);
-    final maxCount =
-        counts.values.fold<int>(0, (a, b) => math.max(a, b));
 
     // Find most common feeling
     ReadingFeeling? mostCommon;
@@ -73,21 +61,17 @@ class DashboardReadingSentimentCard extends StatelessWidget {
           .reduce((a, b) => a.value >= b.value ? a : b)
           .key;
     }
+    // Struggling entries worth a teacher's eye.
+    final needReview = (counts[ReadingFeeling.tricky] ?? 0) +
+        (counts[ReadingFeeling.hard] ?? 0);
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
-        border: Border.all(color: AppColors.teacherBorder),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.charcoal.withValues(alpha: 0.04),
-            blurRadius: 16,
-            spreadRadius: -4,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+        border: Border.all(color: LumiTokens.rule),
+        boxShadow: LumiTokens.shadowCard,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -96,12 +80,17 @@ class DashboardReadingSentimentCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Reading Sentiment',
-                  style: TeacherTypography.sectionHeader
-                      .copyWith(color: AppColors.teacherPrimary)),
-              Text('This week', style: TeacherTypography.caption),
+              Text('Reading Sentiment', style: LumiType.subhead),
+              Text('This week', style: LumiType.caption),
             ],
           ),
+          if (totalWithFeeling > 0) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Based on $totalWithFeeling ${totalWithFeeling == 1 ? 'entry' : 'entries'}',
+              style: LumiType.caption.copyWith(color: LumiTokens.muted),
+            ),
+          ],
           const SizedBox(height: 16),
 
           if (totalWithFeeling == 0)
@@ -110,39 +99,30 @@ class DashboardReadingSentimentCard extends StatelessWidget {
             ..._feelingOrder.map((f) => _buildBar(
                   feeling: f,
                   count: counts[f] ?? 0,
-                  maxCount: maxCount,
+                  total: totalWithFeeling,
                 )),
-            const SizedBox(height: 12),
-            // Footer: most common
+            const SizedBox(height: 6),
+            // Footer: a plain, actionable insight line (no decorative pill).
             if (mostCommon != null)
-              Container(
-                width: double.infinity,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: _feelingColor(mostCommon).withValues(alpha: 0.08),
-                  borderRadius:
-                      BorderRadius.circular(TeacherDimensions.radiusS),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Image.asset(
-                      'assets/blobs/blob-${mostCommon.name}.png',
-                      width: 18,
-                      height: 18,
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              Row(
+                children: [
+                  Image.asset(
+                    'assets/blobs/blob-${mostCommon.name}.png',
+                    width: 18,
+                    height: 18,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      needReview > 0
+                          ? '${_feelingLabel(mostCommon)} most common · $needReview may need review'
+                          : '${_feelingLabel(mostCommon)} most common',
+                      style: LumiType.caption.copyWith(color: LumiTokens.ink),
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Most common: ${_feelingLabel(mostCommon)}',
-                      style: TeacherTypography.caption.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: _feelingTextColor(mostCommon),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
           ],
         ],
@@ -153,9 +133,10 @@ class DashboardReadingSentimentCard extends StatelessWidget {
   Widget _buildBar({
     required ReadingFeeling feeling,
     required int count,
-    required int maxCount,
+    required int total,
   }) {
-    final fraction = maxCount > 0 ? count / maxCount : 0.0;
+    final fraction = total > 0 ? count / total : 0.0;
+    final pct = total > 0 ? (count / total * 100).round() : 0;
     final color = _feelingColor(feeling);
 
     return Padding(
@@ -166,12 +147,18 @@ class DashboardReadingSentimentCard extends StatelessWidget {
           SizedBox(
             width: 24,
             height: 24,
-            child: Image.asset(
-              'assets/blobs/blob-${feeling.name}.png',
-              errorBuilder: (_, __, ___) => Icon(
-                Icons.sentiment_neutral_rounded,
-                size: 20,
-                color: color,
+            child: Padding(
+              // The "hard" blob art sits larger in its canvas than the others;
+              // a small inset keeps all five blobs visually the same size.
+              padding: EdgeInsets.all(feeling == ReadingFeeling.hard ? 2.5 : 0),
+              child: Image.asset(
+                'assets/blobs/blob-${feeling.name}.png',
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Icon(
+                  Icons.sentiment_neutral_rounded,
+                  size: 20,
+                  color: color,
+                ),
               ),
             ),
           ),
@@ -181,8 +168,10 @@ class DashboardReadingSentimentCard extends StatelessWidget {
             width: 48,
             child: Text(
               _feelingLabel(feeling),
-              style: TeacherTypography.caption
-                  .copyWith(fontWeight: FontWeight.w600),
+              style: LumiType.caption.copyWith(
+                fontWeight: FontWeight.w600,
+                color: LumiTokens.ink,
+              ),
             ),
           ),
           const SizedBox(width: 8),
@@ -193,23 +182,33 @@ class DashboardReadingSentimentCard extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: fraction,
                 minHeight: 10,
-                backgroundColor: color.withValues(alpha: 0.08),
-                valueColor: AlwaysStoppedAnimation<Color>(
-                    color.withValues(alpha: 0.7)),
+                backgroundColor: LumiTokens.rule,
+                valueColor:
+                    AlwaysStoppedAnimation<Color>(color.withValues(alpha: 0.7)),
               ),
             ),
           ),
           const SizedBox(width: 10),
-          // Count
+          // Count + percentage of total
           SizedBox(
-            width: 24,
-            child: Text(
-              '$count',
-              textAlign: TextAlign.right,
-              style: TeacherTypography.caption.copyWith(
-                fontWeight: FontWeight.w700,
-                color: AppColors.charcoal,
+            width: 54,
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: '$count',
+                    style: LumiType.caption.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: LumiTokens.ink,
+                    ),
+                  ),
+                  TextSpan(
+                    text: '  $pct%',
+                    style: LumiType.caption.copyWith(color: LumiTokens.muted),
+                  ),
+                ],
               ),
+              textAlign: TextAlign.right,
             ),
           ),
         ],
@@ -225,12 +224,11 @@ class DashboardReadingSentimentCard extends StatelessWidget {
           children: [
             Icon(Icons.sentiment_satisfied_alt_rounded,
                 size: 32,
-                color: AppColors.textSecondary.withValues(alpha: 0.3)),
+                color: LumiTokens.muted.withValues(alpha: 0.3)),
             const SizedBox(height: 8),
             Text(
               'No reading feelings shared yet this week',
-              style: TeacherTypography.bodySmall
-                  .copyWith(color: AppColors.textSecondary),
+              style: LumiType.caption,
             ),
           ],
         ),

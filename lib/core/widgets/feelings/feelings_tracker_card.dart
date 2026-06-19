@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../data/models/reading_log_model.dart';
 import '../../feelings/feeling_aggregator.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/teacher_constants.dart';
+import '../../../theme/lumi_tokens.dart';
+import '../../../theme/lumi_typography.dart';
 import 'feelings_glance_row.dart';
 import 'feelings_line_chart.dart';
 
@@ -32,7 +32,7 @@ class FeelingsTrackerCard extends StatefulWidget {
   const FeelingsTrackerCard({
     super.key,
     required this.logs,
-    this.accentColor = AppColors.success,
+    this.accentColor = LumiTokens.green,
     this.now,
   });
 
@@ -48,43 +48,30 @@ class _FeelingsTrackerCardState extends State<FeelingsTrackerCard> {
     final series =
         aggregateFeelings(widget.logs, period: _period, now: widget.now);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _card(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _header(),
-              const SizedBox(height: 16),
-              if (!series.hasAnyFeeling)
-                _emptyState()
-              else
-                FeelingsLineChart(
-                  buckets: series.buckets,
-                  lineColor: widget.accentColor,
-                ),
-            ],
-          ),
-        ),
-        if (series.showGlance && series.hasAnyFeeling) ...[
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _header(),
           const SizedBox(height: 16),
-          _card(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'This Week at a Glance',
-                  style: TeacherTypography.sectionHeader
-                      .copyWith(color: AppColors.teacherPrimary),
-                ),
-                const SizedBox(height: 16),
-                FeelingsGlanceRow(buckets: series.buckets),
-              ],
+          if (!series.hasAnyFeeling)
+            _emptyState()
+          else ...[
+            FeelingsLineChart(
+              buckets: series.buckets,
+              lineColor: widget.accentColor,
             ),
-          ),
+            // Per-day feeling blobs live in the same card, under the trend —
+            // one card instead of two near-duplicate ones.
+            if (series.showGlance) ...[
+              const SizedBox(height: 16),
+              const Divider(height: 1, color: LumiTokens.rule),
+              const SizedBox(height: 16),
+              FeelingsGlanceRow(buckets: series.buckets),
+            ],
+          ],
         ],
-      ],
+      ),
     );
   }
 
@@ -95,8 +82,7 @@ class _FeelingsTrackerCardState extends State<FeelingsTrackerCard> {
         Flexible(
           child: Text(
             'Reading Feelings',
-            style: TeacherTypography.sectionHeader
-                .copyWith(color: AppColors.teacherPrimary),
+            style: LumiType.subhead,
           ),
         ),
         _periodSelector(),
@@ -109,25 +95,58 @@ class _FeelingsTrackerCardState extends State<FeelingsTrackerCard> {
       initialValue: _period,
       onSelected: (p) => setState(() => _period = p),
       tooltip: 'Change period',
+      // Match the app's rounded, bordered surfaces instead of the default
+      // Material menu.
+      color: LumiTokens.paper,
+      surfaceTintColor: LumiTokens.paper,
+      elevation: 3,
+      position: PopupMenuPosition.under,
+      offset: const Offset(0, 6),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+        side: const BorderSide(color: LumiTokens.rule),
+      ),
       itemBuilder: (_) => [
         for (final p in FeelingPeriod.values)
-          PopupMenuItem(value: p, child: Text(p.label)),
+          PopupMenuItem(
+            value: p,
+            height: 42,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    p.label,
+                    style: LumiType.caption.copyWith(
+                      fontWeight:
+                          p == _period ? FontWeight.w700 : FontWeight.w500,
+                      color: p == _period
+                          ? LumiTokens.ink
+                          : LumiTokens.muted,
+                    ),
+                  ),
+                ),
+                if (p == _period)
+                  const Icon(Icons.check_rounded,
+                      size: 16, color: LumiTokens.ink),
+              ],
+            ),
+          ),
       ],
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: AppColors.teacherBackground,
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
-          border: Border.all(color: AppColors.teacherBorder),
+          color: LumiTokens.cream,
+          borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+          border: Border.all(color: LumiTokens.rule),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               _period.label,
-              style: TeacherTypography.caption.copyWith(
+              style: LumiType.caption.copyWith(
                 fontWeight: FontWeight.w600,
-                color: AppColors.charcoal,
+                color: LumiTokens.ink,
               ),
             ),
             const SizedBox(width: 4),
@@ -147,13 +166,12 @@ class _FeelingsTrackerCardState extends State<FeelingsTrackerCard> {
             Icon(
               Icons.sentiment_satisfied_alt_rounded,
               size: 32,
-              color: AppColors.textSecondary.withValues(alpha: 0.3),
+              color: LumiTokens.muted.withValues(alpha: 0.3),
             ),
             const SizedBox(height: 8),
             Text(
               'No reading feelings recorded yet',
-              style: TeacherTypography.bodySmall
-                  .copyWith(color: AppColors.textSecondary),
+              style: LumiType.caption,
               textAlign: TextAlign.center,
             ),
           ],
@@ -167,17 +185,10 @@ class _FeelingsTrackerCardState extends State<FeelingsTrackerCard> {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
-        border: Border.all(color: AppColors.teacherBorder),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.charcoal.withValues(alpha: 0.04),
-            blurRadius: 16,
-            spreadRadius: -4,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+        border: Border.all(color: LumiTokens.rule),
+        boxShadow: LumiTokens.shadowCard,
       ),
       child: child,
     );

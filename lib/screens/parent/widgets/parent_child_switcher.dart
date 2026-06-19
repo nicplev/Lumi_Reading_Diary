@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/theme/app_colors.dart';
+import '../../../theme/lumi_tokens.dart';
+import '../../../theme/lumi_typography.dart';
+import '../../../theme/section_theme.dart';
 import '../../../core/theme/lumi_spacing.dart';
-import '../../../core/theme/lumi_text_styles.dart';
 import '../../../core/widgets/lumi/student_avatar.dart';
 import '../../../data/models/student_model.dart';
 import '../../../data/providers/active_child_provider.dart';
@@ -72,6 +73,7 @@ class _ChildPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accent = context.sectionTheme.accent;
     return Semantics(
       button: true,
       selected: isActive,
@@ -85,13 +87,13 @@ class _ChildPill extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(6, 6, 14, 6),
           decoration: BoxDecoration(
             color: isActive
-                ? AppColors.rosePink.withValues(alpha: 0.12)
-                : AppColors.white,
-            borderRadius: BorderRadius.circular(999),
+                ? accent.withValues(alpha: 0.12)
+                : LumiTokens.paper,
+            borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
             border: Border.all(
               color: isActive
-                  ? AppColors.rosePink
-                  : AppColors.charcoal.withValues(alpha: 0.12),
+                  ? accent
+                  : LumiTokens.ink.withValues(alpha: 0.12),
               width: isActive ? 1.6 : 1,
             ),
           ),
@@ -102,11 +104,8 @@ class _ChildPill extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 student.firstName,
-                style: LumiTextStyles.bodyMedium(
-                  color: isActive
-                      ? AppColors.rosePink
-                      : AppColors.charcoal.withValues(alpha: 0.7),
-                ).copyWith(
+                style: LumiType.body.copyWith(
+                  color: isActive ? accent : LumiTokens.muted,
                   fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
                 ),
               ),

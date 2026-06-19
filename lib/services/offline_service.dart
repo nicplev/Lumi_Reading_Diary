@@ -219,6 +219,26 @@ class OfflineService with WidgetsBindingObserver {
     }
   }
 
+  /// Troubleshooting reset: clears the local *mirror* of cloud data (reading
+  /// logs, students, allocations) so the app re-downloads it fresh. Crucially
+  /// it preserves the pending-sync queue and local drafts, so any unsynced work
+  /// is never lost — it will still upload on the next sync.
+  Future<void> clearCachedData() async {
+    if (!_initialized) {
+      debugPrint('Offline service not initialized, skipping cached-data clear');
+      return;
+    }
+    try {
+      await _readingLogsBox.clear();
+      await _studentsBox.clear();
+      await _allocationsBox.clear();
+      debugPrint(
+          'Cleared cached cloud data (kept ${_syncQueue.length} pending writes + drafts)');
+    } catch (e) {
+      debugPrint('Error clearing cached data: $e');
+    }
+  }
+
   Future<void> _checkConnectivity() async {
     try {
       final results = await _connectivity.checkConnectivity();
@@ -851,7 +871,14 @@ class OfflineService with WidgetsBindingObserver {
         .doc(logId);
 
     try {
-      await logRef.update({'comprehensionAudioUploaded': true});
+      // Stamp the path + duration alongside the uploaded flag. Idempotent for
+      // the full flow (the log create already set them); required for logs that
+      // attached comprehension after the fact while offline.
+      await logRef.update({
+        'comprehensionAudioPath': storagePath,
+        'comprehensionAudioDurationSec': durationSec,
+        'comprehensionAudioUploaded': true,
+      });
     } on FirebaseException catch (e) {
       if (e.code == 'not-found') {
         // The log create hasn't drained yet — re-throw as a generic

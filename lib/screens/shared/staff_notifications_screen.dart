@@ -1,15 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/teacher_constants.dart';
+import '../../theme/lumi_tokens.dart';
+import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/teacher_filter_chip.dart';
 import '../../core/widgets/lumi/teacher_settings_item.dart';
+import '../../core/widgets/lumi/student_avatar.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/notification_campaign_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/user_model.dart';
 import '../../services/staff_notification_service.dart';
+
+/// Flat, bordered "bento" card surface used across this screen.
+BoxDecoration _lumiCard() => BoxDecoration(
+      color: LumiTokens.paper,
+      borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+      border: Border.all(color: LumiTokens.rule),
+    );
 
 class StaffNotificationsScreen extends StatefulWidget {
   const StaffNotificationsScreen({
@@ -152,9 +160,9 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
 
             return Container(
               decoration: BoxDecoration(
-                color: AppColors.white,
+                color: LumiTokens.paper,
                 borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(TeacherDimensions.radiusXL),
+                  top: Radius.circular(LumiTokens.radiusXL),
                 ),
               ),
               child: SafeArea(
@@ -168,7 +176,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: AppColors.teacherBorder,
+                          color: LumiTokens.rule,
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -182,16 +190,16 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                             width: 36,
                             height: 36,
                             decoration: BoxDecoration(
-                              color: AppColors.warmOrange
+                              color: LumiTokens.yellow
                                   .withValues(alpha: 0.14),
                               borderRadius: BorderRadius.circular(
-                                  TeacherDimensions.radiusM),
+                                  LumiTokens.radiusMedium),
                             ),
                             child: const Icon(Icons.schedule,
-                                color: AppColors.warmOrange, size: 20),
+                                color: LumiTokens.yellow, size: 20),
                           ),
                           const SizedBox(width: 12),
-                          Text('Schedule', style: TeacherTypography.h3),
+                          Text('Schedule', style: LumiType.subhead),
                         ],
                       ),
                     ),
@@ -205,7 +213,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                         child: Padding(
                           padding: const EdgeInsets.only(left: 16),
                           child: Text('DATE',
-                              style: TeacherTypography.sectionHeader),
+                              style: LumiType.sectionLabel),
                         ),
                       ),
                     ),
@@ -230,14 +238,14 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                                   horizontal: 16, vertical: 10),
                               decoration: BoxDecoration(
                                 color: isActive
-                                    ? AppColors.teacherPrimary
-                                    : AppColors.white,
+                                    ? LumiTokens.blue
+                                    : LumiTokens.paper,
                                 borderRadius: BorderRadius.circular(
-                                    TeacherDimensions.radiusRound),
+                                    LumiTokens.radiusPill),
                                 border: Border.all(
                                   color: isActive
-                                      ? AppColors.teacherPrimary
-                                      : AppColors.teacherBorder,
+                                      ? LumiTokens.blue
+                                      : LumiTokens.rule,
                                 ),
                               ),
                               child: Center(
@@ -248,8 +256,8 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
                                     color: isActive
-                                        ? AppColors.white
-                                        : AppColors.textSecondary,
+                                        ? LumiTokens.paper
+                                        : LumiTokens.muted,
                                   ),
                                 ),
                               ),
@@ -268,7 +276,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                         child: Padding(
                           padding: const EdgeInsets.only(left: 16),
                           child: Text('TIME',
-                              style: TeacherTypography.sectionHeader),
+                              style: LumiType.sectionLabel),
                         ),
                       ),
                     ),
@@ -278,11 +286,11 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                         padding: const EdgeInsets.symmetric(
                             horizontal: 20, vertical: 20),
                         decoration: BoxDecoration(
-                          color: AppColors.teacherSurfaceTint,
+                          color: LumiTokens.blue.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(
-                              TeacherDimensions.radiusL),
+                              LumiTokens.radiusLarge),
                           border: Border.all(
-                              color: AppColors.teacherBorder),
+                              color: LumiTokens.rule),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -298,11 +306,11 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                                     width: 40,
                                     height: 32,
                                     decoration: BoxDecoration(
-                                      color: AppColors.white,
+                                      color: LumiTokens.paper,
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: const Icon(Icons.keyboard_arrow_up,
-                                        color: AppColors.teacherPrimary, size: 22),
+                                        color: LumiTokens.blue, size: 22),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -322,18 +330,18 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                                     width: 64,
                                     height: 56,
                                     decoration: BoxDecoration(
-                                      color: AppColors.white,
+                                      color: LumiTokens.paper,
                                       borderRadius: BorderRadius.circular(
-                                          TeacherDimensions.radiusM),
+                                          LumiTokens.radiusMedium),
                                       border: Border.all(
-                                          color: AppColors.teacherPrimary,
+                                          color: LumiTokens.blue,
                                           width: 1.5),
                                     ),
                                     child: Center(
                                       child: Text(
                                         selectedHour.toString().padLeft(2, '0'),
-                                        style: TeacherTypography.h1.copyWith(
-                                            color: AppColors.teacherPrimary),
+                                        style: LumiType.heading.copyWith(
+                                            color: LumiTokens.blue),
                                       ),
                                     ),
                                   ),
@@ -346,11 +354,11 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                                     width: 40,
                                     height: 32,
                                     decoration: BoxDecoration(
-                                      color: AppColors.white,
+                                      color: LumiTokens.paper,
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: const Icon(Icons.keyboard_arrow_down,
-                                        color: AppColors.teacherPrimary, size: 22),
+                                        color: LumiTokens.blue, size: 22),
                                   ),
                                 ),
                               ],
@@ -359,8 +367,8 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 16),
                               child: Text(':',
-                                  style: TeacherTypography.h1
-                                      .copyWith(color: AppColors.textSecondary)),
+                                  style: LumiType.heading
+                                      .copyWith(color: LumiTokens.muted)),
                             ),
                             // Minute column
                             Column(
@@ -373,11 +381,11 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                                     width: 40,
                                     height: 32,
                                     decoration: BoxDecoration(
-                                      color: AppColors.white,
+                                      color: LumiTokens.paper,
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: const Icon(Icons.keyboard_arrow_up,
-                                        color: AppColors.teacherPrimary, size: 22),
+                                        color: LumiTokens.blue, size: 22),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -396,18 +404,18 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                                     width: 64,
                                     height: 56,
                                     decoration: BoxDecoration(
-                                      color: AppColors.white,
+                                      color: LumiTokens.paper,
                                       borderRadius: BorderRadius.circular(
-                                          TeacherDimensions.radiusM),
+                                          LumiTokens.radiusMedium),
                                       border: Border.all(
-                                          color: AppColors.teacherPrimary,
+                                          color: LumiTokens.blue,
                                           width: 1.5),
                                     ),
                                     child: Center(
                                       child: Text(
                                         selectedMinute.toString().padLeft(2, '0'),
-                                        style: TeacherTypography.h1.copyWith(
-                                            color: AppColors.teacherPrimary),
+                                        style: LumiType.heading.copyWith(
+                                            color: LumiTokens.blue),
                                       ),
                                     ),
                                   ),
@@ -420,11 +428,11 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                                     width: 40,
                                     height: 32,
                                     decoration: BoxDecoration(
-                                      color: AppColors.white,
+                                      color: LumiTokens.paper,
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: const Icon(Icons.keyboard_arrow_down,
-                                        color: AppColors.teacherPrimary, size: 22),
+                                        color: LumiTokens.blue, size: 22),
                                   ),
                                 ),
                               ],
@@ -447,23 +455,21 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                                 onTap: () =>
                                     Navigator.of(context).pop(),
                                 borderRadius: BorderRadius.circular(
-                                    TeacherDimensions.radiusM),
+                                    LumiTokens.radiusMedium),
                                 child: Container(
                                   height: 44,
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(
-                                        TeacherDimensions.radiusM),
+                                        LumiTokens.radiusMedium),
                                     border: Border.all(
                                         color:
-                                            AppColors.teacherBorder),
+                                            LumiTokens.rule),
                                   ),
                                   child: Center(
                                     child: Text('Cancel',
-                                        style: TeacherTypography
-                                            .buttonText
+                                        style: LumiType.button
                                             .copyWith(
-                                                color: AppColors
-                                                    .textSecondary)),
+                                                color: LumiTokens.muted)),
                                   ),
                                 ),
                               ),
@@ -486,18 +492,17 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                                       .pop(scheduled);
                                 },
                                 borderRadius: BorderRadius.circular(
-                                    TeacherDimensions.radiusM),
+                                    LumiTokens.radiusMedium),
                                 child: Container(
                                   height: 44,
                                   decoration: BoxDecoration(
-                                    color: AppColors.teacherPrimary,
+                                    color: LumiTokens.blue,
                                     borderRadius: BorderRadius.circular(
-                                        TeacherDimensions.radiusM),
+                                        LumiTokens.radiusMedium),
                                   ),
                                   child: Center(
                                     child: Text('Confirm',
-                                        style: TeacherTypography
-                                            .buttonText),
+                                        style: LumiType.button),
                                   ),
                                 ),
                               ),
@@ -537,9 +542,9 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                 maxHeight: MediaQuery.of(context).size.height * 0.7,
               ),
               decoration: BoxDecoration(
-                color: AppColors.white,
+                color: LumiTokens.paper,
                 borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(TeacherDimensions.radiusXL),
+                  top: Radius.circular(LumiTokens.radiusXL),
                 ),
               ),
               child: Column(
@@ -552,7 +557,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: AppColors.teacherBorder,
+                        color: LumiTokens.rule,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -566,25 +571,25 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                           width: 36,
                           height: 36,
                           decoration: BoxDecoration(
-                            color: AppColors.decodableBlue
+                            color: LumiTokens.blue
                                 .withValues(alpha: 0.14),
                             borderRadius: BorderRadius.circular(
-                                TeacherDimensions.radiusM),
+                                LumiTokens.radiusMedium),
                           ),
                           child: const Icon(Icons.class_outlined,
-                              color: AppColors.decodableBlue, size: 20),
+                              color: LumiTokens.blue, size: 20),
                         ),
                         const SizedBox(width: 12),
                         Text('Choose Classes',
-                            style: TeacherTypography.h3),
+                            style: LumiType.subhead),
                         const Spacer(),
                         Text('${selected.length} selected',
-                            style: TeacherTypography.bodySmall),
+                            style: LumiType.caption),
                       ],
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Divider(height: 1, color: AppColors.teacherBorder),
+                  Divider(height: 1, color: LumiTokens.rule),
                   // List
                   Flexible(
                     child: ListView.separated(
@@ -595,7 +600,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                         height: 1,
                         indent: 20,
                         endIndent: 20,
-                        color: AppColors.teacherBorder
+                        color: LumiTokens.rule
                             .withValues(alpha: 0.5),
                       ),
                       itemBuilder: (context, index) {
@@ -621,13 +626,13 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                                   width: 40,
                                   height: 40,
                                   decoration: BoxDecoration(
-                                    color: AppColors.teacherPrimary
+                                    color: LumiTokens.blue
                                         .withValues(alpha: 0.14),
                                     borderRadius:
                                         BorderRadius.circular(12),
                                   ),
                                   child: const Icon(Icons.class_,
-                                      color: AppColors.teacherPrimary,
+                                      color: LumiTokens.blue,
                                       size: 20),
                                 ),
                                 const SizedBox(width: 14),
@@ -637,15 +642,14 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(classModel.name,
-                                          style: TeacherTypography
-                                              .bodyLarge
+                                          style: LumiType.body
                                               .copyWith(
                                                   fontWeight:
                                                       FontWeight.w600)),
                                       Text(
                                         '${classModel.studentIds.length} students',
                                         style:
-                                            TeacherTypography.bodySmall,
+                                            LumiType.caption,
                                       ),
                                     ],
                                   ),
@@ -657,21 +661,21 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                                   height: 28,
                                   decoration: BoxDecoration(
                                     color: isSelected
-                                        ? AppColors.teacherPrimary
+                                        ? LumiTokens.blue
                                         : Colors.transparent,
                                     borderRadius:
                                         BorderRadius.circular(8),
                                     border: Border.all(
                                       color: isSelected
-                                          ? AppColors.teacherPrimary
-                                          : AppColors.teacherBorder,
+                                          ? LumiTokens.blue
+                                          : LumiTokens.rule,
                                       width: 1.5,
                                     ),
                                   ),
                                   child: isSelected
                                       ? const Icon(Icons.check,
                                           size: 16,
-                                          color: AppColors.white)
+                                          color: LumiTokens.paper)
                                       : null,
                                 ),
                               ],
@@ -682,7 +686,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                     ),
                   ),
                   // Footer
-                  Divider(height: 1, color: AppColors.teacherBorder),
+                  Divider(height: 1, color: LumiTokens.rule),
                   SafeArea(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
@@ -695,22 +699,20 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                                 onTap: () =>
                                     Navigator.of(context).pop(),
                                 borderRadius: BorderRadius.circular(
-                                    TeacherDimensions.radiusM),
+                                    LumiTokens.radiusMedium),
                                 child: Container(
                                   height: 44,
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(
-                                        TeacherDimensions.radiusM),
+                                        LumiTokens.radiusMedium),
                                     border: Border.all(
-                                        color: AppColors.teacherBorder),
+                                        color: LumiTokens.rule),
                                   ),
                                   child: Center(
                                     child: Text('Cancel',
-                                        style: TeacherTypography
-                                            .buttonText
+                                        style: LumiType.button
                                             .copyWith(
-                                                color: AppColors
-                                                    .textSecondary)),
+                                                color: LumiTokens.muted)),
                                   ),
                                 ),
                               ),
@@ -724,18 +726,17 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                                 onTap: () => Navigator.of(context)
                                     .pop(selected),
                                 borderRadius: BorderRadius.circular(
-                                    TeacherDimensions.radiusM),
+                                    LumiTokens.radiusMedium),
                                 child: Container(
                                   height: 44,
                                   decoration: BoxDecoration(
-                                    color: AppColors.teacherPrimary,
+                                    color: LumiTokens.blue,
                                     borderRadius: BorderRadius.circular(
-                                        TeacherDimensions.radiusM),
+                                        LumiTokens.radiusMedium),
                                   ),
                                   child: Center(
                                     child: Text('Apply',
-                                        style: TeacherTypography
-                                            .buttonText),
+                                        style: LumiType.button),
                                   ),
                                 ),
                               ),
@@ -787,9 +788,9 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                 maxHeight: MediaQuery.of(context).size.height * 0.75,
               ),
               decoration: BoxDecoration(
-                color: AppColors.white,
+                color: LumiTokens.paper,
                 borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(TeacherDimensions.radiusXL),
+                  top: Radius.circular(LumiTokens.radiusXL),
                 ),
               ),
               child: Column(
@@ -802,7 +803,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: AppColors.teacherBorder,
+                        color: LumiTokens.rule,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -816,25 +817,25 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                           width: 36,
                           height: 36,
                           decoration: BoxDecoration(
-                            color: AppColors.teacherPrimary
+                            color: LumiTokens.blue
                                 .withValues(alpha: 0.14),
                             borderRadius: BorderRadius.circular(
-                                TeacherDimensions.radiusM),
+                                LumiTokens.radiusMedium),
                           ),
                           child: const Icon(Icons.people_outline,
-                              color: AppColors.teacherPrimary, size: 20),
+                              color: LumiTokens.blue, size: 20),
                         ),
                         const SizedBox(width: 12),
                         Text('Choose Students',
-                            style: TeacherTypography.h3),
+                            style: LumiType.subhead),
                         const Spacer(),
                         Text('${selected.length} selected',
-                            style: TeacherTypography.bodySmall),
+                            style: LumiType.caption),
                       ],
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Divider(height: 1, color: AppColors.teacherBorder),
+                  Divider(height: 1, color: LumiTokens.rule),
                   // List
                   Flexible(
                     child: ListView.separated(
@@ -845,7 +846,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                         height: 1,
                         indent: 20,
                         endIndent: 20,
-                        color: AppColors.teacherBorder
+                        color: LumiTokens.rule
                             .withValues(alpha: 0.5),
                       ),
                       itemBuilder: (context, index) {
@@ -871,23 +872,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                                 horizontal: 20, vertical: 14),
                             child: Row(
                               children: [
-                                CircleAvatar(
-                                  radius: 20,
-                                  backgroundColor: AppColors
-                                      .teacherAccent
-                                      .withValues(alpha: 0.3),
-                                  child: Text(
-                                    student.fullName.isNotEmpty
-                                        ? student.fullName[0]
-                                            .toUpperCase()
-                                        : '?',
-                                    style: TeacherTypography.bodyLarge
-                                        .copyWith(
-                                      color: AppColors.teacherPrimary,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
+                                StudentAvatar.fromStudent(student, size: 40),
                                 const SizedBox(width: 14),
                                 Expanded(
                                   child: Column(
@@ -895,8 +880,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(student.fullName,
-                                          style: TeacherTypography
-                                              .bodyLarge
+                                          style: LumiType.body
                                               .copyWith(
                                                   fontWeight:
                                                       FontWeight
@@ -905,8 +889,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                                         classNames.isNotEmpty
                                             ? classNames.first
                                             : 'Unassigned',
-                                        style: TeacherTypography
-                                            .bodySmall,
+                                        style: LumiType.caption,
                                       ),
                                     ],
                                   ),
@@ -918,21 +901,21 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                                   height: 28,
                                   decoration: BoxDecoration(
                                     color: isSelected
-                                        ? AppColors.teacherPrimary
+                                        ? LumiTokens.blue
                                         : Colors.transparent,
                                     borderRadius:
                                         BorderRadius.circular(8),
                                     border: Border.all(
                                       color: isSelected
-                                          ? AppColors.teacherPrimary
-                                          : AppColors.teacherBorder,
+                                          ? LumiTokens.blue
+                                          : LumiTokens.rule,
                                       width: 1.5,
                                     ),
                                   ),
                                   child: isSelected
                                       ? const Icon(Icons.check,
                                           size: 16,
-                                          color: AppColors.white)
+                                          color: LumiTokens.paper)
                                       : null,
                                 ),
                               ],
@@ -943,7 +926,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                     ),
                   ),
                   // Footer
-                  Divider(height: 1, color: AppColors.teacherBorder),
+                  Divider(height: 1, color: LumiTokens.rule),
                   SafeArea(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
@@ -956,22 +939,20 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                                 onTap: () =>
                                     Navigator.of(context).pop(),
                                 borderRadius: BorderRadius.circular(
-                                    TeacherDimensions.radiusM),
+                                    LumiTokens.radiusMedium),
                                 child: Container(
                                   height: 44,
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(
-                                        TeacherDimensions.radiusM),
+                                        LumiTokens.radiusMedium),
                                     border: Border.all(
-                                        color: AppColors.teacherBorder),
+                                        color: LumiTokens.rule),
                                   ),
                                   child: Center(
                                     child: Text('Cancel',
-                                        style: TeacherTypography
-                                            .buttonText
+                                        style: LumiType.button
                                             .copyWith(
-                                                color: AppColors
-                                                    .textSecondary)),
+                                                color: LumiTokens.muted)),
                                   ),
                                 ),
                               ),
@@ -985,18 +966,17 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                                 onTap: () => Navigator.of(context)
                                     .pop(selected),
                                 borderRadius: BorderRadius.circular(
-                                    TeacherDimensions.radiusM),
+                                    LumiTokens.radiusMedium),
                                 child: Container(
                                   height: 44,
                                   decoration: BoxDecoration(
-                                    color: AppColors.teacherPrimary,
+                                    color: LumiTokens.blue,
                                     borderRadius: BorderRadius.circular(
-                                        TeacherDimensions.radiusM),
+                                        LumiTokens.radiusMedium),
                                   ),
                                   child: Center(
                                     child: Text('Apply',
-                                        style: TeacherTypography
-                                            .buttonText),
+                                        style: LumiType.button),
                                   ),
                                 ),
                               ),
@@ -1079,11 +1059,11 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
+          borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
         ),
         title: Text(
           wasScheduled ? 'Schedule Notification?' : 'Send Notification?',
-          style: TeacherTypography.h3,
+          style: LumiType.subhead,
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1093,14 +1073,14 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
               wasScheduled
                   ? 'This will schedule a notification to $recipientDescription.'
                   : 'This will send a push notification to $recipientDescription.',
-              style: TeacherTypography.bodyLarge,
+              style: LumiType.body,
             ),
             if (wasScheduled) ...[
               const SizedBox(height: 12),
               Text(
                 'Scheduled for: ${DateFormat('EEEE, d MMMM • h:mm a').format(_scheduledFor!)}',
-                style: TeacherTypography.bodyMedium
-                    .copyWith(color: AppColors.textSecondary),
+                style: LumiType.body
+                    .copyWith(color: LumiTokens.muted),
               ),
             ],
           ],
@@ -1109,14 +1089,14 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text('Cancel',
-                style: TeacherTypography.buttonText
-                    .copyWith(color: AppColors.textSecondary)),
+                style: LumiType.button
+                    .copyWith(color: LumiTokens.muted)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: Text(wasScheduled ? 'Schedule' : 'Send',
-                style: TeacherTypography.buttonText
-                    .copyWith(color: AppColors.teacherPrimary)),
+                style: LumiType.button
+                    .copyWith(color: LumiTokens.blue)),
           ),
         ],
       ),
@@ -1207,15 +1187,15 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
   Color _statusColor(String status) {
     switch (status) {
       case 'sent':
-        return AppColors.mintGreen;
+        return LumiTokens.blue;
       case 'partial':
-        return AppColors.warmOrange;
+        return LumiTokens.yellow;
       case 'failed':
-        return AppColors.error;
+        return LumiTokens.red;
       case 'scheduled':
-        return AppColors.skyBlue;
+        return LumiTokens.blue;
       default:
-        return AppColors.teacherPrimary;
+        return LumiTokens.blue;
     }
   }
 
@@ -1223,22 +1203,22 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
     return InputDecoration(
       counterText: '',
       hintText: hint,
-      hintStyle: TeacherTypography.bodyMedium
-          .copyWith(color: AppColors.textSecondary.withValues(alpha: 0.5)),
+      hintStyle: LumiType.body
+          .copyWith(color: LumiTokens.muted.withValues(alpha: 0.5)),
       filled: true,
-      fillColor: AppColors.teacherSurfaceTint,
+      fillColor: LumiTokens.cream,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
-        borderSide: BorderSide(color: AppColors.teacherBorder),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+        borderSide: BorderSide(color: LumiTokens.rule),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
-        borderSide: BorderSide(color: AppColors.teacherBorder),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+        borderSide: BorderSide(color: LumiTokens.rule),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
         borderSide:
-            BorderSide(color: AppColors.teacherPrimary, width: 1.5),
+            BorderSide(color: LumiTokens.blue, width: 1.5),
       ),
       contentPadding: multiline
           ? const EdgeInsets.all(16)
@@ -1264,32 +1244,32 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
       builder: (context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
+            borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
           ),
-          title: Text('Enter $label', style: TeacherTypography.h3),
+          title: Text('Enter $label', style: LumiType.subhead),
           content: TextField(
             controller: controller,
             autofocus: true,
             keyboardType: TextInputType.number,
             textAlign: TextAlign.center,
-            style: TeacherTypography.h1
-                .copyWith(color: AppColors.teacherPrimary),
+            style: LumiType.heading
+                .copyWith(color: LumiTokens.blue),
             decoration: InputDecoration(
               hintText: '$min–$max',
-              hintStyle: TeacherTypography.bodyMedium
-                  .copyWith(color: AppColors.textSecondary.withValues(alpha: 0.4)),
+              hintStyle: LumiType.body
+                  .copyWith(color: LumiTokens.muted.withValues(alpha: 0.4)),
               filled: true,
-              fillColor: AppColors.teacherSurfaceTint,
+              fillColor: LumiTokens.cream,
               border: OutlineInputBorder(
                 borderRadius:
-                    BorderRadius.circular(TeacherDimensions.radiusM),
-                borderSide: BorderSide(color: AppColors.teacherBorder),
+                    BorderRadius.circular(LumiTokens.radiusMedium),
+                borderSide: BorderSide(color: LumiTokens.rule),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius:
-                    BorderRadius.circular(TeacherDimensions.radiusM),
+                    BorderRadius.circular(LumiTokens.radiusMedium),
                 borderSide: BorderSide(
-                    color: AppColors.teacherPrimary, width: 1.5),
+                    color: LumiTokens.blue, width: 1.5),
               ),
               contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16, vertical: 14),
@@ -1305,8 +1285,8 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: Text('Cancel',
-                  style: TeacherTypography.buttonText
-                      .copyWith(color: AppColors.textSecondary)),
+                  style: LumiType.button
+                      .copyWith(color: LumiTokens.muted)),
             ),
             TextButton(
               onPressed: () {
@@ -1316,8 +1296,8 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                 );
               },
               child: Text('Set',
-                  style: TeacherTypography.buttonText
-                      .copyWith(color: AppColors.teacherPrimary)),
+                  style: LumiType.button
+                      .copyWith(color: LumiTokens.blue)),
             ),
           ],
         );
@@ -1335,14 +1315,14 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
-              color: AppColors.teacherPrimary,
+              color: LumiTokens.blue,
               borderRadius:
-                  BorderRadius.circular(TeacherDimensions.radiusRound),
+                  BorderRadius.circular(LumiTokens.radiusPill),
             ),
             child: Text(
               '$count',
-              style: TeacherTypography.caption.copyWith(
-                color: AppColors.white,
+              style: LumiType.caption.copyWith(
+                color: LumiTokens.paper,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -1353,13 +1333,13 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
           width: 34,
           height: 34,
           decoration: BoxDecoration(
-            color: AppColors.teacherSurfaceTint,
+            color: LumiTokens.blue.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(12),
           ),
           child: const Icon(
             Icons.chevron_right,
             size: 18,
-            color: AppColors.teacherPrimary,
+            color: LumiTokens.blue,
           ),
         ),
       ],
@@ -1370,8 +1350,8 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
     return Switch(
       value: value,
       onChanged: onChanged,
-      activeTrackColor: AppColors.teacherPrimary.withValues(alpha: 0.4),
-      activeThumbColor: AppColors.teacherPrimary,
+      activeTrackColor: LumiTokens.green.withValues(alpha: 0.4),
+      activeThumbColor: LumiTokens.green,
     );
   }
 
@@ -1380,7 +1360,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.teacherBackground,
+      backgroundColor: LumiTokens.cream,
       body: SafeArea(
         child: Column(
           children: [
@@ -1395,17 +1375,17 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                       width: 36,
                       height: 36,
                       decoration: BoxDecoration(
-                        color: AppColors.teacherPrimary
-                            .withValues(alpha: 0.14),
+                        color: LumiTokens.muted
+                            .withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(
-                            TeacherDimensions.radiusM),
+                            LumiTokens.radiusMedium),
                       ),
                       child: const Icon(Icons.arrow_back_rounded,
-                          color: AppColors.teacherPrimary, size: 20),
+                          color: LumiTokens.ink, size: 20),
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text('Notifications', style: TeacherTypography.h2),
+                  Text('Notifications', style: LumiType.subhead),
                 ],
               ),
             ),
@@ -1439,8 +1419,8 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.teacherSurfaceTint,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
+        color: LumiTokens.blue.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
       ),
       child: AnimatedBuilder(
         animation: _tabController.animation!,
@@ -1461,12 +1441,12 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                           width: pillWidth,
                           height: constraints.maxHeight,
                           decoration: BoxDecoration(
-                            color: AppColors.teacherPrimary,
+                            color: LumiTokens.blue,
                             borderRadius: BorderRadius.circular(
-                                TeacherDimensions.radiusRound),
+                                LumiTokens.radiusPill),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.teacherPrimary
+                                color: LumiTokens.blue
                                     .withValues(alpha: 0.18),
                                 blurRadius: 12,
                                 spreadRadius: -4,
@@ -1501,8 +1481,8 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                               color: Color.lerp(
-                                AppColors.textSecondary,
-                                AppColors.white,
+                                LumiTokens.muted,
+                                LumiTokens.paper,
                                 activeAmount,
                               ),
                             ),
@@ -1522,6 +1502,25 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
 
   // ─── Compose Tab ────────────────────────────────────────────────
 
+  /// In-card bento header — a soft green icon chip + normal-case title.
+  Widget _cardHeader(IconData icon, String title) {
+    return Row(
+      children: [
+        Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: LumiTokens.muted.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(LumiTokens.radiusSmall),
+          ),
+          child: Icon(icon, size: 17, color: LumiTokens.ink),
+        ),
+        const SizedBox(width: 10),
+        Text(title, style: LumiType.subhead.copyWith(fontSize: 16)),
+      ],
+    );
+  }
+
   Widget _buildComposeTab() {
     if (_classes.isEmpty) {
       return Center(
@@ -1534,22 +1533,22 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: AppColors.teacherPrimary.withValues(alpha: 0.14),
+                  color: LumiTokens.blue.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: const Icon(Icons.class_outlined,
-                    size: 28, color: AppColors.teacherPrimary),
+                    size: 28, color: LumiTokens.blue),
               ),
               const SizedBox(height: 16),
               Text('No classes assigned',
-                  style: TeacherTypography.h3
-                      .copyWith(color: AppColors.textSecondary)),
+                  style: LumiType.subhead
+                      .copyWith(color: LumiTokens.muted)),
               const SizedBox(height: 8),
               Text(
                 'You need at least one class assigned to send notifications to parents.',
                 textAlign: TextAlign.center,
-                style: TeacherTypography.bodyMedium
-                    .copyWith(color: AppColors.textSecondary),
+                style: LumiType.body
+                    .copyWith(color: LumiTokens.muted),
               ),
             ],
           ),
@@ -1560,66 +1559,74 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
       children: [
-        // ── Section A: Message Type ──
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 10),
-          child: Text('MESSAGE TYPE',
-              style: TeacherTypography.sectionHeader),
-        ),
-        Row(
-          children: [
-            Flexible(
-              flex: 3,
-              child: TeacherFilterChip(
-                label: 'Reading',
-                isActive: _messageType == 'reading_reminder',
-                onTap: () =>
-                    setState(() => _messageType = 'reading_reminder'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              flex: 4,
-              child: TeacherFilterChip(
-                label: 'Announcement',
-                isActive: _messageType == 'announcement',
-                onTap: () =>
-                    setState(() => _messageType = 'announcement'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              flex: 3,
-              child: TeacherFilterChip(
-                label: 'General',
-                isActive: _messageType == 'general',
-                onTap: () => setState(() => _messageType = 'general'),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-
-        // ── Section B: Content ──
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 10),
-          child: Text('CONTENT', style: TeacherTypography.sectionHeader),
-        ),
+        // ── Message type ──
         Container(
-          decoration: TeacherDimensions.cardDecoration,
-          padding: const EdgeInsets.all(20),
+          decoration: _lumiCard(),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _cardHeader(Icons.category_rounded, 'Message type'),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Flexible(
+                    flex: 3,
+                    child: TeacherFilterChip(
+                      activeColor: LumiTokens.blue,
+                      label: 'Reading',
+                      isActive: _messageType == 'reading_reminder',
+                      onTap: () =>
+                          setState(() => _messageType = 'reading_reminder'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    flex: 4,
+                    child: TeacherFilterChip(
+                      activeColor: LumiTokens.blue,
+                      label: 'Announcement',
+                      isActive: _messageType == 'announcement',
+                      onTap: () =>
+                          setState(() => _messageType = 'announcement'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    flex: 3,
+                    child: TeacherFilterChip(
+                      activeColor: LumiTokens.blue,
+                      label: 'General',
+                      isActive: _messageType == 'general',
+                      onTap: () =>
+                          setState(() => _messageType = 'general'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // ── Content ──
+        Container(
+          decoration: _lumiCard(),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _cardHeader(Icons.edit_note_rounded, 'Content'),
+              const SizedBox(height: 12),
               Text(
                 'Parents receive this as a push notification and inbox item.',
-                style: TeacherTypography.bodySmall,
+                style: LumiType.caption,
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: _titleController,
                 maxLength: _maxTitleLength,
-                style: TeacherTypography.bodyLarge,
+                style: LumiType.body,
                 decoration: _inputDecoration('Notification title'),
               ),
               const SizedBox(height: 12),
@@ -1628,7 +1635,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                 minLines: 4,
                 maxLines: 6,
                 maxLength: _maxBodyLength,
-                style: TeacherTypography.bodyMedium,
+                style: LumiType.body,
                 decoration: _inputDecoration(
                   'Write your message...',
                   multiline: true,
@@ -1639,24 +1646,25 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
         ),
         const SizedBox(height: 20),
 
-        // ── Section C: Audience ──
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 10),
-          child:
-              Text('AUDIENCE', style: TeacherTypography.sectionHeader),
-        ),
+        // ── Audience ──
         Container(
-          decoration: TeacherDimensions.cardDecoration,
+          decoration: _lumiCard(),
           clipBehavior: Clip.antiAlias,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-                child: Row(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
+                    _cardHeader(Icons.groups_rounded, 'Audience'),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
                       child: TeacherFilterChip(
+                        activeColor: LumiTokens.blue,
                         label: 'Classes',
                         isActive: _audienceType == 'classes',
                         onTap: () {
@@ -1669,6 +1677,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                     const SizedBox(width: 8),
                     Expanded(
                       child: TeacherFilterChip(
+                        activeColor: LumiTokens.blue,
                         label: 'Students',
                         isActive: _audienceType == 'students',
                         onTap: () async {
@@ -1679,6 +1688,8 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                         },
                       ),
                     ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -1687,12 +1698,12 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                   height: 1,
                   indent: 20,
                   endIndent: 20,
-                  color: AppColors.teacherBorder.withValues(alpha: 0.9),
+                  color: LumiTokens.rule.withValues(alpha: 0.9),
                 ),
                 if (_audienceType == 'classes')
                   TeacherSettingsItem(
                     icon: Icons.class_outlined,
-                    iconBgColor: AppColors.decodableBlue,
+                    iconBgColor: LumiTokens.blue,
                     label: _selectedClassIds.isEmpty
                         ? 'Choose classes'
                         : '${_selectedClassIds.length} class${_selectedClassIds.length == 1 ? '' : 'es'} chosen',
@@ -1703,7 +1714,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                 if (_audienceType == 'students') ...[
                   TeacherSettingsItem(
                     icon: Icons.filter_alt_outlined,
-                    iconBgColor: AppColors.teacherAccent,
+                    iconBgColor: LumiTokens.blue,
                     label: _selectedClassIds.isEmpty
                         ? 'Filter by class'
                         : 'Filtering ${_selectedClassIds.length} class${_selectedClassIds.length == 1 ? '' : 'es'}',
@@ -1716,11 +1727,11 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                     indent: 20,
                     endIndent: 20,
                     color:
-                        AppColors.teacherBorder.withValues(alpha: 0.9),
+                        LumiTokens.rule.withValues(alpha: 0.9),
                   ),
                   TeacherSettingsItem(
                     icon: Icons.people_outline,
-                    iconBgColor: AppColors.teacherPrimary,
+                    iconBgColor: LumiTokens.blue,
                     label: _selectedStudentIds.isEmpty
                         ? 'Choose students'
                         : '${_selectedStudentIds.length} student${_selectedStudentIds.length == 1 ? '' : 's'} chosen',
@@ -1734,7 +1745,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                 child: Text(
                   _audienceSummary(),
-                  style: TeacherTypography.bodySmall,
+                  style: LumiType.caption,
                 ),
               ),
             ],
@@ -1742,21 +1753,20 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
         ),
         const SizedBox(height: 20),
 
-        // ── Section D: Schedule & Send ──
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 10),
-          child: Text('SCHEDULE & SEND',
-              style: TeacherTypography.sectionHeader),
-        ),
+        // ── Schedule & send ──
         Container(
-          decoration: TeacherDimensions.cardDecoration,
+          decoration: _lumiCard(),
           clipBehavior: Clip.antiAlias,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                child: _cardHeader(Icons.send_rounded, 'Schedule & send'),
+              ),
               TeacherSettingsItem(
                 icon: Icons.schedule,
-                iconBgColor: AppColors.warmOrange,
+                iconBgColor: LumiTokens.yellow,
                 label: 'Schedule for later',
                 trailing: _buildSwitch(
                   _scheduledFor != null,
@@ -1774,11 +1784,11 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                   height: 1,
                   indent: 20,
                   endIndent: 20,
-                  color: AppColors.teacherBorder.withValues(alpha: 0.9),
+                  color: LumiTokens.rule.withValues(alpha: 0.9),
                 ),
                 TeacherSettingsItem(
                   icon: Icons.calendar_today,
-                  iconBgColor: AppColors.skyBlue,
+                  iconBgColor: LumiTokens.blue,
                   label: DateFormat('EEE, d MMM • h:mm a')
                       .format(_scheduledFor!),
                   onTap: _pickDateTime,
@@ -1795,22 +1805,22 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
           child: InkWell(
             onTap: _isSubmitting ? null : _submitCampaign,
             borderRadius:
-                BorderRadius.circular(TeacherDimensions.radiusM),
+                BorderRadius.circular(LumiTokens.radiusMedium),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               width: double.infinity,
               height: 50,
               decoration: BoxDecoration(
                 color: _isSubmitting
-                    ? AppColors.teacherPrimary.withValues(alpha: 0.5)
-                    : AppColors.teacherPrimary,
+                    ? LumiTokens.green.withValues(alpha: 0.5)
+                    : LumiTokens.green,
                 borderRadius:
-                    BorderRadius.circular(TeacherDimensions.radiusM),
+                    BorderRadius.circular(LumiTokens.radiusMedium),
                 boxShadow: _isSubmitting
                     ? null
                     : [
                         BoxShadow(
-                          color: AppColors.teacherPrimary
+                          color: LumiTokens.green
                               .withValues(alpha: 0.25),
                           blurRadius: 16,
                           spreadRadius: -4,
@@ -1825,7 +1835,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                         height: 22,
                         child: CircularProgressIndicator(
                           strokeWidth: 2.5,
-                          color: AppColors.white,
+                          color: LumiTokens.paper,
                         ),
                       )
                     : Row(
@@ -1835,7 +1845,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                             _scheduledFor == null
                                 ? Icons.send_rounded
                                 : Icons.schedule,
-                            color: AppColors.white,
+                            color: LumiTokens.paper,
                             size: 20,
                           ),
                           const SizedBox(width: 10),
@@ -1843,7 +1853,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                             _scheduledFor == null
                                 ? 'Send Notification'
                                 : 'Schedule Notification',
-                            style: TeacherTypography.buttonText,
+                            style: LumiType.button,
                           ),
                         ],
                       ),
@@ -1879,23 +1889,23 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
                     width: 56,
                     height: 56,
                     decoration: BoxDecoration(
-                      color: AppColors.teacherPrimary
+                      color: LumiTokens.blue
                           .withValues(alpha: 0.14),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: const Icon(Icons.campaign_outlined,
-                        size: 28, color: AppColors.teacherPrimary),
+                        size: 28, color: LumiTokens.blue),
                   ),
                   const SizedBox(height: 16),
                   Text('No notifications sent yet',
-                      style: TeacherTypography.h3
-                          .copyWith(color: AppColors.textSecondary)),
+                      style: LumiType.subhead
+                          .copyWith(color: LumiTokens.muted)),
                   const SizedBox(height: 8),
                   Text(
                     'Notifications you send will appear here with delivery status.',
                     textAlign: TextAlign.center,
-                    style: TeacherTypography.bodyMedium
-                        .copyWith(color: AppColors.textSecondary),
+                    style: LumiType.body
+                        .copyWith(color: LumiTokens.muted),
                   ),
                 ],
               ),
@@ -1952,14 +1962,14 @@ class _CampaignCardState extends State<_CampaignCard> {
       onTap: () => setState(() => _expanded = !_expanded),
       child: Container(
         padding: const EdgeInsets.all(20),
-        decoration: TeacherDimensions.cardDecoration,
+        decoration: _lumiCard(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Expanded(
-                  child: Text(campaign.title, style: TeacherTypography.h3),
+                  child: Text(campaign.title, style: LumiType.subhead),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -1970,7 +1980,7 @@ class _CampaignCardState extends State<_CampaignCard> {
                   ),
                   child: Text(
                     campaign.status.toUpperCase(),
-                    style: TeacherTypography.caption.copyWith(
+                    style: LumiType.caption.copyWith(
                       color: widget.statusColor,
                       fontWeight: FontWeight.w700,
                     ),
@@ -1981,16 +1991,16 @@ class _CampaignCardState extends State<_CampaignCard> {
             const SizedBox(height: 8),
             Text(
               campaign.body,
-              style: TeacherTypography.bodyMedium
-                  .copyWith(color: AppColors.textSecondary),
+              style: LumiType.body
+                  .copyWith(color: LumiTokens.muted),
               maxLines: _expanded ? null : 2,
               overflow: _expanded ? null : TextOverflow.ellipsis,
             ),
             const SizedBox(height: 12),
             Text(
               widget.subtitle,
-              style: TeacherTypography.bodySmall
-                  .copyWith(color: AppColors.textSecondary),
+              style: LumiType.caption
+                  .copyWith(color: LumiTokens.muted),
             ),
             const SizedBox(height: 12),
             Wrap(
@@ -2020,7 +2030,7 @@ class _CampaignCardState extends State<_CampaignCard> {
                 children: [
                   const SizedBox(height: 12),
                   Divider(
-                      height: 1, color: AppColors.teacherBorder),
+                      height: 1, color: LumiTokens.rule),
                   const SizedBox(height: 12),
                   _buildDetailRow(Icons.group_outlined,
                       'Audience: ${campaign.audienceType}'),
@@ -2045,8 +2055,8 @@ class _CampaignCardState extends State<_CampaignCard> {
               const SizedBox(height: 12),
               Text(
                 campaign.errorSummary!,
-                style: TeacherTypography.bodySmall
-                    .copyWith(color: AppColors.error),
+                style: LumiType.caption
+                    .copyWith(color: LumiTokens.red),
               ),
             ],
             Center(
@@ -2059,7 +2069,7 @@ class _CampaignCardState extends State<_CampaignCard> {
                     Icons.expand_more,
                     size: 20,
                     color:
-                        AppColors.textSecondary.withValues(alpha: 0.5),
+                        LumiTokens.muted.withValues(alpha: 0.5),
                   ),
                 ),
               ),
@@ -2074,13 +2084,13 @@ class _CampaignCardState extends State<_CampaignCard> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: AppColors.textSecondary),
+        Icon(icon, size: 16, color: LumiTokens.muted),
         const SizedBox(width: 6),
         Expanded(
           child: Text(
             text,
-            style: TeacherTypography.bodySmall
-                .copyWith(color: AppColors.textSecondary),
+            style: LumiType.caption
+                .copyWith(color: LumiTokens.muted),
           ),
         ),
       ],
@@ -2126,18 +2136,18 @@ class _StatChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.teacherSurfaceTint,
+        color: LumiTokens.blue.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: AppColors.teacherBorder.withValues(alpha: 0.5),
+          color: LumiTokens.rule.withValues(alpha: 0.5),
         ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: AppColors.teacherPrimary),
+          Icon(icon, size: 16, color: LumiTokens.blue),
           const SizedBox(width: 6),
-          Text(label, style: TeacherTypography.bodySmall),
+          Text(label, style: LumiType.caption),
         ],
       ),
     );

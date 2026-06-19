@@ -3,8 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/teacher_constants.dart';
+import '../../theme/lumi_tokens.dart';
+import '../../theme/lumi_typography.dart';
+import '../../theme/section_theme.dart';
 import '../../core/widgets/lumi/lumi_skeleton.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
 import '../../core/widgets/lumi_mascot.dart';
@@ -273,20 +274,40 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     ).isBefore(_startOfWeek());
   }
 
-  String _lastActivityLabel(StudentModel student) {
+  /// Days since the student last read, or null if they never have.
+  int? _daysSinceLastRead(StudentModel student) {
     final lastRead = student.stats?.lastReadingDate;
-    if (lastRead == null) return 'No reading yet';
-
+    if (lastRead == null) return null;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final yesterday = today.subtract(const Duration(days: 1));
     final lastDay = DateTime(lastRead.year, lastRead.month, lastRead.day);
+    return today.difference(lastDay).inDays;
+  }
 
-    if (lastDay.isAtSameMomentAs(today)) return 'Read today';
-    if (lastDay.isAtSameMomentAs(yesterday)) return 'Read yesterday';
-    if (_hasReadThisWeek(student.stats)) return 'Active this week';
+  String _lastActivityLabel(StudentModel student) {
+    final days = _daysSinceLastRead(student);
+    if (days == null) return 'No reading logged';
+    if (days <= 0) return 'Read today';
+    if (days == 1) return 'Read yesterday';
+    return 'Last read $days days ago';
+  }
 
-    return 'No reading this week';
+  /// Reading-status colour for the row's left bar: green (recent) → amber
+  /// (becoming stale) → red (overdue) → grey (no data).
+  Color _recencyColor(StudentModel student) {
+    final days = _daysSinceLastRead(student);
+    if (days == null) return LumiTokens.muted.withValues(alpha: 0.45);
+    if (days <= 1) return LumiTokens.green;
+    if (days <= 4) return LumiTokens.yellow;
+    return LumiTokens.red.withValues(alpha: 0.8);
+  }
+
+  /// The student's first reading group, or null if ungrouped.
+  ReadingGroupModel? _studentGroup(StudentModel student) {
+    for (final g in _groups) {
+      if (g.studentIds.contains(student.id)) return g;
+    }
+    return null;
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> _studentsStream(
@@ -400,12 +421,14 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     final selectedClass = widget.selectedClass;
 
     if (selectedClass == null) {
-      return const Center(
-        child: Text('No class selected', style: TeacherTypography.bodyLarge),
+      return Center(
+        child: Text('No class selected', style: LumiType.bodyL),
       );
     }
 
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+    return LumiSectionScope(
+      section: LumiSectionTheme.classScreen,
+      child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: _studentsStream(selectedClass),
       builder: (context, snapshot) {
         final allStudents = snapshot.hasData
@@ -484,14 +507,13 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                 Positioned(
                   right: 16,
                   bottom: MediaQuery.viewPaddingOf(context).bottom + 84,
-                  child: FloatingActionButton(
+                  child: FloatingActionButton.extended(
                     onPressed: () => _showStudentScannerPicker(selectedClass),
-                    backgroundColor: AppColors.teacherPrimary,
+                    backgroundColor: LumiTokens.green,
+                    foregroundColor: LumiTokens.paper,
                     elevation: 4,
-                    child: const Icon(
-                      Icons.qr_code_scanner_rounded,
-                      color: AppColors.white,
-                    ),
+                    icon: const Icon(Icons.qr_code_scanner_rounded),
+                    label: Text('Scan', style: LumiType.button),
                   ),
                 ),
               ],
@@ -499,6 +521,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
           },
         );
       },
+      ),
     );
   }
 
@@ -528,14 +551,14 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                 children: [
                   Text(
                     selectedClass.name,
-                    style: TeacherTypography.h2,
+                    style: LumiType.heading,
                   ),
                   if (widget.classes.length > 1) ...[
                     const SizedBox(width: 4),
                     Icon(
                       Icons.keyboard_arrow_down_rounded,
                       size: 22,
-                      color: AppColors.textSecondary,
+                      color: LumiTokens.muted,
                     ),
                   ],
                 ],
@@ -546,32 +569,27 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
             if (!isLoading)
               Text(
                 summaryParts.join(' · '),
-                style: TeacherTypography.caption.copyWith(
-                  color: AppColors.textSecondary,
+                style: LumiType.caption.copyWith(
+                  color: LumiTokens.muted,
                   fontWeight: FontWeight.w400,
                 ),
               ),
             const SizedBox(width: 12),
             GestureDetector(
               onTap: _openAllocationScreen,
-              child: Container(
+              child: Padding(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.teacherSurfaceTint,
-                  borderRadius:
-                      BorderRadius.circular(TeacherDimensions.radiusRound),
-                ),
+                    const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.auto_awesome_rounded,
-                        size: 14, color: AppColors.teacherPrimary),
+                        size: 14, color: LumiTokens.green),
                     const SizedBox(width: 5),
                     Text(
-                      'Allocate',
-                      style: TeacherTypography.caption.copyWith(
-                        color: AppColors.teacherPrimary,
+                      'Assign books',
+                      style: LumiType.caption.copyWith(
+                        color: LumiTokens.green,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -648,32 +666,40 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
       children: [
         Text(
           'Students',
-          style: TeacherTypography.h3.copyWith(
-            letterSpacing: 0.3,
-            color: AppColors.textSecondary,
-          ),
+          style: LumiType.subhead.copyWith(letterSpacing: 0.3),
         ),
         const Spacer(),
-        // Sort button
+        // Sort button — a bordered pill so it clearly reads as tappable.
         GestureDetector(
           key: const ValueKey('classroom_sort_button'),
           onTap: () {
             FocusScope.of(context).unfocus();
             _showSortByBottomSheet(context);
           },
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.swap_vert_rounded,
-                  size: 16, color: AppColors.textSecondary),
-              const SizedBox(width: 4),
-              Text(
-                _sortChipLabel(),
-                style: TeacherTypography.caption.copyWith(
-                  color: AppColors.textSecondary,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+              border: Border.all(color: LumiTokens.rule),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.swap_vert_rounded,
+                    size: 14, color: LumiTokens.muted),
+                const SizedBox(width: 4),
+                Text(
+                  _sortChipLabel(),
+                  style: LumiType.caption.copyWith(
+                    color: LumiTokens.ink,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 2),
+                Icon(Icons.keyboard_arrow_down_rounded,
+                    size: 16, color: LumiTokens.muted),
+              ],
+            ),
           ),
         ),
       ],
@@ -718,8 +744,8 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
         children: [
           Text(
             'Needs attention',
-            style: TeacherTypography.caption.copyWith(
-              color: AppColors.warmOrange,
+            style: LumiType.caption.copyWith(
+              color: LumiTokens.yellow,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.3,
             ),
@@ -749,9 +775,9 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                         const SizedBox(height: 4),
                         Text(
                           student.firstName,
-                          style: TeacherTypography.caption.copyWith(
+                          style: LumiType.caption.copyWith(
                             fontSize: 10,
-                            color: AppColors.textSecondary,
+                            color: LumiTokens.muted,
                             fontWeight: FontWeight.w400,
                           ),
                         ),
@@ -810,13 +836,13 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
             width: 72,
             height: 72,
             decoration: BoxDecoration(
-              color: AppColors.teacherPrimaryLight,
-              borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
+              color: LumiTokens.tintGreen,
+              borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
             ),
             child: const Icon(
               Icons.cloud_off_rounded,
               size: 34,
-              color: AppColors.teacherPrimary,
+              color: LumiTokens.green,
             ),
           ),
         ),
@@ -836,10 +862,10 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                   height: 98,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppColors.white,
+                    color: LumiTokens.paper,
                     borderRadius:
-                        BorderRadius.circular(TeacherDimensions.radiusL),
-                    border: Border.all(color: AppColors.teacherBorder),
+                        BorderRadius.circular(LumiTokens.radiusLarge),
+                    border: Border.all(color: LumiTokens.rule),
                   ),
                   child: Row(
                     children: [
@@ -887,13 +913,13 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
             width: 72,
             height: 72,
             decoration: BoxDecoration(
-              color: AppColors.teacherSurfaceTint,
-              borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
+              color: LumiTokens.tintGreen,
+              borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
             ),
             child: const Icon(
               Icons.search_off_rounded,
               size: 34,
-              color: AppColors.teacherPrimary,
+              color: LumiTokens.green,
             ),
           ),
         ),
@@ -914,13 +940,13 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
             width: 72,
             height: 72,
             decoration: BoxDecoration(
-              color: AppColors.teacherSurfaceTint,
-              borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
+              color: LumiTokens.tintGreen,
+              borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
             ),
             child: const Icon(
               Icons.filter_alt_off_rounded,
               size: 34,
-              color: AppColors.teacherPrimary,
+              color: LumiTokens.green,
             ),
           ),
         ),
@@ -970,21 +996,6 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     return 0;
   }
 
-  Color _statusAccentColor(StudentModel student) {
-    final label = _lastActivityLabel(student);
-    switch (label) {
-      case 'Read today':
-        return AppColors.success;
-      case 'Read yesterday':
-      case 'Active this week':
-        return AppColors.teacherPrimary;
-      case 'No reading yet':
-        return AppColors.error.withValues(alpha: 0.6);
-      default:
-        return AppColors.warmOrange;
-    }
-  }
-
   Widget _buildStudentCard(
     StudentModel student, {
     required _StudentBookAssignmentState assignmentState,
@@ -992,7 +1003,6 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     final fullName = '${student.firstName} ${student.lastName}';
     final streak = _activeStreak(student.stats);
     final activityLabel = _lastActivityLabel(student);
-    final accentColor = _statusAccentColor(student);
 
     final bookStatusIcon = switch (assignmentState) {
       _StudentBookAssignmentState.assigned => Icons.menu_book_rounded,
@@ -1000,11 +1010,11 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
       _StudentBookAssignmentState.unknown => Icons.menu_book_outlined,
     };
     final bookStatusColor = switch (assignmentState) {
-      _StudentBookAssignmentState.assigned => AppColors.teacherPrimary,
+      _StudentBookAssignmentState.assigned => LumiTokens.green,
       _StudentBookAssignmentState.unassigned =>
-        AppColors.textSecondary.withValues(alpha: 0.55),
+        LumiTokens.muted.withValues(alpha: 0.55),
       _StudentBookAssignmentState.unknown =>
-        AppColors.textSecondary.withValues(alpha: 0.35),
+        LumiTokens.muted.withValues(alpha: 0.35),
     };
     final bookStatusLabel = switch (assignmentState) {
       _StudentBookAssignmentState.assigned => 'Books assigned',
@@ -1012,12 +1022,21 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
       _StudentBookAssignmentState.unknown => 'Assignment status unavailable',
     };
 
-    // Build single-line meta: "Level 3 · Read yesterday"
+    // Build single-line meta: "Read yesterday · Test 1"
     final metaParts = <String>[];
     if (_levelsEnabled) {
       metaParts.add(_readingLevelLabel(student));
     }
     metaParts.add(activityLabel);
+
+    // Group (with its colour dot) shown when viewing all groups — redundant
+    // once a group filter is active.
+    final showGroup = _groups.isNotEmpty && _selectedGroupFilter == null;
+    final group = showGroup ? _studentGroup(student) : null;
+    final groupName = showGroup ? (group?.name ?? 'Ungrouped') : null;
+    final groupColor = group != null
+        ? (_parseGroupColor(group.color) ?? LumiTokens.muted)
+        : LumiTokens.muted.withValues(alpha: 0.5);
 
     // Next achievement goal for this student
     final stats = student.stats;
@@ -1055,9 +1074,12 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
 
     return Material(
       color: Colors.transparent,
-      borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+      borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
       child: InkWell(
         onTap: () {
+          // Drop any search/keyboard focus before navigating so it isn't
+          // restored (cursor flashing on the search bar) when we pop back.
+          FocusManager.instance.primaryFocus?.unfocus();
           context.push(
             '/teacher/student-detail/${student.id}',
             extra: {
@@ -1068,14 +1090,14 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
             },
           );
         },
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
         child: Ink(
           decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+            color: LumiTokens.paper,
+            borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
             boxShadow: [
               BoxShadow(
-                color: AppColors.charcoal.withValues(alpha: 0.03),
+                color: LumiTokens.ink.withValues(alpha: 0.03),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -1084,11 +1106,11 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
           child: IntrinsicHeight(
             child: Row(
               children: [
-                // Traffic-light accent bar
+                // Reading-status bar (recency: green / amber / red / grey)
                 Container(
                   width: 4,
                   decoration: BoxDecoration(
-                    color: accentColor,
+                    color: _recencyColor(student),
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(12),
                       bottomLeft: Radius.circular(12),
@@ -1113,7 +1135,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                     child: Text(
                                       fullName,
                                       style:
-                                          TeacherTypography.bodyMedium.copyWith(
+                                          LumiType.body.copyWith(
                                         fontWeight: FontWeight.w600,
                                       ),
                                       overflow: TextOverflow.ellipsis,
@@ -1124,13 +1146,13 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                     Icon(
                                       Icons.local_fire_department_rounded,
                                       size: 14,
-                                      color: AppColors.warmOrange,
+                                      color: LumiTokens.yellow,
                                     ),
                                     const SizedBox(width: 2),
                                     Text(
                                       '$streak',
-                                      style: TeacherTypography.caption.copyWith(
-                                        color: AppColors.warmOrange,
+                                      style: LumiType.caption.copyWith(
+                                        color: LumiTokens.yellow,
                                         fontWeight: FontWeight.w800,
                                       ),
                                     ),
@@ -1138,19 +1160,47 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                 ],
                               ),
                               const SizedBox(height: 3),
-                              Text(
-                                metaParts.join(' · '),
-                                style: TeacherTypography.caption.copyWith(
-                                  color: AppColors.textSecondary,
-                                  fontWeight: FontWeight.w400,
-                                ),
-                                overflow: TextOverflow.ellipsis,
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      metaParts.join(' · '),
+                                      style: LumiType.caption.copyWith(
+                                        color: LumiTokens.muted,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (showGroup) ...[
+                                    Text('  ·  ',
+                                        style: LumiType.caption.copyWith(
+                                            color: LumiTokens.muted)),
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: BoxDecoration(
+                                        color: groupColor,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(
+                                        groupName!,
+                                        style: LumiType.caption.copyWith(
+                                          color: LumiTokens.muted,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                               if (nextAchievementLabel != null) ...[
                                 const SizedBox(height: 2),
                                 Text(
                                   nextAchievementLabel,
-                                  style: TeacherTypography.caption.copyWith(
+                                  style: LumiType.caption.copyWith(
                                     color: const Color(0xFF7C3AED),
                                     fontWeight: FontWeight.w400,
                                   ),
@@ -1178,7 +1228,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                             Icon(
                               Icons.chevron_right_rounded,
                               size: 20,
-                              color: AppColors.textSecondary
+                              color: LumiTokens.muted
                                   .withValues(alpha: 0.4),
                             ),
                           ],
@@ -1206,12 +1256,12 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusXL),
-          border: Border.all(color: AppColors.teacherBorder),
+          color: LumiTokens.paper,
+          borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+          border: Border.all(color: LumiTokens.rule),
           boxShadow: [
             BoxShadow(
-              color: AppColors.charcoal.withValues(alpha: 0.04),
+              color: LumiTokens.ink.withValues(alpha: 0.04),
               blurRadius: 18,
               spreadRadius: -8,
               offset: const Offset(0, 12),
@@ -1226,14 +1276,14 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
               const SizedBox(height: 18),
               Text(
                 title,
-                style: TeacherTypography.h3,
+                style: LumiType.subhead,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
                 message,
-                style: TeacherTypography.bodyMedium.copyWith(
-                  color: AppColors.textSecondary,
+                style: LumiType.body.copyWith(
+                  color: LumiTokens.muted,
                   height: 1.4,
                 ),
                 textAlign: TextAlign.center,
@@ -1297,7 +1347,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
             return Container(
               height: MediaQuery.of(sheetContext).size.height * 0.78,
               decoration: const BoxDecoration(
-                color: AppColors.white,
+                color: LumiTokens.paper,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -1308,32 +1358,32 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: AppColors.divider,
+                      color: LumiTokens.rule,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Text('Select Student to Scan', style: TeacherTypography.h3),
+                  Text('Select Student to Scan', style: LumiType.subhead),
                   const SizedBox(height: 12),
 
                   // Search bar
                   Container(
                     decoration: BoxDecoration(
-                      color: AppColors.background,
+                      color: LumiTokens.cream,
                       borderRadius:
-                          BorderRadius.circular(TeacherDimensions.radiusM),
+                          BorderRadius.circular(LumiTokens.radiusMedium),
                     ),
                     child: TextField(
                       onChanged: (v) => setSheetState(() => pickerSearch = v),
-                      style: TeacherTypography.bodyMedium,
+                      style: LumiType.body,
                       decoration: InputDecoration(
                         hintText: 'Search students...',
-                        hintStyle: TeacherTypography.bodyMedium.copyWith(
-                          color: AppColors.textSecondary.withValues(alpha: 0.6),
+                        hintStyle: LumiType.body.copyWith(
+                          color: LumiTokens.muted.withValues(alpha: 0.6),
                         ),
                         prefixIcon: Icon(
                           Icons.search,
-                          color: AppColors.textSecondary.withValues(alpha: 0.5),
+                          color: LumiTokens.muted.withValues(alpha: 0.5),
                           size: 20,
                         ),
                         border: InputBorder.none,
@@ -1405,8 +1455,8 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                           return Center(
                             child: Text(
                               'No active students in this class.',
-                              style: TeacherTypography.bodyMedium.copyWith(
-                                color: AppColors.textSecondary,
+                              style: LumiType.body.copyWith(
+                                color: LumiTokens.muted,
                               ),
                             ),
                           );
@@ -1435,13 +1485,13 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                           children: [
                             // Scan All button
                             Material(
-                              color: AppColors.teacherPrimaryLight
+                              color: LumiTokens.tintGreen
                                   .withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(
-                                  TeacherDimensions.radiusM),
+                                  LumiTokens.radiusMedium),
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(
-                                    TeacherDimensions.radiusM),
+                                    LumiTokens.radiusMedium),
                                 onTap: () {
                                   final allStudents = snapshot.data!.docs
                                       .map((doc) =>
@@ -1457,21 +1507,21 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                   child: Row(
                                     children: [
                                       Icon(Icons.people,
-                                          color: AppColors.teacherPrimary,
+                                          color: LumiTokens.green,
                                           size: 20),
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: Text(
                                           'Scan All Students (Batch Mode)',
-                                          style: TeacherTypography.bodyMedium
+                                          style: LumiType.body
                                               .copyWith(
-                                            color: AppColors.teacherPrimary,
+                                            color: LumiTokens.green,
                                             fontWeight: FontWeight.w700,
                                           ),
                                         ),
                                       ),
                                       Icon(Icons.arrow_forward_ios,
-                                          color: AppColors.teacherPrimary,
+                                          color: LumiTokens.green,
                                           size: 14),
                                     ],
                                   ),
@@ -1494,13 +1544,13 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                   return ListTile(
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(
-                                          TeacherDimensions.radiusM),
+                                          LumiTokens.radiusMedium),
                                     ),
-                                    tileColor: AppColors.background,
+                                    tileColor: LumiTokens.cream,
                                     leading: StudentAvatar.fromStudent(student,
                                         size: 40),
                                     title: Text(student.fullName,
-                                        style: TeacherTypography.bodyMedium
+                                        style: LumiType.body
                                             .copyWith(
                                           fontWeight: FontWeight.w600,
                                         )),
@@ -1513,19 +1563,17 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                             padding: const EdgeInsets.symmetric(
                                                 horizontal: 6, vertical: 1),
                                             decoration: BoxDecoration(
-                                              color: AppColors
-                                                  .teacherPrimaryLight
+                                              color: LumiTokens.tintGreen
                                                   .withValues(alpha: 0.3),
                                               borderRadius:
                                                   BorderRadius.circular(
-                                                      TeacherDimensions
-                                                          .radiusS),
+                                                      LumiTokens.radiusSmall),
                                             ),
                                             child: Text(
                                               _readingLevelLabel(student),
-                                              style: TeacherTypography.caption
+                                              style: LumiType.caption
                                                   .copyWith(
-                                                color: AppColors.teacherPrimary,
+                                                color: LumiTokens.green,
                                                 fontWeight: FontWeight.w600,
                                               ),
                                             ),
@@ -1535,7 +1583,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                         if (isAssigned)
                                           Text(
                                             'Has books',
-                                            style: TeacherTypography.caption
+                                            style: LumiType.caption
                                                 .copyWith(
                                               color: Colors.green,
                                               fontWeight: FontWeight.w600,
@@ -1544,9 +1592,9 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                         else if (assignedStudentIds != null)
                                           Text(
                                             'Needs books',
-                                            style: TeacherTypography.caption
+                                            style: LumiType.caption
                                                 .copyWith(
-                                              color: AppColors.warmOrange,
+                                              color: LumiTokens.yellow,
                                               fontWeight: FontWeight.w600,
                                             ),
                                           ),
@@ -1554,7 +1602,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                     ),
                                     trailing: const Icon(
                                       Icons.qr_code_scanner,
-                                      color: AppColors.teacherPrimary,
+                                      color: LumiTokens.green,
                                     ),
                                     onTap: () {
                                       Navigator.pop(sheetContext);
@@ -1614,7 +1662,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         decoration: const BoxDecoration(
-          color: AppColors.white,
+          color: LumiTokens.paper,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
@@ -1625,39 +1673,39 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.divider,
+                color: LumiTokens.rule,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const SizedBox(height: 20),
-            Text('Select Class', style: TeacherTypography.h3),
+            Text('Select Class', style: LumiType.subhead),
             const SizedBox(height: 16),
             ...widget.classes.map((c) => ListTile(
                   shape: RoundedRectangleBorder(
                     borderRadius:
-                        BorderRadius.circular(TeacherDimensions.radiusM),
+                        BorderRadius.circular(LumiTokens.radiusMedium),
                   ),
                   tileColor: widget.selectedClass?.id == c.id
-                      ? AppColors.teacherPrimaryLight.withValues(alpha: 0.3)
+                      ? LumiTokens.tintGreen.withValues(alpha: 0.3)
                       : null,
                   title: Text(
                     c.name,
-                    style: TeacherTypography.bodyLarge.copyWith(
+                    style: LumiType.bodyL.copyWith(
                       fontWeight: widget.selectedClass?.id == c.id
                           ? FontWeight.w700
                           : FontWeight.w500,
                       color: widget.selectedClass?.id == c.id
-                          ? AppColors.teacherPrimary
-                          : AppColors.charcoal,
+                          ? LumiTokens.green
+                          : LumiTokens.ink,
                     ),
                   ),
                   subtitle: Text(
                     '${c.studentIds.length} students',
-                    style: TeacherTypography.bodySmall,
+                    style: LumiType.caption,
                   ),
                   trailing: widget.selectedClass?.id == c.id
                       ? const Icon(Icons.check_circle,
-                          color: AppColors.teacherPrimary)
+                          color: LumiTokens.green)
                       : null,
                   onTap: () {
                     if (widget.onClassChanged != null) {
@@ -1678,7 +1726,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         decoration: const BoxDecoration(
-          color: AppColors.white,
+          color: LumiTokens.paper,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
@@ -1689,12 +1737,12 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.divider,
+                color: LumiTokens.rule,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const SizedBox(height: 20),
-            Text('Sort Students by', style: TeacherTypography.h3),
+            Text('Sort Students by', style: LumiType.subhead),
             const SizedBox(height: 16),
             _buildSortOption('name', 'First Name', Icons.sort_by_alpha),
             const SizedBox(height: 8),
@@ -1722,24 +1770,24 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     return ListTile(
       key: ValueKey('classroom_sort_option_$value'),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
       ),
       tileColor: isSelected
-          ? AppColors.teacherPrimaryLight.withValues(alpha: 0.3)
+          ? LumiTokens.tintGreen.withValues(alpha: 0.3)
           : null,
       leading: Icon(
         icon,
-        color: isSelected ? AppColors.teacherPrimary : AppColors.textSecondary,
+        color: isSelected ? LumiTokens.green : LumiTokens.muted,
       ),
       title: Text(
         label,
-        style: TeacherTypography.bodyLarge.copyWith(
+        style: LumiType.bodyL.copyWith(
           fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-          color: isSelected ? AppColors.teacherPrimary : AppColors.charcoal,
+          color: isSelected ? LumiTokens.green : LumiTokens.ink,
         ),
       ),
       trailing: isSelected
-          ? const Icon(Icons.check_circle, color: AppColors.teacherPrimary)
+          ? const Icon(Icons.check_circle, color: LumiTokens.green)
           : null,
       onTap: () {
         setState(() => _sortBy = value);
@@ -1762,14 +1810,14 @@ class _ClassroomActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const foregroundColor = AppColors.white;
-    const backgroundColor = AppColors.teacherPrimary;
+    const foregroundColor = LumiTokens.paper;
+    const backgroundColor = LumiTokens.green;
 
     return Material(
       color: backgroundColor,
-      borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+      borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
       child: InkWell(
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
@@ -1783,7 +1831,7 @@ class _ClassroomActionButton extends StatelessWidget {
                 child: Text(
                   label,
                   overflow: TextOverflow.ellipsis,
-                  style: TeacherTypography.bodyMedium.copyWith(
+                  style: LumiType.body.copyWith(
                     color: foregroundColor,
                     fontWeight: FontWeight.w800,
                   ),
@@ -1812,23 +1860,23 @@ class _ClassroomToolChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final foregroundColor = selected ? AppColors.white : AppColors.charcoal;
+    final foregroundColor = selected ? LumiTokens.paper : LumiTokens.ink;
     final backgroundColor =
-        selected ? AppColors.teacherPrimary : AppColors.white;
+        selected ? LumiTokens.green : LumiTokens.paper;
 
     return Material(
       color: backgroundColor,
-      borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
+      borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
       child: InkWell(
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
+            borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
             border: Border.all(
               color:
-                  selected ? AppColors.teacherPrimary : AppColors.teacherBorder,
+                  selected ? LumiTokens.green : LumiTokens.rule,
             ),
           ),
           child: Row(
@@ -1839,7 +1887,7 @@ class _ClassroomToolChip extends StatelessWidget {
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: selected ? AppColors.white : dotColor,
+                    color: selected ? LumiTokens.paper : dotColor,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -1847,7 +1895,7 @@ class _ClassroomToolChip extends StatelessWidget {
               ],
               Text(
                 label,
-                style: TeacherTypography.bodySmall.copyWith(
+                style: LumiType.caption.copyWith(
                   color: foregroundColor,
                   fontWeight: FontWeight.w700,
                 ),
@@ -1874,17 +1922,17 @@ class _PickerFilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected ? AppColors.teacherPrimary : AppColors.background,
-      borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
+      color: selected ? LumiTokens.green : LumiTokens.cream,
+      borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
       child: InkWell(
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
           child: Text(
             label,
-            style: TeacherTypography.bodySmall.copyWith(
-              color: selected ? Colors.white : AppColors.charcoal,
+            style: LumiType.caption.copyWith(
+              color: selected ? Colors.white : LumiTokens.ink,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -1963,13 +2011,18 @@ class _ClassroomSearchBarState extends State<_ClassroomSearchBar>
     final hasQuery = widget.query.isNotEmpty;
     final isActive = _focusNode.hasFocus || hasQuery;
     const borderRadius = BorderRadius.all(
-      Radius.circular(TeacherDimensions.radiusL),
+      Radius.circular(LumiTokens.radiusLarge),
     );
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.teacherSurfaceTint.withValues(alpha: 0.6),
+        color: LumiTokens.paper,
         borderRadius: borderRadius,
+        border: Border.all(
+          color: isActive
+              ? LumiTokens.green.withValues(alpha: 0.45)
+              : LumiTokens.rule,
+        ),
       ),
       child: ClipRRect(
         borderRadius: borderRadius,
@@ -1989,7 +2042,7 @@ class _ClassroomSearchBarState extends State<_ClassroomSearchBar>
                   );
                 },
                 child: ColoredBox(
-                  color: AppColors.teacherPrimaryLight.withValues(alpha: 0.82),
+                  color: LumiTokens.tintGreen.withValues(alpha: 0.3),
                 ),
               ),
             ),
@@ -1999,26 +2052,27 @@ class _ClassroomSearchBarState extends State<_ClassroomSearchBar>
               onChanged: widget.onChanged,
               onTapOutside: (_) => FocusScope.of(context).unfocus(),
               textInputAction: TextInputAction.search,
-              cursorColor: AppColors.rosePink,
-              style: TeacherTypography.bodyMedium.copyWith(
+              cursorColor: LumiTokens.green,
+              style: LumiType.body.copyWith(
                 fontWeight: FontWeight.w600,
+                color: LumiTokens.green,
               ),
               decoration: InputDecoration(
                 hintText: 'Find a student...',
-                hintStyle: TeacherTypography.bodyMedium.copyWith(
-                  color: AppColors.textSecondary.withValues(alpha: 0.65),
+                hintStyle: LumiType.body.copyWith(
+                  color: LumiTokens.muted,
                 ),
                 prefixIcon: Icon(
                   Icons.search_rounded,
                   color: isActive
-                      ? AppColors.teacherPrimary
-                      : AppColors.textSecondary.withValues(alpha: 0.58),
+                      ? LumiTokens.green
+                      : LumiTokens.muted.withValues(alpha: 0.58),
                 ),
                 suffixIcon: hasQuery
                     ? IconButton(
                         tooltip: 'Clear search',
                         icon: const Icon(Icons.close_rounded, size: 20),
-                        color: AppColors.textSecondary,
+                        color: LumiTokens.muted,
                         onPressed: widget.onClear,
                       )
                     : null,

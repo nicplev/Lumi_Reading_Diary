@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/characters/lumi_character.dart';
 import '../../../data/models/student_model.dart';
 
 /// Renders a student's avatar.
 ///
-/// Shows the assigned Lumi character SVG when [characterId] is set and
+/// Shows the assigned Lumi character image when [characterId] is set and
 /// recognised, otherwise falls back to the existing initials circle using
 /// [initial] and [avatarColor].
 ///
@@ -62,10 +61,11 @@ class StudentAvatar extends StatelessWidget {
     final character = LumiCharacters.findById(characterId);
 
     if (character != null) {
-      return SvgPicture.asset(
+      return Image.asset(
         character.assetPath,
         width: size,
         height: size,
+        fit: BoxFit.contain,
       );
     }
 
