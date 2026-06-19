@@ -294,8 +294,11 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
       section: LumiSectionTheme.home,
       child: Scaffold(
         backgroundColor: LumiTokens.cream,
-        body: SafeArea(
-          child: Stack(
+        body: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: SafeArea(
+            child: Stack(
             children: [
               // Confetti overlay
               _ConfettiOverlay(controller: _confettiController),
@@ -474,6 +477,7 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
               ),
             ],
           ),
+        ),
         ),
       ),
     );
