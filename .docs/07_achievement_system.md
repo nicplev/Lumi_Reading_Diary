@@ -2,6 +2,28 @@
 *Created: 2025-11-17*
 *Status: ✅ Complete*
 
+> **⚠️ Current implementation note (2026-06-20).** Parts of this doc are
+> aspirational/outdated. The shipped system awards **15 achievements**: 14 tiers
+> (Books ×5, Reading Time ×5, Reading Nights ×4) + the `first_log` special.
+> Streak tiers are defined but **intentionally never awarded** (nights-read is
+> the reward ladder; a missed night never costs a badge). There is no genre /
+> diversity logic.
+>
+> **Award model:** `detectAchievements` (Firestore `onUpdate` of the student doc)
+> evaluates on **current state** — it awards every tier the student now
+> qualifies for that isn't already earned (idempotent via `arrayUnion`; never
+> double-awards). It is **not** a "threshold crossing" check, so it self-heals
+> for seed/imported data, stats recomputes, or being deployed after the fact.
+>
+> **Backfill:** `backfillAchievements` (admin-gated callable, `{schoolId,
+> studentId?}`) awards all currently-qualified badges for existing students
+> **without notifications** — run it once after deploy so students who already
+> met thresholds get their badges without waiting for their next log.
+>
+> **Deploy:** both functions ship via the normal `firebase deploy --only
+> functions` (CI deploys functions). The detector must be deployed for any
+> award to happen.
+
 ## Overview
 
 Implemented a comprehensive gamification system for Lumi Reading Diary that motivates students through achievements, badges, and visual celebrations. The system integrates seamlessly with the Cloud Functions `detectAchievements` function implemented in Phase 1.

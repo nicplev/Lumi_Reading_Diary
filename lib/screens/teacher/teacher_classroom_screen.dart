@@ -1047,7 +1047,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
         totalBooksRead: stats.totalBooksRead,
         totalMinutesRead: stats.totalMinutesRead,
         totalReadingDays: stats.totalReadingDays,
-        earnedAchievementIds: const [],
+        earnedAchievementIds: student.earnedAchievementIds,
         minProgress: 0.0,
       );
       if (nearest != null) {
