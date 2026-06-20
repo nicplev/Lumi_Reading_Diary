@@ -64,12 +64,11 @@ class _LogReadingScreenState extends State<LogReadingScreen>
 
   bool get _commentsEnabled => _commentSettings.enabled;
   bool get _comprehensionEnabled => _comprehensionSettings.enabled;
-  int get _totalSteps {
-    var n = 3; // book, feeling, confirm
-    if (_commentsEnabled) n += 1;
-    if (_comprehensionEnabled) n += 1;
-    return n;
-  }
+
+  // Three-step flow: Reading → Reflection → Review. Parent comments and the
+  // optional voice reflection are sections *inside* the Reflection step, not
+  // separate pages — so the step count is fixed regardless of school config.
+  static const int _totalSteps = 3;
 
   // Step 1: Book selection
   final List<String> _assignedBookTitles = [];
@@ -550,9 +549,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
                   _buildStep1BookSelection(),
-                  _buildStep2ChildAssessment(),
-                  if (_commentsEnabled) _buildStep3ParentComment(),
-                  if (_comprehensionEnabled) _buildStepComprehension(),
+                  _buildStepReflection(),
                   _buildStep4Confirmation(),
                 ],
               ),
@@ -847,62 +844,90 @@ class _LogReadingScreenState extends State<LogReadingScreen>
     );
   }
 
-  // ─── Step 2: Child Assessment ────────────────────────────
+  // ─── Step 2: Reflection (feeling + optional tags/notes/voice) ──────
+  //
+  // The emotion is the main question; parent comment tags, free-text notes,
+  // and the optional voice reflection are all sections underneath, so the
+  // flow stays at three pages even with every school feature enabled.
 
-  Widget _buildStep2ChildAssessment() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-      child: BlobSelector(
-        selectedFeeling: _selectedFeeling,
-        onFeelingSelected: (feeling) {
-          setState(() => _selectedFeeling = feeling);
-        },
-      ),
-    ).animate().fadeIn();
-  }
-
-  // ─── Step 3: Parent Comment ──────────────────────────────
-
-  Widget _buildStep3ParentComment() {
+  Widget _buildStepReflection() {
     final customPresets = _commentSettings.effectivePresets;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CommentChips(
-            selectedComments: _selectedComments,
-            onCommentsChanged: (comments) {
-              setState(() => _selectedComments = comments);
+          // Main question — BlobSelector owns its "How did reading feel?"
+          // heading, so it reads as the screen's primary prompt.
+          BlobSelector(
+            selectedFeeling: _selectedFeeling,
+            onFeelingSelected: (feeling) {
+              setState(() => _selectedFeeling = feeling);
             },
-            categories: customPresets.isNotEmpty ? customPresets : null,
           ),
-          if (_commentSettings.freeTextEnabled) ...[
-            const SizedBox(height: 24),
-            Text('Additional notes', style: LumiTextStyles.label()),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _notesController,
-              maxLines: 3,
-              cursorColor: LumiTokens.ink,
-              decoration: InputDecoration(
-                hintText: 'Anything else to add? (optional)',
-                filled: true,
-                fillColor: LumiTokens.cream,
-                contentPadding: const EdgeInsets.all(14),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
-                  borderSide: const BorderSide(color: LumiTokens.rule),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
-                  borderSide: const BorderSide(color: LumiTokens.rule),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
-                  borderSide: const BorderSide(color: LumiTokens.red, width: 2),
-                ),
+
+          // Optional: parent comment tag groups.
+          if (_commentsEnabled) ...[
+            const SizedBox(height: 28),
+            const Divider(color: LumiTokens.rule, height: 1),
+            const SizedBox(height: 20),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text('How did it go?', style: LumiTextStyles.label()),
+            ),
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Select up to $kMaxParentCommentChips that apply (optional)',
+                style: LumiTextStyles.bodySmall(color: LumiTokens.muted),
               ),
+            ),
+            const SizedBox(height: 16),
+            CommentChips(
+              showHeader: false,
+              selectedComments: _selectedComments,
+              onCommentsChanged: (comments) {
+                setState(() => _selectedComments = comments);
+              },
+              categories: customPresets.isNotEmpty ? customPresets : null,
+            ),
+          ],
+
+          // Optional: free-text notes (only when comments + free text on).
+          if (_commentsEnabled && _commentSettings.freeTextEnabled) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Additional notes', style: LumiTextStyles.label()),
+            ),
+            const SizedBox(height: 8),
+            _buildNotesField(),
+          ],
+
+          // Optional: short voice reflection, inline — no separate page.
+          if (_comprehensionEnabled) ...[
+            const SizedBox(height: 28),
+            const Divider(color: LumiTokens.rule, height: 1),
+            const SizedBox(height: 20),
+            _cardHeader(Icons.mic_none_rounded, 'Voice reflection'),
+            const SizedBox(height: 4),
+            Text(
+              _comprehensionQuestion,
+              style: LumiTextStyles.bodySmall(color: LumiTokens.muted),
+            ),
+            const SizedBox(height: 16),
+            ComprehensionRecordingStep(
+              key: ValueKey('comprehension_$_logId'),
+              embedded: true,
+              question: _comprehensionQuestion,
+              logId: _logId,
+              initialLocalPath: _comprehensionRecording?.localPath,
+              initialDurationSec: _comprehensionRecording?.durationSec,
+              onRecordingChanged: (result) {
+                setState(() => _comprehensionRecording = result);
+              },
+              onSkip: () {},
             ),
           ],
         ],
@@ -910,20 +935,30 @@ class _LogReadingScreenState extends State<LogReadingScreen>
     ).animate().fadeIn();
   }
 
-  // ─── Optional Step: Comprehension Recording ──────────────
-
-  Widget _buildStepComprehension() {
-    return ComprehensionRecordingStep(
-      key: ValueKey('comprehension_$_logId'),
-      question: _comprehensionQuestion,
-      logId: _logId,
-      initialLocalPath: _comprehensionRecording?.localPath,
-      initialDurationSec: _comprehensionRecording?.durationSec,
-      onRecordingChanged: (result) {
-        setState(() => _comprehensionRecording = result);
-      },
-      onSkip: _nextStep,
-    ).animate().fadeIn();
+  Widget _buildNotesField() {
+    return TextField(
+      controller: _notesController,
+      maxLines: 3,
+      cursorColor: LumiTokens.ink,
+      decoration: InputDecoration(
+        hintText: 'Anything else to add? (optional)',
+        filled: true,
+        fillColor: LumiTokens.cream,
+        contentPadding: const EdgeInsets.all(14),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+          borderSide: const BorderSide(color: LumiTokens.rule),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+          borderSide: const BorderSide(color: LumiTokens.rule),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+          borderSide: const BorderSide(color: LumiTokens.red, width: 2),
+        ),
+      ),
+    );
   }
 
   // ─── Step 4: Confirmation ────────────────────────────────
@@ -933,10 +968,10 @@ class _LogReadingScreenState extends State<LogReadingScreen>
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          Text('Confirm Reading', style: LumiTextStyles.h2()),
+          Text('Review reading', style: LumiTextStyles.h2()),
           const SizedBox(height: 8),
           Text(
-            'Review and confirm tonight\'s reading',
+            'Check the details, then save tonight\'s reading',
             style: LumiTextStyles.bodySmall(
               color: LumiTokens.ink.withValues(alpha: 0.6),
             ),
@@ -1065,11 +1100,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
             Expanded(
               child: LumiPrimaryButton(
                 onPressed: _nextStep,
-                text: _currentStep == _totalSteps - 2
-                    ? 'Review'
-                    : _currentStep == 1
-                        ? (_selectedFeeling != null ? 'Next' : 'Skip')
-                        : 'Next',
+                text: _currentStep == _totalSteps - 2 ? 'Review' : 'Next',
                 isFullWidth: true,
                 color: LumiTokens.red,
               ),

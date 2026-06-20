@@ -66,6 +66,11 @@ class ComprehensionRecordingStep extends StatefulWidget {
   /// has no navigation). Implementations typically move to the next page.
   final VoidCallback onSkip;
 
+  /// When embedded inside the combined reflection screen, the host owns the
+  /// section header and the recorder renders inline (no mascot/title/scroll
+  /// chrome, no "Skip this step" — not recording is itself the skip).
+  final bool embedded;
+
   const ComprehensionRecordingStep({
     super.key,
     required this.question,
@@ -74,6 +79,7 @@ class ComprehensionRecordingStep extends StatefulWidget {
     required this.onSkip,
     this.initialLocalPath,
     this.initialDurationSec,
+    this.embedded = false,
   });
 
   @override
@@ -320,6 +326,11 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
 
   @override
   Widget build(BuildContext context) {
+    // Embedded: the host reflection screen owns the header + scrolling, so
+    // render just the recorder controls inline.
+    if (widget.embedded) {
+      return _buildStateBody();
+    }
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -374,14 +385,16 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
           isFullWidth: true,
           color: LumiTokens.red,
         ),
-        const SizedBox(height: 12),
-        TextButton(
-          onPressed: _skip,
-          child: Text(
-            'Skip this step',
-            style: LumiTextStyles.bodyMedium(color: LumiTokens.ink),
+        if (!widget.embedded) ...[
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: _skip,
+            child: Text(
+              'Skip this step',
+              style: LumiTextStyles.bodyMedium(color: LumiTokens.ink),
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -582,14 +595,16 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
             isFullWidth: true,
             color: LumiTokens.red,
           ),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: _skip,
-            child: Text(
-              'Skip this step',
-              style: LumiTextStyles.bodyMedium(color: LumiTokens.ink),
+          if (!widget.embedded) ...[
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _skip,
+              child: Text(
+                'Skip this step',
+                style: LumiTextStyles.bodyMedium(color: LumiTokens.ink),
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
