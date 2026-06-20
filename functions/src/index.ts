@@ -15,6 +15,11 @@ import {
 } from "./notification_helpers";
 import {buildOnboardingEmail, buildOnboardingQrAttachments, buildStaffOnboardingEmail} from "./email_templates";
 import {
+  DEFAULT_ACHIEVEMENT_THRESHOLDS,
+  computeAwardableAchievements,
+  type AchievementThresholdSet,
+} from "./achievements";
+import {
   computeGentleStreak,
   computeLongestStreak,
   countInWindow,
@@ -1295,77 +1300,45 @@ export const pruneStaleFcmTokens = fns
     }
   });
 
-// ─── Achievement system constants ────────────────────────────────────────────
 
-// Keep in sync with AchievementThresholds.defaults in
-// lib/data/models/achievement_model.dart. readingDays is the primary
-// (cumulative "nights read") reward ladder; streak tiers are no longer awarded.
-const DEFAULT_ACHIEVEMENT_THRESHOLDS = {
-  streak: [5, 10, 20, 50, 100],
-  books: [5, 10, 25, 50, 100],
-  minutes: [300, 600, 1500, 3000, 6000],
-  readingDays: [10, 50, 100, 365],
-};
+// ─── Achievement evaluation: pure logic + constants live in
+// ./achievements.ts (testable). Only the Firestore-backed threshold
+// loader stays here.
 
-interface AchievementTierMeta {
-  id: string;
-  name: string;
-  icon: string;
-  category: string;
-  rarity: string;
-  requirementType: string;
-  description: (value: number) => string;
+/**
+ * Loads a school's custom achievement thresholds, falling back to the platform
+ * defaults per category. Shared by the detector trigger and the backfill.
+ * @param {string} schoolId School whose thresholds to load.
+ * @return {Promise<AchievementThresholdSet>} Resolved per-category thresholds.
+ */
+async function resolveAchievementThresholds(
+  schoolId: string,
+): Promise<AchievementThresholdSet> {
+  let custom: Record<string, number[]> = {};
+  try {
+    const schoolDoc = await db.collection("schools").doc(schoolId).get();
+    custom = schoolDoc.data()?.settings?.achievementThresholds ?? {};
+  } catch (err) {
+    functions.logger.warn(
+      "Could not load school achievement thresholds, using defaults",
+      {schoolId, err},
+    );
+  }
+  return {
+    streak: custom.streak ?? DEFAULT_ACHIEVEMENT_THRESHOLDS.streak,
+    books: custom.books ?? DEFAULT_ACHIEVEMENT_THRESHOLDS.books,
+    minutes: custom.minutes ?? DEFAULT_ACHIEVEMENT_THRESHOLDS.minutes,
+    readingDays: custom.readingDays ?? DEFAULT_ACHIEVEMENT_THRESHOLDS.readingDays,
+  };
 }
 
-// NOTE: streak tiers are intentionally NOT awarded. Streaks are a gentle,
-// secondary signal that earns no rewards — cumulative "nights read" (DAYS_TIERS)
-// is the reward ladder, so a missed night never costs a child a badge. Streak
-// badges earned under the old system remain on student docs and still render.
-
-/* eslint-disable max-len */
-const BOOKS_TIERS: AchievementTierMeta[] = [
-  {id: "books_t1", name: "Book Beginner", icon: "📖", category: "books", rarity: "common", requirementType: "books", description: (v) => `Read ${v} books!`},
-  {id: "books_t2", name: "Book Collector", icon: "📚", category: "books", rarity: "uncommon", requirementType: "books", description: (v) => `Read ${v} books!`},
-  {id: "books_t3", name: "Avid Reader", icon: "📗", category: "books", rarity: "rare", requirementType: "books", description: (v) => `Read ${v} books!`},
-  {id: "books_t4", name: "Bookworm", icon: "🐛", category: "books", rarity: "epic", requirementType: "books", description: (v) => `Read ${v} books!`},
-  {id: "books_t5", name: "Reading Legend", icon: "🏆", category: "books", rarity: "legendary", requirementType: "books", description: (v) => `Read ${v} books!`},
-];
-
-const MINUTES_TIERS: AchievementTierMeta[] = [
-  {id: "minutes_t1", name: "Hour Hand", icon: "⏰", category: "minutes", rarity: "common", requirementType: "minutes", description: (v) => `Read for ${v / 60} hours total!`},
-  {id: "minutes_t2", name: "Time Traveler", icon: "⌚", category: "minutes", rarity: "uncommon", requirementType: "minutes", description: (v) => `Read for ${v / 60} hours total!`},
-  {id: "minutes_t3", name: "Marathon Reader", icon: "🏃", category: "minutes", rarity: "rare", requirementType: "minutes", description: (v) => `Read for ${v / 60} hours total!`},
-  {id: "minutes_t4", name: "Time Master", icon: "⏳", category: "minutes", rarity: "epic", requirementType: "minutes", description: (v) => `Read for ${v / 60} hours total!`},
-  {id: "minutes_t5", name: "Eternal Reader", icon: "♾️", category: "minutes", rarity: "legendary", requirementType: "minutes", description: (v) => `Read for ${v / 60} hours total!`},
-];
-
-// Cumulative "nights read" ladder — the primary reward track. Every night
-// counts forever and is never lost. Thresholds: see DEFAULT_ACHIEVEMENT_THRESHOLDS
-// (readingDays) and the mirror in achievement_model.dart.
-const DAYS_TIERS: AchievementTierMeta[] = [
-  {id: "days_t1", name: "Decade Reader", icon: "📅", category: "readingDays", rarity: "common", requirementType: "days", description: (v) => `Read on ${v} nights!`},
-  {id: "days_t2", name: "Fifty Nights", icon: "🌙", category: "readingDays", rarity: "rare", requirementType: "days", description: (v) => `Read on ${v} nights!`},
-  {id: "days_t3", name: "Century Reader", icon: "💯", category: "readingDays", rarity: "epic", requirementType: "days", description: (v) => `Read on ${v} nights!`},
-  {id: "days_t4", name: "Year of Reading", icon: "🏆", category: "readingDays", rarity: "legendary", requirementType: "days", description: (v) => `Read on ${v} nights — a whole year!`},
-];
-
-/* eslint-enable max-len */
-const FIRST_LOG_ACHIEVEMENT = {
-  id: "first_log",
-  name: "First Chapter",
-  description: "Logged your very first reading session!",
-  icon: "📖",
-  category: "special",
-  rarity: "common",
-  requirementType: "days",
-  requiredValue: 1,
-};
 
 /**
  * Achievement Detector
  * Triggers when student stats are updated to check for new achievements.
  * Reads school-level custom thresholds (falls back to defaults if not set).
- * Awards all 19 tier achievements + the first_log special achievement.
+ * Awards all 14 tier achievements + the first_log special achievement, on
+ * current state (idempotent — never double-awards thanks to arrayUnion).
  */
 export const detectAchievements = fns.firestore
   .document("schools/{schoolId}/students/{studentId}")
@@ -1373,80 +1346,27 @@ export const detectAchievements = fns.firestore
     const schoolId = context.params.schoolId;
     const studentId = context.params.studentId;
     const newData = change.after.data();
-    const oldData = change.before.data();
-
     const newStats = newData.stats || {};
-    const oldStats = oldData.stats || {};
 
-    // Load school-level custom thresholds, fall back to defaults per category
-    let customThresholds: Record<string, number[]> = {};
-    try {
-      const schoolDoc = await db.collection("schools").doc(schoolId).get();
-      customThresholds = schoolDoc.data()?.settings?.achievementThresholds ?? {};
-    } catch (err) {
-      functions.logger.warn("Could not load school achievement thresholds, using defaults", {schoolId, err});
-    }
+    const thresholds = await resolveAchievementThresholds(schoolId);
 
-    const thresholds = {
-      streak: (customThresholds.streak ?? DEFAULT_ACHIEVEMENT_THRESHOLDS.streak),
-      books: (customThresholds.books ?? DEFAULT_ACHIEVEMENT_THRESHOLDS.books),
-      minutes: (customThresholds.minutes ?? DEFAULT_ACHIEVEMENT_THRESHOLDS.minutes),
-      readingDays: (customThresholds.readingDays ?? DEFAULT_ACHIEVEMENT_THRESHOLDS.readingDays),
-    };
+    // Build set of already-earned IDs to prevent duplicates.
+    const existingAchievements: Array<Record<string, unknown>> =
+      newData.achievements || [];
+    const earnedIds = new Set<string>(
+      existingAchievements.map((a) => a.id as string),
+    );
 
-    // Build set of already-earned IDs to prevent duplicates
-    const existingAchievements: Array<Record<string, unknown>> = newData.achievements || [];
-    const earnedIds = new Set<string>(existingAchievements.map((a) => a.id as string));
+    const awardable = computeAwardableAchievements(
+      newStats, earnedIds, thresholds,
+    );
+    if (awardable.length === 0) return null;
 
-    type NewAchievement = {
-      id: string; name: string; description: string; icon: string;
-      category: string; rarity: string; requirementType: string; requiredValue: number;
-      earnedAt: admin.firestore.FieldValue;
-    };
-    const toAward: NewAchievement[] = [];
+    const toAward = awardable.map((a) => ({
+      ...a, earnedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }));
 
-    // Helper: check a tier list against a stat
-    function checkTiers(
-      tiers: AchievementTierMeta[],
-      tierThresholds: number[],
-      newVal: number,
-      oldVal: number,
-    ) {
-      for (let i = 0; i < tiers.length; i++) {
-        const threshold = tierThresholds[i];
-        if (threshold === undefined) continue;
-        if (earnedIds.has(tiers[i].id)) continue;
-        if (newVal >= threshold && oldVal < threshold) {
-          toAward.push({
-            ...tiers[i],
-            description: tiers[i].description(threshold),
-            requiredValue: threshold,
-            earnedAt: admin.firestore.FieldValue.serverTimestamp(),
-          });
-        }
-      }
-    }
-
-    // Streaks deliberately award nothing (see DAYS_TIERS note above).
-    checkTiers(BOOKS_TIERS, thresholds.books, newStats.totalBooksRead || 0, oldStats.totalBooksRead || 0);
-    checkTiers(MINUTES_TIERS, thresholds.minutes, newStats.totalMinutesRead|| 0, oldStats.totalMinutesRead|| 0);
-    checkTiers(DAYS_TIERS, thresholds.readingDays, newStats.totalReadingDays|| 0, oldStats.totalReadingDays|| 0);
-
-    // First-log special achievement
-    if (
-      !earnedIds.has(FIRST_LOG_ACHIEVEMENT.id) &&
-      (newStats.totalReadingDays || 0) >= 1 &&
-      (oldStats.totalReadingDays || 0) === 0
-    ) {
-      toAward.push({
-        ...FIRST_LOG_ACHIEVEMENT,
-        earnedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    }
-
-    if (toAward.length === 0) return null;
-
-    // Write all new achievements in a single update
+    // Write all new achievements in a single update.
     await change.after.ref.update({
       achievements: admin.firestore.FieldValue.arrayUnion(...toAward),
     });
@@ -1487,6 +1407,82 @@ export const detectAchievements = fns.firestore
 
     return null;
   });
+
+/**
+ * Backfill achievements (admin-gated, idempotent).
+ *
+ * Awards every achievement each student currently qualifies for based on their
+ * existing stats — WITHOUT sending notifications. Use after launch / data
+ * migrations so students who reached thresholds before the idempotent detector
+ * existed (or whose stats were imported/recomputed) get their badges without
+ * waiting for their next reading log. Safe to re-run; never double-awards.
+ *
+ * Params: `{ schoolId: string, studentId?: string }`. Omit studentId to process
+ * the whole school. Caller must be a schoolAdmin of that school.
+ */
+export const backfillAchievements = fns.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated", "Must be signed in.",
+    );
+  }
+  const {schoolId, studentId} = (data ?? {}) as {
+    schoolId?: string; studentId?: string;
+  };
+  if (!schoolId) {
+    throw new functions.https.HttpsError(
+      "invalid-argument", "schoolId is required.",
+    );
+  }
+
+  const callerDoc = await db
+    .doc(`schools/${schoolId}/users/${context.auth.uid}`)
+    .get();
+  if (!callerDoc.exists || callerDoc.data()?.role !== "schoolAdmin") {
+    throw new functions.https.HttpsError(
+      "permission-denied", "Only a school admin can run the backfill.",
+    );
+  }
+
+  const thresholds = await resolveAchievementThresholds(schoolId);
+  const studentsRef = db.collection(`schools/${schoolId}/students`);
+  const docs = studentId ?
+    [await studentsRef.doc(studentId).get()].filter((d) => d.exists) :
+    (await studentsRef.get()).docs;
+
+  let studentsProcessed = 0;
+  let studentsUpdated = 0;
+  let achievementsAwarded = 0;
+  for (const doc of docs) {
+    studentsProcessed++;
+    const sData = doc.data() ?? {};
+    const stats = (sData.stats || {}) as Record<string, unknown>;
+    const existing: Array<Record<string, unknown>> = sData.achievements || [];
+    const earnedIds = new Set<string>(existing.map((a) => a.id as string));
+    const awardable = computeAwardableAchievements(stats, earnedIds, thresholds);
+    if (awardable.length === 0) continue;
+    const toAward = awardable.map((a) => ({
+      ...a, earnedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }));
+    try {
+      await doc.ref.update({
+        achievements: admin.firestore.FieldValue.arrayUnion(...toAward),
+      });
+      studentsUpdated++;
+      achievementsAwarded += toAward.length;
+    } catch (err) {
+      functions.logger.warn(
+        `backfillAchievements: failed for student ${doc.id}`, err,
+      );
+    }
+  }
+
+  functions.logger.info("backfillAchievements complete", {
+    schoolId, studentId: studentId ?? "all",
+    studentsProcessed, studentsUpdated, achievementsAwarded,
+  });
+  return {success: true, studentsProcessed, studentsUpdated, achievementsAwarded};
+});
 
 /**
  * Validate Reading Log

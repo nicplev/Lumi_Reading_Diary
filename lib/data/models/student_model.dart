@@ -24,6 +24,11 @@ class StudentModel {
   final String? parentEmail;
   final List<ReadingLevelHistory> levelHistory;
   final StudentStats? stats;
+
+  /// Ids of achievements the student has earned (from the `achievements` array
+  /// written by the `detectAchievements`/`backfillAchievements` functions).
+  /// Used to render earned vs locked badges and to compute next-goal progress.
+  final List<String> earnedAchievementIds;
   // Denormalized name + relationship label for each linked guardian, keyed by
   // parent UID. Maintained server-side by the syncGuardianProfiles Cloud
   // Function — never written by clients. Lets a guardian see who else is
@@ -54,6 +59,7 @@ class StudentModel {
     this.parentEmail,
     this.levelHistory = const [],
     this.stats,
+    this.earnedAchievementIds = const [],
     this.guardianProfiles = const {},
   });
 
@@ -102,6 +108,12 @@ class StudentModel {
               .toList() ??
           [],
       stats: data['stats'] != null ? StudentStats.fromMap(data['stats']) : null,
+      earnedAchievementIds: (data['achievements'] as List<dynamic>?)
+              ?.map((a) =>
+                  (a is Map ? a['id'] : null) is String ? a['id'] as String : null)
+              .whereType<String>()
+              .toList() ??
+          const [],
       guardianProfiles: (data['guardianProfiles'] as Map<String, dynamic>?)
               ?.map((uid, value) => MapEntry(
                   uid,
@@ -169,6 +181,7 @@ class StudentModel {
     String? parentEmail,
     List<ReadingLevelHistory>? levelHistory,
     StudentStats? stats,
+    List<String>? earnedAchievementIds,
     Map<String, GuardianProfile>? guardianProfiles,
   }) {
     return StudentModel(
@@ -198,6 +211,7 @@ class StudentModel {
       parentEmail: parentEmail ?? this.parentEmail,
       levelHistory: levelHistory ?? this.levelHistory,
       stats: stats ?? this.stats,
+      earnedAchievementIds: earnedAchievementIds ?? this.earnedAchievementIds,
       guardianProfiles: guardianProfiles ?? this.guardianProfiles,
     );
   }
