@@ -9,10 +9,19 @@ import FirebaseAuth
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
-    if let controller = window?.rootViewController as? FlutterViewController {
-      if #available(iOS 13.0, *) {
-        SinglePageDocumentScanner.register(with: controller)
+    if #available(iOS 13.0, *) {
+      // Register via FlutterPluginRegistrar (not via window.rootViewController).
+      // In scene-based apps the window is created by the scene delegate, so it
+      // is nil here at launch and the previous controller-based registration was
+      // silently skipped — surfacing as MissingPluginException on the Dart side.
+      if let registrar = self.registrar(forPlugin: "SinglePageDocumentScanner") {
+        SinglePageDocumentScanner.register(with: registrar)
+        NSLog("[CoverScanner] SinglePageDocumentScanner registered via FlutterPluginRegistrar")
+      } else {
+        NSLog("[CoverScanner] SKIPPED registration: registrar(forPlugin:) returned nil")
       }
+    } else {
+      NSLog("[CoverScanner] skipping native scanner registration (iOS < 13)")
     }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }

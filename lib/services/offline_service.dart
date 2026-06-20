@@ -608,7 +608,16 @@ class OfflineService with WidgetsBindingObserver {
   /// state and stay queued (transient) or are parked (permanent).
   Future<void> _syncPendingData() async {
     if (_isSyncing || _syncQueue.isEmpty) return;
-    if (!ServiceStatusController.instance.current.canWriteToFirebase) return;
+    if (!ServiceStatusController.instance.current.canWriteToFirebase) {
+      debugPrint(
+        '[OfflineSync] drain gated by canWriteToFirebase=false; '
+        'pending=${_syncQueue.length}',
+      );
+      return;
+    }
+    debugPrint(
+      '[OfflineSync] drain starting; pending=${_syncQueue.length}',
+    );
 
     _isSyncing = true;
     _broadcastQueue();
@@ -850,19 +859,26 @@ class OfflineService with WidgetsBindingObserver {
       throw const ComprehensionAudioMissingException();
     }
 
-    await FirebaseStorage.instance.ref(storagePath).putFile(
-          file,
-          SettableMetadata(
-            contentType: 'audio/mp4',
-            customMetadata: {
-              'uploadedAt': DateTime.now().toUtc().toIso8601String(),
-              'durationSec': '$durationSec',
-              'schoolId': schoolId,
-              'studentId': studentId,
-              // TODO(retention): used by the future term-aware cleanup function.
-            },
-          ),
-        );
+    try {
+      await FirebaseStorage.instance.ref(storagePath).putFile(
+            file,
+            SettableMetadata(
+              contentType: 'audio/mp4',
+              customMetadata: {
+                'uploadedAt': DateTime.now().toUtc().toIso8601String(),
+                'durationSec': '$durationSec',
+                'schoolId': schoolId,
+                'studentId': studentId,
+                // TODO(retention): used by the future term-aware cleanup function.
+              },
+            ),
+          );
+    } catch (e) {
+      debugPrint(
+          '[CompAudioSync] step=storage_upload failed logId=$logId path=$storagePath '
+          'type=${e.runtimeType} err=$e');
+      rethrow;
+    }
 
     final logRef = _firestore
         .collection('schools')
@@ -880,6 +896,8 @@ class OfflineService with WidgetsBindingObserver {
         'comprehensionAudioUploaded': true,
       });
     } on FirebaseException catch (e) {
+      debugPrint(
+          '[CompAudioSync] step=firestore_patch failed logId=$logId code=${e.code} msg=${e.message}');
       if (e.code == 'not-found') {
         // The log create hasn't drained yet — re-throw as a generic
         // Exception so it's classified transient, not permanent.
@@ -890,11 +908,21 @@ class OfflineService with WidgetsBindingObserver {
 
     // Receipt confirmation: read back from the SERVER so we know the flag
     // landed before removing the item from the queue.
-    final receipt = await logRef.get(const GetOptions(source: Source.server));
-    if (!receipt.exists ||
-        receipt.data()?['comprehensionAudioUploaded'] != true) {
-      throw Exception(
-          'Receipt failed: comprehensionAudioUploaded not set on server');
+    try {
+      final receipt =
+          await logRef.get(const GetOptions(source: Source.server));
+      if (!receipt.exists ||
+          receipt.data()?['comprehensionAudioUploaded'] != true) {
+        debugPrint(
+            '[CompAudioSync] step=receipt_readback flag not set logId=$logId '
+            'exists=${receipt.exists}');
+        throw Exception(
+            'Receipt failed: comprehensionAudioUploaded not set on server');
+      }
+    } on FirebaseException catch (e) {
+      debugPrint(
+          '[CompAudioSync] step=receipt_readback firebase err logId=$logId code=${e.code} msg=${e.message}');
+      rethrow;
     }
 
     // Best-effort temp cleanup — the LAST step so a failure above leaves

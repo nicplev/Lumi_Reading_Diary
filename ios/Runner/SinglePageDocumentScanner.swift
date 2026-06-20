@@ -14,16 +14,24 @@ class SinglePageDocumentScanner: NSObject, VNDocumentCameraViewControllerDelegat
     private var viewController: VNDocumentCameraViewController?
     private var jpgCompressionQuality: Double = 0.92
 
-    static func register(with controller: FlutterViewController) {
+    /// Registered via `FlutterPluginRegistrar` rather than a `FlutterViewController`
+    /// because in scene-based apps (this app has the WidgetKit extension, which
+    /// triggers UIScene lifecycle) `window?.rootViewController` is nil during
+    /// `didFinishLaunchingWithOptions`, so a controller-based registration was
+    /// silently skipped — every channel call then returned MissingPluginException.
+    /// The registrar gets its messenger from the engine, which is wired before
+    /// the window is created.
+    static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(
             name: "lumi/single_page_document_scanner",
-            binaryMessenger: controller.binaryMessenger
+            binaryMessenger: registrar.messenger()
         )
         let instance = SinglePageDocumentScanner()
         channel.setMethodCallHandler(instance.handle)
     }
 
     private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        NSLog("[CoverScanner] handle() called method=%@", call.method)
         guard call.method == "scanSinglePage" else {
             result(FlutterMethodNotImplemented)
             return
@@ -37,6 +45,7 @@ class SinglePageDocumentScanner: NSObject, VNDocumentCameraViewControllerDelegat
         self.result = result
 
         guard VNDocumentCameraViewController.isSupported else {
+            NSLog("[CoverScanner] VNDocumentCameraViewController.isSupported=false; returning UNAVAILABLE")
             result(FlutterError(
                 code: "UNAVAILABLE",
                 message: "Document camera is not available on this device",
@@ -49,8 +58,13 @@ class SinglePageDocumentScanner: NSObject, VNDocumentCameraViewControllerDelegat
         scanner.delegate = self
         self.viewController = scanner
 
-        guard let window = UIApplication.shared.keyWindow,
+        // Scene-aware key-window lookup. `UIApplication.shared.keyWindow` is
+        // deprecated since iOS 13 and returns nil in scene-based apps — which
+        // this app is (the WidgetKit extension forces scene lifecycle). The
+        // pre-deprecation API was what was silently failing on real device.
+        guard let window = Self.activeKeyWindow(),
               var topController = window.rootViewController else {
+            NSLog("[CoverScanner] no active key window or rootViewController; returning NO_VIEW_CONTROLLER")
             result(FlutterError(
                 code: "NO_VIEW_CONTROLLER",
                 message: "Could not find root view controller",
@@ -63,7 +77,21 @@ class SinglePageDocumentScanner: NSObject, VNDocumentCameraViewControllerDelegat
         while let presented = topController.presentedViewController {
             topController = presented
         }
+        NSLog("[CoverScanner] presenting VNDocumentCameraViewController on %@",
+              String(describing: type(of: topController)))
         topController.present(scanner, animated: true)
+    }
+
+    /// Returns the foreground-active scene's key window, falling back to the
+    /// first window of any foreground scene. Replaces `UIApplication.shared.keyWindow`,
+    /// which is deprecated and unreliable under scene-based app lifecycle.
+    private static func activeKeyWindow() -> UIWindow? {
+        let scenes = UIApplication.shared.connectedScenes
+        let activeScene = scenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
+            ?? scenes.first(where: { $0.activationState == .foregroundInactive }) as? UIWindowScene
+            ?? scenes.first as? UIWindowScene
+        guard let scene = activeScene else { return nil }
+        return scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first
     }
 
     // MARK: - VNDocumentCameraViewControllerDelegate

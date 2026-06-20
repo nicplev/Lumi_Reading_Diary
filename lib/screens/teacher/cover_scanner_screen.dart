@@ -265,7 +265,15 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       }
 
       _applyCoverImage(pictures.first);
-    } catch (e) {
+    } catch (e, st) {
+      if (e is PlatformException) {
+        debugPrint(
+            '[CoverScanner] capture failed: PlatformException code=${e.code} '
+            'message=${e.message} details=${e.details}\n$st');
+      } else {
+        debugPrint(
+            '[CoverScanner] capture failed: type=${e.runtimeType} err=$e\n$st');
+      }
       if (!mounted) return;
 
       final cameraStatus = await Permission.camera.status;
@@ -302,14 +310,32 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
   }
 
   Future<List<String>?> _captureCoverWithNativeIosDocumentScanner() async {
-    final pictures =
-        await _singlePageScannerChannel.invokeMethod<List<dynamic>>(
-      'scanSinglePage',
-      {
-        'jpgCompressionQuality': 0.92,
-      },
-    );
+    debugPrint(
+        '[CoverScanner] invoking native scanSinglePage via channel '
+        '${_singlePageScannerChannel.name}');
+    final List<dynamic>? pictures;
+    try {
+      pictures = await _singlePageScannerChannel.invokeMethod<List<dynamic>>(
+        'scanSinglePage',
+        {
+          'jpgCompressionQuality': 0.92,
+        },
+      );
+    } on MissingPluginException catch (e) {
+      debugPrint(
+          '[CoverScanner] native handler not registered on iOS '
+          '(MissingPluginException): ${e.message}');
+      rethrow;
+    } on PlatformException catch (e) {
+      debugPrint(
+          '[CoverScanner] native invokeMethod failed: code=${e.code} '
+          'message=${e.message} details=${e.details}');
+      rethrow;
+    }
 
+    debugPrint(
+        '[CoverScanner] native scanSinglePage returned '
+        '${pictures == null ? "null" : "${pictures.length} picture(s)"}');
     return pictures?.map((picture) => picture as String).toList();
   }
 
