@@ -9,7 +9,6 @@ import 'package:go_router/go_router.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../../theme/section_theme.dart';
-import '../../core/widgets/lumi/lumi_card.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/blob_selector.dart';
 import '../../core/widgets/lumi/comment_chips.dart';
@@ -493,7 +492,7 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
     return Column(
       children: [
         // Feeling prompt — BlobSelector carries its own heading + helper text.
-        LumiCard(
+        _bentoCard(
           child: BlobSelector(
             selectedFeeling: _pickedFeeling,
             onFeelingSelected: _onFeelingSelected,
@@ -506,9 +505,10 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
               onPressed: () => setState(() => _noteExpanded = true),
               text: 'Add a note',
               icon: Icons.edit_note,
+              color: LumiTokens.red,
             )
           else
-            LumiCard(
+            _bentoCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -525,9 +525,28 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
                     TextField(
                       controller: _noteController,
                       maxLines: 2,
-                      decoration: const InputDecoration(
+                      cursorColor: LumiTokens.ink,
+                      decoration: InputDecoration(
                         hintText: 'Anything else to add? (optional)',
-                        border: OutlineInputBorder(),
+                        filled: true,
+                        fillColor: LumiTokens.cream,
+                        contentPadding: const EdgeInsets.all(14),
+                        border: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(LumiTokens.radiusMedium),
+                          borderSide: const BorderSide(color: LumiTokens.rule),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(LumiTokens.radiusMedium),
+                          borderSide: const BorderSide(color: LumiTokens.rule),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(LumiTokens.radiusMedium),
+                          borderSide:
+                              const BorderSide(color: LumiTokens.red, width: 2),
+                        ),
                       ),
                     ),
                   ],
@@ -535,8 +554,9 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
               ),
             ),
         ],
-        // Comprehension recording — the richest signal for teachers. Optional,
-        // collapsed by default so the one-tap parent isn't slowed down.
+        // Comprehension question — same card as the logging flow: the teacher's
+        // question is the hero, the child records an answer. Optional, collapsed
+        // by default so the one-tap parent isn't slowed down.
         if (_comprehensionEnabled) ...[
           const SizedBox(height: 12),
           if (_comprehensionRecording == null && !_comprehensionExpanded)
@@ -544,18 +564,42 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
               onPressed: () => setState(() => _comprehensionExpanded = true),
               text: 'Record ${widget.student.firstName} reading',
               icon: Icons.mic_none_rounded,
+              color: LumiTokens.red,
             )
           else
-            LumiCard(
+            _bentoCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    "A quick recording lets ${widget.student.firstName}'s teacher hear how the reading is going.",
-                    style: LumiType.caption,
+                  Row(
+                    children: [
+                      const Icon(Icons.mic_none_rounded,
+                          size: 18, color: LumiTokens.red),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Comprehension question',
+                        style:
+                            LumiType.body.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
+                  Text(
+                    _comprehensionQuestion,
+                    style: LumiType.bodyL.copyWith(
+                      color: LumiTokens.ink,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Ask ${widget.student.firstName} to answer out loud — '
+                    'optional.',
+                    style: LumiType.caption.copyWith(color: LumiTokens.muted),
+                  ),
+                  const SizedBox(height: 16),
                   ComprehensionRecordingStep(
+                    embedded: true,
                     question: _comprehensionQuestion,
                     logId: widget.readingLog.id,
                     initialLocalPath: _comprehensionRecording?.localPath,
@@ -577,10 +621,26 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
           text: 'Done',
           isFullWidth: true,
           icon: Icons.check,
+          color: LumiTokens.red,
         ),
       ],
     );
   }
+}
+
+/// Flat bento tile (paper surface, hairline rule border, no shadow) — the
+/// success screen's card surface, matching the logging flow.
+Widget _bentoCard({required Widget child, EdgeInsetsGeometry? padding}) {
+  return Container(
+    width: double.infinity,
+    padding: padding ?? const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: LumiTokens.paper,
+      borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+      border: Border.all(color: LumiTokens.rule),
+    ),
+    child: child,
+  );
 }
 
 /// A single rounded stat pill (streak / rest-day / badge). Soft tinted fill
@@ -648,7 +708,7 @@ class _MilestoneCard extends StatelessWidget {
     final fraction = ((total - prev) / span).clamp(0.0, 1.0);
     final remaining = (next - total).clamp(0, 1 << 30);
 
-    return LumiCard(
+    return _bentoCard(
       child: Column(
         children: [
           Text(

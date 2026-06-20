@@ -986,16 +986,27 @@ class _LogReadingScreenState extends State<LogReadingScreen>
           ),
           const SizedBox(height: 20),
 
-          // Voice reflection first, in its own card, so it isn't missed.
+          // Comprehension question first, in its own card, so it isn't missed.
+          // The teacher's question is the hero — the child records an answer.
           if (_comprehensionEnabled) ...[
             _bentoCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _cardHeader(Icons.mic_none_rounded, 'Voice reflection'),
-                  const SizedBox(height: 2),
+                  _cardHeader(
+                      Icons.mic_none_rounded, 'Comprehension question'),
+                  const SizedBox(height: 10),
+                  // The teacher's question — prominent, so the child knows
+                  // exactly what they're answering.
                   Text(
                     _comprehensionQuestion,
+                    style: LumiTextStyles.bodyLarge(color: LumiTokens.ink)
+                        .copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Ask ${widget.student.firstName} to answer out loud — '
+                    'optional.',
                     style: LumiTextStyles.bodySmall(color: LumiTokens.muted),
                   ),
                   const SizedBox(height: 16),
@@ -1017,30 +1028,18 @@ class _LogReadingScreenState extends State<LogReadingScreen>
             if (_commentsEnabled) const SizedBox(height: 24),
           ],
 
-          // Quick comment tags.
-          if (_commentsEnabled) ...[
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text('How did it go?', style: LumiTextStyles.label()),
-            ),
-            const SizedBox(height: 4),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Select up to $kMaxParentCommentChips that apply',
-                style: LumiTextStyles.bodySmall(color: LumiTokens.muted),
-              ),
-            ),
-            const SizedBox(height: 16),
+          // Comment tags — CommentChips owns its "How did it go?" heading and
+          // the "select up to N" hint, and is fed the school's live presets, so
+          // this section is identical to (and stays in sync with) the quick-log
+          // success screen's comment card.
+          if (_commentsEnabled)
             CommentChips(
-              showHeader: false,
               selectedComments: _selectedComments,
               onCommentsChanged: (comments) {
                 setState(() => _selectedComments = comments);
               },
               categories: customPresets.isNotEmpty ? customPresets : null,
             ),
-          ],
 
           // Free-text notes (only when comments + free text on).
           if (_commentsEnabled && _commentSettings.freeTextEnabled) ...[
@@ -1147,7 +1146,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
                   const Divider(height: 24),
                   _buildSummaryRow(
                     Icons.mic_none_rounded,
-                    'Voice reflection',
+                    'Comprehension answer',
                     'Recorded · ${_comprehensionRecording!.durationSec}s',
                   ),
                 ],
