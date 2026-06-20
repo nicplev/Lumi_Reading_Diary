@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../../core/theme/app_colors.dart';
+import '../../theme/lumi_tokens.dart';
 import '../../core/theme/lumi_text_styles.dart';
 import '../../core/theme/lumi_spacing.dart';
 import '../../core/theme/lumi_borders.dart';
@@ -76,7 +76,7 @@ class _DemoRequestScreenState extends State<DemoRequestScreen> {
             shape: LumiBorders.shapeLarge,
             title: Row(
               children: [
-                const Icon(Icons.check_circle, color: AppColors.success),
+                const Icon(Icons.check_circle, color: LumiTokens.green),
                 LumiGap.horizontalXS,
                 Text('Request Submitted!', style: LumiTextStyles.h3()),
               ],
@@ -99,6 +99,7 @@ class _DemoRequestScreenState extends State<DemoRequestScreen> {
                   );
                 },
                 text: 'Continue Registration',
+                color: LumiTokens.red,
               ),
             ],
           ),
@@ -127,7 +128,7 @@ class _DemoRequestScreenState extends State<DemoRequestScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.offWhite,
+      backgroundColor: LumiTokens.cream,
       appBar: AppBar(
         title: Text('Request Demo', style: LumiTextStyles.h2()),
         backgroundColor: Colors.transparent,
@@ -166,7 +167,7 @@ class _DemoRequestScreenState extends State<DemoRequestScreen> {
 
               Text(
                 'Fill in the details below and we\'ll help you get set up',
-                style: LumiTextStyles.body(color: AppColors.charcoal.withValues(alpha: 0.7)),
+                style: LumiTextStyles.body(color: LumiTokens.ink.withValues(alpha: 0.7)),
                 textAlign: TextAlign.center,
               ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
 
@@ -178,26 +179,40 @@ class _DemoRequestScreenState extends State<DemoRequestScreen> {
                   padding: LumiPadding.allXS,
                   margin: EdgeInsets.only(bottom: LumiSpacing.s),
                   decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.1),
+                    color: LumiTokens.red.withValues(alpha: 0.1),
                     borderRadius: LumiBorders.small,
-                    border: Border.all(color: AppColors.error, width: 1),
+                    border: Border.all(color: LumiTokens.red, width: 1),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline, color: AppColors.error),
+                      const Icon(Icons.error_outline, color: LumiTokens.red),
                       LumiGap.horizontalXS,
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: LumiTextStyles.bodySmall(color: AppColors.error),
+                          style: LumiTextStyles.bodySmall(color: LumiTokens.red),
                         ),
                       ),
                     ],
                   ),
                 ).animate().fadeIn().shake(),
 
-              // Form
-              FormBuilder(
+              // Form — local red focus border so fields brand to the
+              // onboarding red rather than the global rosePink input theme.
+              Theme(
+                data: Theme.of(context).copyWith(
+                  inputDecorationTheme:
+                      Theme.of(context).inputDecorationTheme.copyWith(
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                color: LumiTokens.red,
+                                width: 2,
+                              ),
+                            ),
+                          ),
+                ),
+                child: FormBuilder(
                 key: _formKey,
                 child: Column(
                   children: [
@@ -308,9 +323,11 @@ class _DemoRequestScreenState extends State<DemoRequestScreen> {
                       text: 'Submit Request',
                       isLoading: _isLoading,
                       isFullWidth: true,
+                      color: LumiTokens.red,
                     ).animate().fadeIn(delay: 1100.ms, duration: 500.ms),
                   ],
                 ),
+              ),
               ),
 
               LumiGap.m,
@@ -319,21 +336,21 @@ class _DemoRequestScreenState extends State<DemoRequestScreen> {
               Container(
                 padding: LumiPadding.allS,
                 decoration: BoxDecoration(
-                  color: AppColors.info.withValues(alpha: 0.1),
+                  color: LumiTokens.blue.withValues(alpha: 0.1),
                   borderRadius: LumiBorders.medium,
                   border: Border.all(
-                    color: AppColors.info.withValues(alpha: 0.3),
+                    color: LumiTokens.blue.withValues(alpha: 0.3),
                     width: 1,
                   ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.info_outline, color: AppColors.info),
+                    const Icon(Icons.info_outline, color: LumiTokens.blue),
                     LumiGap.horizontalXS,
                     Expanded(
                       child: Text(
                         'After submitting, you\'ll proceed to complete your school setup. The process takes about 15 minutes.',
-                        style: LumiTextStyles.bodySmall(color: AppColors.info),
+                        style: LumiTextStyles.bodySmall(color: LumiTokens.blue),
                       ),
                     ),
                   ],

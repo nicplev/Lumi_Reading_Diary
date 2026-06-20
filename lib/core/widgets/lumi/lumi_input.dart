@@ -50,6 +50,10 @@ class LumiInput extends StatefulWidget {
   /// the field. Used by the auth screens for a clean, modern look.
   final bool borderless;
 
+  /// Accent colour for the focused border + cursor. Defaults to the brand
+  /// rose-pink; pass e.g. `LumiTokens.red` for the auth/red flows.
+  final Color? accentColor;
+
   const LumiInput({
     super.key,
     this.label,
@@ -74,6 +78,7 @@ class LumiInput extends StatefulWidget {
     this.autofocus = false,
     this.borderless = false,
     this.autofillHints,
+    this.accentColor,
   });
 
   @override
@@ -100,6 +105,7 @@ class _LumiInputState extends State<LumiInput> {
   @override
   Widget build(BuildContext context) {
     final borderless = widget.borderless;
+    final accent = widget.accentColor ?? AppColors.rosePink;
     // In borderless mode the label becomes the inline placeholder.
     final hintText = borderless ? (widget.hintText ?? widget.label) : widget.hintText;
 
@@ -135,6 +141,7 @@ class _LumiInputState extends State<LumiInput> {
           autofocus: widget.autofocus,
           autofillHints: widget.autofillHints,
           style: LumiTextStyles.body(),
+          cursorColor: accent,
           decoration: InputDecoration(
             hintText: hintText,
             hintStyle: LumiTextStyles.body(
@@ -151,7 +158,7 @@ class _LumiInputState extends State<LumiInput> {
                 : LumiPadding.input,
             border: borderless ? InputBorder.none : outline(AppColors.charcoal.withOpacity(0.2), 1.5),
             enabledBorder: borderless ? InputBorder.none : outline(AppColors.charcoal.withOpacity(0.2), 1.5),
-            focusedBorder: borderless ? InputBorder.none : outline(AppColors.rosePink, 2.0),
+            focusedBorder: borderless ? InputBorder.none : outline(accent, 2.0),
             errorBorder: borderless ? InputBorder.none : outline(AppColors.error, 1.5),
             focusedErrorBorder: borderless ? InputBorder.none : outline(AppColors.error, 2.0),
             disabledBorder: borderless ? InputBorder.none : outline(AppColors.charcoal.withOpacity(0.1), 1.5),
@@ -283,6 +290,7 @@ class LumiPasswordInput extends StatefulWidget {
   final Widget? prefixIcon;
   final bool borderless;
   final List<String>? autofillHints;
+  final Color? accentColor;
 
   const LumiPasswordInput({
     super.key,
@@ -300,6 +308,7 @@ class LumiPasswordInput extends StatefulWidget {
     this.prefixIcon,
     this.borderless = false,
     this.autofillHints,
+    this.accentColor,
   });
 
   @override
@@ -334,6 +343,7 @@ class _LumiPasswordInputState extends State<LumiPasswordInput> {
       borderless: widget.borderless,
       prefixIcon: widget.prefixIcon,
       autofillHints: widget.autofillHints,
+      accentColor: widget.accentColor,
       suffixIcon: IconButton(
         icon: Icon(
           _obscureText ? Icons.visibility : Icons.visibility_off,

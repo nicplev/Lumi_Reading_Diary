@@ -15,9 +15,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../core/models/decodable_grading.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/theme/teacher_constants.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../../data/models/user_model.dart';
@@ -539,25 +537,26 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusL),
+          borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
         ),
-        title: const Text('Enter ISBN', style: TeacherTypography.h3),
+        title: Text('Enter ISBN', style: LumiType.subhead),
         content: TextField(
           controller: controller,
           keyboardType: TextInputType.number,
+          cursorColor: LumiTokens.ink,
           decoration: InputDecoration(
             hintText: 'e.g. 9781234567890',
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+              borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+              borderSide: BorderSide(color: LumiTokens.rule),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+              borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
               borderSide:
-                  const BorderSide(color: AppColors.teacherPrimary, width: 2),
+                  const BorderSide(color: LumiTokens.yellow, width: 2),
             ),
           ),
           autofocus: true,
@@ -569,7 +568,8 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: AppColors.teacherPrimary,
+              backgroundColor: LumiTokens.yellow,
+              foregroundColor: LumiTokens.ink,
             ),
             onPressed: () {
               final isbn = IsbnAssignmentService.normalizeIsbn(controller.text);
@@ -851,7 +851,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
         child: Scaffold(
           backgroundColor: _currentStep == _ScanStep.isbnScan
               ? Colors.black
-              : AppColors.teacherBackground,
+              : LumiTokens.cream,
           appBar: _buildAppBar(),
           body: _saveSuccess ? _buildSuccessView() : _buildStepView(),
         ),
@@ -871,18 +871,18 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
     return AppBar(
       title: Text(
         _saveSuccess ? 'Done!' : stepLabel,
-        style: TeacherTypography.h3.copyWith(
+        style: LumiType.subhead.copyWith(
           color: _currentStep == _ScanStep.isbnScan
               ? Colors.white
-              : AppColors.charcoal,
+              : LumiTokens.ink,
         ),
       ),
       backgroundColor: _currentStep == _ScanStep.isbnScan
           ? Colors.black
-          : AppColors.teacherBackground,
+          : LumiTokens.cream,
       foregroundColor: _currentStep == _ScanStep.isbnScan
           ? Colors.white
-          : AppColors.charcoal,
+          : LumiTokens.ink,
       elevation: 0,
     );
   }
@@ -1036,7 +1036,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
   Widget _buildCoverReviewView() {
     if (_coverImageBytes == null) {
       return const Center(
-        child: CircularProgressIndicator(color: AppColors.teacherPrimary),
+        child: CircularProgressIndicator(color: LumiTokens.yellow),
       );
     }
 
@@ -1053,7 +1053,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                   controller: _cropController,
                   withCircleUi: false,
                   initialSize: 0.9,
-                  baseColor: AppColors.teacherBackground,
+                  baseColor: LumiTokens.cream,
                   maskColor: Colors.black54,
                   onCropped: _onCoverCropped,
                 ),
@@ -1064,7 +1064,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
             Container(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
               decoration: BoxDecoration(
-                color: AppColors.white,
+                color: LumiTokens.paper,
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.08),
@@ -1081,7 +1081,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                     icon: const Icon(Icons.camera_alt_outlined),
                     label: const Text('Retake'),
                     style: TextButton.styleFrom(
-                      foregroundColor: AppColors.charcoal,
+                      foregroundColor: LumiTokens.ink,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1092,7 +1092,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                     icon: const Icon(Icons.rotate_right_rounded),
                     tooltip: 'Rotate 90°',
                     style: IconButton.styleFrom(
-                      foregroundColor: AppColors.charcoal,
+                      foregroundColor: LumiTokens.ink,
                     ),
                   ),
 
@@ -1102,10 +1102,11 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                   FilledButton.icon(
                     onPressed: _isCropProcessing ? null : _acceptCover,
                     style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.teacherPrimary,
+                      backgroundColor: LumiTokens.yellow,
+                      foregroundColor: LumiTokens.ink,
                       shape: RoundedRectangleBorder(
                         borderRadius:
-                            BorderRadius.circular(TeacherDimensions.radiusM),
+                            BorderRadius.circular(LumiTokens.radiusMedium),
                       ),
                     ),
                     icon: const Icon(Icons.check_rounded),
@@ -1124,7 +1125,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
               color: Colors.black26,
               child: const Center(
                 child:
-                    CircularProgressIndicator(color: AppColors.teacherPrimary),
+                    CircularProgressIndicator(color: LumiTokens.yellow),
               ),
             ),
           ),
@@ -1198,7 +1199,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'Point camera at the ISBN barcode',
-                  style: TeacherTypography.bodyLarge.copyWith(
+                  style: LumiType.bodyL.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1206,7 +1207,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                 const SizedBox(height: 4),
                 Text(
                   'Usually found on the back cover',
-                  style: TeacherTypography.bodySmall.copyWith(
+                  style: LumiType.caption.copyWith(
                     color: Colors.white.withValues(alpha: 0.7),
                   ),
                 ),
@@ -1245,7 +1246,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                     height: 200,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
-                      boxShadow: TeacherDimensions.cardShadow,
+                      boxShadow: LumiTokens.shadowCard,
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
@@ -1257,13 +1258,13 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppColors.teacherPrimaryLight,
+                    color: LumiTokens.yellow.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     'ISBN: ${_scannedIsbn ?? ""}',
-                    style: TeacherTypography.bodySmall.copyWith(
-                      color: AppColors.teacherPrimary,
+                    style: LumiType.caption.copyWith(
+                      color: LumiTokens.ink,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1279,23 +1280,23 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.warmOrange.withValues(alpha: 0.1),
+                color: LumiTokens.blue.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: AppColors.warmOrange.withValues(alpha: 0.3),
+                  color: LumiTokens.blue.withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
                 children: [
                   Icon(Icons.info_outline,
-                      color: AppColors.warmOrange, size: 20),
+                      color: LumiTokens.blue, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'This book already exists in the community database. '
                       'You can update its cover image.',
-                      style: TeacherTypography.bodySmall.copyWith(
-                        color: AppColors.warmOrange,
+                      style: LumiType.caption.copyWith(
+                        color: LumiTokens.blue,
                       ),
                     ),
                   ),
@@ -1306,15 +1307,15 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
           ],
 
           if (_isLoadingMetadata)
-            const Center(
+            Center(
               child: Padding(
-                padding: EdgeInsets.all(32),
+                padding: const EdgeInsets.all(32),
                 child: Column(
                   children: [
-                    CircularProgressIndicator(color: AppColors.teacherPrimary),
-                    SizedBox(height: 12),
+                    const CircularProgressIndicator(color: LumiTokens.yellow),
+                    const SizedBox(height: 12),
                     Text('Looking up book details...',
-                        style: TeacherTypography.bodyMedium),
+                        style: LumiType.body),
                   ],
                 ),
               ),
@@ -1350,14 +1351,14 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: LumiTokens.red.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.red.shade200),
+                  border: Border.all(color: LumiTokens.red.withValues(alpha: 0.3)),
                 ),
                 child: Text(
                   _saveError!,
-                  style: TeacherTypography.bodySmall.copyWith(
-                    color: Colors.red.shade700,
+                  style: LumiType.caption.copyWith(
+                    color: LumiTokens.red,
                   ),
                 ),
               ),
@@ -1372,10 +1373,11 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
               child: FilledButton.icon(
                 onPressed: _isSaving ? null : _saveBook,
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.teacherPrimary,
+                  backgroundColor: LumiTokens.yellow,
+                  foregroundColor: LumiTokens.ink,
                   shape: RoundedRectangleBorder(
                     borderRadius:
-                        BorderRadius.circular(TeacherDimensions.radiusM),
+                        BorderRadius.circular(LumiTokens.radiusMedium),
                   ),
                 ),
                 icon: const Icon(Icons.cloud_upload_outlined),
@@ -1402,8 +1404,8 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       children: [
         Text(
           'Book Type',
-          style: TeacherTypography.bodySmall.copyWith(
-            color: Colors.grey.shade600,
+          style: LumiType.caption.copyWith(
+            color: LumiTokens.muted,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -1459,14 +1461,14 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
               padding:
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: AppColors.teacherPrimaryLight,
+                color: LumiTokens.yellow.withValues(alpha: 0.14),
                 borderRadius:
-                    BorderRadius.circular(TeacherDimensions.radiusS),
+                    BorderRadius.circular(LumiTokens.radiusSmall),
               ),
               child: Text(
                 _selectedSchemaDef!.description,
-                style: TeacherTypography.bodySmall
-                    .copyWith(color: AppColors.teacherPrimary),
+                style: LumiType.caption
+                    .copyWith(color: LumiTokens.ink),
               ),
             ),
             const SizedBox(height: 12),
@@ -1483,8 +1485,8 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       children: [
         Text(
           'Reading grade (optional)',
-          style: TeacherTypography.bodySmall.copyWith(
-            color: Colors.grey.shade600,
+          style: LumiType.caption.copyWith(
+            color: LumiTokens.muted,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -1525,8 +1527,8 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       children: [
         Text(
           'Grading system',
-          style: TeacherTypography.bodySmall.copyWith(
-            color: Colors.grey.shade600,
+          style: LumiType.caption.copyWith(
+            color: LumiTokens.muted,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -1604,8 +1606,8 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
   Widget _buildGroupLabel(String label) {
     return Text(
       label,
-      style: TeacherTypography.caption.copyWith(
-        color: Colors.grey.shade500,
+      style: LumiType.caption.copyWith(
+        color: LumiTokens.muted,
         letterSpacing: 0.3,
       ),
     );
@@ -1614,26 +1616,27 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
   Widget _buildCustomLevelField() {
     return TextField(
       controller: _customLevelController,
+      cursorColor: LumiTokens.ink,
       decoration: InputDecoration(
         labelText: 'Grade label',
         hintText: 'e.g. Set 3, Unit 12, Phase 5',
         prefixIcon: Icon(Icons.edit_outlined,
-            color: AppColors.teacherPrimary, size: 20),
+            color: LumiTokens.muted, size: 20),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+          borderSide: BorderSide(color: LumiTokens.rule),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+          borderSide: BorderSide(color: LumiTokens.rule),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
           borderSide:
-              const BorderSide(color: AppColors.teacherPrimary, width: 2),
+              const BorderSide(color: LumiTokens.yellow, width: 2),
         ),
         filled: true,
-        fillColor: AppColors.white,
+        fillColor: LumiTokens.paper,
       ),
     );
   }
@@ -1646,25 +1649,26 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
   }) {
     return TextField(
       controller: controller,
+      cursorColor: LumiTokens.ink,
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        prefixIcon: Icon(icon, color: AppColors.teacherPrimary, size: 20),
+        prefixIcon: Icon(icon, color: LumiTokens.muted, size: 20),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+          borderSide: BorderSide(color: LumiTokens.rule),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+          borderSide: BorderSide(color: LumiTokens.rule),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
           borderSide:
-              const BorderSide(color: AppColors.teacherPrimary, width: 2),
+              const BorderSide(color: LumiTokens.yellow, width: 2),
         ),
         filled: true,
-        fillColor: AppColors.white,
+        fillColor: LumiTokens.paper,
       ),
     );
   }
@@ -1672,17 +1676,17 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
   // ── Saving View ───────────────────────────────────────────────────
 
   Widget _buildSavingView() {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircularProgressIndicator(color: AppColors.teacherPrimary),
-          SizedBox(height: 20),
-          Text('Uploading cover and saving...', style: TeacherTypography.h3),
-          SizedBox(height: 8),
+          const CircularProgressIndicator(color: LumiTokens.yellow),
+          const SizedBox(height: 20),
+          Text('Uploading cover and saving...', style: LumiType.subhead),
+          const SizedBox(height: 8),
           Text(
             'This may take a moment',
-            style: TeacherTypography.bodyMedium,
+            style: LumiType.body,
           ),
         ],
       ),
@@ -1702,33 +1706,33 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: Colors.green.shade50,
+                color: LumiTokens.green.withValues(alpha: 0.14),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.check_rounded,
                 size: 48,
-                color: Colors.green.shade600,
+                color: LumiTokens.green,
               ),
             ),
             const SizedBox(height: 24),
             Text(
               _bookAlreadyExists ? 'Book Updated!' : 'Book Added!',
-              style: TeacherTypography.h2,
+              style: LumiType.heading,
             ),
             const SizedBox(height: 8),
             Text(
               _titleController.text,
-              style: TeacherTypography.bodyLarge.copyWith(
-                color: AppColors.textSecondary,
+              style: LumiType.bodyL.copyWith(
+                color: LumiTokens.muted,
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               'This book is now available to all teachers\nacross the Lumi community.',
-              style: TeacherTypography.bodyMedium.copyWith(
-                color: AppColors.textSecondary,
+              style: LumiType.body.copyWith(
+                color: LumiTokens.muted,
               ),
               textAlign: TextAlign.center,
             ),
@@ -1739,10 +1743,11 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
               child: FilledButton.icon(
                 onPressed: _scanAnother,
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.teacherPrimary,
+                  backgroundColor: LumiTokens.yellow,
+                  foregroundColor: LumiTokens.ink,
                   shape: RoundedRectangleBorder(
                     borderRadius:
-                        BorderRadius.circular(TeacherDimensions.radiusM),
+                        BorderRadius.circular(LumiTokens.radiusMedium),
                   ),
                 ),
                 icon: const Icon(Icons.document_scanner_outlined),
@@ -1759,10 +1764,10 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
               child: OutlinedButton(
                 onPressed: () => Navigator.of(context).pop(),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.teacherPrimary),
+                  side: const BorderSide(color: LumiTokens.ink),
                   shape: RoundedRectangleBorder(
                     borderRadius:
-                        BorderRadius.circular(TeacherDimensions.radiusM),
+                        BorderRadius.circular(LumiTokens.radiusMedium),
                   ),
                 ),
                 child: const Text(
@@ -1770,7 +1775,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.teacherPrimary,
+                    color: LumiTokens.ink,
                   ),
                 ),
               ),
@@ -1803,11 +1808,11 @@ class _SchemaChip extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? AppColors.teacherPrimary : AppColors.white,
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
+          color: selected ? LumiTokens.yellow : LumiTokens.paper,
+          borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
           border: Border.all(
             color:
-                selected ? AppColors.teacherPrimary : Colors.grey.shade300,
+                selected ? LumiTokens.yellow : LumiTokens.rule,
             width: selected ? 2 : 1,
           ),
         ),
@@ -1817,7 +1822,7 @@ class _SchemaChip extends StatelessWidget {
             fontSize: 13,
             fontWeight:
                 selected ? FontWeight.w600 : FontWeight.w500,
-            color: selected ? Colors.white : Colors.grey.shade700,
+            color: selected ? LumiTokens.ink : LumiTokens.muted,
           ),
         ),
       ),
@@ -1850,11 +1855,11 @@ class _LevelChip extends StatelessWidget {
           vertical: hasSublabel ? 8 : 11,
         ),
         decoration: BoxDecoration(
-          color: selected ? AppColors.teacherPrimary : AppColors.white,
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusS),
+          color: selected ? LumiTokens.yellow : LumiTokens.paper,
+          borderRadius: BorderRadius.circular(LumiTokens.radiusSmall),
           border: Border.all(
             color:
-                selected ? AppColors.teacherPrimary : Colors.grey.shade300,
+                selected ? LumiTokens.yellow : LumiTokens.rule,
             width: selected ? 2 : 1,
           ),
         ),
@@ -1867,7 +1872,7 @@ class _LevelChip extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: selected ? Colors.white : Colors.black87,
+                color: selected ? LumiTokens.ink : LumiTokens.muted,
                 height: 1.1,
               ),
             ),
@@ -1880,7 +1885,7 @@ class _LevelChip extends StatelessWidget {
                   fontSize: 10,
                   fontWeight: FontWeight.w400,
                   color:
-                      selected ? Colors.white70 : Colors.grey.shade500,
+                      selected ? LumiTokens.charcoal : LumiTokens.muted,
                 ),
               ),
             ],
@@ -1914,10 +1919,10 @@ class _BookTypeChip extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: selected ? AppColors.teacherPrimary : AppColors.white,
-          borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+          color: selected ? LumiTokens.yellow : LumiTokens.paper,
+          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
           border: Border.all(
-            color: selected ? AppColors.teacherPrimary : Colors.grey.shade300,
+            color: selected ? LumiTokens.yellow : LumiTokens.rule,
             width: selected ? 2 : 1,
           ),
         ),
@@ -1927,7 +1932,7 @@ class _BookTypeChip extends StatelessWidget {
             Icon(
               icon,
               size: 18,
-              color: selected ? AppColors.white : Colors.grey.shade600,
+              color: selected ? LumiTokens.ink : LumiTokens.muted,
             ),
             const SizedBox(width: 6),
             Text(
@@ -1936,7 +1941,7 @@ class _BookTypeChip extends StatelessWidget {
                 fontSize: 14,
                 fontWeight:
                     selected ? FontWeight.w600 : FontWeight.w400,
-                color: selected ? AppColors.white : Colors.grey.shade700,
+                color: selected ? LumiTokens.ink : LumiTokens.muted,
               ),
             ),
           ],

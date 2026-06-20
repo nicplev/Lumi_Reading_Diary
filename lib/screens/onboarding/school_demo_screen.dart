@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../../core/theme/app_colors.dart';
+import '../../theme/lumi_tokens.dart';
 import '../../core/theme/lumi_text_styles.dart';
 import '../../core/theme/lumi_spacing.dart';
 import '../../core/theme/lumi_borders.dart';
@@ -40,7 +40,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
       description:
           'Lumi helps schools, teachers, and parents work together to nurture a love of reading in every child.',
       heroVariant: LumiVariant.login,
-      color: AppColors.rosePink,
+      color: LumiTokens.red,
     ),
     _DemoSlide(
       title: 'For Teachers',
@@ -55,7 +55,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
         _DemoFeature('Parent communication'),
       ],
       heroVariant: LumiVariant.teacher,
-      color: AppColors.mintGreen,
+      color: LumiTokens.green,
     ),
     _DemoSlide(
       title: 'For Parents',
@@ -70,7 +70,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
         _DemoFeature('Daily reminders'),
       ],
       heroVariant: LumiVariant.parent,
-      color: AppColors.skyBlue,
+      color: LumiTokens.blue,
     ),
     _DemoSlide(
       title: 'For Schools',
@@ -85,7 +85,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
         _DemoFeature('Data export & reports'),
       ],
       heroVariant: LumiVariant.school,
-      color: AppColors.warmOrange,
+      color: LumiTokens.green,
     ),
     _DemoSlide(
       title: 'Seamless Parent Linking',
@@ -100,7 +100,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
         _DemoFeature('Easy unlinking options'),
       ],
       heroVariant: LumiVariant.linking,
-      color: AppColors.darkYellow,
+      color: LumiTokens.blue,
     ),
     _DemoSlide(
       title: 'Key Benefits',
@@ -115,7 +115,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
         _DemoFeature('Excellent support', icon: Icons.support_agent),
       ],
       heroVariant: LumiVariant.promo,
-      color: AppColors.rosePink,
+      color: LumiTokens.red,
     ),
   ];
 
@@ -154,7 +154,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.offWhite,
+      backgroundColor: LumiTokens.cream,
       body: SafeArea(
         child: Column(
           children: [
@@ -189,7 +189,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
                     child: Text(
                       'LUMI READING DIARY',
                       style: LumiTextStyles.overline(
-                        color: AppColors.charcoal.withValues(alpha: 0.55),
+                        color: LumiTokens.ink.withValues(alpha: 0.55),
                       ).copyWith(letterSpacing: 1.2),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -205,6 +205,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
                     },
                     text: 'Skip',
                     icon: Icons.arrow_forward,
+                    color: LumiTokens.muted,
                   ),
                 ],
               ),
@@ -233,6 +234,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
                 child: LumiStepIndicator(
                   stepCount: _slides.length,
                   currentStep: _currentPage,
+                  activeColor: LumiTokens.red,
                 ),
               ),
             ),
@@ -252,6 +254,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
                             onPressed: _previousPage,
                             text: 'Previous',
                             isFullWidth: true,
+                            color: LumiTokens.red,
                           ),
                         ),
                       if (_currentPage > 0) LumiGap.horizontalS,
@@ -263,6 +266,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
                               ? 'Get Started'
                               : 'Next',
                           isFullWidth: true,
+                          color: LumiTokens.red,
                         ),
                       ),
                     ],
@@ -338,7 +342,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
           // Title
           Text(
             slide.title,
-            style: LumiTextStyles.displayMedium(color: AppColors.charcoal),
+            style: LumiTextStyles.displayMedium(color: LumiTokens.ink),
             textAlign: TextAlign.center,
           ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
 
@@ -356,7 +360,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
             Text(
               slide.description,
               style: LumiTextStyles.bodyMedium(
-                color: AppColors.charcoal.withValues(alpha: 0.7),
+                color: LumiTokens.ink.withValues(alpha: 0.7),
               ),
               textAlign: TextAlign.center,
             ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
@@ -377,11 +381,11 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
                   vertical: LumiSpacing.xs,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.white,
+                  color: LumiTokens.paper,
                   borderRadius: LumiBorders.medium,
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.charcoal.withValues(alpha: 0.05),
+                      color: LumiTokens.ink.withValues(alpha: 0.05),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -407,7 +411,7 @@ class _SchoolDemoScreenState extends State<SchoolDemoScreen> {
                       child: Text(
                         feature.text,
                         style: LumiTextStyles.bodyMedium(
-                          color: AppColors.charcoal,
+                          color: LumiTokens.ink,
                         ),
                       ),
                     ),

@@ -635,7 +635,7 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 24),
+                const SizedBox(height: 12),
 
                 // Lumi mascot — small, no message pill. Long-press (5s)
                 // reveals the DEV-only surface.
@@ -666,7 +666,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
 
                 // One heading + one supporting line (no duplicated greeting).
                 Text(
@@ -683,7 +683,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   textAlign: TextAlign.center,
                 ).animate().fadeIn(delay: 250.ms, duration: 500.ms),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
                 // Error message
                 if (_errorMessage != null)
@@ -850,7 +850,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ],
 
-                const SizedBox(height: 28),
+                const SizedBox(height: 20),
 
                 // "New to Lumi?" — compact role rows, not a second onboarding.
                 Align(
@@ -860,42 +860,39 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 8),
 
-                Container(
-                  decoration: BoxDecoration(
-                    color: LumiTokens.paper,
-                    borderRadius:
-                        BorderRadius.circular(LumiTokens.radiusLarge),
-                    border: Border.all(color: LumiTokens.rule),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Column(
-                    children: [
-                      _RoleRow(
-                        icon: Icons.family_restroom,
-                        accent: LumiTokens.red,
-                        title: 'Parent',
-                        subtitle: 'Join with student code',
-                        onTap: () => showParentRegistrationModal(context),
-                      ),
-                      const Divider(height: 1, color: LumiTokens.rule),
-                      _RoleRow(
-                        icon: Icons.school_rounded,
-                        accent: LumiTokens.green,
-                        title: 'Teacher',
-                        subtitle: 'Join with school code',
-                        onTap: () => showTeacherRegistrationModal(context),
-                      ),
-                      const Divider(height: 1, color: LumiTokens.rule),
-                      _RoleRow(
-                        icon: Icons.apartment_rounded,
-                        accent: LumiTokens.blue,
-                        title: 'School',
-                        subtitle: 'Request a demo',
-                        onTap: () => context.push('/onboarding/demo'),
-                      ),
-                    ],
-                  ),
+                // Bento: the two self-serve roles are flat tiles with tinted
+                // icon chips, packed tight under "New to Lumi?".
+                Column(
+                  children: [
+                    _RoleTile(
+                      icon: Icons.family_restroom,
+                      accent: LumiTokens.red,
+                      title: 'Parent',
+                      subtitle: 'Join with student code',
+                      onTap: () => showParentRegistrationModal(context),
+                    ),
+                    const SizedBox(height: 8),
+                    _RoleTile(
+                      icon: Icons.school_rounded,
+                      accent: LumiTokens.green,
+                      title: 'Teacher',
+                      subtitle: 'Join with school code',
+                      onTap: () => showTeacherRegistrationModal(context),
+                    ),
+                  ],
                 ).animate().fadeIn(delay: 850.ms, duration: 500.ms),
+
+                const SizedBox(height: 12),
+
+                // School demo is a rarer, sales-style path — keep it a quiet
+                // text link so it doesn't compete with the two primary tiles.
+                Center(
+                  child: LumiTextButton(
+                    onPressed: () => context.push('/onboarding/demo'),
+                    text: 'Represent a school? Request a demo',
+                    color: LumiTokens.muted,
+                  ),
+                ).animate().fadeIn(delay: 900.ms, duration: 500.ms),
 
                 if (hasDevAccess()) ...[
                   const SizedBox(height: 32),
@@ -956,16 +953,16 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-/// Compact registration row: small semantic icon, title + subtitle, chevron.
-/// Three of these stack inside one grouped card under "New to Lumi?".
-class _RoleRow extends StatelessWidget {
+/// Bento registration tile: a flat bordered card with a tinted icon chip,
+/// title + subtitle, and a chevron. Three stack under "New to Lumi?".
+class _RoleTile extends StatelessWidget {
   final IconData icon;
   final Color accent;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
 
-  const _RoleRow({
+  const _RoleTile({
     required this.icon,
     required this.accent,
     required this.title,
@@ -975,27 +972,46 @@ class _RoleRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            Icon(icon, color: accent, size: 22),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title,
-                      style: LumiType.body
-                          .copyWith(fontWeight: FontWeight.w700)),
-                  Text(subtitle, style: LumiType.caption),
-                ],
+    return Material(
+      color: LumiTokens.paper,
+      shape: RoundedRectangleBorder(
+        side: const BorderSide(color: LumiTokens.rule),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius:
+                      BorderRadius.circular(LumiTokens.radiusMedium),
+                ),
+                child: Icon(icon, color: accent, size: 22),
               ),
-            ),
-            const Icon(Icons.chevron_right_rounded, color: LumiTokens.muted),
-          ],
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: LumiType.body
+                            .copyWith(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: LumiType.caption),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: LumiTokens.muted),
+            ],
+          ),
         ),
       ),
     );

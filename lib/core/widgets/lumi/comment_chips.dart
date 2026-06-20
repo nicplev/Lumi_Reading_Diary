@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../theme/app_colors.dart';
+import '../../../theme/lumi_tokens.dart';
 import '../../theme/lumi_text_styles.dart';
 
 /// Pre-written parent comment templates displayed as selectable chips.
@@ -52,7 +52,7 @@ class CommentChips extends StatelessWidget {
         Text(
           'Select any that apply (optional)',
           style: LumiTextStyles.bodySmall(
-            color: AppColors.charcoal.withValues(alpha: 0.6),
+            color: LumiTokens.ink.withValues(alpha: 0.6),
           ),
         ),
         const SizedBox(height: 20),
@@ -65,7 +65,7 @@ class CommentChips extends StatelessWidget {
                 Text(
                   entry.key,
                   style: LumiTextStyles.label(
-                    color: AppColors.charcoal.withValues(alpha: 0.7),
+                    color: LumiTokens.ink.withValues(alpha: 0.7),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -118,13 +118,13 @@ class _CommentChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.mintGreen
-              : const Color(0xFFF5F5F7),
+              ? LumiTokens.tintGreen
+              : LumiTokens.paper,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected
-                ? const Color(0xFFA5D6A7)
-                : const Color(0xFFE5E7EB),
+                ? LumiTokens.green
+                : LumiTokens.rule,
             width: 1,
           ),
         ),
@@ -135,14 +135,14 @@ class _CommentChip extends StatelessWidget {
               Icon(
                 Icons.check,
                 size: 14,
-                color: AppColors.charcoal.withValues(alpha: 0.8),
+                color: LumiTokens.ink.withValues(alpha: 0.8),
               ),
               const SizedBox(width: 4),
             ],
             Text(
               label,
               style: LumiTextStyles.bodySmall(
-                color: AppColors.charcoal,
+                color: LumiTokens.ink,
               ).copyWith(
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
               ),
