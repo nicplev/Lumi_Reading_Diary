@@ -17,12 +17,18 @@ class CommentChips extends StatelessWidget {
   final Map<String, List<String>>? categories;
   final int maxSelections;
 
+  /// When false the widget's own "How did it go?" heading + subtitle are
+  /// suppressed so it can sit as a section under a host screen's header
+  /// (e.g. the combined reflection step).
+  final bool showHeader;
+
   const CommentChips({
     super.key,
     required this.selectedComments,
     required this.onCommentsChanged,
     this.categories,
     this.maxSelections = kMaxParentCommentChips,
+    this.showHeader = true,
   });
 
   static const defaultCommentCategories = {
@@ -51,18 +57,20 @@ class CommentChips extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'How did it go?',
-          style: LumiTextStyles.h2(),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Select up to $maxSelections that apply (optional)',
-          style: LumiTextStyles.bodySmall(
-            color: LumiTokens.ink.withValues(alpha: 0.6),
+        if (showHeader) ...[
+          Text(
+            'How did it go?',
+            style: LumiTextStyles.h2(),
           ),
-        ),
-        const SizedBox(height: 20),
+          const SizedBox(height: 8),
+          Text(
+            'Select up to $maxSelections that apply (optional)',
+            style: LumiTextStyles.bodySmall(
+              color: LumiTokens.ink.withValues(alpha: 0.6),
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
         ...(categories ?? defaultCommentCategories).entries.map((entry) {
           final atLimit = selectedComments.length >= maxSelections;
           return Padding(

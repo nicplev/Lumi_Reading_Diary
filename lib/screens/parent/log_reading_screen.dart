@@ -64,18 +64,29 @@ class _LogReadingScreenState extends State<LogReadingScreen>
 
   bool get _commentsEnabled => _commentSettings.enabled;
   bool get _comprehensionEnabled => _comprehensionSettings.enabled;
-  int get _totalSteps {
-    var n = 3; // book, feeling, confirm
-    if (_commentsEnabled) n += 1;
-    if (_comprehensionEnabled) n += 1;
-    return n;
-  }
+
+  // Tonight's reading (book + duration + how it felt) → [optional detail] →
+  // Review. The middle "Add detail" page (voice reflection + comment tags +
+  // notes) only appears when the school enables one of those features, so the
+  // flow is three steps in the common case and two when there's nothing
+  // optional to collect — never an empty page.
+  bool get _hasOptionalDetail => _commentsEnabled || _comprehensionEnabled;
+  int get _totalSteps => _hasOptionalDetail ? 3 : 2;
 
   // Step 1: Book selection
   final List<String> _assignedBookTitles = [];
   final Set<String> _selectedBookTitles = {};
   final List<String> _customBookTitles = [];
   int _selectedMinutes = 20;
+
+  // A large class library is collapsed to the first few rows so it doesn't
+  // push Reading time + feeling below the fold; expanded on demand.
+  bool _showAllAssignedBooks = false;
+  static const int _kCollapsedBookCount = 4;
+
+  // When the child has assigned books, the manual "add a book" entry is a
+  // secondary path — collapsed to a slim row until tapped.
+  bool _showAddBookField = false;
 
   // Step 2: Child feeling
   ReadingFeeling? _selectedFeeling;
@@ -323,6 +334,9 @@ class _LogReadingScreenState extends State<LogReadingScreen>
           _comprehensionQuestion =
               ClassModel.fromFirestore(classDoc).comprehensionQuestion;
         }
+        // Settings can shrink the flow (comments + voice both off → 2 steps);
+        // keep a restored/active page index in range.
+        _currentStep = _currentStep.clamp(0, _totalSteps - 1);
       });
     } catch (_) {
       // Defaults are already set; safe to proceed with them.
@@ -474,15 +488,36 @@ class _LogReadingScreenState extends State<LogReadingScreen>
     return Scaffold(
       backgroundColor: LumiTokens.cream,
       appBar: AppBar(
-        title: Text(
-          'Log Reading - ${widget.student.firstName}',
-          style: LumiTextStyles.h3(),
-        ),
         backgroundColor: LumiTokens.paper,
         elevation: 0,
+        titleSpacing: 0,
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: _handleClose,
+        ),
+        // Child's name kept for context, but quieter than a page heading.
+        title: Text(
+          widget.student.firstName,
+          style: LumiTextStyles.bodyMedium(color: LumiTokens.ink)
+              .copyWith(fontWeight: FontWeight.w600),
+        ),
+        // Progress lives in the app bar (a thin bar + a compact count), so the
+        // body can start straight at the step content.
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(28),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Row(
+              children: [
+                Expanded(child: _buildProgressBars()),
+                const SizedBox(width: 12),
+                Text(
+                  'Step ${_currentStep + 1} of $_totalSteps',
+                  style: LumiTextStyles.caption(color: LumiTokens.muted),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
       // Tap anywhere outside a field to dismiss the keyboard — the comment and
@@ -506,9 +541,6 @@ class _LogReadingScreenState extends State<LogReadingScreen>
           child: SafeArea(
         child: Column(
           children: [
-            // Step indicator
-            _buildStepIndicator(),
-
             // Soft notice: another guardian already logged today.
             if (_alreadyLoggedNotice != null)
               Padding(
@@ -550,9 +582,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
                   _buildStep1BookSelection(),
-                  _buildStep2ChildAssessment(),
-                  if (_commentsEnabled) _buildStep3ParentComment(),
-                  if (_comprehensionEnabled) _buildStepComprehension(),
+                  if (_hasOptionalDetail) _buildStepDetail(),
                   _buildStep4Confirmation(),
                 ],
               ),
@@ -595,43 +625,30 @@ class _LogReadingScreenState extends State<LogReadingScreen>
     );
   }
 
-  Widget _buildStepIndicator() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: List.generate(_totalSteps, (index) {
-              final isActive = index == _currentStep;
-              final isCompleted = index < _currentStep;
-              return Expanded(
-                child: Padding(
-                  padding:
-                      EdgeInsets.only(right: index < _totalSteps - 1 ? 8 : 0),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: isCompleted
-                          ? LumiTokens.red
-                          : isActive
-                              ? LumiTokens.red.withValues(alpha: 0.6)
-                              : LumiTokens.ink.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-              );
-            }),
+  /// The three-segment progress bar, rendered in the app bar bottom.
+  Widget _buildProgressBars() {
+    return Row(
+      children: List.generate(_totalSteps, (index) {
+        final isActive = index == _currentStep;
+        final isCompleted = index < _currentStep;
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(right: index < _totalSteps - 1 ? 6 : 0),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              height: 4,
+              decoration: BoxDecoration(
+                color: isCompleted
+                    ? LumiTokens.red
+                    : isActive
+                        ? LumiTokens.red.withValues(alpha: 0.6)
+                        : LumiTokens.ink.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Step ${_currentStep + 1} of $_totalSteps',
-            style: LumiTextStyles.caption(color: LumiTokens.muted),
-          ),
-        ],
-      ),
+        );
+      }),
     );
   }
 
@@ -644,15 +661,12 @@ class _LogReadingScreenState extends State<LogReadingScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('What did you read?', style: LumiTextStyles.h2()),
-          const SizedBox(height: 8),
-          Text(
-            'Select a book or add your own',
-            style: LumiTextStyles.bodySmall(color: LumiTokens.muted),
-          ),
-          const SizedBox(height: 24),
+          Text('Tonight\'s reading', style: LumiTextStyles.h2()),
+          const SizedBox(height: 16),
 
-          // Assigned books
+          // Assigned books — collapsed to the first few so a large class
+          // library doesn't bury Reading time + feeling. Any selected title
+          // stays visible even when collapsed.
           if (hasAssigned) ...[
             _bentoCard(
               child: Column(
@@ -660,7 +674,9 @@ class _LogReadingScreenState extends State<LogReadingScreen>
                 children: [
                   _cardHeader(Icons.assignment_outlined, 'Assigned books'),
                   const SizedBox(height: 4),
-                  ..._assignedBookTitles.map((title) => CheckboxListTile(
+                  ..._visibleAssignedBooks().map((title) => CheckboxListTile(
+                        dense: true,
+                        visualDensity: VisualDensity.compact,
                         title: Text(title, style: LumiTextStyles.body()),
                         value: _selectedBookTitles.contains(title),
                         activeColor: LumiTokens.red,
@@ -676,87 +692,139 @@ class _LogReadingScreenState extends State<LogReadingScreen>
                         contentPadding: EdgeInsets.zero,
                         controlAffinity: ListTileControlAffinity.leading,
                       )),
+                  if (_assignedBookTitles.length > _kCollapsedBookCount + 1)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () => setState(() =>
+                            _showAllAssignedBooks = !_showAllAssignedBooks),
+                        style: TextButton.styleFrom(
+                          foregroundColor: LumiTokens.red,
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        icon: Icon(
+                          _showAllAssignedBooks
+                              ? Icons.expand_less_rounded
+                              : Icons.expand_more_rounded,
+                          size: 20,
+                        ),
+                        label: Text(
+                          _showAllAssignedBooks
+                              ? 'Show fewer'
+                              : 'Show all ${_assignedBookTitles.length} books',
+                          style:
+                              LumiTextStyles.bodySmall(color: LumiTokens.red),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
           ],
 
-          // Manual entry
+          // Manual entry — a secondary path when books are assigned, so it
+          // collapses to a slim, still-visible row (one tap to open). Always
+          // open when nothing is assigned, or once a custom title is added.
           _bentoCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _cardHeader(
-                  Icons.add_rounded,
-                  hasAssigned ? 'Or add a book' : 'Add a book',
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _bookTitleController,
-                        cursorColor: LumiTokens.ink,
-                        decoration: _bookFieldDecoration(),
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: _addCustomBook,
+            child:
+                (hasAssigned && !_showAddBookField && _customBookTitles.isEmpty)
+                    ? InkWell(
+                        onTap: () =>
+                            setState(() => _showAddBookField = true),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.add_rounded,
+                                size: 18, color: LumiTokens.red),
+                            const SizedBox(width: 8),
+                            Text("Add a book that isn't listed",
+                                style: LumiTextStyles.label()),
+                            const Spacer(),
+                            const Icon(Icons.expand_more_rounded,
+                                size: 20, color: LumiTokens.muted),
+                          ],
+                        ),
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _cardHeader(
+                            Icons.add_rounded,
+                            hasAssigned ? 'Or add a book' : 'Add a book',
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _bookTitleController,
+                                  cursorColor: LumiTokens.ink,
+                                  decoration: _bookFieldDecoration(),
+                                  textInputAction: TextInputAction.done,
+                                  onSubmitted: _addCustomBook,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              _RoundAddButton(
+                                onTap: () =>
+                                    _addCustomBook(_bookTitleController.text),
+                              ),
+                            ],
+                          ),
+                          if (_customBookTitles.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: _customBookTitles
+                                    .map((title) => _RemovableBookChip(
+                                          label: title,
+                                          onDeleted: () => setState(() =>
+                                              _customBookTitles.remove(title)),
+                                        ))
+                                    .toList(),
+                              ),
+                            ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    _RoundAddButton(
-                      onTap: () => _addCustomBook(_bookTitleController.text),
-                    ),
-                  ],
-                ),
-                if (_customBookTitles.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _customBookTitles
-                          .map((title) => _RemovableBookChip(
-                                label: title,
-                                onDeleted: () => setState(
-                                    () => _customBookTitles.remove(title)),
-                              ))
-                          .toList(),
-                    ),
-                  ),
-              ],
-            ),
           ),
 
           const SizedBox(height: 16),
 
-          // Reading time
+          // Reading time — value + fine-adjust live on the header row so the
+          // card stays slim; the preset chips below remain the primary,
+          // big-tap control (the ± just covers the rare non-preset value).
           _bentoCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _cardHeader(Icons.timer_outlined, 'Reading time'),
-                const SizedBox(height: 8),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    const Icon(Icons.timer_outlined,
+                        size: 18, color: LumiTokens.red),
+                    const SizedBox(width: 8),
+                    Text('Reading time', style: LumiTextStyles.label()),
+                    const Spacer(),
                     IconButton(
                       onPressed: _selectedMinutes > 5
                           ? () => setState(() => _selectedMinutes -= 5)
                           : null,
                       icon: const Icon(Icons.remove_circle_outline),
                       color: LumiTokens.red,
-                      iconSize: 28,
+                      iconSize: 24,
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints:
+                          const BoxConstraints(minWidth: 36, minHeight: 36),
                     ),
                     SizedBox(
-                      width: 150,
-                      child: Center(
-                        child: Text(
-                          '$_selectedMinutes min',
-                          style: LumiTextStyles.displayMedium(
-                              color: LumiTokens.red),
-                          maxLines: 1,
-                        ),
+                      width: 70,
+                      child: Text(
+                        '$_selectedMinutes min',
+                        textAlign: TextAlign.center,
+                        style: LumiTextStyles.h3(color: LumiTokens.red),
                       ),
                     ),
                     IconButton(
@@ -765,7 +833,11 @@ class _LogReadingScreenState extends State<LogReadingScreen>
                           : null,
                       icon: const Icon(Icons.add_circle_outline),
                       color: LumiTokens.red,
-                      iconSize: 28,
+                      iconSize: 24,
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints:
+                          const BoxConstraints(minWidth: 36, minHeight: 36),
                     ),
                   ],
                 ),
@@ -788,12 +860,57 @@ class _LogReadingScreenState extends State<LogReadingScreen>
               ],
             ),
           ),
+
+          const SizedBox(height: 16),
+
+          // How did reading feel? — on the core page so the child's emotion is
+          // captured up front, which frees the optional detail page to lead
+          // with the easily-missed voice reflection.
+          _bentoCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _cardHeader(
+                  Icons.sentiment_satisfied_alt_outlined,
+                  'How did reading feel?',
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Let your child choose',
+                  style: LumiTextStyles.bodySmall(color: LumiTokens.muted),
+                ),
+                const SizedBox(height: 16),
+                BlobSelector(
+                  showHeader: false,
+                  selectedFeeling: _selectedFeeling,
+                  onFeelingSelected: (feeling) {
+                    setState(() => _selectedFeeling = feeling);
+                  },
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     ).animate().fadeIn();
   }
 
   // ─── Step 1 helpers ──────────────────────────────────────
+
+  /// Assigned-book rows to show: when collapsed, the first few plus any
+  /// already-selected titles (so a selection is never hidden off-screen).
+  List<String> _visibleAssignedBooks() {
+    if (_showAllAssignedBooks ||
+        _assignedBookTitles.length <= _kCollapsedBookCount + 1) {
+      return _assignedBookTitles;
+    }
+    return [
+      for (var i = 0; i < _assignedBookTitles.length; i++)
+        if (i < _kCollapsedBookCount ||
+            _selectedBookTitles.contains(_assignedBookTitles[i]))
+          _assignedBookTitles[i],
+    ];
+  }
 
   void _addCustomBook(String raw) {
     final value = raw.trim();
@@ -847,83 +964,123 @@ class _LogReadingScreenState extends State<LogReadingScreen>
     );
   }
 
-  // ─── Step 2: Child Assessment ────────────────────────────
+  // ─── Step 2: Add detail (optional voice + tags + notes) ────────────
+  //
+  // The emotion now lives on the core first page, so this page is pure
+  // optional detail. It leads with the voice reflection (an easily-missed
+  // feature) in a prominent card, then the quick comment tags and notes.
+  // Shown only when the school enables at least one of these.
 
-  Widget _buildStep2ChildAssessment() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-      child: BlobSelector(
-        selectedFeeling: _selectedFeeling,
-        onFeelingSelected: (feeling) {
-          setState(() => _selectedFeeling = feeling);
-        },
-      ),
-    ).animate().fadeIn();
-  }
-
-  // ─── Step 3: Parent Comment ──────────────────────────────
-
-  Widget _buildStep3ParentComment() {
+  Widget _buildStepDetail() {
     final customPresets = _commentSettings.effectivePresets;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CommentChips(
-            selectedComments: _selectedComments,
-            onCommentsChanged: (comments) {
-              setState(() => _selectedComments = comments);
-            },
-            categories: customPresets.isNotEmpty ? customPresets : null,
+          Text('Anything to add?', style: LumiTextStyles.h2()),
+          const SizedBox(height: 8),
+          Text(
+            'All optional — these help your child\'s teacher',
+            style: LumiTextStyles.bodySmall(color: LumiTokens.muted),
           ),
-          if (_commentSettings.freeTextEnabled) ...[
-            const SizedBox(height: 24),
-            Text('Additional notes', style: LumiTextStyles.label()),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _notesController,
-              maxLines: 3,
-              cursorColor: LumiTokens.ink,
-              decoration: InputDecoration(
-                hintText: 'Anything else to add? (optional)',
-                filled: true,
-                fillColor: LumiTokens.cream,
-                contentPadding: const EdgeInsets.all(14),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
-                  borderSide: const BorderSide(color: LumiTokens.rule),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
-                  borderSide: const BorderSide(color: LumiTokens.rule),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
-                  borderSide: const BorderSide(color: LumiTokens.red, width: 2),
-                ),
+          const SizedBox(height: 20),
+
+          // Voice reflection first, in its own card, so it isn't missed.
+          if (_comprehensionEnabled) ...[
+            _bentoCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _cardHeader(Icons.mic_none_rounded, 'Voice reflection'),
+                  const SizedBox(height: 2),
+                  Text(
+                    _comprehensionQuestion,
+                    style: LumiTextStyles.bodySmall(color: LumiTokens.muted),
+                  ),
+                  const SizedBox(height: 16),
+                  ComprehensionRecordingStep(
+                    key: ValueKey('comprehension_$_logId'),
+                    embedded: true,
+                    question: _comprehensionQuestion,
+                    logId: _logId,
+                    initialLocalPath: _comprehensionRecording?.localPath,
+                    initialDurationSec: _comprehensionRecording?.durationSec,
+                    onRecordingChanged: (result) {
+                      setState(() => _comprehensionRecording = result);
+                    },
+                    onSkip: () {},
+                  ),
+                ],
               ),
             ),
+            if (_commentsEnabled) const SizedBox(height: 24),
+          ],
+
+          // Quick comment tags.
+          if (_commentsEnabled) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text('How did it go?', style: LumiTextStyles.label()),
+            ),
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Select up to $kMaxParentCommentChips that apply',
+                style: LumiTextStyles.bodySmall(color: LumiTokens.muted),
+              ),
+            ),
+            const SizedBox(height: 16),
+            CommentChips(
+              showHeader: false,
+              selectedComments: _selectedComments,
+              onCommentsChanged: (comments) {
+                setState(() => _selectedComments = comments);
+              },
+              categories: customPresets.isNotEmpty ? customPresets : null,
+            ),
+          ],
+
+          // Free-text notes (only when comments + free text on).
+          if (_commentsEnabled && _commentSettings.freeTextEnabled) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Additional notes', style: LumiTextStyles.label()),
+            ),
+            const SizedBox(height: 8),
+            _buildNotesField(),
           ],
         ],
       ),
     ).animate().fadeIn();
   }
 
-  // ─── Optional Step: Comprehension Recording ──────────────
-
-  Widget _buildStepComprehension() {
-    return ComprehensionRecordingStep(
-      key: ValueKey('comprehension_$_logId'),
-      question: _comprehensionQuestion,
-      logId: _logId,
-      initialLocalPath: _comprehensionRecording?.localPath,
-      initialDurationSec: _comprehensionRecording?.durationSec,
-      onRecordingChanged: (result) {
-        setState(() => _comprehensionRecording = result);
-      },
-      onSkip: _nextStep,
-    ).animate().fadeIn();
+  Widget _buildNotesField() {
+    return TextField(
+      controller: _notesController,
+      maxLines: 3,
+      cursorColor: LumiTokens.ink,
+      decoration: InputDecoration(
+        hintText: 'Anything else to add? (optional)',
+        filled: true,
+        fillColor: LumiTokens.cream,
+        contentPadding: const EdgeInsets.all(14),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+          borderSide: const BorderSide(color: LumiTokens.rule),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+          borderSide: const BorderSide(color: LumiTokens.rule),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+          borderSide: const BorderSide(color: LumiTokens.red, width: 2),
+        ),
+      ),
+    );
   }
 
   // ─── Step 4: Confirmation ────────────────────────────────
@@ -933,10 +1090,10 @@ class _LogReadingScreenState extends State<LogReadingScreen>
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          Text('Confirm Reading', style: LumiTextStyles.h2()),
+          Text('Review reading', style: LumiTextStyles.h2()),
           const SizedBox(height: 8),
           Text(
-            'Review and confirm tonight\'s reading',
+            'Check the details, then save tonight\'s reading',
             style: LumiTextStyles.bodySmall(
               color: LumiTokens.ink.withValues(alpha: 0.6),
             ),
@@ -1065,11 +1222,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
             Expanded(
               child: LumiPrimaryButton(
                 onPressed: _nextStep,
-                text: _currentStep == _totalSteps - 2
-                    ? 'Review'
-                    : _currentStep == 1
-                        ? (_selectedFeeling != null ? 'Next' : 'Skip')
-                        : 'Next',
+                text: _currentStep == _totalSteps - 2 ? 'Review' : 'Next',
                 isFullWidth: true,
                 color: LumiTokens.red,
               ),
