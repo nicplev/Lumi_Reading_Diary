@@ -405,56 +405,107 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                 ),
               ),
             ),
-            Container(
-              color: AppColors.white,
-              margin: const EdgeInsets.only(top: 1),
-              child: InkWell(
-                onTap: () => context.push(
-                  '/teacher/class-comprehension-question/${widget.classModel.id}',
-                  extra: {
-                    'teacher': widget.teacher,
-                    'classModel': widget.classModel,
-                  },
+            // A distinct, clearly-editable card (not a faint row) so the
+            // comprehension prompt is easy to find and obviously changeable.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                TeacherDimensions.paddingL,
+                0,
+                TeacherDimensions.paddingL,
+                TeacherDimensions.paddingL,
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius:
+                      BorderRadius.circular(TeacherDimensions.radiusM),
+                  border: Border.all(
+                    color: AppColors.teacherPrimary.withValues(alpha: 0.35),
+                  ),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(TeacherDimensions.paddingL),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.teacherPrimaryLight,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.mic_rounded,
-                            size: 20, color: AppColors.teacherPrimary),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Comprehension Question',
-                              style: TeacherTypography.bodyMedium.copyWith(
-                                fontWeight: FontWeight.w600,
+                clipBehavior: Clip.antiAlias,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => context.push(
+                      '/teacher/class-comprehension-question/${widget.classModel.id}',
+                      extra: {
+                        'teacher': widget.teacher,
+                        'classModel': widget.classModel,
+                      },
+                    ),
+                    child: Padding(
+                      padding:
+                          const EdgeInsets.all(TeacherDimensions.paddingL),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: const BoxDecoration(
+                                  color: AppColors.teacherPrimaryLight,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.mic_rounded,
+                                    size: 20,
+                                    color: AppColors.teacherPrimary),
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              widget.classModel.comprehensionQuestion,
-                              style: TeacherTypography.caption.copyWith(
-                                color: AppColors.textSecondary,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Comprehension question',
+                                  style:
+                                      TeacherTypography.bodyMedium.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
                               ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppColors.teacherPrimary,
+                                  borderRadius: BorderRadius.circular(
+                                      TeacherDimensions.radiusRound),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.edit_outlined,
+                                        size: 14, color: AppColors.white),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Edit',
+                                      style:
+                                          TeacherTypography.caption.copyWith(
+                                        color: AppColors.white,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            '"${widget.classModel.comprehensionQuestion}"',
+                            style: TeacherTypography.bodyMedium
+                                .copyWith(color: AppColors.charcoal),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Students are asked this at the end of logging — '
+                            'change it anytime.',
+                            style: TeacherTypography.caption.copyWith(
+                              color: AppColors.textSecondary,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      const Icon(Icons.chevron_right_rounded,
-                          color: AppColors.textSecondary),
-                    ],
+                    ),
                   ),
                 ),
               ),
