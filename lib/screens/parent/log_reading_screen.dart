@@ -3,10 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/app_colors.dart';
+import '../../theme/lumi_tokens.dart';
 import '../../core/theme/lumi_text_styles.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
-import '../../core/widgets/lumi/lumi_card.dart';
 import '../../core/widgets/lumi/blob_selector.dart';
 import '../../core/widgets/lumi/comment_chips.dart';
 import '../../data/models/user_model.dart';
@@ -216,18 +215,30 @@ class _LogReadingScreenState extends State<LogReadingScreen>
     final action = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Discard draft?'),
-        content: const Text(
+        backgroundColor: LumiTokens.paper,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+        ),
+        title: Text('Discard draft?', style: LumiTextStyles.h3()),
+        content: Text(
           'Keep your progress to finish logging later, or discard it.',
+          style: LumiTextStyles.bodyMedium(color: LumiTokens.muted),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, 'keep'),
-            child: const Text('Keep draft'),
+            child: Text(
+              'Keep draft',
+              style: LumiTextStyles.button().copyWith(color: LumiTokens.muted),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, 'discard'),
-            child: const Text('Discard'),
+            child: Text(
+              'Discard',
+              style: LumiTextStyles.button().copyWith(color: LumiTokens.red),
+            ),
           ),
         ],
       ),
@@ -461,13 +472,13 @@ class _LogReadingScreenState extends State<LogReadingScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.offWhite,
+      backgroundColor: LumiTokens.cream,
       appBar: AppBar(
         title: Text(
           'Log Reading - ${widget.student.firstName}',
           style: LumiTextStyles.h3(),
         ),
-        backgroundColor: AppColors.white,
+        backgroundColor: LumiTokens.paper,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close),
@@ -479,7 +490,20 @@ class _LogReadingScreenState extends State<LogReadingScreen>
       body: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         behavior: HitTestBehavior.opaque,
-        child: SafeArea(
+        // Local red focus border so the book-title and notes fields brand to
+        // the parent red rather than the global rosePink input theme.
+        child: Theme(
+          data: Theme.of(context).copyWith(
+            inputDecorationTheme:
+                Theme.of(context).inputDecorationTheme.copyWith(
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            const BorderSide(color: LumiTokens.red, width: 2),
+                      ),
+                    ),
+          ),
+          child: SafeArea(
         child: Column(
           children: [
             // Step indicator
@@ -492,19 +516,19 @@ class _LogReadingScreenState extends State<LogReadingScreen>
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.warmOrange.withValues(alpha: 0.12),
+                    color: LumiTokens.yellow.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     children: [
                       const Icon(Icons.info_outline,
-                          color: AppColors.warmOrange, size: 20),
+                          color: LumiTokens.yellow, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _alreadyLoggedNotice!,
                           style: LumiTextStyles.bodySmall(
-                            color: AppColors.charcoal,
+                            color: LumiTokens.ink,
                           ),
                         ),
                       ),
@@ -512,7 +536,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
                         onTap: () =>
                             setState(() => _alreadyLoggedNotice = null),
                         child: const Icon(Icons.close,
-                            color: AppColors.warmOrange, size: 18),
+                            color: LumiTokens.yellow, size: 18),
                       ),
                     ],
                   ),
@@ -541,19 +565,19 @@ class _LogReadingScreenState extends State<LogReadingScreen>
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.1),
+                    color: LumiTokens.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     children: [
                       const Icon(Icons.error_outline,
-                          color: AppColors.error, size: 20),
+                          color: LumiTokens.red, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _errorMessage!,
                           style:
-                              LumiTextStyles.bodySmall(color: AppColors.error),
+                              LumiTextStyles.bodySmall(color: LumiTokens.red),
                         ),
                       ),
                     ],
@@ -566,6 +590,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
           ],
         ),
         ),
+        ),
       ),
     );
   }
@@ -573,28 +598,39 @@ class _LogReadingScreenState extends State<LogReadingScreen>
   Widget _buildStepIndicator() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-      child: Row(
-        children: List.generate(_totalSteps, (index) {
-          final isActive = index == _currentStep;
-          final isCompleted = index < _currentStep;
-          return Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(right: index < _totalSteps - 1 ? 8 : 0),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isCompleted
-                      ? AppColors.rosePink
-                      : isActive
-                          ? AppColors.rosePink.withValues(alpha: 0.6)
-                          : AppColors.charcoal.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: List.generate(_totalSteps, (index) {
+              final isActive = index == _currentStep;
+              final isCompleted = index < _currentStep;
+              return Expanded(
+                child: Padding(
+                  padding:
+                      EdgeInsets.only(right: index < _totalSteps - 1 ? 8 : 0),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isCompleted
+                          ? LumiTokens.red
+                          : isActive
+                              ? LumiTokens.red.withValues(alpha: 0.6)
+                              : LumiTokens.ink.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          );
-        }),
+              );
+            }),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Step ${_currentStep + 1} of $_totalSteps',
+            style: LumiTextStyles.caption(color: LumiTokens.muted),
+          ),
+        ],
       ),
     );
   }
@@ -602,6 +638,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
   // ─── Step 1: Book Selection ──────────────────────────────
 
   Widget _buildStep1BookSelection() {
+    final hasAssigned = _assignedBookTitles.isNotEmpty;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -611,24 +648,22 @@ class _LogReadingScreenState extends State<LogReadingScreen>
           const SizedBox(height: 8),
           Text(
             'Select a book or add your own',
-            style: LumiTextStyles.bodySmall(
-              color: AppColors.charcoal.withValues(alpha: 0.6),
-            ),
+            style: LumiTextStyles.bodySmall(color: LumiTokens.muted),
           ),
           const SizedBox(height: 24),
 
-          // Assigned books as checkbox list
-          if (_assignedBookTitles.isNotEmpty) ...[
-            LumiCard(
+          // Assigned books
+          if (hasAssigned) ...[
+            _bentoCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Assigned Books', style: LumiTextStyles.label()),
-                  const SizedBox(height: 12),
+                  _cardHeader(Icons.assignment_outlined, 'Assigned books'),
+                  const SizedBox(height: 4),
                   ..._assignedBookTitles.map((title) => CheckboxListTile(
                         title: Text(title, style: LumiTextStyles.body()),
                         value: _selectedBookTitles.contains(title),
-                        activeColor: AppColors.rosePink,
+                        activeColor: LumiTokens.red,
                         onChanged: (checked) {
                           setState(() {
                             if (checked == true) {
@@ -648,15 +683,13 @@ class _LogReadingScreenState extends State<LogReadingScreen>
           ],
 
           // Manual entry
-          LumiCard(
+          _bentoCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  _assignedBookTitles.isNotEmpty
-                      ? 'Or add a book'
-                      : 'Add a book',
-                  style: LumiTextStyles.label(),
+                _cardHeader(
+                  Icons.add_rounded,
+                  hasAssigned ? 'Or add a book' : 'Add a book',
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -664,37 +697,15 @@ class _LogReadingScreenState extends State<LogReadingScreen>
                     Expanded(
                       child: TextField(
                         controller: _bookTitleController,
-                        decoration: const InputDecoration(
-                          hintText: 'Enter book title',
-                          prefixIcon: Icon(Icons.add),
-                        ),
+                        cursorColor: LumiTokens.ink,
+                        decoration: _bookFieldDecoration(),
                         textInputAction: TextInputAction.done,
-                        onSubmitted: (value) {
-                          if (value.isNotEmpty &&
-                              !_customBookTitles.contains(value)) {
-                            setState(() {
-                              _customBookTitles.add(value);
-                              _bookTitleController.clear();
-                            });
-                          }
-                        },
+                        onSubmitted: _addCustomBook,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      onPressed: () {
-                        final value = _bookTitleController.text.trim();
-                        if (value.isNotEmpty &&
-                            !_customBookTitles.contains(value)) {
-                          setState(() {
-                            _customBookTitles.add(value);
-                            _bookTitleController.clear();
-                          });
-                        }
-                      },
-                      icon: const Icon(Icons.add_circle),
-                      color: AppColors.rosePink,
-                      iconSize: 32,
+                    const SizedBox(width: 10),
+                    _RoundAddButton(
+                      onTap: () => _addCustomBook(_bookTitleController.text),
                     ),
                   ],
                 ),
@@ -705,13 +716,10 @@ class _LogReadingScreenState extends State<LogReadingScreen>
                       spacing: 8,
                       runSpacing: 8,
                       children: _customBookTitles
-                          .map((title) => Chip(
-                                label: Text(title),
-                                deleteIcon: const Icon(Icons.close, size: 18),
-                                onDeleted: () {
-                                  setState(
-                                      () => _customBookTitles.remove(title));
-                                },
+                          .map((title) => _RemovableBookChip(
+                                label: title,
+                                onDeleted: () => setState(
+                                    () => _customBookTitles.remove(title)),
                               ))
                           .toList(),
                     ),
@@ -720,21 +728,15 @@ class _LogReadingScreenState extends State<LogReadingScreen>
             ),
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
 
-          // Minutes selector
-          LumiCard(
+          // Reading time
+          _bentoCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.timer, color: AppColors.rosePink),
-                    const SizedBox(width: 8),
-                    Text('Reading Time', style: LumiTextStyles.label()),
-                  ],
-                ),
-                const SizedBox(height: 12),
+                _cardHeader(Icons.timer_outlined, 'Reading time'),
+                const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -743,16 +745,16 @@ class _LogReadingScreenState extends State<LogReadingScreen>
                           ? () => setState(() => _selectedMinutes -= 5)
                           : null,
                       icon: const Icon(Icons.remove_circle_outline),
-                      color: AppColors.rosePink,
+                      color: LumiTokens.red,
                       iconSize: 28,
                     ),
                     SizedBox(
-                      width: 140,
+                      width: 150,
                       child: Center(
                         child: Text(
                           '$_selectedMinutes min',
                           style: LumiTextStyles.displayMedium(
-                              color: AppColors.rosePink),
+                              color: LumiTokens.red),
                           maxLines: 1,
                         ),
                       ),
@@ -762,37 +764,25 @@ class _LogReadingScreenState extends State<LogReadingScreen>
                           ? () => setState(() => _selectedMinutes += 5)
                           : null,
                       icon: const Icon(Icons.add_circle_outline),
-                      color: AppColors.rosePink,
+                      color: LumiTokens.red,
                       iconSize: 28,
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 Center(
                   child: Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     alignment: WrapAlignment.center,
-                    children: [10, 15, 20, 25, 30].map((minutes) {
-                      return ChoiceChip(
-                        label: Text('$minutes'),
-                        selected: _selectedMinutes == minutes,
-                        onSelected: (selected) {
-                          if (selected) {
-                            setState(() => _selectedMinutes = minutes);
-                          }
-                        },
-                        selectedColor: AppColors.rosePink,
-                        labelStyle: TextStyle(
-                          color: _selectedMinutes == minutes
-                              ? AppColors.white
-                              : AppColors.charcoal,
-                          fontWeight: _selectedMinutes == minutes
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                      );
-                    }).toList(),
+                    children: [10, 15, 20, 25, 30]
+                        .map((minutes) => _MinuteChip(
+                              minutes: minutes,
+                              selected: _selectedMinutes == minutes,
+                              onTap: () =>
+                                  setState(() => _selectedMinutes = minutes),
+                            ))
+                        .toList(),
                   ),
                 ),
               ],
@@ -803,18 +793,70 @@ class _LogReadingScreenState extends State<LogReadingScreen>
     ).animate().fadeIn();
   }
 
+  // ─── Step 1 helpers ──────────────────────────────────────
+
+  void _addCustomBook(String raw) {
+    final value = raw.trim();
+    if (value.isNotEmpty && !_customBookTitles.contains(value)) {
+      setState(() {
+        _customBookTitles.add(value);
+        _bookTitleController.clear();
+      });
+    }
+  }
+
+  InputDecoration _bookFieldDecoration() {
+    OutlineInputBorder border(Color c, double w) => OutlineInputBorder(
+          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+          borderSide: BorderSide(color: c, width: w),
+        );
+    return InputDecoration(
+      hintText: 'Enter book title',
+      filled: true,
+      fillColor: LumiTokens.cream,
+      isDense: true,
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      border: border(LumiTokens.rule, 1),
+      enabledBorder: border(LumiTokens.rule, 1),
+      focusedBorder: border(LumiTokens.red, 2),
+    );
+  }
+
+  /// Flat bento tile: paper surface, hairline rule border, no shadow.
+  Widget _bentoCard({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+        border: Border.all(color: LumiTokens.rule),
+      ),
+      child: child,
+    );
+  }
+
+  Widget _cardHeader(IconData icon, String label) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: LumiTokens.red),
+        const SizedBox(width: 8),
+        Text(label, style: LumiTextStyles.label()),
+      ],
+    );
+  }
+
   // ─── Step 2: Child Assessment ────────────────────────────
 
   Widget _buildStep2ChildAssessment() {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Center(
-        child: BlobSelector(
-          selectedFeeling: _selectedFeeling,
-          onFeelingSelected: (feeling) {
-            setState(() => _selectedFeeling = feeling);
-          },
-        ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+      child: BlobSelector(
+        selectedFeeling: _selectedFeeling,
+        onFeelingSelected: (feeling) {
+          setState(() => _selectedFeeling = feeling);
+        },
       ),
     ).animate().fadeIn();
   }
@@ -842,9 +884,24 @@ class _LogReadingScreenState extends State<LogReadingScreen>
             TextField(
               controller: _notesController,
               maxLines: 3,
-              decoration: const InputDecoration(
+              cursorColor: LumiTokens.ink,
+              decoration: InputDecoration(
                 hintText: 'Anything else to add? (optional)',
-                border: OutlineInputBorder(),
+                filled: true,
+                fillColor: LumiTokens.cream,
+                contentPadding: const EdgeInsets.all(14),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+                  borderSide: const BorderSide(color: LumiTokens.rule),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+                  borderSide: const BorderSide(color: LumiTokens.rule),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+                  borderSide: const BorderSide(color: LumiTokens.red, width: 2),
+                ),
               ),
             ),
           ],
@@ -881,13 +938,13 @@ class _LogReadingScreenState extends State<LogReadingScreen>
           Text(
             'Review and confirm tonight\'s reading',
             style: LumiTextStyles.bodySmall(
-              color: AppColors.charcoal.withValues(alpha: 0.6),
+              color: LumiTokens.ink.withValues(alpha: 0.6),
             ),
           ),
           const SizedBox(height: 24),
 
           // Summary card
-          LumiCard(
+          _bentoCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -929,58 +986,35 @@ class _LogReadingScreenState extends State<LogReadingScreen>
                     _notesController.text,
                   ),
                 ],
+                if (_comprehensionRecording != null) ...[
+                  const Divider(height: 24),
+                  _buildSummaryRow(
+                    Icons.mic_none_rounded,
+                    'Voice reflection',
+                    'Recorded · ${_comprehensionRecording!.durationSec}s',
+                  ),
+                ],
+                const Divider(height: 24),
+                _buildSummaryRow(
+                  Icons.favorite_outline,
+                  'Read together',
+                  'Yes, with ${widget.student.firstName}',
+                ),
               ],
             ),
           ),
 
           const SizedBox(height: 32),
 
-          // Confirmation button with green gradient
-          SizedBox(
-            width: double.infinity,
-            height: 60,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF4CAF50), Color(0xFF66BB6A)],
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF4CAF50).withValues(alpha: 0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: ElevatedButton.icon(
-                onPressed: _isLoading ? null : _saveReadingLog,
-                icon: _isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(AppColors.white),
-                        ),
-                      )
-                    : const Icon(Icons.check, color: AppColors.white),
-                label: Text(
-                  'I read with my child tonight',
-                  style: LumiTextStyles.button(),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-              ),
-            ),
+          // Primary submit — an unmistakable "Save" action (not a status).
+          // Solid Lumi green marks the positive completion of the flow.
+          LumiPrimaryButton(
+            onPressed: _isLoading ? null : _saveReadingLog,
+            text: 'Save reading log',
+            icon: Icons.check_rounded,
+            isLoading: _isLoading,
+            isFullWidth: true,
+            color: LumiTokens.green,
           ),
         ],
       ),
@@ -991,7 +1025,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 20, color: AppColors.rosePink),
+        Icon(icon, size: 20, color: LumiTokens.red),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -1000,7 +1034,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
               Text(
                 label,
                 style: LumiTextStyles.caption(
-                  color: AppColors.charcoal.withValues(alpha: 0.6),
+                  color: LumiTokens.ink.withValues(alpha: 0.6),
                 ),
               ),
               const SizedBox(height: 2),
@@ -1023,6 +1057,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
                 onPressed: _previousStep,
                 text: 'Back',
                 icon: Icons.arrow_back,
+                color: LumiTokens.red,
               ),
             ),
           if (_currentStep > 0) const SizedBox(width: 12),
@@ -1036,8 +1071,110 @@ class _LogReadingScreenState extends State<LogReadingScreen>
                         ? (_selectedFeeling != null ? 'Next' : 'Skip')
                         : 'Next',
                 isFullWidth: true,
+                color: LumiTokens.red,
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A flat Lumi pill for the quick-pick reading minutes. Selected = red fill
+/// with a white check; unselected = paper with a hairline rule border.
+class _MinuteChip extends StatelessWidget {
+  const _MinuteChip({
+    required this.minutes,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final int minutes;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? LumiTokens.red : LumiTokens.paper,
+      shape: StadiumBorder(
+        side: BorderSide(color: selected ? LumiTokens.red : LumiTokens.rule),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (selected) ...[
+                const Icon(Icons.check, size: 14, color: LumiTokens.paper),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                '$minutes',
+                style: LumiTextStyles.body().copyWith(
+                  color: selected ? LumiTokens.paper : LumiTokens.ink,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Red circular "add" affordance next to the book-title field.
+class _RoundAddButton extends StatelessWidget {
+  const _RoundAddButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: LumiTokens.red,
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: const Padding(
+          padding: EdgeInsets.all(11),
+          child: Icon(Icons.add, color: LumiTokens.paper, size: 22),
+        ),
+      ),
+    );
+  }
+}
+
+/// A custom-added book title shown as a soft red removable chip.
+class _RemovableBookChip extends StatelessWidget {
+  const _RemovableBookChip({required this.label, required this.onDeleted});
+
+  final String label;
+  final VoidCallback onDeleted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+      decoration: BoxDecoration(
+        color: LumiTokens.red.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+        border: Border.all(color: LumiTokens.red.withValues(alpha: 0.30)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: LumiTextStyles.bodySmall(color: LumiTokens.ink)),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: onDeleted,
+            child: const Icon(Icons.close, size: 16, color: LumiTokens.red),
+          ),
         ],
       ),
     );

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/theme/app_colors.dart';
+import '../../theme/lumi_tokens.dart';
 import '../../core/theme/lumi_text_styles.dart';
 import '../../core/theme/lumi_spacing.dart';
 import '../../core/theme/lumi_borders.dart';
@@ -231,13 +231,26 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.offWhite,
+      backgroundColor: LumiTokens.cream,
       appBar: AppBar(
         title: const Text('School Registration'),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
-      body: SafeArea(
+      // Local red focus border so all wizard fields brand to the onboarding
+      // red rather than the global rosePink input theme.
+      body: Theme(
+        data: Theme.of(context).copyWith(
+          inputDecorationTheme:
+              Theme.of(context).inputDecorationTheme.copyWith(
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide:
+                          const BorderSide(color: LumiTokens.red, width: 2),
+                    ),
+                  ),
+        ),
+        child: SafeArea(
         child: Column(
           children: [
             // Progress indicator
@@ -262,6 +275,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
           ],
         ),
       ),
+      ),
     );
   }
 
@@ -272,6 +286,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
         child: LumiStepIndicator(
           stepCount: _steps.length,
           currentStep: _currentStep,
+          activeColor: LumiTokens.red,
         ),
       ),
     );
@@ -294,7 +309,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
             'School Information',
             style: LumiTextStyles.h2().copyWith(
               fontWeight: FontWeight.bold,
-              color: AppColors.charcoal,
+              color: LumiTokens.ink,
             ),
             textAlign: TextAlign.center,
           ),
@@ -302,7 +317,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
           Text(
             'Tell us about your school',
             style: LumiTextStyles.body().copyWith(
-              color: AppColors.charcoal.withValues(alpha: 0.6),
+              color: LumiTokens.ink.withValues(alpha: 0.6),
             ),
             textAlign: TextAlign.center,
           ),
@@ -372,7 +387,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
             'Create Admin Account',
             style: LumiTextStyles.h2().copyWith(
               fontWeight: FontWeight.bold,
-              color: AppColors.charcoal,
+              color: LumiTokens.ink,
             ),
             textAlign: TextAlign.center,
           ),
@@ -380,7 +395,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
           Text(
             'This will be the main administrator account',
             style: LumiTextStyles.body().copyWith(
-              color: AppColors.charcoal.withValues(alpha: 0.6),
+              color: LumiTokens.ink.withValues(alpha: 0.6),
             ),
             textAlign: TextAlign.center,
           ),
@@ -390,12 +405,12 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
               padding: LumiPadding.allXS,
               margin: const EdgeInsets.only(bottom: LumiSpacing.s),
               decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.1),
+                color: LumiTokens.red.withValues(alpha: 0.1),
                 borderRadius: LumiBorders.medium,
-                border: Border.all(color: AppColors.error),
+                border: Border.all(color: LumiTokens.red),
               ),
               child: Text(_errorMessage!,
-                  style: const TextStyle(color: AppColors.error)),
+                  style: const TextStyle(color: LumiTokens.red)),
             ),
           FormBuilder(
             key: _adminAccountFormKey,
@@ -477,7 +492,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
             'Reading Level System',
             style: LumiTextStyles.h2().copyWith(
               fontWeight: FontWeight.bold,
-              color: AppColors.charcoal,
+              color: LumiTokens.ink,
             ),
             textAlign: TextAlign.center,
           ),
@@ -485,7 +500,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
           Text(
             'Choose your preferred reading level schema',
             style: LumiTextStyles.body().copyWith(
-              color: AppColors.charcoal.withValues(alpha: 0.6),
+              color: LumiTokens.ink.withValues(alpha: 0.6),
             ),
             textAlign: TextAlign.center,
           ),
@@ -495,13 +510,13 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
               padding: LumiPadding.allXS,
               margin: const EdgeInsets.only(bottom: LumiSpacing.s),
               decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.1),
+                color: LumiTokens.red.withValues(alpha: 0.1),
                 borderRadius: LumiBorders.medium,
-                border: Border.all(color: AppColors.error),
+                border: Border.all(color: LumiTokens.red),
               ),
               child: Text(
                 _errorMessage!,
-                style: const TextStyle(color: AppColors.error),
+                style: const TextStyle(color: LumiTokens.red),
               ),
             ),
           FormBuilder(
@@ -637,7 +652,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
               'Welcome to Lumi!',
               style: LumiTextStyles.h1().copyWith(
                 fontWeight: FontWeight.bold,
-                color: AppColors.rosePink,
+                color: LumiTokens.red,
               ),
               textAlign: TextAlign.center,
             ),
@@ -645,7 +660,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
             Text(
               'Your school setup is active. Next: import students, generate parent link codes, and share the CSV with families.',
               style: LumiTextStyles.bodyLarge().copyWith(
-                color: AppColors.charcoal.withValues(alpha: 0.6),
+                color: LumiTokens.ink.withValues(alpha: 0.6),
               ),
               textAlign: TextAlign.center,
             ),
@@ -654,6 +669,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
               onPressed: () => context.go('/auth/login'),
               text: 'Continue to Login',
               isFullWidth: true,
+              color: LumiTokens.red,
             ),
           ],
         ),
@@ -672,6 +688,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
                 onPressed: _isLoading ? null : _previousStep,
                 text: 'Back',
                 isFullWidth: true,
+                color: LumiTokens.red,
               ),
             ),
           if (_currentStep > 0) LumiGap.s,
@@ -683,6 +700,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
               icon: _currentStep == 2 ? Icons.check_circle : null,
               isLoading: _isLoading,
               isFullWidth: true,
+              color: LumiTokens.red,
             ),
           ),
         ],

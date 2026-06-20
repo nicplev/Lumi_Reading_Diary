@@ -11,7 +11,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/exceptions/linking_exceptions.dart';
 import '../../../core/routing/app_router.dart';
 import '../../../core/services/user_school_index_service.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../theme/lumi_tokens.dart';
 import '../../../core/theme/lumi_text_styles.dart';
 import '../../../core/widgets/lumi/lumi_buttons.dart';
 import '../../../core/widgets/lumi/lumi_input.dart';
@@ -986,11 +986,11 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       onTap: () {},
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.white,
+          color: LumiTokens.paper,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: AppColors.charcoal.withValues(alpha: 0.18),
+              color: LumiTokens.ink.withValues(alpha: 0.18),
               blurRadius: 40,
               offset: const Offset(0, 10),
             ),
@@ -1047,7 +1047,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
               ? IconButton(
                   onPressed: _goBack,
                   icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-                  color: AppColors.charcoal,
+                  color: LumiTokens.ink,
                   splashRadius: 18,
                 )
               : null,
@@ -1065,7 +1065,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
           child: IconButton(
             onPressed: _busy ? null : () => Navigator.of(context).maybePop(),
             icon: const Icon(Icons.close, size: 22),
-            color: AppColors.charcoal,
+            color: LumiTokens.ink,
             splashRadius: 18,
           ),
         ),
@@ -1183,11 +1183,12 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         Text(
           'Enter the 8-character code from your child\'s school.',
           style: LumiTextStyles.bodySmall(
-            color: AppColors.charcoal.withValues(alpha: 0.7),
+            color: LumiTokens.ink.withValues(alpha: 0.7),
           ),
         ),
         const SizedBox(height: 12),
         LumiInput(
+          accentColor: LumiTokens.red,
           controller: _codeController,
           hintText: 'e.g. ABC12345',
           autofocus: true,
@@ -1197,7 +1198,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
             onPressed: _busy ? null : _openQrScanner,
             tooltip: 'Scan QR code',
             icon: const Icon(Icons.qr_code_scanner, size: 22),
-            color: AppColors.charcoal,
+            color: LumiTokens.ink,
             splashRadius: 18,
           ),
           inputFormatters: [
@@ -1213,6 +1214,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         LumiInput(
+          accentColor: LumiTokens.red,
           controller: _firstNameController,
           hintText: 'First name',
           autofocus: true,
@@ -1229,6 +1231,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
               ? Padding(
                   padding: const EdgeInsets.only(top: 12),
                   child: LumiInput(
+                    accentColor: LumiTokens.red,
                     controller: _lastNameController,
                     hintText: 'Last name',
                     textInputAction: TextInputAction.done,
@@ -1263,7 +1266,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         Text(
           'How are you related to $_studentName? This appears on reading logs you record.',
           style: LumiTextStyles.bodySmall(
-            color: AppColors.charcoal.withValues(alpha: 0.7),
+            color: LumiTokens.ink.withValues(alpha: 0.7),
           ),
         ),
         const SizedBox(height: 12),
@@ -1275,7 +1278,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
               ChoiceChip(
                 label: Text(option),
                 selected: _relationshipChoice == option,
-                selectedColor: AppColors.parentColor.withValues(alpha: 0.2),
+                selectedColor: LumiTokens.red.withValues(alpha: 0.2),
                 onSelected: (_) => setState(() => _relationshipChoice = option),
               ),
           ],
@@ -1288,6 +1291,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
               ? Padding(
                   padding: const EdgeInsets.only(top: 12),
                   child: LumiInput(
+                    accentColor: LumiTokens.red,
                     controller: _relationshipOtherController,
                     hintText: 'e.g. Aunt, Foster carer',
                     autofocus: true,
@@ -1322,11 +1326,12 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         Text(
           'Recommended. We\'ll use this to reset your password if you forget it. Without an email, you\'ll sign in with an SMS code each time.',
           style: LumiTextStyles.bodySmall(
-            color: AppColors.charcoal.withValues(alpha: 0.7),
+            color: LumiTokens.ink.withValues(alpha: 0.7),
           ),
         ),
         const SizedBox(height: 12),
         LumiInput(
+          accentColor: LumiTokens.red,
           controller: _emailController,
           hintText: 'you@example.com',
           autofocus: true,
@@ -1344,6 +1349,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
               ? Padding(
                   padding: const EdgeInsets.only(top: 12),
                   child: LumiPasswordInput(
+                    accentColor: LumiTokens.red,
                     controller: _passwordController,
                     focusNode: _passwordFocusNode,
                     hintText: 'Password (at least 8 characters)',
@@ -1377,7 +1383,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
                 child: Text(
                   'I don\'t have an email',
                   style: LumiTextStyles.bodySmall(
-                    color: AppColors.charcoal.withValues(alpha: 0.55),
+                    color: LumiTokens.ink.withValues(alpha: 0.55),
                   ).copyWith(decoration: TextDecoration.underline),
                 ),
               ),
@@ -1392,6 +1398,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         LumiPasswordInput(
+          accentColor: LumiTokens.red,
           controller: _passwordController,
           focusNode: _passwordFocusNode,
           autofocus: true,
@@ -1409,6 +1416,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
               ? Padding(
                   padding: const EdgeInsets.only(top: 12),
                   child: LumiPasswordInput(
+                    accentColor: LumiTokens.red,
                     controller: _confirmController,
                     focusNode: _confirmFocusNode,
                     hintText: 'Confirm password',
@@ -1430,6 +1438,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
 
   Widget _buildConfirmInput() {
     return LumiPasswordInput(
+      accentColor: LumiTokens.red,
       controller: _confirmController,
       focusNode: _confirmFocusNode,
       autofocus: true,
@@ -1447,11 +1456,12 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         Text(
           'We\'ll text you a code to confirm your mobile. This is how you\'ll sign in.',
           style: LumiTextStyles.bodySmall(
-            color: AppColors.charcoal.withValues(alpha: 0.7),
+            color: LumiTokens.ink.withValues(alpha: 0.7),
           ),
         ),
         const SizedBox(height: 12),
         LumiInput(
+          accentColor: LumiTokens.red,
           controller: _phoneController,
           hintText: '0400 000 000',
           autofocus: true,
@@ -1479,11 +1489,12 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         Text(
           subtitle,
           style: LumiTextStyles.bodySmall(
-            color: AppColors.charcoal.withValues(alpha: 0.7),
+            color: LumiTokens.ink.withValues(alpha: 0.7),
           ),
         ),
         const SizedBox(height: 12),
         LumiInput(
+          accentColor: LumiTokens.red,
           controller: _smsCodeController,
           hintText: '123456',
           autofocus: true,
@@ -1504,7 +1515,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
             onPressed: _busy || !_canResend ? null : _resendSmsForCurrentFlow,
             child: Text(
               _canResend ? 'Resend code' : 'Resend in ${_resendRemainingSec}s',
-              style: LumiTextStyles.bodySmall(color: AppColors.parentColor),
+              style: LumiTextStyles.bodySmall(color: LumiTokens.red),
             ),
           ),
         ),
@@ -1563,6 +1574,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
     };
 
     return LumiPrimaryButton(
+      color: LumiTokens.red,
       onPressed: enabled ? onPressed : null,
       text: label,
       isLoading: _busy,
@@ -1584,21 +1596,21 @@ class _CompletedChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.mintGreen.withValues(alpha: 0.35),
+        color: LumiTokens.tintGreen.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: AppColors.success.withValues(alpha: 0.35),
+          color: LumiTokens.green.withValues(alpha: 0.35),
           width: 1,
         ),
       ),
       child: Row(
         children: [
-          const Icon(Icons.check_circle, size: 18, color: AppColors.success),
+          const Icon(Icons.check_circle, size: 18, color: LumiTokens.green),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               label,
-              style: LumiTextStyles.bodySmall(color: AppColors.success)
+              style: LumiTextStyles.bodySmall(color: LumiTokens.green)
                   .copyWith(fontWeight: FontWeight.w600),
               overflow: TextOverflow.ellipsis,
             ),
@@ -1619,22 +1631,22 @@ class _ErrorBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.error.withValues(alpha: 0.08),
+        color: LumiTokens.red.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppColors.error.withValues(alpha: 0.35),
+          color: LumiTokens.red.withValues(alpha: 0.35),
           width: 1,
         ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.error_outline, size: 18, color: AppColors.error),
+          const Icon(Icons.error_outline, size: 18, color: LumiTokens.red),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
-              style: LumiTextStyles.bodySmall(color: AppColors.error),
+              style: LumiTextStyles.bodySmall(color: LumiTokens.red),
             ),
           ),
         ],
@@ -1660,11 +1672,11 @@ class _SuccessCard extends StatelessWidget {
       onTap: () {},
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.white,
+          color: LumiTokens.paper,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: AppColors.charcoal.withValues(alpha: 0.18),
+              color: LumiTokens.ink.withValues(alpha: 0.18),
               blurRadius: 40,
               offset: const Offset(0, 10),
             ),
@@ -1680,13 +1692,13 @@ class _SuccessCard extends StatelessWidget {
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  color: AppColors.success.withValues(alpha: 0.12),
+                  color: LumiTokens.green.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.check_rounded,
                   size: 42,
-                  color: AppColors.success,
+                  color: LumiTokens.green,
                 ),
               )
                   .animate()
@@ -1709,11 +1721,12 @@ class _SuccessCard extends StatelessWidget {
               'Your account is linked to $studentName. Let\'s start reading together.',
               textAlign: TextAlign.center,
               style: LumiTextStyles.body(
-                color: AppColors.charcoal.withValues(alpha: 0.7),
+                color: LumiTokens.ink.withValues(alpha: 0.7),
               ),
             ),
             const SizedBox(height: 24),
             LumiPrimaryButton(
+              color: LumiTokens.red,
               onPressed: onStart,
               text: 'Start Reading',
               isFullWidth: true,

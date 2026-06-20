@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../data/models/reading_log_model.dart';
-import '../../theme/app_colors.dart';
+import '../../../theme/lumi_tokens.dart';
 import '../../theme/lumi_text_styles.dart';
 
 /// A widget that displays 5 blob characters for the child to rate
@@ -71,7 +71,7 @@ class _BlobSelectorState extends State<BlobSelector> {
         Text(
           'Let your child choose',
           style: LumiTextStyles.bodySmall(
-            color: AppColors.charcoal.withValues(alpha: 0.6),
+            color: LumiTokens.ink.withValues(alpha: 0.6),
           ),
           textAlign: TextAlign.center,
         ),
@@ -105,24 +105,37 @@ class _BlobSelectorState extends State<BlobSelector> {
           children: [
             AnimatedScale(
               scale: isSelected
-                  ? 1.35
+                  ? 1.2
                   : isHovered
-                      ? 1.15
+                      ? 1.1
                       : 1.0,
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeOut,
-              child: SizedBox(
+              // A tinted ring + fill on selection so each blob reads as a
+              // control, not just an illustration. Border is always 2px (and
+              // transparent when unselected) so the layout never shifts.
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
                 width: 56,
                 height: 64,
-                child: Image.asset(
-                  blob.asset,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => Container(
-                    decoration: BoxDecoration(
-                      color: blob.color.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Center(
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? blob.color.withValues(alpha: 0.16)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isSelected ? blob.color : Colors.transparent,
+                    width: 2,
+                  ),
+                ),
+                child: SizedBox(
+                  width: 46,
+                  height: 54,
+                  child: Image.asset(
+                    blob.asset,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Center(
                       child: Text(
                         blob.label[0],
                         style: LumiTextStyles.h2(color: blob.color),
@@ -141,7 +154,7 @@ class _BlobSelectorState extends State<BlobSelector> {
               style: LumiTextStyles.caption(
                 color: isSelected
                     ? blob.color
-                    : AppColors.charcoal.withValues(alpha: 0.7),
+                    : LumiTokens.ink.withValues(alpha: 0.7),
               ).copyWith(
                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
               ),

@@ -8,7 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 
-import '../../../core/theme/app_colors.dart';
+import '../../../theme/lumi_tokens.dart';
 import '../../../core/theme/lumi_text_styles.dart';
 import '../../../core/widgets/lumi/lumi_buttons.dart';
 import '../../../core/widgets/lumi_mascot.dart';
@@ -336,7 +336,7 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
           Text(
             widget.question,
             textAlign: TextAlign.center,
-            style: LumiTextStyles.h2(color: AppColors.charcoal),
+            style: LumiTextStyles.h2(color: LumiTokens.ink),
           ),
           const SizedBox(height: 24),
           _buildStateBody(),
@@ -372,13 +372,14 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
           text: 'Record',
           icon: Icons.mic_rounded,
           isFullWidth: true,
+          color: LumiTokens.red,
         ),
         const SizedBox(height: 12),
         TextButton(
           onPressed: _skip,
           child: Text(
             'Skip this step',
-            style: LumiTextStyles.bodyMedium(color: AppColors.charcoal),
+            style: LumiTextStyles.bodyMedium(color: LumiTokens.ink),
           ),
         ),
       ],
@@ -391,13 +392,13 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
         const SizedBox(height: 20),
         Text(
           '$_countdown',
-          style: LumiTextStyles.h1(color: AppColors.rosePinkAccessible)
+          style: LumiTextStyles.h1(color: LumiTokens.red)
               .copyWith(fontSize: 64),
         ),
         const SizedBox(height: 12),
         Text(
           'Get ready…',
-          style: LumiTextStyles.bodyMedium(color: AppColors.charcoal),
+          style: LumiTextStyles.bodyMedium(color: LumiTokens.ink),
         ),
       ],
     );
@@ -413,7 +414,7 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
           child: CustomPaint(
             painter: _WaveformPainter(
               samples: _amplitudeSamples,
-              color: AppColors.rosePinkAccessible,
+              color: LumiTokens.red,
             ),
             child: const SizedBox.expand(),
           ),
@@ -422,7 +423,7 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
         Text(
           _formatDuration(_elapsedSec),
           style: LumiTextStyles.h3(
-            color: warning ? AppColors.warmOrange : AppColors.charcoal,
+            color: warning ? LumiTokens.yellow : LumiTokens.ink,
           ),
         ),
         if (warning)
@@ -430,7 +431,7 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               '$remaining seconds left',
-              style: LumiTextStyles.bodySmall(color: AppColors.warmOrange),
+              style: LumiTextStyles.bodySmall(color: LumiTokens.yellow),
             ),
           ),
         const SizedBox(height: 20),
@@ -439,6 +440,7 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
           text: 'Stop',
           icon: Icons.stop_rounded,
           isFullWidth: true,
+          color: LumiTokens.red,
         ),
       ],
     );
@@ -454,14 +456,15 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
           text: 'Use this recording',
           icon: Icons.check_rounded,
           isFullWidth: true,
+          color: LumiTokens.red,
         ),
         const SizedBox(height: 8),
         TextButton.icon(
           onPressed: _reRecord,
-          icon: const Icon(Icons.refresh_rounded, color: AppColors.charcoal),
+          icon: const Icon(Icons.refresh_rounded, color: LumiTokens.ink),
           label: Text(
             'Re-record',
-            style: LumiTextStyles.bodyMedium(color: AppColors.charcoal),
+            style: LumiTextStyles.bodyMedium(color: LumiTokens.ink),
           ),
         ),
       ],
@@ -474,18 +477,18 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.skyBlue.withValues(alpha: 0.3),
+            color: LumiTokens.blue.withValues(alpha: 0.3),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             children: [
               const Icon(Icons.check_circle_rounded,
-                  color: AppColors.rosePinkAccessible),
+                  color: LumiTokens.red),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   'Recording saved (${_formatDuration(_elapsedSec)})',
-                  style: LumiTextStyles.bodyMedium(color: AppColors.charcoal),
+                  style: LumiTextStyles.bodyMedium(color: LumiTokens.ink),
                 ),
               ),
             ],
@@ -496,10 +499,10 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
         const SizedBox(height: 12),
         TextButton.icon(
           onPressed: _reRecord,
-          icon: const Icon(Icons.refresh_rounded, color: AppColors.charcoal),
+          icon: const Icon(Icons.refresh_rounded, color: LumiTokens.ink),
           label: Text(
             'Re-record',
-            style: LumiTextStyles.bodyMedium(color: AppColors.charcoal),
+            style: LumiTextStyles.bodyMedium(color: LumiTokens.ink),
           ),
         ),
       ],
@@ -514,9 +517,9 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.offWhite,
+        color: LumiTokens.cream,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.charcoal.withValues(alpha: 0.1)),
+        border: Border.all(color: LumiTokens.ink.withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [
@@ -527,7 +530,7 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
                   ? Icons.pause_rounded
                   : Icons.play_arrow_rounded,
               size: 32,
-              color: AppColors.rosePinkAccessible,
+              color: LumiTokens.red,
             ),
           ),
           Expanded(
@@ -536,14 +539,14 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
               children: [
                 LinearProgressIndicator(
                   value: total > 0 ? pos / total : 0,
-                  backgroundColor: AppColors.charcoal.withValues(alpha: 0.08),
+                  backgroundColor: LumiTokens.ink.withValues(alpha: 0.08),
                   valueColor: const AlwaysStoppedAnimation(
-                      AppColors.rosePinkAccessible),
+                      LumiTokens.red),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '${_formatDuration(pos)} / ${_formatDuration(total)}',
-                  style: LumiTextStyles.bodySmall(color: AppColors.charcoal),
+                  style: LumiTextStyles.bodySmall(color: LumiTokens.ink),
                 ),
               ],
             ),
@@ -557,33 +560,34 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.warmOrange.withValues(alpha: 0.12),
+        color: LumiTokens.yellow.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         children: [
           const Icon(Icons.mic_off_rounded,
-              color: AppColors.warmOrange, size: 32),
+              color: LumiTokens.yellow, size: 32),
           const SizedBox(height: 8),
           Text(
             permanent
                 ? 'Microphone access is turned off. Open Settings to enable it.'
                 : 'Lumi needs the microphone to record. Try again?',
             textAlign: TextAlign.center,
-            style: LumiTextStyles.bodyMedium(color: AppColors.charcoal),
+            style: LumiTextStyles.bodyMedium(color: LumiTokens.ink),
           ),
           const SizedBox(height: 12),
           LumiPrimaryButton(
             onPressed: permanent ? () => openAppSettings() : _onRecordPressed,
             text: permanent ? 'Open Settings' : 'Try again',
             isFullWidth: true,
+            color: LumiTokens.red,
           ),
           const SizedBox(height: 8),
           TextButton(
             onPressed: _skip,
             child: Text(
               'Skip this step',
-              style: LumiTextStyles.bodyMedium(color: AppColors.charcoal),
+              style: LumiTextStyles.bodyMedium(color: LumiTokens.ink),
             ),
           ),
         ],

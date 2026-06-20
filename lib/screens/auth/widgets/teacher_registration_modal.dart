@@ -10,7 +10,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/routing/app_router.dart';
 import '../../../core/services/user_school_index_service.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../theme/lumi_tokens.dart';
 import '../../../core/theme/lumi_text_styles.dart';
 import '../../../core/widgets/lumi/lumi_buttons.dart';
 import '../../../core/widgets/lumi/lumi_input.dart';
@@ -662,11 +662,11 @@ setState(() {
       onTap: () {},
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.white,
+          color: LumiTokens.paper,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: AppColors.charcoal.withValues(alpha: 0.18),
+              color: LumiTokens.ink.withValues(alpha: 0.18),
               blurRadius: 40,
               offset: const Offset(0, 10),
             ),
@@ -722,7 +722,7 @@ setState(() {
               ? IconButton(
                   onPressed: _goBack,
                   icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-                  color: AppColors.charcoal,
+                  color: LumiTokens.ink,
                   splashRadius: 18,
                 )
               : null,
@@ -740,7 +740,7 @@ setState(() {
           child: IconButton(
             onPressed: _busy ? null : () => Navigator.of(context).maybePop(),
             icon: const Icon(Icons.close, size: 22),
-            color: AppColors.charcoal,
+            color: LumiTokens.ink,
             splashRadius: 18,
           ),
         ),
@@ -848,11 +848,12 @@ setState(() {
         Text(
           'Enter the school code from your school admin.',
           style: LumiTextStyles.bodySmall(
-            color: AppColors.charcoal.withValues(alpha: 0.7),
+            color: LumiTokens.ink.withValues(alpha: 0.7),
           ),
         ),
         const SizedBox(height: 12),
         LumiInput(
+          accentColor: LumiTokens.red,
           controller: _codeController,
           hintText: 'e.g. LUMI2024',
           autofocus: true,
@@ -870,6 +871,7 @@ setState(() {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         LumiInput(
+          accentColor: LumiTokens.red,
           controller: _firstNameController,
           hintText: 'First name',
           autofocus: true,
@@ -886,6 +888,7 @@ setState(() {
               ? Padding(
                   padding: const EdgeInsets.only(top: 12),
                   child: LumiInput(
+                    accentColor: LumiTokens.red,
                     controller: _lastNameController,
                     hintText: 'Last name',
                     textInputAction: TextInputAction.done,
@@ -917,6 +920,7 @@ setState(() {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         LumiInput(
+          accentColor: LumiTokens.red,
           controller: _emailController,
           hintText: 'you@example.com',
           autofocus: true,
@@ -934,6 +938,7 @@ setState(() {
               ? Padding(
                   padding: const EdgeInsets.only(top: 12),
                   child: LumiPasswordInput(
+                    accentColor: LumiTokens.red,
                     controller: _passwordController,
                     focusNode: _passwordFocusNode,
                     hintText: 'Password (at least 8 characters)',
@@ -958,6 +963,7 @@ setState(() {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         LumiPasswordInput(
+          accentColor: LumiTokens.red,
           controller: _passwordController,
           focusNode: _passwordFocusNode,
           autofocus: true,
@@ -975,6 +981,7 @@ setState(() {
               ? Padding(
                   padding: const EdgeInsets.only(top: 12),
                   child: LumiPasswordInput(
+                    accentColor: LumiTokens.red,
                     controller: _confirmController,
                     focusNode: _confirmFocusNode,
                     hintText: 'Confirm password',
@@ -996,6 +1003,7 @@ setState(() {
 
   Widget _buildConfirmInput() {
     return LumiPasswordInput(
+      accentColor: LumiTokens.red,
       controller: _confirmController,
       focusNode: _confirmFocusNode,
       autofocus: true,
@@ -1013,11 +1021,12 @@ setState(() {
         Text(
           'We\'ll text you a code to confirm your mobile. This becomes your sign-in second factor.',
           style: LumiTextStyles.bodySmall(
-            color: AppColors.charcoal.withValues(alpha: 0.7),
+            color: LumiTokens.ink.withValues(alpha: 0.7),
           ),
         ),
         const SizedBox(height: 12),
         LumiInput(
+          accentColor: LumiTokens.red,
           controller: _phoneController,
           hintText: '0400 000 000',
           autofocus: true,
@@ -1042,11 +1051,12 @@ setState(() {
         Text(
           'Enter the 6-digit code sent to $_phoneDigits.',
           style: LumiTextStyles.bodySmall(
-            color: AppColors.charcoal.withValues(alpha: 0.7),
+            color: LumiTokens.ink.withValues(alpha: 0.7),
           ),
         ),
         const SizedBox(height: 12),
         LumiInput(
+          accentColor: LumiTokens.red,
           controller: _smsCodeController,
           hintText: '123456',
           autofocus: true,
@@ -1069,7 +1079,7 @@ setState(() {
             onPressed: _busy || !_canResend ? null : _sendPhoneCode,
             child: Text(
               _canResend ? 'Resend code' : 'Resend in ${_resendRemainingSec}s',
-              style: LumiTextStyles.bodySmall(color: AppColors.teacherColor),
+              style: LumiTextStyles.bodySmall(color: LumiTokens.red),
             ),
           ),
         ),
@@ -1122,6 +1132,7 @@ setState(() {
     };
 
     return LumiPrimaryButton(
+      color: LumiTokens.red,
       onPressed: enabled ? onPressed : null,
       text: label,
       isLoading: _busy,
@@ -1143,21 +1154,21 @@ class _CompletedChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.mintGreen.withValues(alpha: 0.35),
+        color: LumiTokens.tintGreen.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: AppColors.success.withValues(alpha: 0.35),
+          color: LumiTokens.green.withValues(alpha: 0.35),
           width: 1,
         ),
       ),
       child: Row(
         children: [
-          const Icon(Icons.check_circle, size: 18, color: AppColors.success),
+          const Icon(Icons.check_circle, size: 18, color: LumiTokens.green),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               label,
-              style: LumiTextStyles.bodySmall(color: AppColors.success)
+              style: LumiTextStyles.bodySmall(color: LumiTokens.green)
                   .copyWith(fontWeight: FontWeight.w600),
               overflow: TextOverflow.ellipsis,
             ),
@@ -1180,22 +1191,22 @@ class _ErrorBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.error.withValues(alpha: 0.08),
+        color: LumiTokens.red.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppColors.error.withValues(alpha: 0.35),
+          color: LumiTokens.red.withValues(alpha: 0.35),
           width: 1,
         ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.error_outline, size: 18, color: AppColors.error),
+          const Icon(Icons.error_outline, size: 18, color: LumiTokens.red),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
-              style: LumiTextStyles.bodySmall(color: AppColors.error),
+              style: LumiTextStyles.bodySmall(color: LumiTokens.red),
             ),
           ),
         ],
@@ -1221,11 +1232,11 @@ class _SuccessCard extends StatelessWidget {
       onTap: () {},
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.white,
+          color: LumiTokens.paper,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: AppColors.charcoal.withValues(alpha: 0.18),
+              color: LumiTokens.ink.withValues(alpha: 0.18),
               blurRadius: 40,
               offset: const Offset(0, 10),
             ),
@@ -1241,13 +1252,13 @@ class _SuccessCard extends StatelessWidget {
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  color: AppColors.success.withValues(alpha: 0.12),
+                  color: LumiTokens.green.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.check_rounded,
                   size: 42,
-                  color: AppColors.success,
+                  color: LumiTokens.green,
                 ),
               )
                   .animate()
@@ -1270,11 +1281,12 @@ class _SuccessCard extends StatelessWidget {
               'Welcome to $schoolName. Let\'s get your classes set up.',
               textAlign: TextAlign.center,
               style: LumiTextStyles.body(
-                color: AppColors.charcoal.withValues(alpha: 0.7),
+                color: LumiTokens.ink.withValues(alpha: 0.7),
               ),
             ),
             const SizedBox(height: 24),
             LumiPrimaryButton(
+              color: LumiTokens.red,
               onPressed: onDone,
               text: 'Get Started',
               isFullWidth: true,
