@@ -1362,8 +1362,11 @@ export const detectAchievements = fns.firestore
     );
     if (awardable.length === 0) return null;
 
+    // Concrete timestamp, NOT serverTimestamp() — Firestore rejects the
+    // serverTimestamp() sentinel inside array elements (arrayUnion), which
+    // threw the whole award write before, so nothing was ever persisted.
     const toAward = awardable.map((a) => ({
-      ...a, earnedAt: admin.firestore.FieldValue.serverTimestamp(),
+      ...a, earnedAt: admin.firestore.Timestamp.now(),
     }));
 
     // Write all new achievements in a single update.
@@ -1461,8 +1464,11 @@ export const backfillAchievements = fns.https.onCall(async (data, context) => {
     const earnedIds = new Set<string>(existing.map((a) => a.id as string));
     const awardable = computeAwardableAchievements(stats, earnedIds, thresholds);
     if (awardable.length === 0) continue;
+    // Concrete timestamp, NOT serverTimestamp() — Firestore rejects the
+    // serverTimestamp() sentinel inside array elements (arrayUnion), which
+    // threw the whole award write before, so nothing was ever persisted.
     const toAward = awardable.map((a) => ({
-      ...a, earnedAt: admin.firestore.FieldValue.serverTimestamp(),
+      ...a, earnedAt: admin.firestore.Timestamp.now(),
     }));
     try {
       await doc.ref.update({
