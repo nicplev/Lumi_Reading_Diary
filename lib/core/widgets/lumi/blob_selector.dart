@@ -11,10 +11,16 @@ class BlobSelector extends StatefulWidget {
   final ReadingFeeling? selectedFeeling;
   final ValueChanged<ReadingFeeling> onFeelingSelected;
 
+  /// When false the widget's own "How did reading feel?" heading + subtitle
+  /// are suppressed so it can sit inside a host card that supplies its own
+  /// header (e.g. the emotion card on the combined first step).
+  final bool showHeader;
+
   const BlobSelector({
     super.key,
     this.selectedFeeling,
     required this.onFeelingSelected,
+    this.showHeader = true,
   });
 
   @override
@@ -62,20 +68,22 @@ class _BlobSelectorState extends State<BlobSelector> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          'How did reading feel?',
-          style: LumiTextStyles.h2(),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Let your child choose',
-          style: LumiTextStyles.bodySmall(
-            color: LumiTokens.ink.withValues(alpha: 0.6),
+        if (widget.showHeader) ...[
+          Text(
+            'How did reading feel?',
+            style: LumiTextStyles.h2(),
+            textAlign: TextAlign.center,
           ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 32),
+          const SizedBox(height: 8),
+          Text(
+            'Let your child choose',
+            style: LumiTextStyles.bodySmall(
+              color: LumiTokens.ink.withValues(alpha: 0.6),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 32),
+        ],
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: _blobData.map((blob) => _buildBlobItem(blob)).toList(),
