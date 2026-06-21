@@ -882,17 +882,22 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ).animate().fadeIn(delay: 850.ms, duration: 500.ms),
 
-                const SizedBox(height: 12),
-
+                // HIDDEN (2026-06): "Represent a school? Request a demo" entry
+                // point. The demo-request flow is moving to the marketing
+                // landing-page website. Code is preserved so it can be
+                // re-enabled later — see the /onboarding/demo route and
+                // SchoolDemoScreen / DemoRequestScreen.
+                // const SizedBox(height: 12),
+                //
                 // School demo is a rarer, sales-style path — keep it a quiet
                 // text link so it doesn't compete with the two primary tiles.
-                Center(
-                  child: LumiTextButton(
-                    onPressed: () => context.push('/onboarding/demo'),
-                    text: 'Represent a school? Request a demo',
-                    color: LumiTokens.muted,
-                  ),
-                ).animate().fadeIn(delay: 900.ms, duration: 500.ms),
+                // Center(
+                //   child: LumiTextButton(
+                //     onPressed: () => context.push('/onboarding/demo'),
+                //     text: 'Represent a school? Request a demo',
+                //     color: LumiTokens.muted,
+                //   ),
+                // ).animate().fadeIn(delay: 900.ms, duration: 500.ms),
 
                 if (hasDevAccess()) ...[
                   const SizedBox(height: 32),
