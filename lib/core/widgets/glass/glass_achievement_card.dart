@@ -12,9 +12,16 @@ import 'package:flutter_animate/flutter_animate.dart';
 class AchievementUnlockPopup extends StatefulWidget {
   final AchievementModel achievement;
 
+  /// Optional Material icon to render instead of the model's emoji, so the
+  /// celebration matches the (emoji-free) achievements page.
+  final IconData? icon;
+  final Color? iconColor;
+
   const AchievementUnlockPopup({
     super.key,
     required this.achievement,
+    this.icon,
+    this.iconColor,
   });
 
   @override
@@ -96,10 +103,13 @@ class _AchievementUnlockPopupState extends State<AchievementUnlockPopup> {
                 ],
               ),
               child: Center(
-                child: Text(
-                  achievement.icon,
-                  style: const TextStyle(fontSize: 72),
-                ),
+                child: widget.icon != null
+                    ? Icon(widget.icon,
+                        size: 64, color: widget.iconColor ?? Colors.white)
+                    : Text(
+                        achievement.icon,
+                        style: const TextStyle(fontSize: 72),
+                      ),
               ),
             )
                 .animate(onPlay: (controller) => controller.repeat())
