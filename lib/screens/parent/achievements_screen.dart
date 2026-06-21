@@ -118,11 +118,33 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
             final earnedCount =
                 templates.where((t) => earnedById.containsKey(t.id)).length;
 
+            // Closest-to-unlocking locked badges — the motivating "next goal".
+            final almost = templates
+                .where((t) => !earnedById.containsKey(t.id))
+                .map((t) {
+                  final p = _progressFor(t, stats);
+                  final frac = p.required <= 0
+                      ? 0.0
+                      : (p.current / p.required).clamp(0.0, 1.0);
+                  return (template: t, progress: p, fraction: frac);
+                })
+                .where((e) => e.fraction > 0 && e.fraction < 1)
+                .toList()
+              ..sort((a, b) => b.fraction.compareTo(a.fraction));
+            final almostThere = almost.take(3).toList();
+
             return ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
                 _HeroCard(earned: earnedCount, total: templates.length),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
+                if (almostThere.isNotEmpty) ...[
+                  _AlmostThereSection(
+                    items: almostThere,
+                    onTap: (t) => _showLockedSheet(t, _progressFor(t, stats)),
+                  ),
+                  const SizedBox(height: 20),
+                ],
                 for (final group in _groups) ...[
                   ..._buildGroup(group, templates, earnedById, stats),
                 ],
@@ -168,7 +190,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
         physics: const NeverScrollableScrollPhysics(),
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        childAspectRatio: 0.78,
+        childAspectRatio: 0.72,
         children: [
           for (final t in items)
             _BadgeTile(
@@ -179,7 +201,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
             ),
         ],
       ),
-      const SizedBox(height: 24),
+      const SizedBox(height: 16),
     ];
   }
 
@@ -290,11 +312,12 @@ class _HeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final accent = context.sectionTheme.accent;
     final fraction = total <= 0 ? 0.0 : (earned / total).clamp(0.0, 1.0);
+    final remaining = total - earned;
     final subtitle = earned == 0
         ? 'Keep reading to unlock your first badge! 📚'
         : earned >= total
             ? 'Every badge unlocked — amazing! 🎉'
-            : 'Nicely done — keep the nights rolling.';
+            : '$remaining more to collect — keep it up! ✨';
 
     return LumiCard(
       child: Row(
@@ -329,7 +352,7 @@ class _HeroCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                   child: LinearProgressIndicator(
                     value: fraction,
-                    minHeight: 8,
+                    minHeight: 10,
                     backgroundColor: LumiTokens.rule,
                     valueColor: AlwaysStoppedAnimation(accent),
                   ),
@@ -372,40 +395,71 @@ class _BadgeTile extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
         decoration: BoxDecoration(
+          // Earned cards read as a reward: brighter paper, a stronger accent
+          // border, a soft shadow, and a corner check badge.
           color: isEarned ? LumiTokens.paper : _lockedBg,
           borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
           border: Border.all(
-            color: isEarned ? color.withValues(alpha: 0.5) : LumiTokens.rule,
-            width: isEarned ? 1.5 : 1,
+            color: isEarned ? color.withValues(alpha: 0.7) : LumiTokens.rule,
+            width: isEarned ? 2 : 1,
           ),
           boxShadow: isEarned ? LumiTokens.shadowCard : null,
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Stack(
+          alignment: Alignment.center,
           children: [
-            Opacity(
-              opacity: isEarned ? 1.0 : 0.35,
-              child: Text(template.icon, style: const TextStyle(fontSize: 40)),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Opacity(
+                  opacity: isEarned ? 1.0 : 0.35,
+                  child:
+                      Text(template.icon, style: const TextStyle(fontSize: 36)),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  template.name,
+                  style: LumiType.caption.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isEarned ? LumiTokens.ink : LumiTokens.muted,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 6),
+                if (isEarned)
+                  Text(
+                    'Unlocked',
+                    style: LumiType.caption.copyWith(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  )
+                else ...[
+                  _MiniProgress(
+                      fraction: fraction, accent: context.sectionTheme.accent),
+                  const SizedBox(height: 4),
+                  // Numerical progress so the goal is concrete (and not
+                  // communicated by colour alone).
+                  Text(
+                    '${progress.current}/${progress.required}',
+                    style: LumiType.caption
+                        .copyWith(fontSize: 11, color: LumiTokens.muted),
+                  ),
+                ],
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              template.name,
-              style: LumiType.caption.copyWith(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: isEarned ? LumiTokens.ink : LumiTokens.muted,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 6),
             if (isEarned)
-              Icon(Icons.check_circle_rounded, size: 16, color: color)
-            else
-              _MiniProgress(fraction: fraction, accent: context.sectionTheme.accent),
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Icon(Icons.check_circle_rounded, size: 20, color: color),
+              ),
           ],
         ),
       ),
@@ -433,6 +487,95 @@ class _MiniProgress extends StatelessWidget {
           valueColor: AlwaysStoppedAnimation(accent.withValues(alpha: 0.55)),
         ),
       ),
+    );
+  }
+}
+
+/// "Almost there" — the closest-to-unlocking badges, surfaced near the top so
+/// there's always a concrete next goal to read toward.
+class _AlmostThereSection extends StatelessWidget {
+  final List<
+      ({
+        AchievementModel template,
+        ({int current, int required}) progress,
+        double fraction,
+      })> items;
+  final void Function(AchievementModel) onTap;
+
+  const _AlmostThereSection({required this.items, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = context.sectionTheme.accent;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10, top: 4, left: 2),
+          child: Row(
+            children: [
+              const Text('🔥', style: TextStyle(fontSize: 18)),
+              const SizedBox(width: 8),
+              Text('Almost there',
+                  style: LumiType.subhead.copyWith(fontSize: 18)),
+            ],
+          ),
+        ),
+        LumiCard(
+          child: Column(
+            children: [
+              for (var i = 0; i < items.length; i++) ...[
+                if (i > 0)
+                  const Divider(height: 20, color: LumiTokens.rule),
+                InkWell(
+                  onTap: () => onTap(items[i].template),
+                  borderRadius:
+                      BorderRadius.circular(LumiTokens.radiusMedium),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        Text(items[i].template.icon,
+                            style: const TextStyle(fontSize: 26)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                items[i].template.name,
+                                style: LumiType.body
+                                    .copyWith(fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(height: 6),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(999),
+                                child: LinearProgressIndicator(
+                                  value: items[i].fraction,
+                                  minHeight: 6,
+                                  backgroundColor: LumiTokens.rule,
+                                  valueColor: AlwaysStoppedAnimation(accent),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          '${items[i].progress.current}/'
+                          '${items[i].progress.required}',
+                          style: LumiType.caption
+                              .copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
