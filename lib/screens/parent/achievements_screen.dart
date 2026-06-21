@@ -5,7 +5,6 @@ import 'package:lumi_reading_tracker/data/models/student_model.dart';
 import 'package:lumi_reading_tracker/theme/lumi_tokens.dart';
 import 'package:lumi_reading_tracker/theme/lumi_typography.dart';
 import 'package:lumi_reading_tracker/theme/section_theme.dart';
-import 'package:lumi_reading_tracker/core/widgets/lumi/lumi_card.dart';
 import 'package:lumi_reading_tracker/core/widgets/glass/glass_achievement_card.dart';
 
 /// Achievements screen — a calm, grouped view of every badge a child can earn.
@@ -301,6 +300,21 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
   }
 }
 
+/// Flat bento tile — paper surface, hairline rule border, no shadow. The
+/// surface used across the migrated Lumi parent flows.
+Widget _bentoCard({required Widget child}) {
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: LumiTokens.paper,
+      borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+      border: Border.all(color: LumiTokens.rule),
+    ),
+    child: child,
+  );
+}
+
 /// Top-of-screen summary. Doubles as the empty state when nothing is earned.
 class _HeroCard extends StatelessWidget {
   final int earned;
@@ -319,7 +333,7 @@ class _HeroCard extends StatelessWidget {
             ? 'Every badge unlocked — amazing! 🎉'
             : '$remaining more to collect — keep it up! ✨';
 
-    return LumiCard(
+    return _bentoCard(
       child: Row(
         children: [
           Container(
@@ -382,7 +396,12 @@ class _BadgeTile extends StatelessWidget {
     required this.onTap,
   });
 
-  static const _lockedBg = Color(0xFFF1EFE9);
+  // Subtly recessed locked surface, derived from tokens (no raw hex): a faint
+  // rule wash over the cream canvas so locked tiles read as "not yet earned".
+  static final Color _lockedBg = Color.alphaBlend(
+    LumiTokens.rule.withValues(alpha: 0.4),
+    LumiTokens.cream,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -405,7 +424,6 @@ class _BadgeTile extends StatelessWidget {
             color: isEarned ? color.withValues(alpha: 0.7) : LumiTokens.rule,
             width: isEarned ? 2 : 1,
           ),
-          boxShadow: isEarned ? LumiTokens.shadowCard : null,
         ),
         child: Stack(
           alignment: Alignment.center,
@@ -521,7 +539,7 @@ class _AlmostThereSection extends StatelessWidget {
             ],
           ),
         ),
-        LumiCard(
+        _bentoCard(
           child: Column(
             children: [
               for (var i = 0; i < items.length; i++) ...[
