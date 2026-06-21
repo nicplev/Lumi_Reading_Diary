@@ -15,13 +15,11 @@ import { useToast } from '@/components/lumi/toast';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useSchool, useUpdateSchool } from '@/lib/hooks/use-school';
 import { getReadingLevels } from '@/lib/types';
-import type { ReadingLevelSchema, ParentCommentSettings, ComprehensionRecordingSettings, AchievementCustomization } from '@/lib/types';
+import type { ReadingLevelSchema, ParentCommentSettings, ComprehensionRecordingSettings } from '@/lib/types';
 import { ParentCommentSettingsSection, DEFAULT_PRESETS, type CommentPreviewState } from './parent-comment-settings';
 import { FloatingPhonePreview } from './floating-phone-preview';
 import { ComprehensionRecordingSettingsSection } from './comprehension-recording-settings';
 import { ComprehensionAudioCleanupSection } from './comprehension-audio-cleanup';
-import { AchievementThresholdSettings } from './achievement-threshold-settings';
-import type { AchievementThresholds } from '@/lib/types';
 
 const LEVEL_SCHEMAS: { value: ReadingLevelSchema; label: string; description: string }[] = [
   { value: 'none', label: 'None', description: 'No reading levels' },
@@ -45,7 +43,6 @@ const SETTINGS_TABS = [
   { id: 'school', label: 'School', icon: <Icon name="apartment" size={16} /> },
   { id: 'academic', label: 'Academic', icon: <Icon name="menu_book" size={16} /> },
   { id: 'parent-app', label: 'Parent App', icon: <Icon name="smartphone" size={16} /> },
-  { id: 'achievements', label: 'Achievements', icon: <Icon name="military_tech" size={16} /> },
 ];
 
 export function SettingsPage() {
@@ -91,7 +88,6 @@ export function SettingsPage() {
   const [savingQuiet, setSavingQuiet] = useState(false);
   const [savingComments, setSavingComments] = useState(false);
   const [savingComprehension, setSavingComprehension] = useState(false);
-  const [savingAchievements, setSavingAchievements] = useState(false);
 
   useEffect(() => {
     if (school) {
@@ -222,17 +218,6 @@ export function SettingsPage() {
     }
   };
 
-  const handleSaveAchievements = async (thresholds: AchievementThresholds, customization: AchievementCustomization) => {
-    setSavingAchievements(true);
-    try {
-      await updateSchool.mutateAsync({ achievementThresholds: thresholds, achievementCustomization: customization });
-      toast('Achievement settings updated', 'success');
-    } catch (error) {
-      toast(error instanceof Error ? error.message : 'Failed to save', 'error');
-    } finally {
-      setSavingAchievements(false);
-    }
-  };
 
   const updateTermDate = (key: string, value: string) => {
     setTermDates((prev) => ({ ...prev, [key]: value }));
@@ -426,17 +411,6 @@ export function SettingsPage() {
             loading={savingLevels}
           />
         </>
-      )}
-
-      {/* Achievements Tab */}
-      {activeTab === 'achievements' && (
-        <AchievementThresholdSettings
-          thresholds={school?.settings?.achievementThresholds as AchievementThresholds | undefined}
-          customization={school?.settings?.achievementCustomization as AchievementCustomization | undefined}
-          isAdmin={isAdmin}
-          onSave={handleSaveAchievements}
-          saving={savingAchievements}
-        />
       )}
 
       {/* Parent App Tab */}

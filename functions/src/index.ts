@@ -1306,29 +1306,24 @@ export const pruneStaleFcmTokens = fns
 // loader stays here.
 
 /**
- * Loads a school's custom achievement thresholds, falling back to the platform
- * defaults per category. Shared by the detector trigger and the backfill.
- * @param {string} schoolId School whose thresholds to load.
- * @return {Promise<AchievementThresholdSet>} Resolved per-category thresholds.
+ * Resolves the achievement thresholds for a school.
+ *
+ * Per-school achievement customisation is DISABLED for first release: every
+ * school uses the platform defaults, regardless of any `settings.
+ * achievementThresholds` left on the school doc. (To re-enable later, read
+ * `schoolDoc.data()?.settings?.achievementThresholds` here again.)
+ * @param {string} schoolId School id (unused while customisation is disabled).
+ * @return {Promise<AchievementThresholdSet>} The platform default thresholds.
  */
 async function resolveAchievementThresholds(
   schoolId: string,
 ): Promise<AchievementThresholdSet> {
-  let custom: Record<string, number[]> = {};
-  try {
-    const schoolDoc = await db.collection("schools").doc(schoolId).get();
-    custom = schoolDoc.data()?.settings?.achievementThresholds ?? {};
-  } catch (err) {
-    functions.logger.warn(
-      "Could not load school achievement thresholds, using defaults",
-      {schoolId, err},
-    );
-  }
+  void schoolId;
   return {
-    streak: custom.streak ?? DEFAULT_ACHIEVEMENT_THRESHOLDS.streak,
-    books: custom.books ?? DEFAULT_ACHIEVEMENT_THRESHOLDS.books,
-    minutes: custom.minutes ?? DEFAULT_ACHIEVEMENT_THRESHOLDS.minutes,
-    readingDays: custom.readingDays ?? DEFAULT_ACHIEVEMENT_THRESHOLDS.readingDays,
+    streak: DEFAULT_ACHIEVEMENT_THRESHOLDS.streak,
+    books: DEFAULT_ACHIEVEMENT_THRESHOLDS.books,
+    minutes: DEFAULT_ACHIEVEMENT_THRESHOLDS.minutes,
+    readingDays: DEFAULT_ACHIEVEMENT_THRESHOLDS.readingDays,
   };
 }
 

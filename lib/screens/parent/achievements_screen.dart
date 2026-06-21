@@ -110,36 +110,12 @@ IconData _achievementIcon(AchievementModel t) {
 }
 
 class _AchievementsScreenState extends State<AchievementsScreen> {
-  AchievementThresholds _thresholds = AchievementThresholds.defaults;
-  AchievementCustomization _customization = AchievementCustomization.empty;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadThresholds();
-  }
-
-  Future<void> _loadThresholds() async {
-    try {
-      final schoolDoc = await FirebaseFirestore.instance
-          .collection('schools')
-          .doc(widget.schoolId)
-          .get();
-      final settings = schoolDoc.data()?['settings'] as Map<String, dynamic>?;
-      final rawThresholds = settings?['achievementThresholds'] as Map<String, dynamic>?;
-      final rawCustomization = settings?['achievementCustomization'] as Map<String, dynamic>?;
-      if (mounted) {
-        setState(() {
-          if (rawThresholds != null) _thresholds = AchievementThresholds.fromMap(rawThresholds);
-          if (rawCustomization != null) {
-            _customization = AchievementCustomization.fromMap(rawCustomization);
-          }
-        });
-      }
-    } catch (_) {
-      // Fall back to defaults silently — thresholds always have a safe default.
-    }
-  }
+  // Per-school achievement customisation is disabled for first release — the
+  // page always uses the platform default thresholds + names/colours, ignoring
+  // any settings.achievementThresholds / achievementCustomization left on the
+  // school doc. (To re-enable, load them in initState again.)
+  final AchievementThresholds _thresholds = AchievementThresholds.defaults;
+  final AchievementCustomization _customization = AchievementCustomization.empty;
 
   @override
   Widget build(BuildContext context) {
