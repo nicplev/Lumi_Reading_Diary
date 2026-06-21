@@ -5,6 +5,7 @@ import 'package:lumi_reading_tracker/core/theme/app_colors.dart';
 import 'package:lumi_reading_tracker/core/theme/lumi_text_styles.dart';
 import 'package:lumi_reading_tracker/core/theme/lumi_spacing.dart';
 import 'package:lumi_reading_tracker/core/theme/lumi_borders.dart';
+import 'package:lumi_reading_tracker/theme/lumi_tokens.dart';
 import 'package:lumi_reading_tracker/core/widgets/lumi/lumi_buttons.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
@@ -12,9 +13,16 @@ import 'package:flutter_animate/flutter_animate.dart';
 class AchievementUnlockPopup extends StatefulWidget {
   final AchievementModel achievement;
 
+  /// Optional Material icon to render instead of the model's emoji, so the
+  /// celebration matches the (emoji-free) achievements page.
+  final IconData? icon;
+  final Color? iconColor;
+
   const AchievementUnlockPopup({
     super.key,
     required this.achievement,
+    this.icon,
+    this.iconColor,
   });
 
   @override
@@ -96,10 +104,13 @@ class _AchievementUnlockPopupState extends State<AchievementUnlockPopup> {
                 ],
               ),
               child: Center(
-                child: Text(
-                  achievement.icon,
-                  style: const TextStyle(fontSize: 72),
-                ),
+                child: widget.icon != null
+                    ? Icon(widget.icon,
+                        size: 64, color: widget.iconColor ?? Colors.white)
+                    : Text(
+                        achievement.icon,
+                        style: const TextStyle(fontSize: 72),
+                      ),
               ),
             )
                 .animate(onPlay: (controller) => controller.repeat())
@@ -159,6 +170,7 @@ class _AchievementUnlockPopupState extends State<AchievementUnlockPopup> {
               child: LumiPrimaryButton(
                 onPressed: () => Navigator.pop(context),
                 text: 'Awesome!',
+                color: LumiTokens.red,
               ),
             ),
           ],

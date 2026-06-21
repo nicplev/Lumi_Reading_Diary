@@ -5,7 +5,6 @@ import 'package:lumi_reading_tracker/data/models/student_model.dart';
 import 'package:lumi_reading_tracker/theme/lumi_tokens.dart';
 import 'package:lumi_reading_tracker/theme/lumi_typography.dart';
 import 'package:lumi_reading_tracker/theme/section_theme.dart';
-import 'package:lumi_reading_tracker/core/widgets/lumi/lumi_card.dart';
 import 'package:lumi_reading_tracker/core/widgets/glass/glass_achievement_card.dart';
 
 /// Achievements screen — a calm, grouped view of every badge a child can earn.
@@ -30,45 +29,93 @@ class AchievementsScreen extends StatefulWidget {
   State<AchievementsScreen> createState() => _AchievementsScreenState();
 }
 
-/// Display order + labels for the badge groups. Streak is deliberately omitted.
-const _groups = <({AchievementCategory category, String label, String emoji})>[
-  (category: AchievementCategory.readingDays, label: 'Reading Nights', emoji: '🌙'),
-  (category: AchievementCategory.books, label: 'Books', emoji: '📚'),
-  (category: AchievementCategory.minutes, label: 'Reading Time', emoji: '⏰'),
-  (category: AchievementCategory.special, label: 'Special', emoji: '⭐'),
+/// Display order + labels + icons for the badge groups (no emoji — unified
+/// Material icons, coloured by category). Streak is deliberately omitted.
+const _groups = <({AchievementCategory category, String label, IconData icon})>[
+  (category: AchievementCategory.readingDays, label: 'Reading Nights', icon: Icons.nightlight_round),
+  (category: AchievementCategory.books, label: 'Books', icon: Icons.menu_book_rounded),
+  (category: AchievementCategory.minutes, label: 'Reading Time', icon: Icons.schedule_rounded),
+  (category: AchievementCategory.special, label: 'Special', icon: Icons.star_rounded),
 ];
 
+// Warm accents not in the core token palette (gold/amber read as "reward/time").
+const _goldAccent = Color(0xFFE0A93B);
+const _amberAccent = Color(0xFFF59E0B);
+
+/// Relevant, good-contrast colour per category — used for both the section
+/// header icon and its badge icons (the rarity colour stays on the earned
+/// card's border + check).
+Color _categoryColor(AchievementCategory category) {
+  switch (category) {
+    case AchievementCategory.readingDays:
+      return LumiTokens.blue;
+    case AchievementCategory.books:
+      return LumiTokens.green;
+    case AchievementCategory.minutes:
+      return _amberAccent;
+    case AchievementCategory.special:
+      return LumiTokens.red;
+    default:
+      return LumiTokens.muted;
+  }
+}
+
+/// A unified Material icon per badge (by stable id, with a category fallback
+/// for any custom/unknown achievement).
+IconData _achievementIcon(AchievementModel t) {
+  switch (t.id) {
+    case 'days_t1':
+      return Icons.bedtime_rounded;
+    case 'days_t2':
+      return Icons.nightlight_round;
+    case 'days_t3':
+      return Icons.dark_mode_rounded;
+    case 'days_t4':
+      return Icons.calendar_month_rounded;
+    case 'books_t1':
+      return Icons.menu_book_rounded;
+    case 'books_t2':
+      return Icons.auto_stories_rounded;
+    case 'books_t3':
+      return Icons.local_library_rounded;
+    case 'books_t4':
+      return Icons.library_books_rounded;
+    case 'books_t5':
+      return Icons.workspace_premium_rounded;
+    case 'minutes_t1':
+      return Icons.schedule_rounded;
+    case 'minutes_t2':
+      return Icons.update_rounded;
+    case 'minutes_t3':
+      return Icons.directions_run_rounded;
+    case 'minutes_t4':
+      return Icons.hourglass_bottom_rounded;
+    case 'minutes_t5':
+      return Icons.all_inclusive_rounded;
+    case 'first_log':
+      return Icons.flag_rounded;
+  }
+  switch (t.category) {
+    case AchievementCategory.readingDays:
+      return Icons.nightlight_round;
+    case AchievementCategory.books:
+      return Icons.menu_book_rounded;
+    case AchievementCategory.minutes:
+      return Icons.schedule_rounded;
+    case AchievementCategory.special:
+      return Icons.star_rounded;
+    default:
+      return Icons.emoji_events_rounded;
+  }
+}
+
 class _AchievementsScreenState extends State<AchievementsScreen> {
-  AchievementThresholds _thresholds = AchievementThresholds.defaults;
-  AchievementCustomization _customization = AchievementCustomization.empty;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadThresholds();
-  }
-
-  Future<void> _loadThresholds() async {
-    try {
-      final schoolDoc = await FirebaseFirestore.instance
-          .collection('schools')
-          .doc(widget.schoolId)
-          .get();
-      final settings = schoolDoc.data()?['settings'] as Map<String, dynamic>?;
-      final rawThresholds = settings?['achievementThresholds'] as Map<String, dynamic>?;
-      final rawCustomization = settings?['achievementCustomization'] as Map<String, dynamic>?;
-      if (mounted) {
-        setState(() {
-          if (rawThresholds != null) _thresholds = AchievementThresholds.fromMap(rawThresholds);
-          if (rawCustomization != null) {
-            _customization = AchievementCustomization.fromMap(rawCustomization);
-          }
-        });
-      }
-    } catch (_) {
-      // Fall back to defaults silently — thresholds always have a safe default.
-    }
-  }
+  // Per-school achievement customisation is disabled for first release — the
+  // page always uses the platform default thresholds + names/colours, ignoring
+  // any settings.achievementThresholds / achievementCustomization left on the
+  // school doc. (To re-enable, load them in initState again.)
+  final AchievementThresholds _thresholds = AchievementThresholds.defaults;
+  final AchievementCustomization _customization = AchievementCustomization.empty;
 
   @override
   Widget build(BuildContext context) {
@@ -118,11 +165,33 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
             final earnedCount =
                 templates.where((t) => earnedById.containsKey(t.id)).length;
 
+            // Closest-to-unlocking locked badges — the motivating "next goal".
+            final almost = templates
+                .where((t) => !earnedById.containsKey(t.id))
+                .map((t) {
+                  final p = _progressFor(t, stats);
+                  final frac = p.required <= 0
+                      ? 0.0
+                      : (p.current / p.required).clamp(0.0, 1.0);
+                  return (template: t, progress: p, fraction: frac);
+                })
+                .where((e) => e.fraction > 0 && e.fraction < 1)
+                .toList()
+              ..sort((a, b) => b.fraction.compareTo(a.fraction));
+            final almostThere = almost.take(3).toList();
+
             return ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
                 _HeroCard(earned: earnedCount, total: templates.length),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
+                if (almostThere.isNotEmpty) ...[
+                  _AlmostThereSection(
+                    items: almostThere,
+                    onTap: (t) => _showLockedSheet(t, _progressFor(t, stats)),
+                  ),
+                  const SizedBox(height: 20),
+                ],
                 for (final group in _groups) ...[
                   ..._buildGroup(group, templates, earnedById, stats),
                 ],
@@ -135,7 +204,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
   }
 
   List<Widget> _buildGroup(
-    ({AchievementCategory category, String label, String emoji}) group,
+    ({AchievementCategory category, String label, IconData icon}) group,
     List<AchievementModel> templates,
     Map<String, AchievementModel> earnedById,
     StudentStats? stats,
@@ -150,7 +219,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
         padding: const EdgeInsets.only(bottom: 12, top: 4),
         child: Row(
           children: [
-            Text(group.emoji, style: const TextStyle(fontSize: 18)),
+            Icon(group.icon, size: 20, color: _categoryColor(group.category)),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -168,7 +237,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
         physics: const NeverScrollableScrollPhysics(),
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        childAspectRatio: 0.78,
+        childAspectRatio: 0.72,
         children: [
           for (final t in items)
             _BadgeTile(
@@ -179,7 +248,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
             ),
         ],
       ),
-      const SizedBox(height: 24),
+      const SizedBox(height: 16),
     ];
   }
 
@@ -207,6 +276,8 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
             name: template.name,
             customColor: template.customColor,
           ),
+          icon: _achievementIcon(template),
+          iconColor: Colors.white,
         ),
       );
       return;
@@ -246,8 +317,12 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
             Row(
               children: [
                 Opacity(
-                  opacity: 0.45,
-                  child: Text(t.icon, style: const TextStyle(fontSize: 40)),
+                  opacity: 0.55,
+                  child: Icon(
+                    _achievementIcon(t),
+                    size: 40,
+                    color: _categoryColor(t.category),
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -279,6 +354,21 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
   }
 }
 
+/// Flat bento tile — paper surface, hairline rule border, no shadow. The
+/// surface used across the migrated Lumi parent flows.
+Widget _bentoCard({required Widget child}) {
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: LumiTokens.paper,
+      borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+      border: Border.all(color: LumiTokens.rule),
+    ),
+    child: child,
+  );
+}
+
 /// Top-of-screen summary. Doubles as the empty state when nothing is earned.
 class _HeroCard extends StatelessWidget {
   final int earned;
@@ -290,13 +380,14 @@ class _HeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final accent = context.sectionTheme.accent;
     final fraction = total <= 0 ? 0.0 : (earned / total).clamp(0.0, 1.0);
+    final remaining = total - earned;
     final subtitle = earned == 0
-        ? 'Keep reading to unlock your first badge! 📚'
+        ? 'Keep reading to unlock your first badge.'
         : earned >= total
-            ? 'Every badge unlocked — amazing! 🎉'
-            : 'Nicely done — keep the nights rolling.';
+            ? 'Every badge unlocked — amazing!'
+            : '$remaining more to collect — keep it up!';
 
-    return LumiCard(
+    return _bentoCard(
       child: Row(
         children: [
           Container(
@@ -306,7 +397,10 @@ class _HeroCard extends StatelessWidget {
               color: accent.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
-            child: const Center(child: Text('🏆', style: TextStyle(fontSize: 32))),
+            child: const Center(
+              child: Icon(Icons.emoji_events_rounded,
+                  size: 32, color: _goldAccent),
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -329,7 +423,7 @@ class _HeroCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                   child: LinearProgressIndicator(
                     value: fraction,
-                    minHeight: 8,
+                    minHeight: 10,
                     backgroundColor: LumiTokens.rule,
                     valueColor: AlwaysStoppedAnimation(accent),
                   ),
@@ -359,7 +453,12 @@ class _BadgeTile extends StatelessWidget {
     required this.onTap,
   });
 
-  static const _lockedBg = Color(0xFFF1EFE9);
+  // Subtly recessed locked surface, derived from tokens (no raw hex): a faint
+  // rule wash over the cream canvas so locked tiles read as "not yet earned".
+  static final Color _lockedBg = Color.alphaBlend(
+    LumiTokens.rule.withValues(alpha: 0.4),
+    LumiTokens.cream,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -372,40 +471,73 @@ class _BadgeTile extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
         decoration: BoxDecoration(
+          // Earned cards read as a reward: brighter paper, a stronger accent
+          // border, a soft shadow, and a corner check badge.
           color: isEarned ? LumiTokens.paper : _lockedBg,
           borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
           border: Border.all(
-            color: isEarned ? color.withValues(alpha: 0.5) : LumiTokens.rule,
-            width: isEarned ? 1.5 : 1,
+            color: isEarned ? color.withValues(alpha: 0.7) : LumiTokens.rule,
+            width: isEarned ? 2 : 1,
           ),
-          boxShadow: isEarned ? LumiTokens.shadowCard : null,
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Stack(
+          alignment: Alignment.center,
           children: [
-            Opacity(
-              opacity: isEarned ? 1.0 : 0.35,
-              child: Text(template.icon, style: const TextStyle(fontSize: 40)),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Opacity(
+                  opacity: isEarned ? 1.0 : 0.4,
+                  child: Icon(
+                    _achievementIcon(template),
+                    size: 34,
+                    color: _categoryColor(template.category),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  template.name,
+                  style: LumiType.caption.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isEarned ? LumiTokens.ink : LumiTokens.muted,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 6),
+                if (isEarned)
+                  Text(
+                    'Unlocked',
+                    style: LumiType.caption.copyWith(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  )
+                else ...[
+                  _MiniProgress(
+                      fraction: fraction, accent: context.sectionTheme.accent),
+                  const SizedBox(height: 4),
+                  // Numerical progress so the goal is concrete (and not
+                  // communicated by colour alone).
+                  Text(
+                    '${progress.current}/${progress.required}',
+                    style: LumiType.caption
+                        .copyWith(fontSize: 11, color: LumiTokens.muted),
+                  ),
+                ],
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              template.name,
-              style: LumiType.caption.copyWith(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: isEarned ? LumiTokens.ink : LumiTokens.muted,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 6),
             if (isEarned)
-              Icon(Icons.check_circle_rounded, size: 16, color: color)
-            else
-              _MiniProgress(fraction: fraction, accent: context.sectionTheme.accent),
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Icon(Icons.check_circle_rounded, size: 20, color: color),
+              ),
           ],
         ),
       ),
@@ -433,6 +565,99 @@ class _MiniProgress extends StatelessWidget {
           valueColor: AlwaysStoppedAnimation(accent.withValues(alpha: 0.55)),
         ),
       ),
+    );
+  }
+}
+
+/// "Almost there" — the closest-to-unlocking badges, surfaced near the top so
+/// there's always a concrete next goal to read toward.
+class _AlmostThereSection extends StatelessWidget {
+  final List<
+      ({
+        AchievementModel template,
+        ({int current, int required}) progress,
+        double fraction,
+      })> items;
+  final void Function(AchievementModel) onTap;
+
+  const _AlmostThereSection({required this.items, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = context.sectionTheme.accent;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10, top: 4, left: 2),
+          child: Row(
+            children: [
+              const Icon(Icons.local_fire_department_rounded,
+                  size: 20, color: _amberAccent),
+              const SizedBox(width: 8),
+              Text('Almost there',
+                  style: LumiType.subhead.copyWith(fontSize: 18)),
+            ],
+          ),
+        ),
+        _bentoCard(
+          child: Column(
+            children: [
+              for (var i = 0; i < items.length; i++) ...[
+                if (i > 0)
+                  const Divider(height: 20, color: LumiTokens.rule),
+                InkWell(
+                  onTap: () => onTap(items[i].template),
+                  borderRadius:
+                      BorderRadius.circular(LumiTokens.radiusMedium),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _achievementIcon(items[i].template),
+                          size: 26,
+                          color: _categoryColor(items[i].template.category),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                items[i].template.name,
+                                style: LumiType.body
+                                    .copyWith(fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(height: 6),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(999),
+                                child: LinearProgressIndicator(
+                                  value: items[i].fraction,
+                                  minHeight: 6,
+                                  backgroundColor: LumiTokens.rule,
+                                  valueColor: AlwaysStoppedAnimation(accent),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          '${items[i].progress.current}/'
+                          '${items[i].progress.required}',
+                          style: LumiType.caption
+                              .copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
