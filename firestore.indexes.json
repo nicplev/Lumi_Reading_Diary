@@ -47,6 +47,20 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
+          "fieldPath": "access.academicYear",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "access.status",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "students",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
           "fieldPath": "firstName",
           "order": "ASCENDING"
         },

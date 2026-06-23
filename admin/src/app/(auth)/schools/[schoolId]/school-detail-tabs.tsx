@@ -13,6 +13,8 @@ import { SchoolUsersTab } from "./school-users-tab";
 import { SchoolStudentsTab } from "./school-students-tab";
 import { SchoolClassesTab } from "./school-classes-tab";
 import { SchoolParentsTab } from "./school-parents-tab";
+import { SchoolSubscriptionTab } from "./school-subscription-tab";
+import type { SchoolSubscriptionRow } from "@/lib/firestore/school-subscriptions";
 
 interface SchoolDetailTabsProps {
   school: SchoolDetail;
@@ -25,6 +27,8 @@ interface SchoolDetailTabsProps {
   bookCount?: number;
   activeAllocationCount?: number;
   recentLogCount?: number;
+  subscriptions: SchoolSubscriptionRow[];
+  currentAcademicYear: number;
 }
 
 export function SchoolDetailTabs({
@@ -38,11 +42,14 @@ export function SchoolDetailTabs({
   bookCount,
   activeAllocationCount,
   recentLogCount,
+  subscriptions,
+  currentAcademicYear,
 }: SchoolDetailTabsProps) {
   return (
     <Tabs defaultValue={defaultTab || "overview"} className="space-y-4">
       <TabsList>
         <TabsTrigger value="overview">Overview</TabsTrigger>
+        <TabsTrigger value="subscription">Subscription</TabsTrigger>
         <TabsTrigger value="settings">Settings</TabsTrigger>
         <TabsTrigger value="levels">Reading Levels</TabsTrigger>
         <TabsTrigger value="users">Users</TabsTrigger>
@@ -57,6 +64,14 @@ export function SchoolDetailTabs({
           bookCount={bookCount}
           activeAllocationCount={activeAllocationCount}
           recentLogCount={recentLogCount}
+        />
+      </TabsContent>
+      <TabsContent value="subscription">
+        <SchoolSubscriptionTab
+          schoolId={school.id}
+          studentCount={stats.studentCount}
+          currentAcademicYear={currentAcademicYear}
+          initialSubscriptions={subscriptions}
         />
       </TabsContent>
       <TabsContent value="settings">

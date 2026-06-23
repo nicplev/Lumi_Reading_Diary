@@ -8,6 +8,10 @@ import { listParents } from "@/lib/firestore/parents";
 import { getBookCount } from "@/lib/firestore/books";
 import { getActiveAllocationCount } from "@/lib/firestore/allocations";
 import { getReadingLogCountForSchool } from "@/lib/firestore/reading-logs";
+import {
+  getCurrentAcademicYear,
+  getSubscriptionsForSchool,
+} from "@/lib/firestore/school-subscriptions";
 import { SchoolDetailTabs } from "./school-detail-tabs";
 
 export default async function SchoolDetailPage({
@@ -20,7 +24,7 @@ export default async function SchoolDetailPage({
   const { schoolId } = await params;
   const { tab } = await searchParams;
 
-  const [school, stats, users, students, classes, parents, bookCount, activeAllocationCount, recentLogCount] = await Promise.all([
+  const [school, stats, users, students, classes, parents, bookCount, activeAllocationCount, recentLogCount, subscriptions, currentAcademicYear] = await Promise.all([
     getSchool(schoolId),
     getSchoolStats(schoolId),
     listSchoolUsers(schoolId),
@@ -30,6 +34,8 @@ export default async function SchoolDetailPage({
     getBookCount(schoolId),
     getActiveAllocationCount(schoolId),
     getReadingLogCountForSchool(schoolId),
+    getSubscriptionsForSchool(schoolId),
+    getCurrentAcademicYear(),
   ]);
 
   if (!school) notFound();
@@ -51,6 +57,8 @@ export default async function SchoolDetailPage({
         bookCount={bookCount}
         activeAllocationCount={activeAllocationCount}
         recentLogCount={recentLogCount}
+        subscriptions={subscriptions}
+        currentAcademicYear={currentAcademicYear}
       />
     </>
   );
