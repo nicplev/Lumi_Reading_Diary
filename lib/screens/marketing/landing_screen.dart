@@ -5,7 +5,10 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_card.dart';
-import '../auth/login_screen.dart';
+// HIDDEN (2026-06): Flutter web app login removed from the marketing landing
+// page (see the commented Login buttons below). Re-add this import when the
+// login entry point is restored.
+// import '../auth/login_screen.dart';
 import '../onboarding/demo_request_screen.dart';
 
 class LandingScreen extends StatefulWidget {
@@ -99,17 +102,21 @@ class _LandingScreenState extends State<LandingScreen> {
           // Navigation buttons
           Row(
             children: [
-              LumiTextButton(
-                text: 'Login',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const LoginScreen()),
-                  );
-                },
-              ),
-              const SizedBox(width: 12),
+              // HIDDEN (2026-06): Flutter web app login. This domain is becoming
+              // a marketing-only landing page; parents use the iOS/Android app
+              // and teachers/admins use the separate school portal. Preserved
+              // for re-enable — LoginScreen + /auth/login route still exist.
+              // LumiTextButton(
+              //   text: 'Login',
+              //   onPressed: () {
+              //     Navigator.push(
+              //       context,
+              //       MaterialPageRoute(
+              //           builder: (context) => const LoginScreen()),
+              //     );
+              //   },
+              // ),
+              // const SizedBox(width: 12),
               LumiPrimaryButton(
                 text: 'Request Demo',
                 onPressed: () {
@@ -791,17 +798,18 @@ class _LandingScreenState extends State<LandingScreen> {
                 },
                 icon: Icons.arrow_forward_rounded,
               ),
-              const SizedBox(width: 24),
-              LumiSecondaryButton(
-                text: 'Login',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const LoginScreen()),
-                  );
-                },
-              ),
+              // HIDDEN (2026-06): Flutter web app login — see note above.
+              // const SizedBox(width: 24),
+              // LumiSecondaryButton(
+              //   text: 'Login',
+              //   onPressed: () {
+              //     Navigator.push(
+              //       context,
+              //       MaterialPageRoute(
+              //           builder: (context) => const LoginScreen()),
+              //     );
+              //   },
+              // ),
             ],
           ),
           const SizedBox(height: 32),
@@ -912,13 +920,14 @@ class _LandingScreenState extends State<LandingScreen> {
                           builder: (context) => const DemoRequestScreen()),
                     );
                   }),
-                  _buildFooterLink('Login', () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const LoginScreen()),
-                    );
-                  }),
+                  // HIDDEN (2026-06): Flutter web app login — see note above.
+                  // _buildFooterLink('Login', () {
+                  //   Navigator.push(
+                  //     context,
+                  //     MaterialPageRoute(
+                  //         builder: (context) => const LoginScreen()),
+                  //   );
+                  // }),
                 ],
               ),
             ],
