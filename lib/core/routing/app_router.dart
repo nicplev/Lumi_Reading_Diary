@@ -96,6 +96,16 @@ class AppRouter {
       final firebaseService = _ref.read(firebaseServiceProvider);
       final isLoggedIn = firebaseService.auth.currentUser != null;
 
+      // Web is a marketing-only surface — there is no Flutter web app login.
+      // The landing page's login buttons are hidden, but the route still
+      // exists, so funnel any direct hit on /auth/login back to the landing
+      // page. Parents use the iOS/Android app; teachers/admins use the
+      // separate school portal. (Other /auth/* routes — web-not-available,
+      // forgot-password — stay reachable.)
+      if (kIsWeb && location == '/auth/login') {
+        return '/landing';
+      }
+
       // Public routes: accessible without authentication
       final isPublicRoute = location == '/splash' ||
           location.startsWith('/auth') ||
