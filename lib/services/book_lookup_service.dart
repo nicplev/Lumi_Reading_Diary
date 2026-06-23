@@ -149,19 +149,38 @@ class BookLookupService {
     if (googleResult != null) {
       var resolvedResult = googleResult;
 
-      // Google sometimes returns metadata without a thumbnail for valid ISBNs.
-      // If so, try Open Library for a deterministic ISBN cover URL.
-      if (!_hasUsableCoverUrl(googleResult.coverImageUrl)) {
-        final openLibraryFallback = await _fetchFromOpenLibrary(normalizedIsbn);
-        if (_hasUsableCoverUrl(openLibraryFallback?.coverImageUrl)) {
-          resolvedResult = googleResult.copyWith(
-            coverImageUrl: openLibraryFallback!.coverImageUrl,
-            metadata: {
-              ...?googleResult.metadata,
-              'coverSource': 'open_library',
-              'resolvedAt': Timestamp.fromDate(DateTime.now()),
-            },
-          );
+      // Partial-match fill: Google sometimes returns a record missing a cover
+      // and/or a description for valid ISBNs. When either is missing, query
+      // Open Library (by the same ISBN) to fill the gaps.
+      final needsCover = !_hasUsableCoverUrl(googleResult.coverImageUrl);
+      final needsDescription =
+          !_hasUsableDescription(googleResult.description);
+      if (needsCover || needsDescription) {
+        final openLibraryFallback = await _fetchFromOpenLibrary(
+          normalizedIsbn,
+          withDescription: needsDescription,
+        );
+        if (openLibraryFallback != null) {
+          final filledCover = needsCover &&
+              _hasUsableCoverUrl(openLibraryFallback.coverImageUrl);
+          final filledDescription = needsDescription &&
+              _hasUsableDescription(openLibraryFallback.description);
+          if (filledCover || filledDescription) {
+            resolvedResult = googleResult.copyWith(
+              coverImageUrl: filledCover
+                  ? openLibraryFallback.coverImageUrl
+                  : googleResult.coverImageUrl,
+              description: filledDescription
+                  ? openLibraryFallback.description
+                  : googleResult.description,
+              metadata: {
+                ...?googleResult.metadata,
+                if (filledCover) 'coverSource': 'open_library',
+                if (filledDescription) 'descriptionSource': 'open_library',
+                'resolvedAt': Timestamp.fromDate(DateTime.now()),
+              },
+            );
+          }
         }
       }
 
@@ -171,9 +190,7 @@ class BookLookupService {
         await _cacheBookInFirestore(
           isbn: normalizedIsbn,
           book: resolvedResult,
-          source: resolvedResult.metadata?['coverSource'] == 'open_library'
-              ? 'google_books+open_library_cover'
-              : 'google_books',
+          source: _googleSourceLabel(resolvedResult),
           schoolId: scopedSchoolId,
           actorId: actorId,
         );
@@ -189,7 +206,8 @@ class BookLookupService {
     }
 
     // 3. Open Library API
-    final openLibResult = await _fetchFromOpenLibrary(normalizedIsbn);
+    final openLibResult =
+        await _fetchFromOpenLibrary(normalizedIsbn, withDescription: true);
     if (openLibResult != null) {
       if (scopedSchoolId.isNotEmpty &&
           persistToFirestoreCache &&
@@ -347,7 +365,7 @@ class BookLookupService {
       if (isbn == null || isbn.isEmpty) continue;
 
       final book = await _fetchFromGoogleBooks(isbn) ??
-          await _fetchFromOpenLibrary(isbn);
+          await _fetchFromOpenLibrary(isbn, withDescription: true);
       if (book != null) {
         await _cacheBookInFirestore(
           isbn: isbn,
@@ -463,11 +481,16 @@ class BookLookupService {
 
   // ─── Open Library API ────────────────────────────────────
 
-  Future<BookModel?> _fetchFromOpenLibrary(String isbn) async {
+  Future<BookModel?> _fetchFromOpenLibrary(
+    String isbn, {
+    bool withDescription = false,
+  }) async {
     try {
-      // Use the search API which returns author names directly
+      // Use the search API which returns author names directly. Request
+      // `cover_i` (the cover-existence signal) and `key` (the Work key, used to
+      // fetch a synopsis when the caller needs one).
       final uri = Uri.parse(
-        'https://openlibrary.org/search.json?isbn=$isbn&fields=title,author_name,publisher,number_of_pages_median,first_publish_year,subject&limit=1',
+        'https://openlibrary.org/search.json?isbn=$isbn&fields=key,title,author_name,publisher,number_of_pages_median,first_publish_year,subject,cover_i&limit=1',
       );
 
       final response = await _httpClient.get(uri).timeout(_httpTimeout);
@@ -489,13 +512,29 @@ class BookLookupService {
       final subjects = doc['subject'] as List<dynamic>?;
       final pageCount = doc['number_of_pages_median'] as int?;
 
-      // Open Library provides predictable cover URLs by ISBN
-      final coverUrl = 'https://covers.openlibrary.org/b/isbn/$isbn-M.jpg';
+      // Only emit a cover URL when Open Library actually has one. `cover_i` is
+      // present only when a cover is on file, so building from it avoids the
+      // phantom-cover problem — the /b/isbn/<isbn>.jpg endpoint serves a grey
+      // placeholder (not a 404) when no cover exists.
+      final coverId = doc['cover_i'] as int?;
+      final coverUrl = coverId != null
+          ? 'https://covers.openlibrary.org/b/id/$coverId-M.jpg'
+          : null;
 
       DateTime? publishedDate;
       final firstYear = doc['first_publish_year'] as int?;
       if (firstYear != null) {
         publishedDate = DateTime(firstYear);
+      }
+
+      // Open Library keeps the synopsis on the Work, not the search index, so
+      // fetch it lazily — only when the caller needs to fill a blank.
+      String? description;
+      if (withDescription) {
+        final workKey = doc['key'] as String?;
+        if (workKey != null && workKey.isNotEmpty) {
+          description = await _fetchOpenLibraryDescription(workKey);
+        }
       }
 
       return BookModel(
@@ -506,6 +545,7 @@ class BookLookupService {
             : null,
         isbn: isbn,
         coverImageUrl: coverUrl,
+        description: description,
         genres: subjects?.take(5).map((s) => s.toString()).toList() ?? const [],
         pageCount: pageCount,
         publisher: publishers?.isNotEmpty == true
@@ -520,6 +560,33 @@ class BookLookupService {
       );
     } catch (e) {
       debugPrint('BookLookupService: Open Library lookup failed: $e');
+      return null;
+    }
+  }
+
+  /// Fetch a book synopsis from an Open Library Work record. [workKey] looks
+  /// like `/works/OL12345W`. Open Library returns `description` as either a
+  /// plain string or a `{type, value}` object; both are handled. Returns null
+  /// when the field is missing/blank or on any error.
+  Future<String?> _fetchOpenLibraryDescription(String workKey) async {
+    try {
+      final uri = Uri.parse('https://openlibrary.org$workKey.json');
+      final response = await _httpClient.get(uri).timeout(_httpTimeout);
+      if (response.statusCode != 200) return null;
+
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      final raw = json['description'];
+      String? text;
+      if (raw is String) {
+        text = raw;
+      } else if (raw is Map<String, dynamic>) {
+        text = raw['value'] as String?;
+      }
+      final trimmed = text?.trim();
+      return (trimmed != null && trimmed.isNotEmpty) ? trimmed : null;
+    } catch (e) {
+      debugPrint(
+          'BookLookupService: Open Library description fetch failed: $e');
       return null;
     }
   }
@@ -1105,6 +1172,23 @@ class BookLookupService {
     if (coverUrl == null) return false;
     final trimmed = coverUrl.trim();
     return trimmed.isNotEmpty && trimmed.startsWith('http');
+  }
+
+  static bool _hasUsableDescription(String? description) {
+    return description != null && description.trim().isNotEmpty;
+  }
+
+  /// Cache `source` label for a Google-primary result, recording which fields
+  /// (if any) were filled from Open Library via the partial-match fallback.
+  static String _googleSourceLabel(BookModel book) {
+    final coverFilled = book.metadata?['coverSource'] == 'open_library';
+    final descFilled = book.metadata?['descriptionSource'] == 'open_library';
+    if (coverFilled && descFilled) {
+      return 'google_books+open_library_cover+description';
+    }
+    if (coverFilled) return 'google_books+open_library_cover';
+    if (descFilled) return 'google_books+open_library_description';
+    return 'google_books';
   }
 
   static DateTime? _parsePublishedDate(String? dateStr) {
