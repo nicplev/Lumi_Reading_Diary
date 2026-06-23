@@ -2,6 +2,11 @@ import { adminDb } from '@/lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import type { Book } from '@/lib/types';
 
+// External book APIs (Google Books US, Open Library US) routinely take 3–6s
+// from AU before the first byte; 12s matches the Flutter client's budget so the
+// portal doesn't time out where the app succeeds.
+const LOOKUP_TIMEOUT_MS = 12000;
+
 function toBook(doc: FirebaseFirestore.DocumentSnapshot): Book {
   const data = doc.data()!;
   return {
@@ -54,7 +59,20 @@ export async function getBook(schoolId: string, bookId: string): Promise<Book | 
 
 export async function createBook(
   schoolId: string,
-  data: { title: string; author?: string; isbn?: string; readingLevel?: string; coverImageUrl?: string; createdBy: string }
+  data: {
+    title: string;
+    author?: string;
+    isbn?: string;
+    readingLevel?: string;
+    coverImageUrl?: string;
+    description?: string;
+    genres?: string[];
+    pageCount?: number;
+    publisher?: string;
+    publishedDate?: Date;
+    source?: string;
+    createdBy: string;
+  }
 ): Promise<string> {
   const ref = adminDb.collection('schools').doc(schoolId).collection('books').doc();
   const now = FieldValue.serverTimestamp();
@@ -66,7 +84,11 @@ export async function createBook(
     isbnNormalized: data.isbn ? normalizeIsbn(data.isbn) : null,
     readingLevel: data.readingLevel ?? null,
     coverImageUrl: data.coverImageUrl ?? null,
-    genres: [],
+    description: data.description ?? null,
+    genres: data.genres ?? [],
+    pageCount: data.pageCount ?? null,
+    publisher: data.publisher ?? null,
+    publishedDate: data.publishedDate ?? null,
     tags: [],
     ratingCount: 0,
     isPopular: false,
@@ -75,7 +97,10 @@ export async function createBook(
     scannedByTeacherIds: [],
     addedBy: data.createdBy,
     createdAt: now,
-    metadata: { source: 'web_portal', addedAt: new Date().toISOString() },
+    metadata: {
+      source: data.source ?? 'web_portal',
+      addedAt: new Date().toISOString(),
+    },
   });
 
   return ref.id;
@@ -134,10 +159,20 @@ export async function lookupBookByIsbn(
   // 2. Google Books API
   const googleResult = await fetchFromGoogleBooks(normalized);
   if (googleResult) {
-    // If no cover from Google, try Open Library
-    if (!googleResult.coverImageUrl) {
-      const olCover = await fetchOpenLibraryCover(normalized);
-      if (olCover) googleResult.coverImageUrl = olCover;
+    // Partial-match fill: when Google is missing a cover and/or a description,
+    // pull them from Open Library (queried by the same ISBN).
+    const needsCover = !googleResult.coverImageUrl;
+    const needsDescription = !googleResult.description?.trim();
+    if (needsCover || needsDescription) {
+      const ol = await fetchFromOpenLibrary(normalized, needsDescription);
+      if (ol) {
+        if (needsCover && ol.coverImageUrl) {
+          googleResult.coverImageUrl = ol.coverImageUrl;
+        }
+        if (needsDescription && ol.description?.trim()) {
+          googleResult.description = ol.description;
+        }
+      }
     }
     // Cache to Firestore
     const bookId = await createBook(schoolId, {
@@ -145,19 +180,31 @@ export async function lookupBookByIsbn(
       author: googleResult.author,
       isbn: normalized,
       coverImageUrl: googleResult.coverImageUrl,
+      description: googleResult.description,
+      genres: googleResult.genres,
+      pageCount: googleResult.pageCount,
+      publisher: googleResult.publisher,
+      publishedDate: googleResult.publishedDate,
+      source: 'google_books',
       createdBy: actorId,
     });
     return { ...toBookFromLookup(googleResult, normalized), id: bookId };
   }
 
   // 3. Open Library API
-  const olResult = await fetchFromOpenLibrary(normalized);
+  const olResult = await fetchFromOpenLibrary(normalized, true);
   if (olResult) {
     const bookId = await createBook(schoolId, {
       title: olResult.title,
       author: olResult.author,
       isbn: normalized,
       coverImageUrl: olResult.coverImageUrl,
+      description: olResult.description,
+      genres: olResult.genres,
+      pageCount: olResult.pageCount,
+      publisher: olResult.publisher,
+      publishedDate: olResult.publishedDate,
+      source: 'open_library',
       createdBy: actorId,
     });
     return { ...toBookFromLookup(olResult, normalized), id: bookId };
@@ -179,6 +226,8 @@ interface LookupResult {
   pageCount?: number;
   publisher?: string;
   description?: string;
+  genres?: string[];
+  publishedDate?: Date;
 }
 
 function toBookFromLookup(result: LookupResult, isbn: string): Book {
@@ -189,10 +238,11 @@ function toBookFromLookup(result: LookupResult, isbn: string): Book {
     isbn,
     coverImageUrl: result.coverImageUrl,
     description: result.description,
-    genres: [],
+    genres: result.genres ?? [],
     readingLevel: undefined,
     pageCount: result.pageCount,
     publisher: result.publisher,
+    publishedDate: result.publishedDate,
     tags: [],
     ratingCount: 0,
     isPopular: false,
@@ -210,7 +260,7 @@ async function fetchFromGoogleBooks(isbn: string): Promise<LookupResult | null> 
     const keyParam = apiKey ? `&key=${apiKey}` : '';
     const res = await fetch(
       `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}${keyParam}`,
-      { signal: AbortSignal.timeout(5000) }
+      { signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS) }
     );
     if (!res.ok) return null;
     const data = await res.json();
@@ -224,56 +274,87 @@ async function fetchFromGoogleBooks(isbn: string): Promise<LookupResult | null> 
       pageCount: vol.pageCount,
       publisher: vol.publisher,
       description: vol.description,
+      genres: Array.isArray(vol.categories) ? vol.categories : undefined,
+      publishedDate: parseDateLoose(vol.publishedDate),
     };
   } catch {
     return null;
   }
 }
 
-async function fetchFromOpenLibrary(isbn: string): Promise<LookupResult | null> {
+async function fetchFromOpenLibrary(
+  isbn: string,
+  withDescription = false
+): Promise<LookupResult | null> {
   try {
+    // The search index returns author names directly and exposes `cover_i`
+    // (present only when a cover exists) plus the Work `key` for descriptions.
     const res = await fetch(
-      `https://openlibrary.org/isbn/${isbn}.json`,
-      { signal: AbortSignal.timeout(5000) }
+      `https://openlibrary.org/search.json?isbn=${isbn}` +
+        '&fields=key,title,author_name,publisher,number_of_pages_median,first_publish_year,subject,cover_i' +
+        '&limit=1',
+      { signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS) }
     );
     if (!res.ok) return null;
     const data = await res.json();
+    const doc = data.docs?.[0];
+    if (!doc?.title) return null;
 
-    let author: string | undefined;
-    if (data.authors?.length) {
-      try {
-        const authorRes = await fetch(
-          `https://openlibrary.org${data.authors[0].key}.json`,
-          { signal: AbortSignal.timeout(3000) }
-        );
-        if (authorRes.ok) {
-          const authorData = await authorRes.json();
-          author = authorData.name;
-        }
-      } catch {
-        // ignore author lookup failure
-      }
+    // Build the cover from `cover_i` only — never the unguarded /b/isbn URL,
+    // which serves a grey placeholder (not a 404) when no cover is on file.
+    const coverImageUrl =
+      typeof doc.cover_i === 'number'
+        ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`
+        : undefined;
+
+    let description: string | undefined;
+    if (withDescription && typeof doc.key === 'string') {
+      description = await fetchOpenLibraryDescription(doc.key);
     }
 
     return {
-      title: data.title ?? '',
-      author,
-      coverImageUrl: `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`,
-      pageCount: data.number_of_pages,
-      publisher: data.publishers?.[0],
+      title: doc.title,
+      author: doc.author_name?.[0],
+      coverImageUrl,
+      description,
+      genres: Array.isArray(doc.subject) ? doc.subject.slice(0, 5) : undefined,
+      pageCount: doc.number_of_pages_median,
+      publisher: doc.publisher?.[0],
+      publishedDate:
+        typeof doc.first_publish_year === 'number'
+          ? new Date(Date.UTC(doc.first_publish_year, 0, 1))
+          : undefined,
     };
   } catch {
     return null;
   }
 }
 
-async function fetchOpenLibraryCover(isbn: string): Promise<string | null> {
+/// Fetch a synopsis from an Open Library Work record. `workKey` looks like
+/// `/works/OL123W`. The `description` field is either a string or a
+/// `{ type, value }` object. Returns undefined when missing/blank or on error.
+async function fetchOpenLibraryDescription(
+  workKey: string
+): Promise<string | undefined> {
   try {
-    const url = `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg?default=false`;
-    const res = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(3000) });
-    if (res.ok) return `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`;
-    return null;
+    const res = await fetch(`https://openlibrary.org${workKey}.json`, {
+      signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
+    });
+    if (!res.ok) return undefined;
+    const data = await res.json();
+    const raw = data.description;
+    const text = typeof raw === 'string' ? raw : raw?.value;
+    const trimmed = typeof text === 'string' ? text.trim() : '';
+    return trimmed.length > 0 ? trimmed : undefined;
   } catch {
-    return null;
+    return undefined;
   }
+}
+
+/// Parse a loose date string (e.g. Google's "2024", "2024-03", "2024-03-15")
+/// into a Date, or undefined if absent/invalid.
+function parseDateLoose(value?: string): Date | undefined {
+  if (!value) return undefined;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? undefined : d;
 }
