@@ -79,6 +79,21 @@ service cloud.firestore {
           );
     }
 
+    // ── Access / entitlement helper ─────────────────────────────────
+    // Fail-closed verdict for a student's materialised `access` map. Live
+    // only when status == 'active' AND the absolute hard-expiry is still in
+    // the future. Safe `.get(key, default)` accessors make a missing `access`
+    // map (legacy docs) evaluate to DENIED rather than raising: an absent
+    // status defaults to '' (≠ 'active'), and an absent expiresAt defaults to
+    // request.time (so `> request.time` is false). The expiresAt comparison is
+    // the date-driven backstop — access lapses on schedule even if no Cloud
+    // Function ever runs. school-wide suspension flows through here too: the
+    // subscription trigger flips each student's access.status to 'suspended'.
+    function studentAccessLive(studentData) {
+      return studentData.get('access', {}).get('status', '') == 'active' &&
+          studentData.get('access', {}).get('expiresAt', request.time) > request.time;
+    }
+
     // ── Developer impersonation helpers ─────────────────────────────
     // An allowlisted developer can start a short-lived impersonation
     // session via a Cloud Function, which mints a custom token carrying
@@ -335,11 +350,21 @@ service cloud.firestore {
             getUserData(schoolId).linkedChildren != null &&
             resource.data.studentId in getUserData(schoolId).linkedChildren;
 
+        // The parent logging path is the revenue/usage write and the single
+        // enforcement point for entitlement. One get() of the student doc (low
+        // volume — once per log) gates it on live access: if the child's access
+        // has lapsed (non-renewal) or been suspended (unpaid/off-boarded school
+        // — the trigger cascades status to 'suspended'), the write is DENIED.
+        // Student READS are intentionally left open so the app can read
+        // `access` to render the "access lapsed — contact your school" screen.
         allow create: if isSignedIn() &&
             writeAllowedForDev() &&
             getUserData(schoolId).linkedChildren != null &&
             request.resource.data.studentId in getUserData(schoolId).linkedChildren &&
-            request.resource.data.parentId == request.auth.uid;
+            request.resource.data.parentId == request.auth.uid &&
+            studentAccessLive(
+              get(/databases/$(database)/documents/schools/$(schoolId)/students/$(request.resource.data.studentId)).data
+            );
 
         // Teacher proxy logs: a teacher logs reading on behalf of a student
         // whose carer can't use the app. `parentId` holds the teacher's UID
