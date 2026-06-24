@@ -88,7 +88,12 @@ function localYear(d: Date, tz: string): number {
   }
 }
 
-/** Month number (1-12) of a Date in the given IANA timezone. */
+/**
+ * Month number (1-12) of a Date in the given IANA timezone.
+ * @param {Date} d The instant.
+ * @param {string} tz The IANA timezone.
+ * @return {number} The local month (1-12).
+ */
 function localMonth(d: Date, tz: string): number {
   try {
     return Number(
@@ -101,7 +106,12 @@ function localMonth(d: Date, tz: string): number {
   }
 }
 
-/** Day-of-month of a Date in the given IANA timezone. */
+/**
+ * Day-of-month of a Date in the given IANA timezone.
+ * @param {Date} d The instant.
+ * @param {string} tz The IANA timezone.
+ * @return {number} The local day-of-month.
+ */
 function localDay(d: Date, tz: string): number {
   try {
     return Number(
@@ -209,7 +219,7 @@ const PREP_SYNONYMS = ["prep", "foundation", "kindergarten", "kinder", "k", "f"]
  * (or null) are left unchanged and never flagged as graduated — class/year
  * assignment stays manual in v1, so this only bumps a recognised label.
  * @param {string|null|undefined} current The student's current year level.
- * @return {{next: string|null, graduated: boolean, changed: boolean}} Result.
+ * @return {!Object} Object carrying `next`, `graduated`, and `changed`.
  */
 export function nextYearLevel(current: string | null | undefined): {
   next: string | null;
@@ -219,9 +229,9 @@ export function nextYearLevel(current: string | null | undefined): {
   if (current == null || current === "") {
     return {next: current ?? null, graduated: false, changed: false};
   }
-  const normalised = PREP_SYNONYMS.includes(current.trim().toLowerCase())
-    ? "Prep"
-    : current.trim();
+  const normalised = PREP_SYNONYMS.includes(current.trim().toLowerCase()) ?
+    "Prep" :
+    current.trim();
   const idx = YEAR_LADDER.indexOf(normalised);
   if (idx === -1) {
     // Not a recognised ladder rung — leave untouched.

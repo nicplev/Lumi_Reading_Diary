@@ -28,7 +28,12 @@ function asNonEmptyString(value: unknown, field: string): string {
   return value.trim();
 }
 
-/** Caller must be a teacher or school admin of the target school. */
+/**
+ * Caller must be a teacher or school admin of the target school.
+ * @param {string} uid The caller's UID.
+ * @param {string} schoolId The target school ID.
+ * @return {Promise<boolean>} True when the caller is staff at the school.
+ */
 async function callerIsStaff(uid: string, schoolId: string): Promise<boolean> {
   const snap = await db()
     .collection("schools").doc(schoolId)
@@ -39,7 +44,12 @@ async function callerIsStaff(uid: string, schoolId: string): Promise<boolean> {
   return role === "teacher" || role === "schoolAdmin";
 }
 
-/** Whether the school's subscription for `year` grants active access. */
+/**
+ * Whether the school's subscription for `year` grants active access.
+ * @param {string} schoolId The school ID.
+ * @param {number} year The academic year.
+ * @return {Promise<boolean>} True when the subscription grants active access.
+ */
 async function schoolSubActive(
   schoolId: string,
   year: number,
@@ -242,6 +252,10 @@ export const annualRollover = fns.pubsub
  * Apply `update` to every student in `schoolId` whose access matches the given
  * academicYear + status. Returns the count updated. Uses the
  * access.academicYear + access.status composite index.
+ * @param {string} schoolId The school ID.
+ * @param {!Object} match Object with `academicYear` (number) and `status`.
+ * @param {!Object} update The Firestore update applied to each match.
+ * @return {Promise<number>} The number of student docs updated.
  */
 async function flipStudents(
   schoolId: string,

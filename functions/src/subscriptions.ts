@@ -32,6 +32,10 @@ async function currentAcademicYear(): Promise<number | null> {
  *   `suspended` back to `active`.
  * Deliberately does NOT grant access to students who were never renewed — a
  * school paying late restores only the cohort the school had already selected.
+ * @param {string} schoolId The school ID.
+ * @param {number} year The academic year.
+ * @param {boolean} active Whether the subscription grants active access.
+ * @return {Promise<number>} The number of student docs updated.
  */
 async function cascadeStudentAccess(
   schoolId: string,
@@ -118,8 +122,8 @@ export const onSchoolSubscriptionWrite = fns.firestore
     });
 
     await db().collection("schools").doc(schoolId).set(
-      { access: schoolAccess },
-      { merge: true },
+      {access: schoolAccess},
+      {merge: true},
     );
 
     const cascaded = await cascadeStudentAccess(schoolId, year, active);

@@ -231,7 +231,11 @@ function permissionDenied(message: string) {
   return new functions.https.HttpsError("permission-denied", message);
 }
 
-/** Whether a student doc already carries live (active, unexpired) access. */
+/**
+ * Whether a student doc already carries live (active, unexpired) access.
+ * @param {FirebaseFirestore.DocumentData|undefined} studentData Student doc data.
+ * @return {boolean} True when access.status is active and not yet expired.
+ */
 function studentAccessAlreadyLive(
   studentData: FirebaseFirestore.DocumentData | undefined,
 ): boolean {
