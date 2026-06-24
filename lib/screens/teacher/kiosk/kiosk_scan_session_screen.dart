@@ -493,6 +493,16 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
     // Before the first scan, lead with how to connect the Bluetooth scanner;
     // once scanning works (a scan lands or one is in flight) switch to the
     // active scan prompt.
+    //
+    // TODO(kiosk): real HID scanner connect/disconnect detection.
+    // Today this is a heuristic — the connect-help shows until the first scan
+    // registers. To detect actual connection state (and re-prompt on a
+    // mid-session disconnect, e.g. the scanner's battery dies), add an iOS
+    // GameController `GCKeyboard` platform channel: a MethodChannel for the
+    // current state + an EventChannel streaming GCKeyboardDidConnect/Disconnect
+    // (iOS 14+). Wire it into `showConnectHelp` here and fail OPEN (assume
+    // connected if the channel is unavailable/null) so a native hiccup can
+    // never block scanning. Android: default to connected. See PR #126.
     final showConnectHelp =
         _entries.isEmpty && _celebrateAsset == null && !_isProcessing;
     return showConnectHelp ? _buildConnectScannerPanel() : _buildActiveScanPanel();
