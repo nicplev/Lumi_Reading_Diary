@@ -9,13 +9,20 @@ import { getGreeting } from '@/lib/utils/formatters';
 import Link from 'next/link';
 import type { TeacherDashboardData, WeeklyEngagement } from '@/lib/firestore/dashboard';
 
+interface DashboardWidgets {
+  topReaders: { studentId: string; name: string; minutes: number }[];
+  nudges: { studentId: string; name: string; daysSinceRead: number | null }[];
+  parentComments: { logId: string; studentId: string; studentName: string; preview: string; at: string }[];
+}
+
 interface TeacherDashboardProps {
   userName: string;
   data: TeacherDashboardData;
   weeklyEngagement: WeeklyEngagement[];
+  widgets: DashboardWidgets;
 }
 
-export function TeacherDashboard({ userName, data, weeklyEngagement }: TeacherDashboardProps) {
+export function TeacherDashboard({ userName, data, weeklyEngagement, widgets }: TeacherDashboardProps) {
   const firstName = userName.split(' ')[0];
 
   return (
@@ -71,6 +78,77 @@ export function TeacherDashboard({ userName, data, weeklyEngagement }: TeacherDa
             ))
           )}
         </div>
+      </div>
+
+      {/* Key widgets */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+        <Card>
+          <h2 className="text-lg font-bold text-charcoal mb-3">Top readers this week</h2>
+          {widgets.topReaders.length === 0 ? (
+            <p className="text-sm text-text-secondary">No reading logged yet this week.</p>
+          ) : (
+            <ul className="space-y-2">
+              {widgets.topReaders.map((r, i) => (
+                <li key={r.studentId}>
+                  <Link
+                    href={`/students/${r.studentId}`}
+                    className="flex items-center justify-between hover:bg-background rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
+                  >
+                    <span className="text-sm text-charcoal font-medium truncate">
+                      <span className="text-text-secondary mr-1.5">{i + 1}.</span>
+                      {r.name}
+                    </span>
+                    <span className="text-xs text-text-secondary whitespace-nowrap">{r.minutes} min</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card>
+          <h2 className="text-lg font-bold text-charcoal mb-3">Needs attention</h2>
+          {widgets.nudges.length === 0 ? (
+            <p className="text-sm text-text-secondary">Everyone has read recently. 🎉</p>
+          ) : (
+            <ul className="space-y-2">
+              {widgets.nudges.map((n) => (
+                <li key={n.studentId}>
+                  <Link
+                    href={`/students/${n.studentId}`}
+                    className="flex items-center justify-between hover:bg-background rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
+                  >
+                    <span className="text-sm text-charcoal font-medium truncate">{n.name}</span>
+                    <span className="text-xs text-text-secondary whitespace-nowrap">
+                      {n.daysSinceRead === null ? 'Not read yet' : `${n.daysSinceRead}d ago`}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card>
+          <h2 className="text-lg font-bold text-charcoal mb-3">New parent comments</h2>
+          {widgets.parentComments.length === 0 ? (
+            <p className="text-sm text-text-secondary">No new parent comments.</p>
+          ) : (
+            <ul className="space-y-2.5">
+              {widgets.parentComments.map((c) => (
+                <li key={c.logId}>
+                  <Link
+                    href={`/students/${c.studentId}`}
+                    className="block hover:bg-background rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
+                  >
+                    <p className="text-sm font-medium text-charcoal truncate">{c.studentName}</p>
+                    <p className="text-xs text-text-secondary truncate">{c.preview}</p>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
       </div>
     </div>
   );
