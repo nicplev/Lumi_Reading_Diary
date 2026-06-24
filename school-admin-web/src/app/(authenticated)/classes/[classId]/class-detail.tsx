@@ -10,6 +10,7 @@ import { StudentRoster } from './student-roster';
 import { ReadingGroupsTab } from './reading-groups-tab';
 import { AllocationsTab } from './allocations-tab';
 import { ClassReportTab } from './class-report-tab';
+import { ComprehensionQuestionCard } from './comprehension-question-card';
 import type { SchoolClass, ReadingLevelOption } from '@/lib/types';
 
 type SerializedClass = Omit<SchoolClass, 'createdAt'> & { createdAt: string };
@@ -44,7 +45,10 @@ export function ClassDetail({ schoolClass, levelOptions }: ClassDetailProps) {
       <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'roster' && (
-        <StudentRoster classId={schoolClass.id} levelOptions={levelOptions} />
+        <>
+          <ComprehensionQuestionCard classId={schoolClass.id} />
+          <StudentRoster classId={schoolClass.id} levelOptions={levelOptions} />
+        </>
       )}
       {activeTab === 'groups' && (
         <ReadingGroupsTab classId={schoolClass.id} levelOptions={levelOptions} />

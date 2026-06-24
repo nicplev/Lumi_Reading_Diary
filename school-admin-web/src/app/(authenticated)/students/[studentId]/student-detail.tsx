@@ -18,6 +18,7 @@ import { BookCard } from '@/components/lumi/book-card';
 import { ReadingHistorySection } from './reading-history-section';
 import { LogReadingModal } from './log-reading-modal';
 import { IsbnAssignModal } from './isbn-assign-modal';
+import { AchievementsCard } from './achievements-card';
 import Link from 'next/link';
 import type { ReadingLevelOption } from '@/lib/types';
 
@@ -234,6 +235,11 @@ export function StudentDetail({ studentId, classId, levelOptions, className }: S
             </div>
           )}
         </Card>
+      </div>
+
+      {/* Achievements */}
+      <div className="mt-6">
+        <AchievementsCard studentId={studentId} />
       </div>
 
       {/* Assigned Books */}
