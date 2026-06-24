@@ -9,6 +9,7 @@ import { FilterChip } from '@/components/lumi/filter-chip';
 import { EmptyState } from '@/components/lumi/empty-state';
 import { useSchool } from '@/lib/hooks/use-school';
 import { useClassReport } from '@/lib/hooks/use-reports';
+import { useToast } from '@/components/lumi/toast';
 
 function isoToday(): string {
   const d = new Date();
@@ -58,6 +59,22 @@ export function ClassReportTab({ classId, className, yearLevel }: ClassReportTab
   const [presetKey, setPresetKey] = useState('30');
 
   const { data: report, isLoading } = useClassReport(classId, from, to);
+  const { toast } = useToast();
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    if (!report) return;
+    setDownloading(true);
+    try {
+      // Dynamic import keeps @react-pdf out of the main bundle until it's needed.
+      const { downloadClassReportPdf } = await import('./class-report-pdf');
+      await downloadClassReportPdf(report, school?.displayName || school?.name);
+    } catch {
+      toast('Could not generate the PDF', 'error');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const applyPreset = (key: string) => {
     const preset = PRESETS.find((p) => p.key === key);
@@ -82,9 +99,14 @@ export function ClassReportTab({ classId, className, yearLevel }: ClassReportTab
               />
             ))}
           </div>
-          <Button variant="outline" size="sm" onClick={() => window.print()} disabled={!report}>
-            Print / Save as PDF
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => window.print()} disabled={!report}>
+              Print
+            </Button>
+            <Button size="sm" onClick={handleDownloadPdf} loading={downloading} disabled={!report}>
+              Download PDF
+            </Button>
+          </div>
         </div>
         <div className="flex flex-wrap items-end gap-3">
           <label className="text-sm">
