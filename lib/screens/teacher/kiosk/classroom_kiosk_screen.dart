@@ -149,11 +149,21 @@ class _ClassroomKioskScreenState extends State<ClassroomKioskScreen> {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-                child: Text(
-                  'Tap your name to scan your books for the week',
-                  style: LumiType.body,
-                  textAlign: TextAlign.center,
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+                child: Column(
+                  children: [
+                    Text(
+                      'Find your name',
+                      style: LumiType.heading,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Tap your photo to scan your books for the week',
+                      style: LumiType.body.copyWith(color: LumiTokens.muted),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
               ),
               Expanded(child: _buildRoster()),
@@ -202,23 +212,28 @@ class _ClassroomKioskScreenState extends State<ClassroomKioskScreen> {
           );
         }
 
-        return GridView.builder(
-          padding: const EdgeInsets.all(16),
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 180,
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-            childAspectRatio: 0.82,
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 920),
+            child: GridView.builder(
+              padding: const EdgeInsets.all(20),
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 200,
+                mainAxisSpacing: 20,
+                crossAxisSpacing: 20,
+                childAspectRatio: 0.85,
+              ),
+              itemCount: students.length,
+              itemBuilder: (context, index) {
+                final student = students[index];
+                return _StudentTile(
+                  student: student,
+                  scannedThisWeek: _scannedThisWeek.contains(student.id),
+                  onTap: () => _openSession(student),
+                );
+              },
+            ),
           ),
-          itemCount: students.length,
-          itemBuilder: (context, index) {
-            final student = students[index];
-            return _StudentTile(
-              student: student,
-              scannedThisWeek: _scannedThisWeek.contains(student.id),
-              onTap: () => _openSession(student),
-            );
-          },
         );
       },
     );
@@ -238,28 +253,33 @@ class _StudentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: LumiTokens.paper,
-      borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
-      child: InkWell(
-        onTap: onTap,
+    return DecoratedBox(
+      decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
-            border: Border.all(
-              color: scannedThisWeek ? LumiTokens.green : LumiTokens.rule,
-              width: scannedThisWeek ? 2 : 1,
+        boxShadow: LumiTokens.shadowCard,
+      ),
+      child: Material(
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+              border: Border.all(
+                color: scannedThisWeek ? LumiTokens.green : LumiTokens.rule,
+                width: scannedThisWeek ? 2 : 1,
+              ),
             ),
-          ),
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  StudentAvatar.fromStudent(student, size: 72),
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    StudentAvatar.fromStudent(student, size: 84),
                   if (scannedThisWeek)
                     Positioned(
                       right: -4,
@@ -276,14 +296,15 @@ class _StudentTile extends StatelessWidget {
                     ),
                 ],
               ),
-              const SizedBox(height: 10),
-              Text(
-                student.firstName,
-                style: LumiType.body.copyWith(fontWeight: FontWeight.w700),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+                const SizedBox(height: 10),
+                Text(
+                  student.firstName,
+                  style: LumiType.body.copyWith(fontWeight: FontWeight.w700),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
         ),
       ),

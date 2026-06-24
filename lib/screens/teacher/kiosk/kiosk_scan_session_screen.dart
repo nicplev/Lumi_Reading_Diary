@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../core/widgets/common_widgets.dart';
+import '../../../core/widgets/lumi/student_avatar.dart';
 import '../../../data/models/class_model.dart';
 import '../../../data/models/student_model.dart';
 import '../../../data/models/user_model.dart';
@@ -237,35 +238,68 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.black,
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return SizedBox(
-          height: MediaQuery.of(ctx).size.height * 0.7,
-          child: Stack(
-            children: [
-              MobileScanner(
-                controller: controller,
-                onDetect: (capture) {
-                  for (final barcode in capture.barcodes) {
-                    final code =
-                        IsbnAssignmentService.normalizeIsbn(barcode.rawValue);
-                    if (code != null) {
-                      captured = code;
-                      Navigator.of(ctx).pop();
-                      break;
-                    }
-                  }
-                },
+        return ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          child: SizedBox(
+            height: MediaQuery.of(ctx).size.height * 0.7,
+            child: ColoredBox(
+              color: LumiTokens.ink,
+              child: Stack(
+                children: [
+                  MobileScanner(
+                    controller: controller,
+                    onDetect: (capture) {
+                      for (final barcode in capture.barcodes) {
+                        final code = IsbnAssignmentService.normalizeIsbn(
+                            barcode.rawValue);
+                        if (code != null) {
+                          captured = code;
+                          Navigator.of(ctx).pop();
+                          break;
+                        }
+                      }
+                    },
+                    errorBuilder: (context, error) => _CameraUnavailable(
+                      onClose: () => Navigator.of(ctx).pop(),
+                    ),
+                  ),
+                  Positioned(
+                    top: 16,
+                    right: 16,
+                    child: Material(
+                      color: LumiTokens.paper,
+                      shape: const CircleBorder(),
+                      child: IconButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        icon: const Icon(Icons.close_rounded,
+                            color: LumiTokens.ink),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 32,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: LumiTokens.ink.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+                        ),
+                        child: Text(
+                          'Point at a book barcode',
+                          style: LumiType.caption.copyWith(color: LumiTokens.paper),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              Positioned(
-                top: 12,
-                right: 12,
-                child: IconButton.filled(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  icon: const Icon(Icons.close_rounded),
-                ),
-              ),
-            ],
+            ),
           ),
         );
       },
@@ -292,9 +326,19 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
           appBar: AppBar(
             backgroundColor: LumiTokens.cream,
             elevation: 0,
-            title: Text(
-              'Hi ${widget.student.firstName}! Scan your books',
-              style: LumiType.subhead,
+            titleSpacing: 0,
+            title: Row(
+              children: [
+                StudentAvatar.fromStudent(widget.student, size: 36),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Hi ${widget.student.firstName}! Scan your books',
+                    style: LumiType.subhead,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
           ),
           body: SafeArea(
@@ -312,8 +356,11 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
                           children: [
                             if (_bannerMessage != null) _buildBanner(),
                             Expanded(
-                              child: SingleChildScrollView(
-                                child: _buildScanPrompt(),
+                              child: Center(
+                                child: SingleChildScrollView(
+                                  padding: const EdgeInsets.all(24),
+                                  child: _buildScanPanel(),
+                                ),
                               ),
                             ),
                             _buildDoneBar(),
@@ -321,16 +368,18 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
                         ),
                       ),
                       const VerticalDivider(width: 1, color: LumiTokens.rule),
-                      Expanded(flex: 6, child: _buildEntries()),
+                      Expanded(flex: 6, child: _buildEntriesPane()),
                     ],
                   );
                 }
                 return Column(
                   children: [
                     if (_bannerMessage != null) _buildBanner(),
-                    _buildScanPrompt(),
-                    const SizedBox(height: 8),
-                    Expanded(child: _buildEntries()),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                      child: _buildScanPanel(),
+                    ),
+                    Expanded(child: _buildEntriesPane()),
                     _buildDoneBar(),
                   ],
                 );
@@ -345,26 +394,95 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
   /// The celebratory Lumi book mascot (after a scan) or the scanner icon.
   Widget _buildMascot() {
     if (_isProcessing) {
-      return const Icon(Icons.hourglass_top_rounded,
-          size: 72, color: LumiTokens.green);
+      return const SizedBox(
+        height: 120,
+        child: Center(
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: CircularProgressIndicator(color: LumiTokens.green),
+          ),
+        ),
+      );
     }
     if (_celebrateAsset == null) {
-      return const Icon(Icons.qr_code_scanner_rounded,
-          size: 72, color: LumiTokens.green);
+      return Container(
+        width: 120,
+        height: 120,
+        decoration: BoxDecoration(
+          color: LumiTokens.tintGreen.withValues(alpha: 0.5),
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(Icons.qr_code_scanner_rounded,
+            size: 56, color: LumiTokens.green),
+      );
     }
     return Image.asset(
       _celebrateAsset!,
-      height: 96,
+      height: 120,
       key: ValueKey(_celebrateTick),
     )
         .animate(key: ValueKey(_celebrateTick))
         .scale(
           begin: const Offset(0.6, 0.6),
           end: const Offset(1, 1),
-          duration: 300.ms,
+          duration: 320.ms,
           curve: Curves.easeOutBack,
         )
         .fadeIn(duration: 200.ms);
+  }
+
+  /// The central scan call-to-action card (mascot + heading + camera button).
+  Widget _buildScanPanel() {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 440),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+        decoration: BoxDecoration(
+          color: LumiTokens.paper,
+          borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+          boxShadow: LumiTokens.shadowCard,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildMascot(),
+            const SizedBox(height: 20),
+            Text(
+              _isProcessing ? 'Looking up your book…' : 'Scan a book barcode',
+              style: LumiType.heading,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Point the barcode scanner at your book — or tap below to use '
+              'the camera.',
+              style: LumiType.body.copyWith(color: LumiTokens.muted),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            OutlinedButton.icon(
+              onPressed: _isProcessing ? null : _scanWithCamera,
+              icon: const Icon(Icons.photo_camera_rounded,
+                  color: LumiTokens.green),
+              label: Text(
+                'Use camera',
+                style: LumiType.button.copyWith(color: LumiTokens.green),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: LumiTokens.green, width: 2),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildBanner() {
@@ -391,46 +509,44 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
         .slideY(begin: -0.15, end: 0, curve: Curves.easeOut);
   }
 
-  Widget _buildScanPrompt() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
-      child: Column(
-        children: [
-          _buildMascot(),
-          const SizedBox(height: 12),
-          Text(
-            _isProcessing ? 'Looking up your book…' : 'Scan a book barcode',
-            style: LumiType.subhead,
-            textAlign: TextAlign.center,
+  Widget _buildEntriesPane() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+          child: Text(
+            _entries.isEmpty
+                ? 'Scanned this session'
+                : 'Scanned this session • ${_entries.length}',
+            style: LumiType.sectionLabel,
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Point the scanner at the barcode, or use the camera.',
-            style: LumiType.caption,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: _isProcessing ? null : _scanWithCamera,
-            icon: const Icon(Icons.photo_camera_rounded),
-            label: Text('Use camera', style: LumiType.button),
-          ),
-        ],
-      ),
+        ),
+        Expanded(child: _buildEntries()),
+      ],
     );
   }
 
   Widget _buildEntries() {
     if (_entries.isEmpty) {
       return Center(
-        child: Text(
-          'Your scanned books will appear here.',
-          style: LumiType.caption,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.menu_book_rounded,
+                size: 48, color: LumiTokens.rule),
+            const SizedBox(height: 12),
+            Text(
+              'Your scanned books\nwill appear here.',
+              style: LumiType.body.copyWith(color: LumiTokens.muted),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       );
     }
     return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       itemCount: _entries.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
@@ -543,6 +659,7 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: SizedBox(
         width: double.infinity,
+        height: 56,
         child: FilledButton(
           onPressed: () {
             CommonWidgets.showSuccessSnackbar(
@@ -554,13 +671,68 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
           style: FilledButton.styleFrom(
             backgroundColor: LumiTokens.green,
             foregroundColor: LumiTokens.paper,
-            padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+              borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
             ),
-            textStyle: LumiType.button,
           ),
-          child: Text(_entries.isEmpty ? 'Done' : "I'm done!"),
+          child: Text(
+            _entries.isEmpty ? 'Done' : "I'm done!",
+            style: LumiType.button,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Lumi-styled message shown inside the camera sheet when no camera is
+/// available (e.g. a device with only a Bluetooth scanner, or the simulator).
+class _CameraUnavailable extends StatelessWidget {
+  const _CameraUnavailable({required this.onClose});
+
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: LumiTokens.ink,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.no_photography_rounded,
+                  size: 48, color: LumiTokens.paper),
+              const SizedBox(height: 16),
+              Text(
+                'No camera on this device',
+                style: LumiType.subhead.copyWith(color: LumiTokens.paper),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Use the Bluetooth barcode scanner instead — it works without '
+                'the camera.',
+                style: LumiType.body.copyWith(
+                  color: LumiTokens.paper.withValues(alpha: 0.8),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: onClose,
+                style: FilledButton.styleFrom(
+                  backgroundColor: LumiTokens.green,
+                  foregroundColor: LumiTokens.paper,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+                  ),
+                ),
+                child: Text('Got it', style: LumiType.button),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -625,30 +797,30 @@ class _AlreadyReadSheet extends StatelessWidget {
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
+            height: 52,
             child: FilledButton(
               onPressed: () => Navigator.pop(context, true),
               style: FilledButton.styleFrom(
                 backgroundColor: LumiTokens.green,
                 foregroundColor: LumiTokens.paper,
-                padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
                 ),
-                textStyle: LumiType.button,
               ),
-              child: const Text('Read it again'),
+              child: Text('Read it again', style: LumiType.button),
             ),
           ),
           const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
+            height: 52,
             child: OutlinedButton(
               onPressed: () => Navigator.pop(context, false),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 side: const BorderSide(color: LumiTokens.rule),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
                 ),
               ),
               child: Text(
