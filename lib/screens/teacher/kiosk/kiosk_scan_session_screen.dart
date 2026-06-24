@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../core/widgets/common_widgets.dart';
@@ -53,6 +54,11 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
   bool _isProcessing = false;
   String? _bannerMessage;
   Color _bannerColor = LumiTokens.green;
+
+  /// Lumi book-mascot shown after a successful scan; null shows the scanner
+  /// icon. [_celebrateTick] keys the animation so it replays on each success.
+  String? _celebrateAsset;
+  int _celebrateTick = 0;
 
   String get _schoolId => widget.teacher.schoolId ?? '';
 
@@ -192,7 +198,15 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
 
   void _addEntry(ScannedIsbnBook book, _KioskOutcome outcome) {
     _sessionIsbns.add(book.isbn);
-    setState(() => _entries.insert(0, _KioskScanEntry(book, outcome)));
+    setState(() {
+      _entries.insert(0, _KioskScanEntry(book, outcome));
+      _celebrateAsset = switch (outcome) {
+        _KioskOutcome.added => 'assets/lumi/Lumi_Books_Green.png',
+        _KioskOutcome.renewed => 'assets/lumi/Lumi_Books_LBlue.png',
+        _KioskOutcome.reread => 'assets/lumi/Lumi_Books_Orange.png',
+      };
+      _celebrateTick++;
+    });
   }
 
   void _showBanner(String message, Color color) {
@@ -283,19 +297,73 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
             ),
           ),
           body: SafeArea(
-            child: Column(
-              children: [
-                if (_bannerMessage != null) _buildBanner(),
-                _buildScanPrompt(),
-                const SizedBox(height: 8),
-                Expanded(child: _buildEntries()),
-                _buildDoneBar(),
-              ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // Side-by-side on a landscape iPad; stacked on a phone/portrait.
+                final wide = constraints.maxWidth >= 720;
+                if (wide) {
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        flex: 5,
+                        child: Column(
+                          children: [
+                            if (_bannerMessage != null) _buildBanner(),
+                            Expanded(
+                              child: SingleChildScrollView(
+                                child: _buildScanPrompt(),
+                              ),
+                            ),
+                            _buildDoneBar(),
+                          ],
+                        ),
+                      ),
+                      const VerticalDivider(width: 1, color: LumiTokens.rule),
+                      Expanded(flex: 6, child: _buildEntries()),
+                    ],
+                  );
+                }
+                return Column(
+                  children: [
+                    if (_bannerMessage != null) _buildBanner(),
+                    _buildScanPrompt(),
+                    const SizedBox(height: 8),
+                    Expanded(child: _buildEntries()),
+                    _buildDoneBar(),
+                  ],
+                );
+              },
             ),
           ),
         ),
       ),
     );
+  }
+
+  /// The celebratory Lumi book mascot (after a scan) or the scanner icon.
+  Widget _buildMascot() {
+    if (_isProcessing) {
+      return const Icon(Icons.hourglass_top_rounded,
+          size: 72, color: LumiTokens.green);
+    }
+    if (_celebrateAsset == null) {
+      return const Icon(Icons.qr_code_scanner_rounded,
+          size: 72, color: LumiTokens.green);
+    }
+    return Image.asset(
+      _celebrateAsset!,
+      height: 96,
+      key: ValueKey(_celebrateTick),
+    )
+        .animate(key: ValueKey(_celebrateTick))
+        .scale(
+          begin: const Offset(0.6, 0.6),
+          end: const Offset(1, 1),
+          duration: 300.ms,
+          curve: Curves.easeOutBack,
+        )
+        .fadeIn(duration: 200.ms);
   }
 
   Widget _buildBanner() {
@@ -316,7 +384,10 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
         ),
         textAlign: TextAlign.center,
       ),
-    );
+    )
+        .animate(key: ValueKey(_bannerMessage))
+        .fadeIn(duration: 200.ms)
+        .slideY(begin: -0.15, end: 0, curve: Curves.easeOut);
   }
 
   Widget _buildScanPrompt() {
@@ -324,13 +395,7 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
       child: Column(
         children: [
-          Icon(
-            _isProcessing
-                ? Icons.hourglass_top_rounded
-                : Icons.qr_code_scanner_rounded,
-            size: 72,
-            color: LumiTokens.green,
-          ),
+          _buildMascot(),
           const SizedBox(height: 12),
           Text(
             _isProcessing ? 'Looking up your book…' : 'Scan a book barcode',
@@ -364,10 +429,21 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
       );
     }
     return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       itemCount: _entries.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, index) => _buildEntryTile(_entries[index]),
+      itemBuilder: (context, index) {
+        final tile = _buildEntryTile(_entries[index]);
+        // Animate only the newest (top) tile so the list doesn't re-animate
+        // wholesale on every scan.
+        if (index == 0) {
+          return tile
+              .animate(key: ValueKey(_celebrateTick))
+              .fadeIn(duration: 220.ms)
+              .slideX(begin: 0.12, end: 0, curve: Curves.easeOut);
+        }
+        return tile;
+      },
     );
   }
 
