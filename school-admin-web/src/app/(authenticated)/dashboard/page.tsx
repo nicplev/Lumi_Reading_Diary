@@ -1,6 +1,6 @@
 import { getSession } from '@/lib/auth/session';
 import { redirect } from 'next/navigation';
-import { getDashboardStats, getWeeklyEngagement, getRecentActivity, getTeacherDashboardData } from '@/lib/firestore/dashboard';
+import { getDashboardStats, getWeeklyEngagement, getRecentActivity, getTeacherDashboardData, getTeacherDashboardWidgets } from '@/lib/firestore/dashboard';
 import { getSchool } from '@/lib/firestore/school';
 import { AdminDashboard } from './admin-dashboard';
 import { TeacherDashboard } from './teacher-dashboard';
@@ -32,9 +32,10 @@ export default async function DashboardPage() {
   }
 
   // Teacher dashboard
-  const [teacherData, weeklyEngagement] = await Promise.all([
+  const [teacherData, weeklyEngagement, widgets] = await Promise.all([
     getTeacherDashboardData(session.schoolId, session.uid),
     getWeeklyEngagement(session.schoolId),
+    getTeacherDashboardWidgets(session.schoolId, session.uid),
   ]);
 
   return (
@@ -42,6 +43,10 @@ export default async function DashboardPage() {
       userName={session.fullName}
       data={teacherData}
       weeklyEngagement={weeklyEngagement}
+      widgets={{
+        ...widgets,
+        parentComments: widgets.parentComments.map((c) => ({ ...c, at: c.at.toISOString() })),
+      }}
     />
   );
 }

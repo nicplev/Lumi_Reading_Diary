@@ -279,3 +279,124 @@ export async function getTeacherDashboardData(schoolId: string, userId: string):
 
   return { classes, totalStudents, readToday, onStreak, booksToday };
 }
+
+export interface TeacherTopReader {
+  studentId: string;
+  name: string;
+  minutes: number;
+}
+
+export interface TeacherNudge {
+  studentId: string;
+  name: string;
+  daysSinceRead: number | null; // null = never read
+}
+
+export interface TeacherParentComment {
+  logId: string;
+  studentId: string;
+  studentName: string;
+  preview: string;
+  at: Date;
+}
+
+export interface TeacherDashboardWidgets {
+  topReaders: TeacherTopReader[];
+  nudges: TeacherNudge[];
+  parentComments: TeacherParentComment[];
+}
+
+/**
+ * The "key widgets" for the teacher dashboard, scoped to the teacher's classes:
+ * top readers this week, students needing attention (no read in 3+ days), and
+ * unread parent comments. Reuses the same single this-week-logs scan the rest of
+ * the dashboard uses (no new index).
+ */
+export async function getTeacherDashboardWidgets(
+  schoolId: string,
+  userId: string
+): Promise<TeacherDashboardWidgets> {
+  const classesSnap = await adminDb
+    .collection('schools').doc(schoolId).collection('classes')
+    .where('teacherIds', 'array-contains', userId)
+    .where('isActive', '==', true)
+    .get();
+
+  const classIds = classesSnap.docs.map((d) => d.id);
+  const studentIds = [...new Set(classesSnap.docs.flatMap((d) => (d.data().studentIds ?? []) as string[]))];
+  if (classIds.length === 0) return { topReaders: [], nudges: [], parentComments: [] };
+
+  // Student names + last reading date (for top readers labels + nudges).
+  const nameById = new Map<string, string>();
+  const lastReadById = new Map<string, Date | null>();
+  for (let i = 0; i < studentIds.length; i += 30) {
+    const chunk = studentIds.slice(i, i + 30);
+    try {
+      const snap = await adminDb
+        .collection('schools').doc(schoolId).collection('students')
+        .where('__name__', 'in', chunk)
+        .get();
+      for (const doc of snap.docs) {
+        const s = doc.data();
+        nameById.set(doc.id, `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim());
+        lastReadById.set(doc.id, s.stats?.lastReadingDate?.toDate?.() ?? null);
+      }
+    } catch { /* ignore */ }
+  }
+
+  const startOfWeek = new Date();
+  const dow = startOfWeek.getDay();
+  startOfWeek.setDate(startOfWeek.getDate() + (dow === 0 ? -6 : 1 - dow));
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  const minutesByStudent = new Map<string, number>();
+  const parentComments: TeacherParentComment[] = [];
+  try {
+    const logsSnap = await adminDb
+      .collection('schools').doc(schoolId).collection('readingLogs')
+      .where('date', '>=', startOfWeek)
+      .get();
+    for (const doc of logsSnap.docs) {
+      const d = doc.data();
+      if (!classIds.includes(d.classId)) continue;
+      const sid: string = d.studentId ?? '';
+      if (!sid) continue;
+      minutesByStudent.set(sid, (minutesByStudent.get(sid) ?? 0) + (d.minutesRead ?? 0));
+
+      const lastAt: Date | null = d.lastCommentAt?.toDate?.() ?? null;
+      if (lastAt && d.lastCommentByRole === 'parent') {
+        const viewed: Date | null = d.commentsViewedAt?.[userId]?.toDate?.() ?? null;
+        if (!viewed || viewed < lastAt) {
+          parentComments.push({
+            logId: doc.id,
+            studentId: sid,
+            studentName: nameById.get(sid) ?? 'Student',
+            preview: d.lastCommentPreview ?? '',
+            at: lastAt,
+          });
+        }
+      }
+    }
+  } catch { /* ignore */ }
+
+  const topReaders = [...minutesByStudent.entries()]
+    .filter(([, m]) => m > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([sid, m]) => ({ studentId: sid, name: nameById.get(sid) ?? 'Student', minutes: m }));
+
+  const now = Date.now();
+  const nudges = studentIds
+    .map((sid) => {
+      const last = lastReadById.get(sid) ?? null;
+      const daysSinceRead = last ? Math.floor((now - last.getTime()) / 86_400_000) : null;
+      return { studentId: sid, name: nameById.get(sid) ?? 'Student', daysSinceRead };
+    })
+    .filter((n) => n.daysSinceRead === null || n.daysSinceRead >= 3)
+    .sort((a, b) => (b.daysSinceRead ?? 99_999) - (a.daysSinceRead ?? 99_999))
+    .slice(0, 5);
+
+  parentComments.sort((a, b) => b.at.getTime() - a.at.getTime());
+
+  return { topReaders, nudges, parentComments: parentComments.slice(0, 5) };
+}
