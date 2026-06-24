@@ -513,7 +513,8 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                     children: [
                       // Classroom kiosk: students self-scan on a shared iPad.
                       // An additional path to the same weekly allocations — the
-                      // teacher Scan flow below is unchanged.
+                      // teacher Scan flow below is unchanged. White FAB needs an
+                      // explicit green label colour (LumiType.button is white).
                       FloatingActionButton.extended(
                         heroTag: 'kioskFab',
                         onPressed: () => _openKiosk(selectedClass),
@@ -521,7 +522,10 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                         foregroundColor: LumiTokens.green,
                         elevation: 2,
                         icon: const Icon(Icons.tablet_mac_rounded),
-                        label: Text('Scan-in', style: LumiType.button),
+                        label: Text(
+                          'Class scan-in',
+                          style: LumiType.button.copyWith(color: LumiTokens.green),
+                        ),
                       ),
                       const SizedBox(height: 12),
                       FloatingActionButton.extended(
