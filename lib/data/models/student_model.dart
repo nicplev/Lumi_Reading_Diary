@@ -22,6 +22,14 @@ class StudentModel {
   final Map<String, dynamic>? additionalInfo;
   final String? enrollmentStatus;
   final String? parentEmail;
+
+  /// Materialised, fail-closed access verdict for the current academic year.
+  /// Written exclusively server-side (renewal callable, subscription trigger,
+  /// rollover cron, link redemption). Clients and security rules read it but
+  /// never write it. Null on legacy documents predating the access model —
+  /// treated as "no access" (fail-closed) by [hasActiveAccess].
+  final StudentAccess? access;
+
   final List<ReadingLevelHistory> levelHistory;
   final StudentStats? stats;
 
@@ -57,6 +65,7 @@ class StudentModel {
     this.additionalInfo,
     this.enrollmentStatus,
     this.parentEmail,
+    this.access,
     this.levelHistory = const [],
     this.stats,
     this.earnedAchievementIds = const [],
@@ -65,6 +74,10 @@ class StudentModel {
 
   bool get isEnrolled =>
       enrollmentStatus == 'book_pack' || enrollmentStatus == 'direct_purchase';
+
+  /// Whether the student currently has live, unexpired access. Fail-closed:
+  /// a null [access] (legacy doc) or a non-active/expired status returns false.
+  bool get hasActiveAccess => access?.isActive ?? false;
 
   String get fullName => '$firstName $lastName';
 
@@ -103,6 +116,10 @@ class StudentModel {
       parentEmail: data['parentEmail'] ??
           (data['additionalInfo']
               as Map<String, dynamic>?)?['pendingParentEmail'],
+      access: data['access'] != null
+          ? StudentAccess.fromMap(
+              Map<String, dynamic>.from(data['access'] as Map))
+          : null,
       levelHistory: (data['levelHistory'] as List<dynamic>?)
               ?.map((item) => ReadingLevelHistory.fromMap(item))
               .toList() ??
@@ -148,6 +165,9 @@ class StudentModel {
       'additionalInfo': additionalInfo,
       'enrollmentStatus': enrollmentStatus,
       'parentEmail': parentEmail,
+      // Included so a full-document write round-trips the map; the server
+      // (renewal/subscription/rollover functions) is the authoritative writer.
+      if (access != null) 'access': access!.toMap(),
       'levelHistory': levelHistory.map((e) => e.toMap()).toList(),
       'stats': stats?.toMap(),
       // Included so a full-document write round-trips the map; the
@@ -179,6 +199,7 @@ class StudentModel {
     Map<String, dynamic>? additionalInfo,
     String? enrollmentStatus,
     String? parentEmail,
+    StudentAccess? access,
     List<ReadingLevelHistory>? levelHistory,
     StudentStats? stats,
     List<String>? earnedAchievementIds,
@@ -209,6 +230,7 @@ class StudentModel {
       additionalInfo: additionalInfo ?? this.additionalInfo,
       enrollmentStatus: enrollmentStatus ?? this.enrollmentStatus,
       parentEmail: parentEmail ?? this.parentEmail,
+      access: access ?? this.access,
       levelHistory: levelHistory ?? this.levelHistory,
       stats: stats ?? this.stats,
       earnedAchievementIds: earnedAchievementIds ?? this.earnedAchievementIds,
@@ -244,6 +266,77 @@ class GuardianProfile {
 
   /// Display string preferring the relationship label.
   String get display => relationshipLabel ?? name;
+}
+
+/// Materialised, fail-closed access verdict for a student. Mirrors the
+/// `student.access` map written server-side. See the access model in
+/// the licensing/lifecycle plan. The single source of truth for whether a
+/// parent may log reading or view content for this child.
+class StudentAccess {
+  /// Live access. Anything other than `active` (or a passed [expiresAt])
+  /// means the child is gated.
+  static const String statusActive = 'active';
+  static const String statusExpired = 'expired';
+  static const String statusSuspended = 'suspended';
+
+  final String status;
+
+  /// Calendar year the AU school-year STARTS (e.g. 2026 for the 2026 year).
+  final int academicYear;
+
+  /// Absolute hard boundary (~31 Jan of the following year). Access lapses at
+  /// this instant even if no server job runs — the date is the backstop.
+  final DateTime? expiresAt;
+
+  /// Where the grant came from: school_renewal | book_pack_assumed |
+  /// parent_direct | comp.
+  final String? source;
+  final DateTime? grantedAt;
+  final String? grantedBy;
+
+  StudentAccess({
+    required this.status,
+    required this.academicYear,
+    this.expiresAt,
+    this.source,
+    this.grantedAt,
+    this.grantedBy,
+  });
+
+  /// Fail-closed: live only when status is active AND the hard expiry has not
+  /// passed. A missing [expiresAt] is treated as expired.
+  bool get isActive {
+    if (status != statusActive) return false;
+    final exp = expiresAt;
+    if (exp == null) return false;
+    return DateTime.now().isBefore(exp);
+  }
+
+  factory StudentAccess.fromMap(Map<String, dynamic> map) {
+    return StudentAccess(
+      status: map['status'] as String? ?? statusExpired,
+      academicYear: (map['academicYear'] as num?)?.toInt() ?? 0,
+      expiresAt: map['expiresAt'] != null
+          ? (map['expiresAt'] as Timestamp).toDate()
+          : null,
+      source: map['source'] as String?,
+      grantedAt: map['grantedAt'] != null
+          ? (map['grantedAt'] as Timestamp).toDate()
+          : null,
+      grantedBy: map['grantedBy'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'status': status,
+      'academicYear': academicYear,
+      if (expiresAt != null) 'expiresAt': Timestamp.fromDate(expiresAt!),
+      if (source != null) 'source': source,
+      if (grantedAt != null) 'grantedAt': Timestamp.fromDate(grantedAt!),
+      if (grantedBy != null) 'grantedBy': grantedBy,
+    };
+  }
 }
 
 class ReadingLevelHistory {

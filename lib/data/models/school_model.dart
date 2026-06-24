@@ -38,6 +38,12 @@ class SchoolModel {
   final String? subscriptionPlan;
   final DateTime? subscriptionExpiry;
 
+  /// Materialised whole-school access verdict, written server-side by the
+  /// subscription trigger / rollover cron / offboard wizard. Null on legacy
+  /// documents — treated as active for back-compat reads (whole-school
+  /// suspension is opt-in, set explicitly when a school stops paying).
+  final SchoolAccess? access;
+
   SchoolModel({
     required this.id,
     required this.name,
@@ -61,7 +67,13 @@ class SchoolModel {
     this.teacherCount = 0,
     this.subscriptionPlan,
     this.subscriptionExpiry,
+    this.access,
   });
+
+  /// Fail-closed for staff/family gating: a school is suspended only when an
+  /// explicit `access.status == 'suspended'` is present. Null access (legacy)
+  /// reads as active.
+  bool get isSuspended => access?.status == SchoolAccess.statusSuspended;
 
   factory SchoolModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -101,6 +113,9 @@ class SchoolModel {
       subscriptionExpiry: data['subscriptionExpiry'] != null
           ? (data['subscriptionExpiry'] as Timestamp).toDate()
           : null,
+      access: data['access'] != null
+          ? SchoolAccess.fromMap(Map<String, dynamic>.from(data['access'] as Map))
+          : null,
     );
   }
 
@@ -131,6 +146,8 @@ class SchoolModel {
       'subscriptionExpiry': subscriptionExpiry != null
           ? Timestamp.fromDate(subscriptionExpiry!)
           : null,
+      // Authoritative writer is server-side; included for full-doc round-trip.
+      if (access != null) 'access': access!.toMap(),
     };
   }
 
@@ -174,5 +191,45 @@ class SchoolModel {
       case ReadingLevelSchema.custom:
         return customLevels ?? [];
     }
+  }
+}
+
+/// Materialised whole-school access verdict. Mirrors the `school.access` map
+/// written server-side by the subscription trigger, rollover cron, and
+/// off-board wizard. Drives whole-school suspension for staff and families.
+class SchoolAccess {
+  static const String statusActive = 'active';
+  static const String statusSuspended = 'suspended';
+
+  final String status;
+  final int academicYear;
+  final String? reason;
+  final DateTime? updatedAt;
+
+  SchoolAccess({
+    required this.status,
+    required this.academicYear,
+    this.reason,
+    this.updatedAt,
+  });
+
+  factory SchoolAccess.fromMap(Map<String, dynamic> map) {
+    return SchoolAccess(
+      status: map['status'] as String? ?? statusActive,
+      academicYear: (map['academicYear'] as num?)?.toInt() ?? 0,
+      reason: map['reason'] as String?,
+      updatedAt: map['updatedAt'] != null
+          ? (map['updatedAt'] as Timestamp).toDate()
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'status': status,
+      'academicYear': academicYear,
+      if (reason != null) 'reason': reason,
+      if (updatedAt != null) 'updatedAt': Timestamp.fromDate(updatedAt!),
+    };
   }
 }

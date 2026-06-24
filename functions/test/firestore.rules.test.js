@@ -1898,3 +1898,99 @@ test('platformConfig: clients cannot create, update, or delete flags', async () 
   await assertFails(ref.delete());
   await assertFails(db.collection('platformConfig').doc('someOtherFlag').set({ enabled: false }));
 });
+
+// ── Access entitlement: reading-log create is gated on student.access ───────
+// The parent logging path is the single enforcement point. A parent linked to
+// the student may create a log ONLY when that student's materialised `access`
+// is live (status == 'active' AND expiresAt in the future). Lapsed (expired),
+// suspended (unpaid/off-boarded school cascade), and legacy (no access map)
+// students are all fail-closed.
+
+const FUTURE = new Date(Date.now() + 365 * 86400000);
+const PAST = new Date(Date.now() - 86400000);
+
+async function seedSchoolWithAccessStates() {
+  await seedData(async (db) => {
+    await db.collection('schools').doc('school_1').set({
+      name: 'Lumi School One',
+      createdBy: 'admin_1',
+    });
+    await db.collection('schools').doc('school_1').collection('parents').doc('parent_1').set({
+      role: 'parent',
+      schoolId: 'school_1',
+      // Linked to every student so the linkedChildren gate always passes and
+      // the access check is the only thing that differentiates.
+      linkedChildren: [
+        'student_active',
+        'student_expired',
+        'student_suspended',
+        'student_legacy',
+      ],
+    });
+    await db.collection('schools').doc('school_1').collection('students').doc('student_active').set({
+      schoolId: 'school_1', classId: 'class_1', firstName: 'Ada', lastName: 'A',
+      parentIds: ['parent_1'],
+      access: { status: 'active', academicYear: 2026, expiresAt: FUTURE, source: 'book_pack_assumed' },
+    });
+    await db.collection('schools').doc('school_1').collection('students').doc('student_expired').set({
+      schoolId: 'school_1', classId: 'class_1', firstName: 'Bea', lastName: 'B',
+      parentIds: ['parent_1'],
+      access: { status: 'active', academicYear: 2025, expiresAt: PAST, source: 'book_pack_assumed' },
+    });
+    await db.collection('schools').doc('school_1').collection('students').doc('student_suspended').set({
+      schoolId: 'school_1', classId: 'class_1', firstName: 'Cy', lastName: 'C',
+      parentIds: ['parent_1'],
+      access: { status: 'suspended', academicYear: 2026, expiresAt: FUTURE, source: 'book_pack_assumed' },
+    });
+    await db.collection('schools').doc('school_1').collection('students').doc('student_legacy').set({
+      schoolId: 'school_1', classId: 'class_1', firstName: 'Di', lastName: 'D',
+      parentIds: ['parent_1'],
+      // No access map — predates the access model.
+    });
+  });
+}
+
+function logFor(db, studentId) {
+  return db.collection('schools').doc('school_1').collection('readingLogs').doc(`log_${studentId}`).set({
+    schoolId: 'school_1',
+    studentId,
+    parentId: 'parent_1',
+    minutesRead: 20,
+    status: 'completed',
+    bookTitles: ['Reading'],
+  });
+}
+
+test('access: parent CAN create a log for a student with live access', async () => {
+  await seedSchoolWithAccessStates();
+  const db = authDb('parent_1');
+  await assertSucceeds(logFor(db, 'student_active'));
+});
+
+test('access: parent CANNOT create a log for an expired student', async () => {
+  await seedSchoolWithAccessStates();
+  const db = authDb('parent_1');
+  await assertFails(logFor(db, 'student_expired'));
+});
+
+test('access: parent CANNOT create a log for a suspended student', async () => {
+  await seedSchoolWithAccessStates();
+  const db = authDb('parent_1');
+  await assertFails(logFor(db, 'student_suspended'));
+});
+
+test('access: parent CANNOT create a log for a legacy student with no access map', async () => {
+  await seedSchoolWithAccessStates();
+  const db = authDb('parent_1');
+  await assertFails(logFor(db, 'student_legacy'));
+});
+
+test('access: student reads stay open so the app can render the lapsed screen', async () => {
+  await seedSchoolWithAccessStates();
+  const db = authDb('parent_1');
+  // Even though logging is blocked, the parent can still READ the suspended
+  // child's doc to drive the "access lapsed" UI.
+  await assertSucceeds(
+    db.collection('schools').doc('school_1').collection('students').doc('student_suspended').get(),
+  );
+});

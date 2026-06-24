@@ -28,6 +28,7 @@ import '../../screens/auth/web_not_available_screen.dart';
 import '../../screens/auth/admin_use_web_portal_screen.dart';
 import '../../screens/parent/parent_home_screen.dart';
 import '../../screens/parent/log_reading_screen.dart';
+import '../../screens/parent/access_locked_screen.dart';
 import '../../screens/parent/reading_history_screen.dart';
 import '../../screens/parent/student_goals_screen.dart';
 import '../../screens/parent/achievements_screen.dart';
@@ -325,6 +326,14 @@ class AppRouter {
 
           if (parent == null || student == null) {
             return const LoginScreen();
+          }
+
+          // Fail-closed entitlement gate. All logging entry points route
+          // through here, so one check covers them. The Firestore rules deny
+          // the underlying write regardless; this surfaces a clear reason
+          // (lapsed child vs suspended school) instead of an opaque error.
+          if (!student.hasActiveAccess) {
+            return AccessLockedScreen(student: student);
           }
 
           return LogReadingScreen(

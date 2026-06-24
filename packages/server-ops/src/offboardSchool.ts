@@ -108,7 +108,21 @@ export async function offboardSchoolStep(
     if (schoolDoc.exists && schoolDoc.data()?.isActive === false) {
       throw new ServerOpsValidationError("School is already deactivated");
     }
-    await schoolRef.update({ isActive: false });
+    // Set the materialised `access` map alongside the legacy `isActive` flag so
+    // off-boarding actually cuts access: the security rules and app gate on
+    // `access`, not `isActive`. academicYear is best-effort from config.
+    const cfg = await db.collection("config").doc("academicYear").get();
+    const academicYear =
+      (cfg.data()?.currentAcademicYear as number | undefined) ?? 0;
+    await schoolRef.update({
+      isActive: false,
+      access: {
+        status: "suspended",
+        academicYear,
+        reason: "offboarded",
+        updatedAt: new Date(),
+      },
+    });
     affected = 1;
   } else {
     const snapshot = await db
@@ -116,12 +130,20 @@ export async function offboardSchoolStep(
       .collection(step).get();
 
     if (!snapshot.empty) {
+      // The students step additionally zeroes the materialised access verdict
+      // so a parent's reading-log create is denied immediately (the rules gate
+      // on access.status / access.expiresAt, not isActive).
+      const deactivate =
+        step === "students"
+          ? { isActive: false, "access.status": "suspended" }
+          : { isActive: false };
+
       const batches: WriteBatch[] = [];
       let currentBatch = db.batch();
       let operationCount = 0;
 
       for (const doc of snapshot.docs) {
-        currentBatch.update(doc.ref, { isActive: false });
+        currentBatch.update(doc.ref, deactivate);
         operationCount += 1;
         if (operationCount % FIRESTORE_BATCH_LIMIT === 0) {
           batches.push(currentBatch);

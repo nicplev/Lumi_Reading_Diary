@@ -74,6 +74,13 @@ export {
   unlinkParentFromStudent,
 } from "./parent_linking";
 
+// Access/licensing lifecycle. T1 reacts to subscription changes to recompute
+// school.access + cascade student access. T2 (renewStudents callable) + T4
+// (annualRollover cron) live in functions/src/renewals.ts. See
+// functions/src/access.ts for the shared AU boundary math.
+export {onSchoolSubscriptionWrite} from "./subscriptions";
+export {renewStudents, annualRollover} from "./renewals";
+
 // Daily cleanup for comprehension audio + per-row teacher/school-admin
 // trash button. The cron is driven by /platformConfig/comprehensionRetention
 // written from the super-admin portal. deleteComprehensionAudio is the only

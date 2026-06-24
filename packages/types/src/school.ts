@@ -32,4 +32,20 @@ export interface School {
   parentCount: number;
   subscriptionPlan?: string;
   subscriptionExpiry?: FirestoreTimestamp;
+  /** Materialised whole-school access verdict; absent on legacy docs (= active). */
+  access?: SchoolAccess;
+}
+
+export type SchoolAccessStatus = "active" | "suspended";
+
+/**
+ * Materialised whole-school access verdict, written server-side by the
+ * subscription trigger / rollover cron / off-board wizard. Drives whole-school
+ * suspension for staff and families.
+ */
+export interface SchoolAccess {
+  status: SchoolAccessStatus;
+  academicYear: number;
+  reason?: string;
+  updatedAt?: FirestoreTimestamp;
 }

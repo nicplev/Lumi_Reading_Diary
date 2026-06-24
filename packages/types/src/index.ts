@@ -1,14 +1,36 @@
 export type { FirestoreTimestamp } from "./common";
 
 export { ReadingLevelSchema } from "./school";
-export type { School } from "./school";
+export type { School, SchoolAccess, SchoolAccessStatus } from "./school";
+
+export {
+  ACTIVE_SUBSCRIPTION_STATUSES,
+  isActiveSubscriptionStatus,
+  SUBSCRIPTION_TIERS,
+  tierForStudentCount,
+} from "./school-subscription";
+export type {
+  SchoolSubscription,
+  SubscriptionStatus,
+  SubscriptionTier,
+  SubscriptionTierBand,
+  AcademicYearConfig,
+} from "./school-subscription";
 
 export { UserRole } from "./school-user";
 export type { SchoolUser } from "./school-user";
 
 export type { Parent } from "./parent";
 
-export type { Student, StudentStats, ReadingLevelHistory } from "./student";
+export type {
+  Student,
+  StudentStats,
+  ReadingLevelHistory,
+  EnrollmentStatus,
+  StudentAccess,
+  StudentAccessStatus,
+  StudentAccessSource,
+} from "./student";
 
 export type { Class } from "./class";
 
