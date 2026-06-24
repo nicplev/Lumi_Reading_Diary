@@ -90,3 +90,18 @@ export async function isSchoolSubActive(
     .get();
   return sub.exists && isActiveSubscriptionStatus(sub.data()?.status as string);
 }
+
+/**
+ * The annual renewal window for carrying students into `targetYear`: opens 1
+ * October of the prior year (start of Term 4) and closes end of February of the
+ * target year, in the school timezone. Outside it the portal shows a soft "it's
+ * early" warning but still allows renewal — off-cycle exceptions are permitted.
+ */
+export function isRenewalWindowOpen(targetYear: number, now: Date = new Date()): boolean {
+  const opensNaive = Date.UTC(targetYear - 1, 9, 1, 0, 0, 0); // 1 Oct, prior year
+  const closesNaive = Date.UTC(targetYear, 2, 1, 0, 0, 0); // 1 Mar, target year
+  const opensAt = opensNaive - timezoneOffsetMs(new Date(opensNaive));
+  const closesAt = closesNaive - timezoneOffsetMs(new Date(closesNaive));
+  const t = now.getTime();
+  return t >= opensAt && t < closesAt;
+}
