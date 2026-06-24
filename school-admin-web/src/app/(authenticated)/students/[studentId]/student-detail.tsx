@@ -15,6 +15,8 @@ import { ReadingLevelPicker } from '@/components/features/reading-level-picker';
 import { useStudent, useUpdateStudentLevel, useReadingLevelHistory } from '@/lib/hooks/use-students';
 import { useStudentAllocations } from '@/lib/hooks/use-allocations';
 import { BookCard } from '@/components/lumi/book-card';
+import { ReadingHistorySection } from './reading-history-section';
+import { LogReadingModal } from './log-reading-modal';
 import Link from 'next/link';
 import type { ReadingLevelOption } from '@/lib/types';
 
@@ -43,6 +45,7 @@ export function StudentDetail({ studentId, classId, levelOptions, className }: S
   const [showLevelPicker, setShowLevelPicker] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [expandedAllocation, setExpandedAllocation] = useState<string | null>(null);
+  const [showLogModal, setShowLogModal] = useState(false);
 
   if (isLoading || !student) {
     return (
@@ -101,6 +104,9 @@ export function StudentDetail({ studentId, classId, levelOptions, className }: S
             />
           </div>
         </div>
+        <Button variant="outline" size="sm" onClick={() => setShowLogModal(true)}>
+          Log Reading
+        </Button>
       </div>
 
       {/* Stats Grid */}
@@ -307,6 +313,8 @@ export function StudentDetail({ studentId, classId, levelOptions, className }: S
         </Card>
       </div>
 
+      <ReadingHistorySection studentId={studentId} />
+
       <ReadingLevelPicker
         open={showLevelPicker}
         onClose={() => setShowLevelPicker(false)}
@@ -314,6 +322,15 @@ export function StudentDetail({ studentId, classId, levelOptions, className }: S
         levelOptions={levelOptions}
         onSelect={handleLevelChange}
         loading={updateLevel.isPending}
+      />
+
+      <LogReadingModal
+        open={showLogModal}
+        onClose={() => setShowLogModal(false)}
+        studentId={studentId}
+        classId={classId}
+        studentName={fullName}
+        onLogged={() => setShowLogModal(false)}
       />
     </div>
   );
