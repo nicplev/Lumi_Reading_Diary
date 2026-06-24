@@ -190,6 +190,10 @@ class IsbnAssignmentService {
   }
 
   /// Assign already-resolved books to a student's weekly allocation.
+  ///
+  /// [renewedIsbns] — newly-added items whose ISBN is in this set are tagged
+  /// `metadata.renewed = true` so the UI can show a "Renewed" badge. Defaults
+  /// to empty, so existing callers are unaffected.
   Future<IsbnAssignmentResult> assignResolvedBooks({
     required String schoolId,
     required String classId,
@@ -199,6 +203,7 @@ class IsbnAssignmentService {
     int targetMinutes = 20,
     String? sessionId,
     DateTime? targetDate,
+    Set<String> renewedIsbns = const <String>{},
   }) async {
     final referenceDate = targetDate ?? DateTime.now();
     final weekStart = startOfWeek(referenceDate);
@@ -217,6 +222,7 @@ class IsbnAssignmentService {
       targetMinutes: targetMinutes,
       books: books,
       sessionId: sessionId,
+      renewedIsbns: renewedIsbns,
     );
 
     return IsbnAssignmentResult(
@@ -296,6 +302,7 @@ class IsbnAssignmentService {
     required int targetMinutes,
     required List<ScannedIsbnBook> books,
     String? sessionId,
+    Set<String> renewedIsbns = const <String>{},
   }) async {
     final ref = _firestore
         .collection('schools')
@@ -374,6 +381,7 @@ class IsbnAssignmentService {
             metadata: {
               'source': 'isbn_scan',
               'resolvedFromCatalog': book.resolvedFromCatalog,
+              if (renewedIsbns.contains(isbn)) 'renewed': true,
             },
           ),
         );
@@ -619,6 +627,10 @@ class IsbnAssignmentService {
       weekEnd: weekEnd,
       targetMinutes: targetMinutes,
       books: books,
+      // A carry-over to the next cycle is a renewal — tag the items so the
+      // "Renewed" badge shows for teacher-initiated renewals too.
+      renewedIsbns:
+          books.map((b) => b.isbn).where((i) => i.isNotEmpty).toSet(),
     );
 
     return ReassignmentResult(

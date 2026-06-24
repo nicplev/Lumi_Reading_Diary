@@ -725,18 +725,20 @@ class _TodayCardState extends State<_TodayCard> {
                     .where((a) => a.type == AllocationType.byLevel)
                     .firstOrNull;
                 final seen = <String>{};
-                final allTitles = activeAllocations
+                final allBooks = activeAllocations
                     .where((a) => a.type == AllocationType.byTitle)
                     .expand(
-                      (a) => a
-                          .effectiveAssignmentItemsForStudent(student.id)
-                          .map((item) => item.title),
+                      (a) => a.effectiveAssignmentItemsForStudent(student.id),
                     )
-                    .where((t) => t.trim().isNotEmpty)
-                    .where((t) => seen.add(t.trim().toLowerCase()))
+                    .where((item) => item.title.trim().isNotEmpty)
+                    .where((item) => seen.add(item.title.trim().toLowerCase()))
+                    .map((item) => (
+                          title: item.title,
+                          renewed: item.metadata?['renewed'] == true,
+                        ))
                     .toList();
 
-                if (levelAllocation == null && allTitles.isEmpty) {
+                if (levelAllocation == null && allBooks.isEmpty) {
                   final hasFreeChoice = activeAllocations
                       .any((a) => a.type == AllocationType.freeChoice);
                   if (!hasFreeChoice) {
@@ -770,16 +772,16 @@ class _TodayCardState extends State<_TodayCard> {
                           statusText: 'Assigned',
                         ),
                       ),
-                    ...allTitles.map((title) {
+                    ...allBooks.map((book) {
                       final displayTitle =
-                          IsbnAssignmentService.sanitizeDisplayTitle(title);
+                          IsbnAssignmentService.sanitizeDisplayTitle(book.title);
                       return Padding(
                         padding: EdgeInsets.only(bottom: LumiSpacing.xs),
                         child: LumiBookCard(
                           title: displayTitle,
                           bookType: BookType.library,
-                          statusText: 'Assigned',
-                          coverUrl: coverUrlResolver?.call(title),
+                          statusText: book.renewed ? 'Renewed' : 'Assigned',
+                          coverUrl: coverUrlResolver?.call(book.title),
                         ),
                       );
                     }),

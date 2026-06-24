@@ -158,7 +158,7 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
         _showBanner('"${book.title}" is already on your list.', LumiTokens.blue);
         return;
       case ScanClassification.renew:
-        await _persist(book);
+        await _persist(book, renewed: true);
         _addEntry(book, _KioskOutcome.renewed);
         HapticFeedback.mediumImpact();
         _showBanner('Renewed "${book.title}" for another week! 🎉',
@@ -184,7 +184,7 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
     }
   }
 
-  Future<void> _persist(ScannedIsbnBook book) async {
+  Future<void> _persist(ScannedIsbnBook book, {bool renewed = false}) async {
     await _service.assignResolvedBooks(
       schoolId: _schoolId,
       classId: widget.classModel.id,
@@ -193,6 +193,7 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
       books: [book],
       targetMinutes: widget.classModel.defaultMinutesTarget,
       sessionId: _sessionId,
+      renewedIsbns: renewed ? {book.isbn} : const <String>{},
     );
   }
 
