@@ -507,13 +507,34 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                 Positioned(
                   right: 16,
                   bottom: MediaQuery.viewPaddingOf(context).bottom + 84,
-                  child: FloatingActionButton.extended(
-                    onPressed: () => _showStudentScannerPicker(selectedClass),
-                    backgroundColor: LumiTokens.green,
-                    foregroundColor: LumiTokens.paper,
-                    elevation: 4,
-                    icon: const Icon(Icons.qr_code_scanner_rounded),
-                    label: Text('Scan', style: LumiType.button),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Classroom kiosk: students self-scan on a shared iPad.
+                      // An additional path to the same weekly allocations — the
+                      // teacher Scan flow below is unchanged.
+                      FloatingActionButton.extended(
+                        heroTag: 'kioskFab',
+                        onPressed: () => _openKiosk(selectedClass),
+                        backgroundColor: LumiTokens.paper,
+                        foregroundColor: LumiTokens.green,
+                        elevation: 2,
+                        icon: const Icon(Icons.tablet_mac_rounded),
+                        label: Text('Scan-in', style: LumiType.button),
+                      ),
+                      const SizedBox(height: 12),
+                      FloatingActionButton.extended(
+                        heroTag: 'scanFab',
+                        onPressed: () =>
+                            _showStudentScannerPicker(selectedClass),
+                        backgroundColor: LumiTokens.green,
+                        foregroundColor: LumiTokens.paper,
+                        elevation: 4,
+                        icon: const Icon(Icons.qr_code_scanner_rounded),
+                        label: Text('Scan', style: LumiType.button),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -1298,6 +1319,16 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  void _openKiosk(ClassModel classModel) {
+    context.push(
+      '/teacher/kiosk',
+      extra: {
+        'teacher': widget.teacher,
+        'classModel': classModel,
+      },
     );
   }
 
