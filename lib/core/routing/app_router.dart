@@ -51,6 +51,7 @@ import '../../screens/teacher/student_detail_screen.dart';
 import '../../screens/teacher/teacher_student_reading_history_screen.dart';
 import '../../screens/teacher/isbn_scanner_screen.dart';
 import '../../screens/teacher/cover_scanner_screen.dart';
+import '../../screens/teacher/kiosk/classroom_kiosk_screen.dart';
 import '../../screens/teacher/teacher_level_management_screen.dart';
 import '../../screens/shared/staff_notifications_screen.dart';
 import '../../screens/onboarding/school_registration_wizard.dart';
@@ -696,6 +697,29 @@ class AppRouter {
               studentQueue: studentQueue,
               classModel: classModel,
               initialTargetDate: initialTargetDate,
+            ),
+          );
+        },
+      ),
+
+      GoRoute(
+        path: '/teacher/kiosk',
+        name: 'teacher-kiosk',
+        builder: (context, state) {
+          final params = state.extra is Map<String, dynamic>
+              ? state.extra as Map<String, dynamic>
+              : null;
+          final classModel = params?['classModel'] as ClassModel?;
+          if (classModel == null) {
+            return const _ResourceNotFoundScaffold(
+              message: 'Pick a class first',
+            );
+          }
+          return _userScopedRoute(
+            extra: state.extra,
+            child: (teacher) => ClassroomKioskScreen(
+              teacher: teacher,
+              classModel: classModel,
             ),
           );
         },

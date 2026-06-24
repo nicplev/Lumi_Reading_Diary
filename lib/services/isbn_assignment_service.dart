@@ -704,6 +704,153 @@ class IsbnAssignmentService {
       return false;
     }
   }
+
+  /// Classifies a scanned book for the in-classroom kiosk flow, deciding how to
+  /// react before it is added to the student's weekly list. Read-only — it does
+  /// not write anything; callers still persist via [assignResolvedBooks].
+  ///
+  /// Order of checks (first match wins):
+  ///  1. [ScanClassification.renew] — the book is on the student's *immediately
+  ///     prior* week allocation, so a rescan continues it into this week.
+  ///  2. [ScanClassification.alreadyThisWeek] — already on this week's list.
+  ///  3. [ScanClassification.alreadyRead] — a [bookReadingHistory] entry exists
+  ///     from an earlier week (re-reading is allowed; this just drives a notice).
+  ///  4. [ScanClassification.newBook] — never seen before.
+  ///
+  /// Every lookup is wrapped so a failure degrades to [ScanClassification.newBook]
+  /// and never blocks scanning.
+  Future<ScanClassificationResult> classifyScan({
+    required String schoolId,
+    required String studentId,
+    required String isbn,
+    String? bookId,
+    DateTime? referenceDate,
+  }) async {
+    final now = referenceDate ?? DateTime.now();
+    final weekStart = startOfWeek(now);
+    final prevWeekStart = weekStart.subtract(const Duration(days: 7));
+
+    final allocations = _firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('allocations');
+
+    // 1. Renew — present on the immediately-prior week's list.
+    try {
+      final prevId =
+          buildWeeklyAllocationId(studentId: studentId, weekStart: prevWeekStart);
+      final prevSnap = await allocations.doc(prevId).get();
+      if (prevSnap.exists && _allocationHasActiveIsbn(prevSnap.data(), isbn)) {
+        return ScanClassificationResult(
+          classification: ScanClassification.renew,
+          prevAllocationId: prevId,
+        );
+      }
+    } catch (_) {}
+
+    // 2. Already on this week's list.
+    try {
+      final curId =
+          buildWeeklyAllocationId(studentId: studentId, weekStart: weekStart);
+      final curSnap = await allocations.doc(curId).get();
+      if (curSnap.exists && _allocationHasActiveIsbn(curSnap.data(), isbn)) {
+        return const ScanClassificationResult(
+          classification: ScanClassification.alreadyThisWeek,
+        );
+      }
+    } catch (_) {}
+
+    // 3. Already read in an earlier week.
+    try {
+      final lastReadAt = await _findReadingHistoryDate(
+        studentId: studentId,
+        bookId: bookId,
+        isbn: isbn,
+      );
+      if (lastReadAt != null) {
+        return ScanClassificationResult(
+          classification: ScanClassification.alreadyRead,
+          lastReadAt: lastReadAt,
+        );
+      }
+    } catch (_) {}
+
+    return const ScanClassificationResult(
+      classification: ScanClassification.newBook,
+    );
+  }
+
+  /// True if [data] (a raw allocation document) has a non-deleted assignment
+  /// item whose resolved ISBN matches [isbn].
+  bool _allocationHasActiveIsbn(Map<String, dynamic>? data, String isbn) {
+    if (data == null) return false;
+    final items = AllocationModel.parseAssignmentItems(
+      data['assignmentItems'],
+      legacyBookTitles:
+          (data['bookTitles'] as List?)?.whereType<String>().toList() ??
+              const [],
+      legacyBookIds:
+          (data['bookIds'] as List?)?.whereType<String>().toList() ?? const [],
+    );
+    return items.any(
+      (item) => !item.isDeleted && item.resolvedIsbn?.trim() == isbn,
+    );
+  }
+
+  /// Returns the timestamp of a matching [bookReadingHistory] entry (preferring
+  /// `completedAt`, falling back to `startedAt`), or null if none exists.
+  /// A non-null result with no usable timestamp returns the Unix epoch so the
+  /// caller can still treat the book as previously read.
+  Future<DateTime?> _findReadingHistoryDate({
+    required String studentId,
+    String? bookId,
+    String? isbn,
+  }) async {
+    final variants = <String>{};
+    if (bookId != null && bookId.isNotEmpty) variants.add(bookId);
+    if (isbn != null && isbn.isNotEmpty) {
+      variants.add(isbn);
+      variants.add('isbn_$isbn');
+    }
+    if (variants.isEmpty) return null;
+
+    for (final v in variants) {
+      final snap = await _firestore
+          .collection('bookReadingHistory')
+          .where('studentId', isEqualTo: studentId)
+          .where('bookId', isEqualTo: v)
+          .limit(1)
+          .get();
+      if (snap.docs.isNotEmpty) {
+        final d = snap.docs.first.data();
+        final ts = (d['completedAt'] ?? d['startedAt']) as Timestamp?;
+        return ts?.toDate() ?? DateTime.fromMillisecondsSinceEpoch(0);
+      }
+    }
+    return null;
+  }
+}
+
+/// How a scanned book relates to a student's reading history, used by the
+/// in-classroom kiosk to choose its on-screen response. See
+/// [IsbnAssignmentService.classifyScan].
+enum ScanClassification { renew, alreadyThisWeek, alreadyRead, newBook }
+
+class ScanClassificationResult {
+  const ScanClassificationResult({
+    required this.classification,
+    this.prevAllocationId,
+    this.lastReadAt,
+  });
+
+  final ScanClassification classification;
+
+  /// The prior-week allocation id a renewal was carried from (when [renew]).
+  final String? prevAllocationId;
+
+  /// When the book was last read (when [alreadyRead]); the Unix epoch if a
+  /// history entry exists but carried no usable timestamp.
+  final DateTime? lastReadAt;
 }
 
 class ScannedIsbnBook {
