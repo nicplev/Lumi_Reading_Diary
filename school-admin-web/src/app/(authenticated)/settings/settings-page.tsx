@@ -20,6 +20,8 @@ import { ParentCommentSettingsSection, DEFAULT_PRESETS, type CommentPreviewState
 import { FloatingPhonePreview } from './floating-phone-preview';
 import { ComprehensionRecordingSettingsSection } from './comprehension-recording-settings';
 import { ComprehensionAudioCleanupSection } from './comprehension-audio-cleanup';
+import { RenewalsPage } from '../renewals/renewals-page';
+import type { RenewalRosterEntry } from '@/lib/firestore/renewals';
 
 const LEVEL_SCHEMAS: { value: ReadingLevelSchema; label: string; description: string }[] = [
   { value: 'none', label: 'None', description: 'No reading levels' },
@@ -45,14 +47,37 @@ const SETTINGS_TABS = [
   { id: 'parent-app', label: 'Parent App', icon: <Icon name="smartphone" size={16} /> },
 ];
 
-export function SettingsPage() {
+// Renewals is admin-only and tucked here (rather than the sidebar) because it's
+// a once-a-year tool. Appended to the tab list only for school admins.
+const RENEWALS_TAB = { id: 'renewals', label: 'Renewals', icon: <Icon name="autorenew" size={16} /> };
+const KNOWN_TAB_IDS = ['school', 'academic', 'parent-app', 'renewals'];
+
+interface RenewalsData {
+  currentYear: number;
+  targetYear: number;
+  subActive: boolean;
+  windowOpen: boolean;
+  roster: RenewalRosterEntry[];
+}
+
+interface SettingsPageProps {
+  /** Initial tab from the `?tab=` query param (e.g. /settings?tab=renewals). */
+  initialTab?: string;
+  /** Pre-loaded renewals roster; null for non-admins. */
+  renewals?: RenewalsData | null;
+}
+
+export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   const { data: school, isLoading } = useSchool();
   const updateSchool = useUpdateSchool();
 
   const isAdmin = user?.role === 'schoolAdmin';
-  const [activeTab, setActiveTab] = useState('school');
+  const tabs = isAdmin ? [...SETTINGS_TABS, RENEWALS_TAB] : SETTINGS_TABS;
+  const [activeTab, setActiveTab] = useState(
+    initialTab && KNOWN_TAB_IDS.includes(initialTab) ? initialTab : 'school'
+  );
 
   // School info
   const [name, setName] = useState('');
@@ -280,7 +305,7 @@ export function SettingsPage() {
       />
 
       {/* Tab Navigation */}
-      <Tabs tabs={SETTINGS_TABS} activeTab={activeTab} onChange={setActiveTab} />
+      <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 
       {/* School Tab */}
       {activeTab === 'school' && (
@@ -474,6 +499,24 @@ export function SettingsPage() {
             presets={commentPreview.presets}
           />
         </div>
+      )}
+
+      {/* Renewals Tab (admin-only) */}
+      {activeTab === 'renewals' && isAdmin && (
+        renewals ? (
+          <RenewalsPage
+            currentYear={renewals.currentYear}
+            targetYear={renewals.targetYear}
+            subActive={renewals.subActive}
+            windowOpen={renewals.windowOpen}
+            initialRoster={renewals.roster}
+            embedded
+          />
+        ) : (
+          <Card>
+            <p className="text-sm text-text-secondary">Renewal data is unavailable right now.</p>
+          </Card>
+        )
       )}
     </div>
   );

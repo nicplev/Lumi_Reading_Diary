@@ -13,9 +13,20 @@ interface Props {
   targetYear: number;
   subActive: boolean;
   initialRoster: RenewalRosterEntry[];
+  /** False outside the Oct–Feb window → shows a soft "it's early" warning. */
+  windowOpen?: boolean;
+  /** True when rendered inside the Settings tab → drop the standalone header. */
+  embedded?: boolean;
 }
 
-export function RenewalsPage({ currentYear, targetYear, subActive, initialRoster }: Props) {
+export function RenewalsPage({
+  currentYear,
+  targetYear,
+  subActive,
+  initialRoster,
+  windowOpen = true,
+  embedded = false,
+}: Props) {
   const { toast } = useToast();
   const [roster] = useState(initialRoster);
   const [saving, setSaving] = useState(false);
@@ -74,10 +85,25 @@ export function RenewalsPage({ currentYear, targetYear, subActive, initialRoster
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Renewals"
-        description={`Carry students forward into the ${targetYear} school year`}
-      />
+      {!embedded && (
+        <PageHeader
+          title="Renewals"
+          description={`Carry students forward into the ${targetYear} school year`}
+        />
+      )}
+      {embedded && (
+        <p className="text-sm text-text-secondary">
+          Carry students forward into the {targetYear} school year.
+        </p>
+      )}
+
+      {!windowOpen && (
+        <Card className="border-warning/40 bg-warning/5 p-4 text-sm text-charcoal">
+          It&apos;s early — renewals for {targetYear} usually open around October{' '}
+          {currentYear} (start of Term 4). You can still renew now for an early or
+          one-off case if you need to.
+        </Card>
+      )}
 
       {!subActive && (
         <Card className="border-error/40 bg-error/5 p-4 text-sm">

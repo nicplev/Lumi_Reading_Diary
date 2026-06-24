@@ -17,7 +17,6 @@ const navItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: <Icon name="home" size={18} /> },
   { label: 'Classes', href: '/classes', icon: <Icon name="school" size={18} /> },
   { label: 'Students', href: '/students', icon: <Icon name="person" size={18} /> },
-  { label: 'Renewals', href: '/renewals', icon: <Icon name="autorenew" size={18} />, adminOnly: true },
   { label: 'Library', href: '/library', icon: <Icon name="library_books" size={18} /> },
   { label: 'Users', href: '/users', icon: <Icon name="group" size={18} />, adminOnly: true },
   { label: 'Parent Links', href: '/parent-links', icon: <Icon name="link" size={18} />, adminOnly: true },
