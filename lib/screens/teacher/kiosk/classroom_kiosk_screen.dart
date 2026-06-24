@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/widgets/lumi/student_avatar.dart';
 import '../../../data/models/class_model.dart';
@@ -41,7 +43,53 @@ class _ClassroomKioskScreenState extends State<ClassroomKioskScreen> {
   @override
   void initState() {
     super.initState();
+    // The app is globally locked to portrait (main.dart); a classroom iPad on a
+    // stand is usually landscape, so unlock all orientations while the kiosk is
+    // open and restore portrait on exit.
+    if (!kIsWeb) {
+      SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    }
     _loadScannedThisWeek();
+  }
+
+  @override
+  void dispose() {
+    if (!kIsWeb) {
+      SystemChrome.setPreferredOrientations(const [
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+    }
+    super.dispose();
+  }
+
+  Future<void> _confirmExit() async {
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Exit scan-in?', style: LumiType.subhead),
+        content: Text(
+          'This returns to the teacher app. Students should not normally leave '
+          'this screen.',
+          style: LumiType.body,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Stay', style: LumiType.button),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: LumiTokens.red,
+              foregroundColor: LumiTokens.paper,
+            ),
+            child: Text('Exit', style: LumiType.button),
+          ),
+        ],
+      ),
+    );
+    if (shouldExit == true && mounted) Navigator.of(context).pop();
   }
 
   Future<void> _loadScannedThisWeek() async {
@@ -74,33 +122,43 @@ class _ClassroomKioskScreenState extends State<ClassroomKioskScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: LumiTokens.cream,
-      appBar: AppBar(
+    // Lock the kiosk in: intercept system back so students can't drop into the
+    // teacher app by accident; exit goes through the confirm dialog.
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _confirmExit();
+      },
+      child: Scaffold(
         backgroundColor: LumiTokens.cream,
-        elevation: 0,
-        title: Text('${widget.classModel.name} • Scan-in', style: LumiType.subhead),
-        actions: [
-          IconButton(
-            tooltip: 'Exit kiosk',
-            icon: const Icon(Icons.close_rounded),
-            onPressed: () => Navigator.of(context).maybePop(),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-              child: Text(
-                'Tap your name to scan your books for the week',
-                style: LumiType.body,
-                textAlign: TextAlign.center,
-              ),
+        appBar: AppBar(
+          backgroundColor: LumiTokens.cream,
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          title: Text('${widget.classModel.name} • Scan-in',
+              style: LumiType.subhead),
+          actions: [
+            IconButton(
+              tooltip: 'Exit kiosk',
+              icon: const Icon(Icons.close_rounded),
+              onPressed: _confirmExit,
             ),
-            Expanded(child: _buildRoster()),
           ],
+        ),
+        body: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+                child: Text(
+                  'Tap your name to scan your books for the week',
+                  style: LumiType.body,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              Expanded(child: _buildRoster()),
+            ],
+          ),
         ),
       ),
     );
