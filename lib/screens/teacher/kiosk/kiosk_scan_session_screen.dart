@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/widgets/common_widgets.dart';
 import '../../../core/widgets/lumi/student_avatar.dart';
@@ -433,7 +435,27 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
   }
 
   /// The central scan call-to-action card (mascot + heading + camera button).
-  Widget _buildScanPanel() {
+  /// Best-effort jump to the iPad's Bluetooth settings so a teacher can pair
+  /// the barcode scanner. iOS has no public Bluetooth-pane deep link, so we try
+  /// the (unofficial) Prefs URL, fall back to the app's settings page, and
+  /// finally show a manual hint.
+  Future<void> _openBluetoothSettings() async {
+    try {
+      if (await launchUrl(Uri.parse('App-Prefs:root=Bluetooth'))) return;
+    } catch (_) {}
+    try {
+      if (await openAppSettings()) return;
+    } catch (_) {}
+    if (mounted) {
+      CommonWidgets.showInfoSnackbar(
+        context,
+        "Open the iPad's Settings app → Bluetooth to connect your scanner.",
+      );
+    }
+  }
+
+  /// Shared card chrome for the left-hand scan panel.
+  Widget _panelCard(List<Widget> children) {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 440),
       child: Container(
@@ -444,45 +466,108 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
           borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
           boxShadow: LumiTokens.shadowCard,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildMascot(),
-            const SizedBox(height: 20),
-            Text(
-              _isProcessing ? 'Looking up your book…' : 'Scan a book barcode',
-              style: LumiType.heading,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Point the barcode scanner at your book — or tap below to use '
-              'the camera.',
-              style: LumiType.body.copyWith(color: LumiTokens.muted),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            OutlinedButton.icon(
-              onPressed: _isProcessing ? null : _scanWithCamera,
-              icon: const Icon(Icons.photo_camera_rounded,
-                  color: LumiTokens.green),
-              label: Text(
-                'Use camera',
-                style: LumiType.button.copyWith(color: LumiTokens.green),
-              ),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: LumiTokens.green, width: 2),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
-                ),
-              ),
-            ),
-          ],
+        child: Column(mainAxisSize: MainAxisSize.min, children: children),
+      ),
+    );
+  }
+
+  Widget _cameraButton() {
+    return OutlinedButton.icon(
+      onPressed: _isProcessing ? null : _scanWithCamera,
+      icon: const Icon(Icons.photo_camera_rounded, color: LumiTokens.green),
+      label: Text(
+        'Use camera',
+        style: LumiType.button.copyWith(color: LumiTokens.green),
+      ),
+      style: OutlinedButton.styleFrom(
+        side: const BorderSide(color: LumiTokens.green, width: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
         ),
       ),
     );
+  }
+
+  Widget _buildScanPanel() {
+    // Before the first scan, lead with how to connect the Bluetooth scanner;
+    // once scanning works (a scan lands or one is in flight) switch to the
+    // active scan prompt.
+    final showConnectHelp =
+        _entries.isEmpty && _celebrateAsset == null && !_isProcessing;
+    return showConnectHelp ? _buildConnectScannerPanel() : _buildActiveScanPanel();
+  }
+
+  /// Empty state shown when no scanner has fired yet — explains pairing a
+  /// Bluetooth barcode scanner and offers a jump to Bluetooth settings.
+  Widget _buildConnectScannerPanel() {
+    return _panelCard([
+      Container(
+        width: 120,
+        height: 120,
+        decoration: BoxDecoration(
+          color: LumiTokens.tintBlue.withValues(alpha: 0.5),
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(Icons.bluetooth_searching_rounded,
+            size: 56, color: LumiTokens.indigo),
+      ),
+      const SizedBox(height: 20),
+      Text(
+        'Connect your scanner',
+        style: LumiType.heading,
+        textAlign: TextAlign.center,
+      ),
+      const SizedBox(height: 8),
+      Text(
+        "Pair your barcode scanner in the iPad's Bluetooth settings, then point "
+        "it at a book's barcode to add it. Already paired? Just start scanning.",
+        style: LumiType.body.copyWith(color: LumiTokens.muted),
+        textAlign: TextAlign.center,
+      ),
+      const SizedBox(height: 24),
+      SizedBox(
+        width: double.infinity,
+        height: 52,
+        child: FilledButton.icon(
+          onPressed: _openBluetoothSettings,
+          icon: const Icon(Icons.settings_bluetooth_rounded),
+          label: Text('Open Bluetooth settings', style: LumiType.button),
+          style: FilledButton.styleFrom(
+            backgroundColor: LumiTokens.green,
+            foregroundColor: LumiTokens.paper,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(height: 10),
+      _cameraButton(),
+    ]);
+  }
+
+  /// Active scan prompt (mascot + camera button) shown once scanning is under
+  /// way or a book has been added.
+  Widget _buildActiveScanPanel() {
+    return _panelCard([
+      _buildMascot(),
+      const SizedBox(height: 20),
+      Text(
+        _isProcessing ? 'Looking up your book…' : 'Scan a book barcode',
+        style: LumiType.heading,
+        textAlign: TextAlign.center,
+      ),
+      const SizedBox(height: 8),
+      Text(
+        'Point the barcode scanner at your book — or tap below to use '
+        'the camera.',
+        style: LumiType.body.copyWith(color: LumiTokens.muted),
+        textAlign: TextAlign.center,
+      ),
+      const SizedBox(height: 24),
+      _cameraButton(),
+    ]);
   }
 
   Widget _buildBanner() {
