@@ -1,5 +1,6 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import {buildStudentAccess, isActiveSubscriptionStatus} from "./access";
 
 const fns = functions.region("australia-southeast1");
 
@@ -230,6 +231,22 @@ function permissionDenied(message: string) {
   return new functions.https.HttpsError("permission-denied", message);
 }
 
+/** Whether a student doc already carries live (active, unexpired) access. */
+function studentAccessAlreadyLive(
+  studentData: FirebaseFirestore.DocumentData | undefined,
+): boolean {
+  const access = studentData?.access as Record<string, unknown> | undefined;
+  if (!access || access.status !== "active") return false;
+  const exp = access.expiresAt;
+  const expMs =
+    exp instanceof admin.firestore.Timestamp ?
+      exp.toMillis() :
+      exp instanceof Date ?
+        exp.getTime() :
+        0;
+  return expMs > Date.now();
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Callable: linkParentToStudent
 // ─────────────────────────────────────────────────────────────────────────────
@@ -307,6 +324,33 @@ export const linkParentToStudent = fns
         throw notFound("student-missing", "Student not found.");
       }
 
+      // T3 — materialise access on first link. If the student has no live
+      // access yet and the school's subscription for the current year is
+      // active, grant book-pack-assumed access through end-of-January. Keeps a
+      // new mid-year student in sync with the cohort. All reads happen before
+      // any write (Firestore transaction rule).
+      const cfgSnap = await tx.get(
+        db().collection("config").doc("academicYear"),
+      );
+      const currentYear = cfgSnap.data()?.currentAcademicYear as
+        | number
+        | undefined;
+      let subActive = false;
+      if (typeof currentYear === "number") {
+        const subSnap = await tx.get(
+          db()
+            .collection("schoolSubscriptions")
+            .doc(`${fresh.schoolId}_${currentYear}`),
+        );
+        subActive =
+          subSnap.exists &&
+          isActiveSubscriptionStatus(subSnap.data()?.status as string);
+      }
+      const grantAccess =
+        typeof currentYear === "number" &&
+        subActive &&
+        !studentAccessAlreadyLive(studentSnap.data());
+
       const existingLinked = Array.isArray(parentSnap.data()?.linkedChildren) ?
         (parentSnap.data()?.linkedChildren as string[]) :
         [];
@@ -315,9 +359,17 @@ export const linkParentToStudent = fns
       }
 
       // 3. Atomic writes.
-      tx.update(studentRef, {
+      const studentUpdate: admin.firestore.UpdateData<admin.firestore.DocumentData> = {
         parentIds: admin.firestore.FieldValue.arrayUnion(uid),
-      });
+      };
+      if (grantAccess) {
+        studentUpdate.access = buildStudentAccess({
+          academicYear: currentYear as number,
+          source: "book_pack_assumed",
+          grantedBy: uid,
+        });
+      }
+      tx.update(studentRef, studentUpdate);
       tx.set(
         parentRef,
         {

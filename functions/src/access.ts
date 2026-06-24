@@ -196,6 +196,44 @@ function timezoneOffsetMs(d: Date, tz: string): number {
 }
 
 /**
+ * AU primary-school year ladder. Entry synonyms (Foundation/Kindergarten/K/F)
+ * normalise to Prep. After the final year, the student has graduated.
+ */
+export const YEAR_LADDER = ["Prep", "1", "2", "3", "4", "5", "6"];
+
+const PREP_SYNONYMS = ["prep", "foundation", "kindergarten", "kinder", "k", "f"];
+
+/**
+ * Advance a student's year level by one on renewal. Returns the next level and
+ * whether the student has graduated past the top of the ladder. Unknown values
+ * (or null) are left unchanged and never flagged as graduated — class/year
+ * assignment stays manual in v1, so this only bumps a recognised label.
+ * @param {string|null|undefined} current The student's current year level.
+ * @return {{next: string|null, graduated: boolean, changed: boolean}} Result.
+ */
+export function nextYearLevel(current: string | null | undefined): {
+  next: string | null;
+  graduated: boolean;
+  changed: boolean;
+} {
+  if (current == null || current === "") {
+    return {next: current ?? null, graduated: false, changed: false};
+  }
+  const normalised = PREP_SYNONYMS.includes(current.trim().toLowerCase())
+    ? "Prep"
+    : current.trim();
+  const idx = YEAR_LADDER.indexOf(normalised);
+  if (idx === -1) {
+    // Not a recognised ladder rung — leave untouched.
+    return {next: current, graduated: false, changed: false};
+  }
+  if (idx === YEAR_LADDER.length - 1) {
+    return {next: normalised, graduated: true, changed: false};
+  }
+  return {next: YEAR_LADDER[idx + 1], graduated: false, changed: true};
+}
+
+/**
  * Build a fully-formed `student.access` map for the given academic year. Status
  * defaults to active; expiry is derived from the year unless overridden.
  * @param {object} params Grant parameters.

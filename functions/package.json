@@ -7,7 +7,7 @@
     "lint": "eslint --ext .js,.ts .",
     "build": "tsc",
     "build:watch": "tsc --watch",
-    "test:functions": "npm run build && node --test test/notification.helpers.test.js test/dateUtils.test.js test/achievements.test.js",
+    "test:functions": "npm run build && node --test test/notification.helpers.test.js test/dateUtils.test.js test/achievements.test.js test/access.test.js",
     "test:rules": "JAVA_HOME=\"${JAVA_HOME:-/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home}\" PATH=\"$JAVA_HOME/bin:$PATH\" firebase emulators:exec --only firestore \"node --test test/firestore.rules.test.js\"",
     "test:rules:storage": "JAVA_HOME=\"${JAVA_HOME:-/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home}\" PATH=\"$JAVA_HOME/bin:$PATH\" firebase emulators:exec --only firestore,storage --project demo-lumi-rules-test \"node --test test/storage.rules.test.js\"",
     "serve": "npm run build && firebase emulators:start --only functions",
