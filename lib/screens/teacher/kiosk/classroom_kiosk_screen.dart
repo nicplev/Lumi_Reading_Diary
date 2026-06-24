@@ -212,30 +212,82 @@ class _ClassroomKioskScreenState extends State<ClassroomKioskScreen> {
           );
         }
 
+        final doneCount =
+            students.where((s) => _scannedThisWeek.contains(s.id)).length;
+
         return Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 920),
-            child: GridView.builder(
-              padding: const EdgeInsets.all(20),
-              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 200,
-                mainAxisSpacing: 20,
-                crossAxisSpacing: 20,
-                childAspectRatio: 0.85,
-              ),
-              itemCount: students.length,
-              itemBuilder: (context, index) {
-                final student = students[index];
-                return _StudentTile(
-                  student: student,
-                  scannedThisWeek: _scannedThisWeek.contains(student.id),
-                  onTap: () => _openSession(student),
-                );
-              },
+            child: Column(
+              children: [
+                _buildProgressHeader(doneCount, students.length),
+                Expanded(
+                  child: GridView.builder(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                    gridDelegate:
+                        const SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: 200,
+                      mainAxisSpacing: 20,
+                      crossAxisSpacing: 20,
+                      childAspectRatio: 0.85,
+                    ),
+                    itemCount: students.length,
+                    itemBuilder: (context, index) {
+                      final student = students[index];
+                      return _StudentTile(
+                        student: student,
+                        scannedThisWeek: _scannedThisWeek.contains(student.id),
+                        onTap: () => _openSession(student),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
         );
       },
+    );
+  }
+
+  /// Teacher "who's left" summary: a count + progress bar for the week. Students
+  /// who've scanned get a tick and are dimmed on the grid, so the names that
+  /// still need to scan stand out.
+  Widget _buildProgressHeader(int done, int total) {
+    final remaining = total - done;
+    final fraction = total == 0 ? 0.0 : done / total;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('$done of $total scanned this week',
+                  style: LumiType.caption),
+              Text(
+                remaining == 0 ? 'All done 🎉' : '$remaining to go',
+                style: LumiType.caption.copyWith(
+                  color: remaining == 0 ? LumiTokens.green : LumiTokens.muted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: fraction,
+              minHeight: 6,
+              backgroundColor: LumiTokens.rule,
+              valueColor:
+                  const AlwaysStoppedAnimation<Color>(LumiTokens.green),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -251,9 +303,20 @@ class _StudentTile extends StatelessWidget {
   final bool scannedThisWeek;
   final VoidCallback onTap;
 
+  /// First name + last initial so two kids with the same first name (every
+  /// class has two Jacks) can tell which tile is theirs.
+  String get _displayName {
+    final last = student.lastName.trim();
+    return last.isEmpty ? student.firstName : '${student.firstName} ${last[0]}.';
+  }
+
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
+    // Dim students who've already scanned so the names still to go stand out
+    // (the teacher's "who's left" at a glance).
+    return Opacity(
+      opacity: scannedThisWeek ? 0.55 : 1.0,
+      child: DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
         boxShadow: LumiTokens.shadowCard,
@@ -298,7 +361,7 @@ class _StudentTile extends StatelessWidget {
               ),
                 const SizedBox(height: 10),
                 Text(
-                  student.firstName,
+                  _displayName,
                   style: LumiType.body.copyWith(fontWeight: FontWeight.w700),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -307,6 +370,7 @@ class _StudentTile extends StatelessWidget {
             ),
           ),
         ),
+      ),
       ),
     );
   }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -63,6 +65,13 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
   String? _celebrateAsset;
   int _celebrateTick = 0;
 
+  // Kids walk away the moment their books are scanned, so without this the next
+  // child in line would scan onto the previous child's session. After a spell
+  // of no activity we return to the roster. Each scan persists immediately, so
+  // nothing is lost by leaving.
+  static const _idleTimeout = Duration(seconds: 30);
+  Timer? _idleTimer;
+
   String get _schoolId => widget.teacher.schoolId ?? '';
 
   @override
@@ -70,16 +79,44 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
     super.initState();
     _sessionId = 'kiosk_${DateTime.now().millisecondsSinceEpoch}';
     WidgetsBinding.instance.addPostFrameCallback((_) => _refocus());
+    _resetIdleTimer();
   }
 
   @override
   void dispose() {
+    _idleTimer?.cancel();
     _keyboardFocus.dispose();
     super.dispose();
   }
 
+  void _resetIdleTimer() {
+    _idleTimer?.cancel();
+    _idleTimer = Timer(_idleTimeout, _onIdle);
+  }
+
+  void _onIdle() {
+    if (!mounted) return;
+    // Don't pop out from under a modal (camera / already-read sheet) or while a
+    // lookup is mid-flight — reschedule instead.
+    final isCurrent = ModalRoute.of(context)?.isCurrent ?? false;
+    if (!isCurrent || _isProcessing) {
+      _resetIdleTimer();
+      return;
+    }
+    Navigator.of(context).pop(_entries.length);
+  }
+
+  /// Confirmation feedback on a successful scan — a light system click plus a
+  /// haptic tap. (Swap the click for a bundled chime via just_audio later if a
+  /// richer sound is wanted.)
+  void _playScanFeedback() {
+    SystemSound.play(SystemSoundType.click);
+    HapticFeedback.mediumImpact();
+  }
+
   void _refocus() {
     if (mounted) _keyboardFocus.requestFocus();
+    _resetIdleTimer();
   }
 
   // ── Bluetooth keyboard-wedge capture ────────────────────────────────
@@ -88,6 +125,7 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
   // soft keyboard from popping up on the iPad.
   void _onKey(KeyEvent event) {
     if (event is! KeyDownEvent) return;
+    _resetIdleTimer();
     if (event.logicalKey == LogicalKeyboardKey.enter ||
         event.logicalKey == LogicalKeyboardKey.numpadEnter) {
       final code = _wedgeBuffer.toString();
@@ -163,7 +201,6 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
       case ScanClassification.renew:
         await _persist(book, renewed: true);
         _addEntry(book, _KioskOutcome.renewed);
-        HapticFeedback.mediumImpact();
         _showBanner('Renewed "${book.title}" for another week! 🎉',
             LumiTokens.green);
         return;
@@ -175,13 +212,11 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
         }
         await _persist(book);
         _addEntry(book, _KioskOutcome.reread);
-        HapticFeedback.mediumImpact();
         _showBanner('Reading "${book.title}" again — nice!', LumiTokens.green);
         return;
       case ScanClassification.newBook:
         await _persist(book);
         _addEntry(book, _KioskOutcome.added);
-        HapticFeedback.mediumImpact();
         _showBanner('Added "${book.title}"!', LumiTokens.green);
         return;
     }
@@ -202,6 +237,7 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
 
   void _addEntry(ScannedIsbnBook book, _KioskOutcome outcome) {
     _sessionIsbns.add(book.isbn);
+    _playScanFeedback();
     setState(() {
       _entries.insert(0, _KioskScanEntry(book, outcome));
       _celebrateAsset = switch (outcome) {
@@ -431,7 +467,11 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
           duration: 320.ms,
           curve: Curves.easeOutBack,
         )
-        .fadeIn(duration: 200.ms);
+        .fadeIn(duration: 200.ms)
+        // A little wiggle + shimmer for personality on each scan.
+        .then()
+        .shake(hz: 4, rotation: 0.12, duration: 360.ms)
+        .shimmer(duration: 700.ms, color: LumiTokens.paper.withValues(alpha: 0.6));
   }
 
   /// The central scan call-to-action card (mascot + heading + camera button).
