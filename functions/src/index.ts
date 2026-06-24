@@ -1519,9 +1519,13 @@ export const validateReadingLog = fns.firestore
       validationErrors.push("Student does not exist");
     }
 
-    // Validate parent has permission
+    // Validate parent has permission. Teacher-proxy logs intentionally store the
+    // teacher's uid in `parentId` (loggedByRole === "teacher"), so the
+    // guardian-link check doesn't apply to them.
     const studentData = studentDoc.data();
-    if (studentData && !studentData.parentIds?.includes(logData.parentId)) {
+    const isTeacherProxy = logData.loggedByRole === "teacher";
+    const parentLinked = studentData?.parentIds?.includes(logData.parentId);
+    if (!isTeacherProxy && studentData && !parentLinked) {
       validationErrors.push("Parent not linked to this student");
     }
 
