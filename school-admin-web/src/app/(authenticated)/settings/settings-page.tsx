@@ -21,7 +21,7 @@ import { FloatingPhonePreview } from './floating-phone-preview';
 import { ComprehensionRecordingSettingsSection } from './comprehension-recording-settings';
 import { ComprehensionAudioCleanupSection } from './comprehension-audio-cleanup';
 import { RenewalsPage } from '../renewals/renewals-page';
-import type { RenewalRosterEntry } from '@/lib/firestore/renewals';
+import type { RenewalRosterEntry, RenewalBatchSummary } from '@/lib/firestore/renewals';
 
 const LEVEL_SCHEMAS: { value: ReadingLevelSchema; label: string; description: string }[] = [
   { value: 'none', label: 'None', description: 'No reading levels' },
@@ -58,6 +58,7 @@ interface RenewalsData {
   subActive: boolean;
   windowOpen: boolean;
   roster: RenewalRosterEntry[];
+  recentBatches: RenewalBatchSummary[];
 }
 
 interface SettingsPageProps {
@@ -510,6 +511,7 @@ export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
             subActive={renewals.subActive}
             windowOpen={renewals.windowOpen}
             initialRoster={renewals.roster}
+            recentBatches={renewals.recentBatches}
             embedded
           />
         ) : (
