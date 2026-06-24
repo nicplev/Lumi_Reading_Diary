@@ -328,6 +328,7 @@ export function StudentDetail({ studentId, classId, levelOptions, className }: S
         open={showLogModal}
         onClose={() => setShowLogModal(false)}
         studentId={studentId}
+        classId={classId}
         studentName={fullName}
         onLogged={() => setShowLogModal(false)}
       />

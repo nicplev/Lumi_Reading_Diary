@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '@/components/lumi/modal';
 import { Button } from '@/components/lumi/button';
 import { Input } from '@/components/lumi/input';
+import { FilterChip } from '@/components/lumi/filter-chip';
 import { useToast } from '@/components/lumi/toast';
 import { useCreateTeacherLog } from '@/lib/hooks/use-reading-logs';
+import { useStudentAllocations } from '@/lib/hooks/use-allocations';
 
 function isoDaysAgo(days: number): string {
   const d = new Date();
@@ -14,21 +16,45 @@ function isoDaysAgo(days: number): string {
   return local.toISOString().slice(0, 10);
 }
 
+/** Case-insensitive de-dupe, preserving the first-seen casing. */
+function dedupe(titles: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const t of titles) {
+    const key = t.toLowerCase();
+    if (t && !seen.has(key)) {
+      seen.add(key);
+      out.push(t);
+    }
+  }
+  return out;
+}
+
 interface LogReadingModalProps {
   open: boolean;
   onClose: () => void;
   studentId: string;
+  classId: string;
   studentName?: string;
   onLogged: () => void;
 }
 
-export function LogReadingModal({ open, onClose, studentId, studentName, onLogged }: LogReadingModalProps) {
+export function LogReadingModal({
+  open,
+  onClose,
+  studentId,
+  classId,
+  studentName,
+  onLogged,
+}: LogReadingModalProps) {
   const { toast } = useToast();
   const createLog = useCreateTeacherLog();
+  const { data: allocations } = useStudentAllocations(studentId, classId);
 
   const [date, setDate] = useState(isoDaysAgo(0));
   const [minutes, setMinutes] = useState('20');
-  const [titles, setTitles] = useState('');
+  const [selectedTitles, setSelectedTitles] = useState<string[]>([]);
+  const [customTitles, setCustomTitles] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -36,11 +62,33 @@ export function LogReadingModal({ open, onClose, studentId, studentName, onLogge
     if (open) {
       setDate(isoDaysAgo(0));
       setMinutes('20');
-      setTitles('');
+      setSelectedTitles([]);
+      setCustomTitles('');
       setNotes('');
       setError(null);
     }
   }, [open]);
+
+  // The student's currently-assigned books, computed exactly like the Assigned
+  // Books card (base items minus per-student removals, plus per-student adds).
+  const assignedTitles = useMemo(() => {
+    const titles: string[] = [];
+    for (const a of allocations ?? []) {
+      const override = a.studentOverrides?.[studentId];
+      const baseItems = (a.assignmentItems ?? []).filter((i) => !i.isDeleted);
+      const afterRemoval = override
+        ? baseItems.filter((i) => !override.removedItemIds.includes(i.id))
+        : baseItems;
+      const addedItems = override ? override.addedItems.filter((i) => !i.isDeleted) : [];
+      for (const item of [...afterRemoval, ...addedItems]) {
+        if (item.title?.trim()) titles.push(item.title.trim());
+      }
+    }
+    return dedupe(titles);
+  }, [allocations, studentId]);
+
+  const toggleTitle = (t: string) =>
+    setSelectedTitles((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
 
   const handleSubmit = async () => {
     setError(null);
@@ -48,8 +96,10 @@ export function LogReadingModal({ open, onClose, studentId, studentName, onLogge
     if (!Number.isFinite(mins) || mins < 1 || mins > 240) {
       return setError('Minutes must be between 1 and 240.');
     }
-    const bookTitles = titles.split(',').map((t) => t.trim()).filter(Boolean);
-    if (bookTitles.length === 0) return setError('Add at least one book title.');
+
+    const custom = customTitles.split(',').map((s) => s.trim()).filter(Boolean);
+    const bookTitles = dedupe([...selectedTitles, ...custom]);
+    if (bookTitles.length === 0) return setError('Select or add at least one book.');
 
     try {
       await createLog.mutateAsync({
@@ -103,12 +153,37 @@ export function LogReadingModal({ open, onClose, studentId, studentName, onLogge
           value={minutes}
           onChange={(e) => setMinutes(e.target.value)}
         />
-        <Input
-          label="Book title(s)"
-          placeholder="Separate multiple titles with commas"
-          value={titles}
-          onChange={(e) => setTitles(e.target.value)}
-        />
+
+        <div>
+          <label className="block text-sm font-semibold text-charcoal mb-1.5">Books read</label>
+          {assignedTitles.length > 0 ? (
+            <>
+              <p className="text-xs text-text-secondary mb-2">Tap the assigned book(s) read in this session.</p>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {assignedTitles.map((t) => (
+                  <FilterChip
+                    key={t}
+                    label={t}
+                    selected={selectedTitles.includes(t)}
+                    onClick={() => toggleTitle(t)}
+                  />
+                ))}
+              </div>
+              <Input
+                placeholder="Add another title not listed (comma-separated)"
+                value={customTitles}
+                onChange={(e) => setCustomTitles(e.target.value)}
+              />
+            </>
+          ) : (
+            <Input
+              placeholder="Type the title(s), separated by commas"
+              value={customTitles}
+              onChange={(e) => setCustomTitles(e.target.value)}
+            />
+          )}
+        </div>
+
         <div>
           <label className="block text-sm font-semibold text-charcoal mb-1.5">Notes (optional)</label>
           <textarea
@@ -120,6 +195,7 @@ export function LogReadingModal({ open, onClose, studentId, studentName, onLogge
             className="w-full px-4 py-3 rounded-[var(--radius-md)] border border-divider bg-surface text-charcoal placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-rose-pink/30 focus:border-rose-pink transition-colors text-[15px] resize-y"
           />
         </div>
+
         {error && <p className="text-sm text-error">{error}</p>}
       </form>
     </Modal>
