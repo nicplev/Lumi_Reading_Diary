@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/lumi/skeleton';
 import { useToast } from '@/components/lumi/toast';
 import { useBooks, useDeleteBook } from '@/lib/hooks/use-books';
 import { BookFormModal } from './book-form-modal';
+import { ContributeBookModal } from './contribute-book-modal';
 import { ConfirmDialog } from '@/components/lumi/confirm-dialog';
 import type { ReadingLevelOption } from '@/lib/types';
 
@@ -30,6 +31,7 @@ export function LibraryPage({ levelOptions }: LibraryPageProps) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showContribute, setShowContribute] = useState(false);
   const [editBookId, setEditBookId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
@@ -92,6 +94,9 @@ export function LibraryPage({ levelOptions }: LibraryPageProps) {
         description="School book library"
         action={
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowContribute(true)}>
+              Contribute Book
+            </Button>
             <Button variant="primary" onClick={() => setShowAddModal(true)}>
               Add Book
             </Button>
@@ -177,6 +182,8 @@ export function LibraryPage({ levelOptions }: LibraryPageProps) {
         book={editBook ?? undefined}
         levelOptions={levelOptions}
       />
+
+      <ContributeBookModal open={showContribute} onClose={() => setShowContribute(false)} />
 
       <ConfirmDialog
         open={!!deleteConfirm}
