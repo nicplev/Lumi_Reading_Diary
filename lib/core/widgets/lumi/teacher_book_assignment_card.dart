@@ -21,7 +21,7 @@ class TeacherBookAssignmentCard extends StatelessWidget {
   final List<Color> coverGradient;
   final String? coverImageUrl;
   final String bookType; // 'decodable' or 'library'
-  final String status; // 'completed', 'in_progress', 'new'
+  final String status; // 'completed', 'in_progress', 'renewed', 'new'
   final ValueChanged<TeacherBookCardAction>? onActionSelected;
   final VoidCallback? onTap;
 
@@ -76,6 +76,28 @@ class TeacherBookAssignmentCard extends StatelessWidget {
             style: TeacherTypography.caption.copyWith(
               color: AppColors.teacherPrimary,
             ),
+          ),
+        );
+      case 'renewed':
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: const BoxDecoration(
+            color: Color(0xFFE3F2FD),
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.autorenew_rounded,
+                  size: 12, color: Color(0xFF1565C0)),
+              const SizedBox(width: 4),
+              Text(
+                'Renewed',
+                style: TeacherTypography.caption.copyWith(
+                  color: const Color(0xFF1565C0),
+                ),
+              ),
+            ],
           ),
         );
       default:

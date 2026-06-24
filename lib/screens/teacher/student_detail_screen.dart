@@ -1312,7 +1312,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                   : (item.title.trim().isNotEmpty
                       ? item.title.trim()
                       : (cachedTitle ?? 'Unknown Book (ISBN $itemIsbn)'));
-              final status = _deriveStatusForTitle(allocation, logs, rawTitle);
+              final status = _statusWithRenewal(
+                  _deriveStatusForTitle(allocation, logs, rawTitle), item);
               final displayTitle =
                   IsbnAssignmentService.sanitizeDisplayTitle(rawTitle);
 
@@ -1338,7 +1339,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             final dedupeKey = 'item:${item.id}';
             if (seen.contains(dedupeKey)) continue;
             seen.add(dedupeKey);
-            final status = _deriveStatusForTitle(allocation, logs, title);
+            final status = _statusWithRenewal(
+                _deriveStatusForTitle(allocation, logs, title), item);
             final displayTitle =
                 IsbnAssignmentService.sanitizeDisplayTitle(title);
             results.add(
@@ -1547,6 +1549,16 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     }
 
     return null;
+  }
+
+  /// Promotes a book to the 'renewed' badge when it was carried over from the
+  /// prior week, but only if it hasn't already started/finished this week (a
+  /// 'completed'/'in_progress' status is more informative and takes priority).
+  String _statusWithRenewal(String baseStatus, AllocationBookItem item) {
+    if (baseStatus == 'new' && item.metadata?['renewed'] == true) {
+      return 'renewed';
+    }
+    return baseStatus;
   }
 
   String _deriveStatusForTitle(
