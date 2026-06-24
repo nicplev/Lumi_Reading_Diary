@@ -17,6 +17,7 @@ import { useStudentAllocations } from '@/lib/hooks/use-allocations';
 import { BookCard } from '@/components/lumi/book-card';
 import { ReadingHistorySection } from './reading-history-section';
 import { LogReadingModal } from './log-reading-modal';
+import { IsbnAssignModal } from './isbn-assign-modal';
 import Link from 'next/link';
 import type { ReadingLevelOption } from '@/lib/types';
 
@@ -46,6 +47,7 @@ export function StudentDetail({ studentId, classId, levelOptions, className }: S
   const [showHistory, setShowHistory] = useState(false);
   const [expandedAllocation, setExpandedAllocation] = useState<string | null>(null);
   const [showLogModal, setShowLogModal] = useState(false);
+  const [showIsbnModal, setShowIsbnModal] = useState(false);
 
   if (isLoading || !student) {
     return (
@@ -237,7 +239,12 @@ export function StudentDetail({ studentId, classId, levelOptions, className }: S
       {/* Assigned Books */}
       <div className="mt-6">
         <Card>
-          <h2 className="text-lg font-bold text-charcoal mb-4">Assigned Books</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-charcoal">Assigned Books</h2>
+            <Button variant="outline" size="sm" onClick={() => setShowIsbnModal(true)}>
+              Assign by ISBN
+            </Button>
+          </div>
           {!studentAllocations || studentAllocations.length === 0 ? (
             <EmptyState
               icon={<Icon name="auto_stories" size={40} />}
@@ -331,6 +338,13 @@ export function StudentDetail({ studentId, classId, levelOptions, className }: S
         classId={classId}
         studentName={fullName}
         onLogged={() => setShowLogModal(false)}
+      />
+
+      <IsbnAssignModal
+        open={showIsbnModal}
+        onClose={() => setShowIsbnModal(false)}
+        studentId={studentId}
+        studentName={fullName}
       />
     </div>
   );
