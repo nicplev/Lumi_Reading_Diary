@@ -2,7 +2,7 @@ import { getSession } from '@/lib/auth/session';
 import { redirect } from 'next/navigation';
 import { SettingsPage } from './settings-page';
 import { getCurrentAcademicYear, isSchoolSubActive, isRenewalWindowOpen } from '@/lib/access';
-import { getRenewalRoster } from '@/lib/firestore/renewals';
+import { getRenewalRoster, getRecentRenewalBatches } from '@/lib/firestore/renewals';
 
 export default async function SettingsRoute({
   searchParams,
@@ -21,9 +21,10 @@ export default async function SettingsRoute({
   if (session.role === 'schoolAdmin') {
     const currentYear = await getCurrentAcademicYear();
     const targetYear = currentYear + 1;
-    const [roster, subActive] = await Promise.all([
+    const [roster, subActive, recentBatches] = await Promise.all([
       getRenewalRoster(session.schoolId, targetYear),
       isSchoolSubActive(session.schoolId, targetYear),
+      getRecentRenewalBatches(session.schoolId),
     ]);
     renewals = {
       currentYear,
@@ -31,6 +32,7 @@ export default async function SettingsRoute({
       subActive,
       windowOpen: isRenewalWindowOpen(targetYear),
       roster,
+      recentBatches,
     };
   }
 

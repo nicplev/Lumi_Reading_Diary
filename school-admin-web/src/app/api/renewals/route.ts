@@ -50,7 +50,8 @@ export async function POST(request: NextRequest) {
       session.schoolId,
       academicYear,
       studentIds,
-      session.uid
+      session.uid,
+      session.fullName
     );
     return NextResponse.json(result);
   } catch (error) {
