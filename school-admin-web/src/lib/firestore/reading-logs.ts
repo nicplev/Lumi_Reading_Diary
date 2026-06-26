@@ -22,7 +22,6 @@ export interface ReadingLogRecord {
   allocationId: string | null;
   hasComprehensionAudio: boolean;
   comprehensionAudioDurationSec: number | null;
-  photoUrls: string[];
   lastCommentPreview: string | null;
   lastCommentAt: Date | null;
   lastCommentByRole: string | null;
@@ -87,7 +86,6 @@ export async function getReadingLogsForStudent(
       allocationId: d.allocationId ?? null,
       hasComprehensionAudio: d.comprehensionAudioUploaded === true,
       comprehensionAudioDurationSec: d.comprehensionAudioDurationSec ?? null,
-      photoUrls: Array.isArray(d.photoUrls) ? d.photoUrls : [],
       lastCommentPreview: d.lastCommentPreview ?? null,
       lastCommentAt,
       lastCommentByRole: d.lastCommentByRole ?? null,

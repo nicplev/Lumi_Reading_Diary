@@ -193,7 +193,6 @@ export function ReadingHistorySection({ studentId }: { studentId: string }) {
                         logId={log.id}
                         hasAudio={log.hasComprehensionAudio}
                         durationSec={log.comprehensionAudioDurationSec}
-                        photoUrls={log.photoUrls}
                       />
                       <CommentThread logId={log.id} hasUnread={log.hasUnread} />
                     </>

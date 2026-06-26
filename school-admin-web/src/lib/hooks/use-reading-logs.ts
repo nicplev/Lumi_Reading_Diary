@@ -19,7 +19,6 @@ export interface SerializedReadingLog {
   allocationId: string | null;
   hasComprehensionAudio: boolean;
   comprehensionAudioDurationSec: number | null;
-  photoUrls: string[];
   lastCommentPreview: string | null;
   lastCommentAt: string | null;
   lastCommentByRole: string | null;
