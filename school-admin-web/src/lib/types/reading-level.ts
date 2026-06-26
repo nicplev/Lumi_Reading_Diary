@@ -35,6 +35,23 @@ export interface ReadingGroup {
   studentIds: string[];
   readingLevel?: string;
   color?: string;
+  description?: string;
+  targetMinutes?: number;
+  /** Display order within a class (lower first); 0 for legacy groups. */
+  sortOrder: number;
   isActive: boolean;
   createdAt: Date;
+}
+
+/** This-week performance for one reading group (differentiated-instruction view). */
+export interface ReadingGroupStat {
+  groupId: string;
+  totalStudents: number;
+  activeReaders: number;
+  totalMinutes: number;
+  avgMinutes: number;
+  studentsMetTarget: number;
+  topReaderName: string | null;
+  topReaderMinutes: number;
+  needsSupportCount: number;
 }
