@@ -21,6 +21,7 @@ export interface ReadingLogRecord {
   loggedByLabel: string | null;
   allocationId: string | null;
   hasComprehensionAudio: boolean;
+  comprehensionAudioDurationSec: number | null;
   lastCommentPreview: string | null;
   lastCommentAt: Date | null;
   lastCommentByRole: string | null;
@@ -84,6 +85,7 @@ export async function getReadingLogsForStudent(
       loggedByLabel: d.loggedByLabel ?? null,
       allocationId: d.allocationId ?? null,
       hasComprehensionAudio: d.comprehensionAudioUploaded === true,
+      comprehensionAudioDurationSec: d.comprehensionAudioDurationSec ?? null,
       lastCommentPreview: d.lastCommentPreview ?? null,
       lastCommentAt,
       lastCommentByRole: d.lastCommentByRole ?? null,
@@ -91,6 +93,25 @@ export async function getReadingLogsForStudent(
       createdAt: d.createdAt?.toDate() ?? null,
     };
   });
+}
+
+/**
+ * Returns the Storage path + duration of a log's comprehension recording, or
+ * null if the log has no uploaded audio. The API route streams the bytes from
+ * this path (session-gated) — the recording is never exposed via a public URL.
+ */
+export async function getComprehensionAudio(
+  schoolId: string,
+  logId: string
+): Promise<{ path: string; durationSec: number | null } | null> {
+  const snap = await logsCol(schoolId).doc(logId).get();
+  if (!snap.exists) return null;
+  const d = snap.data()!;
+  if (d.comprehensionAudioUploaded !== true || !d.comprehensionAudioPath) return null;
+  return {
+    path: d.comprehensionAudioPath as string,
+    durationSec: typeof d.comprehensionAudioDurationSec === 'number' ? d.comprehensionAudioDurationSec : null,
+  };
 }
 
 export async function getLogComments(

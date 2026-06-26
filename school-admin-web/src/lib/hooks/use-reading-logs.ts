@@ -18,6 +18,7 @@ export interface SerializedReadingLog {
   loggedByLabel: string | null;
   allocationId: string | null;
   hasComprehensionAudio: boolean;
+  comprehensionAudioDurationSec: number | null;
   lastCommentPreview: string | null;
   lastCommentAt: string | null;
   lastCommentByRole: string | null;
