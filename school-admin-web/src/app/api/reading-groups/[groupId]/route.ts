@@ -9,6 +9,7 @@ const updateGroupSchema = z.object({
   color: z.string().optional(),
   description: z.string().optional(),
   targetMinutes: z.number().optional(),
+  sortOrder: z.number().optional(),
   studentIds: z.array(z.string()).optional(),
 });
 

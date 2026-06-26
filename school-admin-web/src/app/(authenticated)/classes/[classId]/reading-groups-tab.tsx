@@ -1,6 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import { SortableContext, rectSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Card } from '@/components/lumi/card';
 import { Button } from '@/components/lumi/button';
 import { Badge } from '@/components/lumi/badge';
@@ -16,9 +27,11 @@ import {
   useCreateReadingGroup,
   useUpdateReadingGroup,
   useDeleteReadingGroup,
+  useReadingGroupStats,
+  useReorderReadingGroups,
 } from '@/lib/hooks/use-reading-groups';
 import { useStudents } from '@/lib/hooks/use-students';
-import type { ReadingLevelOption } from '@/lib/types';
+import type { ReadingLevelOption, ReadingGroup, ReadingGroupStat } from '@/lib/types';
 
 interface ReadingGroupsTabProps {
   classId: string;
@@ -34,14 +47,18 @@ export function ReadingGroupsTab({ classId, levelOptions }: ReadingGroupsTabProp
   const { toast } = useToast();
   const { data: groups, isLoading } = useReadingGroups(classId);
   const { data: students } = useStudents({ classId });
+  const { data: stats } = useReadingGroupStats(classId);
   const createGroup = useCreateReadingGroup();
   const updateGroup = useUpdateReadingGroup();
   const deleteGroup = useDeleteReadingGroup();
+  const reorderGroups = useReorderReadingGroups();
 
   const [showCreate, setShowCreate] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
   const [managingGroupId, setManagingGroupId] = useState<string | null>(null);
+  const [reordering, setReordering] = useState(false);
+  const [order, setOrder] = useState<string[]>([]);
 
   // Create form state
   const [formName, setFormName] = useState('');
@@ -52,6 +69,43 @@ export function ReadingGroupsTab({ classId, levelOptions }: ReadingGroupsTabProp
 
   // Student assignment state
   const [assignedStudentIds, setAssignedStudentIds] = useState<string[]>([]);
+
+  const statById = useMemo(
+    () => new Map((stats ?? []).map((s) => [s.groupId, s])),
+    [stats]
+  );
+
+  // Keep a local display order in sync with the (sortOrder-ordered) groups so
+  // drag-reorder feels instant; persistence happens on drop.
+  useEffect(() => {
+    setOrder(groups ? groups.map((g) => g.id) : []);
+  }, [groups]);
+
+  const groupById = useMemo(() => new Map((groups ?? []).map((g) => [g.id, g])), [groups]);
+  const orderedGroups = useMemo(
+    () => order.map((id) => groupById.get(id)).filter((g): g is NonNullable<typeof g> => !!g),
+    [order, groupById]
+  );
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor)
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const ids = orderedGroups.map((g) => g.id);
+    const from = ids.indexOf(active.id as string);
+    const to = ids.indexOf(over.id as string);
+    if (from < 0 || to < 0) return;
+    const next = arrayMove(ids, from, to);
+    setOrder(next);
+    reorderGroups.mutate(
+      { classId, orderedIds: next },
+      { onError: (e) => toast(e instanceof Error ? e.message : 'Failed to reorder', 'error') }
+    );
+  };
 
   const groupedStudentIds = new Set(groups?.flatMap((g) => g.studentIds) ?? []);
   const ungroupedStudents = students?.filter((s) => !groupedStudentIds.has(s.id)) ?? [];
@@ -140,8 +194,19 @@ export function ReadingGroupsTab({ classId, levelOptions }: ReadingGroupsTabProp
         </div>
       )}
 
-      <div className="flex justify-end mb-4">
-        <Button onClick={() => setShowCreate(true)}>Create Group</Button>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <p className="text-sm text-text-secondary">
+          {reordering ? 'Drag the groups into the order you want.' : ''}
+        </p>
+        <div className="flex items-center gap-2 shrink-0">
+          {groups && groups.length > 1 && (
+            <Button variant="outline" onClick={() => setReordering((r) => !r)}>
+              <Icon name={reordering ? 'check' : 'swap_vert'} size={16} className="mr-1.5" />
+              {reordering ? 'Done' : 'Reorder'}
+            </Button>
+          )}
+          {!reordering && <Button onClick={() => setShowCreate(true)}>Create Group</Button>}
+        </div>
       </div>
 
       {(!groups || groups.length === 0) ? (
@@ -152,56 +217,25 @@ export function ReadingGroupsTab({ classId, levelOptions }: ReadingGroupsTabProp
           action={<Button onClick={() => setShowCreate(true)}>Create Group</Button>}
         />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {groups.map((group) => (
-            <Card
-              key={group.id}
-              hover
-              onClick={() => setExpandedGroup(expandedGroup === group.id ? null : group.id)}
-              className="relative overflow-hidden"
-            >
-              <div
-                className="absolute top-0 left-0 w-1.5 h-full"
-                style={{ backgroundColor: group.color || '#E5E7EB' }}
-              />
-              <div className="pl-3">
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="font-bold text-charcoal">{group.name}</h3>
-                  <Badge variant="info">{group.studentIds.length}</Badge>
-                </div>
-                {group.readingLevel && (
-                  <ReadingLevelPill level={group.readingLevel} colorHex={group.color} size="sm" />
-                )}
-                {expandedGroup === group.id && (
-                  <div className="mt-3 pt-3 border-t border-divider">
-                    {group.studentIds.length === 0 ? (
-                      <p className="text-xs text-text-secondary">No students assigned</p>
-                    ) : (
-                      <ul className="space-y-1 text-sm text-charcoal">
-                        {group.studentIds.map((sid) => {
-                          const s = students?.find((st) => st.id === sid);
-                          return (
-                            <li key={sid}>
-                              {s ? `${s.firstName} ${s.lastName}` : 'Unknown'}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                    <div className="flex gap-2 mt-3">
-                      <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openManageStudents(group.id); }}>
-                        Manage Students
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setDeletingGroupId(group.id); }}>
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </Card>
-          ))}
-        </div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={orderedGroups.map((g) => g.id)} strategy={rectSortingStrategy}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
+              {orderedGroups.map((group) => (
+                <GroupCard
+                  key={group.id}
+                  group={group}
+                  stat={statById.get(group.id)}
+                  students={students}
+                  expanded={expandedGroup === group.id}
+                  reordering={reordering}
+                  onToggleExpand={() => setExpandedGroup(expandedGroup === group.id ? null : group.id)}
+                  onManage={() => openManageStudents(group.id)}
+                  onDelete={() => setDeletingGroupId(group.id)}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       {/* Create Group Modal */}
@@ -295,6 +329,117 @@ export function ReadingGroupsTab({ classId, levelOptions }: ReadingGroupsTabProp
         confirmLabel="Delete"
         loading={deleteGroup.isPending}
       />
+    </div>
+  );
+}
+
+function GroupCard({
+  group,
+  stat,
+  students,
+  expanded,
+  reordering,
+  onToggleExpand,
+  onManage,
+  onDelete,
+}: {
+  group: Pick<ReadingGroup, 'id' | 'name' | 'color' | 'readingLevel' | 'studentIds'>;
+  stat: ReadingGroupStat | undefined;
+  students: { id: string; firstName: string; lastName: string }[] | undefined;
+  expanded: boolean;
+  reordering: boolean;
+  onToggleExpand: () => void;
+  onManage: () => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: group.id,
+    disabled: !reordering,
+  });
+  const style: React.CSSProperties = { transform: CSS.Transform.toString(transform), transition };
+
+  return (
+    <div ref={setNodeRef} style={style} className={isDragging ? 'z-10' : ''}>
+      <Card
+        hover={!reordering}
+        onClick={reordering ? undefined : onToggleExpand}
+        className={`relative overflow-hidden h-full ${reordering ? 'ring-1 ring-inset ring-rose-pink/30' : ''} ${
+          isDragging ? 'shadow-card-hover' : ''
+        }`}
+      >
+        <div className="absolute top-0 left-0 w-1.5 h-full" style={{ backgroundColor: group.color || '#E5E7EB' }} />
+        <div className="pl-3">
+          <div className="flex items-start justify-between mb-2 gap-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              {reordering && (
+                <button
+                  type="button"
+                  className="cursor-grab active:cursor-grabbing touch-none text-text-secondary -ml-1"
+                  aria-label="Drag to reorder"
+                  {...attributes}
+                  {...listeners}
+                >
+                  <Icon name="drag_indicator" size={18} />
+                </button>
+              )}
+              <h3 className="font-bold text-charcoal truncate">{group.name}</h3>
+            </div>
+            <Badge variant="info">{group.studentIds.length}</Badge>
+          </div>
+
+          {group.readingLevel && <ReadingLevelPill level={group.readingLevel} colorHex={group.color} size="sm" />}
+
+          {/* This-week stats strip */}
+          {stat && (
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-text-secondary">
+              <span>
+                <span className="font-semibold text-charcoal">{stat.activeReaders}/{stat.totalStudents}</span> reading
+              </span>
+              <span>
+                <span className="font-semibold text-charcoal">{stat.avgMinutes}</span> min avg
+              </span>
+              <span>
+                <span className="font-semibold text-charcoal">{stat.studentsMetTarget}</span> met target
+              </span>
+            </div>
+          )}
+
+          {!reordering && expanded && (
+            <div className="mt-3 pt-3 border-t border-divider">
+              {stat && (stat.topReaderName || stat.needsSupportCount > 0) && (
+                <div className="mb-3 space-y-1 text-xs">
+                  {stat.topReaderName && (
+                    <p className="text-text-secondary">
+                      ⭐ Top reader: <span className="text-charcoal font-medium">{stat.topReaderName}</span> ({stat.topReaderMinutes} min)
+                    </p>
+                  )}
+                  {stat.needsSupportCount > 0 && (
+                    <p className="text-text-secondary">⚠️ {stat.needsSupportCount} need support this week</p>
+                  )}
+                </div>
+              )}
+              {group.studentIds.length === 0 ? (
+                <p className="text-xs text-text-secondary">No students assigned</p>
+              ) : (
+                <ul className="space-y-1 text-sm text-charcoal">
+                  {group.studentIds.map((sid) => {
+                    const s = students?.find((st) => st.id === sid);
+                    return <li key={sid}>{s ? `${s.firstName} ${s.lastName}` : 'Unknown'}</li>;
+                  })}
+                </ul>
+              )}
+              <div className="flex gap-2 mt-3">
+                <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onManage(); }}>
+                  Manage Students
+                </Button>
+                <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onDelete(); }}>
+                  Delete
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
     </div>
   );
 }

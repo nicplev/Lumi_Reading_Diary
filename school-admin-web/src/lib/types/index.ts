@@ -8,7 +8,7 @@ export type { SchoolClass } from './class';
 export type { Book } from './book';
 export type { Allocation, AllocationBookItem, AllocationCadence, AllocationType, StudentAllocationOverride } from './allocation';
 export type { ReadingLog, ReadingStatus } from './reading-log';
-export type { ReadingLevelEvent, ReadingLevelOption, ReadingGroup } from './reading-level';
+export type { ReadingLevelEvent, ReadingLevelOption, ReadingGroup, ReadingGroupStat } from './reading-level';
 export type { StudentLinkCode, LinkCodeStatus, LinkCodeIntent } from './link-code';
 export type { Parent, ParentWithStudents, LinkedStudent } from './parent';
 export type { NotificationCampaign, CampaignStatus, NotificationAudienceType } from './notification';
