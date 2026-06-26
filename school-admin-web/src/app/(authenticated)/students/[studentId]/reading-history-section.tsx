@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/lumi/empty-state';
 import { SearchInput } from '@/components/lumi/search-input';
 import { FilterChip } from '@/components/lumi/filter-chip';
 import { CommentThread } from './comment-thread';
+import { LogMedia } from './log-media';
 import { useReadingLogs } from '@/lib/hooks/use-reading-logs';
 
 const FEELING_META: Record<string, { label: string; emoji: string }> = {
@@ -186,7 +187,17 @@ export function ReadingHistorySection({ studentId }: { studentId: string }) {
                       </div>
                     </div>
                   </button>
-                  {isExpanded && <CommentThread logId={log.id} hasUnread={log.hasUnread} />}
+                  {isExpanded && (
+                    <>
+                      <LogMedia
+                        logId={log.id}
+                        hasAudio={log.hasComprehensionAudio}
+                        durationSec={log.comprehensionAudioDurationSec}
+                        photoUrls={log.photoUrls}
+                      />
+                      <CommentThread logId={log.id} hasUnread={log.hasUnread} />
+                    </>
+                  )}
                 </li>
               );
             })}
