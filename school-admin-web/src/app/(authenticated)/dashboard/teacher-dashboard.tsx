@@ -1,7 +1,6 @@
 'use client';
 
 import { StatCard } from '@/components/lumi/stat-card';
-import { Card } from '@/components/lumi/card';
 import { Badge } from '@/components/lumi/badge';
 import { Icon } from '@/components/lumi/icon';
 import { WeeklyChart } from './weekly-chart';
@@ -24,6 +23,12 @@ interface TeacherDashboardProps {
   widgets: DashboardWidgets;
 }
 
+/** Vertically-centred empty-state line so short cards don't look top-heavy when
+ *  stretched to match a taller card in the same row. */
+function EmptyMsg({ children }: { children: React.ReactNode }) {
+  return <p className="text-sm text-text-secondary h-full flex items-center">{children}</p>;
+}
+
 export function TeacherDashboard({ userName, data, weeklyEngagement, widgets }: TeacherDashboardProps) {
   const { user } = useAuth();
   const firstName = userName.split(' ')[0];
@@ -32,130 +37,115 @@ export function TeacherDashboard({ userName, data, weeklyEngagement, widgets }: 
     {
       id: 'weekly',
       title: 'This week',
-      node: (
-        <Card>
-          <h2 className="text-lg font-bold text-charcoal mb-4">This Week</h2>
-          <WeeklyChart data={weeklyEngagement} />
-        </Card>
-      ),
+      size: 'lg',
+      body: <WeeklyChart data={weeklyEngagement} />,
     },
     {
       id: 'classes',
       title: 'Your classes',
-      node: (
-        <Card>
-          <h2 className="text-lg font-bold text-charcoal mb-3">Your Classes</h2>
-          {data.classes.length === 0 ? (
-            <p className="text-sm text-text-secondary">No classes assigned yet.</p>
-          ) : (
-            <div className="space-y-1">
-              {data.classes.map((cls) => (
-                <Link
-                  key={cls.id}
-                  href={`/classes/${cls.id}`}
-                  className="block hover:bg-background rounded-[var(--radius-md)] p-2 -mx-2 transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-charcoal">{cls.name}</span>
-                    {cls.yearLevel && <Badge variant="info">{cls.yearLevel}</Badge>}
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-text-secondary mt-0.5">
-                    <span className="inline-flex items-center gap-1">
-                      <Icon name="person" size={12} /> {cls.studentCount}
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <Icon name="auto_stories" size={12} /> {cls.readTodayCount} today
-                    </span>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </Card>
+      action: (
+        <Link href="/classes" className="text-xs font-semibold text-rose-pink hover:underline whitespace-nowrap">
+          View all
+        </Link>
       ),
+      body:
+        data.classes.length === 0 ? (
+          <EmptyMsg>No classes assigned yet.</EmptyMsg>
+        ) : (
+          <div className="space-y-1">
+            {data.classes.map((cls) => (
+              <Link
+                key={cls.id}
+                href={`/classes/${cls.id}`}
+                className="block hover:bg-background rounded-[var(--radius-md)] p-2 -mx-2 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-charcoal">{cls.name}</span>
+                  {cls.yearLevel && <Badge variant="info">{cls.yearLevel}</Badge>}
+                </div>
+                <div className="flex items-center gap-3 text-xs text-text-secondary mt-0.5">
+                  <span className="inline-flex items-center gap-1">
+                    <Icon name="person" size={12} /> {cls.studentCount}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Icon name="auto_stories" size={12} /> {cls.readTodayCount} today
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        ),
     },
     {
       id: 'topReaders',
       title: 'Top readers',
-      node: (
-        <Card>
-          <h2 className="text-lg font-bold text-charcoal mb-3">Top readers this week</h2>
-          {widgets.topReaders.length === 0 ? (
-            <p className="text-sm text-text-secondary">No reading logged yet this week.</p>
-          ) : (
-            <ul className="space-y-2">
-              {widgets.topReaders.map((r, i) => (
-                <li key={r.studentId}>
-                  <Link
-                    href={`/students/${r.studentId}`}
-                    className="flex items-center justify-between hover:bg-background rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
-                  >
-                    <span className="text-sm text-charcoal font-medium truncate">
-                      <span className="text-text-secondary mr-1.5">{i + 1}.</span>
-                      {r.name}
-                    </span>
-                    <span className="text-xs text-text-secondary whitespace-nowrap">{r.minutes} min</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      ),
+      body:
+        widgets.topReaders.length === 0 ? (
+          <EmptyMsg>No reading logged yet this week.</EmptyMsg>
+        ) : (
+          <ul className="space-y-2">
+            {widgets.topReaders.map((r, i) => (
+              <li key={r.studentId}>
+                <Link
+                  href={`/students/${r.studentId}`}
+                  className="flex items-center justify-between hover:bg-background rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
+                >
+                  <span className="text-sm text-charcoal font-medium truncate">
+                    <span className="text-text-secondary mr-1.5">{i + 1}.</span>
+                    {r.name}
+                  </span>
+                  <span className="text-xs text-text-secondary whitespace-nowrap">{r.minutes} min</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ),
     },
     {
       id: 'nudges',
       title: 'Needs attention',
-      node: (
-        <Card>
-          <h2 className="text-lg font-bold text-charcoal mb-3">Needs attention</h2>
-          {widgets.nudges.length === 0 ? (
-            <p className="text-sm text-text-secondary">Everyone has read recently. 🎉</p>
-          ) : (
-            <ul className="space-y-2">
-              {widgets.nudges.map((n) => (
-                <li key={n.studentId}>
-                  <Link
-                    href={`/students/${n.studentId}`}
-                    className="flex items-center justify-between hover:bg-background rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
-                  >
-                    <span className="text-sm text-charcoal font-medium truncate">{n.name}</span>
-                    <span className="text-xs text-text-secondary whitespace-nowrap">
-                      {n.daysSinceRead === null ? 'Not read yet' : `${n.daysSinceRead}d ago`}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      ),
+      body:
+        widgets.nudges.length === 0 ? (
+          <EmptyMsg>Everyone has read recently. 🎉</EmptyMsg>
+        ) : (
+          <ul className="space-y-2">
+            {widgets.nudges.map((n) => (
+              <li key={n.studentId}>
+                <Link
+                  href={`/students/${n.studentId}`}
+                  className="flex items-center justify-between hover:bg-background rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
+                >
+                  <span className="text-sm text-charcoal font-medium truncate">{n.name}</span>
+                  <span className="text-xs text-text-secondary whitespace-nowrap">
+                    {n.daysSinceRead === null ? 'Not read yet' : `${n.daysSinceRead}d ago`}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ),
     },
     {
       id: 'parentComments',
       title: 'Parent comments',
-      node: (
-        <Card>
-          <h2 className="text-lg font-bold text-charcoal mb-3">New parent comments</h2>
-          {widgets.parentComments.length === 0 ? (
-            <p className="text-sm text-text-secondary">No new parent comments.</p>
-          ) : (
-            <ul className="space-y-2.5">
-              {widgets.parentComments.map((c) => (
-                <li key={c.logId}>
-                  <Link
-                    href={`/students/${c.studentId}`}
-                    className="block hover:bg-background rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
-                  >
-                    <p className="text-sm font-medium text-charcoal truncate">{c.studentName}</p>
-                    <p className="text-xs text-text-secondary truncate">{c.preview}</p>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      ),
+      body:
+        widgets.parentComments.length === 0 ? (
+          <EmptyMsg>No new parent comments.</EmptyMsg>
+        ) : (
+          <ul className="space-y-2.5">
+            {widgets.parentComments.map((c) => (
+              <li key={c.logId}>
+                <Link
+                  href={`/students/${c.studentId}`}
+                  className="block hover:bg-background rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
+                >
+                  <p className="text-sm font-medium text-charcoal truncate">{c.studentName}</p>
+                  <p className="text-xs text-text-secondary truncate">{c.preview}</p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ),
     },
   ];
 
