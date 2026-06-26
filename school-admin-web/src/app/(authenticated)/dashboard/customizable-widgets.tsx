@@ -58,22 +58,32 @@ function loadLayout(key: string): StoredLayout | null {
 export function CustomizableWidgets({
   widgets,
   storageKey,
+  defaultHidden = [],
 }: {
   widgets: DashboardWidgetDef[];
   storageKey: string;
+  /** Widget ids hidden by default (until the teacher shows them via Customize),
+   *  applied only when there's no saved layout yet — keeps the first-run
+   *  dashboard focused while every widget stays one click away. */
+  defaultHidden?: string[];
 }) {
   const [order, setOrder] = useState<string[]>(() => widgets.map((w) => w.id));
   const [hidden, setHidden] = useState<string[]>([]);
   const [editing, setEditing] = useState(false);
 
   // Hydrate from localStorage after mount (first render matches the server →
-  // no hydration mismatch).
+  // no hydration mismatch). With no saved layout, seed the default-hidden set.
   useEffect(() => {
     const stored = loadLayout(storageKey);
     if (stored) {
       setOrder(stored.order);
       setHidden(stored.hidden);
+    } else if (defaultHidden.length > 0) {
+      setHidden(defaultHidden);
     }
+    // defaultHidden is intentionally read once on mount (a new array each render
+    // would otherwise re-seed and fight the teacher's toggles).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
 
   const persist = (nextOrder: string[], nextHidden: string[]) => {
@@ -118,7 +128,7 @@ export function CustomizableWidgets({
 
   const reset = () => {
     setOrder(widgets.map((w) => w.id));
-    setHidden([]);
+    setHidden(defaultHidden);
     try {
       localStorage.removeItem(storageKey);
     } catch {

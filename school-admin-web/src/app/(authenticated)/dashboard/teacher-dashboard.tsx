@@ -4,6 +4,12 @@ import { StatCard } from '@/components/lumi/stat-card';
 import { Badge } from '@/components/lumi/badge';
 import { Icon } from '@/components/lumi/icon';
 import { WeeklyChart } from './weekly-chart';
+import { EngagementRing } from './widgets/engagement-ring';
+import { SentimentBar } from './widgets/sentiment-bar';
+import { RecentReading } from './widgets/recent-reading';
+import { GroupComparison } from './widgets/group-comparison';
+import { AchievementSpotlight } from './widgets/achievement-spotlight';
+import { ReadingCalendar } from './widgets/reading-calendar';
 import { CustomizableWidgets, type DashboardWidgetDef } from './customizable-widgets';
 import { getGreeting } from '@/lib/utils/formatters';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -14,6 +20,32 @@ interface DashboardWidgets {
   topReaders: { studentId: string; name: string; minutes: number }[];
   nudges: { studentId: string; name: string; daysSinceRead: number | null }[];
   parentComments: { logId: string; studentId: string; studentName: string; preview: string; at: string }[];
+  sentiment: { feeling: string; count: number }[];
+  recentReading: {
+    logId: string;
+    studentId: string;
+    studentName: string;
+    books: string[];
+    minutes: number;
+    at: string;
+  }[];
+  groupComparison: {
+    groupId: string;
+    name: string;
+    color: string | null;
+    totalStudents: number;
+    activeReaders: number;
+    totalMinutes: number;
+    avgMinutes: number;
+  }[];
+  recentAchievements: {
+    studentId: string;
+    studentName: string;
+    name: string;
+    icon: string;
+    rarity: string;
+    earnedAt: string | null;
+  }[];
 }
 
 interface TeacherDashboardProps {
@@ -39,6 +71,11 @@ export function TeacherDashboard({ userName, data, weeklyEngagement, widgets }: 
       title: 'This week',
       size: 'lg',
       body: <WeeklyChart data={weeklyEngagement} />,
+    },
+    {
+      id: 'engagement',
+      title: "Today's engagement",
+      body: <EngagementRing readToday={data.readToday} totalStudents={data.totalStudents} />,
     },
     {
       id: 'classes',
@@ -102,6 +139,11 @@ export function TeacherDashboard({ userName, data, weeklyEngagement, widgets }: 
         ),
     },
     {
+      id: 'recentReading',
+      title: 'Recent reading',
+      body: <RecentReading items={widgets.recentReading} />,
+    },
+    {
       id: 'nudges',
       title: 'Needs attention',
       body:
@@ -147,6 +189,28 @@ export function TeacherDashboard({ userName, data, weeklyEngagement, widgets }: 
           </ul>
         ),
     },
+    {
+      id: 'sentiment',
+      title: 'How reading felt',
+      body: <SentimentBar sentiment={widgets.sentiment} />,
+    },
+    {
+      id: 'groupComparison',
+      title: 'Reading groups',
+      size: 'lg',
+      body: <GroupComparison groups={widgets.groupComparison} />,
+    },
+    {
+      id: 'achievements',
+      title: 'Recent achievements',
+      body: <AchievementSpotlight items={widgets.recentAchievements} />,
+    },
+    {
+      id: 'readingCalendar',
+      title: 'Reading calendar',
+      size: 'lg',
+      body: <ReadingCalendar />,
+    },
   ];
 
   return (
@@ -173,6 +237,7 @@ export function TeacherDashboard({ userName, data, weeklyEngagement, widgets }: 
       <CustomizableWidgets
         widgets={widgetDefs}
         storageKey={`lumi-teacher-dashboard-widgets:${user?.uid ?? 'anon'}`}
+        defaultHidden={['sentiment', 'groupComparison', 'achievements', 'readingCalendar']}
       />
     </div>
   );
