@@ -300,10 +300,47 @@ export interface TeacherParentComment {
   at: Date;
 }
 
+export interface TeacherSentiment {
+  feeling: string;
+  count: number;
+}
+
+export interface TeacherRecentReading {
+  logId: string;
+  studentId: string;
+  studentName: string;
+  books: string[];
+  minutes: number;
+  at: Date;
+}
+
+export interface TeacherGroupComparison {
+  groupId: string;
+  name: string;
+  color: string | null;
+  totalStudents: number;
+  activeReaders: number;
+  totalMinutes: number;
+  avgMinutes: number;
+}
+
+export interface TeacherRecentAchievement {
+  studentId: string;
+  studentName: string;
+  name: string;
+  icon: string;
+  rarity: string;
+  earnedAt: Date | null;
+}
+
 export interface TeacherDashboardWidgets {
   topReaders: TeacherTopReader[];
   nudges: TeacherNudge[];
   parentComments: TeacherParentComment[];
+  sentiment: TeacherSentiment[];
+  recentReading: TeacherRecentReading[];
+  groupComparison: TeacherGroupComparison[];
+  recentAchievements: TeacherRecentAchievement[];
 }
 
 /**
@@ -324,11 +361,23 @@ export async function getTeacherDashboardWidgets(
 
   const classIds = classesSnap.docs.map((d) => d.id);
   const studentIds = [...new Set(classesSnap.docs.flatMap((d) => (d.data().studentIds ?? []) as string[]))];
-  if (classIds.length === 0) return { topReaders: [], nudges: [], parentComments: [] };
+  if (classIds.length === 0)
+    return {
+      topReaders: [],
+      nudges: [],
+      parentComments: [],
+      sentiment: [],
+      recentReading: [],
+      groupComparison: [],
+      recentAchievements: [],
+    };
 
-  // Student names + last reading date (for top readers labels + nudges).
+  // Student names + last reading date (for top readers labels + nudges) and any
+  // earned achievements (for the achievement-spotlight widget) — all read from
+  // the student docs we already fetch here, so no extra reads.
   const nameById = new Map<string, string>();
   const lastReadById = new Map<string, Date | null>();
+  const recentAchievements: TeacherRecentAchievement[] = [];
   for (let i = 0; i < studentIds.length; i += 30) {
     const chunk = studentIds.slice(i, i + 30);
     try {
@@ -338,8 +387,21 @@ export async function getTeacherDashboardWidgets(
         .get();
       for (const doc of snap.docs) {
         const s = doc.data();
-        nameById.set(doc.id, `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim());
+        const studentName = `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim();
+        nameById.set(doc.id, studentName);
         lastReadById.set(doc.id, s.stats?.lastReadingDate?.toDate?.() ?? null);
+        if (Array.isArray(s.achievements)) {
+          for (const a of s.achievements) {
+            recentAchievements.push({
+              studentId: doc.id,
+              studentName: studentName || 'Student',
+              name: a.name ?? '',
+              icon: a.icon ?? '🏅',
+              rarity: a.rarity ?? 'common',
+              earnedAt: a.earnedAt?.toDate?.() ?? null,
+            });
+          }
+        }
       }
     } catch { /* ignore */ }
   }
@@ -351,6 +413,8 @@ export async function getTeacherDashboardWidgets(
 
   const minutesByStudent = new Map<string, number>();
   const parentComments: TeacherParentComment[] = [];
+  const feelingCounts = new Map<string, number>();
+  const recentReading: TeacherRecentReading[] = [];
   try {
     const logsSnap = await adminDb
       .collection('schools').doc(schoolId).collection('readingLogs')
@@ -361,7 +425,24 @@ export async function getTeacherDashboardWidgets(
       if (!classIds.includes(d.classId)) continue;
       const sid: string = d.studentId ?? '';
       if (!sid) continue;
-      minutesByStudent.set(sid, (minutesByStudent.get(sid) ?? 0) + (d.minutesRead ?? 0));
+      const minutes = d.minutesRead ?? 0;
+      minutesByStudent.set(sid, (minutesByStudent.get(sid) ?? 0) + minutes);
+
+      if (typeof d.childFeeling === 'string' && d.childFeeling) {
+        feelingCounts.set(d.childFeeling, (feelingCounts.get(d.childFeeling) ?? 0) + 1);
+      }
+
+      const readAt: Date | null = d.date?.toDate?.() ?? d.createdAt?.toDate?.() ?? null;
+      if (readAt) {
+        recentReading.push({
+          logId: doc.id,
+          studentId: sid,
+          studentName: nameById.get(sid) ?? 'Student',
+          books: Array.isArray(d.bookTitles) ? d.bookTitles : [],
+          minutes,
+          at: readAt,
+        });
+      }
 
       const lastAt: Date | null = d.lastCommentAt?.toDate?.() ?? null;
       if (lastAt && d.lastCommentByRole === 'parent') {
@@ -378,6 +459,53 @@ export async function getTeacherDashboardWidgets(
       }
     }
   } catch { /* ignore */ }
+
+  // Reading-group comparison — bucket this week's minutes by group membership.
+  // `classId in` is a single-field filter (no composite index); isActive is
+  // filtered client-side to avoid one.
+  const groupComparison: TeacherGroupComparison[] = [];
+  try {
+    const groupDocs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+    for (let i = 0; i < classIds.length; i += 30) {
+      const chunk = classIds.slice(i, i + 30);
+      const snap = await adminDb
+        .collection('schools').doc(schoolId).collection('readingGroups')
+        .where('classId', 'in', chunk)
+        .get();
+      groupDocs.push(...snap.docs);
+    }
+    for (const g of groupDocs) {
+      const data = g.data();
+      if (data.isActive === false) continue;
+      const members: string[] = Array.isArray(data.studentIds) ? data.studentIds : [];
+      let activeReaders = 0;
+      let totalMinutes = 0;
+      for (const sid of members) {
+        const m = minutesByStudent.get(sid) ?? 0;
+        if (m > 0) activeReaders++;
+        totalMinutes += m;
+      }
+      groupComparison.push({
+        groupId: g.id,
+        name: data.name ?? 'Group',
+        color: data.color ?? null,
+        totalStudents: members.length,
+        activeReaders,
+        totalMinutes,
+        avgMinutes: members.length > 0 ? Math.round(totalMinutes / members.length) : 0,
+      });
+    }
+    groupComparison.sort((a, b) => b.totalMinutes - a.totalMinutes);
+  } catch { /* ignore */ }
+
+  const FEELING_ORDER = ['hard', 'tricky', 'okay', 'good', 'great'];
+  const sentiment: TeacherSentiment[] = FEELING_ORDER.map((feeling) => ({
+    feeling,
+    count: feelingCounts.get(feeling) ?? 0,
+  }));
+
+  recentReading.sort((a, b) => b.at.getTime() - a.at.getTime());
+  recentAchievements.sort((a, b) => (b.earnedAt?.getTime() ?? 0) - (a.earnedAt?.getTime() ?? 0));
 
   const topReaders = [...minutesByStudent.entries()]
     .filter(([, m]) => m > 0)
@@ -398,5 +526,77 @@ export async function getTeacherDashboardWidgets(
 
   parentComments.sort((a, b) => b.at.getTime() - a.at.getTime());
 
-  return { topReaders, nudges, parentComments: parentComments.slice(0, 5) };
+  return {
+    topReaders,
+    nudges,
+    parentComments: parentComments.slice(0, 5),
+    sentiment,
+    recentReading: recentReading.slice(0, 6),
+    groupComparison,
+    recentAchievements: recentAchievements.slice(0, 5),
+  };
+}
+
+export interface ReadingCalendarDay {
+  /** yyyy-mm-dd in the server's local time, matching the rest of the dashboard. */
+  date: string;
+  count: number;
+}
+
+/**
+ * Daily reading-log counts across the teacher's classes for the last `weeks`
+ * weeks (oldest first, zero-filled) — powers the dashboard heatmap. One
+ * single-field `date >=` scan filtered to the teacher's classes client-side:
+ * the same index the other dashboard scans use, just a wider window. Fetched
+ * lazily by the calendar widget so this heavier scan only runs when it's shown.
+ */
+export async function getTeacherReadingCalendar(
+  schoolId: string,
+  userId: string,
+  weeks = 6
+): Promise<ReadingCalendarDay[]> {
+  const classesSnap = await adminDb
+    .collection('schools').doc(schoolId).collection('classes')
+    .where('teacherIds', 'array-contains', userId)
+    .where('isActive', '==', true)
+    .get();
+  const classIds = new Set(classesSnap.docs.map((d) => d.id));
+  if (classIds.size === 0) return [];
+
+  const span = weeks * 7;
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - (span - 1));
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const dateKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+  const counts = new Map<string, number>();
+  try {
+    const logsSnap = await adminDb
+      .collection('schools').doc(schoolId).collection('readingLogs')
+      .where('date', '>=', start)
+      .get();
+    for (const doc of logsSnap.docs) {
+      const d = doc.data();
+      if (!classIds.has(d.classId)) continue;
+      const when: Date | null = d.date?.toDate?.() ?? d.createdAt?.toDate?.() ?? null;
+      if (!when) continue;
+      const key = dateKey(when);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+  } catch { /* ignore */ }
+
+  // Emit every day in the window (including zero-count days) so the heatmap grid
+  // is complete and weekday-aligned in the component.
+  const out: ReadingCalendarDay[] = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const cursor = new Date(start);
+  while (cursor <= today) {
+    const key = dateKey(cursor);
+    out.push({ date: key, count: counts.get(key) ?? 0 });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return out;
 }

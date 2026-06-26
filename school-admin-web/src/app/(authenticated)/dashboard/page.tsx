@@ -44,8 +44,16 @@ export default async function DashboardPage() {
       data={teacherData}
       weeklyEngagement={weeklyEngagement}
       widgets={{
-        ...widgets,
+        topReaders: widgets.topReaders,
+        nudges: widgets.nudges,
         parentComments: widgets.parentComments.map((c) => ({ ...c, at: c.at.toISOString() })),
+        sentiment: widgets.sentiment,
+        groupComparison: widgets.groupComparison,
+        recentReading: widgets.recentReading.map((r) => ({ ...r, at: r.at.toISOString() })),
+        recentAchievements: widgets.recentAchievements.map((a) => ({
+          ...a,
+          earnedAt: a.earnedAt ? a.earnedAt.toISOString() : null,
+        })),
       }}
     />
   );
