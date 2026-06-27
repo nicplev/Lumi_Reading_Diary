@@ -201,7 +201,7 @@ export function ParentAppPreview({ enabled, freeTextEnabled, presets }: ParentAp
         </div>
       </div>
 
-      <p className="mt-3 text-center text-xs text-text-secondary">
+      <p className="mt-3 text-center text-xs text-muted">
         Live preview &mdash; tap a chip to see the selected state
       </p>
     </div>

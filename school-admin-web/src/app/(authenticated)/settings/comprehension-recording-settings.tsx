@@ -42,8 +42,8 @@ export function ComprehensionRecordingSettingsSection({
 
   return (
     <Card>
-      <h2 className="text-lg font-bold text-charcoal mb-1">Comprehension Recording</h2>
-      <p className="text-sm text-text-secondary mb-4">
+      <h2 className="text-lg font-bold text-ink mb-1">Comprehension Recording</h2>
+      <p className="text-sm text-muted mb-4">
         Adds an optional voice-recording step at the end of the parent&apos;s reading-log
         wizard so the child can briefly recap what they read. Teachers can edit the
         per-class prompt inside the teacher app.
@@ -66,8 +66,8 @@ export function ComprehensionRecordingSettingsSection({
           className="w-5 h-5 rounded border-gray-300 text-rose-400 focus:ring-rose-400 cursor-pointer"
         />
         <div>
-          <span className="text-sm font-semibold text-charcoal">Enable comprehension recording</span>
-          <p className="text-xs text-text-secondary">
+          <span className="text-sm font-semibold text-ink">Enable comprehension recording</span>
+          <p className="text-xs text-muted">
             When disabled, the recording step is hidden from parents and the per-class
             question tile is hidden from teachers. Recording is always optional per
             session — parents can skip.
