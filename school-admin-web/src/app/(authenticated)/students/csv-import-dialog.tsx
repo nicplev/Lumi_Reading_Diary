@@ -170,7 +170,7 @@ export function CSVImportDialog({ open, onClose }: CSVImportDialogProps) {
     >
       {step === 'upload' && (
         <div className="text-center py-8">
-          <div className="text-4xl mb-4">📄</div>
+          <div className="flex justify-center mb-4 text-text-secondary/50"><Icon name="upload_file" size={48} /></div>
           <p className="text-sm text-text-secondary mb-3">
             Upload a CSV file with columns: Student ID, First Name, Last Name, Class Name, DOB, Parent Email, Reading Level.
           </p>
@@ -273,7 +273,7 @@ export function CSVImportDialog({ open, onClose }: CSVImportDialogProps) {
                 <Icon name="task_alt" size={56} />
               </span>
             ) : (
-              <span className="text-4xl">⚠️</span>
+              <span className="inline-flex items-center justify-center text-warm-orange"><Icon name="warning" size={56} /></span>
             )}
           </div>
           <h3 className="text-lg font-bold text-charcoal mb-2">Import Complete</h3>

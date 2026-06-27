@@ -209,7 +209,7 @@ export function BulkImportStaffModal({ open, onClose }: BulkImportStaffModalProp
       {step === 'upload' && (
         <div className="py-2">
           <div className="text-center mb-4">
-            <div className="text-4xl mb-3">👥</div>
+            <div className="flex justify-center mb-3 text-text-secondary/50"><Icon name="group" size={48} /></div>
             <p className="text-sm text-text-secondary">
               Upload a CSV with columns: <strong>Name, Email, Role</strong>.
             </p>
@@ -323,7 +323,7 @@ export function BulkImportStaffModal({ open, onClose }: BulkImportStaffModalProp
                   <Icon name="task_alt" size={56} />
                 </span>
               ) : (
-                <span className="text-4xl">⚠️</span>
+                <span className="inline-flex items-center justify-center text-warm-orange"><Icon name="warning" size={56} /></span>
               )}
             </div>
             <h3 className="text-lg font-bold text-charcoal mb-2">Import Complete</h3>
