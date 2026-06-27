@@ -35,7 +35,7 @@ export function ClassDetail({ schoolClass, levelOptions, classOptions = [], leve
   }, [schoolClass.id, schoolClass.name, schoolClass.yearLevel, setOverride]);
 
   const tabs = [
-    { id: 'roster', label: 'Roster', count: schoolClass.studentIds.length, icon: <Icon name="group" size={18} /> },
+    { id: 'roster', label: 'Class', count: schoolClass.studentIds.length, icon: <Icon name="group" size={18} /> },
     { id: 'groups', label: 'Reading Groups', icon: <Icon name="library_books" size={18} /> },
     { id: 'allocations', label: 'Allocations', icon: <Icon name="inventory_2" size={18} /> },
     { id: 'report', label: 'Report', icon: <Icon name="assessment" size={18} /> },
