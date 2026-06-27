@@ -122,12 +122,13 @@ export async function middleware(request: NextRequest) {
   }
 
   // Admin-only routes
-  // Students are managed by admins; teachers reach student profiles via their class.
-  const adminOnlyPaths = ['/users', '/parent-links', '/analytics', '/settings', '/students'];
-  if (
-    adminOnlyPaths.some((path) => pathname.startsWith(path)) &&
-    sessionData.role !== 'schoolAdmin'
-  ) {
+  const adminOnlyPaths = ['/users', '/parent-links', '/analytics', '/settings'];
+  // The Students *list* (/students) is admin-only, but teachers must still reach
+  // individual student profiles (/students/[id]) from their class, the dashboard
+  // widgets, reading groups, etc. — so match the list exactly, not by prefix.
+  const isAdminOnly =
+    adminOnlyPaths.some((path) => pathname.startsWith(path)) || pathname === '/students';
+  if (isAdminOnly && sessionData.role !== 'schoolAdmin') {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 

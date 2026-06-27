@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import {
   DndContext,
   closestCenter,
@@ -479,11 +480,17 @@ function GroupCard({
               {resolvedMembers.length === 0 ? (
                 <p className="text-xs text-text-secondary">No students assigned</p>
               ) : (
-                <ul className="space-y-1.5 text-sm text-charcoal">
+                <ul className="space-y-0.5 text-sm text-charcoal">
                   {resolvedMembers.map((s) => (
-                    <li key={s.id} className="flex items-center gap-2">
-                      <Avatar name={`${s.firstName} ${s.lastName}`} characterId={s.characterId} size="xs" />
-                      {s.firstName} {s.lastName}
+                    <li key={s.id}>
+                      <Link
+                        href={`/students/${s.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-2 rounded-[var(--radius-sm)] px-1 py-0.5 -mx-1 hover:bg-background transition-colors"
+                      >
+                        <Avatar name={`${s.firstName} ${s.lastName}`} characterId={s.characterId} size="xs" />
+                        {s.firstName} {s.lastName}
+                      </Link>
                     </li>
                   ))}
                 </ul>
