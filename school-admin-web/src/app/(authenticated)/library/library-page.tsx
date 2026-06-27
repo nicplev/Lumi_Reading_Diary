@@ -13,10 +13,9 @@ import { Skeleton } from '@/components/lumi/skeleton';
 import { useToast } from '@/components/lumi/toast';
 import { useBooks, useDeleteBook } from '@/lib/hooks/use-books';
 import { useLibraryAssignments } from '@/lib/hooks/use-library-assignments';
-import { assignedStudentIdsForBook, narrowToClasses } from '@/lib/library/assignment-matching';
+import { assignedStudentIdsForBook } from '@/lib/library/assignment-matching';
 import { BookFormModal } from './book-form-modal';
 import { ContributeBookModal } from './contribute-book-modal';
-import { BookAssigneesModal } from './book-assignees-modal';
 import { ConfirmDialog } from '@/components/lumi/confirm-dialog';
 import type { ReadingLevelOption } from '@/lib/types';
 
@@ -38,18 +37,12 @@ export function LibraryPage({ levelOptions }: LibraryPageProps) {
   const [showContribute, setShowContribute] = useState(false);
   const [editBookId, setEditBookId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [scope, setScope] = useState<'myClass' | 'school'>('myClass');
-  const [assigneesBook, setAssigneesBook] = useState<{ id: string; isbn?: string; title: string } | null>(null);
 
-  const viewer = assignments?.viewer;
-  // Teachers can narrow to their own classes; admins always see whole school.
-  const showScopeToggle = viewer?.role === 'teacher' && viewer.classIds.length > 0;
-  const narrowIds = showScopeToggle && scope === 'myClass' ? viewer!.classIds : null;
+  // School-wide assigned count for the card badge; the per-class breakdown +
+  // My-class/Whole-school filter live inside the book detail modal.
   const assignedCount = (book: { id: string; isbn?: string; title: string }) => {
     if (!assignments) return 0;
-    let ids = assignedStudentIdsForBook(assignments, book);
-    if (narrowIds) ids = narrowToClasses(ids, assignments, narrowIds);
-    return ids.size;
+    return assignedStudentIdsForBook(assignments, book).size;
   };
 
   const filtered = useMemo(() => {
@@ -136,13 +129,6 @@ export function LibraryPage({ levelOptions }: LibraryPageProps) {
             onClick={() => setFilter(opt.value)}
           />
         ))}
-        {showScopeToggle && (
-          <div className="ml-auto flex items-center gap-1.5">
-            <span className="text-sm text-text-secondary">Assigned:</span>
-            <FilterChip label="My class" selected={scope === 'myClass'} onClick={() => setScope('myClass')} />
-            <FilterChip label="Whole school" selected={scope === 'school'} onClick={() => setScope('school')} />
-          </div>
-        )}
       </div>
 
       <div className="mb-6">
@@ -183,18 +169,9 @@ export function LibraryPage({ levelOptions }: LibraryPageProps) {
                       <span className="text-[10px]">Decodable</span>
                     </Badge>
                   ) : count > 0 ? (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setAssigneesBook({ id: book.id, isbn: book.isbn, title: book.title });
-                      }}
-                      title="View who has this book"
-                    >
-                      <Badge variant="success">
-                        <span className="text-[10px]">{count} assigned</span>
-                      </Badge>
-                    </button>
+                    <Badge variant="success">
+                      <span className="text-[10px]">{count} assigned</span>
+                    </Badge>
                   ) : undefined
                 }
               />
@@ -220,14 +197,6 @@ export function LibraryPage({ levelOptions }: LibraryPageProps) {
       />
 
       <ContributeBookModal open={showContribute} onClose={() => setShowContribute(false)} />
-
-      <BookAssigneesModal
-        open={!!assigneesBook}
-        onClose={() => setAssigneesBook(null)}
-        book={assigneesBook}
-        snapshot={assignments}
-        viewerClassIds={narrowIds}
-      />
 
       <ConfirmDialog
         open={!!deleteConfirm}

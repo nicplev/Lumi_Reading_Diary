@@ -9,6 +9,7 @@ import { Badge } from '@/components/lumi/badge';
 import { ReadingLevelPill } from '@/components/lumi/reading-level-pill';
 import { useToast } from '@/components/lumi/toast';
 import { useCreateBook, useUpdateBook, useLookupIsbn } from '@/lib/hooks/use-books';
+import { BookAssignees } from './book-assignees';
 import type { ReadingLevelOption } from '@/lib/types';
 
 interface BookFormModalProps {
@@ -130,6 +131,9 @@ export function BookFormModal({ open, onClose, book, levelOptions }: BookFormMod
                 <Badge variant="default">Not set</Badge>
               )}
             </div>
+          </div>
+          <div className="pt-4 border-t border-divider">
+            <BookAssignees book={{ id: book.id, isbn: book.isbn, title: book.title }} />
           </div>
         </div>
       </Modal>
