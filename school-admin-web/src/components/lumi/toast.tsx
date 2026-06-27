@@ -16,11 +16,12 @@ interface ToastContextType {
 
 const ToastContext = createContext<ToastContextType>({ toast: () => {} });
 
+// Semantic, fixed brand hues — a toast means the same thing in every section.
 const typeStyles: Record<ToastType, string> = {
-  success: 'bg-mint-green text-charcoal',
-  error: 'bg-error text-white',
-  info: 'bg-sky-blue text-charcoal',
-  warning: 'bg-warm-orange text-white',
+  success: 'bg-lumi-green text-white',
+  error: 'bg-lumi-red text-white',
+  info: 'bg-lumi-blue text-ink',
+  warning: 'bg-lumi-orange text-white',
 };
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {

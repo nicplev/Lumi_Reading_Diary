@@ -79,12 +79,12 @@ export function DataTable<T>({
 
   if (loading) {
     return (
-      <div className="bg-surface rounded-[var(--radius-lg)] shadow-card overflow-hidden">
+      <div className="bg-paper rounded-[var(--radius-lg)] shadow-card overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-divider">
+            <tr className="border-b border-rule">
               {columns.map((col) => (
-                <th key={col.id} className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                <th key={col.id} className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">
                   {col.header}
                 </th>
               ))}
@@ -92,7 +92,7 @@ export function DataTable<T>({
           </thead>
           <tbody>
             {Array.from({ length: 5 }).map((_, i) => (
-              <tr key={i} className="border-b border-divider/50">
+              <tr key={i} className="border-b border-rule/50">
                 {columns.map((col) => (
                   <td key={col.id} className="px-4 py-3">
                     <Skeleton className="h-4 w-24" />
@@ -112,24 +112,24 @@ export function DataTable<T>({
 
   return (
     <div>
-      <div className="bg-surface rounded-[var(--radius-lg)] shadow-card overflow-hidden">
+      <div className="bg-paper rounded-[var(--radius-lg)] shadow-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-divider">
+              <tr className="border-b border-rule">
                 {table.getHeaderGroups().map((headerGroup) =>
                   headerGroup.headers.map((header) => (
                     <th
                       key={header.id}
-                      className={`px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider ${
-                        header.column.getCanSort() ? 'cursor-pointer select-none hover:text-charcoal' : ''
+                      className={`px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider ${
+                        header.column.getCanSort() ? 'cursor-pointer select-none hover:text-ink' : ''
                       } ${(header.column.columnDef.meta as { className?: string })?.className ?? ''}`}
                       onClick={header.column.getToggleSortingHandler()}
                     >
                       <span className="inline-flex items-center gap-1">
                         {flexRender(header.column.columnDef.header, header.getContext())}
-                        {header.column.getIsSorted() === 'asc' && <span className="text-rose-pink">↑</span>}
-                        {header.column.getIsSorted() === 'desc' && <span className="text-rose-pink">↓</span>}
+                        {header.column.getIsSorted() === 'asc' && <span className="text-section">↑</span>}
+                        {header.column.getIsSorted() === 'desc' && <span className="text-section">↓</span>}
                       </span>
                     </th>
                   ))
@@ -140,15 +140,15 @@ export function DataTable<T>({
               {table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}
-                  className={`border-b border-divider/50 last:border-b-0 ${
-                    onRowClick ? 'cursor-pointer hover:bg-background/50 transition-colors' : ''
+                  className={`border-b border-rule/50 last:border-b-0 ${
+                    onRowClick ? 'cursor-pointer hover:bg-cream/50 transition-colors' : ''
                   }`}
                   onClick={() => onRowClick?.(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <td
                       key={cell.id}
-                      className={`px-4 py-3 text-sm text-charcoal ${
+                      className={`px-4 py-3 text-sm text-ink ${
                         (cell.column.columnDef.meta as { className?: string })?.className ?? ''
                       }`}
                     >
@@ -164,12 +164,12 @@ export function DataTable<T>({
 
       {(table.getPageCount() > 1 || pageSizeOptions) && (
         <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
-          <p className="text-sm text-text-secondary">
+          <p className="text-sm text-muted">
             Page {table.getState().pagination.pageIndex + 1} of {Math.max(table.getPageCount(), 1)} ({data.length} total)
           </p>
           <div className="flex items-center gap-3">
             {pageSizeOptions && pageSizeOptions.length > 0 && (
-              <label className="flex items-center gap-2 text-sm text-text-secondary">
+              <label className="flex items-center gap-2 text-sm text-muted">
                 <span>Rows per page</span>
                 <select
                   value={table.getState().pagination.pageSize}
@@ -178,7 +178,7 @@ export function DataTable<T>({
                     table.setPageSize(next);
                     onPageSizeChange?.(next);
                   }}
-                  className="pl-2 pr-7 py-1 rounded-[var(--radius-sm)] border border-divider bg-surface text-charcoal font-semibold appearance-none focus:outline-none focus:ring-2 focus:ring-rose-pink/30"
+                  className="pl-2 pr-7 py-1 rounded-[var(--radius-sm)] border border-rule bg-paper text-ink font-semibold appearance-none focus:outline-none focus:ring-2 focus:ring-section/30"
                 >
                   {pageSizeOptions.map((size) => (
                     <option key={size} value={size}>

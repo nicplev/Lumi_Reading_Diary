@@ -101,11 +101,11 @@ export function StatusEditorBadge({ status, onChange, disabled }: StatusEditorBa
         title="Click to change subscription status"
         aria-haspopup="menu"
         aria-expanded={open}
-        className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] cursor-pointer transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-pink/40 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] cursor-pointer transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-section/40 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <span className="inline-flex items-center gap-0.5">
           <Badge variant={current.badge.variant}>{current.badge.label}</Badge>
-          <Icon name="expand_more" size={16} className="text-text-secondary -ml-0.5" />
+          <Icon name="expand_more" size={16} className="text-muted -ml-0.5" />
         </span>
         {current.showDirect && <Badge variant="info">Direct</Badge>}
       </button>
@@ -115,7 +115,7 @@ export function StatusEditorBadge({ status, onChange, disabled }: StatusEditorBa
           ref={menuRef}
           role="menu"
           style={{ position: 'fixed', top: pos.top, left: pos.left, width: MENU_WIDTH }}
-          className="z-50 bg-surface border border-divider rounded-[var(--radius-md)] shadow-card py-1"
+          className="z-50 bg-paper border border-rule rounded-[var(--radius-md)] shadow-card py-1"
         >
           {OPTIONS.map((opt) => {
             const isCurrent = opt.value === status;
@@ -124,15 +124,15 @@ export function StatusEditorBadge({ status, onChange, disabled }: StatusEditorBa
                 key={opt.value}
                 role="menuitem"
                 onClick={() => handlePick(opt.value)}
-                className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-sm font-semibold transition-colors hover:bg-background focus:outline-none ${
-                  isCurrent ? 'text-charcoal' : 'text-text-secondary'
+                className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-sm font-semibold transition-colors hover:bg-cream focus:outline-none ${
+                  isCurrent ? 'text-ink' : 'text-muted'
                 }`}
               >
                 <span className="flex items-center gap-2">
                   <Badge variant={opt.badge.variant}>{opt.badge.label}</Badge>
                   {opt.showDirect && <Badge variant="info">Direct</Badge>}
                 </span>
-                {isCurrent && <Icon name="check" size={16} className="text-mint-green-dark" />}
+                {isCurrent && <Icon name="check" size={16} className="text-lumi-green-dark" />}
               </button>
             );
           })}

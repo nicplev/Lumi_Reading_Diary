@@ -71,7 +71,7 @@ export function KebabMenu({ items }: KebabMenuProps) {
       <button
         ref={buttonRef}
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center justify-center w-8 h-8 rounded-[var(--radius-sm)] text-text-secondary hover:bg-background hover:text-charcoal transition-colors focus:outline-none focus-visible:outline-none"
+        className="inline-flex items-center justify-center w-8 h-8 rounded-[var(--radius-sm)] text-muted hover:bg-cream hover:text-ink transition-colors focus:outline-none focus-visible:outline-none"
         aria-label="More actions"
         aria-haspopup="menu"
         aria-expanded={open}
@@ -84,7 +84,7 @@ export function KebabMenu({ items }: KebabMenuProps) {
           ref={menuRef}
           role="menu"
           style={{ position: 'fixed', top: pos.top, left: pos.left, width: MENU_WIDTH }}
-          className="z-50 bg-surface border border-divider rounded-[var(--radius-md)] shadow-card py-1"
+          className="z-50 bg-paper border border-rule rounded-[var(--radius-md)] shadow-card py-1"
         >
           {items.map((item, i) => (
             <button
@@ -94,8 +94,8 @@ export function KebabMenu({ items }: KebabMenuProps) {
                 setOpen(false);
                 item.onClick();
               }}
-              className={`w-full text-left px-4 py-2 text-sm font-semibold transition-colors hover:bg-background focus:outline-none ${
-                item.variant === 'danger' ? 'text-error' : 'text-charcoal'
+              className={`w-full text-left px-4 py-2 text-sm font-semibold transition-colors hover:bg-cream focus:outline-none ${
+                item.variant === 'danger' ? 'text-error' : 'text-ink'
               }`}
             >
               {item.label}
