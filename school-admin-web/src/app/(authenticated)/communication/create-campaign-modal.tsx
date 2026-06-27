@@ -164,22 +164,22 @@ export function CreateCampaignModal({ open, onClose, onSent }: CreateCampaignMod
             maxLength={TITLE_MAX}
             onChange={(e) => setTitle(e.target.value)}
           />
-          <p className="mt-1 text-xs text-text-secondary text-right">
+          <p className="mt-1 text-xs text-muted text-right">
             {title.length}/{TITLE_MAX}
           </p>
         </div>
 
         <div>
-          <label className="block text-sm font-semibold text-charcoal mb-1.5">Message</label>
+          <label className="block text-sm font-semibold text-ink mb-1.5">Message</label>
           <textarea
             value={body}
             maxLength={BODY_MAX}
             onChange={(e) => setBody(e.target.value)}
             rows={4}
             placeholder="Write your message to parents…"
-            className="w-full px-4 py-3 rounded-[var(--radius-md)] border border-divider bg-surface text-charcoal placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-rose-pink/30 focus:border-rose-pink transition-colors text-[15px] resize-y"
+            className="w-full px-4 py-3 rounded-[var(--radius-md)] border border-rule bg-paper text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-section/30 focus:border-section transition-colors text-[15px] resize-y"
           />
-          <p className="mt-1 text-xs text-text-secondary text-right">
+          <p className="mt-1 text-xs text-muted text-right">
             {body.length}/{BODY_MAX}
           </p>
         </div>
@@ -192,34 +192,34 @@ export function CreateCampaignModal({ open, onClose, onSent }: CreateCampaignMod
         />
 
         {audienceType === 'school' && (
-          <p className="text-sm text-text-secondary px-1">
+          <p className="text-sm text-muted px-1">
             Every parent in the school with a linked child will receive this message.
           </p>
         )}
 
         {audienceType === 'classes' && (
           <div>
-            <label className="block text-sm font-semibold text-charcoal mb-1.5">Classes</label>
-            <div className="space-y-1 max-h-48 overflow-y-auto rounded-[var(--radius-md)] border border-divider p-2">
+            <label className="block text-sm font-semibold text-ink mb-1.5">Classes</label>
+            <div className="space-y-1 max-h-48 overflow-y-auto rounded-[var(--radius-md)] border border-rule p-2">
               {(classes ?? []).map((c) => (
                 <label
                   key={c.id}
-                  className="flex items-center gap-2 cursor-pointer px-1 py-1 rounded-[var(--radius-sm)] hover:bg-background"
+                  className="flex items-center gap-2 cursor-pointer px-1 py-1 rounded-[var(--radius-sm)] hover:bg-cream"
                 >
                   <input
                     type="checkbox"
                     checked={selectedClassIds.includes(c.id)}
                     onChange={() => toggleClass(c.id)}
-                    className="w-4 h-4 rounded border-divider text-rose-pink focus:ring-rose-pink/30"
+                    className="w-4 h-4 rounded border-rule text-section focus:ring-section/30"
                   />
-                  <span className="text-sm text-charcoal">{c.name}</span>
-                  <span className="text-xs text-text-secondary">
+                  <span className="text-sm text-ink">{c.name}</span>
+                  <span className="text-xs text-muted">
                     {c.studentIds.length} student{c.studentIds.length === 1 ? '' : 's'}
                   </span>
                 </label>
               ))}
               {(classes ?? []).length === 0 && (
-                <p className="text-xs text-text-secondary py-2 text-center">No classes available.</p>
+                <p className="text-xs text-muted py-2 text-center">No classes available.</p>
               )}
             </div>
           </div>
@@ -232,13 +232,13 @@ export function CreateCampaignModal({ open, onClose, onSent }: CreateCampaignMod
                 {selectedStudents.map((s) => (
                   <span
                     key={s.id}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] bg-brand-primary/10 text-xs font-semibold text-charcoal"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] bg-brand-primary/10 text-xs font-semibold text-ink"
                   >
                     {s.name}
                     <button
                       type="button"
                       onClick={() => toggleStudent(s)}
-                      className="text-text-secondary hover:text-error ml-0.5"
+                      className="text-muted hover:text-error ml-0.5"
                     >
                       &times;
                     </button>
@@ -269,16 +269,16 @@ export function CreateCampaignModal({ open, onClose, onSent }: CreateCampaignMod
               type="checkbox"
               checked={scheduleEnabled}
               onChange={(e) => setScheduleEnabled(e.target.checked)}
-              className="w-4 h-4 rounded border-divider text-rose-pink focus:ring-rose-pink/30"
+              className="w-4 h-4 rounded border-rule text-section focus:ring-section/30"
             />
-            <span className="text-sm font-semibold text-charcoal">Schedule for later</span>
+            <span className="text-sm font-semibold text-ink">Schedule for later</span>
           </label>
           {scheduleEnabled && (
             <input
               type="datetime-local"
               value={scheduledLocal}
               onChange={(e) => setScheduledLocal(e.target.value)}
-              className="mt-2 w-full px-4 py-3 rounded-[var(--radius-md)] border border-divider bg-surface text-charcoal focus:outline-none focus:ring-2 focus:ring-rose-pink/30 focus:border-rose-pink transition-colors text-[15px]"
+              className="mt-2 w-full px-4 py-3 rounded-[var(--radius-md)] border border-rule bg-paper text-ink focus:outline-none focus:ring-2 focus:ring-section/30 focus:border-section transition-colors text-[15px]"
             />
           )}
         </div>
@@ -304,30 +304,30 @@ function StudentPicker({
   const { data: students, isLoading } = useStudents({ classId });
 
   if (isLoading) {
-    return <p className="text-xs text-text-secondary py-2 px-1">Loading students…</p>;
+    return <p className="text-xs text-muted py-2 px-1">Loading students…</p>;
   }
 
   const list = students ?? [];
   if (list.length === 0) {
-    return <p className="text-xs text-text-secondary py-2 text-center">No students in this class.</p>;
+    return <p className="text-xs text-muted py-2 text-center">No students in this class.</p>;
   }
 
   return (
-    <div className="space-y-1 max-h-44 overflow-y-auto rounded-[var(--radius-md)] border border-divider p-2">
+    <div className="space-y-1 max-h-44 overflow-y-auto rounded-[var(--radius-md)] border border-rule p-2">
       {list.map((s) => {
         const name = `${s.firstName} ${s.lastName}`.trim();
         return (
           <label
             key={s.id}
-            className="flex items-center gap-2 cursor-pointer px-1 py-1 rounded-[var(--radius-sm)] hover:bg-background"
+            className="flex items-center gap-2 cursor-pointer px-1 py-1 rounded-[var(--radius-sm)] hover:bg-cream"
           >
             <input
               type="checkbox"
               checked={selectedIds.includes(s.id)}
               onChange={() => onToggle({ id: s.id, name })}
-              className="w-4 h-4 rounded border-divider text-rose-pink focus:ring-rose-pink/30"
+              className="w-4 h-4 rounded border-rule text-section focus:ring-section/30"
             />
-            <span className="text-sm text-charcoal">{name}</span>
+            <span className="text-sm text-ink">{name}</span>
           </label>
         );
       })}
