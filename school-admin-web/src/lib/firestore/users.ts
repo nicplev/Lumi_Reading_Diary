@@ -17,6 +17,7 @@ function toUser(doc: FirebaseFirestore.DocumentSnapshot): SchoolUser {
     createdAt: data.createdAt?.toDate() ?? new Date(),
     lastLoginAt: data.lastLoginAt?.toDate(),
     profileImageUrl: data.profileImageUrl,
+    characterId: data.characterId,
     phone: data.phone,
     pendingDeletion: data.pendingDeletion ?? false,
     scheduledDeletionAt: data.scheduledDeletionAt?.toDate(),
@@ -250,13 +251,14 @@ export async function getStaffCredential(
 export async function updateUser(
   schoolId: string,
   userId: string,
-  data: Partial<Pick<SchoolUser, 'fullName' | 'role' | 'phone' | 'classIds'>>
+  data: Partial<Pick<SchoolUser, 'fullName' | 'role' | 'phone' | 'classIds' | 'characterId'>>
 ): Promise<void> {
   const update: Record<string, unknown> = {};
   if (data.fullName !== undefined) update.fullName = data.fullName;
   if (data.role !== undefined) update.role = data.role;
   if (data.phone !== undefined) update.phone = data.phone;
   if (data.classIds !== undefined) update.classIds = data.classIds;
+  if (data.characterId !== undefined) update.characterId = data.characterId;
 
   await adminDb
     .collection('schools')

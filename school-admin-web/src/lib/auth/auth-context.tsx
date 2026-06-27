@@ -10,6 +10,7 @@ export interface AuthUser {
   schoolId: string;
   role: 'teacher' | 'schoolAdmin';
   fullName: string;
+  characterId?: string;
 }
 
 interface AuthContextType {

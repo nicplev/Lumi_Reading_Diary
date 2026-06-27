@@ -43,6 +43,7 @@ async function findUserInSchool(schoolId: string, uid: string, email: string, de
       schoolId,
       role: role as 'teacher' | 'schoolAdmin',
       fullName: data.fullName || decodedName || '',
+      characterId: data.characterId,
     },
   };
 }

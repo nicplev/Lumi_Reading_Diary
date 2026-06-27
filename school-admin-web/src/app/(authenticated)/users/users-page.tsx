@@ -149,7 +149,7 @@ export function UsersPage() {
       accessorFn: (row) => row.fullName,
       cell: (value, row) => (
         <div className="flex items-center gap-3">
-          <Avatar name={value as string} size="sm" />
+          <Avatar name={value as string} characterId={row.characterId} size="sm" />
           <div>
             <div className="flex items-center gap-2">
               <p className="font-semibold text-charcoal">{value as string}</p>
