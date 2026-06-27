@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Avatar } from '@/components/lumi/avatar';
 import { FilterChip } from '@/components/lumi/filter-chip';
 import { useLibraryAssignments } from '@/lib/hooks/use-library-assignments';
@@ -56,7 +57,11 @@ export function BookAssignees({ book }: { book: { id: string; isbn?: string; tit
               </h5>
               <div className="space-y-1.5">
                 {g.students.map((s) => (
-                  <div key={s.id} className="flex items-center gap-2.5">
+                  <Link
+                    key={s.id}
+                    href={`/students/${s.id}`}
+                    className="flex items-center gap-2.5 rounded-[var(--radius-sm)] px-1 py-0.5 -mx-1 hover:bg-background transition-colors"
+                  >
                     <Avatar
                       name={`${s.firstName} ${s.lastName}`}
                       characterId={s.characterId}
@@ -65,7 +70,7 @@ export function BookAssignees({ book }: { book: { id: string; isbn?: string; tit
                     <span className="text-sm text-charcoal">
                       {s.firstName} {s.lastName}
                     </span>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </div>

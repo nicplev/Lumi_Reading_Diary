@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { Card } from '@/components/lumi/card';
 import { Badge } from '@/components/lumi/badge';
 import { Button } from '@/components/lumi/button';
@@ -113,13 +114,14 @@ export function AllocationDetail({ allocation, students, onClose }: AllocationDe
         ) : (
           <div className="flex flex-wrap gap-2">
             {allocation.studentIds.map((sid) => (
-              <span
+              <Link
                 key={sid}
-                className="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-[var(--radius-pill)] bg-background text-sm text-charcoal"
+                href={`/students/${sid}`}
+                className="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-[var(--radius-pill)] bg-background text-sm text-charcoal hover:bg-divider/40 transition-colors"
               >
                 <Avatar name={nameOf(sid) ?? sid} characterId={studentById.get(sid)?.characterId} size="xs" />
                 {nameOf(sid) ?? 'Unknown student'}
-              </span>
+              </Link>
             ))}
           </div>
         )}
