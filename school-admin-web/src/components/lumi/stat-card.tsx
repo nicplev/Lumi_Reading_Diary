@@ -15,13 +15,6 @@ interface StatCardProps {
   sparklineData?: number[];
 }
 
-const colorClasses = {
-  pink: 'bg-rose-pink/10 text-rose-pink',
-  green: 'bg-mint-green/40 text-mint-green-dark',
-  orange: 'bg-warm-orange/10 text-warm-orange',
-  blue: 'bg-sky-blue/40 text-sky-blue-dark',
-};
-
 const sparkColors: Record<NonNullable<StatCardProps['color']>, string> = {
   pink: '#FF8698',
   green: '#7FB26B',
@@ -38,7 +31,7 @@ export function StatCard({ title, value, icon, trend, color = 'pink', href, subt
       {/* Title row: icon grouped with title */}
       <div className="flex items-center gap-2 mb-2">
         {icon && (
-          <span className={`inline-flex items-center justify-center w-8 h-8 rounded-[var(--radius-md)] text-base flex-shrink-0 ${colorClasses[color]}`}>
+          <span className="inline-flex items-center justify-center w-8 h-8 rounded-[var(--radius-md)] text-base flex-shrink-0 bg-charcoal/5 text-charcoal">
             {icon}
           </span>
         )}

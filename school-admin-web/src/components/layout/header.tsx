@@ -26,7 +26,7 @@ export function Header() {
   const segments = pathname.split('/').filter(Boolean);
 
   return (
-    <header className="h-14 border-b border-divider bg-surface/80 backdrop-blur-sm flex items-center px-6 sticky top-0 z-30">
+    <header className="h-14 border-b border-divider bg-surface flex items-center px-6 sticky top-0 z-30">
       <nav className="flex items-center gap-1.5 text-sm">
         {segments.map((segment, index) => {
           const href = '/' + segments.slice(0, index + 1).join('/');
