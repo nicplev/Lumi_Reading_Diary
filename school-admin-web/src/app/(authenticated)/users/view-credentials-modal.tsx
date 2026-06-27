@@ -67,11 +67,11 @@ export function ViewCredentialsModal({ open, onClose, user }: ViewCredentialsMod
       }
     >
       {fetchCredential.isPending && (
-        <p className="text-sm text-text-secondary py-6 text-center">Loading…</p>
+        <p className="text-sm text-muted py-6 text-center">Loading…</p>
       )}
 
       {!fetchCredential.isPending && error && (
-        <div className="bg-background border border-divider rounded-[var(--radius-md)] px-4 py-3 text-sm text-text-secondary">
+        <div className="bg-cream border border-rule rounded-[var(--radius-md)] px-4 py-3 text-sm text-muted">
           {error}
         </div>
       )}
@@ -79,20 +79,20 @@ export function ViewCredentialsModal({ open, onClose, user }: ViewCredentialsMod
       {!fetchCredential.isPending && tempPassword && user && (
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-text-secondary mb-1">Email</label>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Email</label>
             <div className="flex items-center gap-2">
-              <code className="flex-1 bg-background border border-divider px-3 py-2 rounded-[var(--radius-md)] text-sm text-charcoal break-all">{user.email}</code>
+              <code className="flex-1 bg-cream border border-rule px-3 py-2 rounded-[var(--radius-md)] text-sm text-ink break-all">{user.email}</code>
               <Button variant="ghost" size="sm" onClick={() => copy(user.email, 'Email')}>Copy</Button>
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-text-secondary mb-1">Temporary password</label>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Temporary password</label>
             <div className="flex items-center gap-2">
-              <code className="flex-1 bg-background border border-divider px-3 py-2 rounded-[var(--radius-md)] text-sm font-mono text-charcoal">{tempPassword}</code>
+              <code className="flex-1 bg-cream border border-rule px-3 py-2 rounded-[var(--radius-md)] text-sm font-mono text-ink">{tempPassword}</code>
               <Button variant="ghost" size="sm" onClick={() => copy(tempPassword, 'Password')}>Copy</Button>
             </div>
           </div>
-          <p className="text-xs text-text-secondary">
+          <p className="text-xs text-muted">
             This temporary password is hidden automatically once {user.fullName} logs in for the first time.
           </p>
         </div>

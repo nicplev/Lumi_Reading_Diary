@@ -102,7 +102,7 @@ export function CreateUserModal({ open, onClose }: CreateUserModalProps) {
           error={password.length > 0 && password.length < 6 ? 'Password must be at least 6 characters' : undefined}
         />
 
-        <p className="text-xs text-text-secondary">
+        <p className="text-xs text-muted">
           The user will be able to sign in immediately with this password.
           You can generate a password reset link later if needed.
         </p>

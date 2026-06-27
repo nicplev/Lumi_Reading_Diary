@@ -209,17 +209,17 @@ export function BulkImportStaffModal({ open, onClose }: BulkImportStaffModalProp
       {step === 'upload' && (
         <div className="py-2">
           <div className="text-center mb-4">
-            <div className="flex justify-center mb-3 text-text-secondary/50"><Icon name="group" size={48} /></div>
-            <p className="text-sm text-text-secondary">
+            <div className="flex justify-center mb-3 text-muted/50"><Icon name="group" size={48} /></div>
+            <p className="text-sm text-muted">
               Upload a CSV with columns: <strong>Name, Email, Role</strong>.
             </p>
           </div>
-          <div className="bg-sky-blue/10 border border-sky-blue/20 rounded-[var(--radius-md)] px-4 py-3 mb-4 text-sm text-charcoal">
+          <div className="bg-lumi-blue/10 border border-lumi-blue/20 rounded-[var(--radius-md)] px-4 py-3 mb-4 text-sm text-ink">
             <p className="mb-1"><strong>Role</strong> must be <code>teacher</code> or <code>admin</code> (blank defaults to teacher).</p>
             <p>Each staff member gets an auto-generated temporary password and an email with login instructions. You can view or re-send these from the Users list.</p>
           </div>
 
-          <label className="block text-xs font-semibold uppercase tracking-wide text-text-secondary mb-1">
+          <label className="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">
             Optional note to include in the email
           </label>
           <textarea
@@ -228,7 +228,7 @@ export function BulkImportStaffModal({ open, onClose }: BulkImportStaffModalProp
             rows={2}
             maxLength={2000}
             placeholder="e.g. Welcome to the team! Reach out to the office if you need help logging in."
-            className="w-full rounded-[var(--radius-md)] border border-divider px-3 py-2 text-sm text-charcoal focus:outline-none focus:ring-2 focus:ring-rose-pink/40 mb-4"
+            className="w-full rounded-[var(--radius-md)] border border-rule px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-section/40 mb-4"
           />
 
           <input
@@ -257,7 +257,7 @@ export function BulkImportStaffModal({ open, onClose }: BulkImportStaffModalProp
                 a.click();
                 URL.revokeObjectURL(url);
               }}
-              className="text-sm text-rose-pink hover:underline font-semibold"
+              className="text-sm text-section hover:underline font-semibold"
             >
               Download CSV Template
             </button>
@@ -274,21 +274,21 @@ export function BulkImportStaffModal({ open, onClose }: BulkImportStaffModalProp
           <div className="overflow-x-auto max-h-80">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-divider">
-                  <th className="px-2 py-2 text-left text-xs text-text-secondary">#</th>
-                  <th className="px-2 py-2 text-left text-xs text-text-secondary">Name</th>
-                  <th className="px-2 py-2 text-left text-xs text-text-secondary">Email</th>
-                  <th className="px-2 py-2 text-left text-xs text-text-secondary">Role</th>
-                  <th className="px-2 py-2 text-left text-xs text-text-secondary">Status</th>
+                <tr className="border-b border-rule">
+                  <th className="px-2 py-2 text-left text-xs text-muted">#</th>
+                  <th className="px-2 py-2 text-left text-xs text-muted">Name</th>
+                  <th className="px-2 py-2 text-left text-xs text-muted">Email</th>
+                  <th className="px-2 py-2 text-left text-xs text-muted">Role</th>
+                  <th className="px-2 py-2 text-left text-xs text-muted">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {parsedRows.map((row, i) => (
-                  <tr key={i} className={`border-b border-divider/50 ${row.error ? 'bg-error/5' : ''}`}>
-                    <td className="px-2 py-1.5 text-text-secondary">{i + 1}</td>
+                  <tr key={i} className={`border-b border-rule/50 ${row.error ? 'bg-error/5' : ''}`}>
+                    <td className="px-2 py-1.5 text-muted">{i + 1}</td>
                     <td className="px-2 py-1.5">{row.fullName || <span className="text-error">missing</span>}</td>
                     <td className="px-2 py-1.5">{row.email || <span className="text-error">missing</span>}</td>
-                    <td className="px-2 py-1.5 text-text-secondary">{row.roleLabel || '-'}</td>
+                    <td className="px-2 py-1.5 text-muted">{row.roleLabel || '-'}</td>
                     <td className="px-2 py-1.5">
                       {row.error ? (
                         <Badge variant="error">{row.error}</Badge>
@@ -306,11 +306,11 @@ export function BulkImportStaffModal({ open, onClose }: BulkImportStaffModalProp
 
       {step === 'importing' && (
         <div className="text-center py-8">
-          <svg className="animate-spin mx-auto h-8 w-8 text-rose-pink mb-4" viewBox="0 0 24 24" fill="none">
+          <svg className="animate-spin mx-auto h-8 w-8 text-section mb-4" viewBox="0 0 24 24" fill="none">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          <p className="text-sm text-text-secondary">Creating staff accounts…</p>
+          <p className="text-sm text-muted">Creating staff accounts…</p>
         </div>
       )}
 
@@ -323,16 +323,16 @@ export function BulkImportStaffModal({ open, onClose }: BulkImportStaffModalProp
                   <Icon name="task_alt" size={56} />
                 </span>
               ) : (
-                <span className="inline-flex items-center justify-center text-warm-orange"><Icon name="warning" size={56} /></span>
+                <span className="inline-flex items-center justify-center text-lumi-orange"><Icon name="warning" size={56} /></span>
               )}
             </div>
-            <h3 className="text-lg font-bold text-charcoal mb-2">Import Complete</h3>
+            <h3 className="text-lg font-bold text-ink mb-2">Import Complete</h3>
             <div className="flex justify-center gap-4 mb-2">
               <Badge variant="success">{result.successCount} created</Badge>
               {result.errorCount > 0 && <Badge variant="error">{result.errorCount} failed</Badge>}
             </div>
             {result.created.length > 0 && (
-              <p className="text-sm text-text-secondary">
+              <p className="text-sm text-muted">
                 Login emails sent to {result.created.length} staff member{result.created.length !== 1 ? 's' : ''}.
               </p>
             )}
@@ -341,32 +341,32 @@ export function BulkImportStaffModal({ open, onClose }: BulkImportStaffModalProp
           {result.created.length > 0 && (
             <div className="mb-4">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Temporary passwords</p>
-                <button onClick={downloadCredentialsCSV} className="text-sm text-rose-pink hover:underline font-semibold">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Temporary passwords</p>
+                <button onClick={downloadCredentialsCSV} className="text-sm text-section hover:underline font-semibold">
                   Download credentials CSV
                 </button>
               </div>
-              <div className="bg-warning/5 border border-warning/20 rounded-[var(--radius-md)] px-3 py-2 mb-3 text-xs text-charcoal">
+              <div className="bg-warning/5 border border-warning/20 rounded-[var(--radius-md)] px-3 py-2 mb-3 text-xs text-ink">
                 Save or send these now — for security, temporary passwords are hidden once a staff member logs in.
               </div>
-              <div className="overflow-x-auto max-h-56 border border-divider rounded-[var(--radius-md)]">
+              <div className="overflow-x-auto max-h-56 border border-rule rounded-[var(--radius-md)]">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-divider bg-background/50">
-                      <th className="px-3 py-2 text-left text-xs text-text-secondary">Email</th>
-                      <th className="px-3 py-2 text-left text-xs text-text-secondary">Temp Password</th>
+                    <tr className="border-b border-rule bg-cream/50">
+                      <th className="px-3 py-2 text-left text-xs text-muted">Email</th>
+                      <th className="px-3 py-2 text-left text-xs text-muted">Temp Password</th>
                       <th className="px-2 py-2"></th>
                     </tr>
                   </thead>
                   <tbody>
                     {result.created.map((c) => (
-                      <tr key={c.uid} className="border-b border-divider/50">
+                      <tr key={c.uid} className="border-b border-rule/50">
                         <td className="px-3 py-1.5">{c.email}</td>
                         <td className="px-3 py-1.5 font-mono">{c.tempPassword}</td>
                         <td className="px-2 py-1.5 text-right">
                           <button
                             onClick={() => copy(c.tempPassword, 'Password')}
-                            className="text-xs text-rose-pink hover:underline"
+                            className="text-xs text-section hover:underline"
                           >
                             Copy
                           </button>
@@ -381,7 +381,7 @@ export function BulkImportStaffModal({ open, onClose }: BulkImportStaffModalProp
 
           {result.errors.length > 0 && (
             <div className="text-left max-h-32 overflow-y-auto">
-              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary mb-1">Errors</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted mb-1">Errors</p>
               {result.errors.map((err, i) => (
                 <p key={i} className="text-xs text-error">Row {err.row}: {err.message}</p>
               ))}
