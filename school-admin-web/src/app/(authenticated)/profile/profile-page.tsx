@@ -154,17 +154,17 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <PageHeader title="Profile" />
+      <PageHeader eyebrow="Profile" title="Profile" />
 
       {/* Profile Header */}
       <Card>
         <div className="flex items-center gap-4">
           <Avatar name={displayName} characterId={profile?.characterId ?? user?.characterId} size="lg" />
           <div>
-            <h2 className="text-[22px] font-bold text-charcoal">
+            <h2 className="text-[22px] font-bold text-ink">
               {displayName}
             </h2>
-            <p className="text-sm text-text-secondary">{userEmail}</p>
+            <p className="text-sm text-muted">{userEmail}</p>
             <Badge variant={roleBadgeVariant} className="mt-1">
               {roleLabel}
             </Badge>
@@ -184,7 +184,7 @@ export default function ProfilePage() {
 
       {/* Personal Information — Editable */}
       <Card>
-        <h3 className="text-[17px] font-bold text-charcoal mb-4 flex items-center gap-2">
+        <h3 className="text-[17px] font-bold text-ink mb-4 flex items-center gap-2">
           <Icon name="edit" size={18} />
           Personal Information
         </h3>
@@ -229,36 +229,36 @@ export default function ProfilePage() {
 
       {/* Account Details */}
       <Card>
-        <h3 className="text-[17px] font-bold text-charcoal mb-4 flex items-center gap-2">
+        <h3 className="text-[17px] font-bold text-ink mb-4 flex items-center gap-2">
           <Icon name="info" size={18} />
           Account Details
         </h3>
         <div className="space-y-3">
-          <div className="flex justify-between py-2 border-b border-divider">
-            <span className="text-sm text-text-secondary">Email</span>
-            <span className="text-sm font-semibold text-charcoal">{userEmail}</span>
+          <div className="flex justify-between py-2 border-b border-rule">
+            <span className="text-sm text-muted">Email</span>
+            <span className="text-sm font-semibold text-ink">{userEmail}</span>
           </div>
-          <div className="flex justify-between py-2 border-b border-divider">
-            <span className="text-sm text-text-secondary">Role</span>
+          <div className="flex justify-between py-2 border-b border-rule">
+            <span className="text-sm text-muted">Role</span>
             <Badge variant={roleBadgeVariant}>
               {roleLabel}
             </Badge>
           </div>
-          <div className="flex justify-between py-2 border-b border-divider">
-            <span className="text-sm text-text-secondary">School</span>
-            <span className="text-sm font-semibold text-charcoal">
+          <div className="flex justify-between py-2 border-b border-rule">
+            <span className="text-sm text-muted">School</span>
+            <span className="text-sm font-semibold text-ink">
               {school?.displayName || school?.name || '—'}
             </span>
           </div>
           {!loadingProfile && (
             <>
-              <div className="flex justify-between py-2 border-b border-divider">
-                <span className="text-sm text-text-secondary">Last Login</span>
-                <span className="text-sm text-charcoal">{formatDate(profile?.lastLoginAt)}</span>
+              <div className="flex justify-between py-2 border-b border-rule">
+                <span className="text-sm text-muted">Last Login</span>
+                <span className="text-sm text-ink">{formatDate(profile?.lastLoginAt)}</span>
               </div>
               <div className="flex justify-between py-2">
-                <span className="text-sm text-text-secondary">Account Created</span>
-                <span className="text-sm text-charcoal">{formatDate(profile?.createdAt)}</span>
+                <span className="text-sm text-muted">Account Created</span>
+                <span className="text-sm text-ink">{formatDate(profile?.createdAt)}</span>
               </div>
             </>
           )}
@@ -268,7 +268,7 @@ export default function ProfilePage() {
       {/* Assigned Classes — Teachers only */}
       {(user?.role || profile?.role) === 'teacher' && userClasses && userClasses.length > 0 && (
         <Card>
-          <h3 className="text-[17px] font-bold text-charcoal mb-4 flex items-center gap-2">
+          <h3 className="text-[17px] font-bold text-ink mb-4 flex items-center gap-2">
             <Icon name="school" size={18} />
             Assigned Classes
           </h3>
@@ -277,20 +277,20 @@ export default function ProfilePage() {
               <Link
                 key={cls.id}
                 href={`/classes/${cls.id}`}
-                className="flex items-center justify-between p-3 rounded-[var(--radius-md)] hover:bg-background transition-colors"
+                className="flex items-center justify-between p-3 rounded-[var(--radius-md)] hover:bg-cream transition-colors"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-[var(--radius-md)] bg-brand-primary/10 flex items-center justify-center">
                     <Icon name="school" size={16} className="text-brand-primary" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-charcoal">{cls.name}</p>
+                    <p className="text-sm font-semibold text-ink">{cls.name}</p>
                     {cls.yearLevel && (
-                      <p className="text-xs text-text-secondary">Year {cls.yearLevel}</p>
+                      <p className="text-xs text-muted">Year {cls.yearLevel}</p>
                     )}
                   </div>
                 </div>
-                <Icon name="chevron_right" size={18} className="text-text-secondary" />
+                <Icon name="chevron_right" size={18} className="text-muted" />
               </Link>
             ))}
           </div>
@@ -299,11 +299,11 @@ export default function ProfilePage() {
 
       {/* Security */}
       <Card>
-        <h3 className="text-[17px] font-bold text-charcoal mb-4 flex items-center gap-2">
+        <h3 className="text-[17px] font-bold text-ink mb-4 flex items-center gap-2">
           <Icon name="lock" size={18} />
           Security
         </h3>
-        <p className="text-sm text-text-secondary mb-4">
+        <p className="text-sm text-muted mb-4">
           Request a password reset link sent to your email address.
         </p>
         <div className="flex gap-3">

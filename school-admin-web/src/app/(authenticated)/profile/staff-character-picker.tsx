@@ -61,12 +61,12 @@ export function StaffCharacterPicker({
               type="button"
               onClick={() => setSelected(id)}
               className={`relative rounded-[var(--radius-md)] p-2 border-2 transition-colors ${
-                isSelected ? 'border-rose-pink bg-rose-pink/5' : 'border-divider/40 hover:bg-background'
+                isSelected ? 'border-section bg-section/5' : 'border-rule/40 hover:bg-cream'
               }`}
             >
               {src && <img src={src} alt="" className="w-full aspect-square object-contain" />}
               {isSelected && (
-                <span className="absolute top-1 right-1 w-5 h-5 rounded-full bg-rose-pink text-white flex items-center justify-center">
+                <span className="absolute top-1 right-1 w-5 h-5 rounded-full bg-section text-white flex items-center justify-center">
                   <Icon name="check" size={12} />
                 </span>
               )}

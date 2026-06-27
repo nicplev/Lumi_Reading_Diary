@@ -155,17 +155,17 @@ export function ImpersonationPicker() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-charcoal mb-2">
+        <h1 className="text-2xl font-bold text-ink mb-2">
           Impersonate a school (read-only)
         </h1>
-        <p className="text-sm text-charcoal/70">
+        <p className="text-sm text-ink/70">
           Every session and action is recorded to the super-admin audit trail.
           Writes are blocked server-side and by Firestore rules. Sessions expire
           after 30 minutes.
         </p>
       </div>
 
-      <div className="space-y-5 bg-white border border-divider rounded-[var(--radius-md)] p-6 shadow-card">
+      <div className="space-y-5 bg-white border border-rule rounded-[var(--radius-md)] p-6 shadow-card">
         <Select
           label="School"
           value={schoolId}
@@ -179,10 +179,10 @@ export function ImpersonationPicker() {
         />
 
         <div>
-          <label className="block text-sm font-semibold text-charcoal mb-1.5">
+          <label className="block text-sm font-semibold text-ink mb-1.5">
             Role
           </label>
-          <div className="inline-flex rounded-[var(--radius-md)] border border-divider overflow-hidden">
+          <div className="inline-flex rounded-[var(--radius-md)] border border-rule overflow-hidden">
             {(['teacher', 'schoolAdmin'] as const).map((r) => (
               <button
                 key={r}
@@ -191,7 +191,7 @@ export function ImpersonationPicker() {
                 className={`px-4 py-2 text-sm ${
                   role === r
                     ? 'bg-brand-primary text-white'
-                    : 'bg-white text-charcoal hover:bg-background'
+                    : 'bg-white text-ink hover:bg-cream'
                 }`}
               >
                 {r === 'teacher' ? 'Teacher' : 'School admin'}
@@ -221,9 +221,9 @@ export function ImpersonationPicker() {
         />
 
         <div>
-          <label className="block text-sm font-semibold text-charcoal mb-1.5">
+          <label className="block text-sm font-semibold text-ink mb-1.5">
             Reason{' '}
-            <span className="text-xs font-normal text-charcoal/60">
+            <span className="text-xs font-normal text-ink/60">
               (min 20 characters)
             </span>
           </label>
@@ -233,9 +233,9 @@ export function ImpersonationPicker() {
             rows={3}
             maxLength={500}
             placeholder="e.g. Reproducing reading log bug reported in ticket #123"
-            className="w-full rounded-[var(--radius-sm)] border border-divider px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            className="w-full rounded-[var(--radius-sm)] border border-rule px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
           />
-          <p className="text-xs text-charcoal/60 mt-1">
+          <p className="text-xs text-ink/60 mt-1">
             {reason.trim().length}/500 — stored verbatim in the audit log.
           </p>
         </div>

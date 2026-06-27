@@ -125,18 +125,19 @@ export function RenewalsPage({
     <div className="space-y-6">
       {!embedded && (
         <PageHeader
+          eyebrow="Renewals"
           title="Renewals"
           description={`Carry students forward into the ${targetYear} school year`}
         />
       )}
       {embedded && (
-        <p className="text-sm text-text-secondary">
+        <p className="text-sm text-muted">
           Carry students forward into the {targetYear} school year.
         </p>
       )}
 
       {!windowOpen && (
-        <Card className="border-warning/40 bg-warning/5 p-4 text-sm text-charcoal">
+        <Card className="border-warning/40 bg-warning/5 p-4 text-sm text-ink">
           It&apos;s early — renewals for {targetYear} usually open around October{' '}
           {currentYear} (start of Term 4). You can still renew now for an early or
           one-off case if you need to.
@@ -157,7 +158,7 @@ export function RenewalsPage({
           <span>Graduates (excluded): <strong>{stats.graduates}</strong></span>
           <span>Already renewed: <strong>{stats.alreadyRenewed}</strong></span>
         </div>
-        <p className="mt-2 text-xs text-text-secondary">
+        <p className="mt-2 text-xs text-muted">
           Everyone is pre-ticked except graduates and students already renewed.
           Untick anyone not returning (non-payers / leavers). Year levels are
           bumped automatically; class assignment stays manual.
@@ -167,7 +168,7 @@ export function RenewalsPage({
       <Card className="overflow-hidden p-0">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b text-left text-text-secondary">
+            <tr className="border-b text-left text-muted">
               <th className="w-10 p-3"></th>
               <th className="p-3">Student</th>
               <th className="p-3">Year level → next</th>
@@ -200,14 +201,14 @@ export function RenewalsPage({
                   ) : s.graduated ? (
                     <Badge>Graduate</Badge>
                   ) : (
-                    <span className="text-text-secondary">—</span>
+                    <span className="text-muted">—</span>
                   )}
                 </td>
               </tr>
             ))}
             {roster.length === 0 && (
               <tr>
-                <td colSpan={4} className="p-6 text-center text-text-secondary">
+                <td colSpan={4} className="p-6 text-center text-muted">
                   No active students to renew.
                 </td>
               </tr>
@@ -228,19 +229,19 @@ export function RenewalsPage({
 
       {recentBatches.length > 0 && (
         <Card className="p-4">
-          <h3 className="text-sm font-bold text-charcoal mb-1">Recent renewals</h3>
-          <p className="text-xs text-text-secondary mb-3">
+          <h3 className="text-sm font-bold text-ink mb-1">Recent renewals</h3>
+          <p className="text-xs text-muted mb-3">
             Made a mistake? Undo restores those students to exactly how they were
             before the renewal — access, year level, and graduate flag.
           </p>
-          <ul className="divide-y divide-divider">
+          <ul className="divide-y divide-rule">
             {recentBatches.map((b) => (
               <li
                 key={b.id}
                 className="flex items-center justify-between gap-4 py-2 text-sm"
               >
-                <span className="text-text-secondary">
-                  <strong className="text-charcoal">{b.count}</strong> student
+                <span className="text-muted">
+                  <strong className="text-ink">{b.count}</strong> student
                   {b.count === 1 ? '' : 's'} → {b.academicYear}
                   {b.performedAtIso
                     ? ` · ${new Date(b.performedAtIso).toLocaleDateString()}`
