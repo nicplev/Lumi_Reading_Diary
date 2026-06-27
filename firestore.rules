@@ -206,6 +206,9 @@ service cloud.firestore {
                   'fcmTokenUpdatedAt',
                   'lastLoginAt',
                   'relationshipLabel',
+                  // Profile mascot a staff member picks for themselves (app/portal).
+                  // Category-vs-role (la_/mt_/ft_) is enforced by the write paths.
+                  'characterId',
                 ])
               )
             );
