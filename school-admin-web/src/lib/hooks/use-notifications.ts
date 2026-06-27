@@ -26,6 +26,28 @@ export function useNotificationCampaigns() {
   });
 }
 
+/** Archive / unarchive a message in the history (single; call repeatedly for bulk). */
+export function useArchiveCampaign() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ campaignId, archived }: { campaignId: string; archived: boolean }) => {
+      const res = await fetch(`/api/notification-campaigns/${campaignId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ archived }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to update message');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notification-campaigns'] });
+    },
+  });
+}
+
 export interface CreateCampaignInput {
   schoolId: string;
   title: string;

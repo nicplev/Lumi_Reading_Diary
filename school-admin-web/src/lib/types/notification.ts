@@ -38,4 +38,6 @@ export interface NotificationCampaign {
   };
   errorSummary: string | null;
   sentAt: Date | null;
+  /** Hidden from the default Communication history when true (portal-only flag). */
+  archived: boolean;
 }
