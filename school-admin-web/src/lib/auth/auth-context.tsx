@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef } f
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { auth } from '@/lib/firebase/client';
 
-interface AuthUser {
+export interface AuthUser {
   uid: string;
   email: string;
   schoolId: string;
@@ -30,10 +30,19 @@ const AuthContext = createContext<AuthContextType>({
   setSessionData: () => {},
 });
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+export function AuthProvider({
+  children,
+  initialUser,
+}: {
+  children: React.ReactNode;
+  /** Server-resolved session, seeded from the root layout so the user is known
+   *  on first paint instead of waiting on the client Firebase + /me round-trip
+   *  (which left the profile chip stuck on "Loading…"). */
+  initialUser?: AuthUser | null;
+}) {
+  const [user, setUser] = useState<AuthUser | null>(initialUser ?? null);
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialUser);
   const sessionSetByLogin = useRef(false);
 
   useEffect(() => {
@@ -94,9 +103,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    await signOut(auth);
-    setUser(null);
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      await signOut(auth);
+    } finally {
+      setUser(null);
+      // Hard-redirect so the cleared session cookie is re-evaluated by middleware
+      // and all client state resets. Without this the page sits on the current
+      // route until a manual refresh (the reported "sign out does nothing" bug).
+      window.location.href = '/login';
+    }
   }, []);
 
   const setSessionData = useCallback((data: AuthUser) => {
