@@ -63,10 +63,10 @@ export function ReadingLevelPicker({
             onClick={() => setSelected(opt.value)}
             className={`px-2 py-2 rounded-[var(--radius-md)] text-sm font-bold text-center transition-colors ${
               selected === opt.value
-                ? 'ring-2 ring-rose-pink bg-rose-pink/10 text-rose-pink-dark'
+                ? 'ring-2 ring-section bg-section/10 text-section'
                 : opt.value === currentLevel
-                ? 'bg-background text-charcoal border-2 border-charcoal/20'
-                : 'bg-background text-text-secondary hover:bg-divider/50'
+                ? 'bg-cream text-ink border-2 border-ink/20'
+                : 'bg-cream text-muted hover:bg-rule/50'
             }`}
             style={
               opt.colorHex

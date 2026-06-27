@@ -26,7 +26,7 @@ export function SearchInput({ value, onChange, placeholder = 'Search...', deboun
   return (
     <div className="relative">
       <svg
-        className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"
+        className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
         width="16"
         height="16"
         viewBox="0 0 16 16"
@@ -50,7 +50,7 @@ export function SearchInput({ value, onChange, placeholder = 'Search...', deboun
       {internal && (
         <button
           onClick={() => handleChange('')}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary hover:text-charcoal transition-colors"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-ink transition-colors"
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             <path d="M11 3L3 11M3 3l8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />

@@ -15,14 +15,14 @@ const sizeClasses = {
 export function ReadingLevelPill({ level, colorHex, onClick, size = 'md' }: ReadingLevelPillProps) {
   if (!level) {
     return (
-      <span className={`inline-flex items-center rounded-[var(--radius-pill)] font-semibold text-text-secondary/50 bg-background border border-divider ${sizeClasses[size]}`}>
+      <span className={`inline-flex items-center rounded-[var(--radius-pill)] font-semibold text-muted/50 bg-cream border border-rule ${sizeClasses[size]}`}>
         No Level
       </span>
     );
   }
 
-  const bgColor = colorHex ? `${colorHex}20` : 'var(--color-rose-pink-light)';
-  const textColor = colorHex || 'var(--color-rose-pink-dark)';
+  const bgColor = colorHex ? `${colorHex}20` : 'var(--color-section-tint)';
+  const textColor = colorHex || 'var(--color-section)';
 
   const Tag = onClick ? 'button' : 'span';
 

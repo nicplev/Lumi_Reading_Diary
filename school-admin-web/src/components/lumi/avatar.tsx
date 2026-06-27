@@ -26,12 +26,14 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
+// Fixed Lumi palette — an initials avatar keeps the same colour regardless of
+// which section it appears in, so it stays a stable identity cue.
 const avatarColors = [
-  'bg-rose-pink/20 text-rose-pink-dark',
-  'bg-mint-green/40 text-mint-green-dark',
-  'bg-warm-orange/20 text-warm-orange',
-  'bg-sky-blue/40 text-sky-blue-dark',
-  'bg-soft-yellow/60 text-charcoal',
+  'bg-tint-red text-lumi-red-dark',
+  'bg-tint-green text-lumi-green-dark',
+  'bg-tint-blue text-lumi-blue-dark',
+  'bg-tint-yellow text-ink',
+  'bg-tint-orange text-ink',
 ];
 
 function getColorForName(name: string): string {

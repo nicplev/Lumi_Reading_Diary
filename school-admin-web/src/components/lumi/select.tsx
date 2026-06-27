@@ -20,7 +20,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     return (
       <div>
         {label && (
-          <label htmlFor={id} className="block text-sm font-semibold text-charcoal mb-1.5">
+          <label htmlFor={id} className="block text-sm font-semibold text-ink mb-1.5">
             {label}
           </label>
         )}
@@ -45,7 +45,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             ))}
           </select>
           <svg
-            className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-text-secondary"
+            className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted"
             width="16"
             height="16"
             viewBox="0 0 16 16"
