@@ -15,7 +15,7 @@ interface TabsProps {
 
 export function Tabs({ tabs, activeTab, onChange }: TabsProps) {
   return (
-    <div className="border-b border-divider mb-6">
+    <div className="border-b border-rule mb-6">
       <nav className="flex gap-6 -mb-px">
         {tabs.map((tab) => (
           <button
@@ -23,8 +23,8 @@ export function Tabs({ tabs, activeTab, onChange }: TabsProps) {
             onClick={() => onChange(tab.id)}
             className={`pb-3 text-sm font-semibold transition-colors whitespace-nowrap focus:outline-none focus-visible:outline-none ${
               activeTab === tab.id
-                ? 'border-b-2 border-rose-pink text-charcoal font-bold'
-                : 'text-text-secondary hover:text-charcoal'
+                ? 'border-b-2 border-section text-ink font-bold'
+                : 'text-muted hover:text-ink'
             }`}
           >
             <span className="flex items-center gap-1.5">
@@ -32,7 +32,7 @@ export function Tabs({ tabs, activeTab, onChange }: TabsProps) {
               {tab.label}
               {tab.count != null && (
                 <span className={`text-xs px-1.5 py-0.5 rounded-[var(--radius-pill)] ${
-                  activeTab === tab.id ? 'bg-rose-pink/10 text-rose-pink' : 'bg-background text-text-secondary'
+                  activeTab === tab.id ? 'bg-section/10 text-section' : 'bg-cream text-muted'
                 }`}>
                   {tab.count}
                 </span>

@@ -1,13 +1,22 @@
 import type { Metadata } from 'next';
-import { Nunito } from 'next/font/google';
+import { Nunito, Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 import { getSession } from '@/lib/auth/session';
 
+// Display face — headings, wordmark, big numbers, buttons.
 const nunito = Nunito({
   subsets: ['latin'],
   variable: '--font-family-nunito',
   display: 'optional',
+});
+
+// Body face — long-form text. A readable 400/500 rather than the guide's
+// Light-300, which is too thin for a data-dense admin portal with tables.
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
@@ -31,7 +40,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     : null;
 
   return (
-    <html lang="en" className={nunito.variable} suppressHydrationWarning>
+    <html lang="en" className={`${nunito.variable} ${inter.variable}`} suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -47,7 +56,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           }}
         />
       </head>
-      <body className="font-[family-name:var(--font-family-nunito)] antialiased" suppressHydrationWarning>
+      <body className="antialiased" suppressHydrationWarning>
         <Providers initialUser={initialUser}>{children}</Providers>
       </body>
     </html>

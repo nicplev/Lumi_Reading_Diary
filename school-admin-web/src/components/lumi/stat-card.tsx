@@ -9,20 +9,23 @@ interface StatCardProps {
   value: string | number;
   icon?: React.ReactNode;
   trend?: { value: number; label: string };
-  color?: 'pink' | 'green' | 'orange' | 'blue';
+  color?: 'pink' | 'red' | 'green' | 'orange' | 'blue' | 'yellow';
   href?: string;
   subtitle?: string;
   sparklineData?: number[];
 }
 
+// Brand-aligned tile colours — the icon chip + sparkline share one hue.
 const sparkColors: Record<NonNullable<StatCardProps['color']>, string> = {
-  pink: '#FF8698',
-  green: '#7FB26B',
-  orange: '#F39C4B',
-  blue: '#5FA8D3',
+  pink: '#EC4544',
+  red: '#EC4544',
+  green: '#51BA65',
+  orange: '#FAA51A',
+  blue: '#56C8E6',
+  yellow: '#FFCB05',
 };
 
-export function StatCard({ title, value, icon, trend, color = 'pink', href, subtitle, sparklineData }: StatCardProps) {
+export function StatCard({ title, value, icon, trend, color = 'blue', href, subtitle, sparklineData }: StatCardProps) {
   const sparkGradId = `sparkGrad-${useId()}`;
   const sparkColor = sparkColors[color];
 
@@ -31,18 +34,21 @@ export function StatCard({ title, value, icon, trend, color = 'pink', href, subt
       {/* Title row: icon grouped with title */}
       <div className="flex items-center gap-2 mb-2">
         {icon && (
-          <span className="inline-flex items-center justify-center w-8 h-8 rounded-[var(--radius-md)] text-base flex-shrink-0 bg-charcoal/5 text-charcoal">
+          <span
+            className="inline-flex items-center justify-center w-8 h-8 rounded-[var(--radius-md)] text-base flex-shrink-0"
+            style={{ backgroundColor: `${sparkColor}1F`, color: sparkColor }}
+          >
             {icon}
           </span>
         )}
-        <span className="text-sm font-semibold text-text-secondary">{title}</span>
+        <span className="text-sm font-semibold text-muted">{title}</span>
       </div>
 
       <div className="mt-auto">
-        <div className="text-[26px] font-extrabold text-charcoal leading-tight">{value}</div>
+        <div className="font-display text-[26px] font-extrabold text-ink leading-tight">{value}</div>
 
         {subtitle && (
-          <p className="text-xs text-text-secondary mt-1">{subtitle}</p>
+          <p className="text-xs text-muted mt-1">{subtitle}</p>
         )}
 
         {trend && (
@@ -50,7 +56,7 @@ export function StatCard({ title, value, icon, trend, color = 'pink', href, subt
             <span className={`text-xs font-semibold ${trend.value >= 0 ? 'text-success' : 'text-error'}`}>
               {trend.value >= 0 ? '↑' : '↓'} {Math.abs(trend.value)}%
             </span>
-            <span className="text-xs text-text-secondary">{trend.label}</span>
+            <span className="text-xs text-muted">{trend.label}</span>
           </div>
         )}
       </div>
@@ -82,7 +88,7 @@ export function StatCard({ title, value, icon, trend, color = 'pink', href, subt
     </>
   );
 
-  const className = `bg-surface rounded-[var(--radius-lg)] shadow-card p-4 min-h-[132px] flex flex-col ${href ? 'hover:shadow-card-hover transition-shadow' : ''}`;
+  const className = `bg-paper rounded-[var(--radius-lg)] border border-rule shadow-card p-4 min-h-[132px] flex flex-col ${href ? 'hover:shadow-card-hover hover:-translate-y-0.5 transition' : ''}`;
 
   if (href) {
     return (

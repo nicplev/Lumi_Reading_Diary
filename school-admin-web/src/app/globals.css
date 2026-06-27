@@ -1,50 +1,127 @@
 @import "tailwindcss";
 
+/* ─────────────────────────────────────────────────────────────────────────
+   Lumi design tokens — single source of truth for the school portal.
+   Mirrors the Flutter LumiTokens in docs/New_Lumi_Design_Guide.md.
+   Never hard-code colours in components — reach for these utilities
+   (bg-cream, text-ink, bg-paper, border-rule, bg-section, …).
+
+   Section-as-theme: every page belongs to one section, and that section's
+   accent flows through `--section-accent`, exposed as the `section` colour
+   utilities (bg-section / text-section / ring-section / bg-section-tint).
+   The accent is set on a wrapper by <SectionScope> / <RouteSectionScope>:
+     Dashboard / Analytics / Communication → Lumi Blue
+     Classes / Students                    → Lumi Red
+     Library                               → Lumi Yellow
+     Users / Parent Links / Settings       → Lumi Green
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Active section accent — defaults to red (the brand anchor); overridden
+     per-section on a wrapper element via inline CSS vars. */
+  --section-accent: #EC4544;
+  --section-accent-tint: #F4B5B7;
+  --section-on-accent: #FFFFFF;
+}
+
 @theme {
-  --color-brand-primary: #FF8698;
-  --color-brand-primary-dark: #E5687A;
-  --color-brand-secondary: #FF8B5A;
+  /* ── Brand / section palette ──────────────────────────────────────────── */
+  --color-lumi-red: #EC4544;
+  --color-lumi-red-dark: #D63A39;
+  --color-lumi-yellow: #FFCB05;
+  --color-lumi-yellow-dark: #E6B600;
+  --color-lumi-green: #51BA65;
+  --color-lumi-green-dark: #429654;
+  --color-lumi-blue: #56C8E6;
+  --color-lumi-blue-dark: #2A9FC4;
 
-  --color-rose-pink: #FF8698;
-  --color-rose-pink-light: #FFB8C4;
-  --color-rose-pink-dark: #E5687A;
-  --color-mint-green: #D2EBBF;
-  --color-mint-green-dark: #A8D48F;
-  --color-warm-orange: #FF8B5A;
-  --color-warm-orange-light: #FFB08A;
-  --color-sky-blue: #BCE7F0;
-  --color-sky-blue-dark: #8ED4E2;
-  --color-soft-yellow: #FFF6A4;
-  --color-charcoal: #121211;
-  --color-text-secondary: #6B7280;
-  --color-divider: #E5E7EB;
-  --color-background: #F5F5F7;
+  /* Active-section accent (driven by --section-accent on the nearest scope) */
+  --color-section: var(--section-accent);
+  --color-section-tint: var(--section-accent-tint);
+  --color-on-section: var(--section-on-accent);
+
+  /* ── Tints — soft fills, selected states, badges ──────────────────────── */
+  --color-tint-red: #F4B5B7;
+  --color-tint-yellow: #FBE89F;
+  --color-tint-green: #B5DAB8;
+  --color-tint-blue: #C8E8F1;
+  --color-tint-orange: #FED8A8;
+
+  /* ── Extended palette — mascot variants / data-viz accents only ───────── */
+  --color-lumi-orange: #FAA51A;
+  --color-lumi-indigo: #1989CA;
+  --color-lumi-purple: #A571B0;
+  --color-lumi-pink: #F5A1C5;
+
+  /* ── Neutrals ─────────────────────────────────────────────────────────── */
+  --color-cream: #F7F5F0;   /* primary background — warm, paperback feel */
+  --color-paper: #FFFFFF;   /* card + surface fill on cream */
+  --color-ink: #1A1A1A;     /* primary text — never pure black */
+  --color-ink-soft: #2A2A2A;
+  --color-muted: #6B6B6B;   /* secondary text, captions, metadata */
+  --color-rule: #E5E2DC;    /* borders + dividers — warm grey, not cool */
+
+  /* ── Semantic — kept inside the brand palette ─────────────────────────── */
+  --color-success: #51BA65;
+  --color-error: #EC4544;
+  --color-warning: #FAA51A;
+
+  /* ── Backwards-compatible aliases ─────────────────────────────────────────
+     Existing components still reference these keys; they are re-pointed to the
+     new palette so the whole app shifts to cream/ink immediately and we
+     migrate page-by-page without breakage. Prefer the names above in new code;
+     these retire as each page is refactored to the design system. */
+  --color-brand-primary: #EC4544;
+  --color-brand-primary-dark: #D63A39;
+  --color-brand-secondary: #FAA51A;
+  --color-rose-pink: #EC4544;
+  --color-rose-pink-light: #F4B5B7;
+  --color-rose-pink-dark: #D63A39;
+  --color-mint-green: #51BA65;
+  --color-mint-green-dark: #429654;
+  --color-warm-orange: #FAA51A;
+  --color-warm-orange-light: #FED8A8;
+  --color-sky-blue: #56C8E6;
+  --color-sky-blue-dark: #2A9FC4;
+  --color-soft-yellow: #FBE89F;
+  --color-charcoal: #1A1A1A;
+  --color-text-secondary: #6B6B6B;
+  --color-divider: #E5E2DC;
+  --color-background: #F7F5F0;
   --color-surface: #FFFFFF;
-  --color-lumi-peach: #FFAB91;
-  --color-success: #22C55E;
-  --color-error: #EF4444;
-  --color-warning: #F59E0B;
+  --color-lumi-peach: #FED8A8;
 
+  /* ── Typography — Nunito ExtraBold for display, Inter for body ────────── */
   --font-family-nunito: 'Nunito', sans-serif;
+  --font-display: var(--font-family-nunito);
+  --font-body: var(--font-inter), 'Inter', system-ui, sans-serif;
 
+  /* ── Corner radii ─────────────────────────────────────────────────────── */
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 18px;
   --radius-xl: 24px;
   --radius-pill: 9999px;
 
-  --shadow-card: 0 14px 28px -8px rgba(255, 134, 152, 0.10), 0 4px 10px -6px rgba(18, 18, 17, 0.05);
-  --shadow-card-hover: 0 18px 36px -8px rgba(255, 134, 152, 0.15), 0 6px 14px -6px rgba(18, 18, 17, 0.08);
+  /* ── Elevation — soft, warm, low (bento tiles resting on cream) ───────── */
+  --shadow-card: 0 1px 2px rgba(26, 26, 26, 0.04), 0 8px 24px -12px rgba(26, 26, 26, 0.12);
+  --shadow-card-hover: 0 2px 4px rgba(26, 26, 26, 0.06), 0 16px 32px -12px rgba(26, 26, 26, 0.16);
 }
 
 body {
-  font-family: var(--font-family-nunito);
-  background-color: var(--color-background);
-  color: var(--color-charcoal);
+  font-family: var(--font-body);
+  background-color: var(--color-cream);
+  color: var(--color-ink);
 }
 
-/* Material Symbols icon glyph rendering. Defined in our bundled CSS (not left to
-   the external Google stylesheet's load timing) so the rules apply instantly. */
+/* Display face — Nunito — for headings, wordmark, big numbers, buttons.
+   Long-form body stays in Inter (set on <body>). */
+h1, h2, h3, h4, h5, h6, .font-display {
+  font-family: var(--font-display);
+}
+
+/* Material Symbols icon glyph rendering. Defined in our bundled CSS (not left
+   to the external Google stylesheet's load timing) so the rules apply instantly. */
 .material-symbols-rounded {
   font-family: 'Material Symbols Rounded';
   font-weight: normal;

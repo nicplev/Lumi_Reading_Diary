@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { useSchool } from '@/lib/hooks/use-school';
 import { Icon } from '@/components/lumi/icon';
 import { Avatar } from '@/components/lumi/avatar';
+import { sectionForPath } from '@/lib/theme/sections';
 
 interface NavItem {
   label: string;
@@ -48,9 +49,9 @@ export function Sidebar({ hasDevAccess = false }: SidebarProps) {
     );
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-[240px] bg-surface border-r border-divider flex flex-col z-40">
-      {/* Logo */}
-      <div className="px-5 py-5 border-b border-divider">
+    <aside className="fixed left-0 top-0 bottom-0 w-[240px] bg-paper border-r border-rule flex flex-col z-40">
+      {/* Wordmark */}
+      <div className="px-5 py-5">
         <Link href="/dashboard" className="flex items-center gap-2.5">
           {school?.logoUrl ? (
             <img
@@ -59,32 +60,40 @@ export function Sidebar({ hasDevAccess = false }: SidebarProps) {
               className="w-9 h-9 rounded-[var(--radius-md)] object-contain"
             />
           ) : (
-            <span className="inline-flex items-center justify-center w-9 h-9 rounded-[var(--radius-md)] bg-brand-primary/10 text-brand-primary">
-              <Icon name="library_books" size={20} />
+            <span className="inline-flex items-center justify-center w-9 h-9 rounded-[var(--radius-md)] bg-lumi-red/10 text-lumi-red">
+              <Icon name="local_fire_department" size={22} />
             </span>
           )}
-          <div>
-            <span className="text-lg font-bold text-charcoal">{school?.displayName || school?.name || 'Lumi'}</span>
-            <span className="text-[11px] font-semibold text-text-secondary block -mt-0.5">School Portal</span>
+          <div className="min-w-0">
+            <span className="font-display text-lg font-extrabold text-ink tracking-tight block truncate">
+              {school?.displayName || school?.name || 'Lumi'}
+            </span>
+            <span className="text-[11px] font-semibold text-muted block -mt-0.5">School Portal</span>
           </div>
         </Link>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 overflow-y-auto">
+      {/* Navigation — each item lights up in its own section colour when active */}
+      <nav className="flex-1 px-3 py-2 overflow-y-auto">
         <ul className="space-y-1">
           {visibleItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+            const accent = sectionForPath(item.href).accent;
             return (
               <li key={item.href}>
                 <Link
                   href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-md)] text-[14px] font-semibold transition-colors ${
-                    isActive
-                      ? 'bg-brand-primary/10 text-brand-primary'
-                      : 'text-text-secondary hover:bg-background hover:text-charcoal'
+                  style={isActive ? { backgroundColor: `${accent}1A`, color: accent } : undefined}
+                  className={`relative flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-md)] text-[14px] font-semibold transition-colors ${
+                    isActive ? '' : 'text-muted hover:bg-cream hover:text-ink'
                   }`}
                 >
+                  {isActive && (
+                    <span
+                      className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full"
+                      style={{ backgroundColor: accent }}
+                    />
+                  )}
                   <span className="text-base leading-none">{item.icon}</span>
                   {item.label}
                 </Link>
@@ -96,10 +105,10 @@ export function Sidebar({ hasDevAccess = false }: SidebarProps) {
 
       {/* Dev tools (only when the signed-in user is on the dev allowlist) */}
       {hasDevAccess && (
-        <div className="px-3 pt-2 border-t border-divider">
+        <div className="px-3 pt-2 border-t border-rule">
           <Link
             href="/dev/impersonate"
-            className="flex items-center gap-3 px-3 py-2 rounded-[var(--radius-md)] text-[13px] font-semibold text-[#B91C1C] hover:bg-[#B91C1C]/5 transition-colors"
+            className="flex items-center gap-3 px-3 py-2 rounded-[var(--radius-md)] text-[13px] font-semibold text-lumi-red-dark hover:bg-lumi-red/5 transition-colors"
           >
             <Icon name="shield" size={16} />
             Impersonate School
@@ -108,10 +117,10 @@ export function Sidebar({ hasDevAccess = false }: SidebarProps) {
       )}
 
       {/* User section */}
-      <div className="px-3 py-4 border-t border-divider">
+      <div className="px-3 py-4 border-t border-rule">
         <Link
           href="/profile"
-          className="flex items-center gap-3 px-3 py-2 rounded-[var(--radius-md)] hover:bg-background transition-colors"
+          className="flex items-center gap-3 px-3 py-2 rounded-[var(--radius-md)] hover:bg-cream transition-colors"
         >
           <Avatar
             name={user?.fullName || user?.email || 'User'}
@@ -119,13 +128,13 @@ export function Sidebar({ hasDevAccess = false }: SidebarProps) {
             size="sm"
           />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-charcoal truncate">{user?.fullName || user?.email || 'Loading...'}</p>
-            <p className="text-[11px] text-text-secondary capitalize">{user?.role === 'schoolAdmin' ? 'Admin' : 'Teacher'}</p>
+            <p className="text-sm font-semibold text-ink truncate">{user?.fullName || user?.email || 'Loading...'}</p>
+            <p className="text-[11px] text-muted capitalize">{user?.role === 'schoolAdmin' ? 'Admin' : 'Teacher'}</p>
           </div>
         </Link>
         <button
           onClick={logout}
-          className="w-full mt-2 px-3 py-2 rounded-[var(--radius-md)] text-[13px] font-semibold text-text-secondary hover:bg-background hover:text-charcoal transition-colors text-left"
+          className="w-full mt-2 px-3 py-2 rounded-[var(--radius-md)] text-[13px] font-semibold text-muted hover:bg-cream hover:text-ink transition-colors text-left"
         >
           Sign Out
         </button>
