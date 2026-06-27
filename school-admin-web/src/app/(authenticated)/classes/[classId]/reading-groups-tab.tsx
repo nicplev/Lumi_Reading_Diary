@@ -458,12 +458,21 @@ function GroupCard({
               {stat && (stat.topReaderName || stat.needsSupportCount > 0) && (
                 <div className="mb-3 space-y-1 text-xs">
                   {stat.topReaderName && (
-                    <p className="text-text-secondary">
-                      ⭐ Top reader: <span className="text-charcoal font-medium">{stat.topReaderName}</span> ({stat.topReaderMinutes} min)
+                    <p className="text-text-secondary flex items-center gap-1.5">
+                      <Icon name="star" size={14} className="text-warm-orange flex-shrink-0" />
+                      <span>
+                        Top reader: <span className="text-charcoal font-medium">{stat.topReaderName}</span> ({stat.topReaderMinutes} min)
+                      </span>
                     </p>
                   )}
                   {stat.needsSupportCount > 0 && (
-                    <p className="text-text-secondary">⚠️ {stat.needsSupportCount} need support this week</p>
+                    <p
+                      className="text-text-secondary flex items-center gap-1.5"
+                      title="Students who read on fewer than 3 days, met under half their target, or didn't read at all this week."
+                    >
+                      <Icon name="info" size={14} className="flex-shrink-0" />
+                      <span>{stat.needsSupportCount} need attention this week</span>
+                    </p>
                   )}
                 </div>
               )}

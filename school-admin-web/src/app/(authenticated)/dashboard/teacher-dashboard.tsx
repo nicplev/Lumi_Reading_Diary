@@ -157,7 +157,10 @@ export function TeacherDashboard({ userName, data, weeklyEngagement, widgets }: 
       title: 'Needs attention',
       body:
         widgets.nudges.length === 0 ? (
-          <EmptyMsg>Everyone has read recently. 🎉</EmptyMsg>
+          <EmptyMsg>
+            <Icon name="check_circle" size={16} className="text-mint-green-dark mr-1.5 flex-shrink-0" />
+            Everyone has read recently.
+          </EmptyMsg>
         ) : (
           <ul className="space-y-2 max-h-72 overflow-y-auto -mr-1 pr-1">
             {widgets.nudges.map((n) => (
