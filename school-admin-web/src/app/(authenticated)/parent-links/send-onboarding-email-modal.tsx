@@ -120,33 +120,33 @@ export function SendOnboardingEmailModal({
       <div className="space-y-5">
         {/* Summary stats */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between py-2 px-3 bg-background rounded-[var(--radius-md)]">
-            <span className="text-sm text-text-secondary">Students selected</span>
-            <span className="text-sm font-bold text-charcoal">{summary.total}</span>
+          <div className="flex items-center justify-between py-2 px-3 bg-cream rounded-[var(--radius-md)]">
+            <span className="text-sm text-muted">Students selected</span>
+            <span className="text-sm font-bold text-ink">{summary.total}</span>
           </div>
-          <div className="flex items-center justify-between py-2 px-3 bg-mint-green/10 rounded-[var(--radius-md)]">
-            <span className="text-sm text-text-secondary">Will receive emails</span>
+          <div className="flex items-center justify-between py-2 px-3 bg-lumi-green/10 rounded-[var(--radius-md)]">
+            <span className="text-sm text-muted">Will receive emails</span>
             <Badge variant="success">{summary.willReceive}</Badge>
           </div>
           {summary.skipped > 0 && (
-            <div className="py-2 px-3 bg-background rounded-[var(--radius-md)]">
+            <div className="py-2 px-3 bg-cream rounded-[var(--radius-md)]">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-sm text-text-secondary">Will be skipped</span>
+                <span className="text-sm text-muted">Will be skipped</span>
                 <Badge variant="warning">{summary.skipped}</Badge>
               </div>
               <div className="space-y-0.5 ml-2">
                 {summary.noEmail > 0 && (
-                  <p className="text-xs text-text-secondary">
+                  <p className="text-xs text-muted">
                     {summary.noEmail} without parent email
                   </p>
                 )}
                 {summary.notEnrolled > 0 && (
-                  <p className="text-xs text-text-secondary">
+                  <p className="text-xs text-muted">
                     {summary.notEnrolled} not subscribed
                   </p>
                 )}
                 {summary.alreadyLinked > 0 && (
-                  <p className="text-xs text-text-secondary">
+                  <p className="text-xs text-muted">
                     {summary.alreadyLinked} already linked to a parent
                   </p>
                 )}
@@ -157,7 +157,7 @@ export function SendOnboardingEmailModal({
 
         {/* Email subject */}
         <div>
-          <label className="block text-sm font-semibold text-charcoal mb-1.5">
+          <label className="block text-sm font-semibold text-ink mb-1.5">
             Email Subject
           </label>
           <input
@@ -165,21 +165,21 @@ export function SendOnboardingEmailModal({
             value={emailSubject}
             onChange={(e) => setEmailSubject(e.target.value)}
             placeholder="Welcome to Lumi Reading Tracker"
-            className="w-full px-3 py-2.5 rounded-[var(--radius-md)] border border-divider bg-surface text-charcoal placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-rose-pink/30 focus:border-rose-pink transition-colors text-[15px]"
+            className="w-full px-3 py-2.5 rounded-[var(--radius-md)] border border-rule bg-paper text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-section/30 focus:border-section transition-colors text-[15px]"
           />
         </div>
 
         {/* Custom message */}
         <div>
-          <label className="block text-sm font-semibold text-charcoal mb-1.5">
-            Custom Message <span className="text-text-secondary font-normal">(optional)</span>
+          <label className="block text-sm font-semibold text-ink mb-1.5">
+            Custom Message <span className="text-muted font-normal">(optional)</span>
           </label>
           <textarea
             value={customMessage}
             onChange={(e) => setCustomMessage(e.target.value)}
             placeholder="Add a personal note to include in the email..."
             rows={3}
-            className="w-full px-3 py-2.5 rounded-[var(--radius-md)] border border-divider bg-surface text-charcoal placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-rose-pink/30 focus:border-rose-pink transition-colors text-[15px] resize-none"
+            className="w-full px-3 py-2.5 rounded-[var(--radius-md)] border border-rule bg-paper text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-section/30 focus:border-section transition-colors text-[15px] resize-none"
           />
         </div>
 
@@ -189,13 +189,13 @@ export function SendOnboardingEmailModal({
             type="checkbox"
             checked={generateMissingCodes}
             onChange={(e) => setGenerateMissingCodes(e.target.checked)}
-            className="w-4 h-4 mt-0.5 rounded border-divider text-rose-pink focus:ring-rose-pink/30"
+            className="w-4 h-4 mt-0.5 rounded border-rule text-section focus:ring-section/30"
           />
           <div>
-            <p className="text-sm font-semibold text-charcoal">
+            <p className="text-sm font-semibold text-ink">
               Generate link codes for students without one
             </p>
-            <p className="text-xs text-text-secondary mt-0.5">
+            <p className="text-xs text-muted mt-0.5">
               Students need a link code for parents to connect. New codes will be created automatically.
             </p>
           </div>

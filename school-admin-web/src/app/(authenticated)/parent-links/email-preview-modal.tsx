@@ -41,7 +41,7 @@ export function EmailPreviewModal({ open, onClose, schoolName }: EmailPreviewMod
         </Button>
       }
     >
-      <div className="border border-divider rounded-[var(--radius-md)] overflow-hidden">
+      <div className="border border-rule rounded-[var(--radius-md)] overflow-hidden">
         {/* Email preview */}
         <div className="bg-[#f5f5f5] p-6">
           <div className="max-w-md mx-auto bg-white rounded-lg shadow-sm overflow-hidden">
