@@ -34,18 +34,18 @@ export function KanbanColumn({
 
   return (
     <div
-      className={`w-[320px] min-w-[320px] flex-shrink-0 h-full flex flex-col rounded-[var(--radius-lg)] border border-divider bg-surface ${
+      className={`w-[320px] min-w-[320px] flex-shrink-0 h-full flex flex-col rounded-[var(--radius-lg)] border border-rule bg-paper ${
         isUnassigned ? '' : ''
       }`}
     >
       {/* Header */}
       <div
-        className={`px-4 py-3 border-b border-divider ${
-          isUnassigned ? 'bg-background rounded-t-[var(--radius-lg)]' : ''
+        className={`px-4 py-3 border-b border-rule ${
+          isUnassigned ? 'bg-cream rounded-t-[var(--radius-lg)]' : ''
         }`}
       >
         <div className="flex items-center gap-2">
-          <span className="font-bold text-sm text-charcoal truncate">{className}</span>
+          <span className="font-bold text-sm text-ink truncate">{className}</span>
           {yearLevel && <Badge>{yearLevel}</Badge>}
           <Badge variant="info">{studentCount}</Badge>
           <div className="flex-1" />
@@ -64,7 +64,7 @@ export function KanbanColumn({
           )}
         </div>
         {!isUnassigned && (
-          <p className="mt-1 text-xs text-text-secondary truncate">
+          <p className="mt-1 text-xs text-muted truncate">
             {teacherNames && teacherNames.length > 0 ? teacherNames.join(', ') : 'No teacher assigned'}
           </p>
         )}
@@ -74,12 +74,12 @@ export function KanbanColumn({
       <div
         ref={setNodeRef}
         className={`flex-1 overflow-y-auto p-2 space-y-1.5 min-h-[120px] transition-colors ${
-          isOver ? 'border-2 border-dashed border-rose-pink bg-rose-pink/5 rounded-b-[var(--radius-lg)]' : ''
+          isOver ? 'border-2 border-dashed border-section bg-section/5 rounded-b-[var(--radius-lg)]' : ''
         }`}
       >
         {studentCount === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <span className="text-text-secondary text-xs">No students</span>
+            <span className="text-muted text-xs">No students</span>
           </div>
         ) : (
           children
@@ -87,7 +87,7 @@ export function KanbanColumn({
       </div>
 
       {/* Footer */}
-      <div className="px-3 py-2 border-t border-divider/50">
+      <div className="px-3 py-2 border-t border-rule/50">
         <Button variant="ghost" size="sm" onClick={onAddStudent} className="w-full text-sm">
           + Add Student
         </Button>

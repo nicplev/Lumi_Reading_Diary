@@ -84,15 +84,15 @@ export function BookSearchInput({ onAdd }: BookSearchInputProps) {
         </div>
 
         {showDropdown && matches.length > 0 && (
-          <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-surface rounded-[var(--radius-md)] shadow-card-hover border border-divider max-h-48 overflow-y-auto">
+          <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-paper rounded-[var(--radius-md)] shadow-card-hover border border-rule max-h-48 overflow-y-auto">
             {matches.map((book) => (
               <button
                 key={book.id}
                 onClick={() => handleSelect(book)}
-                className="w-full text-left px-3 py-2 hover:bg-background transition-colors text-sm"
+                className="w-full text-left px-3 py-2 hover:bg-cream transition-colors text-sm"
               >
-                <span className="font-semibold text-charcoal">{book.title}</span>
-                {book.author && <span className="text-text-secondary ml-1">by {book.author}</span>}
+                <span className="font-semibold text-ink">{book.title}</span>
+                {book.author && <span className="text-muted ml-1">by {book.author}</span>}
               </button>
             ))}
           </div>

@@ -114,15 +114,15 @@ export function ClassFormModal({ open, onClose, onSubmit, loading, initialData, 
         />
         {teachers.length > 0 && (
           <div>
-            <label className="block text-sm font-semibold text-charcoal mb-1.5">Assigned Teachers</label>
+            <label className="block text-sm font-semibold text-ink mb-1.5">Assigned Teachers</label>
             {selectedTeachers.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {selectedTeachers.map((id) => {
                   const t = teachers.find((t) => t.id === id);
                   return (
-                    <span key={id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] bg-brand-primary/10 text-xs font-semibold text-charcoal">
+                    <span key={id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] bg-brand-primary/10 text-xs font-semibold text-ink">
                       {t?.fullName.includes('@') ? t.fullName.split('@')[0] : t?.fullName ?? id}
-                      <button type="button" onClick={() => toggleTeacher(id)} className="text-text-secondary hover:text-error ml-0.5">&times;</button>
+                      <button type="button" onClick={() => toggleTeacher(id)} className="text-muted hover:text-error ml-0.5">&times;</button>
                     </span>
                   );
                 })}
@@ -133,27 +133,27 @@ export function ClassFormModal({ open, onClose, onSubmit, loading, initialData, 
               value={teacherSearch}
               onChange={(e) => setTeacherSearch(e.target.value)}
               placeholder="Search teachers..."
-              className="w-full px-3 py-2 text-sm border border-divider rounded-[var(--radius-md)] bg-surface text-charcoal placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-brand-primary/20 mb-2"
+              className="w-full px-3 py-2 text-sm border border-rule rounded-[var(--radius-md)] bg-paper text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-brand-primary/20 mb-2"
             />
             <div className="space-y-1 max-h-40 overflow-y-auto">
               {filteredTeachers.map((teacher) => (
-                <label key={teacher.id} className="flex items-center gap-2 cursor-pointer px-1 py-1 rounded-[var(--radius-sm)] hover:bg-background">
+                <label key={teacher.id} className="flex items-center gap-2 cursor-pointer px-1 py-1 rounded-[var(--radius-sm)] hover:bg-cream">
                   <input
                     type="checkbox"
                     checked={selectedTeachers.includes(teacher.id)}
                     onChange={() => toggleTeacher(teacher.id)}
-                    className="w-4 h-4 rounded border-divider text-rose-pink focus:ring-rose-pink/30"
+                    className="w-4 h-4 rounded border-rule text-section focus:ring-section/30"
                   />
-                  <span className="text-sm text-charcoal">
+                  <span className="text-sm text-ink">
                     {teacher.fullName.includes('@')
-                      ? <><span className="text-text-secondary">{teacher.fullName}</span> <span className="text-xs text-text-secondary/60">(no name set)</span></>
+                      ? <><span className="text-muted">{teacher.fullName}</span> <span className="text-xs text-muted/60">(no name set)</span></>
                       : teacher.fullName
                     }
                   </span>
                 </label>
               ))}
               {filteredTeachers.length === 0 && (
-                <p className="text-xs text-text-secondary py-2 text-center">No teachers match your search</p>
+                <p className="text-xs text-muted py-2 text-center">No teachers match your search</p>
               )}
             </div>
           </div>

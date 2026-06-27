@@ -41,9 +41,11 @@ interface ReadingGroupsTabProps {
   levelOptions: ReadingLevelOption[];
 }
 
+// Group identity swatches — the Lumi brand + extended palette, so each group
+// reads as a distinct on-brand colour.
 const GROUP_COLORS = [
-  '#FF8698', '#D2EBBF', '#FF8B5A', '#BCE7F0',
-  '#FFF6A4', '#FFAB91', '#CE93D8', '#80DEEA',
+  '#EC4544', '#51BA65', '#56C8E6', '#FFCB05',
+  '#FAA51A', '#A571B0', '#F5A1C5', '#1989CA',
 ];
 
 export function ReadingGroupsTab({ classId, levelOptions }: ReadingGroupsTabProps) {
@@ -193,9 +195,9 @@ export function ReadingGroupsTab({ classId, levelOptions }: ReadingGroupsTabProp
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="bg-surface rounded-[var(--radius-lg)] shadow-card p-5 animate-pulse">
-            <div className="h-5 bg-divider/60 rounded w-24 mb-3" />
-            <div className="h-4 bg-divider/60 rounded w-16" />
+          <div key={i} className="bg-paper rounded-[var(--radius-lg)] shadow-card p-5 animate-pulse">
+            <div className="h-5 bg-rule/60 rounded w-24 mb-3" />
+            <div className="h-4 bg-rule/60 rounded w-16" />
           </div>
         ))}
       </div>
@@ -220,11 +222,11 @@ export function ReadingGroupsTab({ classId, levelOptions }: ReadingGroupsTabProp
   return (
     <div>
       {ungroupedStudents.length > 0 && (
-        <div className="mb-4 p-4 bg-soft-yellow/30 rounded-[var(--radius-md)] border border-soft-yellow">
-          <p className="text-sm font-semibold text-charcoal">
+        <div className="mb-4 p-4 bg-tint-yellow/40 rounded-[var(--radius-md)] border border-tint-yellow">
+          <p className="text-sm font-semibold text-ink">
             {ungroupedStudents.length} student{ungroupedStudents.length !== 1 ? 's' : ''} not in any group
           </p>
-          <p className="text-xs text-text-secondary mt-0.5">
+          <p className="text-xs text-muted mt-0.5">
             {ungroupedStudents.map((s) => `${s.firstName} ${s.lastName}`).slice(0, 5).join(', ')}
             {ungroupedStudents.length > 5 && ` and ${ungroupedStudents.length - 5} more`}
           </p>
@@ -232,7 +234,7 @@ export function ReadingGroupsTab({ classId, levelOptions }: ReadingGroupsTabProp
       )}
 
       <div className="flex items-center justify-between gap-3 mb-4">
-        <p className="text-sm text-text-secondary">
+        <p className="text-sm text-muted">
           {reordering ? 'Drag the groups into the order you want.' : ''}
         </p>
         <div className="flex items-center gap-2 shrink-0">
@@ -298,14 +300,14 @@ export function ReadingGroupsTab({ classId, levelOptions }: ReadingGroupsTabProp
           <Input label="Group Name" value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g. Level B Readers" />
           <Input label="Description (optional)" value={formDescription} onChange={(e) => setFormDescription(e.target.value)} />
           <div>
-            <label className="block text-sm font-semibold text-charcoal mb-1.5">Reading Level (optional)</label>
+            <label className="block text-sm font-semibold text-ink mb-1.5">Reading Level (optional)</label>
             <div className="flex flex-wrap gap-2">
               {levelOptions.slice(0, 16).map((opt) => (
                 <button
                   key={opt.value}
                   onClick={() => setFormLevel(formLevel === opt.value ? '' : opt.value)}
                   className={`px-2 py-1 rounded-[var(--radius-sm)] text-xs font-bold ${
-                    formLevel === opt.value ? 'ring-2 ring-rose-pink bg-rose-pink/10' : 'bg-background text-text-secondary'
+                    formLevel === opt.value ? 'ring-2 ring-section bg-section/10' : 'bg-cream text-muted'
                   }`}
                 >
                   {opt.shortLabel}
@@ -314,13 +316,13 @@ export function ReadingGroupsTab({ classId, levelOptions }: ReadingGroupsTabProp
             </div>
           </div>
           <div>
-            <label className="block text-sm font-semibold text-charcoal mb-1.5">Color</label>
+            <label className="block text-sm font-semibold text-ink mb-1.5">Color</label>
             <div className="flex gap-2">
               {GROUP_COLORS.map((color) => (
                 <button
                   key={color}
                   onClick={() => setFormColor(color)}
-                  className={`w-8 h-8 rounded-full ${formColor === color ? 'ring-2 ring-offset-2 ring-charcoal' : ''}`}
+                  className={`w-8 h-8 rounded-full ${formColor === color ? 'ring-2 ring-offset-2 ring-ink' : ''}`}
                   style={{ backgroundColor: color }}
                 />
               ))}
@@ -345,7 +347,7 @@ export function ReadingGroupsTab({ classId, levelOptions }: ReadingGroupsTabProp
       >
         <div className="max-h-80 overflow-y-auto space-y-2">
           {students?.map((s) => (
-            <label key={s.id} className="flex items-center gap-3 p-2 rounded-[var(--radius-sm)] hover:bg-background cursor-pointer">
+            <label key={s.id} className="flex items-center gap-3 p-2 rounded-[var(--radius-sm)] hover:bg-cream cursor-pointer">
               <input
                 type="checkbox"
                 checked={assignedStudentIds.includes(s.id)}
@@ -354,9 +356,9 @@ export function ReadingGroupsTab({ classId, levelOptions }: ReadingGroupsTabProp
                     prev.includes(s.id) ? prev.filter((id) => id !== s.id) : [...prev, s.id]
                   )
                 }
-                className="w-4 h-4 rounded border-divider text-rose-pink focus:ring-rose-pink/30"
+                className="w-4 h-4 rounded border-rule text-section focus:ring-section/30"
               />
-              <span className="text-sm text-charcoal font-semibold">{s.firstName} {s.lastName}</span>
+              <span className="text-sm text-ink font-semibold">{s.firstName} {s.lastName}</span>
               {s.currentReadingLevel && <ReadingLevelPill level={s.currentReadingLevel} size="sm" />}
             </label>
           ))}
@@ -413,7 +415,7 @@ function GroupCard({
       <Card
         hover={!reordering}
         onClick={reordering ? undefined : onToggleExpand}
-        className={`h-full ${reordering ? 'ring-1 ring-inset ring-rose-pink/30' : ''} ${
+        className={`h-full ${reordering ? 'ring-1 ring-inset ring-section/30' : ''} ${
           isDragging ? 'shadow-card-hover' : ''
         }`}
       >
@@ -423,7 +425,7 @@ function GroupCard({
               {reordering && (
                 <button
                   type="button"
-                  className="cursor-grab active:cursor-grabbing touch-none text-text-secondary -ml-1"
+                  className="cursor-grab active:cursor-grabbing touch-none text-muted -ml-1"
                   aria-label="Drag to reorder"
                   {...attributes}
                   {...listeners}
@@ -437,7 +439,7 @@ function GroupCard({
                   style={{ backgroundColor: group.color }}
                 />
               )}
-              <h3 className="font-bold text-charcoal truncate">{group.name}</h3>
+              <h3 className="font-bold text-ink truncate">{group.name}</h3>
             </div>
             <Badge variant="info">{memberCount}</Badge>
           </div>
@@ -446,34 +448,34 @@ function GroupCard({
 
           {/* This-week stats strip */}
           {stat && (
-            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-text-secondary">
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted">
               <span>
-                <span className="font-semibold text-charcoal">{stat.activeReaders}/{stat.totalStudents}</span> reading
+                <span className="font-semibold text-ink">{stat.activeReaders}/{stat.totalStudents}</span> reading
               </span>
               <span>
-                <span className="font-semibold text-charcoal">{stat.avgMinutes}</span> min avg
+                <span className="font-semibold text-ink">{stat.avgMinutes}</span> min avg
               </span>
               <span>
-                <span className="font-semibold text-charcoal">{stat.studentsMetTarget}</span> met target
+                <span className="font-semibold text-ink">{stat.studentsMetTarget}</span> met target
               </span>
             </div>
           )}
 
           {!reordering && expanded && (
-            <div className="mt-3 pt-3 border-t border-divider">
+            <div className="mt-3 pt-3 border-t border-rule">
               {stat && (stat.topReaderName || stat.needsSupportCount > 0) && (
                 <div className="mb-3 space-y-1 text-xs">
                   {stat.topReaderName && (
-                    <p className="text-text-secondary flex items-center gap-1.5">
-                      <Icon name="star" size={14} className="text-warm-orange flex-shrink-0" />
+                    <p className="text-muted flex items-center gap-1.5">
+                      <Icon name="star" size={14} className="text-lumi-orange flex-shrink-0" />
                       <span>
-                        Top reader: <span className="text-charcoal font-medium">{stat.topReaderName}</span> ({stat.topReaderMinutes} min)
+                        Top reader: <span className="text-ink font-medium">{stat.topReaderName}</span> ({stat.topReaderMinutes} min)
                       </span>
                     </p>
                   )}
                   {stat.needsSupportCount > 0 && (
                     <p
-                      className="text-text-secondary flex items-center gap-1.5"
+                      className="text-muted flex items-center gap-1.5"
                       title="Students who read on fewer than 3 days, met under half their target, or didn't read at all this week."
                     >
                       <Icon name="info" size={14} className="flex-shrink-0" />
@@ -483,15 +485,15 @@ function GroupCard({
                 </div>
               )}
               {resolvedMembers.length === 0 ? (
-                <p className="text-xs text-text-secondary">No students assigned</p>
+                <p className="text-xs text-muted">No students assigned</p>
               ) : (
-                <ul className="space-y-0.5 text-sm text-charcoal">
+                <ul className="space-y-0.5 text-sm text-ink">
                   {resolvedMembers.map((s) => (
                     <li key={s.id}>
                       <Link
                         href={`/students/${s.id}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="flex items-center gap-2 rounded-[var(--radius-sm)] px-1 py-0.5 -mx-1 hover:bg-background transition-colors"
+                        className="flex items-center gap-2 rounded-[var(--radius-sm)] px-1 py-0.5 -mx-1 hover:bg-cream transition-colors"
                       >
                         <Avatar name={`${s.firstName} ${s.lastName}`} characterId={s.characterId} size="xs" />
                         {s.firstName} {s.lastName}

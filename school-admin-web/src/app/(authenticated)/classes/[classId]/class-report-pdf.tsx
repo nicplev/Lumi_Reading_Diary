@@ -6,19 +6,19 @@ import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer
 import type { ClassReport } from '@/lib/firestore/reports';
 
 const styles = StyleSheet.create({
-  page: { padding: 32, fontSize: 10, color: '#2B2B2B', fontFamily: 'Helvetica' },
-  schoolName: { fontSize: 10, color: '#6B7280' },
+  page: { padding: 32, fontSize: 10, color: '#1A1A1A', fontFamily: 'Helvetica' },
+  schoolName: { fontSize: 10, color: '#6B6B6B' },
   title: { fontSize: 20, fontWeight: 'bold', marginTop: 2 },
-  subtitle: { fontSize: 10, color: '#6B7280', marginTop: 2, marginBottom: 16 },
+  subtitle: { fontSize: 10, color: '#6B6B6B', marginTop: 2, marginBottom: 16 },
   metricsRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 },
   metric: { width: '25%', padding: 4 },
-  metricBox: { border: '1 solid #E5E7EB', borderRadius: 4, padding: 8 },
-  metricLabel: { fontSize: 7, color: '#6B7280', textTransform: 'uppercase' },
+  metricBox: { border: '1 solid #E5E2DC', borderRadius: 4, padding: 8 },
+  metricLabel: { fontSize: 7, color: '#6B6B6B', textTransform: 'uppercase' },
   metricValue: { fontSize: 16, fontWeight: 'bold', marginTop: 3 },
   section: { marginBottom: 14 },
   sectionTitle: { fontSize: 13, fontWeight: 'bold', marginBottom: 6 },
-  row: { flexDirection: 'row', borderBottom: '1 solid #F0F0F0', paddingVertical: 3 },
-  th: { fontSize: 8, color: '#6B7280', fontWeight: 'bold' },
+  row: { flexDirection: 'row', borderBottom: '1 solid #EDEAE3', paddingVertical: 3 },
+  th: { fontSize: 8, color: '#6B6B6B', fontWeight: 'bold' },
   cell: { fontSize: 9 },
   footer: {
     position: 'absolute',
@@ -26,9 +26,9 @@ const styles = StyleSheet.create({
     left: 32,
     right: 32,
     fontSize: 8,
-    color: '#9CA3AF',
+    color: '#6B6B6B',
     textAlign: 'center',
-    borderTop: '1 solid #F0F0F0',
+    borderTop: '1 solid #EDEAE3',
     paddingTop: 6,
   },
 });

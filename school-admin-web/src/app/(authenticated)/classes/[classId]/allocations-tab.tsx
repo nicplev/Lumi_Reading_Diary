@@ -175,7 +175,7 @@ export function AllocationsTab({ classId, levelOptions }: AllocationsTabProps) {
   return (
     <div className="mt-4">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">Allocations</h3>
+        <h3 className="text-sm font-semibold text-muted uppercase tracking-wider">Allocations</h3>
         <Button size="sm" onClick={() => setShowCreate(true)}>
           Create Allocation
         </Button>

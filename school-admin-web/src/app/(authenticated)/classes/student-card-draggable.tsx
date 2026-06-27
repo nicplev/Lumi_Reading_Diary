@@ -38,17 +38,17 @@ export function StudentCardDraggable({ student, classId, isPending = false, dimm
       style={style}
       {...listeners}
       {...attributes}
-      className={`group relative flex items-center gap-2.5 h-14 bg-surface rounded-[var(--radius-md)] px-3 py-2 transition-all ${
+      className={`group relative flex items-center gap-2.5 h-14 bg-paper rounded-[var(--radius-md)] px-3 py-2 transition-all ${
         isPending
           ? 'border-2 border-dashed border-orange-400/60 bg-orange-50/60'
-          : 'border border-divider/50'
+          : 'border border-rule/50'
       } ${isDragging ? 'cursor-grabbing shadow-md' : 'cursor-grab hover:shadow-card'}`}
     >
       {isPending && (
         <span className="absolute top-1 left-1 w-1.5 h-1.5 rounded-full bg-orange-400" />
       )}
       <Avatar name={fullName} size="sm" />
-      <span className="text-sm font-bold text-charcoal truncate flex-1">{fullName}</span>
+      <span className="text-sm font-bold text-ink truncate flex-1">{fullName}</span>
       {showReadingLevel && student.currentReadingLevel && (
         <ReadingLevelPill level={student.currentReadingLevel} size="sm" />
       )}

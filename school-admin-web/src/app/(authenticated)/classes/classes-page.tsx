@@ -53,14 +53,14 @@ export function ClassesPage({ teachers, isAdmin }: ClassesPageProps) {
       id: 'yearLevel',
       header: 'Year Level',
       accessorFn: (row) => row.yearLevel ?? '',
-      cell: (val) => val ? <Badge>{val as string}</Badge> : <span className="text-text-secondary">-</span>,
+      cell: (val) => val ? <Badge>{val as string}</Badge> : <span className="text-muted">-</span>,
       sortable: true,
     },
     {
       id: 'teachers',
       header: 'Teachers',
       accessorFn: (row) => row.teacherIds.map((id) => teacherMap.get(id) ?? 'Unknown').join(', '),
-      cell: (val) => <span className="text-sm text-text-secondary">{(val as string) || 'None assigned'}</span>,
+      cell: (val) => <span className="text-sm text-muted">{(val as string) || 'None assigned'}</span>,
     },
     {
       id: 'students',
@@ -122,7 +122,7 @@ export function ClassesPage({ teachers, isAdmin }: ClassesPageProps) {
   if (!isAdmin) {
     return (
       <div>
-        <PageHeader title="Class" description="Your assigned class" />
+        <PageHeader eyebrow="Class" title="Class" description="Your assigned class" />
         <EmptyState
           icon={<Icon name="school" size={40} />}
           title="No class assigned yet"
@@ -135,6 +135,7 @@ export function ClassesPage({ teachers, isAdmin }: ClassesPageProps) {
   return (
     <div>
       <PageHeader
+        eyebrow="Class"
         title="Classes"
         description="Manage your school's classes"
         action={<Button onClick={() => setShowCreate(true)}>Add Class</Button>}
