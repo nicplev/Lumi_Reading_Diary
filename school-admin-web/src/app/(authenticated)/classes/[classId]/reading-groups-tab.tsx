@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -21,6 +21,7 @@ import { ReadingLevelPill } from '@/components/lumi/reading-level-pill';
 import { ConfirmDialog } from '@/components/lumi/confirm-dialog';
 import { EmptyState } from '@/components/lumi/empty-state';
 import { Icon } from '@/components/lumi/icon';
+import { Avatar } from '@/components/lumi/avatar';
 import { useToast } from '@/components/lumi/toast';
 import {
   useReadingGroups,
@@ -31,6 +32,7 @@ import {
   useReorderReadingGroups,
 } from '@/lib/hooks/use-reading-groups';
 import { useStudents } from '@/lib/hooks/use-students';
+import { ReadingGroupOrganizer } from './reading-group-organizer';
 import type { ReadingLevelOption, ReadingGroup, ReadingGroupStat } from '@/lib/types';
 
 interface ReadingGroupsTabProps {
@@ -58,6 +60,7 @@ export function ReadingGroupsTab({ classId, levelOptions }: ReadingGroupsTabProp
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
   const [managingGroupId, setManagingGroupId] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
+  const [organizing, setOrganizing] = useState(false);
   const [order, setOrder] = useState<string[]>([]);
 
   // Create form state
@@ -80,6 +83,24 @@ export function ReadingGroupsTab({ classId, levelOptions }: ReadingGroupsTabProp
   useEffect(() => {
     setOrder(groups ? groups.map((g) => g.id) : []);
   }, [groups]);
+
+  // One-time reconcile: strip group studentIds that don't resolve to a current
+  // class student (orphaned/stale data that otherwise renders as "Unknown").
+  // Guarded on a non-empty roster so we never wipe members when students are
+  // still loading or the roster came back empty.
+  const reconciledRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!groups || !students || students.length === 0) return;
+    const valid = new Set(students.map((s) => s.id));
+    for (const g of groups) {
+      if (reconciledRef.current.has(g.id)) continue;
+      const cleaned = g.studentIds.filter((id) => valid.has(id));
+      if (cleaned.length !== g.studentIds.length) {
+        reconciledRef.current.add(g.id);
+        updateGroup.mutate({ groupId: g.id, studentIds: cleaned });
+      }
+    }
+  }, [groups, students, updateGroup]);
 
   const groupById = useMemo(() => new Map((groups ?? []).map((g) => [g.id, g])), [groups]);
   const orderedGroups = useMemo(
@@ -180,6 +201,21 @@ export function ReadingGroupsTab({ classId, levelOptions }: ReadingGroupsTabProp
     );
   }
 
+  if (organizing && groups && students) {
+    return (
+      <ReadingGroupOrganizer
+        groups={groups.map((g) => ({ id: g.id, name: g.name, color: g.color ?? null, studentIds: g.studentIds }))}
+        students={students.map((s) => ({
+          id: s.id,
+          firstName: s.firstName,
+          lastName: s.lastName,
+          characterId: s.characterId,
+        }))}
+        onExit={() => setOrganizing(false)}
+      />
+    );
+  }
+
   return (
     <div>
       {ungroupedStudents.length > 0 && (
@@ -199,6 +235,12 @@ export function ReadingGroupsTab({ classId, levelOptions }: ReadingGroupsTabProp
           {reordering ? 'Drag the groups into the order you want.' : ''}
         </p>
         <div className="flex items-center gap-2 shrink-0">
+          {!reordering && groups && groups.length > 0 && students && students.length > 0 && (
+            <Button variant="outline" onClick={() => setOrganizing(true)}>
+              <Icon name="swap_horiz" size={16} className="mr-1.5" />
+              Move Students
+            </Button>
+          )}
           {groups && groups.length > 1 && (
             <Button variant="outline" onClick={() => setReordering((r) => !r)}>
               <Icon name={reordering ? 'check' : 'swap_vert'} size={16} className="mr-1.5" />
@@ -345,7 +387,7 @@ function GroupCard({
 }: {
   group: Pick<ReadingGroup, 'id' | 'name' | 'color' | 'readingLevel' | 'studentIds'>;
   stat: ReadingGroupStat | undefined;
-  students: { id: string; firstName: string; lastName: string }[] | undefined;
+  students: { id: string; firstName: string; lastName: string; characterId?: string }[] | undefined;
   expanded: boolean;
   reordering: boolean;
   onToggleExpand: () => void;
@@ -357,6 +399,13 @@ function GroupCard({
     disabled: !reordering,
   });
   const style: React.CSSProperties = { transform: CSS.Transform.toString(transform), transition };
+
+  // Resolve member ids to current class students; unresolved ids (orphaned data)
+  // are simply omitted rather than shown as "Unknown".
+  const resolvedMembers = group.studentIds
+    .map((sid) => students?.find((st) => st.id === sid))
+    .filter((s): s is NonNullable<typeof s> => !!s);
+  const memberCount = students ? resolvedMembers.length : group.studentIds.length;
 
   return (
     <div ref={setNodeRef} style={style} className={isDragging ? 'z-10' : ''}>
@@ -384,7 +433,7 @@ function GroupCard({
               )}
               <h3 className="font-bold text-charcoal truncate">{group.name}</h3>
             </div>
-            <Badge variant="info">{group.studentIds.length}</Badge>
+            <Badge variant="info">{memberCount}</Badge>
           </div>
 
           {group.readingLevel && <ReadingLevelPill level={group.readingLevel} colorHex={group.color} size="sm" />}
@@ -418,14 +467,16 @@ function GroupCard({
                   )}
                 </div>
               )}
-              {group.studentIds.length === 0 ? (
+              {resolvedMembers.length === 0 ? (
                 <p className="text-xs text-text-secondary">No students assigned</p>
               ) : (
-                <ul className="space-y-1 text-sm text-charcoal">
-                  {group.studentIds.map((sid) => {
-                    const s = students?.find((st) => st.id === sid);
-                    return <li key={sid}>{s ? `${s.firstName} ${s.lastName}` : 'Unknown'}</li>;
-                  })}
+                <ul className="space-y-1.5 text-sm text-charcoal">
+                  {resolvedMembers.map((s) => (
+                    <li key={s.id} className="flex items-center gap-2">
+                      <Avatar name={`${s.firstName} ${s.lastName}`} characterId={s.characterId} size="xs" />
+                      {s.firstName} {s.lastName}
+                    </li>
+                  ))}
                 </ul>
               )}
               <div className="flex gap-2 mt-3">
