@@ -413,12 +413,11 @@ function GroupCard({
       <Card
         hover={!reordering}
         onClick={reordering ? undefined : onToggleExpand}
-        className={`relative overflow-hidden h-full ${reordering ? 'ring-1 ring-inset ring-rose-pink/30' : ''} ${
+        className={`h-full ${reordering ? 'ring-1 ring-inset ring-rose-pink/30' : ''} ${
           isDragging ? 'shadow-card-hover' : ''
         }`}
       >
-        <div className="absolute top-0 left-0 w-1.5 h-full" style={{ backgroundColor: group.color || '#E5E7EB' }} />
-        <div className="pl-3">
+        <div>
           <div className="flex items-start justify-between mb-2 gap-2">
             <div className="flex items-center gap-1.5 min-w-0">
               {reordering && (
@@ -431,6 +430,12 @@ function GroupCard({
                 >
                   <Icon name="drag_indicator" size={18} />
                 </button>
+              )}
+              {group.color && (
+                <span
+                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: group.color }}
+                />
               )}
               <h3 className="font-bold text-charcoal truncate">{group.name}</h3>
             </div>
