@@ -10,6 +10,7 @@ import '../../data/models/user_model.dart';
 import '../../data/models/class_model.dart';
 import '../../services/firebase_service.dart';
 import '../../core/widgets/lumi/feedback_widget.dart';
+import 'widgets/staff_character_picker_sheet.dart';
 
 class TeacherProfileScreen extends StatefulWidget {
   final UserModel user;
@@ -25,13 +26,23 @@ class TeacherProfileScreen extends StatefulWidget {
 
 class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
   final FirebaseService _firebaseService = FirebaseService.instance;
+  late UserModel _user;
   List<ClassModel> _classes = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
+    _user = widget.user;
     _loadClasses();
+  }
+
+  void _openCharacterPicker() {
+    showStaffCharacterPicker(
+      context,
+      user: _user,
+      onChanged: (updated) => setState(() => _user = updated),
+    );
   }
 
   Future<void> _loadClasses() async {
@@ -112,11 +123,13 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: TeacherProfileCard(
-                initials: widget.user.fullName.isNotEmpty
-                    ? widget.user.fullName[0].toUpperCase()
+                initials: _user.fullName.isNotEmpty
+                    ? _user.fullName[0].toUpperCase()
                     : '?',
-                fullName: widget.user.fullName,
+                fullName: _user.fullName,
                 subtitle: 'Teacher',
+                characterId: _user.characterId,
+                onAvatarTap: _openCharacterPicker,
                 stats: _isLoading
                     ? []
                     : [
@@ -268,15 +281,10 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                 title: 'ACTIONS',
                 items: [
                   TeacherSettingsItem(
-                    icon: Icons.edit_outlined,
+                    icon: Icons.emoji_emotions_outlined,
                     iconBgColor: AppColors.teacherPrimaryLight,
-                    label: 'Edit Profile',
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('Edit Profile coming soon')),
-                      );
-                    },
+                    label: 'Choose Character',
+                    onTap: _openCharacterPicker,
                   ),
                   TeacherSettingsItem(
                     icon: Icons.feedback_outlined,

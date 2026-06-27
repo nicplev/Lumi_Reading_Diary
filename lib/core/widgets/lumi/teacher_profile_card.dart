@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/teacher_constants.dart';
+import 'staff_avatar.dart';
 
 /// Profile stat data for the profile card stats row.
 class ProfileStat {
@@ -19,6 +20,10 @@ class TeacherProfileCard extends StatelessWidget {
   final String fullName;
   final String subtitle;
   final List<ProfileStat> stats;
+  /// Chosen staff Lumi character id; renders in place of the initials circle.
+  final String? characterId;
+  /// Tap handler for the avatar (e.g. open the character picker).
+  final VoidCallback? onAvatarTap;
 
   const TeacherProfileCard({
     super.key,
@@ -26,6 +31,8 @@ class TeacherProfileCard extends StatelessWidget {
     required this.fullName,
     required this.subtitle,
     this.stats = const [],
+    this.characterId,
+    this.onAvatarTap,
   });
 
   @override
@@ -39,24 +46,14 @@ class TeacherProfileCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Avatar
-          Container(
-            width: TeacherDimensions.avatarL,
-            height: TeacherDimensions.avatarL,
-            decoration: const BoxDecoration(
-              color: AppColors.teacherPrimary,
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                initials,
-                style: const TextStyle(
-                  fontFamily: 'Nunito',
-                  fontSize: 32,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.white,
-                ),
-              ),
+          // Avatar (character if chosen, else initials circle) — tap to change.
+          GestureDetector(
+            onTap: onAvatarTap,
+            child: StaffAvatar(
+              characterId: characterId,
+              initial: initials,
+              avatarColor: AppColors.teacherPrimary,
+              size: TeacherDimensions.avatarL,
             ),
           ),
           const SizedBox(height: 16),

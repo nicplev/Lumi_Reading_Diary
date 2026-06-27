@@ -23,10 +23,15 @@ class CharacterGrid extends StatelessWidget {
   /// Called with the tapped character's id.
   final ValueChanged<String> onSelect;
 
+  /// Characters to render. Defaults to the full student catalogue; pass a
+  /// different list (e.g. `StaffLumiCharacters.teacher`) to reuse this grid.
+  final List<LumiCharacter> characters;
+
   const CharacterGrid({
     super.key,
     required this.selectedId,
     required this.onSelect,
+    this.characters = LumiCharacters.all,
   });
 
   @override
@@ -40,9 +45,9 @@ class CharacterGrid extends StatelessWidget {
         crossAxisSpacing: 12,
         childAspectRatio: 0.82,
       ),
-      itemCount: LumiCharacters.all.length,
+      itemCount: characters.length,
       itemBuilder: (context, index) {
-        final character = LumiCharacters.all[index];
+        final character = characters[index];
         final isSelected = selectedId == character.id;
 
         return _CharacterTile(
