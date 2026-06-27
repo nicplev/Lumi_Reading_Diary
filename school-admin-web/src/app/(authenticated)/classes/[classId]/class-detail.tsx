@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useBreadcrumbs } from '@/components/layout/breadcrumb-context';
 import { PageHeader } from '@/components/lumi/page-header';
+import { Select } from '@/components/lumi/select';
 import { Tabs } from '@/components/lumi/tabs';
-import { Badge } from '@/components/lumi/badge';
 import { Icon } from '@/components/lumi/icon';
 import { StudentRoster } from './student-roster';
 import { ReadingGroupsTab } from './reading-groups-tab';
@@ -18,9 +19,14 @@ type SerializedClass = Omit<SchoolClass, 'createdAt'> & { createdAt: string };
 interface ClassDetailProps {
   schoolClass: SerializedClass;
   levelOptions: ReadingLevelOption[];
+  /** The teacher's classes for the switcher; >1 renders a dropdown. Empty for admins. */
+  classOptions?: { id: string; name: string }[];
+  /** False when the school has reading levels turned off — hides level-setting UI. */
+  levelsEnabled?: boolean;
 }
 
-export function ClassDetail({ schoolClass, levelOptions }: ClassDetailProps) {
+export function ClassDetail({ schoolClass, levelOptions, classOptions = [], levelsEnabled = true }: ClassDetailProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('roster');
   const { setOverride } = useBreadcrumbs();
 
@@ -40,6 +46,18 @@ export function ClassDetail({ schoolClass, levelOptions }: ClassDetailProps) {
       <PageHeader
         title={schoolClass.name}
         description={[schoolClass.yearLevel, `${schoolClass.studentIds.length} students`].filter(Boolean).join(' · ')}
+        action={
+          classOptions.length > 1 ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-text-secondary whitespace-nowrap">Class</span>
+              <Select
+                options={classOptions.map((c) => ({ value: c.id, label: c.name }))}
+                value={schoolClass.id}
+                onChange={(id) => router.push(`/classes/${id}`)}
+              />
+            </div>
+          ) : undefined
+        }
       />
 
       <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
@@ -47,7 +65,7 @@ export function ClassDetail({ schoolClass, levelOptions }: ClassDetailProps) {
       {activeTab === 'roster' && (
         <>
           <ComprehensionQuestionCard classId={schoolClass.id} />
-          <StudentRoster classId={schoolClass.id} levelOptions={levelOptions} />
+          <StudentRoster classId={schoolClass.id} levelOptions={levelOptions} levelsEnabled={levelsEnabled} />
         </>
       )}
       {activeTab === 'groups' && (

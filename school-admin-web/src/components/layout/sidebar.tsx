@@ -47,9 +47,14 @@ export function Sidebar({ hasDevAccess = false }: SidebarProps) {
   const { user, logout } = useAuth();
   const { data: school } = useSchool();
 
-  const visibleItems = navItems.filter(
-    (item) => !item.adminOnly || user?.role === 'schoolAdmin'
-  );
+  const isAdmin = user?.role === 'schoolAdmin';
+  const visibleItems = navItems
+    .filter((item) => !item.adminOnly || isAdmin)
+    // Teachers typically have a single class, so the section reads "Class"
+    // (admins manage many → "Classes").
+    .map((item) =>
+      item.href === '/classes' && !isAdmin ? { ...item, label: 'Class' } : item
+    );
 
   return (
     <aside className="fixed left-0 top-0 bottom-0 w-[240px] bg-surface border-r border-divider flex flex-col z-40">
