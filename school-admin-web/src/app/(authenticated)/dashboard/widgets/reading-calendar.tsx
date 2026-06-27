@@ -2,8 +2,8 @@
 
 import { useReadingCalendar, type ReadingCalendarDay } from '@/lib/hooks/use-reading-calendar';
 
-// 0 = none, then increasing pink intensity.
-const LEVEL_COLORS = ['#F3F4F6', '#FFD6DC', '#FFA9B5', '#FF8698'];
+// 0 = none, then increasing Lumi Blue intensity (dashboard data-viz).
+const LEVEL_COLORS = ['#EDEAE3', '#C8E8F1', '#9BD7EA', '#56C8E6'];
 
 /** Parse a yyyy-mm-dd key as a local date (avoids UTC-vs-local off-by-one). */
 function parseLocal(date: string): Date {
@@ -21,13 +21,13 @@ export function ReadingCalendar() {
 
   if (isLoading) {
     return (
-      <p className="text-sm text-text-secondary h-full flex items-center">Loading reading calendar…</p>
+      <p className="text-sm text-muted h-full flex items-center">Loading reading calendar…</p>
     );
   }
 
   const days = data ?? [];
   if (days.length === 0) {
-    return <p className="text-sm text-text-secondary h-full flex items-center">No reading activity yet.</p>;
+    return <p className="text-sm text-muted h-full flex items-center">No reading activity yet.</p>;
   }
 
   const max = Math.max(...days.map((d) => d.count), 1);
@@ -51,8 +51,8 @@ export function ReadingCalendar() {
   return (
     <div className="h-full flex flex-col justify-center gap-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold text-charcoal">Last {weeks} weeks</span>
-        <span className="text-xs text-text-secondary">{rangeLabel}</span>
+        <span className="text-xs font-semibold text-ink">Last {weeks} weeks</span>
+        <span className="text-xs text-muted">{rangeLabel}</span>
       </div>
       <div className="grid grid-flow-col gap-1" style={{ gridTemplateRows: 'repeat(7, 1fr)' }}>
         {cells.map((cell, i) =>
@@ -68,7 +68,7 @@ export function ReadingCalendar() {
           )
         )}
       </div>
-      <div className="flex items-center justify-between gap-1.5 text-xs text-text-secondary">
+      <div className="flex items-center justify-between gap-1.5 text-xs text-muted">
         <span>Reading logs / day</span>
         <span className="inline-flex items-center gap-1.5">
           <span>Fewer</span>

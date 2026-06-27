@@ -68,7 +68,7 @@ interface TeacherDashboardProps {
 /** Vertically-centred empty-state line so short cards don't look top-heavy when
  *  stretched to match a taller card in the same row. */
 function EmptyMsg({ children }: { children: React.ReactNode }) {
-  return <p className="text-sm text-text-secondary h-full flex items-center">{children}</p>;
+  return <p className="text-sm text-muted h-full flex items-center">{children}</p>;
 }
 
 export function TeacherDashboard({ userName, data, weeklyEngagement, widgets }: TeacherDashboardProps) {
@@ -91,7 +91,7 @@ export function TeacherDashboard({ userName, data, weeklyEngagement, widgets }: 
       id: 'classes',
       title: 'Your classes',
       action: (
-        <Link href="/classes" className="text-xs font-semibold text-rose-pink hover:underline whitespace-nowrap">
+        <Link href="/classes" className="text-xs font-semibold text-section hover:underline whitespace-nowrap">
           View all
         </Link>
       ),
@@ -104,13 +104,13 @@ export function TeacherDashboard({ userName, data, weeklyEngagement, widgets }: 
               <Link
                 key={cls.id}
                 href={`/classes/${cls.id}`}
-                className="block hover:bg-background rounded-[var(--radius-md)] p-2 -mx-2 transition-colors"
+                className="block hover:bg-cream rounded-[var(--radius-md)] p-2 -mx-2 transition-colors"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-charcoal">{cls.name}</span>
+                  <span className="text-sm font-bold text-ink">{cls.name}</span>
                   {cls.yearLevel && <Badge variant="info">{cls.yearLevel}</Badge>}
                 </div>
-                <div className="flex items-center gap-3 text-xs text-text-secondary mt-0.5">
+                <div className="flex items-center gap-3 text-xs text-muted mt-0.5">
                   <span className="inline-flex items-center gap-1">
                     <Icon name="person" size={12} /> {cls.studentCount}
                   </span>
@@ -135,12 +135,12 @@ export function TeacherDashboard({ userName, data, weeklyEngagement, widgets }: 
               <li key={r.studentId}>
                 <Link
                   href={`/students/${r.studentId}`}
-                  className="flex items-center gap-2 hover:bg-background rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
+                  className="flex items-center gap-2 hover:bg-cream rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
                 >
-                  <span className="text-xs text-text-secondary w-4 text-right flex-shrink-0">{i + 1}</span>
+                  <span className="text-xs text-muted w-4 text-right flex-shrink-0">{i + 1}</span>
                   <Avatar name={r.name} characterId={r.characterId} size="sm" className="flex-shrink-0" />
-                  <span className="text-sm text-charcoal font-medium truncate flex-1">{r.name}</span>
-                  <span className="text-xs text-text-secondary whitespace-nowrap">{r.minutes} min</span>
+                  <span className="text-sm text-ink font-medium truncate flex-1">{r.name}</span>
+                  <span className="text-xs text-muted whitespace-nowrap">{r.minutes} min</span>
                 </Link>
               </li>
             ))}
@@ -158,7 +158,7 @@ export function TeacherDashboard({ userName, data, weeklyEngagement, widgets }: 
       body:
         widgets.nudges.length === 0 ? (
           <EmptyMsg>
-            <Icon name="check_circle" size={16} className="text-mint-green-dark mr-1.5 flex-shrink-0" />
+            <Icon name="check_circle" size={16} className="text-lumi-green-dark mr-1.5 flex-shrink-0" />
             Everyone has read recently.
           </EmptyMsg>
         ) : (
@@ -167,11 +167,11 @@ export function TeacherDashboard({ userName, data, weeklyEngagement, widgets }: 
               <li key={n.studentId}>
                 <Link
                   href={`/students/${n.studentId}`}
-                  className="flex items-center gap-2 hover:bg-background rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
+                  className="flex items-center gap-2 hover:bg-cream rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
                 >
                   <Avatar name={n.name} characterId={n.characterId} size="sm" className="flex-shrink-0" />
-                  <span className="text-sm text-charcoal font-medium truncate flex-1">{n.name}</span>
-                  <span className="text-xs text-text-secondary whitespace-nowrap">
+                  <span className="text-sm text-ink font-medium truncate flex-1">{n.name}</span>
+                  <span className="text-xs text-muted whitespace-nowrap">
                     {n.daysSinceRead === null ? 'Not read yet' : `${n.daysSinceRead}d ago`}
                   </span>
                 </Link>
@@ -192,12 +192,12 @@ export function TeacherDashboard({ userName, data, weeklyEngagement, widgets }: 
               <li key={c.logId}>
                 <Link
                   href={`/students/${c.studentId}`}
-                  className="flex items-start gap-2 hover:bg-background rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
+                  className="flex items-start gap-2 hover:bg-cream rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
                 >
                   <Avatar name={c.studentName} characterId={c.characterId} size="sm" className="flex-shrink-0 mt-0.5" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-charcoal truncate">{c.studentName}</p>
-                    <p className="text-xs text-text-secondary truncate">{c.preview}</p>
+                    <p className="text-sm font-medium text-ink truncate">{c.studentName}</p>
+                    <p className="text-xs text-muted truncate">{c.preview}</p>
                   </div>
                 </Link>
               </li>
@@ -233,19 +233,19 @@ export function TeacherDashboard({ userName, data, weeklyEngagement, widgets }: 
     <div>
       {/* Greeting */}
       <div className="mb-6">
-        <h1 className="text-[28px] font-bold text-charcoal">
+        <h1 className="font-display text-[28px] font-extrabold tracking-tight text-ink">
           {getGreeting()}, {firstName}
         </h1>
-        <p className="text-sm text-text-secondary mt-1">
+        <p className="text-sm text-muted mt-1">
           {new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })}
         </p>
       </div>
 
       {/* Stats Grid (fixed) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard title="Total Students" value={data.totalStudents} icon={<Icon name="person" />} color="pink" />
-        <StatCard title="Read Today" value={data.readToday} icon={<Icon name="auto_stories" />} color="green" />
-        <StatCard title="On Streak" value={data.onStreak} icon={<Icon name="local_fire_department" />} color="orange" />
+        <StatCard title="Total Students" value={data.totalStudents} icon={<Icon name="person" />} color="blue" />
+        <StatCard title="Read Today" value={data.readToday} icon={<Icon name="auto_stories" />} color="blue" />
+        <StatCard title="On Streak" value={data.onStreak} icon={<Icon name="local_fire_department" />} color="blue" />
         <StatCard title="Books Today" value={data.booksToday} icon={<Icon name="library_books" />} color="blue" />
       </div>
 

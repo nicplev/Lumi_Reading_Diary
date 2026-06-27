@@ -20,25 +20,25 @@ export function EngagementRing({
     <div className="h-full flex flex-col items-center justify-center gap-3 py-2">
       <div className="relative w-36 h-36">
         <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
-          <circle cx="60" cy="60" r={r} fill="none" stroke="#F3F4F6" strokeWidth="12" />
+          <circle cx="60" cy="60" r={r} fill="none" stroke="#EDEAE3" strokeWidth="12" />
           <circle
             cx="60"
             cy="60"
             r={r}
             fill="none"
-            stroke="#FF8698"
+            stroke="#56C8E6"
             strokeWidth="12"
             strokeLinecap="round"
             strokeDasharray={`${dash} ${circ}`}
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-3xl font-bold text-charcoal leading-none">{pct}%</span>
-          <span className="text-xs text-text-secondary mt-1">read today</span>
+          <span className="font-display text-3xl font-extrabold text-ink leading-none">{pct}%</span>
+          <span className="text-xs text-muted mt-1">read today</span>
         </div>
       </div>
-      <p className="text-sm text-text-secondary">
-        <span className="font-bold text-charcoal">{readToday}</span> of {totalStudents} students
+      <p className="text-sm text-muted">
+        <span className="font-bold text-ink">{readToday}</span> of {totalStudents} students
       </p>
     </div>
   );
