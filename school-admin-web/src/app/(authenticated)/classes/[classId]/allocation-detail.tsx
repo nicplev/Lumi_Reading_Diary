@@ -1,12 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Card } from '@/components/lumi/card';
 import { Badge } from '@/components/lumi/badge';
 import { Button } from '@/components/lumi/button';
+import { Avatar } from '@/components/lumi/avatar';
 import { useToast } from '@/components/lumi/toast';
 import { useAddBookToAllocation, useRemoveBookFromAllocation } from '@/lib/hooks/use-allocations';
 import { BookSearchInput } from './book-search-input';
+
+interface AllocationStudent {
+  id: string;
+  firstName: string;
+  lastName: string;
+  characterId?: string;
+}
 
 interface AllocationDetailProps {
   allocation: {
@@ -27,6 +35,7 @@ interface AllocationDetailProps {
       addedItems: { id: string; title: string; isDeleted: boolean }[];
     }>;
   };
+  students?: AllocationStudent[];
   onClose: () => void;
 }
 
@@ -43,11 +52,20 @@ const cadenceLabels: Record<string, string> = {
   custom: 'Custom',
 };
 
-export function AllocationDetail({ allocation, onClose }: AllocationDetailProps) {
+export function AllocationDetail({ allocation, students, onClose }: AllocationDetailProps) {
   const { toast } = useToast();
   const addBook = useAddBookToAllocation();
   const removeBook = useRemoveBookFromAllocation();
   const [showAddBook, setShowAddBook] = useState(false);
+
+  const studentById = useMemo(
+    () => new Map((students ?? []).map((s) => [s.id, s])),
+    [students]
+  );
+  const nameOf = (id: string) => {
+    const s = studentById.get(id);
+    return s ? `${s.firstName} ${s.lastName}` : null;
+  };
 
   const activeItems = allocation.assignmentItems.filter((i) => !i.isDeleted);
   const now = new Date().toISOString();
@@ -86,8 +104,25 @@ export function AllocationDetail({ allocation, onClose }: AllocationDetailProps)
 
       <div className="text-xs text-text-secondary mb-4">
         {new Date(allocation.startDate).toLocaleDateString()} - {new Date(allocation.endDate).toLocaleDateString()}
-        {allocation.studentIds.length > 0 && ` · ${allocation.studentIds.length} specific students`}
-        {allocation.studentIds.length === 0 && ' · Whole class'}
+      </div>
+
+      <div className="mb-4">
+        <h4 className="text-sm font-semibold text-charcoal mb-1.5">Assigned to</h4>
+        {allocation.studentIds.length === 0 ? (
+          <p className="text-sm text-text-secondary">Whole class</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {allocation.studentIds.map((sid) => (
+              <span
+                key={sid}
+                className="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-[var(--radius-pill)] bg-background text-sm text-charcoal"
+              >
+                <Avatar name={nameOf(sid) ?? sid} characterId={studentById.get(sid)?.characterId} size="xs" />
+                {nameOf(sid) ?? 'Unknown student'}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {allocation.levelStart && (
@@ -165,7 +200,9 @@ export function AllocationDetail({ allocation, onClose }: AllocationDetailProps)
           <div className="space-y-2">
             {overrideEntries.map((override) => (
               <div key={override.studentId} className="p-2 rounded-[var(--radius-md)] bg-background text-xs">
-                <span className="font-semibold text-charcoal">Student {override.studentId.slice(0, 8)}...</span>
+                <span className="font-semibold text-charcoal">
+                  {nameOf(override.studentId) ?? `Student ${override.studentId.slice(0, 8)}…`}
+                </span>
                 {override.removedItemIds.length > 0 && (
                   <span className="text-text-secondary ml-2">{override.removedItemIds.length} removed</span>
                 )}
