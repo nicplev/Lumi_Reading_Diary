@@ -1,4 +1,5 @@
 import { characterImageSrc } from '@/lib/characters';
+import { staffCharacterImageSrc } from '@/lib/staff-characters';
 
 interface AvatarProps {
   name: string;
@@ -53,7 +54,8 @@ export function Avatar({ name, imageUrl, characterId, size = 'md', className = '
   // Character art is a full-bleed illustration — show it contained with NO
   // circular clip so it's never cropped (mirrors the app's StudentAvatar, which
   // renders the character at size with BoxFit.contain and no circle).
-  const charSrc = characterImageSrc(characterId);
+  // Student and staff slug namespaces are disjoint, so try both.
+  const charSrc = characterImageSrc(characterId) ?? staffCharacterImageSrc(characterId);
   if (charSrc) {
     return (
       <img

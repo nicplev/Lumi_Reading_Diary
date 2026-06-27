@@ -11,6 +11,8 @@ export interface SchoolUser {
   createdAt: Date;
   lastLoginAt?: Date;
   profileImageUrl?: string;
+  /** Chosen staff Lumi character id (la_, mt_ or ft_ prefixed); see lib/staff-characters.ts. */
+  characterId?: string;
   phone?: string;
   pendingDeletion?: boolean;
   scheduledDeletionAt?: Date;

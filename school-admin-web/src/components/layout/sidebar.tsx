@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useSchool } from '@/lib/hooks/use-school';
 import { Icon } from '@/components/lumi/icon';
+import { Avatar } from '@/components/lumi/avatar';
 
 interface NavItem {
   label: string;
@@ -24,16 +25,6 @@ const navItems: NavItem[] = [
   { label: 'Analytics', href: '/analytics', icon: <Icon name="bar_chart" size={18} />, adminOnly: true },
   { label: 'Settings', href: '/settings', icon: <Icon name="settings" size={18} />, adminOnly: true },
 ];
-
-function getInitials(fullName?: string, email?: string): string {
-  if (fullName) {
-    return fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  }
-  if (email) {
-    return email[0].toUpperCase();
-  }
-  return '??';
-}
 
 interface SidebarProps {
   /** True if the signed-in user holds developer access. When set, the footer
@@ -122,9 +113,11 @@ export function Sidebar({ hasDevAccess = false }: SidebarProps) {
           href="/profile"
           className="flex items-center gap-3 px-3 py-2 rounded-[var(--radius-md)] hover:bg-background transition-colors"
         >
-          <div className="w-8 h-8 rounded-full bg-brand-primary/10 flex items-center justify-center text-xs font-bold text-brand-primary">
-            {getInitials(user?.fullName, user?.email)}
-          </div>
+          <Avatar
+            name={user?.fullName || user?.email || 'User'}
+            characterId={user?.characterId}
+            size="sm"
+          />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-charcoal truncate">{user?.fullName || user?.email || 'Loading...'}</p>
             <p className="text-[11px] text-text-secondary capitalize">{user?.role === 'schoolAdmin' ? 'Admin' : 'Teacher'}</p>

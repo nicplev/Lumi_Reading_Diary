@@ -13,6 +13,7 @@ import { Input } from '@/components/lumi/input';
 import { Avatar } from '@/components/lumi/avatar';
 import { Badge } from '@/components/lumi/badge';
 import { Icon } from '@/components/lumi/icon';
+import { StaffCharacterPicker } from './staff-character-picker';
 import type { SchoolUser } from '@/lib/types';
 
 type SerializedProfile = Omit<SchoolUser, 'createdAt' | 'lastLoginAt'> & {
@@ -37,6 +38,10 @@ export default function ProfilePage() {
 
   // Password reset
   const [resettingPassword, setResettingPassword] = useState(false);
+
+  // Character picker
+  const [showCharacterPicker, setShowCharacterPicker] = useState(false);
+  const [savingCharacter, setSavingCharacter] = useState(false);
 
   useEffect(() => {
     async function fetchProfile() {
@@ -71,6 +76,7 @@ export default function ProfilePage() {
   const roleLabel = (user?.role || profile?.role) === 'schoolAdmin' ? 'School Admin' : 'Teacher';
   const roleBadgeVariant = (user?.role || profile?.role) === 'schoolAdmin' ? 'info' as const : 'success' as const;
   const userEmail = user?.email || profile?.email || '';
+  const staffRole = (user?.role || profile?.role) as 'teacher' | 'schoolAdmin' | undefined;
 
   async function handleSave() {
     setSaving(true);
@@ -94,6 +100,29 @@ export default function ProfilePage() {
       toast(err instanceof Error ? err.message : 'Failed to update profile', 'error');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSaveCharacter(characterId: string) {
+    setSavingCharacter(true);
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ characterId }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to save');
+      }
+      setProfile(prev => (prev ? { ...prev, characterId } : prev));
+      await refreshUser();
+      setShowCharacterPicker(false);
+      toast('Character updated', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to update character', 'error');
+    } finally {
+      setSavingCharacter(false);
     }
   }
 
@@ -130,7 +159,7 @@ export default function ProfilePage() {
       {/* Profile Header */}
       <Card>
         <div className="flex items-center gap-4">
-          <Avatar name={displayName} size="lg" />
+          <Avatar name={displayName} characterId={profile?.characterId ?? user?.characterId} size="lg" />
           <div>
             <h2 className="text-[22px] font-bold text-charcoal">
               {displayName}
@@ -140,6 +169,16 @@ export default function ProfilePage() {
               {roleLabel}
             </Badge>
           </div>
+          {staffRole && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-auto self-start"
+              onClick={() => setShowCharacterPicker(true)}
+            >
+              Change character
+            </Button>
+          )}
         </div>
       </Card>
 
@@ -281,6 +320,17 @@ export default function ProfilePage() {
           </Button>
         </div>
       </Card>
+
+      {staffRole && (
+        <StaffCharacterPicker
+          open={showCharacterPicker}
+          onClose={() => setShowCharacterPicker(false)}
+          role={staffRole}
+          currentId={profile?.characterId ?? user?.characterId}
+          onSave={handleSaveCharacter}
+          saving={savingCharacter}
+        />
+      )}
     </div>
   );
 }

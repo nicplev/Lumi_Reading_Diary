@@ -31,6 +31,8 @@ export interface SessionData {
   /** EFFECTIVE role — see note on schoolId above. */
   role: 'teacher' | 'schoolAdmin';
   fullName: string;
+  /** Chosen staff Lumi character id; renders in the profile chip. */
+  characterId?: string;
   /** Present iff a developer impersonation session is active. */
   impersonation?: ImpersonationSessionBlock;
 }
@@ -78,6 +80,7 @@ export async function getSession(): Promise<SessionData | null> {
       schoolId: payload.schoolId as string,
       role: payload.role as 'teacher' | 'schoolAdmin',
       fullName: payload.fullName as string,
+      characterId: payload.characterId as string | undefined,
       impersonation: payload.impersonation as ImpersonationSessionBlock | undefined,
     };
   } catch {

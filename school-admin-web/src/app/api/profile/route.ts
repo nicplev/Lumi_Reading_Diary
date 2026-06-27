@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession, createSessionCookie } from '@/lib/auth/session';
 import { getUser, updateUser } from '@/lib/firestore/users';
+import { isStaffCharacterAllowed } from '@/lib/staff-characters';
 
 export async function GET() {
   const session = await getSession();
@@ -23,14 +24,21 @@ export async function PATCH(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { fullName, phone } = body;
+  const { fullName, phone, characterId } = body;
 
-  const update: { fullName?: string; phone?: string } = {};
+  const update: { fullName?: string; phone?: string; characterId?: string } = {};
   if (typeof fullName === 'string' && fullName.trim()) {
     update.fullName = fullName.trim();
   }
   if (typeof phone === 'string') {
     update.phone = phone.trim();
+  }
+  if (typeof characterId === 'string') {
+    // A teacher may only pick mt_*/ft_*, an admin only la_* (slug category = role).
+    if (!isStaffCharacterAllowed(session.role, characterId)) {
+      return NextResponse.json({ error: 'That character is not available for your role.' }, { status: 400 });
+    }
+    update.characterId = characterId;
   }
 
   if (Object.keys(update).length === 0) {
@@ -39,9 +47,13 @@ export async function PATCH(request: NextRequest) {
 
   await updateUser(session.schoolId, session.uid, update);
 
-  // Update the session cookie so sidebar reflects changes immediately
-  if (update.fullName) {
-    await createSessionCookie({ ...session, fullName: update.fullName });
+  // Re-issue the session cookie so the profile chip reflects changes immediately.
+  if (update.fullName || update.characterId) {
+    await createSessionCookie({
+      ...session,
+      fullName: update.fullName ?? session.fullName,
+      characterId: update.characterId ?? session.characterId,
+    });
   }
 
   return NextResponse.json({ success: true });
