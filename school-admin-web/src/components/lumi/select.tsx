@@ -30,7 +30,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             id={id}
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className={`w-full px-4 py-3 rounded-[var(--radius-md)] border bg-surface text-charcoal focus:outline-none focus:ring-2 focus:ring-rose-pink/30 focus:border-rose-pink transition-colors text-[15px] appearance-none pr-10 ${error ? 'border-error' : 'border-divider'} ${!value && placeholder ? 'text-text-secondary/50' : ''} ${className}`}
+            className={`w-full px-4 py-3 rounded-[var(--radius-md)] border bg-paper text-ink focus:outline-none focus:ring-2 focus:ring-section/30 focus:border-section transition-colors text-[15px] appearance-none pr-10 ${error ? 'border-error' : 'border-rule'} ${!value && placeholder ? 'text-muted/50' : ''} ${className}`}
             {...props}
           >
             {placeholder && (

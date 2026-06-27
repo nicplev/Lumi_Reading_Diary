@@ -9,12 +9,15 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
 }
 
+// The primary + secondary variants follow the active section accent
+// (bg-section / bg-section-tint); danger is always Lumi Red, regardless of
+// section, because destructive actions read the same everywhere.
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: 'bg-brand-primary text-white hover:bg-brand-primary-dark shadow-card',
-  secondary: 'bg-brand-secondary text-white hover:bg-brand-secondary/90',
-  outline: 'border border-divider bg-surface text-charcoal hover:bg-background',
-  ghost: 'text-charcoal hover:bg-background',
-  danger: 'bg-error text-white hover:bg-error/90',
+  primary: 'bg-section text-on-section hover:brightness-95 shadow-card',
+  secondary: 'bg-section-tint text-ink hover:brightness-95',
+  outline: 'border border-rule bg-paper text-ink hover:bg-cream',
+  ghost: 'text-ink hover:bg-cream',
+  danger: 'bg-lumi-red text-white hover:bg-lumi-red-dark shadow-card',
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
@@ -29,7 +32,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         disabled={disabled || loading}
-        className={`inline-flex items-center justify-center font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+        className={`inline-flex items-center justify-center font-display font-bold transition disabled:opacity-50 disabled:cursor-not-allowed ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
         {...props}
       >
         {loading && (

@@ -15,7 +15,7 @@ const paddingClasses = {
 export function Card({ hover, padding = 'md', className = '', children, ...props }: CardProps) {
   return (
     <div
-      className={`bg-surface rounded-[var(--radius-lg)] shadow-card ${hover ? 'hover:shadow-card-hover transition-shadow cursor-pointer' : ''} ${paddingClasses[padding]} ${className}`}
+      className={`bg-paper rounded-[var(--radius-lg)] border border-rule shadow-card ${hover ? 'hover:shadow-card-hover hover:-translate-y-0.5 transition cursor-pointer' : ''} ${paddingClasses[padding]} ${className}`}
       {...props}
     >
       {children}

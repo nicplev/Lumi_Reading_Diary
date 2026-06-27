@@ -4,6 +4,7 @@ import { MobileNav } from '@/components/layout/mobile-nav';
 import { ImpersonationBanner } from '@/components/layout/impersonation-banner';
 import { ImpersonationWatermark } from '@/components/layout/impersonation-watermark';
 import { SchoolThemeProvider } from '@/components/providers/school-theme-provider';
+import { RouteSectionScope } from '@/components/lumi/section-scope';
 import { BreadcrumbProvider } from '@/components/layout/breadcrumb-context';
 import { getSession } from '@/lib/auth/session';
 import { hasDevAccess } from '@/lib/auth/dev-access';
@@ -37,18 +38,22 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
           expiresAt={impersonation.expiresAt}
         />
       )}
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-cream">
         {/* Desktop sidebar */}
         <div className="hidden lg:block">
           <Sidebar hasDevAccess={showDevTools} />
         </div>
 
-        {/* Main content */}
+        {/* Main content — RouteSectionScope themes everything by the current
+            route, so each page's accent (and the design-system widgets within)
+            follows the section colour automatically. */}
         <div className="lg:ml-[240px]">
           <Header />
-          <main className="p-6 pb-24 lg:pb-6">
-            {children}
-          </main>
+          <RouteSectionScope>
+            <main className="p-6 pb-24 lg:pb-6">
+              {children}
+            </main>
+          </RouteSectionScope>
         </div>
 
         {/* Mobile bottom nav */}

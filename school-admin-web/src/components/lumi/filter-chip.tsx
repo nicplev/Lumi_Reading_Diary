@@ -13,13 +13,13 @@ export function FilterChip({ label, selected, onClick, count }: FilterChipProps)
       onClick={onClick}
       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-pill)] text-[13px] font-semibold transition-colors ${
         selected
-          ? 'bg-rose-pink text-white'
-          : 'bg-background text-text-secondary border border-divider hover:bg-divider/50'
+          ? 'bg-section text-on-section'
+          : 'bg-paper text-muted border border-rule hover:bg-cream'
       }`}
     >
       {label}
       {count != null && (
-        <span className={`text-xs ${selected ? 'text-white/80' : 'text-text-secondary/60'}`}>
+        <span className={`text-xs ${selected ? 'text-on-section/80' : 'text-muted/60'}`}>
           {count}
         </span>
       )}
