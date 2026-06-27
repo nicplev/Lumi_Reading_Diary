@@ -153,6 +153,7 @@ flutter:
     - assets/animations/
     - assets/blobs/
     - assets/characters/
+    - assets/staff_characters/
     - assets/lumi/
 
   # An image asset can refer to one or more resolution-specific "variants", see
