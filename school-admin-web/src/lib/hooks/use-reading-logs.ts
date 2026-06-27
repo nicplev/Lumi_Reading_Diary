@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 
 export interface SerializedReadingLog {
   id: string;
@@ -35,16 +35,27 @@ export interface SerializedLogComment {
   createdAt: string | null;
 }
 
-export function useReadingLogs(studentId: string) {
+export function useReadingLogs(studentId: string, range?: { from: string; to: string }) {
   return useQuery<SerializedReadingLog[]>({
-    queryKey: ['reading-logs', studentId],
+    // Range is part of the key so widening the window refetches rather than
+    // serving the narrower cached set. Partial-match invalidation by
+    // ['reading-logs'] still catches every windowed query.
+    queryKey: ['reading-logs', studentId, range?.from ?? null, range?.to ?? null],
     queryFn: async () => {
-      const res = await fetch(`/api/reading-logs?studentId=${encodeURIComponent(studentId)}`);
+      const params = new URLSearchParams({ studentId });
+      if (range) {
+        params.set('from', range.from);
+        params.set('to', range.to);
+      }
+      const res = await fetch(`/api/reading-logs?${params.toString()}`);
       if (!res.ok) throw new Error('Failed to fetch reading logs');
       return res.json();
     },
     enabled: !!studentId,
     staleTime: 30 * 1000,
+    // Keep the prior window visible while a wider one loads, so switching presets
+    // shows an "Updating…" hint instead of flashing the list empty.
+    placeholderData: keepPreviousData,
   });
 }
 

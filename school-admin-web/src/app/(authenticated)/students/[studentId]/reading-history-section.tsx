@@ -7,6 +7,7 @@ import { Icon } from '@/components/lumi/icon';
 import { EmptyState } from '@/components/lumi/empty-state';
 import { SearchInput } from '@/components/lumi/search-input';
 import { FilterChip } from '@/components/lumi/filter-chip';
+import { Button } from '@/components/lumi/button';
 import { FeelingBlob } from '@/components/lumi/feeling-blob';
 import { FEELINGS, FEELING_ORDER } from '@/lib/feelings';
 import { CommentThread } from './comment-thread';
@@ -20,13 +21,42 @@ const STATUS_DOT: Record<string, string> = {
   pending: 'bg-divider',
 };
 
-type DateFilter = 'all' | 'week' | 'month';
+type Preset = '7d' | '60d' | 'custom';
 
-const DATE_FILTERS: { value: DateFilter; label: string }[] = [
-  { value: 'week', label: 'Last 7 days' },
-  { value: 'month', label: 'This month' },
-  { value: 'all', label: 'All time' },
-];
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// <input type="date"> speaks YYYY-MM-DD; convert to/from local Date parts so the
+// window matches the viewer's calendar day rather than UTC.
+function toDateInput(d: Date): string {
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+function dateInputToISO(value: string, endOfDay: boolean): string {
+  const [y, m, d] = value.split('-').map(Number);
+  return new Date(
+    y,
+    m - 1,
+    d,
+    endOfDay ? 23 : 0,
+    endOfDay ? 59 : 0,
+    endOfDay ? 59 : 0,
+    endOfDay ? 999 : 0,
+  ).toISOString();
+}
+
+function startOfDaysAgo(days: number): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return new Date(d.getTime() - days * DAY_MS).toISOString();
+}
+
+function endOfToday(): string {
+  const d = new Date();
+  d.setHours(23, 59, 59, 999);
+  return d.toISOString();
+}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
@@ -37,29 +67,51 @@ function formatDate(iso: string): string {
 }
 
 export function ReadingHistorySection({ studentId }: { studentId: string }) {
-  const { data: logs, isLoading } = useReadingLogs(studentId);
   const [mode, setMode] = useState<'logs' | 'books'>('logs');
-  // Default to the last 7 days — a prolific reader can have hundreds of logs,
-  // and showing them all buries the rest of the profile under endless scroll.
-  const [dateFilter, setDateFilter] = useState<DateFilter>('week');
+  // Default to the last 7 days — a prolific reader can have hundreds of logs, and
+  // fetching them all buries the rest of the profile under endless scroll. Wider
+  // windows load on demand; the server hard-caps history at 2 years.
+  const [preset, setPreset] = useState<Preset>('7d');
+  const [customFrom, setCustomFrom] = useState(toDateInput(new Date(Date.now() - 60 * DAY_MS)));
+  const [customTo, setCustomTo] = useState(toDateInput(new Date()));
+  const [appliedCustom, setAppliedCustom] = useState<{ from: string; to: string } | null>(null);
   const [feelings, setFeelings] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  // Date inputs are bounded to [2 years ago, today] — the same hard floor the
+  // server enforces, so the picker can never request data that's been cleaned up.
+  const todayInput = toDateInput(new Date());
+  const minInput = (() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 2);
+    return toDateInput(d);
+  })();
+
+  const range = useMemo(() => {
+    if (preset === '7d') return { from: startOfDaysAgo(7), to: endOfToday() };
+    if (preset === '60d') return { from: startOfDaysAgo(60), to: endOfToday() };
+    return appliedCustom ?? { from: startOfDaysAgo(7), to: endOfToday() };
+  }, [preset, appliedCustom]);
+
+  const { data: logs, isLoading, isFetching } = useReadingLogs(studentId, range);
+
+  const canApplyCustom = !!customFrom && !!customTo && customFrom <= customTo;
+  const applyCustom = () => {
+    if (!canApplyCustom) return;
+    setAppliedCustom({
+      from: dateInputToISO(customFrom, false),
+      to: dateInputToISO(customTo, true),
+    });
+  };
+
   const toggleFeeling = (key: string) =>
     setFeelings((prev) => (prev.includes(key) ? prev.filter((f) => f !== key) : [...prev, key]));
 
+  // Date windowing happens server-side (see `range`); here we only narrow by
+  // feeling + book title within whatever window was fetched.
   const filtered = useMemo(() => {
     let list = logs ?? [];
-    const now = Date.now();
-    if (dateFilter === 'week') {
-      const cutoff = now - 7 * 24 * 60 * 60 * 1000;
-      list = list.filter((l) => new Date(l.date).getTime() >= cutoff);
-    } else if (dateFilter === 'month') {
-      const d = new Date();
-      const startOfMonth = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
-      list = list.filter((l) => new Date(l.date).getTime() >= startOfMonth);
-    }
     if (feelings.length > 0) {
       list = list.filter((l) => l.childFeeling && feelings.includes(l.childFeeling));
     }
@@ -68,7 +120,7 @@ export function ReadingHistorySection({ studentId }: { studentId: string }) {
       list = list.filter((l) => l.bookTitles.some((t) => t.toLowerCase().includes(q)));
     }
     return list;
-  }, [logs, dateFilter, feelings, search]);
+  }, [logs, feelings, search]);
 
   const bookSummary = useMemo(() => {
     const map = new Map<string, { title: string; sessions: number; minutes: number }>();
@@ -89,11 +141,13 @@ export function ReadingHistorySection({ studentId }: { studentId: string }) {
       <Card>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-charcoal">Reading History</h2>
-          {logs && logs.length > 0 && (
+          {isFetching && !isLoading ? (
+            <span className="text-sm text-text-secondary">Updating…</span>
+          ) : logs && logs.length > 0 ? (
             <span className="text-sm text-text-secondary">
               {logs.length} session{logs.length === 1 ? '' : 's'}
             </span>
-          )}
+          ) : null}
         </div>
 
         <Tabs
@@ -107,15 +161,44 @@ export function ReadingHistorySection({ studentId }: { studentId: string }) {
 
         <div className="flex flex-col gap-3 mt-4 mb-4">
           <div className="flex flex-wrap gap-2">
-            {DATE_FILTERS.map((f) => (
-              <FilterChip
-                key={f.value}
-                label={f.label}
-                selected={dateFilter === f.value}
-                onClick={() => setDateFilter(f.value)}
-              />
-            ))}
+            <FilterChip label="Last 7 days" selected={preset === '7d'} onClick={() => setPreset('7d')} />
+            <FilterChip label="Last 60 days" selected={preset === '60d'} onClick={() => setPreset('60d')} />
+            <FilterChip label="Custom range" selected={preset === 'custom'} onClick={() => setPreset('custom')} />
           </div>
+          {preset === 'custom' && (
+            <div className="rounded-[var(--radius-md)] border border-divider bg-background p-3 flex flex-col gap-3">
+              <div className="flex flex-wrap items-end gap-3">
+                <label className="flex flex-col gap-1 text-xs font-medium text-text-secondary">
+                  From
+                  <input
+                    type="date"
+                    value={customFrom}
+                    min={minInput}
+                    max={customTo || todayInput}
+                    onChange={(e) => setCustomFrom(e.target.value)}
+                    className="rounded-[var(--radius-sm)] border border-divider bg-surface px-2.5 py-1.5 text-sm text-charcoal"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-text-secondary">
+                  To
+                  <input
+                    type="date"
+                    value={customTo}
+                    min={customFrom || minInput}
+                    max={todayInput}
+                    onChange={(e) => setCustomTo(e.target.value)}
+                    className="rounded-[var(--radius-sm)] border border-divider bg-surface px-2.5 py-1.5 text-sm text-charcoal"
+                  />
+                </label>
+                <Button variant="outline" onClick={applyCustom} disabled={!canApplyCustom}>
+                  Load
+                </Button>
+              </div>
+              <p className="text-xs text-text-secondary">
+                Pick any range within the last 2 years. Reading history older than 2 years isn’t kept.
+              </p>
+            </div>
+          )}
           <div className="flex flex-wrap gap-2">
             {FEELING_ORDER.map((key) => (
               <FilterChip
@@ -139,10 +222,10 @@ export function ReadingHistorySection({ studentId }: { studentId: string }) {
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={<Icon name="menu_book" size={40} />}
-            title={(logs ?? []).length === 0 ? 'No reading logged yet' : 'No sessions match your filters'}
+            title={(logs ?? []).length === 0 ? 'No reading in this range' : 'No sessions match your filters'}
             description={
               (logs ?? []).length === 0
-                ? 'Reading sessions logged by families or staff will appear here.'
+                ? 'Try the last 60 days or a custom date range to look further back.'
                 : 'Try clearing the filters or search.'
             }
           />
