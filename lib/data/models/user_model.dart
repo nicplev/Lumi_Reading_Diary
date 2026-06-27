@@ -17,6 +17,8 @@ class UserModel {
   final List<String> linkedChildren; // For parents
   final List<String> classIds; // For teachers
   final String? profileImageUrl;
+  // Chosen staff Lumi character id (la_/mt_/ft_ prefixed); see StaffLumiCharacters.
+  final String? characterId;
   final bool isActive;
   final DateTime createdAt;
   final DateTime? lastLoginAt;
@@ -38,6 +40,7 @@ class UserModel {
     this.linkedChildren = const [],
     this.classIds = const [],
     this.profileImageUrl,
+    this.characterId,
     this.isActive = true,
     required this.createdAt,
     this.lastLoginAt,
@@ -62,6 +65,7 @@ class UserModel {
       linkedChildren: List<String>.from(data['linkedChildren'] ?? []),
       classIds: List<String>.from(data['classIds'] ?? []),
       profileImageUrl: data['profileImageUrl'],
+      characterId: data['characterId'] as String?,
       isActive: data['isActive'] ?? true,
       createdAt: data['createdAt'] != null
           ? (data['createdAt'] as Timestamp).toDate()
@@ -86,6 +90,7 @@ class UserModel {
       'linkedChildren': linkedChildren,
       'classIds': classIds,
       'profileImageUrl': profileImageUrl,
+      'characterId': characterId,
       'isActive': isActive,
       'createdAt': Timestamp.fromDate(createdAt),
       'lastLoginAt':
@@ -107,6 +112,7 @@ class UserModel {
     List<String>? linkedChildren,
     List<String>? classIds,
     String? profileImageUrl,
+    String? characterId,
     bool? isActive,
     DateTime? createdAt,
     DateTime? lastLoginAt,
@@ -125,6 +131,7 @@ class UserModel {
       linkedChildren: linkedChildren ?? this.linkedChildren,
       classIds: classIds ?? this.classIds,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
+      characterId: characterId ?? this.characterId,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       lastLoginAt: lastLoginAt ?? this.lastLoginAt,
