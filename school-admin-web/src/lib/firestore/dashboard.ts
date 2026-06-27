@@ -518,7 +518,7 @@ export async function getTeacherDashboardWidgets(
   recentAchievements.sort((a, b) => (b.earnedAt?.getTime() ?? 0) - (a.earnedAt?.getTime() ?? 0));
 
   const topReaders = [...minutesByStudent.entries()]
-    .filter(([, m]) => m > 0)
+    .filter(([sid, m]) => m > 0 && nameById.has(sid))
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
     .map(([sid, m]) => ({
@@ -530,6 +530,10 @@ export async function getTeacherDashboardWidgets(
 
   const now = Date.now();
   const nudges = studentIds
+    // Skip ids that don't resolve to a current student doc — orphaned ids in the
+    // class's studentIds array otherwise render as ghost "Student / Not read yet"
+    // rows. (Real students always resolve via the batch fetch above.)
+    .filter((sid) => nameById.has(sid))
     .map((sid) => {
       const last = lastReadById.get(sid) ?? null;
       const daysSinceRead = last ? Math.floor((now - last.getTime()) / 86_400_000) : null;
