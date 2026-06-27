@@ -122,7 +122,8 @@ export async function middleware(request: NextRequest) {
   }
 
   // Admin-only routes
-  const adminOnlyPaths = ['/users', '/parent-links', '/analytics', '/settings'];
+  // Students are managed by admins; teachers reach student profiles via their class.
+  const adminOnlyPaths = ['/users', '/parent-links', '/analytics', '/settings', '/students'];
   if (
     adminOnlyPaths.some((path) => pathname.startsWith(path)) &&
     sessionData.role !== 'schoolAdmin'
