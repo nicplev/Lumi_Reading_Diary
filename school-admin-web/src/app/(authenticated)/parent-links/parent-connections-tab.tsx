@@ -54,7 +54,7 @@ export function ParentConnectionsTab() {
         value ? (
           <Badge variant="default">{value as string}</Badge>
         ) : (
-          <span className="text-text-secondary text-sm">—</span>
+          <span className="text-muted text-sm">—</span>
         ),
       sortable: true,
     },
@@ -67,7 +67,7 @@ export function ParentConnectionsTab() {
         value ? (
           <span className="text-sm">{value as string}</span>
         ) : (
-          <span className="text-sm text-text-secondary">—</span>
+          <span className="text-sm text-muted">—</span>
         ),
       sortable: true,
     },
@@ -77,7 +77,7 @@ export function ParentConnectionsTab() {
       accessorFn: (row) => row.linkedStudents.length,
       cell: (_, row) =>
         row.linkedStudents.length === 0 ? (
-          <span className="text-text-secondary text-sm">No students linked</span>
+          <span className="text-muted text-sm">No students linked</span>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {row.linkedStudents.map((s) => (
@@ -107,7 +107,7 @@ export function ParentConnectionsTab() {
         value ? (
           <span className="text-sm">{new Date(value as string).toLocaleDateString()}</span>
         ) : (
-          <span className="text-sm text-text-secondary">Never</span>
+          <span className="text-sm text-muted">Never</span>
         ),
       sortable: true,
     },

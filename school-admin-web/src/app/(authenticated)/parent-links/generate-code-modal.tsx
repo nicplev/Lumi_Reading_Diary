@@ -113,8 +113,8 @@ export function GenerateCodeModal({ open, onClose }: GenerateCodeModalProps) {
     >
       {generatedCode ? (
         <div className="text-center py-4">
-          <p className="text-sm text-text-secondary mb-3">Share this code with the parent:</p>
-          <code className="inline-block bg-background px-6 py-3 rounded-[var(--radius-md)] text-2xl font-mono font-bold text-charcoal tracking-widest">
+          <p className="text-sm text-muted mb-3">Share this code with the parent:</p>
+          <code className="inline-block bg-cream px-6 py-3 rounded-[var(--radius-md)] text-2xl font-mono font-bold text-ink tracking-widest">
             {generatedCode}
           </code>
           <button
@@ -122,7 +122,7 @@ export function GenerateCodeModal({ open, onClose }: GenerateCodeModalProps) {
               navigator.clipboard.writeText(generatedCode);
               toast('Copied to clipboard', 'success');
             }}
-            className="block mx-auto mt-3 text-sm text-rose-pink hover:underline"
+            className="block mx-auto mt-3 text-sm text-section hover:underline"
           >
             Copy to clipboard
           </button>
@@ -166,13 +166,13 @@ export function GenerateCodeModal({ open, onClose }: GenerateCodeModalProps) {
               {selectedClass && (
                 <div className="flex items-center gap-2">
                   <Badge variant="info">{classStudentCount} student{classStudentCount !== 1 ? 's' : ''}</Badge>
-                  <span className="text-xs text-text-secondary">will receive new link codes</span>
+                  <span className="text-xs text-muted">will receive new link codes</span>
                 </div>
               )}
             </div>
           )}
 
-          <p className="text-xs text-text-secondary">
+          <p className="text-xs text-muted">
             Generating a new code supersedes any existing active staff code for
             the student. A guardian&apos;s pending co-parent invite is not
             affected. Use this to add a second guardian to an already-linked

@@ -156,7 +156,7 @@ export function ParentOnboardingTab() {
             e.stopPropagation();
             toggleSelect(row.id);
           }}
-          className="w-4 h-4 rounded border-divider text-rose-pink focus:ring-rose-pink/30 cursor-pointer"
+          className="w-4 h-4 rounded border-rule text-section focus:ring-section/30 cursor-pointer"
         />
       ),
       className: 'w-10',
@@ -179,9 +179,9 @@ export function ParentOnboardingTab() {
       accessorFn: (row) => row.parentEmail ?? '',
       cell: (value) =>
         value ? (
-          <span className="text-sm text-charcoal">{value as string}</span>
+          <span className="text-sm text-ink">{value as string}</span>
         ) : (
-          <span className="text-sm text-text-secondary/50 italic">No email</span>
+          <span className="text-sm text-muted/50 italic">No email</span>
         ),
       sortable: true,
     },
@@ -200,12 +200,12 @@ export function ParentOnboardingTab() {
   if (studentsLoading) {
     return (
       <div className="space-y-4">
-        <div className="bg-surface shadow-card rounded-[var(--radius-lg)] p-4 animate-pulse">
-          <div className="h-4 w-48 bg-background rounded mb-3" />
-          <div className="h-2 w-full bg-background rounded mb-4" />
+        <div className="bg-paper shadow-card rounded-[var(--radius-lg)] p-4 animate-pulse">
+          <div className="h-4 w-48 bg-cream rounded mb-3" />
+          <div className="h-2 w-full bg-cream rounded mb-4" />
           <div className="flex gap-3">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-8 w-28 bg-background rounded-full" />
+              <div key={i} className="h-8 w-28 bg-cream rounded-full" />
             ))}
           </div>
         </div>
@@ -220,7 +220,7 @@ export function ParentOnboardingTab() {
     <div>
       {/* Status guide (inline tooltip) */}
       <div className="flex items-center gap-1.5 mb-4">
-        <span className="text-sm font-semibold text-text-secondary">Onboarding Status Guide</span>
+        <span className="text-sm font-semibold text-muted">Onboarding Status Guide</span>
         <InfoTooltip>
           <strong>Linked</strong> = parent account connected.{' '}
           <strong>Ready</strong> = subscribed, can receive invite.{' '}
@@ -230,19 +230,19 @@ export function ParentOnboardingTab() {
       </div>
 
       {/* Stats Section */}
-      <div className="bg-surface shadow-card rounded-[var(--radius-lg)] p-4 mb-6 space-y-3">
+      <div className="bg-paper shadow-card rounded-[var(--radius-lg)] p-4 mb-6 space-y-3">
         {/* Progress bar */}
         <div className="flex items-center gap-3">
-          <span className="text-sm font-semibold text-charcoal whitespace-nowrap">
+          <span className="text-sm font-semibold text-ink whitespace-nowrap">
             {stats.linked} / {total} parents linked
           </span>
-          <div className="flex-1 h-2 rounded-full bg-background overflow-hidden">
+          <div className="flex-1 h-2 rounded-full bg-cream overflow-hidden">
             <div
-              className="h-full bg-mint-green rounded-full transition-all duration-500"
+              className="h-full bg-lumi-green rounded-full transition-all duration-500"
               style={{ width: `${linkedPct}%` }}
             />
           </div>
-          <span className="text-sm font-medium text-text-secondary w-10 text-right">
+          <span className="text-sm font-medium text-muted w-10 text-right">
             {linkedPct}%
           </span>
         </div>
@@ -253,9 +253,9 @@ export function ParentOnboardingTab() {
             const count = activeStudents.filter((st) => getOnboardingStatus(st) === s).length;
             const isActive = statusFilter === s;
             const variantColors: Record<OnboardingStatus, string> = {
-              linked: 'border-mint-green/60 text-mint-green-dark bg-mint-green/10',
-              ready: 'border-soft-yellow/60 text-charcoal bg-soft-yellow/20',
-              no_subscription: 'border-divider text-text-secondary bg-background',
+              linked: 'border-lumi-green/60 text-lumi-green-dark bg-lumi-green/10',
+              ready: 'border-lumi-yellow/60 text-ink bg-lumi-yellow/20',
+              no_subscription: 'border-rule text-muted bg-cream',
             };
             return (
               <button
@@ -277,7 +277,7 @@ export function ParentOnboardingTab() {
         {/* Class filters */}
         {uniqueClassIds.length > 1 && (
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider mr-1">Class:</span>
+            <span className="text-xs font-semibold text-muted uppercase tracking-wider mr-1">Class:</span>
             <FilterChip
               label="All"
               selected={classFilter === 'all'}
@@ -313,8 +313,8 @@ export function ParentOnboardingTab() {
 
       {/* Bulk Action Bar */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 mb-4 px-4 py-3 bg-rose-pink/5 border border-rose-pink/20 rounded-[var(--radius-md)]">
-          <span className="text-sm font-semibold text-charcoal">
+        <div className="flex items-center gap-3 mb-4 px-4 py-3 bg-section/5 border border-section/20 rounded-[var(--radius-md)]">
+          <span className="text-sm font-semibold text-ink">
             {selectedIds.size} selected
           </span>
           <Button variant="outline" size="sm" onClick={selectAllEligible}>
@@ -352,13 +352,13 @@ export function ParentOnboardingTab() {
         <div className="flex items-center justify-between mt-3">
           <button
             onClick={toggleSelectAll}
-            className="text-sm text-rose-pink hover:underline font-semibold"
+            className="text-sm text-section hover:underline font-semibold"
           >
             Select all {filtered.length} visible students
           </button>
           <button
             onClick={selectAllEligible}
-            className="text-sm text-rose-pink hover:underline font-semibold"
+            className="text-sm text-section hover:underline font-semibold"
           >
             Select all eligible (subscribed + email + not linked)
           </button>
@@ -367,28 +367,28 @@ export function ParentOnboardingTab() {
 
       {/* Email History Section */}
       <div className="mt-8">
-        <h3 className="text-lg font-bold text-charcoal mb-4">Email History</h3>
+        <h3 className="text-lg font-bold text-ink mb-4">Email History</h3>
         {emailsLoading ? (
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="bg-surface shadow-card rounded-[var(--radius-lg)] p-4 animate-pulse">
-                <div className="h-4 w-48 bg-background rounded mb-2" />
-                <div className="h-4 w-32 bg-background rounded" />
+              <div key={i} className="bg-paper shadow-card rounded-[var(--radius-lg)] p-4 animate-pulse">
+                <div className="h-4 w-48 bg-cream rounded mb-2" />
+                <div className="h-4 w-32 bg-cream rounded" />
               </div>
             ))}
           </div>
         ) : !emailHistory || emailHistory.length === 0 ? (
-          <p className="text-sm text-text-secondary">No emails sent yet</p>
+          <p className="text-sm text-muted">No emails sent yet</p>
         ) : (
           <div className="space-y-3">
             {emailHistory.map((record: OnboardingEmailRecord) => (
               <div
                 key={record.id}
-                className="bg-surface shadow-card rounded-[var(--radius-lg)] p-4 flex items-center justify-between"
+                className="bg-paper shadow-card rounded-[var(--radius-lg)] p-4 flex items-center justify-between"
               >
                 <div className="flex items-center gap-4">
                   <div>
-                    <p className="text-sm font-semibold text-charcoal">
+                    <p className="text-sm font-semibold text-ink">
                       {new Date(record.createdAt).toLocaleDateString(undefined, {
                         year: 'numeric',
                         month: 'short',
@@ -398,14 +398,14 @@ export function ParentOnboardingTab() {
                       })}
                     </p>
                     {record.emailSubject && (
-                      <p className="text-xs text-text-secondary mt-0.5">{record.emailSubject}</p>
+                      <p className="text-xs text-muted mt-0.5">{record.emailSubject}</p>
                     )}
                   </div>
                   <Badge variant={emailStatusVariants[record.status] ?? 'default'}>
                     {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
                   </Badge>
                 </div>
-                <div className="text-sm text-text-secondary">
+                <div className="text-sm text-muted">
                   {record.deliveryCounts ? (
                     <span>
                       {record.deliveryCounts.sent} sent

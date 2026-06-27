@@ -19,6 +19,7 @@ export function ParentLinksPage() {
   return (
     <div>
       <PageHeader
+        eyebrow="Parent Links"
         title="Parent Links"
         description="Manage parent connections and link codes"
       />

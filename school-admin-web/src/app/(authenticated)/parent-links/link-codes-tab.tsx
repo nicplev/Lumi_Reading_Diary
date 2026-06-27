@@ -117,12 +117,12 @@ export function LinkCodesTab() {
       accessorFn: (row) => row.code,
       cell: (value, row) => (
         <div className="flex items-center gap-2">
-          <code className="bg-background px-2 py-1 rounded text-sm font-mono font-bold text-charcoal">
+          <code className="bg-cream px-2 py-1 rounded text-sm font-mono font-bold text-ink">
             {value as string}
           </code>
           <button
             onClick={(e) => { e.stopPropagation(); handleCopy(value as string, row.id); }}
-            className="text-text-secondary hover:text-charcoal transition-colors"
+            className="text-muted hover:text-ink transition-colors"
             title="Copy code"
           >
             {copiedId === row.id ? (
@@ -193,7 +193,7 @@ export function LinkCodesTab() {
             variant="ghost"
             size="sm"
             onClick={(e) => { e.stopPropagation(); setDeleteConfirm(row.id); }}
-            className="text-text-secondary hover:text-error"
+            className="text-muted hover:text-error"
             title="Remove from list"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
