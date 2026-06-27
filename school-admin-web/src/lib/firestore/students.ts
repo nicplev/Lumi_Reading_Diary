@@ -19,6 +19,7 @@ function toStudent(doc: FirebaseFirestore.DocumentSnapshot): Student {
     parentIds: data.parentIds ?? [],
     dateOfBirth: data.dateOfBirth?.toDate(),
     profileImageUrl: data.profileImageUrl,
+    characterId: data.characterId,
     isActive: data.isActive ?? true,
     createdAt: data.createdAt?.toDate() ?? new Date(),
     enrolledAt: data.enrolledAt?.toDate(),

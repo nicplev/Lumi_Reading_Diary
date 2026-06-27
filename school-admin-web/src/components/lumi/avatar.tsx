@@ -1,6 +1,10 @@
+import { characterImageSrc } from '@/lib/characters';
+
 interface AvatarProps {
   name: string;
   imageUrl?: string;
+  /** Lumi character id; rendered as the character PNG when recognised. */
+  characterId?: string;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
 }
@@ -34,13 +38,26 @@ function getColorForName(name: string): string {
   return avatarColors[Math.abs(hash) % avatarColors.length];
 }
 
-export function Avatar({ name, imageUrl, size = 'md', className = '' }: AvatarProps) {
+export function Avatar({ name, imageUrl, characterId, size = 'md', className = '' }: AvatarProps) {
   if (imageUrl) {
     return (
       <img
         src={imageUrl}
         alt={name}
         className={`${sizeClasses[size]} rounded-full object-cover ${className}`}
+      />
+    );
+  }
+
+  // Character art (transparent flame/animal) — contain, not cover, on a faint
+  // circular backdrop so it reads as an avatar. Mirrors the app's StudentAvatar.
+  const charSrc = characterImageSrc(characterId);
+  if (charSrc) {
+    return (
+      <img
+        src={charSrc}
+        alt={name}
+        className={`${sizeClasses[size]} rounded-full object-contain bg-black/5 ${className}`}
       />
     );
   }
