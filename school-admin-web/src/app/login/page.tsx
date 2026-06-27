@@ -82,15 +82,15 @@ function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+    <div className="min-h-screen flex items-center justify-center bg-cream px-4">
       <div className="w-full max-w-sm">
         {/* Logo / Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-[var(--radius-xl)] bg-rose-pink/10 mb-4">
-            <span className="text-rose-pink"><Icon name="library_books" size={32} /></span>
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-[var(--radius-xl)] bg-section/10 mb-4">
+            <span className="text-section"><Icon name="library_books" size={32} /></span>
           </div>
-          <h1 className="text-[28px] font-bold text-charcoal">Lumi School</h1>
-          <p className="text-text-secondary text-sm mt-1">
+          <h1 className="font-display text-[28px] font-extrabold tracking-tight text-ink">Lumi School</h1>
+          <p className="text-muted text-sm mt-1">
             {forgotMode ? 'Reset your password' : 'Sign in to your school portal'}
           </p>
         </div>
@@ -109,7 +109,7 @@ function LoginForm() {
             )}
 
             <div>
-              <label htmlFor="reset-email" className="block text-sm font-semibold text-charcoal mb-1.5">
+              <label htmlFor="reset-email" className="block text-sm font-semibold text-ink mb-1.5">
                 Email
               </label>
               <input
@@ -119,14 +119,14 @@ function LoginForm() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="teacher@school.com"
                 required
-                className="w-full px-4 py-3 rounded-[var(--radius-md)] border border-divider bg-surface text-charcoal placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-rose-pink/30 focus:border-rose-pink transition-colors text-[15px]"
+                className="w-full px-4 py-3 rounded-[var(--radius-md)] border border-rule bg-paper text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-section/30 focus:border-section transition-colors text-[15px]"
               />
             </div>
 
             <button
               type="submit"
               disabled={resetLoading}
-              className="w-full py-3 px-4 rounded-[var(--radius-md)] bg-rose-pink text-white font-bold text-[15px] hover:bg-rose-pink-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-card flex items-center justify-center gap-2"
+              className="w-full py-3 px-4 rounded-[var(--radius-md)] bg-section text-white font-bold text-[15px] hover:bg-lumi-red-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-card flex items-center justify-center gap-2"
             >
               {resetLoading && (
                 <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
@@ -140,7 +140,7 @@ function LoginForm() {
             <button
               type="button"
               onClick={() => { setForgotMode(false); setResetMessage(null); setError(''); }}
-              className="w-full text-sm text-rose-pink hover:text-rose-pink-dark font-semibold transition-colors py-2"
+              className="w-full text-sm text-section hover:text-lumi-red-dark font-semibold transition-colors py-2"
             >
               Back to sign in
             </button>
@@ -156,7 +156,7 @@ function LoginForm() {
               )}
 
               <div>
-                <label htmlFor="email" className="block text-sm font-semibold text-charcoal mb-1.5">
+                <label htmlFor="email" className="block text-sm font-semibold text-ink mb-1.5">
                   Email
                 </label>
                 <input
@@ -166,19 +166,19 @@ function LoginForm() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="teacher@school.com"
                   required
-                  className="w-full px-4 py-3 rounded-[var(--radius-md)] border border-divider bg-surface text-charcoal placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-rose-pink/30 focus:border-rose-pink transition-colors text-[15px]"
+                  className="w-full px-4 py-3 rounded-[var(--radius-md)] border border-rule bg-paper text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-section/30 focus:border-section transition-colors text-[15px]"
                 />
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label htmlFor="password" className="block text-sm font-semibold text-charcoal">
+                  <label htmlFor="password" className="block text-sm font-semibold text-ink">
                     Password
                   </label>
                   <button
                     type="button"
                     onClick={() => { setForgotMode(true); setError(''); setResetMessage(null); }}
-                    className="text-xs text-rose-pink hover:text-rose-pink-dark font-semibold transition-colors"
+                    className="text-xs text-section hover:text-lumi-red-dark font-semibold transition-colors"
                   >
                     Forgot password?
                   </button>
@@ -191,14 +191,14 @@ function LoginForm() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     required
-                    className="w-full px-4 py-3 pr-12 rounded-[var(--radius-md)] border border-divider bg-surface text-charcoal placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-rose-pink/30 focus:border-rose-pink transition-colors text-[15px]"
+                    className="w-full px-4 py-3 pr-12 rounded-[var(--radius-md)] border border-rule bg-paper text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-section/30 focus:border-section transition-colors text-[15px]"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     tabIndex={-1}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary hover:text-charcoal transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-ink transition-colors"
                   >
                     <Icon name={showPassword ? 'visibility_off' : 'visibility'} size={20} />
                   </button>
@@ -208,7 +208,7 @@ function LoginForm() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 px-4 rounded-[var(--radius-md)] bg-rose-pink text-white font-bold text-[15px] hover:bg-rose-pink-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-card flex items-center justify-center gap-2"
+                className="w-full py-3 px-4 rounded-[var(--radius-md)] bg-section text-white font-bold text-[15px] hover:bg-lumi-red-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-card flex items-center justify-center gap-2"
               >
                 {loading && (
                   <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
@@ -220,7 +220,7 @@ function LoginForm() {
               </button>
             </form>
 
-            <p className="text-center text-text-secondary text-xs mt-6">
+            <p className="text-center text-muted text-xs mt-6">
               Contact your school admin if you need access
             </p>
           </>
@@ -233,8 +233,8 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-text-secondary">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-cream">
+        <div className="animate-pulse text-muted">Loading...</div>
       </div>
     }>
       <LoginForm />
