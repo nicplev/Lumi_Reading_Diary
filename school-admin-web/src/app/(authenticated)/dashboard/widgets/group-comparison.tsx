@@ -23,7 +23,7 @@ export function GroupComparison({ groups }: { groups: GroupRow[] }) {
   const max = Math.max(...groups.map((g) => g.avgMinutes), 1);
 
   return (
-    <ul className="space-y-3">
+    <ul className="space-y-3 max-h-80 overflow-y-auto -mr-1 pr-1">
       {groups.map((g) => (
         <li key={g.groupId}>
           <div className="flex items-center justify-between gap-2 mb-1">

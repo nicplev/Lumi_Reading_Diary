@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Avatar } from '@/components/lumi/avatar';
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -31,6 +32,7 @@ interface RecentReadingItem {
   books: string[];
   minutes: number;
   at: string;
+  characterId?: string;
 }
 
 /** A live feed of the latest reading logged across the teacher's classes. */
@@ -44,14 +46,15 @@ export function RecentReading({ items }: { items: RecentReadingItem[] }) {
   }
 
   return (
-    <ul className="space-y-2.5">
+    <ul className="space-y-2.5 max-h-72 overflow-y-auto -mr-1 pr-1">
       {items.map((it) => (
         <li key={it.logId}>
           <Link
             href={`/students/${it.studentId}`}
-            className="flex items-start justify-between gap-3 hover:bg-background rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
+            className="flex items-start gap-2 hover:bg-background rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
           >
-            <div className="min-w-0">
+            <Avatar name={it.studentName} characterId={it.characterId} size="sm" className="flex-shrink-0 mt-0.5" />
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-charcoal truncate">{it.studentName}</p>
               <p className="text-xs text-text-secondary truncate">
                 {it.books.length > 0 ? it.books.join(', ') : 'Reading'} · {it.minutes} min

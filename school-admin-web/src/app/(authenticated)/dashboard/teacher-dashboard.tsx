@@ -3,6 +3,7 @@
 import { StatCard } from '@/components/lumi/stat-card';
 import { Badge } from '@/components/lumi/badge';
 import { Icon } from '@/components/lumi/icon';
+import { Avatar } from '@/components/lumi/avatar';
 import { WeeklyChart } from './weekly-chart';
 import { EngagementRing } from './widgets/engagement-ring';
 import { SentimentBar } from './widgets/sentiment-bar';
@@ -17,9 +18,16 @@ import Link from 'next/link';
 import type { TeacherDashboardData, WeeklyEngagement } from '@/lib/firestore/dashboard';
 
 interface DashboardWidgets {
-  topReaders: { studentId: string; name: string; minutes: number }[];
-  nudges: { studentId: string; name: string; daysSinceRead: number | null }[];
-  parentComments: { logId: string; studentId: string; studentName: string; preview: string; at: string }[];
+  topReaders: { studentId: string; name: string; minutes: number; characterId?: string }[];
+  nudges: { studentId: string; name: string; daysSinceRead: number | null; characterId?: string }[];
+  parentComments: {
+    logId: string;
+    studentId: string;
+    studentName: string;
+    preview: string;
+    at: string;
+    characterId?: string;
+  }[];
   sentiment: { feeling: string; count: number }[];
   recentReading: {
     logId: string;
@@ -28,6 +36,7 @@ interface DashboardWidgets {
     books: string[];
     minutes: number;
     at: string;
+    characterId?: string;
   }[];
   groupComparison: {
     groupId: string;
@@ -45,6 +54,7 @@ interface DashboardWidgets {
     icon: string;
     rarity: string;
     earnedAt: string | null;
+    characterId?: string;
   }[];
 }
 
@@ -125,12 +135,11 @@ export function TeacherDashboard({ userName, data, weeklyEngagement, widgets }: 
               <li key={r.studentId}>
                 <Link
                   href={`/students/${r.studentId}`}
-                  className="flex items-center justify-between hover:bg-background rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
+                  className="flex items-center gap-2 hover:bg-background rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
                 >
-                  <span className="text-sm text-charcoal font-medium truncate">
-                    <span className="text-text-secondary mr-1.5">{i + 1}.</span>
-                    {r.name}
-                  </span>
+                  <span className="text-xs text-text-secondary w-4 text-right flex-shrink-0">{i + 1}</span>
+                  <Avatar name={r.name} characterId={r.characterId} size="sm" className="flex-shrink-0" />
+                  <span className="text-sm text-charcoal font-medium truncate flex-1">{r.name}</span>
                   <span className="text-xs text-text-secondary whitespace-nowrap">{r.minutes} min</span>
                 </Link>
               </li>
@@ -150,14 +159,15 @@ export function TeacherDashboard({ userName, data, weeklyEngagement, widgets }: 
         widgets.nudges.length === 0 ? (
           <EmptyMsg>Everyone has read recently. 🎉</EmptyMsg>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-2 max-h-72 overflow-y-auto -mr-1 pr-1">
             {widgets.nudges.map((n) => (
               <li key={n.studentId}>
                 <Link
                   href={`/students/${n.studentId}`}
-                  className="flex items-center justify-between hover:bg-background rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
+                  className="flex items-center gap-2 hover:bg-background rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
                 >
-                  <span className="text-sm text-charcoal font-medium truncate">{n.name}</span>
+                  <Avatar name={n.name} characterId={n.characterId} size="sm" className="flex-shrink-0" />
+                  <span className="text-sm text-charcoal font-medium truncate flex-1">{n.name}</span>
                   <span className="text-xs text-text-secondary whitespace-nowrap">
                     {n.daysSinceRead === null ? 'Not read yet' : `${n.daysSinceRead}d ago`}
                   </span>
@@ -174,15 +184,18 @@ export function TeacherDashboard({ userName, data, weeklyEngagement, widgets }: 
         widgets.parentComments.length === 0 ? (
           <EmptyMsg>No new parent comments.</EmptyMsg>
         ) : (
-          <ul className="space-y-2.5">
+          <ul className="space-y-2.5 max-h-72 overflow-y-auto -mr-1 pr-1">
             {widgets.parentComments.map((c) => (
               <li key={c.logId}>
                 <Link
                   href={`/students/${c.studentId}`}
-                  className="block hover:bg-background rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
+                  className="flex items-start gap-2 hover:bg-background rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
                 >
-                  <p className="text-sm font-medium text-charcoal truncate">{c.studentName}</p>
-                  <p className="text-xs text-text-secondary truncate">{c.preview}</p>
+                  <Avatar name={c.studentName} characterId={c.characterId} size="sm" className="flex-shrink-0 mt-0.5" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-charcoal truncate">{c.studentName}</p>
+                    <p className="text-xs text-text-secondary truncate">{c.preview}</p>
+                  </div>
                 </Link>
               </li>
             ))}

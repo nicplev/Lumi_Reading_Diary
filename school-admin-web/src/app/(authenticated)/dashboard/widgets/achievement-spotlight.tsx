@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { Icon } from '@/components/lumi/icon';
+import { Avatar } from '@/components/lumi/avatar';
 
 // Rarity colours mirror the app's AchievementRarity palette (same as the
 // per-student achievements card).
@@ -20,6 +21,7 @@ interface SpotlightItem {
   icon: string;
   rarity: string;
   earnedAt: string | null;
+  characterId?: string;
 }
 
 /** The most recently earned achievements across the teacher's students. */
@@ -36,7 +38,7 @@ export function AchievementSpotlight({ items }: { items: SpotlightItem[] }) {
   }
 
   return (
-    <ul className="space-y-2.5">
+    <ul className="space-y-2.5 max-h-72 overflow-y-auto -mr-1 pr-1">
       {items.map((a, i) => {
         const rarity = RARITY[a.rarity] ?? RARITY.common;
         return (
@@ -56,7 +58,10 @@ export function AchievementSpotlight({ items }: { items: SpotlightItem[] }) {
                     {rarity.label}
                   </span>
                 </div>
-                <p className="text-xs text-text-secondary truncate">{a.studentName}</p>
+                <p className="text-xs text-text-secondary truncate flex items-center gap-1">
+                  <Avatar name={a.studentName} characterId={a.characterId} size="xs" className="flex-shrink-0" />
+                  <span className="truncate">{a.studentName}</span>
+                </p>
               </div>
             </Link>
           </li>
