@@ -21,6 +21,7 @@ export default async function StudentDetailRoute({ params }: { params: Promise<{
 
   const schoolClass = student.classId ? await getClass(session.schoolId, student.classId) : null;
 
+  const levelsEnabled = (school?.levelSchema ?? 'aToZ') !== 'none';
   const levels = getReadingLevels(school?.levelSchema ?? 'aToZ', school?.customLevels);
   const levelOptions: ReadingLevelOption[] = levels.map((level, i) => ({
     value: level,
@@ -36,6 +37,7 @@ export default async function StudentDetailRoute({ params }: { params: Promise<{
       studentId={studentId}
       classId={student.classId}
       levelOptions={levelOptions}
+      levelsEnabled={levelsEnabled}
       className={schoolClass?.name}
     />
   );

@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal } from '@/components/lumi/modal';
 import { Button } from '@/components/lumi/button';
+import { Input } from '@/components/lumi/input';
 import { FilterChip } from '@/components/lumi/filter-chip';
 import { useToast } from '@/components/lumi/toast';
+import { useBooks } from '@/lib/hooks/use-books';
 import { useAssignIsbns, type AssignIsbnsResult } from '@/lib/hooks/use-isbn-assignment';
 
 // Monday of the week `offsetWeeks` from now, in the browser's local time — this
@@ -43,35 +45,83 @@ interface IsbnAssignModalProps {
   studentName?: string;
 }
 
+interface PickedBook {
+  title: string;
+  isbn?: string;
+}
+
 export function IsbnAssignModal({ open, onClose, studentId, studentName }: IsbnAssignModalProps) {
   const { toast } = useToast();
   const assign = useAssignIsbns();
+  const { data: books } = useBooks();
 
   const [weekOffset, setWeekOffset] = useState(0);
+  const [query, setQuery] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [picked, setPicked] = useState<PickedBook[]>([]);
   const [text, setText] = useState('');
   const [result, setResult] = useState<AssignIsbnsResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) {
       setWeekOffset(0);
+      setQuery('');
+      setShowDropdown(false);
+      setPicked([]);
       setText('');
       setResult(null);
       setError(null);
     }
   }, [open]);
 
+  useEffect(() => {
+    const handle = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setShowDropdown(false);
+    };
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, []);
+
   const monday = useMemo(() => mondayOf(weekOffset), [weekOffset]);
+
+  const matches = useMemo(() => {
+    if (!query.trim() || !books) return [];
+    const q = query.toLowerCase().trim();
+    return books
+      .filter((b) => b.title.toLowerCase().includes(q) || b.author?.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [query, books]);
+
+  const addBook = (book: PickedBook) => {
+    setPicked((prev) =>
+      prev.some((p) => (book.isbn && p.isbn === book.isbn) || p.title === book.title)
+        ? prev
+        : [...prev, book]
+    );
+    setQuery('');
+    setShowDropdown(false);
+  };
 
   const handleAssign = async () => {
     setError(null);
     setResult(null);
-    const isbns = text.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
-    if (isbns.length === 0) return setError('Enter at least one ISBN.');
+    const fromLibrary = picked.map((p) => p.isbn?.trim()).filter((x): x is string => !!x);
+    const fromText = text.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
+    const isbns = [...new Set([...fromLibrary, ...fromText])];
+    if (isbns.length === 0) {
+      return setError(
+        picked.some((p) => !p.isbn)
+          ? 'The selected book(s) have no ISBN on file — pick a book with an ISBN, or enter one below.'
+          : 'Pick a book from the library or enter an ISBN.'
+      );
+    }
 
     try {
       const r = await assign.mutateAsync({ studentId, isbns, weekStart: ymd(monday) });
       setResult(r);
+      setPicked([]);
       setText('');
       if (r.assigned.length > 0) {
         toast(`Assigned ${r.assigned.length} book${r.assigned.length === 1 ? '' : 's'}`, 'success');
@@ -89,11 +139,11 @@ export function IsbnAssignModal({ open, onClose, studentId, studentName }: IsbnA
     <Modal
       open={open}
       onClose={onClose}
-      title="Assign by ISBN"
+      title="Assign Books"
       description={
         studentName
-          ? `Assign books to ${studentName} for a week by ISBN — the same as scanning on the iPad.`
-          : 'Assign books for a week by ISBN.'
+          ? `Assign books to ${studentName} for a week — pick from the school library or enter an ISBN.`
+          : 'Assign books for a week from the library or by ISBN.'
       }
       footer={
         <>
@@ -122,12 +172,65 @@ export function IsbnAssignModal({ open, onClose, studentId, studentName }: IsbnA
           <p className="text-xs text-text-secondary mt-1.5">{rangeLabel(monday)}</p>
         </div>
 
+        {/* Pick from the school library */}
+        <div ref={searchRef} className="relative">
+          <label className="block text-sm font-semibold text-charcoal mb-1.5">From the school library</label>
+          <Input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setShowDropdown(true);
+            }}
+            onFocus={() => setShowDropdown(true)}
+            placeholder="Search by title or author..."
+          />
+          {showDropdown && matches.length > 0 && (
+            <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-surface rounded-[var(--radius-md)] shadow-card-hover border border-divider max-h-48 overflow-y-auto">
+              {matches.map((book) => (
+                <button
+                  key={book.id}
+                  type="button"
+                  onClick={() => addBook({ title: book.title, isbn: book.isbn })}
+                  className="w-full text-left px-3 py-2 hover:bg-background transition-colors text-sm"
+                >
+                  <span className="font-semibold text-charcoal">{book.title}</span>
+                  {book.author && <span className="text-text-secondary ml-1">by {book.author}</span>}
+                  {!book.isbn && <span className="text-error text-xs ml-1">· no ISBN</span>}
+                </button>
+              ))}
+            </div>
+          )}
+          {picked.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {picked.map((p, i) => (
+                <span
+                  key={`${p.title}-${i}`}
+                  className={`inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-[var(--radius-pill)] text-sm ${
+                    p.isbn ? 'bg-background text-charcoal' : 'bg-error/10 text-error'
+                  }`}
+                >
+                  {p.title}
+                  {!p.isbn && ' · no ISBN'}
+                  <button
+                    type="button"
+                    onClick={() => setPicked((prev) => prev.filter((_, idx) => idx !== i))}
+                    className="ml-0.5 hover:opacity-70"
+                    aria-label={`Remove ${p.title}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div>
-          <label className="block text-sm font-semibold text-charcoal mb-1.5">ISBNs</label>
+          <label className="block text-sm font-semibold text-charcoal mb-1.5">Or enter ISBNs</label>
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            rows={4}
+            rows={3}
             placeholder="Type or paste ISBNs — one per line, or separated by spaces/commas"
             className="w-full px-4 py-3 rounded-[var(--radius-md)] border border-divider bg-surface text-charcoal placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-rose-pink/30 focus:border-rose-pink transition-colors text-[15px] resize-y font-mono"
           />

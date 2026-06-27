@@ -26,10 +26,12 @@ interface StudentDetailProps {
   studentId: string;
   classId: string;
   levelOptions: ReadingLevelOption[];
+  /** False when the school has reading levels off — hides the level pill + card. */
+  levelsEnabled?: boolean;
   className?: string;
 }
 
-export function StudentDetail({ studentId, classId, levelOptions, className }: StudentDetailProps) {
+export function StudentDetail({ studentId, classId, levelOptions, levelsEnabled = true, className }: StudentDetailProps) {
   const { toast } = useToast();
   const { setOverride } = useBreadcrumbs();
   const { data: student, isLoading } = useStudent(studentId);
@@ -101,10 +103,12 @@ export function StudentDetail({ studentId, classId, levelOptions, className }: S
           <div className="flex items-center gap-3 mt-1">
             {student.studentId && <span className="text-sm text-text-secondary">ID: {student.studentId}</span>}
             {className && <Badge>{className}</Badge>}
-            <ReadingLevelPill
-              level={student.currentReadingLevel}
-              onClick={() => setShowLevelPicker(true)}
-            />
+            {levelsEnabled && (
+              <ReadingLevelPill
+                level={student.currentReadingLevel}
+                onClick={() => setShowLevelPicker(true)}
+              />
+            )}
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={() => setShowLogModal(true)}>
@@ -140,8 +144,9 @@ export function StudentDetail({ studentId, classId, levelOptions, className }: S
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Reading Level Card */}
+      <div className={`grid grid-cols-1 ${levelsEnabled ? 'lg:grid-cols-2' : ''} gap-6`}>
+        {/* Reading Level Card — hidden when the school has reading levels off */}
+        {levelsEnabled && (
         <Card>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-charcoal">Reading Level</h2>
@@ -201,6 +206,7 @@ export function StudentDetail({ studentId, classId, levelOptions, className }: S
             </div>
           )}
         </Card>
+        )}
 
         {/* Guardians */}
         <Card>
@@ -237,18 +243,13 @@ export function StudentDetail({ studentId, classId, levelOptions, className }: S
         </Card>
       </div>
 
-      {/* Achievements */}
-      <div className="mt-6">
-        <AchievementsCard studentId={studentId} />
-      </div>
-
       {/* Assigned Books */}
       <div className="mt-6">
         <Card>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-charcoal">Assigned Books</h2>
             <Button variant="outline" size="sm" onClick={() => setShowIsbnModal(true)}>
-              Assign by ISBN
+              Assign Books
             </Button>
           </div>
           {!studentAllocations || studentAllocations.length === 0 ? (
@@ -327,6 +328,11 @@ export function StudentDetail({ studentId, classId, levelOptions, className }: S
       </div>
 
       <ReadingHistorySection studentId={studentId} />
+
+      {/* Achievements — lower priority for day-to-day, kept at the bottom */}
+      <div className="mt-6">
+        <AchievementsCard studentId={studentId} />
+      </div>
 
       <ReadingLevelPicker
         open={showLevelPicker}
