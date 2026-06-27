@@ -29,10 +29,10 @@ export function AchievementSpotlight({ items }: { items: SpotlightItem[] }) {
   if (items.length === 0) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-center py-4">
-        <span className="text-text-secondary/40 mb-2">
+        <span className="text-muted/40 mb-2">
           <Icon name="emoji_events" size={28} />
         </span>
-        <p className="text-sm text-text-secondary">No achievements earned recently.</p>
+        <p className="text-sm text-muted">No achievements earned recently.</p>
       </div>
     );
   }
@@ -45,12 +45,12 @@ export function AchievementSpotlight({ items }: { items: SpotlightItem[] }) {
           <li key={`${a.studentId}-${a.name}-${i}`}>
             <Link
               href={`/students/${a.studentId}`}
-              className="flex items-center gap-3 hover:bg-background rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
+              className="flex items-center gap-3 hover:bg-cream rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
             >
               <span className="text-2xl leading-none flex-shrink-0">{a.icon}</span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-charcoal truncate">{a.name}</p>
+                  <p className="text-sm font-semibold text-ink truncate">{a.name}</p>
                   <span
                     style={{ backgroundColor: rarity.color }}
                     className="text-white text-[10px] font-semibold px-2 py-0.5 rounded-[var(--radius-pill)] flex-shrink-0"
@@ -58,7 +58,7 @@ export function AchievementSpotlight({ items }: { items: SpotlightItem[] }) {
                     {rarity.label}
                   </span>
                 </div>
-                <p className="text-xs text-text-secondary truncate flex items-center gap-1">
+                <p className="text-xs text-muted truncate flex items-center gap-1">
                   <Avatar name={a.studentName} characterId={a.characterId} size="xs" className="flex-shrink-0" />
                   <span className="truncate">{a.studentName}</span>
                 </p>

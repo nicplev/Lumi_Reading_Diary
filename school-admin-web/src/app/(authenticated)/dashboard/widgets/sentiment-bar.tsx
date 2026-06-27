@@ -11,7 +11,7 @@ export function SentimentBar({ sentiment }: { sentiment: { feeling: string; coun
 
   if (total === 0) {
     return (
-      <p className="text-sm text-text-secondary h-full flex items-center">
+      <p className="text-sm text-muted h-full flex items-center">
         No reading feelings logged yet this week.
       </p>
     );
@@ -38,7 +38,7 @@ export function SentimentBar({ sentiment }: { sentiment: { feeling: string; coun
           return (
             <div key={key} className="flex flex-col items-center">
               <FeelingBlob feeling={key} size={28} />
-              <span className="text-sm font-bold text-charcoal mt-1">{count}</span>
+              <span className="text-sm font-bold text-ink mt-1">{count}</span>
             </div>
           );
         })}

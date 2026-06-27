@@ -6,6 +6,9 @@ interface WeeklyChartProps {
   data: Array<{ day: string; count: number }>;
 }
 
+// Dashboard is the Lumi Blue section — its data-viz reads in blue.
+const ACCENT = '#56C8E6';
+
 export function WeeklyChart({ data }: WeeklyChartProps) {
   const maxValue = Math.max(...data.map(d => d.count), 1);
 
@@ -15,19 +18,19 @@ export function WeeklyChart({ data }: WeeklyChartProps) {
         <AreaChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: -15 }}>
           <defs>
             <linearGradient id="readingGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#FF8698" stopOpacity={0.3} />
-              <stop offset="100%" stopColor="#FF8698" stopOpacity={0} />
+              <stop offset="0%" stopColor={ACCENT} stopOpacity={0.3} />
+              <stop offset="100%" stopColor={ACCENT} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#E5E2DC" vertical={false} />
           <XAxis
             dataKey="day"
-            tick={{ fill: '#6B7280', fontSize: 12, fontWeight: 600 }}
+            tick={{ fill: '#6B6B6B', fontSize: 12, fontWeight: 600 }}
             tickLine={false}
-            axisLine={{ stroke: '#E5E7EB' }}
+            axisLine={{ stroke: '#E5E2DC' }}
           />
           <YAxis
-            tick={{ fill: '#6B7280', fontSize: 12 }}
+            tick={{ fill: '#6B6B6B', fontSize: 12 }}
             tickLine={false}
             axisLine={false}
             domain={[0, Math.max(5, Math.ceil(maxValue * 1.2))]}
@@ -36,23 +39,23 @@ export function WeeklyChart({ data }: WeeklyChartProps) {
           <Tooltip
             contentStyle={{
               backgroundColor: '#FFFFFF',
-              border: '1px solid #E5E7EB',
+              border: '1px solid #E5E2DC',
               borderRadius: '12px',
               fontSize: '13px',
               fontWeight: 600,
-              boxShadow: '0 4px 10px -6px rgba(18,18,17,0.1)',
+              boxShadow: '0 8px 24px -12px rgba(26,26,26,0.16)',
             }}
             formatter={(value: number) => [`${value} logs`, 'Reading']}
-            cursor={{ stroke: 'rgba(255, 134, 152, 0.2)', strokeWidth: 1 }}
+            cursor={{ stroke: 'rgba(86, 200, 230, 0.25)', strokeWidth: 1 }}
           />
           <Area
             type="monotone"
             dataKey="count"
-            stroke="#FF8698"
+            stroke={ACCENT}
             strokeWidth={2}
             fill="url(#readingGradient)"
             dot={false}
-            activeDot={{ r: 4, fill: '#FF8698', strokeWidth: 0 }}
+            activeDot={{ r: 4, fill: ACCENT, strokeWidth: 0 }}
           />
         </AreaChart>
       </ResponsiveContainer>

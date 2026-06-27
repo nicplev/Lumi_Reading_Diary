@@ -22,7 +22,7 @@ function RelTime({ iso }: { iso: string }) {
   useEffect(() => {
     setLabel(timeAgo(iso));
   }, [iso]);
-  return <span className="text-xs text-text-secondary whitespace-nowrap">{label}</span>;
+  return <span className="text-xs text-muted whitespace-nowrap">{label}</span>;
 }
 
 interface RecentReadingItem {
@@ -39,7 +39,7 @@ interface RecentReadingItem {
 export function RecentReading({ items }: { items: RecentReadingItem[] }) {
   if (items.length === 0) {
     return (
-      <p className="text-sm text-text-secondary h-full flex items-center">
+      <p className="text-sm text-muted h-full flex items-center">
         No reading logged yet this week.
       </p>
     );
@@ -51,12 +51,12 @@ export function RecentReading({ items }: { items: RecentReadingItem[] }) {
         <li key={it.logId}>
           <Link
             href={`/students/${it.studentId}`}
-            className="flex items-start gap-2 hover:bg-background rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
+            className="flex items-start gap-2 hover:bg-cream rounded-[var(--radius-sm)] px-1 py-1 -mx-1"
           >
             <Avatar name={it.studentName} characterId={it.characterId} size="sm" className="flex-shrink-0 mt-0.5" />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-charcoal truncate">{it.studentName}</p>
-              <p className="text-xs text-text-secondary truncate">
+              <p className="text-sm font-medium text-ink truncate">{it.studentName}</p>
+              <p className="text-xs text-muted truncate">
                 {it.books.length > 0 ? it.books.join(', ') : 'Reading'} · {it.minutes} min
               </p>
             </div>

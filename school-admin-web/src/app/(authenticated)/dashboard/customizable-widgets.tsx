@@ -145,10 +145,10 @@ export function CustomizableWidgets({
   return (
     <div>
       <div className="flex items-center justify-between gap-3 mb-4">
-        <p className="text-sm text-text-secondary">
+        <p className="text-sm text-muted">
           {editing ? (
             <span className="inline-flex items-center gap-1.5">
-              <Icon name="drag_indicator" size={16} className="text-text-secondary" />
+              <Icon name="drag_indicator" size={16} className="text-muted" />
               Drag to reorder · tap the eye to show or hide
             </span>
           ) : hiddenCount > 0 ? (
@@ -228,7 +228,7 @@ function SortableWidget({
     <div ref={setNodeRef} style={style} className={`${span} ${isDragging ? 'z-10' : ''}`}>
       <Card
         padding="md"
-        className={`h-full flex flex-col ${editing ? 'ring-1 ring-inset ring-rose-pink/30' : ''} ${
+        className={`h-full flex flex-col ${editing ? 'ring-1 ring-inset ring-section/30' : ''} ${
           isDragging ? 'shadow-card-hover' : ''
         } ${editing && hidden ? 'opacity-50' : ''}`}
       >
@@ -236,15 +236,15 @@ function SortableWidget({
           {editing ? (
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 text-base font-bold text-charcoal cursor-grab active:cursor-grabbing touch-none -ml-1"
+              className="inline-flex items-center gap-1.5 text-base font-bold text-ink cursor-grab active:cursor-grabbing touch-none -ml-1"
               {...attributes}
               {...listeners}
             >
-              <Icon name="drag_indicator" size={18} className="text-text-secondary" />
+              <Icon name="drag_indicator" size={18} className="text-muted" />
               {title}
             </button>
           ) : (
-            <h2 className="text-base font-bold text-charcoal">{title}</h2>
+            <h2 className="text-base font-bold text-ink">{title}</h2>
           )}
           {editing ? (
             <button
@@ -252,7 +252,7 @@ function SortableWidget({
               onClick={onToggleHide}
               title={hidden ? 'Show widget' : 'Hide widget'}
               aria-label={hidden ? 'Show widget' : 'Hide widget'}
-              className="inline-flex items-center justify-center w-7 h-7 rounded-[var(--radius-sm)] text-text-secondary hover:bg-background hover:text-charcoal transition-colors"
+              className="inline-flex items-center justify-center w-7 h-7 rounded-[var(--radius-sm)] text-muted hover:bg-cream hover:text-ink transition-colors"
             >
               <Icon name={hidden ? 'visibility_off' : 'visibility'} size={18} />
             </button>
