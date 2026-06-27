@@ -172,7 +172,7 @@ export function AllocationFormModal({ open, onClose, classId, levelOptions }: Al
         <div className="space-y-4">
           {type === 'byTitle' && (
             <>
-              <p className="text-sm text-text-secondary">Search your library and add books to this allocation.</p>
+              <p className="text-sm text-muted">Search your library and add books to this allocation.</p>
               <BookSearchInput
                 onAdd={(book) => {
                   if (!books.some((b) => b.title === book.title && b.bookId === book.bookId)) {
@@ -182,13 +182,13 @@ export function AllocationFormModal({ open, onClose, classId, levelOptions }: Al
               />
               {books.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-sm font-semibold text-charcoal">{books.length} book{books.length !== 1 ? 's' : ''} added</p>
+                  <p className="text-sm font-semibold text-ink">{books.length} book{books.length !== 1 ? 's' : ''} added</p>
                   {books.map((book, i) => (
-                    <div key={i} className="flex items-center justify-between p-2 rounded-[var(--radius-md)] bg-background">
-                      <span className="text-sm text-charcoal">{book.title}</span>
+                    <div key={i} className="flex items-center justify-between p-2 rounded-[var(--radius-md)] bg-cream">
+                      <span className="text-sm text-ink">{book.title}</span>
                       <button
                         onClick={() => setBooks(books.filter((_, j) => j !== i))}
-                        className="text-text-secondary hover:text-error transition-colors"
+                        className="text-muted hover:text-error transition-colors"
                       >
                         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                           <path d="M11 3L3 11M3 3l8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -202,7 +202,7 @@ export function AllocationFormModal({ open, onClose, classId, levelOptions }: Al
           )}
           {type === 'byLevel' && (
             <div className="space-y-4">
-              <p className="text-sm text-text-secondary">Select the reading level range for this allocation.</p>
+              <p className="text-sm text-muted">Select the reading level range for this allocation.</p>
               <div className="grid grid-cols-2 gap-4">
                 <Select
                   label="Level Start"
@@ -223,8 +223,8 @@ export function AllocationFormModal({ open, onClose, classId, levelOptions }: Al
           )}
           {type === 'freeChoice' && (
             <div className="text-center py-6">
-              <span className="text-text-secondary/40 mb-2 block"><Icon name="auto_stories" size={36} /></span>
-              <p className="text-sm text-text-secondary">Students will choose their own books within the target minutes.</p>
+              <span className="text-muted/40 mb-2 block"><Icon name="auto_stories" size={36} /></span>
+              <p className="text-sm text-muted">Students will choose their own books within the target minutes.</p>
             </div>
           )}
         </div>
@@ -238,9 +238,9 @@ export function AllocationFormModal({ open, onClose, classId, levelOptions }: Al
                 type="checkbox"
                 checked={wholeClass}
                 onChange={(e) => setWholeClass(e.target.checked)}
-                className="rounded border-divider text-rose-pink focus:ring-rose-pink"
+                className="rounded border-rule text-section focus:ring-section"
               />
-              <span className="text-sm font-semibold text-charcoal">Whole Class</span>
+              <span className="text-sm font-semibold text-ink">Whole Class</span>
             </label>
           </div>
           {!wholeClass && (
@@ -248,15 +248,15 @@ export function AllocationFormModal({ open, onClose, classId, levelOptions }: Al
               {students?.map((student) => (
                 <label
                   key={student.id}
-                  className="flex items-center gap-3 p-2 rounded-[var(--radius-md)] hover:bg-background cursor-pointer"
+                  className="flex items-center gap-3 p-2 rounded-[var(--radius-md)] hover:bg-cream cursor-pointer"
                 >
                   <input
                     type="checkbox"
                     checked={selectedStudents.includes(student.id)}
                     onChange={() => toggleStudent(student.id)}
-                    className="rounded border-divider text-rose-pink focus:ring-rose-pink"
+                    className="rounded border-rule text-section focus:ring-section"
                   />
-                  <span className="text-sm text-charcoal">{student.firstName} {student.lastName}</span>
+                  <span className="text-sm text-ink">{student.firstName} {student.lastName}</span>
                   {student.currentReadingLevel && (
                     <Badge variant="default">{student.currentReadingLevel}</Badge>
                   )}

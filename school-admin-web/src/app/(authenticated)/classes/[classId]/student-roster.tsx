@@ -116,8 +116,8 @@ export function StudentRoster({ classId, levelOptions, levelsEnabled = true }: S
       </div>
 
       {showLevels && selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 mb-4 p-3 bg-rose-pink/5 rounded-[var(--radius-md)] border border-rose-pink/20">
-          <span className="text-sm font-semibold text-charcoal">{selectedIds.size} selected</span>
+        <div className="flex items-center gap-3 mb-4 p-3 bg-section/5 rounded-[var(--radius-md)] border border-section/20">
+          <span className="text-sm font-semibold text-ink">{selectedIds.size} selected</span>
           <Button size="sm" onClick={() => setShowBulkPicker(true)}>Set Level</Button>
           <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>Clear</Button>
         </div>
@@ -126,43 +126,43 @@ export function StudentRoster({ classId, levelOptions, levelsEnabled = true }: S
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="bg-surface rounded-[var(--radius-md)] shadow-card p-4 animate-pulse">
+            <div key={i} className="bg-paper rounded-[var(--radius-md)] shadow-card p-4 animate-pulse">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-divider/60 rounded-full" />
+                <div className="w-10 h-10 bg-rule/60 rounded-full" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-divider/60 rounded w-32" />
-                  <div className="h-3 bg-divider/60 rounded w-20" />
+                  <div className="h-4 bg-rule/60 rounded w-32" />
+                  <div className="h-3 bg-rule/60 rounded w-20" />
                 </div>
               </div>
             </div>
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-8 text-text-secondary text-sm">
+        <div className="text-center py-8 text-muted text-sm">
           {search ? 'No students match your search.' : 'No students in this class.'}
         </div>
       ) : (
-        <div className="bg-surface rounded-[var(--radius-lg)] shadow-card overflow-hidden">
+        <div className="bg-paper rounded-[var(--radius-lg)] shadow-card overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-divider">
+              <tr className="border-b border-rule">
                 {showLevels && (
                   <th className="px-4 py-3 w-10">
                     <input
                       type="checkbox"
                       checked={selectedIds.size === filtered.length && filtered.length > 0}
                       onChange={toggleAll}
-                      className="w-4 h-4 rounded border-divider text-rose-pink focus:ring-rose-pink/30"
+                      className="w-4 h-4 rounded border-rule text-section focus:ring-section/30"
                     />
                   </th>
                 )}
-                <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Student</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">ID</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">Student</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">ID</th>
                 {showLevels && (
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Level</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">Level</th>
                 )}
-                <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Streak</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Last Read</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">Streak</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">Last Read</th>
                 <th className="px-4 py-3 w-20"></th>
               </tr>
             </thead>
@@ -170,7 +170,7 @@ export function StudentRoster({ classId, levelOptions, levelsEnabled = true }: S
               {filtered.map((student) => (
                 <tr
                   key={student.id}
-                  className="border-b border-divider/50 last:border-b-0 hover:bg-background/50 transition-colors cursor-pointer"
+                  className="border-b border-rule/50 last:border-b-0 hover:bg-cream/50 transition-colors cursor-pointer"
                   onClick={() => router.push(`/students/${student.id}`)}
                 >
                   {showLevels && (
@@ -179,7 +179,7 @@ export function StudentRoster({ classId, levelOptions, levelsEnabled = true }: S
                         type="checkbox"
                         checked={selectedIds.has(student.id)}
                         onChange={() => toggleSelect(student.id)}
-                        className="w-4 h-4 rounded border-divider text-rose-pink focus:ring-rose-pink/30"
+                        className="w-4 h-4 rounded border-rule text-section focus:ring-section/30"
                       />
                     </td>
                   )}
@@ -190,12 +190,12 @@ export function StudentRoster({ classId, levelOptions, levelsEnabled = true }: S
                         characterId={student.characterId}
                         size="sm"
                       />
-                      <span className="font-semibold text-sm text-charcoal">
+                      <span className="font-semibold text-sm text-ink">
                         {student.firstName} {student.lastName}
                       </span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-text-secondary">{student.studentId || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-muted">{student.studentId || '-'}</td>
                   {showLevels && (
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <ReadingLevelPill
@@ -205,10 +205,10 @@ export function StudentRoster({ classId, levelOptions, levelsEnabled = true }: S
                       />
                     </td>
                   )}
-                  <td className="px-4 py-3 text-sm text-charcoal">
+                  <td className="px-4 py-3 text-sm text-ink">
                     {student.stats?.currentStreak ? `${student.stats.currentStreak} days` : '-'}
                   </td>
-                  <td className="px-4 py-3 text-sm text-text-secondary">
+                  <td className="px-4 py-3 text-sm text-muted">
                     {student.stats?.lastReadingDate
                       ? new Date(student.stats.lastReadingDate).toLocaleDateString()
                       : '-'}

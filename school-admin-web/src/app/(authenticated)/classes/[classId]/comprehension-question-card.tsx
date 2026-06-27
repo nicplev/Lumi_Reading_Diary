@@ -47,8 +47,8 @@ export function ComprehensionQuestionCard({ classId }: { classId: string }) {
     <Card className="mb-4">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
-          <h2 className="text-sm font-bold text-charcoal">Comprehension question</h2>
-          <p className="text-xs text-text-secondary mt-0.5">
+          <h2 className="text-sm font-bold text-ink">Comprehension question</h2>
+          <p className="text-xs text-muted mt-0.5">
             Shown to families at the end of a reading log for this class.
           </p>
         </div>
@@ -67,7 +67,7 @@ export function ComprehensionQuestionCard({ classId }: { classId: string }) {
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-text-secondary mt-3">Loading…</p>
+        <p className="text-sm text-muted mt-3">Loading…</p>
       ) : editing ? (
         <div className="mt-3 space-y-2">
           <textarea
@@ -76,10 +76,10 @@ export function ComprehensionQuestionCard({ classId }: { classId: string }) {
             rows={2}
             onChange={(e) => setValue(e.target.value)}
             placeholder={data?.default}
-            className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-divider bg-surface text-charcoal text-sm focus:outline-none focus:ring-2 focus:ring-rose-pink/30 focus:border-rose-pink transition-colors resize-y"
+            className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-rule bg-paper text-ink text-sm focus:outline-none focus:ring-2 focus:ring-section/30 focus:border-section transition-colors resize-y"
           />
           <div className="flex items-center justify-between">
-            <span className="text-xs text-text-secondary">
+            <span className="text-xs text-muted">
               {value.length}/{MAX}
               {!value.trim() ? ' · will use the default' : ''}
             </span>
@@ -97,9 +97,9 @@ export function ComprehensionQuestionCard({ classId }: { classId: string }) {
           </div>
         </div>
       ) : (
-        <p className="mt-3 text-sm text-charcoal">
+        <p className="mt-3 text-sm text-ink">
           &ldquo;{effective}&rdquo;
-          {!data?.question && <span className="text-xs text-text-secondary ml-2">(default)</span>}
+          {!data?.question && <span className="text-xs text-muted ml-2">(default)</span>}
         </p>
       )}
     </Card>

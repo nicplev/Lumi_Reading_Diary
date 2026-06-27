@@ -103,21 +103,21 @@ export function AllocationDetail({ allocation, students, onClose }: AllocationDe
         </Button>
       </div>
 
-      <div className="text-xs text-text-secondary mb-4">
+      <div className="text-xs text-muted mb-4">
         {new Date(allocation.startDate).toLocaleDateString()} - {new Date(allocation.endDate).toLocaleDateString()}
       </div>
 
       <div className="mb-4">
-        <h4 className="text-sm font-semibold text-charcoal mb-1.5">Assigned to</h4>
+        <h4 className="text-sm font-semibold text-ink mb-1.5">Assigned to</h4>
         {allocation.studentIds.length === 0 ? (
-          <p className="text-sm text-text-secondary">Whole class</p>
+          <p className="text-sm text-muted">Whole class</p>
         ) : (
           <div className="flex flex-wrap gap-2">
             {allocation.studentIds.map((sid) => (
               <Link
                 key={sid}
                 href={`/students/${sid}`}
-                className="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-[var(--radius-pill)] bg-background text-sm text-charcoal hover:bg-divider/40 transition-colors"
+                className="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-[var(--radius-pill)] bg-cream text-sm text-ink hover:bg-rule/40 transition-colors"
               >
                 <Avatar name={nameOf(sid) ?? sid} characterId={studentById.get(sid)?.characterId} size="xs" />
                 {nameOf(sid) ?? 'Unknown student'}
@@ -128,7 +128,7 @@ export function AllocationDetail({ allocation, students, onClose }: AllocationDe
       </div>
 
       {allocation.levelStart && (
-        <div className="text-sm text-charcoal mb-4">
+        <div className="text-sm text-ink mb-4">
           Level range: <span className="font-semibold">{allocation.levelStart}</span> - <span className="font-semibold">{allocation.levelEnd}</span>
         </div>
       )}
@@ -136,7 +136,7 @@ export function AllocationDetail({ allocation, students, onClose }: AllocationDe
       {/* Books List */}
       <div className="mb-4">
         <div className="flex items-center justify-between mb-2">
-          <h4 className="text-sm font-semibold text-charcoal">Books ({activeItems.length})</h4>
+          <h4 className="text-sm font-semibold text-ink">Books ({activeItems.length})</h4>
           {allocation.isActive && (
             <Button variant="ghost" size="sm" onClick={() => setShowAddBook(!showAddBook)}>
               {showAddBook ? 'Cancel' : '+ Add Book'}
@@ -166,22 +166,22 @@ export function AllocationDetail({ allocation, students, onClose }: AllocationDe
         )}
 
         {activeItems.length === 0 ? (
-          <p className="text-sm text-text-secondary">No books assigned.</p>
+          <p className="text-sm text-muted">No books assigned.</p>
         ) : (
           <div className="space-y-1">
             {activeItems.map((item) => (
               <div
                 key={item.id}
-                className="flex items-center justify-between p-2 rounded-[var(--radius-md)] bg-background"
+                className="flex items-center justify-between p-2 rounded-[var(--radius-md)] bg-cream"
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-sm text-charcoal truncate">{item.title}</span>
+                  <span className="text-sm text-ink truncate">{item.title}</span>
                   {item.isbn && <Badge variant="default"><span className="text-[10px]">{item.isbn}</span></Badge>}
                 </div>
                 {allocation.isActive && (
                   <button
                     onClick={() => handleRemoveBook(item.id)}
-                    className="text-text-secondary hover:text-error transition-colors flex-shrink-0 ml-2"
+                    className="text-muted hover:text-error transition-colors flex-shrink-0 ml-2"
                     disabled={removeBook.isPending}
                   >
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -198,18 +198,18 @@ export function AllocationDetail({ allocation, students, onClose }: AllocationDe
       {/* Student Overrides */}
       {overrideEntries.length > 0 && (
         <div>
-          <h4 className="text-sm font-semibold text-charcoal mb-2">Student Overrides ({overrideEntries.length})</h4>
+          <h4 className="text-sm font-semibold text-ink mb-2">Student Overrides ({overrideEntries.length})</h4>
           <div className="space-y-2">
             {overrideEntries.map((override) => (
-              <div key={override.studentId} className="p-2 rounded-[var(--radius-md)] bg-background text-xs">
-                <span className="font-semibold text-charcoal">
+              <div key={override.studentId} className="p-2 rounded-[var(--radius-md)] bg-cream text-xs">
+                <span className="font-semibold text-ink">
                   {nameOf(override.studentId) ?? `Student ${override.studentId.slice(0, 8)}…`}
                 </span>
                 {override.removedItemIds.length > 0 && (
-                  <span className="text-text-secondary ml-2">{override.removedItemIds.length} removed</span>
+                  <span className="text-muted ml-2">{override.removedItemIds.length} removed</span>
                 )}
                 {override.addedItems.filter((i) => !i.isDeleted).length > 0 && (
-                  <span className="text-text-secondary ml-2">{override.addedItems.filter((i) => !i.isDeleted).length} added</span>
+                  <span className="text-muted ml-2">{override.addedItems.filter((i) => !i.isDeleted).length} added</span>
                 )}
               </div>
             ))}

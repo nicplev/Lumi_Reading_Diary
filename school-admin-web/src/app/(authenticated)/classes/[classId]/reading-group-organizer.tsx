@@ -132,7 +132,7 @@ export function ReadingGroupOrganizer({
   return (
     <div>
       <div className="flex items-center justify-between gap-3 mb-4">
-        <p className="text-sm text-text-secondary">Drag students between groups, then save.</p>
+        <p className="text-sm text-muted">Drag students between groups, then save.</p>
         <Button variant="outline" onClick={onExit} disabled={saving}>
           <Icon name="check" size={16} className="mr-1.5" />
           Done
@@ -184,20 +184,20 @@ function Column({
     <div
       ref={setNodeRef}
       className={`w-60 flex-shrink-0 rounded-[var(--radius-lg)] border p-3 transition-colors ${
-        isOver ? 'border-rose-pink bg-rose-pink/5' : 'border-divider bg-surface'
+        isOver ? 'border-section bg-section/5' : 'border-rule bg-paper'
       }`}
     >
       <div className="flex items-center gap-2 mb-2.5">
         {color && <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />}
-        <span className="font-bold text-charcoal text-sm truncate">{name}</span>
-        <span className="ml-auto text-xs text-text-secondary">{members.length}</span>
+        <span className="font-bold text-ink text-sm truncate">{name}</span>
+        <span className="ml-auto text-xs text-muted">{members.length}</span>
       </div>
       <div className="space-y-1.5 min-h-[64px]">
         {members.map((s) => (
           <Chip key={s.id} student={s} />
         ))}
         {members.length === 0 && (
-          <p className="text-xs text-text-secondary/60 py-4 text-center">Drop students here</p>
+          <p className="text-xs text-muted/60 py-4 text-center">Drop students here</p>
         )}
       </div>
     </div>
@@ -213,7 +213,7 @@ function Chip({ student, overlay }: { student: OrganizerStudent; overlay?: boole
       style={overlay ? undefined : style}
       {...(overlay ? {} : listeners)}
       {...(overlay ? {} : attributes)}
-      className={`flex items-center gap-2 p-2 rounded-[var(--radius-md)] bg-background border border-divider cursor-grab active:cursor-grabbing touch-none ${
+      className={`flex items-center gap-2 p-2 rounded-[var(--radius-md)] bg-cream border border-rule cursor-grab active:cursor-grabbing touch-none ${
         isDragging && !overlay ? 'opacity-40' : ''
       } ${overlay ? 'shadow-card-hover' : ''}`}
     >
@@ -223,7 +223,7 @@ function Chip({ student, overlay }: { student: OrganizerStudent; overlay?: boole
         size="sm"
         className="flex-shrink-0"
       />
-      <span className="text-sm text-charcoal font-medium truncate">
+      <span className="text-sm text-ink font-medium truncate">
         {student.firstName} {student.lastName}
       </span>
     </div>

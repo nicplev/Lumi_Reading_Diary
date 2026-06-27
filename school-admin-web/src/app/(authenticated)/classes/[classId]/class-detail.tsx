@@ -44,12 +44,13 @@ export function ClassDetail({ schoolClass, levelOptions, classOptions = [], leve
   return (
     <div>
       <PageHeader
+        eyebrow="Class"
         title={schoolClass.name}
         description={[schoolClass.yearLevel, `${schoolClass.studentIds.length} students`].filter(Boolean).join(' · ')}
         action={
           classOptions.length > 1 ? (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-text-secondary whitespace-nowrap">Class</span>
+              <span className="text-sm text-muted whitespace-nowrap">Class</span>
               <Select
                 options={classOptions.map((c) => ({ value: c.id, label: c.name }))}
                 value={schoolClass.id}

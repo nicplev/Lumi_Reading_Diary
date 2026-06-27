@@ -82,7 +82,7 @@ export function AddStudentToClassModal({
 
         <div className="max-h-64 overflow-y-auto space-y-1">
           {filteredStudents.length === 0 ? (
-            <div className="py-8 text-center text-sm text-text-secondary">
+            <div className="py-8 text-center text-sm text-muted">
               No students available
             </div>
           ) : (
@@ -93,10 +93,10 @@ export function AddStudentToClassModal({
                   key={student.id}
                   onClick={() => onMove(student.id)}
                   disabled={loading}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-md)] hover:bg-background transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-md)] hover:bg-cream transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Avatar name={fullName} size="sm" />
-                  <span className="text-sm font-semibold text-charcoal truncate flex-1">
+                  <span className="text-sm font-semibold text-ink truncate flex-1">
                     {fullName}
                   </span>
                   <Badge variant={student.classId ? 'default' : 'warning'}>

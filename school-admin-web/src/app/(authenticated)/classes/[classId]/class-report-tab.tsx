@@ -45,9 +45,9 @@ interface ClassReportTabProps {
 
 function Metric({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-[var(--radius-md)] border border-divider p-4">
-      <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide">{label}</p>
-      <p className="text-2xl font-bold text-charcoal mt-1">{value}</p>
+    <div className="rounded-[var(--radius-md)] border border-rule p-4">
+      <p className="text-xs font-semibold text-muted uppercase tracking-wide">{label}</p>
+      <p className="text-2xl font-bold text-ink mt-1">{value}</p>
     </div>
   );
 }
@@ -110,7 +110,7 @@ export function ClassReportTab({ classId, className, yearLevel }: ClassReportTab
         </div>
         <div className="flex flex-wrap items-end gap-3">
           <label className="text-sm">
-            <span className="block text-xs font-semibold text-text-secondary mb-1">From</span>
+            <span className="block text-xs font-semibold text-muted mb-1">From</span>
             <input
               type="date"
               value={from}
@@ -119,11 +119,11 @@ export function ClassReportTab({ classId, className, yearLevel }: ClassReportTab
                 setFrom(e.target.value);
                 setPresetKey('custom');
               }}
-              className="px-3 py-2 rounded-[var(--radius-md)] border border-divider bg-surface text-charcoal text-sm focus:outline-none focus:ring-2 focus:ring-rose-pink/30"
+              className="px-3 py-2 rounded-[var(--radius-md)] border border-rule bg-paper text-ink text-sm focus:outline-none focus:ring-2 focus:ring-section/30"
             />
           </label>
           <label className="text-sm">
-            <span className="block text-xs font-semibold text-text-secondary mb-1">To</span>
+            <span className="block text-xs font-semibold text-muted mb-1">To</span>
             <input
               type="date"
               value={to}
@@ -133,23 +133,23 @@ export function ClassReportTab({ classId, className, yearLevel }: ClassReportTab
                 setTo(e.target.value);
                 setPresetKey('custom');
               }}
-              className="px-3 py-2 rounded-[var(--radius-md)] border border-divider bg-surface text-charcoal text-sm focus:outline-none focus:ring-2 focus:ring-rose-pink/30"
+              className="px-3 py-2 rounded-[var(--radius-md)] border border-rule bg-paper text-ink text-sm focus:outline-none focus:ring-2 focus:ring-section/30"
             />
           </label>
         </div>
       </div>
 
       {isLoading || !report ? (
-        <p className="text-sm text-text-secondary py-10 text-center">Building report…</p>
+        <p className="text-sm text-muted py-10 text-center">Building report…</p>
       ) : (
         <div id="class-report" className="space-y-6">
           {/* Report header */}
-          <div className="border-b border-divider pb-4">
+          <div className="border-b border-rule pb-4">
             {school?.displayName || school?.name ? (
-              <p className="text-sm text-text-secondary">{school.displayName || school.name}</p>
+              <p className="text-sm text-muted">{school.displayName || school.name}</p>
             ) : null}
-            <h1 className="text-2xl font-bold text-charcoal">Class Reading Report</h1>
-            <p className="text-sm text-text-secondary mt-0.5">
+            <h1 className="text-2xl font-bold text-ink">Class Reading Report</h1>
+            <p className="text-sm text-muted mt-0.5">
               {[className, yearLevel].filter(Boolean).join(' · ')} · {formatDate(from)} – {formatDate(to)}
             </p>
           </div>
@@ -168,13 +168,13 @@ export function ClassReportTab({ classId, className, yearLevel }: ClassReportTab
 
           {/* Top readers */}
           <Card>
-            <h2 className="text-lg font-bold text-charcoal mb-3">Top readers</h2>
+            <h2 className="text-lg font-bold text-ink mb-3">Top readers</h2>
             {report.topReaders.length === 0 ? (
-              <p className="text-sm text-text-secondary">No reading recorded in this period.</p>
+              <p className="text-sm text-muted">No reading recorded in this period.</p>
             ) : (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-text-secondary border-b border-divider">
+                  <tr className="text-left text-muted border-b border-rule">
                     <th className="py-2 font-semibold w-8">#</th>
                     <th className="py-2 font-semibold">Student</th>
                     <th className="py-2 font-semibold text-right">Minutes</th>
@@ -184,9 +184,9 @@ export function ClassReportTab({ classId, className, yearLevel }: ClassReportTab
                 </thead>
                 <tbody>
                   {report.topReaders.map((r, i) => (
-                    <tr key={r.id} className="border-b border-divider/60">
-                      <td className="py-2 text-text-secondary">{i + 1}</td>
-                      <td className="py-2 text-charcoal font-medium">{r.name}</td>
+                    <tr key={r.id} className="border-b border-rule/60">
+                      <td className="py-2 text-muted">{i + 1}</td>
+                      <td className="py-2 text-ink font-medium">{r.name}</td>
                       <td className="py-2 text-right">{r.minutes}</td>
                       <td className="py-2 text-right">{r.readingDays}</td>
                       <td className="py-2 text-right">{r.books}</td>
@@ -199,16 +199,16 @@ export function ClassReportTab({ classId, className, yearLevel }: ClassReportTab
 
           {/* Needs support */}
           <Card>
-            <h2 className="text-lg font-bold text-charcoal mb-3">Students needing support</h2>
+            <h2 className="text-lg font-bold text-ink mb-3">Students needing support</h2>
             {report.needsSupport.length === 0 ? (
-              <div className="flex items-center gap-2 text-sm text-mint-green-dark">
+              <div className="flex items-center gap-2 text-sm text-lumi-green-dark">
                 <Icon name="check_circle" size={18} />
                 All students are actively engaged in reading.
               </div>
             ) : (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-text-secondary border-b border-divider">
+                  <tr className="text-left text-muted border-b border-rule">
                     <th className="py-2 font-semibold">Student</th>
                     <th className="py-2 font-semibold text-right">Minutes</th>
                     <th className="py-2 font-semibold text-right">Days</th>
@@ -217,8 +217,8 @@ export function ClassReportTab({ classId, className, yearLevel }: ClassReportTab
                 </thead>
                 <tbody>
                   {report.needsSupport.map((r) => (
-                    <tr key={r.id} className="border-b border-divider/60">
-                      <td className="py-2 text-charcoal font-medium">{r.name}</td>
+                    <tr key={r.id} className="border-b border-rule/60">
+                      <td className="py-2 text-ink font-medium">{r.name}</td>
                       <td className="py-2 text-right">{r.minutes}</td>
                       <td className="py-2 text-right">{r.readingDays}</td>
                       <td className="py-2 text-right">
@@ -233,28 +233,28 @@ export function ClassReportTab({ classId, className, yearLevel }: ClassReportTab
 
           {/* Reading level distribution */}
           <Card>
-            <h2 className="text-lg font-bold text-charcoal mb-3">Reading levels</h2>
+            <h2 className="text-lg font-bold text-ink mb-3">Reading levels</h2>
             {report.levelDistribution.length === 0 ? (
-              <p className="text-sm text-text-secondary">No students in this class.</p>
+              <p className="text-sm text-muted">No students in this class.</p>
             ) : (
               <div className="space-y-2">
                 {report.levelDistribution.map((l) => {
                   const pct = report.totalStudents > 0 ? Math.round((l.count / report.totalStudents) * 100) : 0;
                   return (
                     <div key={l.level} className="flex items-center gap-3">
-                      <span className="text-sm text-charcoal w-28 shrink-0">{l.level}</span>
-                      <div className="flex-1 h-2.5 rounded-full bg-background overflow-hidden">
-                        <div className="h-full bg-rose-pink" style={{ width: `${pct}%` }} />
+                      <span className="text-sm text-ink w-28 shrink-0">{l.level}</span>
+                      <div className="flex-1 h-2.5 rounded-full bg-cream overflow-hidden">
+                        <div className="h-full bg-section" style={{ width: `${pct}%` }} />
                       </div>
-                      <span className="text-xs text-text-secondary w-10 text-right">{l.count}</span>
+                      <span className="text-xs text-muted w-10 text-right">{l.count}</span>
                     </div>
                   );
                 })}
               </div>
             )}
             {report.popularLevel && (
-              <p className="text-xs text-text-secondary mt-3">
-                Most common level: <span className="font-semibold text-charcoal">{report.popularLevel}</span>
+              <p className="text-xs text-muted mt-3">
+                Most common level: <span className="font-semibold text-ink">{report.popularLevel}</span>
                 {report.longestStreak > 0 && <> · Longest streak: {report.longestStreak} days</>}
               </p>
             )}
