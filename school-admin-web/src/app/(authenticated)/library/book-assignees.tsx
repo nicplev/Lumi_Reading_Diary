@@ -22,7 +22,7 @@ export function BookAssignees({ book }: { book: { id: string; isbn?: string; tit
   const narrowIds = showToggle && scope === 'myClass' ? viewer!.classIds : null;
 
   if (!snapshot) {
-    return <p className="text-sm text-text-secondary">Loading assignments…</p>;
+    return <p className="text-sm text-muted">Loading assignments…</p>;
   }
 
   let ids = assignedStudentIdsForBook(snapshot, book);
@@ -33,7 +33,7 @@ export function BookAssignees({ book }: { book: { id: string; isbn?: string; tit
   return (
     <div>
       <div className="flex items-center justify-between gap-2 mb-2">
-        <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Assigned to</p>
+        <p className="text-xs font-semibold text-muted uppercase tracking-wider">Assigned to</p>
         {showToggle && (
           <div className="flex items-center gap-1.5">
             <FilterChip label="My class" selected={scope === 'myClass'} onClick={() => setScope('myClass')} />
@@ -42,7 +42,7 @@ export function BookAssignees({ book }: { book: { id: string; isbn?: string; tit
         )}
       </div>
 
-      <p className="text-sm text-charcoal mb-3">
+      <p className="text-sm text-ink mb-3">
         {total === 0
           ? 'Not currently assigned to any student.'
           : `${total} student${total === 1 ? '' : 's'}`}
@@ -52,7 +52,7 @@ export function BookAssignees({ book }: { book: { id: string; isbn?: string; tit
         <div className="space-y-3 max-h-60 overflow-y-auto">
           {groups.map((g) => (
             <div key={g.classId}>
-              <h5 className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-1.5">
+              <h5 className="text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
                 {g.className} · {g.students.length}
               </h5>
               <div className="space-y-1.5">
@@ -60,14 +60,14 @@ export function BookAssignees({ book }: { book: { id: string; isbn?: string; tit
                   <Link
                     key={s.id}
                     href={`/students/${s.id}`}
-                    className="flex items-center gap-2.5 rounded-[var(--radius-sm)] px-1 py-0.5 -mx-1 hover:bg-background transition-colors"
+                    className="flex items-center gap-2.5 rounded-[var(--radius-sm)] px-1 py-0.5 -mx-1 hover:bg-cream transition-colors"
                   >
                     <Avatar
                       name={`${s.firstName} ${s.lastName}`}
                       characterId={s.characterId}
                       size="sm"
                     />
-                    <span className="text-sm text-charcoal">
+                    <span className="text-sm text-ink">
                       {s.firstName} {s.lastName}
                     </span>
                   </Link>

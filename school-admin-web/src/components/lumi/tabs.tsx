@@ -32,7 +32,7 @@ export function Tabs({ tabs, activeTab, onChange }: TabsProps) {
               {tab.label}
               {tab.count != null && (
                 <span className={`text-xs px-1.5 py-0.5 rounded-[var(--radius-pill)] ${
-                  activeTab === tab.id ? 'bg-section/10 text-section' : 'bg-cream text-muted'
+                  activeTab === tab.id ? 'bg-section/10 text-section-strong' : 'bg-cream text-muted'
                 }`}>
                   {tab.count}
                 </span>

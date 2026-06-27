@@ -100,6 +100,7 @@ export function LibraryPage({ levelOptions }: LibraryPageProps) {
   return (
     <div>
       <PageHeader
+        eyebrow="Library"
         title="Library"
         description="School book library"
         action={
@@ -138,7 +139,7 @@ export function LibraryPage({ levelOptions }: LibraryPageProps) {
       {isLoading ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="bg-surface rounded-[var(--radius-lg)] shadow-card overflow-hidden">
+            <div key={i} className="bg-paper rounded-[var(--radius-lg)] shadow-card overflow-hidden">
               <Skeleton className="aspect-[3/4] w-full" />
               <div className="p-3 space-y-2">
                 <Skeleton className="h-4 w-3/4" />
@@ -177,7 +178,7 @@ export function LibraryPage({ levelOptions }: LibraryPageProps) {
               />
               <button
                 onClick={(e) => { e.stopPropagation(); setDeleteConfirm(book.id); }}
-                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full bg-surface/90 shadow-sm hover:bg-error/10 text-text-secondary hover:text-error"
+                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full bg-paper/90 shadow-sm hover:bg-error/10 text-muted hover:text-error"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                   <path d="M11 3L3 11M3 3l8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />

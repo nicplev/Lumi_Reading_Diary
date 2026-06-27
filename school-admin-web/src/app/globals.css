@@ -20,6 +20,7 @@
   /* Active section accent — defaults to red (the brand anchor); overridden
      per-section on a wrapper element via inline CSS vars. */
   --section-accent: #EC4544;
+  --section-accent-strong: #D63A39;
   --section-accent-tint: #F4B5B7;
   --section-on-accent: #FFFFFF;
 }
@@ -37,6 +38,7 @@
 
   /* Active-section accent (driven by --section-accent on the nearest scope) */
   --color-section: var(--section-accent);
+  --color-section-strong: var(--section-accent-strong);
   --color-section-tint: var(--section-accent-tint);
   --color-on-section: var(--section-on-accent);
 

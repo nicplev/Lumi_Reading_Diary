@@ -164,7 +164,7 @@ export function ContributeBookModal({ open, onClose }: ContributeBookModalProps)
             Look up
           </Button>
         </div>
-        {lookupNote && <p className="text-xs text-text-secondary -mt-2">{lookupNote}</p>}
+        {lookupNote && <p className="text-xs text-muted -mt-2">{lookupNote}</p>}
 
         <Input label="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
         <Input label="Author" value={author} onChange={(e) => setAuthor(e.target.value)} />
@@ -176,19 +176,19 @@ export function ContributeBookModal({ open, onClose }: ContributeBookModalProps)
         />
 
         <div>
-          <label className="block text-sm font-semibold text-charcoal mb-1.5">Description (optional)</label>
+          <label className="block text-sm font-semibold text-ink mb-1.5">Description (optional)</label>
           <textarea
             value={description}
             rows={3}
             maxLength={4000}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="A short synopsis…"
-            className="w-full px-4 py-3 rounded-[var(--radius-md)] border border-divider bg-surface text-charcoal placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-rose-pink/30 focus:border-rose-pink transition-colors text-[15px] resize-y"
+            className="w-full px-4 py-3 rounded-[var(--radius-md)] border border-rule bg-paper text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-section/30 focus:border-section transition-colors text-[15px] resize-y"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-semibold text-charcoal mb-1.5">Cover photo (optional)</label>
+          <label className="block text-sm font-semibold text-ink mb-1.5">Cover photo (optional)</label>
           <div
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
@@ -197,13 +197,13 @@ export function ContributeBookModal({ open, onClose }: ContributeBookModalProps)
               if (f) onFile(f);
             }}
             onClick={() => fileInputRef.current?.click()}
-            className="border-2 border-dashed border-divider rounded-[var(--radius-md)] p-4 text-center cursor-pointer hover:border-rose-pink/50 transition-colors"
+            className="border-2 border-dashed border-rule rounded-[var(--radius-md)] p-4 text-center cursor-pointer hover:border-section/50 transition-colors"
           >
             {coverDataUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={coverDataUrl} alt="Cover preview" className="mx-auto max-h-44 rounded-[var(--radius-sm)]" />
             ) : (
-              <p className="text-sm text-text-secondary">Drag a cover image here, or click to choose</p>
+              <p className="text-sm text-muted">Drag a cover image here, or click to choose</p>
             )}
             <input
               ref={fileInputRef}
