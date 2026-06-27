@@ -30,6 +30,7 @@ function toCampaign(doc: FirebaseFirestore.DocumentSnapshot): NotificationCampai
     },
     errorSummary: data.errorSummary ?? null,
     sentAt: data.sentAt?.toDate() ?? null,
+    archived: data.archived ?? false,
   };
 }
 
@@ -72,4 +73,31 @@ export async function getNotificationCampaigns(
 
   const snap = await base.orderBy('createdAt', 'desc').limit(max).get();
   return snap.docs.map(toCampaign);
+}
+
+/**
+ * Archive / unarchive a campaign (portal-only "hide from history" flag).
+ * Enforces the same scoping the history read uses: teachers may only touch
+ * their own messages; admins may only touch admin-sent ones.
+ */
+export async function setCampaignArchived(
+  schoolId: string,
+  campaignId: string,
+  archived: boolean,
+  requester: { uid: string; role: 'teacher' | 'schoolAdmin' }
+): Promise<void> {
+  const ref = adminDb
+    .collection('schools')
+    .doc(schoolId)
+    .collection('notificationCampaigns')
+    .doc(campaignId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('not-found');
+  const data = snap.data()!;
+  const allowed =
+    requester.role === 'schoolAdmin'
+      ? data.createdByRole === 'schoolAdmin'
+      : data.createdBy === requester.uid;
+  if (!allowed) throw new Error('forbidden');
+  await ref.update({ archived });
 }
