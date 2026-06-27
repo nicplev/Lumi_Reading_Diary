@@ -28,15 +28,17 @@ interface AnalyticsPageProps {
   termDates: Record<string, string>; // ISO strings
 }
 
+// Categorical series palette — the Lumi brand + extended hues, led by the
+// dashboard's blue. Last entry is the neutral "rest" slice.
 const PIE_COLORS = [
-  '#FF8698', '#6DD4A1', '#FFD166', '#5BB5E8', '#C490D1',
-  '#FF6B8A', '#45C49B', '#FFB84D', '#4A9FD9', '#B77BC4',
-  '#E8E8E8',
+  '#56C8E6', '#EC4544', '#51BA65', '#FFCB05', '#A571B0',
+  '#FAA51A', '#F5A1C5', '#1989CA', '#D63A39', '#429654',
+  '#E5E2DC',
 ];
 
 const TOOLTIP_STYLE = {
   backgroundColor: '#FFFFFF',
-  border: '1px solid #E5E7EB',
+  border: '1px solid #E5E2DC',
   borderRadius: '12px',
   fontSize: '13px',
   fontWeight: 600,
@@ -139,7 +141,7 @@ export function AnalyticsPage({ levelSchema, termDates }: AnalyticsPageProps) {
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
-        <PageHeader title="Analytics" description={subtitle} />
+        <PageHeader eyebrow="Analytics" title="Analytics" description={subtitle} />
 
         {/* Period toggle */}
         <div className="flex items-center gap-1.5 flex-wrap shrink-0">
@@ -149,8 +151,8 @@ export function AnalyticsPage({ levelSchema, termDates }: AnalyticsPageProps) {
               onClick={() => setPeriod(p)}
               className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                 period === p
-                  ? 'bg-rose-pink text-white shadow-sm'
-                  : 'bg-background text-text-secondary hover:text-charcoal border border-gray-200'
+                  ? 'bg-section text-on-section shadow-sm'
+                  : 'bg-cream text-muted hover:text-ink border border-rule'
               }`}
             >
               {p === '5days' ? 'Last 5 Days' : p === 'month' ? 'This Month' : 'School Year'}
@@ -163,21 +165,21 @@ export function AnalyticsPage({ levelSchema, termDates }: AnalyticsPageProps) {
                 onClick={() => { setPeriod('term'); setTermDropdownOpen((o) => !o); }}
                 className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1 ${
                   period === 'term'
-                    ? 'bg-rose-pink text-white shadow-sm'
-                    : 'bg-background text-text-secondary hover:text-charcoal border border-gray-200'
+                    ? 'bg-section text-on-section shadow-sm'
+                    : 'bg-cream text-muted hover:text-ink border border-rule'
                 }`}
               >
                 {period === 'term' ? `Term ${termKey.replace('term', '')}` : 'School Term'}
                 <Icon name="expand_more" size={14} />
               </button>
               {termDropdownOpen && (
-                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 py-1 min-w-[100px]">
+                <div className="absolute right-0 top-full mt-1 bg-paper border border-rule rounded-xl shadow-lg z-20 py-1 min-w-[100px]">
                   {configuredTerms.map((i) => (
                     <button
                       key={i}
                       onClick={() => { setTermKey(`term${i}`); setPeriod('term'); setTermDropdownOpen(false); }}
-                      className={`w-full text-left px-3 py-2 text-xs font-semibold hover:bg-background transition-colors flex items-center justify-between gap-2 ${
-                        termKey === `term${i}` ? 'text-rose-pink' : 'text-charcoal'
+                      className={`w-full text-left px-3 py-2 text-xs font-semibold hover:bg-cream transition-colors flex items-center justify-between gap-2 ${
+                        termKey === `term${i}` ? "text-section-strong" : 'text-ink'
                       }`}
                     >
                       Term {i}
@@ -190,7 +192,7 @@ export function AnalyticsPage({ levelSchema, termDates }: AnalyticsPageProps) {
           )}
 
           {isFetching && (
-            <div className="w-4 h-4 rounded-full border-2 border-rose-pink border-t-transparent animate-spin" />
+            <div className="w-4 h-4 rounded-full border-2 border-section border-t-transparent animate-spin" />
           )}
         </div>
       </div>
@@ -232,18 +234,18 @@ export function AnalyticsPage({ levelSchema, termDates }: AnalyticsPageProps) {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Row 1: Trend charts */}
           <Card>
-            <h3 className="text-lg font-bold text-charcoal mb-4">Reading Minutes Trend</h3>
+            <h3 className="text-lg font-bold text-ink mb-4">Reading Minutes Trend</h3>
             {chartData.length === 0 ? (
               <EmptyState icon={<Icon name="bar_chart" size={40} />} title="No data" description="No reading logs in this period." />
             ) : (
               <div className="h-[240px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: -15 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
-                    <XAxis dataKey="label" tick={{ fill: '#6B7280', fontSize: 11, fontWeight: 600 }} tickLine={false} axisLine={{ stroke: '#E5E7EB' }} />
-                    <YAxis tick={{ fill: '#6B7280', fontSize: 12 }} tickLine={false} axisLine={false} allowDecimals={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E2DC" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fill: '#6B6B6B', fontSize: 11, fontWeight: 600 }} tickLine={false} axisLine={{ stroke: '#E5E2DC' }} />
+                    <YAxis tick={{ fill: '#6B6B6B', fontSize: 12 }} tickLine={false} axisLine={false} allowDecimals={false} />
                     <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value: number) => [`${value} min`, 'Minutes']} />
-                    <Line type="monotone" dataKey="minutes" stroke="#FF8698" strokeWidth={2.5} dot={false} activeDot={{ r: 5, fill: '#FF8698' }} />
+                    <Line type="monotone" dataKey="minutes" stroke="#56C8E6" strokeWidth={2.5} dot={false} activeDot={{ r: 5, fill: '#56C8E6' }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -251,18 +253,18 @@ export function AnalyticsPage({ levelSchema, termDates }: AnalyticsPageProps) {
           </Card>
 
           <Card>
-            <h3 className="text-lg font-bold text-charcoal mb-4">Daily Logs Trend</h3>
+            <h3 className="text-lg font-bold text-ink mb-4">Daily Logs Trend</h3>
             {chartData.length === 0 ? (
               <EmptyState icon={<Icon name="bar_chart" size={40} />} title="No data" description="No reading logs in this period." />
             ) : (
               <div className="h-[240px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: -15 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
-                    <XAxis dataKey="label" tick={{ fill: '#6B7280', fontSize: 11, fontWeight: 600 }} tickLine={false} axisLine={{ stroke: '#E5E7EB' }} />
-                    <YAxis tick={{ fill: '#6B7280', fontSize: 12 }} tickLine={false} axisLine={false} allowDecimals={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E2DC" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fill: '#6B6B6B', fontSize: 11, fontWeight: 600 }} tickLine={false} axisLine={{ stroke: '#E5E2DC' }} />
+                    <YAxis tick={{ fill: '#6B6B6B', fontSize: 12 }} tickLine={false} axisLine={false} allowDecimals={false} />
                     <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value: number) => [`${value} logs`, 'Logs']} />
-                    <Bar dataKey="logs" fill="#6DD4A1" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                    <Bar dataKey="logs" fill="#51BA65" radius={[4, 4, 0, 0]} maxBarSize={32} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -299,17 +301,17 @@ function AtRiskSpotlightCard({ atRisk }: { atRisk: AtRiskStudent[] }) {
   return (
     <Card>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-bold text-charcoal">Needs Attention</h3>
+        <h3 className="text-lg font-bold text-ink">Needs Attention</h3>
         <Badge variant={atRisk.length > 0 ? 'error' : 'success'}>
           {atRisk.length} student{atRisk.length !== 1 ? 's' : ''}
         </Badge>
       </div>
 
       {atRisk.length === 0 ? (
-        <div className="flex items-center gap-3 py-4 text-text-secondary">
+        <div className="flex items-center gap-3 py-4 text-muted">
           <Icon name="check_circle" size={24} className="text-green-500" />
           <div>
-            <p className="font-semibold text-charcoal text-sm">Everyone&apos;s reading on track</p>
+            <p className="font-semibold text-ink text-sm">Everyone&apos;s reading on track</p>
             <p className="text-xs">No students have been inactive this period.</p>
           </div>
         </div>
@@ -323,8 +325,8 @@ function AtRiskSpotlightCard({ atRisk }: { atRisk: AtRiskStudent[] }) {
                 <div key={student.id} className="flex items-center gap-3">
                   <Avatar name={student.name} size="sm" />
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-charcoal text-sm truncate">{student.name}</p>
-                    <p className="text-xs text-text-secondary truncate">{student.className}</p>
+                    <p className="font-semibold text-ink text-sm truncate">{student.name}</p>
+                    <p className="text-xs text-muted truncate">{student.className}</p>
                   </div>
                   <Badge variant={variant}>{label}</Badge>
                 </div>
@@ -334,7 +336,7 @@ function AtRiskSpotlightCard({ atRisk }: { atRisk: AtRiskStudent[] }) {
           {canExpand && (
             <button
               onClick={() => setExpanded((e) => !e)}
-              className="mt-3 text-xs font-semibold text-text-secondary hover:text-charcoal transition-colors flex items-center gap-1"
+              className="mt-3 text-xs font-semibold text-muted hover:text-ink transition-colors flex items-center gap-1"
             >
               <Icon name={expanded ? 'expand_less' : 'expand_more'} size={16} />
               {expanded ? 'Show less' : `Show all ${capped.length} students`}
@@ -369,14 +371,14 @@ function ClassSnapshotCard({ classes }: { classes: ClassComparisonRow[] }) {
   return (
     <Card>
       <div className="flex items-center justify-between mb-5">
-        <h3 className="text-lg font-bold text-charcoal">Class Performance</h3>
+        <h3 className="text-lg font-bold text-ink">Class Performance</h3>
         <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1.5 text-xs text-text-secondary">
-            <span className="inline-block w-3 h-2 rounded-sm bg-[#FF8698]" />
+          <span className="flex items-center gap-1.5 text-xs text-muted">
+            <span className="inline-block w-3 h-2 rounded-sm bg-[#56C8E6]" />
             Sessions
           </span>
-          <span className="flex items-center gap-1.5 text-xs text-text-secondary">
-            <span className="inline-block w-3 h-2 rounded-sm bg-[#6DD4A1]" />
+          <span className="flex items-center gap-1.5 text-xs text-muted">
+            <span className="inline-block w-3 h-2 rounded-sm bg-[#51BA65]" />
             Books
           </span>
         </div>
@@ -389,24 +391,24 @@ function ClassSnapshotCard({ classes }: { classes: ClassComparisonRow[] }) {
           {ranked.map((cls, i) => (
             <div key={cls.classId}>
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-bold text-text-secondary w-5 shrink-0">#{i + 1}</span>
-                <span className="text-sm font-semibold text-charcoal">
+                <span className="text-xs font-bold text-muted w-5 shrink-0">#{i + 1}</span>
+                <span className="text-sm font-semibold text-ink">
                   {cls.name}
-                  {cls.yearLevel && <span className="text-xs text-text-secondary font-normal ml-1">({cls.yearLevel})</span>}
+                  {cls.yearLevel && <span className="text-xs text-muted font-normal ml-1">({cls.yearLevel})</span>}
                 </span>
               </div>
               <div className="space-y-1.5 pl-7">
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-[#FF8698] rounded-full transition-all" style={{ width: `${Math.min((cls.totalLogs / maxLogs) * 100, 100)}%` }} />
+                  <div className="flex-1 h-2 bg-rule/60 rounded-full overflow-hidden">
+                    <div className="h-full bg-[#56C8E6] rounded-full transition-all" style={{ width: `${Math.min((cls.totalLogs / maxLogs) * 100, 100)}%` }} />
                   </div>
-                  <span className="text-xs text-text-secondary w-20 text-right shrink-0">{cls.totalLogs} sessions</span>
+                  <span className="text-xs text-muted w-20 text-right shrink-0">{cls.totalLogs} sessions</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-[#6DD4A1] rounded-full transition-all" style={{ width: `${Math.min((cls.booksRead / maxBooks) * 100, 100)}%` }} />
+                  <div className="flex-1 h-2 bg-rule/60 rounded-full overflow-hidden">
+                    <div className="h-full bg-[#51BA65] rounded-full transition-all" style={{ width: `${Math.min((cls.booksRead / maxBooks) * 100, 100)}%` }} />
                   </div>
-                  <span className="text-xs text-text-secondary w-20 text-right shrink-0">{cls.booksRead} book{cls.booksRead !== 1 ? 's' : ''}</span>
+                  <span className="text-xs text-muted w-20 text-right shrink-0">{cls.booksRead} book{cls.booksRead !== 1 ? 's' : ''}</span>
                 </div>
               </div>
             </div>
@@ -425,36 +427,36 @@ function TopReadersCard({ topReaders }: { topReaders: TopReader[] }) {
 
   return (
     <Card>
-      <h3 className="text-lg font-bold text-charcoal mb-4">Top Readers</h3>
+      <h3 className="text-lg font-bold text-ink mb-4">Top Readers</h3>
       {top5.length === 0 ? (
         <EmptyState icon={<Icon name="emoji_events" size={40} />} title="No data" description="No reading stats available yet." />
       ) : (
         <div className="space-y-4">
           {top5.map((reader, i) => (
             <div key={reader.id} className="flex items-center gap-3">
-              <span className="text-xs font-bold text-text-secondary w-5 shrink-0">#{i + 1}</span>
+              <span className="text-xs font-bold text-muted w-5 shrink-0">#{i + 1}</span>
               <Avatar name={reader.name} size="sm" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-charcoal truncate">{reader.name}</p>
+                <p className="text-sm font-semibold text-ink truncate">{reader.name}</p>
                 <div className="flex items-center gap-2 mt-1">
-                  <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="flex-1 h-1.5 bg-rule/60 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-[#FF8698] rounded-full transition-all"
+                      className="h-full bg-[#56C8E6] rounded-full transition-all"
                       style={{ width: `${Math.min((reader.totalMinutes / maxMinutes) * 100, 100)}%` }}
                     />
                   </div>
                 </div>
               </div>
               <div className="text-right shrink-0">
-                <p className="text-sm font-bold text-charcoal">{reader.totalMinutes.toLocaleString()} min</p>
+                <p className="text-sm font-bold text-ink">{reader.totalMinutes.toLocaleString()} min</p>
                 {reader.uniqueBooks > 0 && (
-                  <p className="text-xs text-text-secondary">{reader.uniqueBooks} book{reader.uniqueBooks !== 1 ? 's' : ''}</p>
+                  <p className="text-xs text-muted">{reader.uniqueBooks} book{reader.uniqueBooks !== 1 ? 's' : ''}</p>
                 )}
               </div>
               {reader.streak > 0 && (
                 <span title="Current reading streak">
                   <Badge variant="success">
-                    <Icon name="local_fire_department" size={14} className="text-warm-orange mr-0.5 leading-none -mt-[3px]" />
+                    <Icon name="local_fire_department" size={14} className="text-lumi-orange mr-0.5 leading-none -mt-[3px]" />
                     {reader.streak}d
                   </Badge>
                 </span>
@@ -475,26 +477,26 @@ function TopBooksCard({ books }: { books: PopularBook[] }) {
 
   return (
     <Card>
-      <h3 className="text-lg font-bold text-charcoal mb-4">Most Read Books</h3>
+      <h3 className="text-lg font-bold text-ink mb-4">Most Read Books</h3>
       {top5.length === 0 ? (
         <EmptyState icon={<Icon name="library_books" size={40} />} title="No books" description="No books have been logged in this period." />
       ) : (
         <div className="space-y-4">
           {top5.map((book, i) => (
             <div key={book.title} className="flex items-center gap-3">
-              <span className="text-xs font-bold text-text-secondary w-5 shrink-0">#{i + 1}</span>
+              <span className="text-xs font-bold text-muted w-5 shrink-0">#{i + 1}</span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-charcoal truncate">{book.title}</p>
+                <p className="text-sm font-semibold text-ink truncate">{book.title}</p>
                 <div className="flex items-center gap-2 mt-1">
-                  <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="flex-1 h-1.5 bg-rule/60 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-[#5BB5E8] rounded-full transition-all"
+                      className="h-full bg-[#56C8E6] rounded-full transition-all"
                       style={{ width: `${Math.min((book.count / maxCount) * 100, 100)}%` }}
                     />
                   </div>
                 </div>
               </div>
-              <span className="text-sm font-bold text-charcoal shrink-0">
+              <span className="text-sm font-bold text-ink shrink-0">
                 {book.count}×
               </span>
             </div>
@@ -513,7 +515,7 @@ function LevelsSection({ levels }: { levels: LevelBucket[] }) {
   return (
     <>
       <Card>
-        <h3 className="text-lg font-bold text-charcoal mb-4">Reading Level Distribution</h3>
+        <h3 className="text-lg font-bold text-ink mb-4">Reading Level Distribution</h3>
         <div className="h-[280px]">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -540,7 +542,7 @@ function LevelsSection({ levels }: { levels: LevelBucket[] }) {
       </Card>
 
       <Card>
-        <h3 className="text-lg font-bold text-charcoal mb-4">Level Breakdown</h3>
+        <h3 className="text-lg font-bold text-ink mb-4">Level Breakdown</h3>
         <div className="space-y-2 max-h-[300px] overflow-y-auto">
           {levels.map((bucket) => {
             const pct = total > 0 ? Math.round((bucket.count / total) * 100) : 0;
@@ -548,12 +550,12 @@ function LevelsSection({ levels }: { levels: LevelBucket[] }) {
               <div key={bucket.level} className="flex items-center gap-3">
                 <ReadingLevelPill level={bucket.level} size="sm" />
                 <div className="flex-1">
-                  <div className="h-2 bg-background rounded-full overflow-hidden">
-                    <div className="h-full bg-rose-pink rounded-full transition-all" style={{ width: `${pct}%` }} />
+                  <div className="h-2 bg-cream rounded-full overflow-hidden">
+                    <div className="h-full bg-section rounded-full transition-all" style={{ width: `${pct}%` }} />
                   </div>
                 </div>
-                <span className="text-sm font-semibold text-charcoal w-16 text-right">
-                  {bucket.count} <span className="text-text-secondary font-normal text-xs">({pct}%)</span>
+                <span className="text-sm font-semibold text-ink w-16 text-right">
+                  {bucket.count} <span className="text-muted font-normal text-xs">({pct}%)</span>
                 </span>
               </div>
             );
