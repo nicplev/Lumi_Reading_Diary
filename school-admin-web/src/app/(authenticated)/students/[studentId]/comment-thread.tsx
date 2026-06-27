@@ -50,11 +50,11 @@ export function CommentThread({ logId, hasUnread }: { logId: string; hasUnread: 
   };
 
   return (
-    <div className="mt-3 border-t border-divider pt-3 space-y-3">
+    <div className="mt-3 border-t border-rule pt-3 space-y-3">
       {isLoading ? (
-        <p className="text-xs text-text-secondary">Loading comments…</p>
+        <p className="text-xs text-muted">Loading comments…</p>
       ) : (comments ?? []).length === 0 ? (
-        <p className="text-xs text-text-secondary">
+        <p className="text-xs text-muted">
           No comments yet — start the conversation with this family.
         </p>
       ) : (
@@ -62,13 +62,13 @@ export function CommentThread({ logId, hasUnread }: { logId: string; hasUnread: 
           {(comments ?? []).map((c) => (
             <li key={c.id} className="flex flex-col gap-0.5">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-charcoal">{c.authorName}</span>
+                <span className="text-sm font-semibold text-ink">{c.authorName}</span>
                 <Badge variant={c.authorRole === 'teacher' ? 'info' : 'default'}>
                   {c.authorRole === 'teacher' ? 'Staff' : 'Parent'}
                 </Badge>
-                <span className="text-xs text-text-secondary">{formatTime(c.createdAt)}</span>
+                <span className="text-xs text-muted">{formatTime(c.createdAt)}</span>
               </div>
-              <p className="text-sm text-charcoal whitespace-pre-wrap">{c.body}</p>
+              <p className="text-sm text-ink whitespace-pre-wrap">{c.body}</p>
             </li>
           ))}
         </ul>
@@ -81,7 +81,7 @@ export function CommentThread({ logId, hasUnread }: { logId: string; hasUnread: 
           rows={2}
           maxLength={2000}
           placeholder="Reply to the family…"
-          className="flex-1 px-3 py-2 rounded-[var(--radius-md)] border border-divider bg-surface text-charcoal placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-rose-pink/30 focus:border-rose-pink transition-colors text-sm resize-y"
+          className="flex-1 px-3 py-2 rounded-[var(--radius-md)] border border-rule bg-paper text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-section/30 focus:border-section transition-colors text-sm resize-y"
         />
         <Button size="sm" onClick={handleSend} loading={postComment.isPending} disabled={!draft.trim()}>
           Send

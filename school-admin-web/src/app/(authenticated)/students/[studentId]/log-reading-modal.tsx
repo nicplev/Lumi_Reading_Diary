@@ -155,10 +155,10 @@ export function LogReadingModal({
         />
 
         <div>
-          <label className="block text-sm font-semibold text-charcoal mb-1.5">Books read</label>
+          <label className="block text-sm font-semibold text-ink mb-1.5">Books read</label>
           {assignedTitles.length > 0 ? (
             <>
-              <p className="text-xs text-text-secondary mb-2">Tap the assigned book(s) read in this session.</p>
+              <p className="text-xs text-muted mb-2">Tap the assigned book(s) read in this session.</p>
               <div className="flex flex-wrap gap-2 mb-2">
                 {assignedTitles.map((t) => (
                   <FilterChip
@@ -185,14 +185,14 @@ export function LogReadingModal({
         </div>
 
         <div>
-          <label className="block text-sm font-semibold text-charcoal mb-1.5">Notes (optional)</label>
+          <label className="block text-sm font-semibold text-ink mb-1.5">Notes (optional)</label>
           <textarea
             value={notes}
             maxLength={280}
             rows={3}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Anything worth noting about this session…"
-            className="w-full px-4 py-3 rounded-[var(--radius-md)] border border-divider bg-surface text-charcoal placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-rose-pink/30 focus:border-rose-pink transition-colors text-[15px] resize-y"
+            className="w-full px-4 py-3 rounded-[var(--radius-md)] border border-rule bg-paper text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-section/30 focus:border-section transition-colors text-[15px] resize-y"
           />
         </div>
 

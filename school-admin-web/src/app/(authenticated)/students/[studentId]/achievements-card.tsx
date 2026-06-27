@@ -24,20 +24,20 @@ export function AchievementsCard({ studentId }: { studentId: string }) {
   return (
     <Card>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold text-charcoal">Achievements</h2>
+        <h2 className="text-lg font-bold text-ink">Achievements</h2>
         {data && data.length > 0 && (
-          <span className="text-sm text-text-secondary">{data.length} earned</span>
+          <span className="text-sm text-muted">{data.length} earned</span>
         )}
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-text-secondary">Loading…</p>
+        <p className="text-sm text-muted">Loading…</p>
       ) : (data ?? []).length === 0 ? (
         <div className="flex flex-col items-center justify-center py-6 text-center">
-          <span className="text-text-secondary/40 mb-2">
+          <span className="text-muted/40 mb-2">
             <Icon name="emoji_events" size={32} />
           </span>
-          <p className="text-sm text-text-secondary">No achievements earned yet.</p>
+          <p className="text-sm text-muted">No achievements earned yet.</p>
         </div>
       ) : (
         <div className="space-y-2.5">
@@ -48,7 +48,7 @@ export function AchievementsCard({ studentId }: { studentId: string }) {
                 <span className="text-2xl leading-none">{a.icon}</span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="font-semibold text-charcoal text-sm">{a.name}</p>
+                    <p className="font-semibold text-ink text-sm">{a.name}</p>
                     <span
                       style={{ backgroundColor: rarity.color }}
                       className="text-white text-[10px] font-semibold px-2 py-0.5 rounded-[var(--radius-pill)]"
@@ -56,7 +56,7 @@ export function AchievementsCard({ studentId }: { studentId: string }) {
                       {rarity.label}
                     </span>
                   </div>
-                  <p className="text-xs text-text-secondary">
+                  <p className="text-xs text-muted">
                     {a.description}
                     {a.earnedAt ? ` · ${formatDate(a.earnedAt)}` : ''}
                   </p>

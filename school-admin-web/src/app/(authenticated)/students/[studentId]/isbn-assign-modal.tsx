@@ -158,7 +158,7 @@ export function IsbnAssignModal({ open, onClose, studentId, studentName }: IsbnA
     >
       <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
         <div>
-          <label className="block text-sm font-semibold text-charcoal mb-1.5">Week</label>
+          <label className="block text-sm font-semibold text-ink mb-1.5">Week</label>
           <div className="flex flex-wrap gap-2">
             {WEEK_OPTIONS.map((w) => (
               <FilterChip
@@ -169,12 +169,12 @@ export function IsbnAssignModal({ open, onClose, studentId, studentName }: IsbnA
               />
             ))}
           </div>
-          <p className="text-xs text-text-secondary mt-1.5">{rangeLabel(monday)}</p>
+          <p className="text-xs text-muted mt-1.5">{rangeLabel(monday)}</p>
         </div>
 
         {/* Pick from the school library */}
         <div ref={searchRef} className="relative">
-          <label className="block text-sm font-semibold text-charcoal mb-1.5">From the school library</label>
+          <label className="block text-sm font-semibold text-ink mb-1.5">From the school library</label>
           <Input
             value={query}
             onChange={(e) => {
@@ -185,16 +185,16 @@ export function IsbnAssignModal({ open, onClose, studentId, studentName }: IsbnA
             placeholder="Search by title or author..."
           />
           {showDropdown && matches.length > 0 && (
-            <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-surface rounded-[var(--radius-md)] shadow-card-hover border border-divider max-h-48 overflow-y-auto">
+            <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-paper rounded-[var(--radius-md)] shadow-card-hover border border-rule max-h-48 overflow-y-auto">
               {matches.map((book) => (
                 <button
                   key={book.id}
                   type="button"
                   onClick={() => addBook({ title: book.title, isbn: book.isbn })}
-                  className="w-full text-left px-3 py-2 hover:bg-background transition-colors text-sm"
+                  className="w-full text-left px-3 py-2 hover:bg-cream transition-colors text-sm"
                 >
-                  <span className="font-semibold text-charcoal">{book.title}</span>
-                  {book.author && <span className="text-text-secondary ml-1">by {book.author}</span>}
+                  <span className="font-semibold text-ink">{book.title}</span>
+                  {book.author && <span className="text-muted ml-1">by {book.author}</span>}
                   {!book.isbn && <span className="text-error text-xs ml-1">· no ISBN</span>}
                 </button>
               ))}
@@ -206,7 +206,7 @@ export function IsbnAssignModal({ open, onClose, studentId, studentName }: IsbnA
                 <span
                   key={`${p.title}-${i}`}
                   className={`inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-[var(--radius-pill)] text-sm ${
-                    p.isbn ? 'bg-background text-charcoal' : 'bg-error/10 text-error'
+                    p.isbn ? 'bg-cream text-ink' : 'bg-error/10 text-error'
                   }`}
                 >
                   {p.title}
@@ -226,23 +226,23 @@ export function IsbnAssignModal({ open, onClose, studentId, studentName }: IsbnA
         </div>
 
         <div>
-          <label className="block text-sm font-semibold text-charcoal mb-1.5">Or enter ISBNs</label>
+          <label className="block text-sm font-semibold text-ink mb-1.5">Or enter ISBNs</label>
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
             rows={3}
             placeholder="Type or paste ISBNs — one per line, or separated by spaces/commas"
-            className="w-full px-4 py-3 rounded-[var(--radius-md)] border border-divider bg-surface text-charcoal placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-rose-pink/30 focus:border-rose-pink transition-colors text-[15px] resize-y font-mono"
+            className="w-full px-4 py-3 rounded-[var(--radius-md)] border border-rule bg-paper text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-section/30 focus:border-section transition-colors text-[15px] resize-y font-mono"
           />
-          <p className="text-xs text-text-secondary mt-1">ISBN-10 or ISBN-13. Titles are looked up automatically.</p>
+          <p className="text-xs text-muted mt-1">ISBN-10 or ISBN-13. Titles are looked up automatically.</p>
         </div>
 
         {result && (
-          <div className="space-y-1.5 text-sm rounded-[var(--radius-md)] bg-background p-3">
+          <div className="space-y-1.5 text-sm rounded-[var(--radius-md)] bg-cream p-3">
             {result.assigned.length > 0 && (
               <div>
-                <p className="font-semibold text-mint-green-dark">Assigned {result.assigned.length}:</p>
-                <ul className="list-disc ml-5 text-charcoal">
+                <p className="font-semibold text-lumi-green-dark">Assigned {result.assigned.length}:</p>
+                <ul className="list-disc ml-5 text-ink">
                   {result.assigned.map((a) => (
                     <li key={a.isbn}>{a.title}</li>
                   ))}
@@ -250,7 +250,7 @@ export function IsbnAssignModal({ open, onClose, studentId, studentName }: IsbnA
               </div>
             )}
             {result.duplicates.length > 0 && (
-              <p className="text-text-secondary">
+              <p className="text-muted">
                 {result.duplicates.length} already assigned this week — skipped.
               </p>
             )}

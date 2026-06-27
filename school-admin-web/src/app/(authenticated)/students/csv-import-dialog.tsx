@@ -170,11 +170,11 @@ export function CSVImportDialog({ open, onClose }: CSVImportDialogProps) {
     >
       {step === 'upload' && (
         <div className="text-center py-8">
-          <div className="flex justify-center mb-4 text-text-secondary/50"><Icon name="upload_file" size={48} /></div>
-          <p className="text-sm text-text-secondary mb-3">
+          <div className="flex justify-center mb-4 text-muted/50"><Icon name="upload_file" size={48} /></div>
+          <p className="text-sm text-muted mb-3">
             Upload a CSV file with columns: Student ID, First Name, Last Name, Class Name, DOB, Parent Email, Reading Level.
           </p>
-          <div className="bg-sky-blue/10 border border-sky-blue/20 rounded-[var(--radius-md)] px-4 py-3 mb-4 text-sm text-charcoal">
+          <div className="bg-lumi-blue/10 border border-lumi-blue/20 rounded-[var(--radius-md)] px-4 py-3 mb-4 text-sm text-ink">
             <p className="mb-1"><strong>Required columns:</strong> First Name, Last Name, Class Name</p>
             <p><strong>Reading Level</strong> is optional and can match any format your school uses (e.g. A-Z, PM Benchmark, colours, numbered levels).</p>
           </div>
@@ -204,7 +204,7 @@ export function CSVImportDialog({ open, onClose }: CSVImportDialogProps) {
                 a.click();
                 URL.revokeObjectURL(url);
               }}
-              className="text-sm text-rose-pink hover:underline font-semibold"
+              className="text-sm text-section hover:underline font-semibold"
             >
               Download CSV Template
             </button>
@@ -221,25 +221,25 @@ export function CSVImportDialog({ open, onClose }: CSVImportDialogProps) {
           <div className="overflow-x-auto max-h-80">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-divider">
-                  <th className="px-2 py-2 text-left text-xs text-text-secondary">#</th>
-                  <th className="px-2 py-2 text-left text-xs text-text-secondary">First Name</th>
-                  <th className="px-2 py-2 text-left text-xs text-text-secondary">Last Name</th>
-                  <th className="px-2 py-2 text-left text-xs text-text-secondary">Class</th>
-                  <th className="px-2 py-2 text-left text-xs text-text-secondary">ID</th>
-                  <th className="px-2 py-2 text-left text-xs text-text-secondary">Level</th>
-                  <th className="px-2 py-2 text-left text-xs text-text-secondary">Status</th>
+                <tr className="border-b border-rule">
+                  <th className="px-2 py-2 text-left text-xs text-muted">#</th>
+                  <th className="px-2 py-2 text-left text-xs text-muted">First Name</th>
+                  <th className="px-2 py-2 text-left text-xs text-muted">Last Name</th>
+                  <th className="px-2 py-2 text-left text-xs text-muted">Class</th>
+                  <th className="px-2 py-2 text-left text-xs text-muted">ID</th>
+                  <th className="px-2 py-2 text-left text-xs text-muted">Level</th>
+                  <th className="px-2 py-2 text-left text-xs text-muted">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {parsedRows.map((row, i) => (
-                  <tr key={i} className={`border-b border-divider/50 ${row.error ? 'bg-error/5' : ''}`}>
-                    <td className="px-2 py-1.5 text-text-secondary">{i + 1}</td>
+                  <tr key={i} className={`border-b border-rule/50 ${row.error ? 'bg-error/5' : ''}`}>
+                    <td className="px-2 py-1.5 text-muted">{i + 1}</td>
                     <td className="px-2 py-1.5">{row.firstName || <span className="text-error">missing</span>}</td>
                     <td className="px-2 py-1.5">{row.lastName || <span className="text-error">missing</span>}</td>
                     <td className="px-2 py-1.5">{row.className || <span className="text-error">missing</span>}</td>
-                    <td className="px-2 py-1.5 text-text-secondary">{row.studentId || '-'}</td>
-                    <td className="px-2 py-1.5 text-text-secondary">{row.readingLevel || '-'}</td>
+                    <td className="px-2 py-1.5 text-muted">{row.studentId || '-'}</td>
+                    <td className="px-2 py-1.5 text-muted">{row.readingLevel || '-'}</td>
                     <td className="px-2 py-1.5">
                       {row.error ? (
                         <Badge variant="error">{row.error}</Badge>
@@ -257,11 +257,11 @@ export function CSVImportDialog({ open, onClose }: CSVImportDialogProps) {
 
       {step === 'importing' && (
         <div className="text-center py-8">
-          <svg className="animate-spin mx-auto h-8 w-8 text-rose-pink mb-4" viewBox="0 0 24 24" fill="none">
+          <svg className="animate-spin mx-auto h-8 w-8 text-section mb-4" viewBox="0 0 24 24" fill="none">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          <p className="text-sm text-text-secondary">Importing students...</p>
+          <p className="text-sm text-muted">Importing students...</p>
         </div>
       )}
 
@@ -273,16 +273,16 @@ export function CSVImportDialog({ open, onClose }: CSVImportDialogProps) {
                 <Icon name="task_alt" size={56} />
               </span>
             ) : (
-              <span className="inline-flex items-center justify-center text-warm-orange"><Icon name="warning" size={56} /></span>
+              <span className="inline-flex items-center justify-center text-lumi-orange"><Icon name="warning" size={56} /></span>
             )}
           </div>
-          <h3 className="text-lg font-bold text-charcoal mb-2">Import Complete</h3>
+          <h3 className="text-lg font-bold text-ink mb-2">Import Complete</h3>
           <div className="flex justify-center gap-4 mb-4">
             <Badge variant="success">{result.successCount} imported</Badge>
             {result.errorCount > 0 && <Badge variant="error">{result.errorCount} failed</Badge>}
           </div>
           {result.createdClassNames.length > 0 && (
-            <p className="text-sm text-text-secondary mb-2">
+            <p className="text-sm text-muted mb-2">
               Created new classes: {result.createdClassNames.join(', ')}
             </p>
           )}
