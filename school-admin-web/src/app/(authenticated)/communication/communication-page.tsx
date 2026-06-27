@@ -116,7 +116,7 @@ export function CommunicationPage({ readOnly = false }: CommunicationPageProps) 
         type="checkbox"
         checked={allSelected}
         onChange={toggleAll}
-        className="w-4 h-4 rounded border-divider text-rose-pink focus:ring-rose-pink/30"
+        className="w-4 h-4 rounded border-rule text-section focus:ring-section/30"
       />
     ),
     accessorFn: (row) => row.id,
@@ -126,7 +126,7 @@ export function CommunicationPage({ readOnly = false }: CommunicationPageProps) 
         checked={selectedIds.has(row.id)}
         onChange={() => toggleSelect(row.id)}
         onClick={(e) => e.stopPropagation()}
-        className="w-4 h-4 rounded border-divider text-rose-pink focus:ring-rose-pink/30"
+        className="w-4 h-4 rounded border-rule text-section focus:ring-section/30"
       />
     ),
     className: 'w-10',
@@ -154,8 +154,8 @@ export function CommunicationPage({ readOnly = false }: CommunicationPageProps) 
       accessorFn: (row) => row.title,
       cell: (val, row) => (
         <div className="max-w-md">
-          <p className="font-semibold text-charcoal truncate">{val as string}</p>
-          <p className="text-sm text-text-secondary truncate">{row.body}</p>
+          <p className="font-semibold text-ink truncate">{val as string}</p>
+          <p className="text-sm text-muted truncate">{row.body}</p>
         </div>
       ),
       sortable: true,
@@ -164,7 +164,7 @@ export function CommunicationPage({ readOnly = false }: CommunicationPageProps) 
       id: 'audience',
       header: 'Audience',
       accessorFn: (row) => describeAudience(row),
-      cell: (val) => <span className="text-sm text-text-secondary">{val as string}</span>,
+      cell: (val) => <span className="text-sm text-muted">{val as string}</span>,
     },
     {
       id: 'type',
@@ -178,11 +178,11 @@ export function CommunicationPage({ readOnly = false }: CommunicationPageProps) 
       accessorFn: (row) => row.recipientCounts.parents,
       cell: (val, row) =>
         row.status === 'sent' || row.status === 'partial' ? (
-          <span className="text-sm text-text-secondary">
+          <span className="text-sm text-muted">
             {val as number} parent{(val as number) === 1 ? '' : 's'}
           </span>
         ) : (
-          <span className="text-text-secondary">—</span>
+          <span className="text-muted">—</span>
         ),
     },
     {
@@ -197,10 +197,10 @@ export function CommunicationPage({ readOnly = false }: CommunicationPageProps) 
               <Badge variant={meta.variant}>{meta.label}</Badge>
             </span>
             {row.status === 'scheduled' && row.scheduledFor && (
-              <span className="text-xs text-text-secondary">{formatDateTime(row.scheduledFor)}</span>
+              <span className="text-xs text-muted">{formatDateTime(row.scheduledFor)}</span>
             )}
             {row.errorSummary && row.status !== 'scheduled' && (
-              <span className="text-xs text-text-secondary max-w-[16rem] truncate" title={row.errorSummary}>
+              <span className="text-xs text-muted max-w-[16rem] truncate" title={row.errorSummary}>
                 {row.errorSummary}
               </span>
             )}
@@ -212,7 +212,7 @@ export function CommunicationPage({ readOnly = false }: CommunicationPageProps) 
       id: 'created',
       header: 'Created',
       accessorFn: (row) => row.createdAt,
-      cell: (val) => <span className="text-sm text-text-secondary">{formatDateTime(val as string)}</span>,
+      cell: (val) => <span className="text-sm text-muted">{formatDateTime(val as string)}</span>,
       sortable: true,
     },
     ...(readOnly ? [] : [actionsColumn]),
@@ -221,6 +221,7 @@ export function CommunicationPage({ readOnly = false }: CommunicationPageProps) 
   return (
     <div>
       <PageHeader
+        eyebrow="Communication"
         title="Communication"
         description="Send notifications to parents in your classes."
         action={
@@ -231,7 +232,7 @@ export function CommunicationPage({ readOnly = false }: CommunicationPageProps) 
       />
 
       {readOnly && (
-        <div className="mb-4 px-4 py-2.5 rounded-[var(--radius-md)] bg-soft-yellow/40 text-sm text-charcoal">
+        <div className="mb-4 px-4 py-2.5 rounded-[var(--radius-md)] bg-tint-yellow/60 text-sm text-ink">
           Sending is disabled while viewing this school in read-only mode.
         </div>
       )}
@@ -252,8 +253,8 @@ export function CommunicationPage({ readOnly = false }: CommunicationPageProps) 
       </div>
 
       {!readOnly && selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 mb-4 p-3 bg-rose-pink/5 rounded-[var(--radius-md)] border border-rose-pink/20">
-          <span className="text-sm font-semibold text-charcoal">{selectedIds.size} selected</span>
+        <div className="flex items-center gap-3 mb-4 p-3 bg-section/5 rounded-[var(--radius-md)] border border-section/20">
+          <span className="text-sm font-semibold text-ink">{selectedIds.size} selected</span>
           <Button
             size="sm"
             onClick={() => setArchived([...selectedIds], bulkArchiveValue)}
