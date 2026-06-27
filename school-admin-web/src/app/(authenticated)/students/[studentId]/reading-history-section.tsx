@@ -23,9 +23,9 @@ const STATUS_DOT: Record<string, string> = {
 type DateFilter = 'all' | 'week' | 'month';
 
 const DATE_FILTERS: { value: DateFilter; label: string }[] = [
-  { value: 'all', label: 'All time' },
   { value: 'week', label: 'Last 7 days' },
   { value: 'month', label: 'This month' },
+  { value: 'all', label: 'All time' },
 ];
 
 function formatDate(iso: string): string {
@@ -39,7 +39,9 @@ function formatDate(iso: string): string {
 export function ReadingHistorySection({ studentId }: { studentId: string }) {
   const { data: logs, isLoading } = useReadingLogs(studentId);
   const [mode, setMode] = useState<'logs' | 'books'>('logs');
-  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  // Default to the last 7 days — a prolific reader can have hundreds of logs,
+  // and showing them all buries the rest of the profile under endless scroll.
+  const [dateFilter, setDateFilter] = useState<DateFilter>('week');
   const [feelings, setFeelings] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
