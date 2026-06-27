@@ -52,13 +52,23 @@ export async function getReadingLogsForStudent(
   schoolId: string,
   studentId: string,
   viewerUid: string,
-  max = 200
+  opts?: { from?: Date; to?: Date; max?: number }
 ): Promise<ReadingLogRecord[]> {
-  const snap = await logsCol(schoolId)
+  // Ceiling generous enough that a full 2-year custom pull on a daily reader
+  // (~730 logs) isn't silently clipped at the older end (results are date desc).
+  const max = opts?.max ?? 1000;
+  // Hard floor: never surface logs older than 2 years. Older data is cleaned up
+  // manually, so the UI must not be able to seek/scroll into it regardless of
+  // what range the client asks for. Reuses the existing (studentId, date) index.
+  const floor = new Date();
+  floor.setFullYear(floor.getFullYear() - 2);
+  const from = opts?.from && opts.from.getTime() > floor.getTime() ? opts.from : floor;
+
+  let q: FirebaseFirestore.Query = logsCol(schoolId)
     .where('studentId', '==', studentId)
-    .orderBy('date', 'desc')
-    .limit(max)
-    .get();
+    .where('date', '>=', from);
+  if (opts?.to) q = q.where('date', '<=', opts.to);
+  const snap = await q.orderBy('date', 'desc').limit(max).get();
 
   return snap.docs.map((doc) => {
     const d = doc.data();

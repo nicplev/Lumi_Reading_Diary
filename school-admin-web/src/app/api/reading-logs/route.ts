@@ -24,8 +24,21 @@ export async function GET(request: NextRequest) {
   const studentId = searchParams.get('studentId');
   if (!studentId) return NextResponse.json({ error: 'studentId is required' }, { status: 400 });
 
+  // Optional date window. Invalid dates are ignored (treated as no bound) — the
+  // 2-year hard floor is enforced server-side in getReadingLogsForStudent.
+  const parseDate = (raw: string | null): Date | undefined => {
+    if (!raw) return undefined;
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? undefined : d;
+  };
+  const from = parseDate(searchParams.get('from'));
+  const to = parseDate(searchParams.get('to'));
+
   try {
-    const logs = await getReadingLogsForStudent(session.schoolId, studentId, session.uid);
+    const logs = await getReadingLogsForStudent(session.schoolId, studentId, session.uid, {
+      from,
+      to,
+    });
     return NextResponse.json(logs.map(serialize));
   } catch {
     return NextResponse.json({ error: 'Failed to fetch reading logs' }, { status: 500 });
