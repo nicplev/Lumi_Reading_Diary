@@ -68,6 +68,8 @@ export interface Student {
   parentIds: string[];
   dateOfBirth?: Date;
   profileImageUrl?: string;
+  /** Chosen Lumi character id (Firestore field + PNG stem); see lib/characters.ts. */
+  characterId?: string;
   isActive: boolean;
   createdAt: Date;
   enrolledAt?: Date;
