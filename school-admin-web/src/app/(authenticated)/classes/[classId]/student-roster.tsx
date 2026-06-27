@@ -15,12 +15,16 @@ import type { ReadingLevelOption } from '@/lib/types';
 interface StudentRosterProps {
   classId: string;
   levelOptions: ReadingLevelOption[];
+  /** When false (school has reading levels off), the level column and all
+   *  level-setting UI are hidden — the roster still lists students. */
+  levelsEnabled?: boolean;
 }
 
 type SortKey = 'name' | 'level' | 'streak';
 
-export function StudentRoster({ classId, levelOptions }: StudentRosterProps) {
+export function StudentRoster({ classId, levelOptions, levelsEnabled = true }: StudentRosterProps) {
   const router = useRouter();
+  const showLevels = levelsEnabled;
   const { toast } = useToast();
   const { data: students, isLoading } = useStudents({ classId });
   const bulkUpdate = useBulkUpdateLevel();
@@ -103,7 +107,7 @@ export function StudentRoster({ classId, levelOptions }: StudentRosterProps) {
         <Select
           options={[
             { value: 'name', label: 'Name A-Z' },
-            { value: 'level', label: 'Reading Level' },
+            ...(showLevels ? [{ value: 'level', label: 'Reading Level' }] : []),
             { value: 'streak', label: 'Streak' },
           ]}
           value={sortBy}
@@ -111,7 +115,7 @@ export function StudentRoster({ classId, levelOptions }: StudentRosterProps) {
         />
       </div>
 
-      {selectedIds.size > 0 && (
+      {showLevels && selectedIds.size > 0 && (
         <div className="flex items-center gap-3 mb-4 p-3 bg-rose-pink/5 rounded-[var(--radius-md)] border border-rose-pink/20">
           <span className="text-sm font-semibold text-charcoal">{selectedIds.size} selected</span>
           <Button size="sm" onClick={() => setShowBulkPicker(true)}>Set Level</Button>
@@ -142,17 +146,21 @@ export function StudentRoster({ classId, levelOptions }: StudentRosterProps) {
           <table className="w-full">
             <thead>
               <tr className="border-b border-divider">
-                <th className="px-4 py-3 w-10">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.size === filtered.length && filtered.length > 0}
-                    onChange={toggleAll}
-                    className="w-4 h-4 rounded border-divider text-rose-pink focus:ring-rose-pink/30"
-                  />
-                </th>
+                {showLevels && (
+                  <th className="px-4 py-3 w-10">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.size === filtered.length && filtered.length > 0}
+                      onChange={toggleAll}
+                      className="w-4 h-4 rounded border-divider text-rose-pink focus:ring-rose-pink/30"
+                    />
+                  </th>
+                )}
                 <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Student</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">ID</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Level</th>
+                {showLevels && (
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Level</th>
+                )}
                 <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Streak</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Last Read</th>
                 <th className="px-4 py-3 w-20"></th>
@@ -165,30 +173,38 @@ export function StudentRoster({ classId, levelOptions }: StudentRosterProps) {
                   className="border-b border-divider/50 last:border-b-0 hover:bg-background/50 transition-colors cursor-pointer"
                   onClick={() => router.push(`/students/${student.id}`)}
                 >
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(student.id)}
-                      onChange={() => toggleSelect(student.id)}
-                      className="w-4 h-4 rounded border-divider text-rose-pink focus:ring-rose-pink/30"
-                    />
-                  </td>
+                  {showLevels && (
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(student.id)}
+                        onChange={() => toggleSelect(student.id)}
+                        className="w-4 h-4 rounded border-divider text-rose-pink focus:ring-rose-pink/30"
+                      />
+                    </td>
+                  )}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <Avatar name={`${student.firstName} ${student.lastName}`} size="sm" />
+                      <Avatar
+                        name={`${student.firstName} ${student.lastName}`}
+                        characterId={student.characterId}
+                        size="sm"
+                      />
                       <span className="font-semibold text-sm text-charcoal">
                         {student.firstName} {student.lastName}
                       </span>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm text-text-secondary">{student.studentId || '-'}</td>
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                    <ReadingLevelPill
-                      level={student.currentReadingLevel}
-                      onClick={() => setLevelPickerStudentId(student.id)}
-                      size="sm"
-                    />
-                  </td>
+                  {showLevels && (
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <ReadingLevelPill
+                        level={student.currentReadingLevel}
+                        onClick={() => setLevelPickerStudentId(student.id)}
+                        size="sm"
+                      />
+                    </td>
+                  )}
                   <td className="px-4 py-3 text-sm text-charcoal">
                     {student.stats?.currentStreak ? `${student.stats.currentStreak} days` : '-'}
                   </td>
@@ -213,7 +229,7 @@ export function StudentRoster({ classId, levelOptions }: StudentRosterProps) {
         </div>
       )}
 
-      {levelPickerStudentId && (
+      {showLevels && levelPickerStudentId && (
         <SingleLevelPicker
           studentId={levelPickerStudentId}
           currentLevel={pickerStudent?.currentReadingLevel}
@@ -222,13 +238,15 @@ export function StudentRoster({ classId, levelOptions }: StudentRosterProps) {
         />
       )}
 
-      <ReadingLevelPicker
-        open={showBulkPicker}
-        onClose={() => setShowBulkPicker(false)}
-        levelOptions={levelOptions}
-        onSelect={handleBulkLevel}
-        loading={bulkUpdate.isPending}
-      />
+      {showLevels && (
+        <ReadingLevelPicker
+          open={showBulkPicker}
+          onClose={() => setShowBulkPicker(false)}
+          levelOptions={levelOptions}
+          onSelect={handleBulkLevel}
+          loading={bulkUpdate.isPending}
+        />
+      )}
     </div>
   );
 }

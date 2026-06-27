@@ -21,9 +21,12 @@ type ViewMode = 'list' | 'board';
 
 interface ClassesPageProps {
   teachers: { id: string; fullName: string }[];
+  /** Admins get the full List/Board management view; teachers (only reaching
+   *  this page when they have no class assigned) get a simple empty state. */
+  isAdmin: boolean;
 }
 
-export function ClassesPage({ teachers }: ClassesPageProps) {
+export function ClassesPage({ teachers, isAdmin }: ClassesPageProps) {
   const router = useRouter();
   const { toast } = useToast();
   const { data: classes, isLoading } = useClasses();
@@ -115,6 +118,19 @@ export function ClassesPage({ teachers }: ClassesPageProps) {
       toast(error instanceof Error ? error.message : 'Failed to delete class', 'error');
     }
   };
+
+  if (!isAdmin) {
+    return (
+      <div>
+        <PageHeader title="Class" description="Your assigned class" />
+        <EmptyState
+          icon={<Icon name="school" size={40} />}
+          title="No class assigned yet"
+          description="Your school admin will assign you to a class. Check back soon."
+        />
+      </div>
+    );
+  }
 
   return (
     <div>
