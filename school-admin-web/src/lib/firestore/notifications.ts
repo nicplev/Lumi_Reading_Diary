@@ -34,23 +34,42 @@ function toCampaign(doc: FirebaseFirestore.DocumentSnapshot): NotificationCampai
 }
 
 /**
- * Reads campaign history. Teachers see only their own (filtered by `createdBy`),
- * matching the app's `watchCampaigns` query — the composite index
- * (createdBy ASC, createdAt DESC) already exists in firestore.indexes.json.
+ * Reads campaign history.
+ * - Teachers (`createdBy`) see only their own, via the existing composite index
+ *   (createdBy ASC, createdAt DESC) — matches the app's `watchCampaigns` query.
+ * - Admins (`createdByRole`) see only admin-sent messages; teacher-sent ones
+ *   stay in each teacher's own history. There's no (createdByRole, createdAt)
+ *   index and we avoid adding one (portal convention reuses the app backend with
+ *   no new indexes), so the role filter runs in memory over a padded recent
+ *   window so admin messages aren't crowded out by teacher traffic.
  */
 export async function getNotificationCampaigns(
   schoolId: string,
-  options?: { createdBy?: string; max?: number }
+  options?: { createdBy?: string; createdByRole?: string; max?: number }
 ): Promise<NotificationCampaign[]> {
   const base = adminDb
     .collection('schools')
     .doc(schoolId)
     .collection('notificationCampaigns');
+  const max = options?.max ?? 100;
 
-  const query: FirebaseFirestore.Query = options?.createdBy
-    ? base.where('createdBy', '==', options.createdBy).orderBy('createdAt', 'desc')
-    : base.orderBy('createdAt', 'desc');
+  if (options?.createdBy) {
+    const snap = await base
+      .where('createdBy', '==', options.createdBy)
+      .orderBy('createdAt', 'desc')
+      .limit(max)
+      .get();
+    return snap.docs.map(toCampaign);
+  }
 
-  const snap = await query.limit(options?.max ?? 100).get();
+  if (options?.createdByRole) {
+    const snap = await base.orderBy('createdAt', 'desc').limit(Math.max(max, 300)).get();
+    return snap.docs
+      .map(toCampaign)
+      .filter((c) => c.createdByRole === options.createdByRole)
+      .slice(0, max);
+  }
+
+  const snap = await base.orderBy('createdAt', 'desc').limit(max).get();
   return snap.docs.map(toCampaign);
 }

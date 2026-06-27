@@ -11,7 +11,10 @@ export async function GET() {
 
   try {
     const campaigns = await getNotificationCampaigns(session.schoolId, {
+      // Teachers: own messages only. Admins: admin-sent only (teacher messages
+      // stay in each teacher's own history).
       createdBy: session.role === 'teacher' ? session.uid : undefined,
+      createdByRole: session.role === 'schoolAdmin' ? 'schoolAdmin' : undefined,
     });
     return NextResponse.json(
       campaigns.map((c) => ({
