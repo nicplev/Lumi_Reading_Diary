@@ -7,6 +7,7 @@ export { ACTIVE_SUBSCRIPTION_STATUSES, isActiveSubscriptionStatus, SUBSCRIPTION_
 export type { SchoolClass } from './class';
 export type { Book } from './book';
 export type { Allocation, AllocationBookItem, AllocationCadence, AllocationType, StudentAllocationOverride } from './allocation';
+export type { LibraryAssignmentSnapshot, LibraryAssigneeStudent, LibraryAssignmentViewer } from './library-assignment';
 export type { ReadingLog, ReadingStatus } from './reading-log';
 export type { ReadingLevelEvent, ReadingLevelOption, ReadingGroup, ReadingGroupStat } from './reading-level';
 export type { StudentLinkCode, LinkCodeStatus, LinkCodeIntent } from './link-code';
