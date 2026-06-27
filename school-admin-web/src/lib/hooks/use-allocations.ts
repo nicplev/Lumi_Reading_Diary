@@ -105,14 +105,14 @@ export function useUpdateAllocation() {
   });
 }
 
-export function useDeactivateAllocation() {
+export function useDeleteAllocation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (allocationId: string) => {
       const res = await fetch(`/api/allocations/${allocationId}`, { method: 'DELETE' });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Failed to deactivate allocation');
+        throw new Error(err.error || 'Failed to delete allocation');
       }
       return res.json();
     },

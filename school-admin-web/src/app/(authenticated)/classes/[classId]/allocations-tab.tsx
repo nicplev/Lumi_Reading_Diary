@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/lumi/button';
 import { Badge } from '@/components/lumi/badge';
 import { EmptyState } from '@/components/lumi/empty-state';
 import { Icon } from '@/components/lumi/icon';
 import { DataTable, type DataTableColumn } from '@/components/lumi/data-table';
 import { useToast } from '@/components/lumi/toast';
-import { useAllocations, useDeactivateAllocation } from '@/lib/hooks/use-allocations';
+import { useAllocations, useDeleteAllocation } from '@/lib/hooks/use-allocations';
+import { useStudents } from '@/lib/hooks/use-students';
 import { ConfirmDialog } from '@/components/lumi/confirm-dialog';
 import { AllocationFormModal } from './allocation-form-modal';
 import { AllocationDetail } from './allocation-detail';
@@ -36,21 +37,35 @@ const cadenceLabels: Record<string, string> = {
 export function AllocationsTab({ classId, levelOptions }: AllocationsTabProps) {
   const { toast } = useToast();
   const { data: allocations, isLoading } = useAllocations({ classId });
-  const deactivate = useDeactivateAllocation();
+  const { data: students } = useStudents({ classId });
+  const deleteAllocation = useDeleteAllocation();
 
   const [showCreate, setShowCreate] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [deactivateConfirm, setDeactivateConfirm] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const detailRef = useRef<HTMLDivElement>(null);
 
-  const handleDeactivate = async () => {
-    if (!deactivateConfirm) return;
-    try {
-      await deactivate.mutateAsync(deactivateConfirm);
-      toast('Allocation deactivated', 'success');
-    } catch (error) {
-      toast(error instanceof Error ? error.message : 'Failed to deactivate', 'error');
+  const expandedAllocation = expandedId
+    ? allocations?.find((a) => a.id === expandedId)
+    : undefined;
+
+  // The detail panel renders at the top of the tab; bring it into view on open.
+  useEffect(() => {
+    if (expandedAllocation) {
+      detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
-    setDeactivateConfirm(null);
+  }, [expandedAllocation]);
+
+  const handleDelete = async () => {
+    if (!deleteConfirm) return;
+    try {
+      await deleteAllocation.mutateAsync(deleteConfirm);
+      if (expandedId === deleteConfirm) setExpandedId(null);
+      toast('Allocation deleted', 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to delete', 'error');
+    }
+    setDeleteConfirm(null);
   };
 
   const columns: DataTableColumn<SerializedAllocation>[] = [
@@ -78,6 +93,19 @@ export function AllocationsTab({ classId, levelOptions }: AllocationsTabProps) {
         const end = new Date(row.endDate).toLocaleDateString();
         return <span className="text-xs">{start} - {end}</span>;
       },
+    },
+    {
+      id: 'assignedTo',
+      header: 'Assigned To',
+      accessorFn: (row) => row.studentIds.length,
+      cell: (_, row) =>
+        row.studentIds.length === 0 ? (
+          <span className="text-sm">Whole class</span>
+        ) : (
+          <span className="text-sm">
+            {row.studentIds.length} student{row.studentIds.length === 1 ? '' : 's'}
+          </span>
+        ),
     },
     {
       id: 'books',
@@ -115,16 +143,14 @@ export function AllocationsTab({ classId, levelOptions }: AllocationsTabProps) {
           >
             {expandedId === row.id ? 'Close' : 'Details'}
           </Button>
-          {row.isActive && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setDeactivateConfirm(row.id)}
-              className="text-error hover:text-error"
-            >
-              Deactivate
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setDeleteConfirm(row.id)}
+            className="text-error hover:text-error"
+          >
+            Delete
+          </Button>
         </div>
       ),
       className: 'text-right',
@@ -139,6 +165,16 @@ export function AllocationsTab({ classId, levelOptions }: AllocationsTabProps) {
           Create Allocation
         </Button>
       </div>
+
+      {expandedAllocation && (
+        <div ref={detailRef} className="mb-4 scroll-mt-4">
+          <AllocationDetail
+            allocation={expandedAllocation}
+            students={students}
+            onClose={() => setExpandedId(null)}
+          />
+        </div>
+      )}
 
       <DataTable
         columns={columns}
@@ -155,15 +191,6 @@ export function AllocationsTab({ classId, levelOptions }: AllocationsTabProps) {
         }
       />
 
-      {expandedId && allocations && (
-        <div className="mt-4">
-          <AllocationDetail
-            allocation={allocations.find((a) => a.id === expandedId)!}
-            onClose={() => setExpandedId(null)}
-          />
-        </div>
-      )}
-
       <AllocationFormModal
         open={showCreate}
         onClose={() => setShowCreate(false)}
@@ -172,14 +199,14 @@ export function AllocationsTab({ classId, levelOptions }: AllocationsTabProps) {
       />
 
       <ConfirmDialog
-        open={!!deactivateConfirm}
-        onClose={() => setDeactivateConfirm(null)}
-        onConfirm={handleDeactivate}
-        title="Deactivate Allocation"
-        description="This allocation will be marked as inactive. Students will no longer see these assignments."
-        confirmLabel="Deactivate"
+        open={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={handleDelete}
+        title="Delete Allocation"
+        description="This permanently deletes the allocation — students will no longer see these assignments. This can't be undone."
+        confirmLabel="Delete"
         variant="danger"
-        loading={deactivate.isPending}
+        loading={deleteAllocation.isPending}
       />
     </div>
   );

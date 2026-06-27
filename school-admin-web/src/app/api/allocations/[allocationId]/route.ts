@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
-import { getAllocation, updateAllocation, deactivateAllocation } from '@/lib/firestore/allocations';
+import { getAllocation, updateAllocation, deleteAllocation } from '@/lib/firestore/allocations';
 import { z } from 'zod';
 
 function serializeAllocation(a: Record<string, unknown>) {
@@ -64,9 +64,9 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
 
   const { allocationId } = await params;
   try {
-    await deactivateAllocation(session.schoolId, allocationId);
+    await deleteAllocation(session.schoolId, allocationId);
     return NextResponse.json({ success: true });
   } catch {
-    return NextResponse.json({ error: 'Failed to deactivate allocation' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to delete allocation' }, { status: 500 });
   }
 }

@@ -195,6 +195,16 @@ export async function deactivateAllocation(schoolId: string, allocationId: strin
     .update({ isActive: false });
 }
 
+/** Permanently removes an allocation document (hard delete). */
+export async function deleteAllocation(schoolId: string, allocationId: string): Promise<void> {
+  await adminDb
+    .collection('schools')
+    .doc(schoolId)
+    .collection('allocations')
+    .doc(allocationId)
+    .delete();
+}
+
 export async function addBookToAllocation(
   schoolId: string,
   allocationId: string,
