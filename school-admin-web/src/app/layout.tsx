@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Nunito } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
+import { getSession } from '@/lib/auth/session';
 
 const nunito = Nunito({
   subsets: ['latin'],
@@ -14,7 +15,20 @@ export const metadata: Metadata = {
   description: 'School administration portal for Lumi Reading Tracker',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Seed the client auth context with the server session so the profile chip and
+  // role-gated nav render correctly on first paint (no "Loading…" flash/stall).
+  const session = await getSession();
+  const initialUser = session
+    ? {
+        uid: session.uid,
+        email: session.email,
+        schoolId: session.schoolId,
+        role: session.role,
+        fullName: session.fullName,
+      }
+    : null;
+
   return (
     <html lang="en" className={nunito.variable} suppressHydrationWarning>
       <head>
@@ -33,7 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="font-[family-name:var(--font-family-nunito)] antialiased" suppressHydrationWarning>
-        <Providers>{children}</Providers>
+        <Providers initialUser={initialUser}>{children}</Providers>
       </body>
     </html>
   );

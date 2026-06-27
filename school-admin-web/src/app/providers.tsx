@@ -2,10 +2,16 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
-import { AuthProvider } from '@/lib/auth/auth-context';
+import { AuthProvider, type AuthUser } from '@/lib/auth/auth-context';
 import { ToastProvider } from '@/components/lumi/toast';
 
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({
+  children,
+  initialUser,
+}: {
+  children: React.ReactNode;
+  initialUser?: AuthUser | null;
+}) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -20,7 +26,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
+      <AuthProvider initialUser={initialUser}>
         <ToastProvider>
           {children}
         </ToastProvider>
