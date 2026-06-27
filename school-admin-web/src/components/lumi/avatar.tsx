@@ -50,15 +50,16 @@ export function Avatar({ name, imageUrl, characterId, size = 'md', className = '
     );
   }
 
-  // Character art (transparent flame/animal) — contain, not cover, on a faint
-  // circular backdrop so it reads as an avatar. Mirrors the app's StudentAvatar.
+  // Character art is a full-bleed illustration — show it contained with NO
+  // circular clip so it's never cropped (mirrors the app's StudentAvatar, which
+  // renders the character at size with BoxFit.contain and no circle).
   const charSrc = characterImageSrc(characterId);
   if (charSrc) {
     return (
       <img
         src={charSrc}
         alt={name}
-        className={`${sizeClasses[size]} rounded-full object-contain bg-black/5 ${className}`}
+        className={`${sizeClasses[size]} object-contain ${className}`}
       />
     );
   }
