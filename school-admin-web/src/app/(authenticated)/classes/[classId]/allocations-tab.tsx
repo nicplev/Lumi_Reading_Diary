@@ -5,6 +5,7 @@ import { Button } from '@/components/lumi/button';
 import { Badge } from '@/components/lumi/badge';
 import { EmptyState } from '@/components/lumi/empty-state';
 import { Icon } from '@/components/lumi/icon';
+import { FilterChip } from '@/components/lumi/filter-chip';
 import { DataTable, type DataTableColumn } from '@/components/lumi/data-table';
 import { useToast } from '@/components/lumi/toast';
 import { useAllocations, useDeleteAllocation } from '@/lib/hooks/use-allocations';
@@ -43,11 +44,24 @@ export function AllocationsTab({ classId, levelOptions }: AllocationsTabProps) {
   const [showCreate, setShowCreate] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'current' | 'expired' | 'all'>('current');
   const detailRef = useRef<HTMLDivElement>(null);
 
   const expandedAllocation = expandedId
     ? allocations?.find((a) => a.id === expandedId)
     : undefined;
+
+  // Hide expired allocations by default (endDate < now); newest first. Teachers
+  // can switch to Expired/All to find old ones. The Date Range header re-sorts.
+  const visibleAllocations = useMemo(() => {
+    const nowIso = new Date().toISOString();
+    const list = (allocations ?? []).filter((a) => {
+      if (statusFilter === 'all') return true;
+      const expired = a.endDate < nowIso;
+      return statusFilter === 'expired' ? expired : !expired;
+    });
+    return [...list].sort((a, b) => b.startDate.localeCompare(a.startDate));
+  }, [allocations, statusFilter]);
 
   // The detail panel renders at the top of the tab; bring it into view on open.
   useEffect(() => {
@@ -93,6 +107,7 @@ export function AllocationsTab({ classId, levelOptions }: AllocationsTabProps) {
         const end = new Date(row.endDate).toLocaleDateString();
         return <span className="text-xs">{start} - {end}</span>;
       },
+      sortable: true,
     },
     {
       id: 'assignedTo',
@@ -166,6 +181,21 @@ export function AllocationsTab({ classId, levelOptions }: AllocationsTabProps) {
         </Button>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        {([
+          { value: 'current', label: 'Current' },
+          { value: 'expired', label: 'Expired' },
+          { value: 'all', label: 'All' },
+        ] as const).map((opt) => (
+          <FilterChip
+            key={opt.value}
+            label={opt.label}
+            selected={statusFilter === opt.value}
+            onClick={() => setStatusFilter(opt.value)}
+          />
+        ))}
+      </div>
+
       {expandedAllocation && (
         <div ref={detailRef} className="mb-4 scroll-mt-4">
           <AllocationDetail
@@ -178,16 +208,24 @@ export function AllocationsTab({ classId, levelOptions }: AllocationsTabProps) {
 
       <DataTable
         columns={columns}
-        data={allocations ?? []}
+        data={visibleAllocations}
         loading={isLoading}
         onRowClick={(row) => setExpandedId(expandedId === row.id ? null : row.id)}
         emptyState={
-          <EmptyState
-            icon={<Icon name="inventory_2" size={40} />}
-            title="No allocations"
-            description="Create an allocation to assign books to this class."
-            action={<Button onClick={() => setShowCreate(true)}>Create Allocation</Button>}
-          />
+          (allocations?.length ?? 0) > 0 ? (
+            <EmptyState
+              icon={<Icon name="inventory_2" size={40} />}
+              title="No allocations match this filter"
+              description="Switch to Expired or All to see older allocations."
+            />
+          ) : (
+            <EmptyState
+              icon={<Icon name="inventory_2" size={40} />}
+              title="No allocations"
+              description="Create an allocation to assign books to this class."
+              action={<Button onClick={() => setShowCreate(true)}>Create Allocation</Button>}
+            />
+          )
         }
       />
 
