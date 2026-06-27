@@ -105,7 +105,7 @@ export function BookFormModal({ open, onClose, book, levelOptions }: BookFormMod
         <div className="space-y-4">
           {coverImageUrl && (
             <div className="flex justify-center">
-              <div className="w-28 h-36 rounded-[var(--radius-md)] bg-background overflow-hidden shadow-card">
+              <div className="w-28 h-36 rounded-[var(--radius-md)] bg-cream overflow-hidden shadow-card">
                 <img src={coverImageUrl} alt={book.title} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               </div>
             </div>
@@ -113,18 +113,18 @@ export function BookFormModal({ open, onClose, book, levelOptions }: BookFormMod
           <div className="space-y-3">
             {author && (
               <div>
-                <p className="text-xs font-semibold text-text-secondary">Author</p>
-                <p className="text-sm text-charcoal">{author}</p>
+                <p className="text-xs font-semibold text-muted">Author</p>
+                <p className="text-sm text-ink">{author}</p>
               </div>
             )}
             {isbn && (
               <div>
-                <p className="text-xs font-semibold text-text-secondary">ISBN</p>
-                <p className="text-sm text-charcoal font-mono">{isbn}</p>
+                <p className="text-xs font-semibold text-muted">ISBN</p>
+                <p className="text-sm text-ink font-mono">{isbn}</p>
               </div>
             )}
             <div>
-              <p className="text-xs font-semibold text-text-secondary">Reading Level</p>
+              <p className="text-xs font-semibold text-muted">Reading Level</p>
               {readingLevel ? (
                 <ReadingLevelPill level={readingLevel} size="sm" />
               ) : (
@@ -132,7 +132,7 @@ export function BookFormModal({ open, onClose, book, levelOptions }: BookFormMod
               )}
             </div>
           </div>
-          <div className="pt-4 border-t border-divider">
+          <div className="pt-4 border-t border-rule">
             <BookAssignees book={{ id: book.id, isbn: book.isbn, title: book.title }} />
           </div>
         </div>
@@ -222,7 +222,7 @@ export function BookFormModal({ open, onClose, book, levelOptions }: BookFormMod
 
         {coverImageUrl && (
           <div className="flex justify-center">
-            <div className="w-24 h-32 rounded bg-background overflow-hidden">
+            <div className="w-24 h-32 rounded bg-cream overflow-hidden">
               <img
                 src={coverImageUrl}
                 alt="Cover preview"

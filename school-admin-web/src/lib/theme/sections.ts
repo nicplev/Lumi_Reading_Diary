@@ -16,8 +16,11 @@ export type LumiSectionKey = 'dashboard' | 'class' | 'library' | 'settings';
 
 export interface LumiSectionTheme {
   key: LumiSectionKey;
-  /** Accent hex — headers, primary CTAs, active nav. */
+  /** Accent hex — fills, borders, active nav. */
   accent: string;
+  /** Darker, readable-on-cream variant for accent *text* (eyebrows, links,
+   *  sort arrows). The bright accent (esp. yellow) fails contrast on cream. */
+  accentStrong: string;
   /** Soft fill for selected states + badges. */
   accentTint: string;
   /** Readable foreground on a filled accent surface. */
@@ -30,6 +33,7 @@ export const SECTIONS: Record<LumiSectionKey, LumiSectionTheme> = {
   dashboard: {
     key: 'dashboard',
     accent: '#56C8E6',
+    accentStrong: '#2A9FC4',
     accentTint: '#C8E8F1',
     onAccent: '#1A1A1A', // blue is light — ink reads better than white
     label: 'Insights',
@@ -37,6 +41,7 @@ export const SECTIONS: Record<LumiSectionKey, LumiSectionTheme> = {
   class: {
     key: 'class',
     accent: '#EC4544',
+    accentStrong: '#D63A39',
     accentTint: '#F4B5B7',
     onAccent: '#FFFFFF',
     label: 'Class',
@@ -44,6 +49,7 @@ export const SECTIONS: Record<LumiSectionKey, LumiSectionTheme> = {
   library: {
     key: 'library',
     accent: '#FFCB05',
+    accentStrong: '#A87900', // dark gold — readable on cream
     accentTint: '#FBE89F',
     onAccent: '#1A1A1A', // yellow is light — always ink
     label: 'Library',
@@ -51,6 +57,7 @@ export const SECTIONS: Record<LumiSectionKey, LumiSectionTheme> = {
   settings: {
     key: 'settings',
     accent: '#51BA65',
+    accentStrong: '#429654',
     accentTint: '#B5DAB8',
     onAccent: '#FFFFFF',
     label: 'Settings',
@@ -84,6 +91,7 @@ export function sectionForPath(pathname: string): LumiSectionTheme {
 export function sectionVars(theme: LumiSectionTheme): React.CSSProperties {
   return {
     '--section-accent': theme.accent,
+    '--section-accent-strong': theme.accentStrong,
     '--section-accent-tint': theme.accentTint,
     '--section-on-accent': theme.onAccent,
   } as React.CSSProperties;

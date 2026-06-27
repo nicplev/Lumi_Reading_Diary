@@ -12,7 +12,7 @@ export function PageHeader({ title, description, action, eyebrow }: PageHeaderPr
     <div className="flex items-start justify-between mb-6 gap-4">
       <div className="min-w-0">
         {eyebrow && (
-          <p className="text-[11px] font-bold tracking-[0.12em] uppercase text-section mb-1.5">
+          <p className="text-[11px] font-bold tracking-[0.12em] uppercase text-section-strong mb-1.5">
             {eyebrow}
           </p>
         )}

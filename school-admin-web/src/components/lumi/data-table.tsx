@@ -128,8 +128,8 @@ export function DataTable<T>({
                     >
                       <span className="inline-flex items-center gap-1">
                         {flexRender(header.column.columnDef.header, header.getContext())}
-                        {header.column.getIsSorted() === 'asc' && <span className="text-section">↑</span>}
-                        {header.column.getIsSorted() === 'desc' && <span className="text-section">↓</span>}
+                        {header.column.getIsSorted() === 'asc' && <span className="text-section-strong">↑</span>}
+                        {header.column.getIsSorted() === 'desc' && <span className="text-section-strong">↓</span>}
                       </span>
                     </th>
                   ))
