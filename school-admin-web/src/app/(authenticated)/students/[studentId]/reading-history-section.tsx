@@ -15,10 +15,10 @@ import { LogMedia } from './log-media';
 import { useReadingLogs } from '@/lib/hooks/use-reading-logs';
 
 const STATUS_DOT: Record<string, string> = {
-  completed: 'bg-mint-green',
-  partial: 'bg-soft-yellow',
+  completed: 'bg-lumi-green',
+  partial: 'bg-lumi-yellow',
   skipped: 'bg-error',
-  pending: 'bg-divider',
+  pending: 'bg-rule',
 };
 
 type Preset = '7d' | '60d' | 'custom';
@@ -140,11 +140,11 @@ export function ReadingHistorySection({ studentId }: { studentId: string }) {
     <div className="mt-6">
       <Card>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-charcoal">Reading History</h2>
+          <h2 className="text-lg font-bold text-ink">Reading History</h2>
           {isFetching && !isLoading ? (
-            <span className="text-sm text-text-secondary">Updating…</span>
+            <span className="text-sm text-muted">Updating…</span>
           ) : logs && logs.length > 0 ? (
-            <span className="text-sm text-text-secondary">
+            <span className="text-sm text-muted">
               {logs.length} session{logs.length === 1 ? '' : 's'}
             </span>
           ) : null}
@@ -166,9 +166,9 @@ export function ReadingHistorySection({ studentId }: { studentId: string }) {
             <FilterChip label="Custom range" selected={preset === 'custom'} onClick={() => setPreset('custom')} />
           </div>
           {preset === 'custom' && (
-            <div className="rounded-[var(--radius-md)] border border-divider bg-background p-3 flex flex-col gap-3">
+            <div className="rounded-[var(--radius-md)] border border-rule bg-cream p-3 flex flex-col gap-3">
               <div className="flex flex-wrap items-end gap-3">
-                <label className="flex flex-col gap-1 text-xs font-medium text-text-secondary">
+                <label className="flex flex-col gap-1 text-xs font-medium text-muted">
                   From
                   <input
                     type="date"
@@ -176,10 +176,10 @@ export function ReadingHistorySection({ studentId }: { studentId: string }) {
                     min={minInput}
                     max={customTo || todayInput}
                     onChange={(e) => setCustomFrom(e.target.value)}
-                    className="rounded-[var(--radius-sm)] border border-divider bg-surface px-2.5 py-1.5 text-sm text-charcoal"
+                    className="rounded-[var(--radius-sm)] border border-rule bg-paper px-2.5 py-1.5 text-sm text-ink"
                   />
                 </label>
-                <label className="flex flex-col gap-1 text-xs font-medium text-text-secondary">
+                <label className="flex flex-col gap-1 text-xs font-medium text-muted">
                   To
                   <input
                     type="date"
@@ -187,14 +187,14 @@ export function ReadingHistorySection({ studentId }: { studentId: string }) {
                     min={customFrom || minInput}
                     max={todayInput}
                     onChange={(e) => setCustomTo(e.target.value)}
-                    className="rounded-[var(--radius-sm)] border border-divider bg-surface px-2.5 py-1.5 text-sm text-charcoal"
+                    className="rounded-[var(--radius-sm)] border border-rule bg-paper px-2.5 py-1.5 text-sm text-ink"
                   />
                 </label>
                 <Button variant="outline" onClick={applyCustom} disabled={!canApplyCustom}>
                   Load
                 </Button>
               </div>
-              <p className="text-xs text-text-secondary">
+              <p className="text-xs text-muted">
                 Pick any range within the last 2 years. Reading history older than 2 years isn’t kept.
               </p>
             </div>
@@ -218,7 +218,7 @@ export function ReadingHistorySection({ studentId }: { studentId: string }) {
         </div>
 
         {isLoading ? (
-          <p className="text-sm text-text-secondary py-6 text-center">Loading reading history…</p>
+          <p className="text-sm text-muted py-6 text-center">Loading reading history…</p>
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={<Icon name="menu_book" size={40} />}
@@ -230,7 +230,7 @@ export function ReadingHistorySection({ studentId }: { studentId: string }) {
             }
           />
         ) : mode === 'logs' ? (
-          <ul className="divide-y divide-divider">
+          <ul className="divide-y divide-rule">
             {filtered.map((log) => {
               const isExpanded = expandedId === log.id;
               return (
@@ -242,13 +242,13 @@ export function ReadingHistorySection({ studentId }: { studentId: string }) {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3">
                         <span
-                          className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[log.status] ?? 'bg-divider'}`}
+                          className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[log.status] ?? 'bg-rule'}`}
                         />
                         <div>
-                          <p className="font-semibold text-charcoal">
+                          <p className="font-semibold text-ink">
                             {log.bookTitles.join(', ') || 'Reading'}
                           </p>
-                          <p className="text-xs text-text-secondary">
+                          <p className="text-xs text-muted">
                             {formatDate(log.date)} · {log.minutesRead} min
                             {log.loggedByRole === 'teacher' && log.loggedByLabel
                               ? ` · ${log.loggedByLabel}`
@@ -259,12 +259,12 @@ export function ReadingHistorySection({ studentId }: { studentId: string }) {
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {log.childFeeling && <FeelingBlob feeling={log.childFeeling} size={18} />}
                         {log.hasComprehensionAudio && (
-                          <Icon name="mic" size={16} className="text-text-secondary" />
+                          <Icon name="mic" size={16} className="text-muted" />
                         )}
                         <span className="relative inline-flex items-center">
-                          <Icon name="chat_bubble" size={16} className="text-text-secondary" />
+                          <Icon name="chat_bubble" size={16} className="text-muted" />
                           {log.hasUnread && (
-                            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-mint-green" />
+                            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-lumi-green" />
                           )}
                         </span>
                       </div>
@@ -285,11 +285,11 @@ export function ReadingHistorySection({ studentId }: { studentId: string }) {
             })}
           </ul>
         ) : (
-          <ul className="divide-y divide-divider">
+          <ul className="divide-y divide-rule">
             {bookSummary.map((b) => (
               <li key={b.title} className="py-3 flex items-center justify-between gap-3">
-                <span className="font-semibold text-charcoal">{b.title}</span>
-                <span className="text-xs text-text-secondary whitespace-nowrap">
+                <span className="font-semibold text-ink">{b.title}</span>
+                <span className="text-xs text-muted whitespace-nowrap">
                   {b.sessions} session{b.sessions === 1 ? '' : 's'} · {b.minutes} min
                 </span>
               </li>

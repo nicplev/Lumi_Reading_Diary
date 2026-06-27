@@ -26,12 +26,12 @@ export function LogMedia({
 
   return (
     <div className="mt-3">
-      <div className="rounded-[var(--radius-md)] bg-background p-3">
+      <div className="rounded-[var(--radius-md)] bg-cream p-3">
         <div className="flex items-center gap-2 mb-2">
-          <Icon name="mic" size={16} className="text-rose-pink" />
-          <span className="text-xs font-semibold text-charcoal">Comprehension answer</span>
+          <Icon name="mic" size={16} className="text-section" />
+          <span className="text-xs font-semibold text-ink">Comprehension answer</span>
           {durationSec ? (
-            <span className="text-xs text-text-secondary">{formatDuration(durationSec)}</span>
+            <span className="text-xs text-muted">{formatDuration(durationSec)}</span>
           ) : null}
         </div>
         <audio controls preload="none" src={`/api/reading-logs/${logId}/audio`} className="w-full h-9">

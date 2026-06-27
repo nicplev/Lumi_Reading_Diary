@@ -56,17 +56,17 @@ export function StudentDetail({ studentId, classId, levelOptions, levelsEnabled 
     return (
       <div className="animate-pulse space-y-6">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 bg-divider/60 rounded-full" />
+          <div className="w-14 h-14 bg-rule/60 rounded-full" />
           <div className="space-y-2">
-            <div className="h-6 bg-divider/60 rounded w-40" />
-            <div className="h-4 bg-divider/60 rounded w-24" />
+            <div className="h-6 bg-rule/60 rounded w-40" />
+            <div className="h-4 bg-rule/60 rounded w-24" />
           </div>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-surface rounded-[var(--radius-lg)] shadow-card p-5">
-              <div className="h-4 bg-divider/60 rounded w-24 mb-3" />
-              <div className="h-8 bg-divider/60 rounded w-16" />
+            <div key={i} className="bg-paper rounded-[var(--radius-lg)] shadow-card p-5">
+              <div className="h-4 bg-rule/60 rounded w-24 mb-3" />
+              <div className="h-8 bg-rule/60 rounded w-16" />
             </div>
           ))}
         </div>
@@ -99,9 +99,10 @@ export function StudentDetail({ studentId, classId, levelOptions, levelsEnabled 
       <div className="flex items-start gap-4 mb-6">
         <Avatar name={fullName} size="lg" />
         <div className="flex-1">
-          <h1 className="text-[28px] font-bold text-charcoal">{fullName}</h1>
+          <p className="text-[11px] font-bold tracking-[0.12em] uppercase text-section mb-1">Student</p>
+          <h1 className="font-display text-[28px] font-extrabold tracking-tight text-ink">{fullName}</h1>
           <div className="flex items-center gap-3 mt-1">
-            {student.studentId && <span className="text-sm text-text-secondary">ID: {student.studentId}</span>}
+            {student.studentId && <span className="text-sm text-muted">ID: {student.studentId}</span>}
             {className && <Badge>{className}</Badge>}
             {levelsEnabled && (
               <ReadingLevelPill
@@ -149,7 +150,7 @@ export function StudentDetail({ studentId, classId, levelOptions, levelsEnabled 
         {levelsEnabled && (
         <Card>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-charcoal">Reading Level</h2>
+            <h2 className="text-lg font-bold text-ink">Reading Level</h2>
             <Button variant="outline" size="sm" onClick={() => setShowLevelPicker(true)}>
               Change Level
             </Button>
@@ -157,7 +158,7 @@ export function StudentDetail({ studentId, classId, levelOptions, levelsEnabled 
           <div className="flex items-center gap-3 mb-4">
             <ReadingLevelPill level={student.currentReadingLevel} />
             {student.readingLevelUpdatedAt && (
-              <span className="text-xs text-text-secondary">
+              <span className="text-xs text-muted">
                 Updated {new Date(student.readingLevelUpdatedAt).toLocaleDateString()}
               </span>
             )}
@@ -173,30 +174,30 @@ export function StudentDetail({ studentId, classId, levelOptions, levelsEnabled 
           {showHistory && (
             <div className="mt-4 space-y-3">
               {!levelHistory || levelHistory.length === 0 ? (
-                <p className="text-sm text-text-secondary">No level changes recorded.</p>
+                <p className="text-sm text-muted">No level changes recorded.</p>
               ) : (
                 levelHistory.map((event) => (
                   <div
                     key={event.id}
-                    className="flex items-start gap-3 p-3 bg-background rounded-[var(--radius-md)]"
+                    className="flex items-start gap-3 p-3 bg-cream rounded-[var(--radius-md)]"
                   >
                     <div className="flex-shrink-0 mt-1">
-                      <div className="w-2 h-2 rounded-full bg-rose-pink" />
+                      <div className="w-2 h-2 rounded-full bg-section" />
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         {event.fromLevel && (
                           <>
                             <ReadingLevelPill level={event.fromLevel} size="sm" />
-                            <span className="text-xs text-text-secondary">→</span>
+                            <span className="text-xs text-muted">→</span>
                           </>
                         )}
                         <ReadingLevelPill level={event.toLevel} size="sm" />
                       </div>
                       {event.reason && (
-                        <p className="text-xs text-text-secondary">{event.reason}</p>
+                        <p className="text-xs text-muted">{event.reason}</p>
                       )}
-                      <p className="text-xs text-text-secondary/60 mt-1">
+                      <p className="text-xs text-muted/60 mt-1">
                         {new Date(event.createdAt).toLocaleDateString()} by {event.changedByName}
                       </p>
                     </div>
@@ -210,7 +211,7 @@ export function StudentDetail({ studentId, classId, levelOptions, levelsEnabled 
 
         {/* Guardians */}
         <Card>
-          <h2 className="text-lg font-bold text-charcoal mb-4">Guardians</h2>
+          <h2 className="text-lg font-bold text-ink mb-4">Guardians</h2>
           {student.parentIds.length === 0 ? (
             <div className="flex items-center gap-2">
               <Badge variant="default">No guardian linked</Badge>
@@ -225,7 +226,7 @@ export function StudentDetail({ studentId, classId, levelOptions, levelsEnabled 
                   {guardians.map(([uid, g]) => (
                     <li key={uid} className="flex items-center gap-2 text-sm">
                       <Icon name="person" size={16} />
-                      <span className="text-charcoal font-medium">{g.name}</span>
+                      <span className="text-ink font-medium">{g.name}</span>
                       {g.relationshipLabel && (
                         <Badge variant="info">{g.relationshipLabel}</Badge>
                       )}
@@ -233,7 +234,7 @@ export function StudentDetail({ studentId, classId, levelOptions, levelsEnabled 
                   ))}
                 </ul>
               ) : (
-                <p className="text-xs text-text-secondary">
+                <p className="text-xs text-muted">
                   Guardian details will appear once a guardian next signs in or
                   updates their profile.
                 </p>
@@ -247,7 +248,7 @@ export function StudentDetail({ studentId, classId, levelOptions, levelsEnabled 
       <div className="mt-6">
         <Card>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-charcoal">Assigned Books</h2>
+            <h2 className="text-lg font-bold text-ink">Assigned Books</h2>
             <Button variant="outline" size="sm" onClick={() => setShowIsbnModal(true)}>
               Assign Books
             </Button>
@@ -258,7 +259,7 @@ export function StudentDetail({ studentId, classId, levelOptions, levelsEnabled 
               title="No books assigned"
               description="This student has no active book allocations."
               action={
-                <Link href="/library" className="inline-flex items-center gap-1.5 text-sm font-semibold text-rose-pink hover:text-rose-pink-dark transition-colors mt-2">
+                <Link href="/library" className="inline-flex items-center gap-1.5 text-sm font-semibold text-section hover:text-lumi-red-dark transition-colors mt-2">
                   <Icon name="library_books" size={16} />
                   Browse Library
                 </Link>
@@ -282,19 +283,19 @@ export function StudentDetail({ studentId, classId, levelOptions, levelsEnabled 
                 const cadenceLabel = allocation.cadence === 'daily' ? 'Daily' : allocation.cadence === 'weekly' ? 'Weekly' : allocation.cadence === 'fortnightly' ? 'Fortnightly' : allocation.cadence;
 
                 return (
-                  <div key={allocation.id} className="border border-divider rounded-[var(--radius-md)]">
+                  <div key={allocation.id} className="border border-rule rounded-[var(--radius-md)]">
                     <button
                       onClick={() => setExpandedAllocation(isExpanded ? null : allocation.id)}
-                      className="w-full flex items-center justify-between p-3 text-left hover:bg-background/50 transition-colors rounded-[var(--radius-md)]"
+                      className="w-full flex items-center justify-between p-3 text-left hover:bg-cream/50 transition-colors rounded-[var(--radius-md)]"
                     >
                       <div className="flex items-center gap-2">
                         <Badge variant="info">{typeLabel}</Badge>
-                        <span className="text-sm text-charcoal font-semibold">{cadenceLabel}</span>
-                        <span className="text-xs text-text-secondary">{allocation.targetMinutes}min</span>
+                        <span className="text-sm text-ink font-semibold">{cadenceLabel}</span>
+                        <span className="text-xs text-muted">{allocation.targetMinutes}min</span>
                         <Badge variant="default">{effectiveItems.length} books</Badge>
                       </div>
                       <svg
-                        className={`w-4 h-4 text-text-secondary transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                        className={`w-4 h-4 text-muted transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                         viewBox="0 0 16 16"
                         fill="none"
                       >
@@ -303,11 +304,11 @@ export function StudentDetail({ studentId, classId, levelOptions, levelsEnabled 
                     </button>
                     {isExpanded && (
                       <div className="px-3 pb-3 space-y-2">
-                        <p className="text-xs text-text-secondary">
+                        <p className="text-xs text-muted">
                           {new Date(allocation.startDate).toLocaleDateString()} - {new Date(allocation.endDate).toLocaleDateString()}
                         </p>
                         {effectiveItems.length === 0 ? (
-                          <p className="text-sm text-text-secondary">No specific books assigned.</p>
+                          <p className="text-sm text-muted">No specific books assigned.</p>
                         ) : (
                           effectiveItems.map((item) => (
                             <BookCard

@@ -211,7 +211,7 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
       id: 'studentId',
       header: 'Student ID',
       accessorFn: (row) => row.studentId ?? '',
-      cell: (val) => <span className="text-text-secondary">{(val as string) || '-'}</span>,
+      cell: (val) => <span className="text-muted">{(val as string) || '-'}</span>,
       sortable: true,
     },
     {
@@ -251,7 +251,7 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
       id: 'parentEmail',
       header: 'Parent Email',
       accessorFn: (row) => row.parentEmail ?? '',
-      cell: (val) => <span className="text-sm text-text-secondary">{(val as string) || '-'}</span>,
+      cell: (val) => <span className="text-sm text-muted">{(val as string) || '-'}</span>,
     },
   ];
 
@@ -272,7 +272,7 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
           }}
           onChange={toggleSelectAll}
           onClick={(e) => e.stopPropagation()}
-          className="accent-rose-pink cursor-pointer"
+          className="accent-section cursor-pointer"
         />
       ),
       accessorFn: () => null,
@@ -282,7 +282,7 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
           checked={selectedIds.has(row.id)}
           onChange={(e) => { e.stopPropagation(); toggleSelected(row.id); }}
           onClick={(e) => e.stopPropagation()}
-          className="accent-rose-pink"
+          className="accent-section"
         />
       ),
       className: 'w-10',
@@ -322,6 +322,7 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
   return (
     <div>
       <PageHeader
+        eyebrow="Students"
         title="Students"
         description="Manage students across your school"
         action={
@@ -368,14 +369,14 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
-        <div className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-rose-pink/5 border border-rose-pink/20 rounded-[var(--radius-lg)]">
+        <div className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-section/5 border border-section/20 rounded-[var(--radius-lg)]">
           <input
             type="checkbox"
             checked={allFilteredSelected}
             onChange={toggleSelectAll}
-            className="accent-rose-pink"
+            className="accent-section"
           />
-          <span className="text-sm font-semibold text-charcoal">{selectedIds.size} selected</span>
+          <span className="text-sm font-semibold text-ink">{selectedIds.size} selected</span>
           <div className="flex flex-wrap gap-2 ml-auto">
             <Button variant="outline" size="sm" onClick={() => handleBulkEnrollment('book_pack')}>
               Mark Subscribed
