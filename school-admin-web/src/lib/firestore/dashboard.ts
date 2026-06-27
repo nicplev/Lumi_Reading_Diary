@@ -284,12 +284,14 @@ export interface TeacherTopReader {
   studentId: string;
   name: string;
   minutes: number;
+  characterId?: string;
 }
 
 export interface TeacherNudge {
   studentId: string;
   name: string;
   daysSinceRead: number | null; // null = never read
+  characterId?: string;
 }
 
 export interface TeacherParentComment {
@@ -298,6 +300,7 @@ export interface TeacherParentComment {
   studentName: string;
   preview: string;
   at: Date;
+  characterId?: string;
 }
 
 export interface TeacherSentiment {
@@ -312,6 +315,7 @@ export interface TeacherRecentReading {
   books: string[];
   minutes: number;
   at: Date;
+  characterId?: string;
 }
 
 export interface TeacherGroupComparison {
@@ -331,6 +335,7 @@ export interface TeacherRecentAchievement {
   icon: string;
   rarity: string;
   earnedAt: Date | null;
+  characterId?: string;
 }
 
 export interface TeacherDashboardWidgets {
@@ -376,6 +381,7 @@ export async function getTeacherDashboardWidgets(
   // earned achievements (for the achievement-spotlight widget) — all read from
   // the student docs we already fetch here, so no extra reads.
   const nameById = new Map<string, string>();
+  const characterById = new Map<string, string | undefined>();
   const lastReadById = new Map<string, Date | null>();
   const recentAchievements: TeacherRecentAchievement[] = [];
   for (let i = 0; i < studentIds.length; i += 30) {
@@ -389,6 +395,7 @@ export async function getTeacherDashboardWidgets(
         const s = doc.data();
         const studentName = `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim();
         nameById.set(doc.id, studentName);
+        characterById.set(doc.id, s.characterId);
         lastReadById.set(doc.id, s.stats?.lastReadingDate?.toDate?.() ?? null);
         if (Array.isArray(s.achievements)) {
           for (const a of s.achievements) {
@@ -399,6 +406,7 @@ export async function getTeacherDashboardWidgets(
               icon: a.icon ?? '🏅',
               rarity: a.rarity ?? 'common',
               earnedAt: a.earnedAt?.toDate?.() ?? null,
+              characterId: s.characterId,
             });
           }
         }
@@ -441,6 +449,7 @@ export async function getTeacherDashboardWidgets(
           books: Array.isArray(d.bookTitles) ? d.bookTitles : [],
           minutes,
           at: readAt,
+          characterId: characterById.get(sid),
         });
       }
 
@@ -454,6 +463,7 @@ export async function getTeacherDashboardWidgets(
             studentName: nameById.get(sid) ?? 'Student',
             preview: d.lastCommentPreview ?? '',
             at: lastAt,
+            characterId: characterById.get(sid),
           });
         }
       }
@@ -511,29 +521,39 @@ export async function getTeacherDashboardWidgets(
     .filter(([, m]) => m > 0)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
-    .map(([sid, m]) => ({ studentId: sid, name: nameById.get(sid) ?? 'Student', minutes: m }));
+    .map(([sid, m]) => ({
+      studentId: sid,
+      name: nameById.get(sid) ?? 'Student',
+      minutes: m,
+      characterId: characterById.get(sid),
+    }));
 
   const now = Date.now();
   const nudges = studentIds
     .map((sid) => {
       const last = lastReadById.get(sid) ?? null;
       const daysSinceRead = last ? Math.floor((now - last.getTime()) / 86_400_000) : null;
-      return { studentId: sid, name: nameById.get(sid) ?? 'Student', daysSinceRead };
+      return {
+        studentId: sid,
+        name: nameById.get(sid) ?? 'Student',
+        daysSinceRead,
+        characterId: characterById.get(sid),
+      };
     })
     .filter((n) => n.daysSinceRead === null || n.daysSinceRead >= 3)
     .sort((a, b) => (b.daysSinceRead ?? 99_999) - (a.daysSinceRead ?? 99_999))
-    .slice(0, 5);
+    .slice(0, 20);
 
   parentComments.sort((a, b) => b.at.getTime() - a.at.getTime());
 
   return {
     topReaders,
     nudges,
-    parentComments: parentComments.slice(0, 5),
+    parentComments: parentComments.slice(0, 20),
     sentiment,
-    recentReading: recentReading.slice(0, 6),
-    groupComparison,
-    recentAchievements: recentAchievements.slice(0, 5),
+    recentReading: recentReading.slice(0, 20),
+    groupComparison: groupComparison.slice(0, 12),
+    recentAchievements: recentAchievements.slice(0, 15),
   };
 }
 

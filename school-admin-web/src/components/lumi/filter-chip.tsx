@@ -1,7 +1,7 @@
 'use client';
 
 interface FilterChipProps {
-  label: string;
+  label: React.ReactNode;
   selected: boolean;
   onClick: () => void;
   count?: number;

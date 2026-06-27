@@ -7,17 +7,11 @@ import { Icon } from '@/components/lumi/icon';
 import { EmptyState } from '@/components/lumi/empty-state';
 import { SearchInput } from '@/components/lumi/search-input';
 import { FilterChip } from '@/components/lumi/filter-chip';
+import { FeelingBlob } from '@/components/lumi/feeling-blob';
+import { FEELINGS, FEELING_ORDER } from '@/lib/feelings';
 import { CommentThread } from './comment-thread';
 import { LogMedia } from './log-media';
 import { useReadingLogs } from '@/lib/hooks/use-reading-logs';
-
-const FEELING_META: Record<string, { label: string; emoji: string }> = {
-  hard: { label: 'Hard', emoji: '😣' },
-  tricky: { label: 'Tricky', emoji: '😕' },
-  okay: { label: 'Okay', emoji: '🙂' },
-  good: { label: 'Good', emoji: '😀' },
-  great: { label: 'Great', emoji: '🤩' },
-};
 
 const STATUS_DOT: Record<string, string> = {
   completed: 'bg-mint-green',
@@ -121,10 +115,15 @@ export function ReadingHistorySection({ studentId }: { studentId: string }) {
             ))}
           </div>
           <div className="flex flex-wrap gap-2">
-            {Object.entries(FEELING_META).map(([key, m]) => (
+            {FEELING_ORDER.map((key) => (
               <FilterChip
                 key={key}
-                label={`${m.emoji} ${m.label}`}
+                label={
+                  <span className="inline-flex items-center gap-1.5">
+                    <FeelingBlob feeling={key} size={16} />
+                    {FEELINGS[key].label}
+                  </span>
+                }
                 selected={feelings.includes(key)}
                 onClick={() => toggleFeeling(key)}
               />
@@ -149,7 +148,6 @@ export function ReadingHistorySection({ studentId }: { studentId: string }) {
           <ul className="divide-y divide-divider">
             {filtered.map((log) => {
               const isExpanded = expandedId === log.id;
-              const feeling = log.childFeeling ? FEELING_META[log.childFeeling] : null;
               return (
                 <li key={log.id} className="py-3">
                   <button
@@ -174,7 +172,7 @@ export function ReadingHistorySection({ studentId }: { studentId: string }) {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        {feeling && <span title={feeling.label}>{feeling.emoji}</span>}
+                        {log.childFeeling && <FeelingBlob feeling={log.childFeeling} size={18} />}
                         {log.hasComprehensionAudio && (
                           <Icon name="mic" size={16} className="text-text-secondary" />
                         )}
