@@ -254,16 +254,16 @@ export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
   if (isLoading) {
     return (
       <div>
-        <PageHeader title="Settings" description="School configuration" />
+        <PageHeader eyebrow="Settings" title="Settings" description="School configuration" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-surface rounded-[var(--radius-lg)] shadow-card p-5">
+            <div key={i} className="bg-paper rounded-[var(--radius-lg)] shadow-card p-5">
               <Skeleton className="h-4 w-20 mb-3" />
               <Skeleton className="h-8 w-16" />
             </div>
           ))}
         </div>
-        <div className="border-b border-divider mb-6">
+        <div className="border-b border-rule mb-6">
           <div className="flex gap-6 pb-3">
             {Array.from({ length: 3 }).map((_, i) => (
               <Skeleton key={i} className="h-4 w-20" />
@@ -272,7 +272,7 @@ export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="bg-surface rounded-[var(--radius-lg)] shadow-card p-6">
+            <div key={i} className="bg-paper rounded-[var(--radius-lg)] shadow-card p-6">
               <Skeleton className="h-5 w-32 mb-4" />
               <Skeleton className="h-10 w-full mb-3" />
               <Skeleton className="h-10 w-full" />
@@ -286,19 +286,20 @@ export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
   return (
     <div>
       <PageHeader
+        eyebrow="Settings"
         title="Settings"
         description="School configuration"
         action={
           school ? (
             <div className="flex items-center gap-3">
-              <span className="inline-flex items-center gap-1.5 text-sm text-text-secondary">
+              <span className="inline-flex items-center gap-1.5 text-sm text-muted">
                 <Icon name="group" size={16} />
-                <span className="font-semibold text-charcoal">{school.studentCount}</span> students
+                <span className="font-semibold text-ink">{school.studentCount}</span> students
               </span>
-              <span className="w-px h-4 bg-divider" />
-              <span className="inline-flex items-center gap-1.5 text-sm text-text-secondary">
+              <span className="w-px h-4 bg-rule" />
+              <span className="inline-flex items-center gap-1.5 text-sm text-muted">
                 <Icon name="person" size={16} />
-                <span className="font-semibold text-charcoal">{school.teacherCount}</span> teachers
+                <span className="font-semibold text-ink">{school.teacherCount}</span> teachers
               </span>
             </div>
           ) : undefined
@@ -311,7 +312,7 @@ export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
       {/* School Tab */}
       {activeTab === 'school' && (
         <Card>
-          <h2 className="text-lg font-bold text-charcoal mb-4">School Information</h2>
+          <h2 className="text-lg font-bold text-ink mb-4">School Information</h2>
           <div className="space-y-4">
             <Input label="School Name" value={name} onChange={(e) => setName(e.target.value)} disabled={!isAdmin} />
             <Input
@@ -350,7 +351,7 @@ export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Reading Level Schema */}
             <Card>
-              <h2 className="text-lg font-bold text-charcoal mb-4">Reading Level Schema</h2>
+              <h2 className="text-lg font-bold text-ink mb-4">Reading Level Schema</h2>
               <div className="space-y-4">
                 <Select
                   label="Schema"
@@ -370,7 +371,7 @@ export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
                 )}
                 {previewLevels.length > 0 && (
                   <div>
-                    <p className="text-sm font-semibold text-charcoal mb-2">Preview ({previewLevels.length} levels)</p>
+                    <p className="text-sm font-semibold text-ink mb-2">Preview ({previewLevels.length} levels)</p>
                     <div className="flex flex-wrap gap-1.5">
                       {previewLevels.slice(0, 30).map((level) => (
                         <Badge key={level} variant="default">{level}</Badge>
@@ -393,8 +394,8 @@ export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
 
             {/* Term Dates */}
             <Card>
-              <h2 className="text-lg font-bold text-charcoal mb-1">Term Dates</h2>
-              <p className="text-sm text-text-secondary mb-4">Used for analytics, reporting periods, and term-based comparisons.</p>
+              <h2 className="text-lg font-bold text-ink mb-1">Term Dates</h2>
+              <p className="text-sm text-muted mb-4">Used for analytics, reporting periods, and term-based comparisons.</p>
               <div className="space-y-4">
                 {[1, 2, 3, 4].map((term) => (
                   <div key={term} className="grid grid-cols-2 gap-4">
@@ -444,8 +445,8 @@ export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
         <div className="space-y-6">
           {/* Quiet Hours */}
           <Card className="max-w-md">
-            <h2 className="text-lg font-bold text-charcoal mb-1">Parent Notification Quiet Hours</h2>
-            <p className="text-sm text-text-secondary mb-4">
+            <h2 className="text-lg font-bold text-ink mb-1">Parent Notification Quiet Hours</h2>
+            <p className="text-sm text-muted mb-4">
               Push notifications to parents are not sent during these hours (school timezone). Teachers are unaffected.
             </p>
             <div className="grid grid-cols-2 gap-4">
@@ -516,7 +517,7 @@ export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
           />
         ) : (
           <Card>
-            <p className="text-sm text-text-secondary">Renewal data is unavailable right now.</p>
+            <p className="text-sm text-muted">Renewal data is unavailable right now.</p>
           </Card>
         )
       )}

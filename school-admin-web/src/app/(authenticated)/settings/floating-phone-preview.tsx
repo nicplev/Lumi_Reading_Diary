@@ -96,7 +96,7 @@ export function FloatingPhonePreview({ enabled, freeTextEnabled, presets }: Comm
       >
         <button
           type="button"
-          className="flex items-center gap-2 rounded-full bg-charcoal px-4 py-3 text-sm font-semibold text-white shadow-lg hover:opacity-90"
+          className="flex items-center gap-2 rounded-full bg-ink px-4 py-3 text-sm font-semibold text-white shadow-lg hover:opacity-90"
           style={{ cursor: 'grab' }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -138,8 +138,8 @@ export function FloatingPhonePreview({ enabled, freeTextEnabled, presets }: Comm
           userSelect: 'none',
         }}
       >
-        <div className="flex items-center gap-2 text-charcoal">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" className="text-text-secondary">
+        <div className="flex items-center gap-2 text-ink">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" className="text-muted">
             <circle cx="9" cy="6" r="1.4" fill="currentColor" /><circle cx="15" cy="6" r="1.4" fill="currentColor" />
             <circle cx="9" cy="12" r="1.4" fill="currentColor" /><circle cx="15" cy="12" r="1.4" fill="currentColor" />
             <circle cx="9" cy="18" r="1.4" fill="currentColor" /><circle cx="15" cy="18" r="1.4" fill="currentColor" />
@@ -152,7 +152,7 @@ export function FloatingPhonePreview({ enabled, freeTextEnabled, presets }: Comm
             onClick={minimise}
             onPointerDown={(e) => e.stopPropagation()}
             title="Minimise"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-text-secondary hover:bg-gray-100"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-muted hover:bg-gray-100"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
           </button>

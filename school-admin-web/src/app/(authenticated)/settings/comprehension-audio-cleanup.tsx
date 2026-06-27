@@ -100,8 +100,8 @@ export function ComprehensionAudioCleanupSection({ isAdmin }: { isAdmin: boolean
 
   return (
     <Card>
-      <h2 className="text-lg font-bold text-charcoal mb-1">Comprehension Audio Cleanup</h2>
-      <p className="text-sm text-text-secondary mb-4">
+      <h2 className="text-lg font-bold text-ink mb-1">Comprehension Audio Cleanup</h2>
+      <p className="text-sm text-muted mb-4">
         Permanently delete comprehension recordings from a date range, optionally
         scoped to a single class. The reading log itself is preserved — only the
         audio file is removed. Use this for end-of-term or end-of-year cleanups
@@ -109,7 +109,7 @@ export function ComprehensionAudioCleanupSection({ isAdmin }: { isAdmin: boolean
       </p>
 
       {!isAdmin && (
-        <p className="text-sm text-text-secondary italic">
+        <p className="text-sm text-muted italic">
           Only school admins can run bulk cleanups.
         </p>
       )}
@@ -147,7 +147,7 @@ export function ComprehensionAudioCleanupSection({ isAdmin }: { isAdmin: boolean
           />
 
           {previewCount !== null && (
-            <div className="rounded-lg border border-divider bg-surface-muted px-4 py-3 text-sm text-charcoal">
+            <div className="rounded-lg border border-rule bg-paper-muted px-4 py-3 text-sm text-ink">
               {previewCount === 0
                 ? 'No recordings match this filter.'
                 : `${previewCount} recording${previewCount === 1 ? '' : 's'} will be deleted.`}

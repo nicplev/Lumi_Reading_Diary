@@ -110,8 +110,8 @@ export function ParentCommentSettingsSection({
   return (
     <>
       <Card>
-        <h2 className="text-lg font-bold text-charcoal mb-1">Parent Comments</h2>
-        <p className="text-sm text-text-secondary mb-4">
+        <h2 className="text-lg font-bold text-ink mb-1">Parent Comments</h2>
+        <p className="text-sm text-muted mb-4">
           Control how parents leave feedback when logging reading sessions.
         </p>
 
@@ -125,8 +125,8 @@ export function ParentCommentSettingsSection({
             className="w-5 h-5 rounded border-gray-300 text-rose-400 focus:ring-rose-400 cursor-pointer"
           />
           <div>
-            <span className="text-sm font-semibold text-charcoal">Enable parent comments</span>
-            <p className="text-xs text-text-secondary">When disabled, the comment step is hidden from parents entirely.</p>
+            <span className="text-sm font-semibold text-ink">Enable parent comments</span>
+            <p className="text-xs text-muted">When disabled, the comment step is hidden from parents entirely.</p>
           </div>
         </label>
 
@@ -141,15 +141,15 @@ export function ParentCommentSettingsSection({
               className="w-5 h-5 rounded border-gray-300 text-rose-400 focus:ring-rose-400 cursor-pointer"
             />
             <div>
-              <span className="text-sm font-semibold text-charcoal">Allow free-text comments</span>
-              <p className="text-xs text-text-secondary">When disabled, parents can only select from preset options (no typed comments).</p>
+              <span className="text-sm font-semibold text-ink">Allow free-text comments</span>
+              <p className="text-xs text-muted">When disabled, parents can only select from preset options (no typed comments).</p>
             </div>
           </label>
 
           {/* Custom Presets */}
           <div className="border-t border-border pt-4">
-            <h3 className="text-sm font-bold text-charcoal mb-1">Custom Comment Presets</h3>
-            <p className="text-xs text-text-secondary mb-4">
+            <h3 className="text-sm font-bold text-ink mb-1">Custom Comment Presets</h3>
+            <p className="text-xs text-muted mb-4">
               Add custom categories and comment options. When no custom presets are configured, default comments are shown to parents.
             </p>
 
@@ -162,7 +162,7 @@ export function ParentCommentSettingsSection({
                       type="button"
                       onClick={() => moveCategory(index, 'up')}
                       disabled={index === 0 || !isAdmin}
-                      className="text-xs text-text-secondary hover:text-charcoal disabled:opacity-30 p-0.5"
+                      className="text-xs text-muted hover:text-ink disabled:opacity-30 p-0.5"
                       title="Move up"
                     >
                       &#9650;
@@ -171,7 +171,7 @@ export function ParentCommentSettingsSection({
                       type="button"
                       onClick={() => moveCategory(index, 'down')}
                       disabled={index === customPresets.length - 1 || !isAdmin}
-                      className="text-xs text-text-secondary hover:text-charcoal disabled:opacity-30 p-0.5"
+                      className="text-xs text-muted hover:text-ink disabled:opacity-30 p-0.5"
                       title="Move down"
                     >
                       &#9660;
@@ -202,14 +202,14 @@ export function ParentCommentSettingsSection({
                   {category.chips.map((chip) => (
                     <span
                       key={chip}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-border rounded-full text-sm text-charcoal"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-border rounded-full text-sm text-ink"
                     >
                       {chip}
                       {isAdmin && (
                         <button
                           type="button"
                           onClick={() => removeChip(category.id, chip)}
-                          className="text-text-secondary hover:text-red-500 text-xs ml-0.5"
+                          className="text-muted hover:text-red-500 text-xs ml-0.5"
                           title="Remove chip"
                         >
                           &times;
@@ -218,7 +218,7 @@ export function ParentCommentSettingsSection({
                     </span>
                   ))}
                   {category.chips.length === 0 && (
-                    <span className="text-xs text-text-secondary italic">No comment options yet</span>
+                    <span className="text-xs text-muted italic">No comment options yet</span>
                   )}
                 </div>
 
