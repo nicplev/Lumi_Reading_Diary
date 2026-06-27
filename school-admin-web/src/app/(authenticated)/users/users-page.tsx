@@ -152,12 +152,12 @@ export function UsersPage() {
           <Avatar name={value as string} characterId={row.characterId} size="sm" />
           <div>
             <div className="flex items-center gap-2">
-              <p className="font-semibold text-charcoal">{value as string}</p>
+              <p className="font-semibold text-ink">{value as string}</p>
               {isAdmin && hasPendingTempPassword(row) && (
                 <Badge variant="warning">Temp password</Badge>
               )}
             </div>
-            <p className="text-xs text-text-secondary">{row.email}</p>
+            <p className="text-xs text-muted">{row.email}</p>
           </div>
         </div>
       ),
@@ -247,6 +247,7 @@ export function UsersPage() {
   return (
     <div>
       <PageHeader
+        eyebrow="Users"
         title="Users"
         description="Manage school staff"
         action={
@@ -264,14 +265,14 @@ export function UsersPage() {
       />
 
       <div className="mb-4 flex items-center gap-3 text-sm" title="New teachers and admins enter this code when creating an account in the Lumi mobile app.">
-        <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Staff code</span>
-        <code className="bg-background border border-border px-2 py-1 rounded font-mono font-bold text-charcoal tracking-wider">
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted">Staff code</span>
+        <code className="bg-cream border border-border px-2 py-1 rounded font-mono font-bold text-ink tracking-wider">
           {schoolCode?.code ?? '—'}
         </code>
         {schoolCode?.code && (
           <button
             onClick={handleCopyCode}
-            className="text-text-secondary hover:text-charcoal transition-colors"
+            className="text-muted hover:text-ink transition-colors"
             title="Copy code"
           >
             {codeCopied ? (
@@ -284,7 +285,7 @@ export function UsersPage() {
         {isAdmin && (
           <button
             onClick={() => setRotateConfirm(true)}
-            className="text-xs text-text-secondary hover:text-charcoal underline underline-offset-2"
+            className="text-xs text-muted hover:text-ink underline underline-offset-2"
           >
             {schoolCode?.code ? 'Change' : 'Generate'}
           </button>
