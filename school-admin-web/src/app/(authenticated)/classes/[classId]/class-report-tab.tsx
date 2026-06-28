@@ -41,6 +41,9 @@ interface ClassReportTabProps {
   classId: string;
   className: string;
   yearLevel?: string;
+  /** False when the school has reading levels turned off — hides the
+   *  reading-level distribution card (mirrors the roster's level UI gating). */
+  levelsEnabled?: boolean;
 }
 
 function Metric({ label, value }: { label: string; value: string | number }) {
@@ -52,7 +55,7 @@ function Metric({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-export function ClassReportTab({ classId, className, yearLevel }: ClassReportTabProps) {
+export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = true }: ClassReportTabProps) {
   const { data: school } = useSchool();
   const [from, setFrom] = useState(isoDaysAgo(30));
   const [to, setTo] = useState(isoToday());
@@ -231,7 +234,8 @@ export function ClassReportTab({ classId, className, yearLevel }: ClassReportTab
             )}
           </Card>
 
-          {/* Reading level distribution */}
+          {/* Reading level distribution — only when the school has reading levels enabled */}
+          {levelsEnabled && (
           <Card>
             <h2 className="text-lg font-bold text-ink mb-3">Reading levels</h2>
             {report.levelDistribution.length === 0 ? (
@@ -259,6 +263,7 @@ export function ClassReportTab({ classId, className, yearLevel }: ClassReportTab
               </p>
             )}
           </Card>
+          )}
 
           {report.totalStudents === 0 && (
             <EmptyState
