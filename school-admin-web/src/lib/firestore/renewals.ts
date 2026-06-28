@@ -13,6 +13,8 @@ export interface RenewalRosterEntry {
   graduated: boolean;
   /** academicYear the student's current access is for, if any. */
   accessYear: number | null;
+  /** Current materialised access status, if any (for the Status column). */
+  accessStatus: 'active' | 'expired' | 'suspended' | null;
   /** Whether the student is already renewed into the target year. */
   alreadyRenewed: boolean;
 }
@@ -27,28 +29,47 @@ export async function getRenewalRoster(
   schoolId: string,
   targetAcademicYear: number
 ): Promise<RenewalRosterEntry[]> {
-  const snap = await adminDb
-    .collection('schools')
-    .doc(schoolId)
-    .collection('students')
-    .where('isActive', '==', true)
-    .get();
+  const [snap, classesSnap] = await Promise.all([
+    adminDb
+      .collection('schools')
+      .doc(schoolId)
+      .collection('students')
+      .where('isActive', '==', true)
+      .get(),
+    adminDb.collection('schools').doc(schoolId).collection('classes').get(),
+  ]);
+
+  // Year level lives on the class; a student inherits their class's year level
+  // unless they carry an individual override (set when a prior rollover bumped
+  // them). This is why the column was blank before — students rarely have an
+  // individual yearLevel set.
+  const classYearLevel = new Map<string, string>();
+  classesSnap.docs.forEach((c) => {
+    const yl = c.data().yearLevel;
+    if (typeof yl === 'string' && yl.trim()) classYearLevel.set(c.id, yl.trim());
+  });
 
   return snap.docs.map((doc) => {
     const d = doc.data();
     const additional = (d.additionalInfo ?? {}) as Record<string, unknown>;
-    const currentYearLevel = (additional.yearLevel as string | undefined) ?? null;
+    const individualYearLevel = (additional.yearLevel as string | undefined)?.trim() || null;
+    const classId = (d.classId as string | undefined) ?? '';
+    const currentYearLevel =
+      individualYearLevel ?? (classId ? classYearLevel.get(classId) ?? null : null);
     const ladder = nextYearLevel(currentYearLevel);
     const accessYear = (d.access?.academicYear as number | undefined) ?? null;
+    const accessStatus =
+      (d.access?.status as 'active' | 'expired' | 'suspended' | undefined) ?? null;
     return {
       studentId: doc.id,
       firstName: d.firstName ?? '',
       lastName: d.lastName ?? '',
-      classId: d.classId ?? '',
+      classId,
       currentYearLevel,
       nextYearLevel: ladder.next,
       graduated: ladder.graduated,
       accessYear,
+      accessStatus,
       alreadyRenewed: accessYear === targetAcademicYear,
     };
   });

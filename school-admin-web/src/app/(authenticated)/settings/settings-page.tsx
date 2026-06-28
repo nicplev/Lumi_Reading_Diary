@@ -47,9 +47,11 @@ const SETTINGS_TABS = [
   { id: 'parent-app', label: 'Parent App', icon: <Icon name="smartphone" size={16} /> },
 ];
 
-// Renewals is admin-only and tucked here (rather than the sidebar) because it's
-// a once-a-year tool. Appended to the tab list only for school admins.
-const RENEWALS_TAB = { id: 'renewals', label: 'Renewals', icon: <Icon name="autorenew" size={16} /> };
+// Rollover (year-to-year turnover) is admin-only and tucked here (rather than the
+// sidebar) because it's a once-a-year tool. Appended to the tab list only for
+// school admins. The internal id stays `renewals` so /settings?tab=renewals and
+// the /renewals redirect keep working.
+const RENEWALS_TAB = { id: 'renewals', label: 'Rollover', icon: <Icon name="autorenew" size={16} /> };
 const KNOWN_TAB_IDS = ['school', 'academic', 'parent-app', 'renewals'];
 
 interface RenewalsData {
