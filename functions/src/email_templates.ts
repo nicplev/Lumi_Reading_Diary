@@ -346,7 +346,11 @@ export function buildStaffOnboardingEmail(params: {
   staffName: string;
   role: "teacher" | "schoolAdmin";
   loginEmail: string;
-  tempPassword: string;
+  /** Sign-in password — included only when the admin created the account and
+   *  the teacher hasn't signed in yet. Omitted for self-registered / active. */
+  tempPassword?: string;
+  /** School join code — shown to teachers so they can join in the Lumi app. */
+  schoolCode?: string;
   portalUrl: string;
   appStoreUrl?: string;
   playStoreUrl?: string;
@@ -358,6 +362,7 @@ export function buildStaffOnboardingEmail(params: {
     role,
     loginEmail,
     tempPassword,
+    schoolCode,
     portalUrl,
     appStoreUrl = "#",
     playStoreUrl = "#",
@@ -368,6 +373,9 @@ export function buildStaffOnboardingEmail(params: {
   const roleLabel = isAdmin ? "Administrator" : "Teacher";
   const firstName = staffName.split(" ")[0] || staffName;
   const mascotSrc = `cid:${LUMI_MASCOT_CONTENT_ID}`;
+  const hasTempPassword = !!tempPassword;
+  // Teachers join the mobile app with the school code; admins use the web portal.
+  const showSchoolCode = !!schoolCode && !isAdmin;
 
   const customMessageBlock = customMessage ?
     `
@@ -389,7 +397,7 @@ export function buildStaffOnboardingEmail(params: {
       </tr>` :
     "";
 
-  const credentialCard = `
+  const credentialCard = hasTempPassword ? `
       <tr>
         <td style="padding: 0 24px 8px 24px;">
           <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: ${CARD_TINT}; background-image: linear-gradient(180deg, ${CARD_TINT} 0%, ${PAPER} 78%); border-radius: 20px; border: 1px solid ${RULE};">
@@ -420,19 +428,65 @@ export function buildStaffOnboardingEmail(params: {
             </tr>
           </table>
         </td>
-      </tr>`;
+      </tr>` : "";
 
-  const steps = isAdmin ?
-    [
-      renderStep(1, "Open the school portal", "Go to the Lumi school portal in your web browser."),
-      renderStep(2, "Sign in", "Use the email and temporary password above."),
-      renderStep(3, "Set your own password", "Update your password from your profile once you're in."),
-    ].join("\n") :
-    [
-      renderStep(1, "Download the Lumi app", "Available on the App Store and Google Play."),
-      renderStep(2, "Sign in", "Use the email and temporary password above."),
-      renderStep(3, "Set your own password", "Update your password from your profile once you're in."),
-    ].join("\n");
+  const schoolCodeCard = showSchoolCode ? `
+      <tr>
+        <td style="padding: 0 24px 8px 24px;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: ${CARD_TINT}; background-image: linear-gradient(180deg, ${CARD_TINT} 0%, ${PAPER} 78%); border-radius: 20px; border: 1px solid ${RULE};">
+            <tr>
+              <td style="padding: 28px 24px;">
+                <p style="margin: 0 0 16px 0; font-family: ${FONT_DISPLAY}; font-size: 11px; font-weight: 700; color: ${RED_DARK}; text-transform: uppercase; letter-spacing: 2px; text-align: center;">
+                  Your school code
+                </p>
+                <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto;">
+                  <tr>
+                    <td style="background-color: ${PAPER}; border: 2px dashed ${RED}; border-radius: 14px; padding: 18px 34px;">
+                      <span style="font-family: ${FONT_MONO}; font-size: 28px; font-weight: 700; color: ${RED}; letter-spacing: 5px;">
+                        ${schoolCode}
+                      </span>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin: 16px 0 0 0; font-family: ${FONT_BODY}; font-size: 13px; color: ${MUTED}; text-align: center; line-height: 1.5;">
+                  Enter this in the Lumi app to join ${schoolName}.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>` : "";
+
+  // Steps adapt to how this person gets in: log in with a temp password
+  // (admin-created), or join with the school code (self-register).
+  const stepItems = isAdmin ?
+    (hasTempPassword ?
+      [
+        renderStep(1, "Open the school portal", "Go to the Lumi school portal in your web browser."),
+        renderStep(2, "Sign in", "Use the email and temporary password above."),
+        renderStep(3, "Set your own password", "Update your password from your profile once you're in."),
+      ] :
+      [
+        renderStep(1, "Open the school portal", "Go to the Lumi school portal in your web browser."),
+        renderStep(2, "Sign in", "Use your email and password to log in."),
+      ]) :
+    (hasTempPassword ?
+      [
+        renderStep(1, "Download the Lumi app", "Available on the App Store and Google Play."),
+        renderStep(2, "Log in", "Sign in with your email and the temporary password above."),
+        renderStep(3, "Set your own password", "Update your password from your profile once you're in."),
+      ] :
+      [
+        renderStep(1, "Download the Lumi app", "Available on the App Store and Google Play."),
+        renderStep(2, "Enter your school code", "Use the code above to join your school in the app."),
+        renderStep(3, "Create your account", "Sign up with your email address to finish setting up."),
+      ]);
+  const steps = stepItems.join("\n");
+
+  const sectionTitle = hasTempPassword ? "How to sign in" : "How to get started";
+  const welcomeLead = hasTempPassword ?
+    `You've been added to <strong style="color: ${RED};">${schoolName}</strong> on Lumi as a ${roleLabel}. Here are your sign-in details.` :
+    `You've been added to <strong style="color: ${RED};">${schoolName}</strong> on Lumi as a ${roleLabel}. Here's how to get set up.`;
 
   const ctaBlock = isAdmin ?
     `
@@ -504,7 +558,7 @@ export function buildStaffOnboardingEmail(params: {
                 Welcome to the team, ${firstName}!
               </h2>
               <p style="margin: 0; font-family: ${FONT_BODY}; font-size: 15px; color: ${INK_SOFT}; line-height: 1.7;">
-                You've been added to <strong style="color: ${RED};">${schoolName}</strong> on Lumi as a ${roleLabel}. Here are your sign-in details.
+                ${welcomeLead}
               </p>
             </td>
           </tr>
@@ -514,12 +568,13 @@ export function buildStaffOnboardingEmail(params: {
           <tr><td style="height: 20px; line-height: 20px; font-size: 0;">&nbsp;</td></tr>
 
           ${credentialCard}
+          ${schoolCodeCard}
 
           <!-- Section title -->
           <tr>
             <td style="padding: 28px 32px 4px;">
               <h3 style="margin: 0; font-family: ${FONT_DISPLAY}; font-size: 22px; font-weight: 800; color: ${INK}; text-align: center;">
-                How to sign in
+                ${sectionTitle}
               </h3>
             </td>
           </tr>

@@ -15,6 +15,7 @@ import {
 } from "./notification_helpers";
 import {buildOnboardingEmail, buildOnboardingQrAttachments, buildStaffOnboardingEmail} from "./email_templates";
 import {lumiMascotAttachment} from "./email_assets";
+import {generateTempPassword} from "./temp_password";
 import {
   DEFAULT_ACHIEVEMENT_THRESHOLDS,
   computeAwardableAchievements,
@@ -1958,6 +1959,14 @@ export const processStaffOnboardingEmail = fns
       const emailSubject = data.emailSubject ?? `Your ${schoolName} staff account on Lumi`;
       const senderEmail = sendgridSenderEmail.value() || "noreply@lumi-reading.app";
 
+      // The school's active join code (top-level schoolCodes; one active per
+      // school) — teachers enter it in the Lumi app to join. Omitted if none.
+      const codeSnap = await db.collection("schoolCodes").where("schoolId", "==", schoolId).get();
+      const schoolCode: string | undefined = codeSnap.docs
+        .map((d) => d.data())
+        .filter((d) => d.isActive === true)
+        .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0))[0]?.code;
+
       const recipients: StaffEmailRecipient[] = [];
       let sentCount = 0;
       let failedCount = 0;
@@ -1983,17 +1992,40 @@ export const processStaffOnboardingEmail = fns
           }
           const user = userSnap.data()!;
           const email: string = user.email ?? "";
-          const tempPassword: string | undefined = credSnap.exists ? credSnap.data()?.tempPassword : undefined;
 
           if (!email) {
             recipients.push({userId, email: "", status: "skipped", skippedReason: "no_email"});
             skippedCount++;
             continue;
           }
-          if (!tempPassword) {
-            recipients.push({userId, email, status: "skipped", skippedReason: "no_temp_password"});
-            skippedCount++;
-            continue;
+
+          // Include a sign-in password only for an admin-created account
+          // (createdBy set) that hasn't signed in yet — so we never email a
+          // password the teacher has already replaced. Use the stored credential
+          // if present (matches what the admin saw); otherwise issue a fresh one
+          // now (covers single Add-Staff, which doesn't pre-store one).
+          const createdByAdmin = !!user.createdBy;
+          const hasLoggedIn = !!user.lastLoginAt;
+          let tempPassword: string | undefined;
+          if (createdByAdmin && !hasLoggedIn) {
+            const stored: string | undefined = credSnap.exists ? credSnap.data()?.tempPassword : undefined;
+            if (stored) {
+              tempPassword = stored;
+            } else {
+              const fresh = generateTempPassword();
+              await admin.auth().updateUser(userId, {password: fresh});
+              await db.doc(`schools/${schoolId}/staffCredentials/${userId}`).set({
+                tempPassword: fresh,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                createdBy: data.createdBy ?? "system",
+                consumedAt: null,
+              }, {merge: true});
+              await db.doc(`schools/${schoolId}/users/${userId}`).set({
+                mustChangePassword: true,
+                tempPasswordCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              }, {merge: true});
+              tempPassword = fresh;
+            }
           }
 
           const html = buildStaffOnboardingEmail({
@@ -2002,6 +2034,7 @@ export const processStaffOnboardingEmail = fns
             role: user.role === "schoolAdmin" ? "schoolAdmin" : "teacher",
             loginEmail: email,
             tempPassword,
+            schoolCode,
             portalUrl: STAFF_PORTAL_URL,
             customMessage,
           });
