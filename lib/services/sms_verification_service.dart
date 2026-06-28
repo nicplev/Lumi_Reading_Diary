@@ -30,14 +30,12 @@ class SmsVerificationService {
   SmsVerificationService({FirebaseAuth? auth, FirebaseFunctions? functions})
       : _auth = auth ?? FirebaseAuth.instance,
         _functions = functions ?? lumiFunctions;
-  // NOTE: We do NOT set `appVerificationDisabledForTesting` here. While that
-  // flag works for primary phone sign-in, Firebase rejects the resulting
-  // session token at the multi-factor enroll endpoint with
-  // `invalid-user-token`. Simulator testing therefore goes through the
-  // standard reCAPTCHA fallback (Safari opens, user taps the checkbox,
-  // returns via the custom URL scheme). Test phone numbers configured in
-  // the Firebase Console still bypass real SMS delivery — they just go
-  // through the real verification path on the way in.
+  // NOTE: `appVerificationDisabledForTesting` is set globally in DEBUG builds
+  // (see main.dart) so configured test phone numbers work on the iOS Simulator
+  // without the reCAPTCHA fallback. It was historically avoided because it
+  // broke the OLD client `multiFactor.enroll` endpoint with `invalid-user-token`
+  // — but signup now enrols MFA server-side (linkPhoneAndEnrollMfa → Admin SDK),
+  // so that path is gone and the flag is safe. Never set in release builds.
 
   final FirebaseAuth _auth;
   final FirebaseFunctions _functions;
