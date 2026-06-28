@@ -25,10 +25,14 @@ export function LegalDocument({
   return (
     <div className="min-h-screen bg-cream text-ink">
       <header className="border-b border-rule bg-paper/70">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-5 py-4">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] bg-lumi-red/10 text-lumi-red">
-            <BookMark />
-          </span>
+        <div className="mx-auto flex max-w-3xl items-center gap-2.5 px-5 py-4">
+          {/* Lumi mascot — character art is full-bleed, shown contained with no
+              clip (mirrors the portal Avatar / app StudentAvatar). */}
+          <img
+            src="/characters/lumi_cool_kid.png"
+            alt="Lumi"
+            className="h-10 w-10 object-contain"
+          />
           <span className="font-display text-lg font-extrabold tracking-tight">Lumi</span>
         </div>
       </header>
@@ -77,21 +81,5 @@ export function LegalDocument({
         </div>
       </footer>
     </div>
-  );
-}
-
-function BookMark() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M4 4.5A1.5 1.5 0 0 1 5.5 3H11v16H5.5A1.5 1.5 0 0 0 4 20.5V4.5Z"
-        fill="currentColor"
-        opacity="0.55"
-      />
-      <path
-        d="M20 4.5A1.5 1.5 0 0 0 18.5 3H13v16h5.5A1.5 1.5 0 0 1 20 20.5V4.5Z"
-        fill="currentColor"
-      />
-    </svg>
   );
 }
