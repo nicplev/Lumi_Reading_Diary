@@ -172,6 +172,29 @@ class SmsVerificationService {
     required String phoneNumber,
     String? displayName,
   }) async {
+    // Ensure the session is fresh before linking. A stale/expired token — which
+    // happens when the app cold-starts onto a session whose account was deleted
+    // server-side, or on the iOS Simulator — makes linkWithCredential fail with
+    // `user-token-expired`. Refresh first; if the account is genuinely gone,
+    // sign out so the NEXT signup attempt starts from a clean session (rather
+    // than re-hitting the dead one every retry).
+    try {
+      await user.reload();
+      await user.getIdToken(true);
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-token-expired' ||
+          e.code == 'user-not-found' ||
+          e.code == 'user-disabled') {
+        await _auth.signOut();
+        throw FirebaseAuthException(
+          code: 'session-stale',
+          message: 'Your sign-in session expired. Please close this and '
+              'start signup again.',
+        );
+      }
+      rethrow;
+    }
+
     final credential = PhoneAuthProvider.credential(
       verificationId: verificationId,
       smsCode: smsCode,
@@ -194,6 +217,16 @@ class SmsVerificationService {
             code: 'phone-already-registered',
             message: 'This phone number is already registered to another '
                 'account. Use a different number, or log in instead.',
+          );
+        case 'user-token-expired':
+        case 'user-mismatch':
+        case 'requires-recent-login':
+          // Dead/expired session — sign out so the next attempt is clean.
+          await _auth.signOut();
+          throw FirebaseAuthException(
+            code: 'session-stale',
+            message: 'Your sign-in session expired. Please close this and '
+                'start signup again.',
           );
         default:
           // Wrong code etc. surface via friendlyError as usual.
