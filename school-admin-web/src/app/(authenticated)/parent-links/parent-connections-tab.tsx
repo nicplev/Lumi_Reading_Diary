@@ -92,12 +92,18 @@ export function ParentConnectionsTab() {
     {
       id: 'status',
       header: 'Status',
-      accessorFn: (row) => row.isActive,
-      cell: (value) => (
-        <Badge variant={value ? 'success' : 'default'}>
-          {value ? 'Active' : 'Inactive'}
-        </Badge>
-      ),
+      // Sort groups removed (Auth account gone) → inactive → active.
+      accessorFn: (row) =>
+        row.authMissing ? 'removed' : row.isActive ? 'active' : 'inactive',
+      cell: (_, row) =>
+        row.authMissing ? (
+          <Badge variant="error">Removed</Badge>
+        ) : (
+          <Badge variant={row.isActive ? 'success' : 'default'}>
+            {row.isActive ? 'Active' : 'Inactive'}
+          </Badge>
+        ),
+      sortable: true,
     },
     {
       id: 'lastLogin',

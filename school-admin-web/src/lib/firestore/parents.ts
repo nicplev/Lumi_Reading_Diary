@@ -1,6 +1,38 @@
-import { adminDb } from '@/lib/firebase/admin';
+import { adminDb, adminAuth } from '@/lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import type { Parent, ParentWithStudents, LinkedStudent } from '@/lib/types';
+
+/**
+ * Returns the subset of parent UIDs whose Firebase Auth account no longer
+ * exists. The parent list is purely Firestore-driven, so a parent whose Auth
+ * user was deleted out-of-band lingers as a ghost "Active" row — this lets the
+ * caller flag those instead. Batched in 100s (getUsers' per-call cap).
+ *
+ * Fails open: on any Auth error we return an empty set, so a transient failure
+ * never mislabels real parents as removed.
+ */
+async function findUidsMissingFromAuth(uids: string[]): Promise<Set<string>> {
+  const missing = new Set<string>();
+  // A Firebase UID is 1–128 chars; guard so a malformed doc id can't reject a
+  // whole getUsers batch.
+  const valid = uids.filter((u) => u && u.length <= 128);
+  if (valid.length === 0) return missing;
+  try {
+    for (let i = 0; i < valid.length; i += 100) {
+      const chunk = valid.slice(i, i + 100);
+      const { notFound } = await adminAuth.getUsers(
+        chunk.map((uid) => ({ uid }))
+      );
+      for (const id of notFound) {
+        if ('uid' in id && id.uid) missing.add(id.uid);
+      }
+    }
+  } catch (err) {
+    console.error('findUidsMissingFromAuth failed; treating all as present', err);
+    return new Set();
+  }
+  return missing;
+}
 
 function toParent(doc: FirebaseFirestore.DocumentSnapshot): Parent {
   const data = doc.data()!;
@@ -102,6 +134,15 @@ export async function getParentsWithStudents(
       }
       await batch.commit();
     }
+  }
+
+  // Reconcile the displayed parents against Firebase Auth. A parent whose Auth
+  // user was deleted out-of-band is a ghost that can't sign in — flag it so the
+  // UI shows "Removed" instead of a misleading "Active". Non-destructive: we
+  // only annotate, never delete (cleanup of dead docs is a separate decision).
+  const missingAuth = await findUidsMissingFromAuth(result.map((p) => p.id));
+  for (const parent of result) {
+    if (missingAuth.has(parent.id)) parent.authMissing = true;
   }
 
   return result;
