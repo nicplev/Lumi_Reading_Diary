@@ -112,6 +112,17 @@ export const enrollLinkedPhoneAsMfa = fns
         displayName: f.displayName ?? undefined,
         factorId: "phone" as const,
       }));
+
+      // Identity Platform requires a VERIFIED email before a second factor can
+      // be enrolled — and this applies to the Admin SDK too, not just clients.
+      // To keep the app's email-verification gate intact (the user must still
+      // verify their email to get past the splash screen), mark the email
+      // verified ONLY for the enrol, then restore it in `finally`. The enrolled
+      // factor persists; emailVerified returns to false so the gate still bites.
+      const restoreUnverified = user.emailVerified === false;
+      if (restoreUnverified) {
+        await auth.updateUser(uid, {emailVerified: true});
+      }
       try {
         await auth.updateUser(uid, {
           multiFactor: {
@@ -142,6 +153,17 @@ export const enrollLinkedPhoneAsMfa = fns
           "internal",
           "Could not enroll the phone as a second factor.",
         );
+      } finally {
+        if (restoreUnverified) {
+          try {
+            await auth.updateUser(uid, {emailVerified: false});
+          } catch (e) {
+            functions.logger.error(
+              "enrollLinkedPhoneAsMfa: failed to restore emailVerified=false",
+              {uid, error: e instanceof Error ? e.message : String(e)},
+            );
+          }
+        }
       }
     }
 
