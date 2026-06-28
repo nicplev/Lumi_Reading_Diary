@@ -996,7 +996,11 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
                   )
                 : KeyedSubtree(
                     key: const ValueKey('form'),
-                    child: _buildFormCard(),
+                    // AutofillGroup + per-field autofillHints stabilise iOS
+                    // credential AutoFill so the "Passwords" accessory bar
+                    // doesn't flicker — that flicker changed the keyboard inset,
+                    // shifted the modal, and dropped the field's focus.
+                    child: AutofillGroup(child: _buildFormCard()),
                   ),
           ),
         ),
@@ -1384,6 +1388,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
                     accentColor: LumiTokens.red,
                     controller: _passwordController,
                     focusNode: _passwordFocusNode,
+                    autofillHints: const [AutofillHints.newPassword],
                     hintText: 'Password (at least 8 characters)',
                   )
                       .animate()
@@ -1434,6 +1439,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
           controller: _passwordController,
           focusNode: _passwordFocusNode,
           autofocus: true,
+          autofillHints: const [AutofillHints.newPassword],
           hintText: 'At least 8 characters',
           helperText: 'Include uppercase, lowercase, and a number.',
           errorText: _passwordController.text.isNotEmpty && !_passwordValid
@@ -1451,6 +1457,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
                     accentColor: LumiTokens.red,
                     controller: _confirmController,
                     focusNode: _confirmFocusNode,
+                    autofillHints: const [AutofillHints.newPassword],
                     hintText: 'Confirm password',
                   )
                       .animate()
@@ -1474,6 +1481,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       controller: _confirmController,
       focusNode: _confirmFocusNode,
       autofocus: true,
+      autofillHints: const [AutofillHints.newPassword],
       hintText: 'Re-enter password',
       errorText: _confirmController.text.isNotEmpty && !_confirmValid
           ? 'Passwords don\'t match'
