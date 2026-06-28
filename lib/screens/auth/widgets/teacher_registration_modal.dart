@@ -403,25 +403,25 @@ setState(() {
     final phone = _phoneE164;
 
     try {
-      User user;
       if (_pendingUserId == null) {
         final cred = await _auth.createUserWithEmailAndPassword(
           email: email,
           password: password,
         );
-        user = cred.user!;
+        final user = cred.user!;
         await user.updateDisplayName(fullName);
         await user.sendEmailVerification();
         _pendingUserId = user.uid;
-      } else {
-        // Mid-flow retry (e.g. resend from the SMS stage). The MFA session
-        // must come from the currently-signed-in user, which is still ours.
-        user = _auth.currentUser!;
       }
+      // Mid-flow retries (resend from the SMS stage) just re-send the code;
+      // the account already exists and the signed-in session is still ours.
 
-      final handle = await _smsService.sendEnrollmentCode(
-        user: user,
-        phoneNumber: phone,
+      // Primary phone verification (no multi-factor session): the phone is
+      // verified + linked client-side, then enrolled server-side via
+      // linkPhoneAndEnrollMfa. The client-side MFA-session enroll is blocked
+      // until the email is verified, which we don't require during signup.
+      final handle = await _smsService.sendPrimaryPhoneCode(
+        phoneNumberE164: phone,
         forceResendingToken: _resendToken,
       );
 
@@ -488,7 +488,7 @@ setState(() {
             .trim();
 
     try {
-      await _smsService.enrollPhoneFactor(
+      await _smsService.linkPhoneAndEnrollMfa(
         user: user,
         verificationId: verificationId,
         smsCode: _smsCodeController.text.trim(),

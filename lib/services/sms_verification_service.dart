@@ -137,6 +137,11 @@ class SmsVerificationService {
   /// Enrolls [phoneNumber] as a second factor on [user] using the SMS code
   /// the user just typed in. Must be called with the [verificationId]
   /// returned from [sendEnrollmentCode].
+  ///
+  /// NOTE: Identity Platform blocks this client-side enroll until the user's
+  /// email is verified. Lumi's signup enrolls MFA before email verification,
+  /// so the registration flow uses [linkPhoneAndEnrollMfa] (server-side)
+  /// instead. This direct path only works on already-verified-email accounts.
   Future<void> enrollPhoneFactor({
     required User user,
     required String verificationId,
@@ -149,6 +154,67 @@ class SmsVerificationService {
     );
     final assertion = PhoneMultiFactorGenerator.getAssertion(credential);
     await user.multiFactor.enroll(assertion, displayName: phoneNumber);
+  }
+
+  /// Enrolls [phoneNumber] as a second factor on [user] WITHOUT requiring a
+  /// verified email.
+  ///
+  /// Identity Platform blocks the direct client-side [enrollPhoneFactor] path
+  /// until the account's email is verified — but Lumi enrolls MFA during
+  /// signup, before the email link is clicked. This path instead proves phone
+  /// ownership by LINKING the SMS-verified credential, then enrolls the factor
+  /// via the `enrollLinkedPhoneAsMfa` Cloud Function (the Admin SDK is not
+  /// subject to that rule). The function also unlinks the primary phone
+  /// provider so the phone stays a second factor only. Pair with
+  /// [sendPrimaryPhoneCode] for the SMS send (no multi-factor session).
+  Future<void> linkPhoneAndEnrollMfa({
+    required User user,
+    required String verificationId,
+    required String smsCode,
+    required String phoneNumber,
+    String? displayName,
+  }) async {
+    final credential = PhoneAuthProvider.credential(
+      verificationId: verificationId,
+      smsCode: smsCode,
+    );
+
+    // Prove ownership: link the verified phone to this account. Tolerate it
+    // already being linked from an earlier attempt (idempotent retry); a wrong
+    // SMS code still surfaces as invalid-verification-code from the link call.
+    try {
+      await user.linkWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      if (e.code != 'provider-already-linked' &&
+          e.code != 'credential-already-in-use') {
+        rethrow;
+      }
+    }
+
+    // Enroll server-side and unlink the primary phone provider. Re-shape any
+    // function error into a FirebaseAuthException so the existing
+    // [friendlyError] mapping + modal handling surface a clean message.
+    try {
+      await _functions
+          .httpsCallable('enrollLinkedPhoneAsMfa')
+          .call<Map<String, dynamic>>({
+        'phoneE164': phoneNumber,
+        if (displayName != null && displayName.isNotEmpty)
+          'displayName': displayName,
+      });
+    } on FirebaseFunctionsException catch (e) {
+      throw FirebaseAuthException(
+        code: e.code == 'already-exists'
+            ? 'second-factor-already-in-use'
+            : 'mfa-enroll-failed',
+        message: e.message ??
+            'Could not set up phone verification. Please try again.',
+      );
+    }
+
+    // Refresh local state so the enrolled factor + provider changes are
+    // reflected before the caller continues.
+    await user.reload();
   }
 
   /// Whether [user] already has an SMS factor enrolled. Used by the parent

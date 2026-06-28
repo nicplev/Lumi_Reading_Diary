@@ -689,7 +689,6 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
 
       // At this point we have a signed-in user. If MFA is already enrolled,
       // bail — we would have already taken the login-resolver branch above.
-      final user = _auth.currentUser!;
       if (_mfaAlreadyEnrolled) {
         // Shouldn't be reached given the login branch returns early, but
         // guard against a programmer error.
@@ -698,9 +697,12 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         return;
       }
 
-      final handle = await _smsService.sendEnrollmentCode(
-        user: user,
-        phoneNumber: phone,
+      // Primary phone verification (no multi-factor session): the phone is
+      // verified + linked client-side, then enrolled server-side via
+      // linkPhoneAndEnrollMfa. The client-side MFA-session enroll is blocked
+      // until the email is verified, which we don't require during signup.
+      final handle = await _smsService.sendPrimaryPhoneCode(
+        phoneNumberE164: phone,
         forceResendingToken: _resendToken,
       );
 
@@ -782,7 +784,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
               'Your session expired. Please start registration again.');
           return;
         }
-        await _smsService.enrollPhoneFactor(
+        await _smsService.linkPhoneAndEnrollMfa(
           user: user,
           verificationId: verificationId,
           smsCode: smsCode,
