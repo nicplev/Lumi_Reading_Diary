@@ -161,24 +161,38 @@ class _PhoneVerifyRecoveryScreenState extends State<PhoneVerifyRecoveryScreen> {
       _errorMessage = null;
     });
     try {
-      final cred = await _smsService.signInWithPhoneCode(
-        verificationId: record.verificationId,
-        smsCode: _codeController.text.trim(),
-      );
-      final uid = cred.user?.uid;
-      if (uid == null) {
-        throw FirebaseAuthException(
-          code: 'no-user',
-          message: 'Sign-in did not return a user.',
-        );
-      }
-
       switch (record.mode) {
-        case PhoneVerificationMode.phonePrimaryRegistration:
-          await _finishRegistration(uid: uid, record: record);
+        // Email+MFA enrolment: the account already exists and is still signed
+        // in (the Firebase session survives the teardown / relaunch), so we
+        // link + enrol the phone on the current user rather than signing in.
+        case PhoneVerificationMode.teacherMfaEnrollment:
+          await _finishTeacherMfa(record: record);
           break;
+        case PhoneVerificationMode.parentMfaEnrollment:
+          await _finishParentMfa(record: record);
+          break;
+        // Phone is the PRIMARY credential here — the SMS code signs in.
+        case PhoneVerificationMode.phonePrimaryRegistration:
         case PhoneVerificationMode.phoneLogin:
-          await _finishLogin(uid: uid, record: record);
+          {
+            final cred = await _smsService.signInWithPhoneCode(
+              verificationId: record.verificationId,
+              smsCode: _codeController.text.trim(),
+            );
+            final uid = cred.user?.uid;
+            if (uid == null) {
+              throw FirebaseAuthException(
+                code: 'no-user',
+                message: 'Sign-in did not return a user.',
+              );
+            }
+            if (record.mode ==
+                PhoneVerificationMode.phonePrimaryRegistration) {
+              await _finishRegistration(uid: uid, record: record);
+            } else {
+              await _finishLogin(uid: uid, record: record);
+            }
+          }
           break;
       }
     } on FirebaseAuthException catch (e) {
@@ -356,6 +370,183 @@ class _PhoneVerifyRecoveryScreenState extends State<PhoneVerifyRecoveryScreen> {
     context.go(AppRouter.getHomeRouteForRole(user.role));
   }
 
+  /// Teacher email+MFA recovery tail. The email/password account already
+  /// exists and is signed in; link the verified phone + enrol it as a second
+  /// factor server-side, then write the teacher doc + index. Mirrors the
+  /// teacher modal's finalisation (non-critical counters / code-usage bumps
+  /// are skipped on this rare recovery path).
+  Future<void> _finishTeacherMfa({
+    required PendingPhoneVerification record,
+  }) async {
+    final user = _firebaseService.auth.currentUser;
+    if (user == null) {
+      await _firebaseService.signOut();
+      await PhoneVerificationRecoveryService.instance.clear();
+      if (!mounted) return;
+      setState(() => _errorMessage =
+          'Your session expired. Please start registration again.');
+      return;
+    }
+    final ctx = record.contextJson;
+    final schoolId = ctx['schoolId'] as String?;
+    final email = ctx['email'] as String?;
+    final fullName = (ctx['fullName'] as String?) ?? '';
+    if (schoolId == null || email == null) {
+      throw StateError('Recovery context missing required fields.');
+    }
+
+    await _smsService.linkPhoneAndEnrollMfa(
+      user: user,
+      verificationId: record.verificationId,
+      smsCode: _codeController.text.trim(),
+      phoneNumber: record.phoneE164,
+    );
+
+    final teacherUser = UserModel(
+      id: user.uid,
+      email: email,
+      fullName: fullName,
+      role: UserRole.teacher,
+      schoolId: schoolId,
+      phoneNumber: record.phoneE164,
+      phoneVerified: true,
+      createdAt: DateTime.now(),
+      lastLoginAt: DateTime.now(),
+    );
+    await _firebaseService.firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('users')
+        .doc(user.uid)
+        .set({
+      ...teacherUser.toFirestore(),
+      'permissions': {
+        'notifications': {
+          'assignedClasses': true,
+          'assignedStudents': true,
+          'schedule': true,
+          'wholeSchool': false,
+        },
+      },
+    }, SetOptions(merge: true));
+
+    await UserSchoolIndexService().createOrUpdateIndex(
+      email: email,
+      schoolId: schoolId,
+      userType: 'user',
+      userId: user.uid,
+    );
+
+    await PhoneVerificationRecoveryService.instance.clear();
+    if (!mounted) return;
+    context.go(AppRouter.getHomeRouteForRole(UserRole.teacher));
+  }
+
+  /// Parent email+MFA recovery tail. Links + enrols the phone on the
+  /// already-signed-in account, then writes the parent doc, indexes
+  /// (email + phone), and links the student. Mirrors the parent modal's
+  /// email+MFA finalisation.
+  Future<void> _finishParentMfa({
+    required PendingPhoneVerification record,
+  }) async {
+    final user = _firebaseService.auth.currentUser;
+    if (user == null) {
+      await _firebaseService.signOut();
+      await PhoneVerificationRecoveryService.instance.clear();
+      if (!mounted) return;
+      setState(() => _errorMessage =
+          'Your session expired. Please start registration again.');
+      return;
+    }
+    final uid = user.uid;
+    final ctx = record.contextJson;
+    final schoolId = ctx['schoolId'] as String?;
+    final linkCode = ctx['linkCode'] as String?;
+    final email = (ctx['email'] as String?) ?? '';
+    final fullName = (ctx['fullName'] as String?) ?? '';
+    final relationshipLabel = ctx['relationshipLabel'] as String?;
+    if (schoolId == null || linkCode == null) {
+      throw StateError('Recovery context missing required fields.');
+    }
+    final hasEmail = email.isNotEmpty;
+
+    await _smsService.linkPhoneAndEnrollMfa(
+      user: user,
+      verificationId: record.verificationId,
+      smsCode: _codeController.text.trim(),
+      phoneNumber: record.phoneE164,
+    );
+
+    final parentRef = _firebaseService.firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('parents')
+        .doc(uid);
+    final existingDoc = await parentRef.get();
+    if (!existingDoc.exists) {
+      final parentUser = UserModel(
+        id: uid,
+        email: hasEmail ? email : null,
+        fullName: fullName,
+        role: UserRole.parent,
+        schoolId: schoolId,
+        linkedChildren: const [],
+        createdAt: DateTime.now(),
+        isActive: true,
+        phoneNumber: record.phoneE164,
+        phoneVerified: true,
+        relationshipLabel: relationshipLabel,
+      );
+      await parentRef.set(parentUser.toFirestore(), SetOptions(merge: true));
+      try {
+        await _firebaseService.firestore
+            .collection('schools')
+            .doc(schoolId)
+            .update({'parentCount': FieldValue.increment(1)});
+      } catch (_) {
+        // Non-critical; continue.
+      }
+    } else if (relationshipLabel != null) {
+      await parentRef.update({'relationshipLabel': relationshipLabel});
+    }
+
+    final indexService = UserSchoolIndexService();
+    if (hasEmail) {
+      await indexService.createOrUpdateIndex(
+        email: email,
+        schoolId: schoolId,
+        userType: 'parent',
+        userId: uid,
+      );
+    }
+    await indexService.createOrUpdatePhoneIndex(
+      phoneE164: record.phoneE164,
+      schoolId: schoolId,
+      userType: 'parent',
+      userId: uid,
+    );
+
+    try {
+      await _linkingService.linkParentToStudent(
+        code: linkCode,
+        parentUserId: uid,
+        parentEmail: hasEmail ? email : null,
+      );
+    } on AlreadyLinkedException {
+      // Already linked — treat as success.
+    }
+
+    final fresh = await parentRef.get();
+    if (fresh.exists) {
+      NotificationService.instance
+          .onParentAuthenticated(UserModel.fromFirestore(fresh));
+    }
+
+    await PhoneVerificationRecoveryService.instance.clear();
+    if (!mounted) return;
+    context.go(AppRouter.getHomeRouteForRole(UserRole.parent));
+  }
+
   Future<void> _cancel() async {
     await PhoneVerificationRecoveryService.instance.clear();
     if (!mounted) return;
@@ -510,7 +701,7 @@ class _PhoneVerifyRecoveryCard extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'We sent a 6-digit code to $phoneE164. Enter it below to finish signing in.',
+                'We sent a 6-digit code to $phoneE164. Enter it below to continue.',
                 textAlign: TextAlign.center,
                 style: LumiTextStyles.bodySmall(
                   color: AppColors.charcoal.withValues(alpha: 0.7),

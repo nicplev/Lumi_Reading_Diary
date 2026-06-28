@@ -16,6 +16,7 @@ import '../../../core/widgets/lumi/lumi_buttons.dart';
 import '../../../core/widgets/lumi/lumi_input.dart';
 import '../../../data/models/user_model.dart';
 import '../../../services/crash_reporting_service.dart';
+import '../../../services/phone_verification_recovery_service.dart';
 import '../../../services/school_code_service.dart';
 import '../../../services/sms_verification_service.dart';
 
@@ -423,6 +424,31 @@ setState(() {
       final handle = await _smsService.sendPrimaryPhoneCode(
         phoneNumberE164: phone,
         forceResendingToken: _resendToken,
+        // Resilience: iOS can pop this modal during the reCAPTCHA Safari
+        // handoff (when silent-push app verification isn't available, e.g. the
+        // Simulator). Persist the verification + signup context so the recovery
+        // screen can finish enrolment. The created account stays signed in, so
+        // recovery links + enrols the phone there instead of re-creating it.
+        onCodeSentPersist: (h) {
+          final record = PendingPhoneVerification(
+            verificationId: h.verificationId,
+            resendToken: h.resendToken,
+            phoneE164: phone,
+            mode: PhoneVerificationMode.teacherMfaEnrollment,
+            contextJson: {
+              'schoolId': _verifiedSchoolId,
+              'email': email,
+              'fullName': fullName,
+              'codeId': _verifiedCodeId,
+            },
+            savedAt: DateTime.now(),
+          );
+          unawaited(PhoneVerificationRecoveryService.instance.save(record));
+          if (!mounted) {
+            PhoneVerificationRecoveryService.instance.onRecoveryNeeded
+                ?.call(record);
+          }
+        },
       );
 
       if (!mounted) return;
@@ -549,6 +575,10 @@ setState(() {
           // Non-critical; the account is created.
         }
       }
+
+      // Finished in-modal — drop any recovery record so a cold start doesn't
+      // route to the recovery screen for an already-completed signup.
+      unawaited(PhoneVerificationRecoveryService.instance.clear());
 
       if (!mounted) return;
       setState(() {

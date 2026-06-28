@@ -704,6 +704,32 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       final handle = await _smsService.sendPrimaryPhoneCode(
         phoneNumberE164: phone,
         forceResendingToken: _resendToken,
+        // Resilience: iOS can pop this modal during the reCAPTCHA Safari
+        // handoff. Persist the verification + signup context so the recovery
+        // screen can finish enrolment on the already-signed-in account.
+        onCodeSentPersist: (h) {
+          final record = PendingPhoneVerification(
+            verificationId: h.verificationId,
+            resendToken: h.resendToken,
+            phoneE164: phone,
+            mode: PhoneVerificationMode.parentMfaEnrollment,
+            contextJson: {
+              'schoolId': code.schoolId,
+              'linkCode': code.code,
+              'email': email,
+              'fullName':
+                  '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'
+                      .trim(),
+              'relationshipLabel': _relationshipLabel,
+            },
+            savedAt: DateTime.now(),
+          );
+          unawaited(PhoneVerificationRecoveryService.instance.save(record));
+          if (!mounted) {
+            PhoneVerificationRecoveryService.instance.onRecoveryNeeded
+                ?.call(record);
+          }
+        },
       );
 
       if (!mounted) return;
@@ -865,6 +891,10 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       } on AlreadyLinkedException {
         // Treat as success — already linked.
       }
+
+      // Finished in-modal — drop any recovery record (phone-primary or MFA)
+      // so a cold start doesn't resume an already-completed signup.
+      unawaited(PhoneVerificationRecoveryService.instance.clear());
 
       final refreshed = await parentRef.get();
       if (!mounted) return;
