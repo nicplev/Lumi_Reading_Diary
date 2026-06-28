@@ -215,7 +215,7 @@ export function renderEmailShell(params: EmailShellParams): string {
           <!-- Hero -->
           <tr>
             <td style="background-color: ${RED}; background-image: ${RED_GRADIENT}; padding: 44px 32px 40px; text-align: center;">
-              <img src="${mascotSrc}" width="88" height="110" alt="Lumi" style="display: block; width: 88px; height: 110px; margin: 0 auto 14px;" />
+              <img src="${mascotSrc}" width="103" height="100" alt="Lumi" style="display: block; width: 103px; height: 100px; margin: 0 auto 14px;" />
               <h1 style="margin: 0 0 8px 0; font-family: ${FONT_DISPLAY}; font-size: 44px; font-weight: 800; color: ${PAPER}; letter-spacing: 1px; line-height: 1;">
                 Lumi
               </h1>
@@ -263,8 +263,8 @@ export function renderEmailShell(params: EmailShellParams): string {
             <td style="padding: 20px 32px 0;">
               <table width="100%" cellpadding="0" cellspacing="0" border="0">
                 ${renderStep(1, "Download the Lumi app", "Available on the App Store and Google Play.")}
-                ${renderStep(2, "Create your parent account", "Sign up with your email or use Google / Apple sign-in.")}
-                ${renderStep(3, "Enter your link code", "Use the code above, or scan the QR with the app.")}
+                ${renderStep(2, "Enter your link code", "Open Lumi and enter the code above, or scan the QR. It unlocks parent sign-up for your school.")}
+                ${renderStep(3, "Create your parent account", "Sign up with your email address to finish setting up.")}
                 ${renderStep(4, "Start tracking", "Log books, see streaks, and celebrate every milestone.")}
               </table>
             </td>
@@ -484,7 +484,7 @@ export function buildStaffOnboardingEmail(params: {
           <!-- Hero -->
           <tr>
             <td style="background-color: ${RED}; background-image: ${RED_GRADIENT}; padding: 44px 32px 40px; text-align: center;">
-              <img src="${mascotSrc}" width="88" height="110" alt="Lumi" style="display: block; width: 88px; height: 110px; margin: 0 auto 14px;" />
+              <img src="${mascotSrc}" width="103" height="100" alt="Lumi" style="display: block; width: 103px; height: 100px; margin: 0 auto 14px;" />
               <h1 style="margin: 0 0 8px 0; font-family: ${FONT_DISPLAY}; font-size: 44px; font-weight: 800; color: ${PAPER}; letter-spacing: 1px; line-height: 1;">
                 Lumi
               </h1>
