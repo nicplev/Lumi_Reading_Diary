@@ -347,6 +347,12 @@ class SmsVerificationService {
         'This phone number is already set up as a second factor on another account.',
       'unsupported-first-factor' =>
         'Your account type doesn\'t support phone MFA.',
+      // Project-level: SMS multi-factor auth disabled (or Phone provider/region
+      // not enabled) for the Firebase project. End users can't fix this, so keep
+      // it calm and point them at support rather than leaking the raw
+      // "SMS based MFA not enabled" provider message.
+      'operation-not-allowed' =>
+        'Phone verification isn\'t available right now. Please try again shortly, or contact support if it keeps happening.',
       'invalid-user-token' || 'user-token-expired' =>
         'Your sign-in session expired. Please close this and start signup again.',
       _ => e.message ?? 'Something went wrong. Please try again.',
