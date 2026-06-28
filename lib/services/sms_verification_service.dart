@@ -179,15 +179,27 @@ class SmsVerificationService {
       smsCode: smsCode,
     );
 
-    // Prove ownership: link the verified phone to this account. Tolerate it
-    // already being linked from an earlier attempt (idempotent retry); a wrong
-    // SMS code still surfaces as invalid-verification-code from the link call.
+    // Prove ownership: link the verified phone to this account.
     try {
       await user.linkWithCredential(credential);
     } on FirebaseAuthException catch (e) {
-      if (e.code != 'provider-already-linked' &&
-          e.code != 'credential-already-in-use') {
-        rethrow;
+      switch (e.code) {
+        case 'provider-already-linked':
+          // Phone already linked to THIS account from an earlier attempt —
+          // idempotent retry; fall through to enrolment.
+          break;
+        case 'credential-already-in-use':
+          // The phone belongs to a DIFFERENT account (it's already registered,
+          // e.g. as a phone-primary login). Surface clearly instead of letting
+          // the server report a confusing "not verified for this account".
+          throw FirebaseAuthException(
+            code: 'phone-already-registered',
+            message: 'This phone number is already registered to another '
+                'account. Use a different number, or log in instead.',
+          );
+        default:
+          // Wrong code etc. surface via friendlyError as usual.
+          rethrow;
       }
     }
 
