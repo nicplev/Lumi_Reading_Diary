@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 const sendSchema = z.object({
   targetUserIds: z.array(z.string()).min(1),
+  emailSubject: z.string().max(200).optional(),
   customMessage: z.string().max(2000).optional(),
 });
 
@@ -28,6 +29,7 @@ export async function POST(request: NextRequest) {
         createdAt: new Date(),
         createdBy: session.uid,
         targetUserIds: data.targetUserIds,
+        emailSubject: data.emailSubject ?? null,
         customMessage: data.customMessage ?? null,
       });
 

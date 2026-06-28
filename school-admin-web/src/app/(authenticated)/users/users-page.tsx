@@ -9,6 +9,7 @@ import { SearchInput } from '@/components/lumi/search-input';
 import { EmptyState } from '@/components/lumi/empty-state';
 import { Icon } from '@/components/lumi/icon';
 import { DataTable, type DataTableColumn } from '@/components/lumi/data-table';
+import { Tabs } from '@/components/lumi/tabs';
 import { ConfirmDialog } from '@/components/lumi/confirm-dialog';
 import { useToast } from '@/components/lumi/toast';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -18,6 +19,7 @@ import { KebabMenu } from '@/components/lumi/kebab-menu';
 import { CreateUserModal } from './create-user-modal';
 import { BulkImportStaffModal } from './bulk-import-staff-modal';
 import { ViewCredentialsModal } from './view-credentials-modal';
+import { StaffOnboardingTab } from './staff-onboarding-tab';
 
 type SerializedUser = NonNullable<ReturnType<typeof useUsers>['data']>[number];
 
@@ -50,6 +52,7 @@ export function UsersPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<SerializedUser | null>(null);
   const [rotateConfirm, setRotateConfirm] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
+  const [tab, setTab] = useState<'staff' | 'onboarding'>('staff');
 
   const staff = useMemo(() => {
     if (!allUsers) return [];
@@ -292,23 +295,40 @@ export function UsersPage() {
         )}
       </div>
 
-      <div className="mb-4">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search by name or email..." />
-      </div>
+      {isAdmin && (
+        <Tabs
+          tabs={[
+            { id: 'staff', label: 'Staff' },
+            { id: 'onboarding', label: 'Onboarding' },
+          ]}
+          activeTab={tab}
+          onChange={(id) => setTab(id as 'staff' | 'onboarding')}
+        />
+      )}
 
-      <DataTable
-        columns={staffColumns}
-        data={filtered}
-        loading={isLoading}
-        emptyState={
-          <EmptyState
-            icon={<Icon name="group" size={40} />}
-            title={search ? 'No users found' : 'No staff members'}
-            description={isAdmin ? 'Add staff members to get started.' : undefined}
-            action={isAdmin ? <Button onClick={() => setShowCreate(true)}>Add Staff Member</Button> : undefined}
+      {isAdmin && tab === 'onboarding' ? (
+        <StaffOnboardingTab />
+      ) : (
+        <>
+          <div className="mb-4">
+            <SearchInput value={search} onChange={setSearch} placeholder="Search by name or email..." />
+          </div>
+
+          <DataTable
+            columns={staffColumns}
+            data={filtered}
+            loading={isLoading}
+            emptyState={
+              <EmptyState
+                icon={<Icon name="group" size={40} />}
+                title={search ? 'No users found' : 'No staff members'}
+                description={isAdmin ? 'Add staff members to get started.' : undefined}
+                action={isAdmin ? <Button onClick={() => setShowCreate(true)}>Add Staff Member</Button> : undefined}
+              />
+            }
           />
-        }
-      />
+        </>
+      )}
 
       {isAdmin && (
         <>
