@@ -51,7 +51,9 @@ export function buildStaffOnboardingEmailPreview(params: {
   const firstName = staffName.split(" ")[0] || staffName;
   const mascotSrc = LUMI_MASCOT_DATA_URI;
   const hasTempPassword = !!tempPassword;
-  const showSchoolCode = !!schoolCode && !isAdmin;
+  // School code only on the self-register path; admin-created teachers log in
+  // directly with the temp password, so the code would just be noise.
+  const showSchoolCode = !!schoolCode && !isAdmin && !hasTempPassword;
 
   const customMessageBlock = customMessage
     ? `
