@@ -7,6 +7,7 @@ import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
 import '../../core/widgets/lumi/feedback_widget.dart';
+import '../../core/widgets/lumi/legal_links_row.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
@@ -718,6 +719,8 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
                 style: LumiType.body,
               ),
               const SizedBox(height: LumiTokens.space4),
+              const LegalLinksRow(accent: LumiTokens.green),
+              const SizedBox(height: LumiTokens.space2),
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: Text('Close',

@@ -9,6 +9,7 @@ import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/feedback_widget.dart';
 import '../../core/widgets/lumi/teacher_settings_section.dart';
 import '../../core/widgets/lumi/teacher_settings_item.dart';
+import '../../core/widgets/lumi/legal_links_row.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/user_model.dart';
 import '../../services/firebase_service.dart';
@@ -219,6 +220,8 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
                     .copyWith(color: LumiTokens.muted)),
             const SizedBox(height: 8),
             Text('Reading Tracker for Schools', style: LumiType.body),
+            const SizedBox(height: LumiTokens.space4),
+            const LegalLinksRow(accent: LumiTokens.red),
           ],
         ),
         actions: [
