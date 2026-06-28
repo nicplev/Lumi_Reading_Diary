@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -56,6 +57,24 @@ void main() async {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
+
+      // DEBUG ONLY: let configured Firebase test phone numbers work on the iOS
+      // Simulator. The Simulator can't receive the silent push used for phone
+      // app-verification, so it falls back to reCAPTCHA / a real send and then
+      // rejects the fixed test code. This flag skips app verification so the
+      // console test numbers (e.g. +61400000000 → 123456) sign in directly.
+      // Safe now that MFA enrolment is server-side (Admin SDK) — the flag's
+      // only known issue was the OLD client multiFactor.enroll endpoint, which
+      // signup no longer uses. NEVER enabled in release builds. (Note: with
+      // this on, only configured test numbers work in debug — not real ones.)
+      if (kDebugMode && !kIsWeb) {
+        try {
+          await FirebaseAuth.instance
+              .setSettings(appVerificationDisabledForTesting: true);
+        } catch (e) {
+          debugPrint('Warning: phone-auth test settings not applied: $e');
+        }
+      }
 
       // Activate App Check before any other Firebase SDK calls so attested
       // requests include the token from the very first ID-token mint.

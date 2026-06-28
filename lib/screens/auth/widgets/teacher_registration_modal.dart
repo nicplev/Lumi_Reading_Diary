@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:ui';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,13 +8,13 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/routing/app_router.dart';
-import '../../../core/services/user_school_index_service.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../core/theme/lumi_text_styles.dart';
 import '../../../core/widgets/lumi/lumi_buttons.dart';
 import '../../../core/widgets/lumi/lumi_input.dart';
 import '../../../data/models/user_model.dart';
 import '../../../services/crash_reporting_service.dart';
+import '../../../services/phone_verification_recovery_service.dart';
 import '../../../services/school_code_service.dart';
 import '../../../services/sms_verification_service.dart';
 
@@ -119,7 +118,6 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
   final _schoolCodeService = SchoolCodeService();
   final _smsService = SmsVerificationService();
   final _auth = FirebaseAuth.instance;
-  final _firestore = FirebaseFirestore.instance;
 
   final _codeController = TextEditingController();
   final _firstNameController = TextEditingController();
@@ -403,26 +401,51 @@ setState(() {
     final phone = _phoneE164;
 
     try {
-      User user;
       if (_pendingUserId == null) {
         final cred = await _auth.createUserWithEmailAndPassword(
           email: email,
           password: password,
         );
-        user = cred.user!;
+        final user = cred.user!;
         await user.updateDisplayName(fullName);
         await user.sendEmailVerification();
         _pendingUserId = user.uid;
-      } else {
-        // Mid-flow retry (e.g. resend from the SMS stage). The MFA session
-        // must come from the currently-signed-in user, which is still ours.
-        user = _auth.currentUser!;
       }
+      // Mid-flow retries (resend from the SMS stage) just re-send the code;
+      // the account already exists and the signed-in session is still ours.
 
-      final handle = await _smsService.sendEnrollmentCode(
-        user: user,
-        phoneNumber: phone,
+      // Primary phone verification (no multi-factor session): the phone is
+      // verified + linked client-side, then enrolled server-side via
+      // linkPhoneAndEnrollMfa. The client-side MFA-session enroll is blocked
+      // until the email is verified, which we don't require during signup.
+      final handle = await _smsService.sendPrimaryPhoneCode(
+        phoneNumberE164: phone,
         forceResendingToken: _resendToken,
+        // Resilience: iOS can pop this modal during the reCAPTCHA Safari
+        // handoff (when silent-push app verification isn't available, e.g. the
+        // Simulator). Persist the verification + signup context so the recovery
+        // screen can finish enrolment. The created account stays signed in, so
+        // recovery links + enrols the phone there instead of re-creating it.
+        onCodeSentPersist: (h) {
+          final record = PendingPhoneVerification(
+            verificationId: h.verificationId,
+            resendToken: h.resendToken,
+            phoneE164: phone,
+            mode: PhoneVerificationMode.teacherMfaEnrollment,
+            contextJson: {
+              'schoolId': _verifiedSchoolId,
+              'email': email,
+              'fullName': fullName,
+              'codeId': _verifiedCodeId,
+            },
+            savedAt: DateTime.now(),
+          );
+          unawaited(PhoneVerificationRecoveryService.instance.save(record));
+          if (!mounted) {
+            PhoneVerificationRecoveryService.instance.onRecoveryNeeded
+                ?.call(record);
+          }
+        },
       );
 
       if (!mounted) return;
@@ -465,7 +488,6 @@ setState(() {
   Future<void> _verifySmsAndFinish() async {
     if (!_smsCodeValid) return;
     final schoolId = _verifiedSchoolId;
-    final codeId = _verifiedCodeId;
     final verificationId = _verificationId;
     if (schoolId == null || verificationId == null) return;
 
@@ -488,71 +510,41 @@ setState(() {
             .trim();
 
     try {
-      await _smsService.enrollPhoneFactor(
+      final outcome = await _smsService.completeMfaSignup(
         user: user,
         verificationId: verificationId,
         smsCode: _smsCodeController.text.trim(),
         phoneNumber: phone,
-      );
-
-      final indexService = UserSchoolIndexService();
-
-      final teacherUser = UserModel(
-        id: user.uid,
-        email: email,
+        role: 'teacher',
+        schoolId: schoolId,
         fullName: fullName,
-        role: UserRole.teacher,
-        schoolId: schoolId,
-        phoneNumber: phone,
-        phoneVerified: true,
-        createdAt: DateTime.now(),
-        lastLoginAt: DateTime.now(),
-      );
-
-      await _firestore
-          .collection('schools')
-          .doc(schoolId)
-          .collection('users')
-          .doc(user.uid)
-          .set({
-        ...teacherUser.toFirestore(),
-        'permissions': {
-          'notifications': {
-            'assignedClasses': true,
-            'assignedStudents': true,
-            'schedule': true,
-            'wholeSchool': false,
-          },
-        },
-      });
-
-      try {
-        await _firestore
-            .collection('schools')
-            .doc(schoolId)
-            .update({'teacherCount': FieldValue.increment(1)});
-      } catch (_) {
-        // Non-critical; continue.
-      }
-
-      await indexService.createOrUpdateIndex(
         email: email,
-        schoolId: schoolId,
-        userType: 'user',
-        userId: user.uid,
       );
 
-      if (codeId != null) {
-        try {
-          await _schoolCodeService.incrementCodeUsage(codeId);
-        } catch (_) {
-          // Non-critical; the account is created.
-        }
-      }
+      // The server enrolled the factor AND wrote the teacher doc + index — the
+      // enrol revokes the client session, so finalisation must be server-side.
+      // Drop any recovery record so a cold start doesn't resume a done signup.
+      unawaited(PhoneVerificationRecoveryService.instance.clear());
 
       if (!mounted) return;
+      if (outcome == MfaSignupOutcome.needsLogin) {
+        // Fully set up, but the session couldn't be re-established (MFA
+        // challenge on the custom token) — send the user to log in.
+        _goToLoginAfterSignup();
+        return;
+      }
       setState(() {
-        _createdTeacher = teacherUser;
+        _createdTeacher = UserModel(
+          id: user.uid,
+          email: email,
+          fullName: fullName,
+          role: UserRole.teacher,
+          schoolId: schoolId,
+          phoneNumber: phone,
+          phoneVerified: true,
+          createdAt: DateTime.now(),
+          lastLoginAt: DateTime.now(),
+        );
         _stage = _Stage.success;
       });
     } on FirebaseAuthException catch (e) {
@@ -599,6 +591,19 @@ setState(() {
     }
   }
 
+  /// Fallback for when the signup completed server-side but the custom-token
+  /// re-auth was MFA-challenged: the account is fully set up, so close the modal
+  /// and send the user to log in (email + password + SMS) to continue.
+  void _goToLoginAfterSignup() {
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+    Navigator.of(context).pop();
+    router.go('/auth/login');
+    messenger.showSnackBar(const SnackBar(
+      content: Text('Account created! Please log in to continue.'),
+    ));
+  }
+
   // ---------------------------------------------------------------------------
   // Build
   // ---------------------------------------------------------------------------
@@ -640,7 +645,11 @@ setState(() {
                   )
                 : KeyedSubtree(
                     key: const ValueKey('form'),
-                    child: _buildFormCard(),
+                    // AutofillGroup + per-field autofillHints stabilise iOS
+                    // credential AutoFill so the "Passwords" accessory bar
+                    // doesn't flicker — that flicker changed the keyboard inset,
+                    // shifted the modal, and dropped the field's focus.
+                    child: AutofillGroup(child: _buildFormCard()),
                   ),
           ),
         ),
@@ -941,6 +950,7 @@ setState(() {
                     accentColor: LumiTokens.red,
                     controller: _passwordController,
                     focusNode: _passwordFocusNode,
+                    autofillHints: const [AutofillHints.newPassword],
                     hintText: 'Password (at least 8 characters)',
                   )
                       .animate()
@@ -967,6 +977,7 @@ setState(() {
           controller: _passwordController,
           focusNode: _passwordFocusNode,
           autofocus: true,
+          autofillHints: const [AutofillHints.newPassword],
           hintText: 'At least 8 characters',
           helperText: 'Include uppercase, lowercase, and a number.',
           errorText: _passwordController.text.isNotEmpty && !_passwordValid
@@ -984,6 +995,7 @@ setState(() {
                     accentColor: LumiTokens.red,
                     controller: _confirmController,
                     focusNode: _confirmFocusNode,
+                    autofillHints: const [AutofillHints.newPassword],
                     hintText: 'Confirm password',
                   )
                       .animate()
@@ -1007,6 +1019,7 @@ setState(() {
       controller: _confirmController,
       focusNode: _confirmFocusNode,
       autofocus: true,
+      autofillHints: const [AutofillHints.newPassword],
       hintText: 'Re-enter password',
       errorText: _confirmController.text.isNotEmpty && !_confirmValid
           ? 'Passwords don\'t match'

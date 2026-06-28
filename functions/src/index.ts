@@ -46,6 +46,12 @@ export {maintainLibraryCounts} from "./library_counts";
 // functions/src/sms_rate_limit.ts for the policy and rollout notes.
 export {requestSmsVerification} from "./sms_rate_limit";
 
+// Server-side phone second-factor enrollment. Identity Platform blocks
+// client-side MFA enrollment on unverified emails; the client links the
+// SMS-verified phone and this enrolls it via the Admin SDK. See
+// functions/src/mfa_enrollment.ts.
+export {enrollLinkedPhoneAsMfa} from "./mfa_enrollment";
+
 admin.initializeApp();
 const db = admin.firestore();
 

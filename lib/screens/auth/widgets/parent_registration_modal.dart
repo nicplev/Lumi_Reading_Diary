@@ -689,7 +689,6 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
 
       // At this point we have a signed-in user. If MFA is already enrolled,
       // bail — we would have already taken the login-resolver branch above.
-      final user = _auth.currentUser!;
       if (_mfaAlreadyEnrolled) {
         // Shouldn't be reached given the login branch returns early, but
         // guard against a programmer error.
@@ -698,10 +697,39 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         return;
       }
 
-      final handle = await _smsService.sendEnrollmentCode(
-        user: user,
-        phoneNumber: phone,
+      // Primary phone verification (no multi-factor session): the phone is
+      // verified + linked client-side, then enrolled server-side via
+      // linkPhoneAndEnrollMfa. The client-side MFA-session enroll is blocked
+      // until the email is verified, which we don't require during signup.
+      final handle = await _smsService.sendPrimaryPhoneCode(
+        phoneNumberE164: phone,
         forceResendingToken: _resendToken,
+        // Resilience: iOS can pop this modal during the reCAPTCHA Safari
+        // handoff. Persist the verification + signup context so the recovery
+        // screen can finish enrolment on the already-signed-in account.
+        onCodeSentPersist: (h) {
+          final record = PendingPhoneVerification(
+            verificationId: h.verificationId,
+            resendToken: h.resendToken,
+            phoneE164: phone,
+            mode: PhoneVerificationMode.parentMfaEnrollment,
+            contextJson: {
+              'schoolId': code.schoolId,
+              'linkCode': code.code,
+              'email': email,
+              'fullName':
+                  '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'
+                      .trim(),
+              'relationshipLabel': _relationshipLabel,
+            },
+            savedAt: DateTime.now(),
+          );
+          unawaited(PhoneVerificationRecoveryService.instance.save(record));
+          if (!mounted) {
+            PhoneVerificationRecoveryService.instance.onRecoveryNeeded
+                ?.call(record);
+          }
+        },
       );
 
       if (!mounted) return;
@@ -774,22 +802,51 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         userId = cred.user!.uid;
         enrolledPhone = null; // not changing the enrolled phone
       } else {
-        // Email + MFA branch: enroll the phone we collected as a second
-        // factor on the freshly-created email/password account.
+        // Email + MFA branch: the server enrols the phone factor AND finalises
+        // the signup (parent doc + indexes + child link) — because enrolling
+        // MFA revokes the client session, so the client can't write afterwards.
+        // It returns a custom token we re-auth with to land on home.
         final user = _auth.currentUser;
         if (user == null) {
           setState(() => _errorMessage =
               'Your session expired. Please start registration again.');
           return;
         }
-        await _smsService.enrollPhoneFactor(
+        final outcome = await _smsService.completeMfaSignup(
           user: user,
           verificationId: verificationId,
           smsCode: smsCode,
           phoneNumber: phone,
+          role: 'parent',
+          schoolId: code.schoolId,
+          fullName: fullName,
+          email: hasEmail ? email : null,
+          relationshipLabel: _relationshipLabel,
+          linkCode: code.code,
         );
-        userId = user.uid;
-        enrolledPhone = phone;
+        unawaited(PhoneVerificationRecoveryService.instance.clear());
+        if (!mounted) return;
+        if (outcome == MfaSignupOutcome.needsLogin) {
+          // Fully set up, but the session couldn't be re-established (MFA
+          // challenge on the custom token) — send the user to log in.
+          _goToLoginAfterSignup();
+          return;
+        }
+        // sessionReady: the server wrote the parent doc — read it for the
+        // success card, then show success. Server already did the rest.
+        final parentSnap = await _firestore
+            .collection('schools')
+            .doc(code.schoolId)
+            .collection('parents')
+            .doc(user.uid)
+            .get();
+        setState(() {
+          _createdParent =
+              parentSnap.exists ? UserModel.fromFirestore(parentSnap) : null;
+          _stage = _Stage.success;
+        });
+        AnalyticsService.instance.logParentLinkingCompleted();
+        return;
       }
 
       final indexService = UserSchoolIndexService();
@@ -864,6 +921,10 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         // Treat as success — already linked.
       }
 
+      // Finished in-modal — drop any recovery record (phone-primary or MFA)
+      // so a cold start doesn't resume an already-completed signup.
+      unawaited(PhoneVerificationRecoveryService.instance.clear());
+
       final refreshed = await parentRef.get();
       if (!mounted) return;
       setState(() {
@@ -923,6 +984,19 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
     }
   }
 
+  /// Fallback for when the signup completed server-side but the custom-token
+  /// re-auth was MFA-challenged: the account is fully set up, so close the modal
+  /// and send the user to log in (phone or email + SMS) to continue.
+  void _goToLoginAfterSignup() {
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+    Navigator.of(context).pop();
+    router.go('/auth/login');
+    messenger.showSnackBar(const SnackBar(
+      content: Text('Account created! Please log in to continue.'),
+    ));
+  }
+
   // ---------------------------------------------------------------------------
   // Build
   // ---------------------------------------------------------------------------
@@ -964,7 +1038,11 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
                   )
                 : KeyedSubtree(
                     key: const ValueKey('form'),
-                    child: _buildFormCard(),
+                    // AutofillGroup + per-field autofillHints stabilise iOS
+                    // credential AutoFill so the "Passwords" accessory bar
+                    // doesn't flicker — that flicker changed the keyboard inset,
+                    // shifted the modal, and dropped the field's focus.
+                    child: AutofillGroup(child: _buildFormCard()),
                   ),
           ),
         ),
@@ -1352,6 +1430,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
                     accentColor: LumiTokens.red,
                     controller: _passwordController,
                     focusNode: _passwordFocusNode,
+                    autofillHints: const [AutofillHints.newPassword],
                     hintText: 'Password (at least 8 characters)',
                   )
                       .animate()
@@ -1402,6 +1481,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
           controller: _passwordController,
           focusNode: _passwordFocusNode,
           autofocus: true,
+          autofillHints: const [AutofillHints.newPassword],
           hintText: 'At least 8 characters',
           helperText: 'Include uppercase, lowercase, and a number.',
           errorText: _passwordController.text.isNotEmpty && !_passwordValid
@@ -1419,6 +1499,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
                     accentColor: LumiTokens.red,
                     controller: _confirmController,
                     focusNode: _confirmFocusNode,
+                    autofillHints: const [AutofillHints.newPassword],
                     hintText: 'Confirm password',
                   )
                       .animate()
@@ -1442,6 +1523,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       controller: _confirmController,
       focusNode: _confirmFocusNode,
       autofocus: true,
+      autofillHints: const [AutofillHints.newPassword],
       hintText: 'Re-enter password',
       errorText: _confirmController.text.isNotEmpty && !_confirmValid
           ? 'Passwords don\'t match'

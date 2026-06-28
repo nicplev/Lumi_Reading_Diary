@@ -16,6 +16,20 @@ enum PhoneVerificationMode {
   /// Existing phone-only parent signing in. `contextJson` is empty — the
   /// recovery screen looks up the school via `lookupSchoolByPhone`.
   phoneLogin,
+
+  /// Teacher signing up with email + password, enrolling the phone as a
+  /// second factor. The email/password account already exists and is signed
+  /// in (the session survives the teardown / relaunch), so recovery links the
+  /// verified phone + enrols server-side rather than signing in. `contextJson`
+  /// carries schoolId / email / fullName / codeId so the recovery screen can
+  /// write the teacher doc + index after enrolment.
+  teacherMfaEnrollment,
+
+  /// Parent signing up with email + password, enrolling the phone as a second
+  /// factor. Like [teacherMfaEnrollment] but the recovery tail writes the
+  /// parent doc + indexes + links the student. `contextJson` carries
+  /// schoolId / linkCode / email / fullName / relationshipLabel.
+  parentMfaEnrollment,
 }
 
 /// Snapshot of an in-flight Firebase phone verification that needs to
