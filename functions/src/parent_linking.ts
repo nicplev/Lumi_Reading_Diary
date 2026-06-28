@@ -260,143 +260,158 @@ interface LinkParentInput {
   clientInfo?: unknown;
 }
 
+/**
+ * Core parent↔student link logic, shared by the [linkParentToStudent] callable
+ * and the server-side MFA signup finaliser (enrollLinkedPhoneAsMfa). Validates
+ * the code and atomically links parent↔student, granting book-pack access on
+ * first link. The parent doc must already exist.
+ * @param {string} uid The parent's Firebase UID.
+ * @param {string} codeUpper The uppercased link code.
+ * @return {Promise<{studentId: string, schoolId: string, linkedChildren: string[]}>}
+ *   The linked student id, school id, and projected linkedChildren.
+ */
+export async function linkParentToStudentCore(
+  uid: string,
+  codeUpper: string,
+): Promise<{studentId: string; schoolId: string; linkedChildren: string[]}> {
+  const best = await findBestCodeForString(codeUpper);
+  if (!best) {
+    throw failedPrecondition("invalid-code", "Link code not recognised.");
+  }
+
+  return db().runTransaction(async (tx) => {
+    // 1. Re-read inside the transaction (TOCTOU defense).
+    const codeRef = db().collection(COLL_LINK_CODES).doc(best.id);
+    const codeSnap = await tx.get(codeRef);
+    if (!codeSnap.exists) {
+      throw failedPrecondition("invalid-code", "Link code not recognised.");
+    }
+    const fresh = parseCodeDoc(codeSnap);
+    if (fresh.code !== codeUpper) {
+      throw failedPrecondition("invalid-code", "Link code not recognised.");
+    }
+    if (fresh.status === "used") {
+      throw failedPrecondition("code-used", "This code has already been used.");
+    }
+    if (fresh.status === "revoked") {
+      throw failedPrecondition(
+        "code-revoked",
+        "This code has been revoked.",
+        fresh.revokeReason !== null ? {reason: fresh.revokeReason} : undefined
+      );
+    }
+    if (fresh.expiresAt === null) {
+      throw failedPrecondition("invalid-code", "Link code is malformed.");
+    }
+    if (fresh.status === "expired" || fresh.expiresAt < new Date()) {
+      throw failedPrecondition("code-expired", "This code has expired.");
+    }
+    if (fresh.status !== "active") {
+      throw failedPrecondition("invalid-code", "Link code is not active.");
+    }
+    if (fresh.schoolId.length === 0 || fresh.studentId.length === 0) {
+      throw failedPrecondition("invalid-code", "Link code is malformed.");
+    }
+
+    // 2. Parent doc must already exist — the client creates it before
+    //    calling this. Server never forks doc-shape ownership.
+    const parentRef = db()
+      .collection("schools").doc(fresh.schoolId)
+      .collection("parents").doc(uid);
+    const parentSnap = await tx.get(parentRef);
+    if (!parentSnap.exists) {
+      throw failedPrecondition(
+        "parent-doc-missing",
+        "Parent profile must exist before linking."
+      );
+    }
+
+    const studentRef = db()
+      .collection("schools").doc(fresh.schoolId)
+      .collection("students").doc(fresh.studentId);
+    const studentSnap = await tx.get(studentRef);
+    if (!studentSnap.exists) {
+      throw notFound("student-missing", "Student not found.");
+    }
+
+    // T3 — materialise access on first link. If the student has no live
+    // access yet and the school's subscription for the current year is
+    // active, grant book-pack-assumed access through end-of-January. Keeps a
+    // new mid-year student in sync with the cohort. All reads happen before
+    // any write (Firestore transaction rule).
+    const cfgSnap = await tx.get(
+      db().collection("config").doc("academicYear"),
+    );
+    const currentYear = cfgSnap.data()?.currentAcademicYear as
+        | number
+        | undefined;
+    let subActive = false;
+    if (typeof currentYear === "number") {
+      const subSnap = await tx.get(
+        db()
+          .collection("schoolSubscriptions")
+          .doc(`${fresh.schoolId}_${currentYear}`),
+      );
+      subActive =
+          subSnap.exists &&
+          isActiveSubscriptionStatus(subSnap.data()?.status as string);
+    }
+    const grantAccess =
+        typeof currentYear === "number" &&
+        subActive &&
+        !studentAccessAlreadyLive(studentSnap.data());
+
+    const existingLinked = Array.isArray(parentSnap.data()?.linkedChildren) ?
+      (parentSnap.data()?.linkedChildren as string[]) :
+      [];
+    if (existingLinked.includes(fresh.studentId)) {
+      throw alreadyExists("already-linked", "Already linked to this student.");
+    }
+
+    // 3. Atomic writes.
+    const studentUpdate: admin.firestore.UpdateData<admin.firestore.DocumentData> = {
+      parentIds: admin.firestore.FieldValue.arrayUnion(uid),
+    };
+    if (grantAccess) {
+      studentUpdate.access = buildStudentAccess({
+        academicYear: currentYear as number,
+        source: "book_pack_assumed",
+        grantedBy: uid,
+      });
+    }
+    tx.update(studentRef, studentUpdate);
+    tx.set(
+      parentRef,
+      {
+        linkedChildren: admin.firestore.FieldValue.arrayUnion(fresh.studentId),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      {merge: true}
+    );
+    tx.update(codeRef, {
+      status: "used",
+      usedBy: uid,
+      usedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Return projected fresh linkedChildren so the client can skip a
+    // follow-up read.
+    const projectedLinked = [...existingLinked, fresh.studentId];
+    return {
+      studentId: fresh.studentId,
+      schoolId: fresh.schoolId,
+      linkedChildren: projectedLinked,
+    };
+  });
+}
+
 export const linkParentToStudent = fns
   .runWith(parentLinkingRuntime({timeoutSeconds: 30, memory: "256MB"}))
   .https.onCall(async (data: LinkParentInput, context) => {
     const {uid} = requireAuthed(context);
     const codeUpper = asNonEmptyString(data.code, "code").toUpperCase();
-
     await enforceRateLimit(uid);
-
-    const best = await findBestCodeForString(codeUpper);
-    if (!best) {
-      throw failedPrecondition("invalid-code", "Link code not recognised.");
-    }
-
-    return db().runTransaction(async (tx) => {
-      // 1. Re-read inside the transaction (TOCTOU defense).
-      const codeRef = db().collection(COLL_LINK_CODES).doc(best.id);
-      const codeSnap = await tx.get(codeRef);
-      if (!codeSnap.exists) {
-        throw failedPrecondition("invalid-code", "Link code not recognised.");
-      }
-      const fresh = parseCodeDoc(codeSnap);
-      if (fresh.code !== codeUpper) {
-        throw failedPrecondition("invalid-code", "Link code not recognised.");
-      }
-      if (fresh.status === "used") {
-        throw failedPrecondition("code-used", "This code has already been used.");
-      }
-      if (fresh.status === "revoked") {
-        throw failedPrecondition(
-          "code-revoked",
-          "This code has been revoked.",
-          fresh.revokeReason !== null ? {reason: fresh.revokeReason} : undefined
-        );
-      }
-      if (fresh.expiresAt === null) {
-        throw failedPrecondition("invalid-code", "Link code is malformed.");
-      }
-      if (fresh.status === "expired" || fresh.expiresAt < new Date()) {
-        throw failedPrecondition("code-expired", "This code has expired.");
-      }
-      if (fresh.status !== "active") {
-        throw failedPrecondition("invalid-code", "Link code is not active.");
-      }
-      if (fresh.schoolId.length === 0 || fresh.studentId.length === 0) {
-        throw failedPrecondition("invalid-code", "Link code is malformed.");
-      }
-
-      // 2. Parent doc must already exist — the client creates it before
-      //    calling this. Server never forks doc-shape ownership.
-      const parentRef = db()
-        .collection("schools").doc(fresh.schoolId)
-        .collection("parents").doc(uid);
-      const parentSnap = await tx.get(parentRef);
-      if (!parentSnap.exists) {
-        throw failedPrecondition(
-          "parent-doc-missing",
-          "Parent profile must exist before linking."
-        );
-      }
-
-      const studentRef = db()
-        .collection("schools").doc(fresh.schoolId)
-        .collection("students").doc(fresh.studentId);
-      const studentSnap = await tx.get(studentRef);
-      if (!studentSnap.exists) {
-        throw notFound("student-missing", "Student not found.");
-      }
-
-      // T3 — materialise access on first link. If the student has no live
-      // access yet and the school's subscription for the current year is
-      // active, grant book-pack-assumed access through end-of-January. Keeps a
-      // new mid-year student in sync with the cohort. All reads happen before
-      // any write (Firestore transaction rule).
-      const cfgSnap = await tx.get(
-        db().collection("config").doc("academicYear"),
-      );
-      const currentYear = cfgSnap.data()?.currentAcademicYear as
-        | number
-        | undefined;
-      let subActive = false;
-      if (typeof currentYear === "number") {
-        const subSnap = await tx.get(
-          db()
-            .collection("schoolSubscriptions")
-            .doc(`${fresh.schoolId}_${currentYear}`),
-        );
-        subActive =
-          subSnap.exists &&
-          isActiveSubscriptionStatus(subSnap.data()?.status as string);
-      }
-      const grantAccess =
-        typeof currentYear === "number" &&
-        subActive &&
-        !studentAccessAlreadyLive(studentSnap.data());
-
-      const existingLinked = Array.isArray(parentSnap.data()?.linkedChildren) ?
-        (parentSnap.data()?.linkedChildren as string[]) :
-        [];
-      if (existingLinked.includes(fresh.studentId)) {
-        throw alreadyExists("already-linked", "Already linked to this student.");
-      }
-
-      // 3. Atomic writes.
-      const studentUpdate: admin.firestore.UpdateData<admin.firestore.DocumentData> = {
-        parentIds: admin.firestore.FieldValue.arrayUnion(uid),
-      };
-      if (grantAccess) {
-        studentUpdate.access = buildStudentAccess({
-          academicYear: currentYear as number,
-          source: "book_pack_assumed",
-          grantedBy: uid,
-        });
-      }
-      tx.update(studentRef, studentUpdate);
-      tx.set(
-        parentRef,
-        {
-          linkedChildren: admin.firestore.FieldValue.arrayUnion(fresh.studentId),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
-        {merge: true}
-      );
-      tx.update(codeRef, {
-        status: "used",
-        usedBy: uid,
-        usedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      // Return projected fresh linkedChildren so the client can skip a
-      // follow-up read.
-      const projectedLinked = [...existingLinked, fresh.studentId];
-      return {
-        studentId: fresh.studentId,
-        schoolId: fresh.schoolId,
-        linkedChildren: projectedLinked,
-      };
-    });
+    return linkParentToStudentCore(uid, codeUpper);
   });
 
 // ─────────────────────────────────────────────────────────────────────────────

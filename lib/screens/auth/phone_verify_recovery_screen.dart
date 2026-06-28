@@ -395,50 +395,23 @@ class _PhoneVerifyRecoveryScreenState extends State<PhoneVerifyRecoveryScreen> {
       throw StateError('Recovery context missing required fields.');
     }
 
-    await _smsService.linkPhoneAndEnrollMfa(
+    final outcome = await _smsService.completeMfaSignup(
       user: user,
       verificationId: record.verificationId,
       smsCode: _codeController.text.trim(),
       phoneNumber: record.phoneE164,
-    );
-
-    final teacherUser = UserModel(
-      id: user.uid,
-      email: email,
+      role: 'teacher',
+      schoolId: schoolId,
       fullName: fullName,
-      role: UserRole.teacher,
-      schoolId: schoolId,
-      phoneNumber: record.phoneE164,
-      phoneVerified: true,
-      createdAt: DateTime.now(),
-      lastLoginAt: DateTime.now(),
-    );
-    await _firebaseService.firestore
-        .collection('schools')
-        .doc(schoolId)
-        .collection('users')
-        .doc(user.uid)
-        .set({
-      ...teacherUser.toFirestore(),
-      'permissions': {
-        'notifications': {
-          'assignedClasses': true,
-          'assignedStudents': true,
-          'schedule': true,
-          'wholeSchool': false,
-        },
-      },
-    }, SetOptions(merge: true));
-
-    await UserSchoolIndexService().createOrUpdateIndex(
       email: email,
-      schoolId: schoolId,
-      userType: 'user',
-      userId: user.uid,
     );
 
     await PhoneVerificationRecoveryService.instance.clear();
     if (!mounted) return;
+    if (outcome == MfaSignupOutcome.needsLogin) {
+      context.go('/auth/login');
+      return;
+    }
     context.go(AppRouter.getHomeRouteForRole(UserRole.teacher));
   }
 
@@ -458,7 +431,6 @@ class _PhoneVerifyRecoveryScreenState extends State<PhoneVerifyRecoveryScreen> {
           'Your session expired. Please start registration again.');
       return;
     }
-    final uid = user.uid;
     final ctx = record.contextJson;
     final schoolId = ctx['schoolId'] as String?;
     final linkCode = ctx['linkCode'] as String?;
@@ -468,82 +440,25 @@ class _PhoneVerifyRecoveryScreenState extends State<PhoneVerifyRecoveryScreen> {
     if (schoolId == null || linkCode == null) {
       throw StateError('Recovery context missing required fields.');
     }
-    final hasEmail = email.isNotEmpty;
-
-    await _smsService.linkPhoneAndEnrollMfa(
+    final outcome = await _smsService.completeMfaSignup(
       user: user,
       verificationId: record.verificationId,
       smsCode: _codeController.text.trim(),
       phoneNumber: record.phoneE164,
-    );
-
-    final parentRef = _firebaseService.firestore
-        .collection('schools')
-        .doc(schoolId)
-        .collection('parents')
-        .doc(uid);
-    final existingDoc = await parentRef.get();
-    if (!existingDoc.exists) {
-      final parentUser = UserModel(
-        id: uid,
-        email: hasEmail ? email : null,
-        fullName: fullName,
-        role: UserRole.parent,
-        schoolId: schoolId,
-        linkedChildren: const [],
-        createdAt: DateTime.now(),
-        isActive: true,
-        phoneNumber: record.phoneE164,
-        phoneVerified: true,
-        relationshipLabel: relationshipLabel,
-      );
-      await parentRef.set(parentUser.toFirestore(), SetOptions(merge: true));
-      try {
-        await _firebaseService.firestore
-            .collection('schools')
-            .doc(schoolId)
-            .update({'parentCount': FieldValue.increment(1)});
-      } catch (_) {
-        // Non-critical; continue.
-      }
-    } else if (relationshipLabel != null) {
-      await parentRef.update({'relationshipLabel': relationshipLabel});
-    }
-
-    final indexService = UserSchoolIndexService();
-    if (hasEmail) {
-      await indexService.createOrUpdateIndex(
-        email: email,
-        schoolId: schoolId,
-        userType: 'parent',
-        userId: uid,
-      );
-    }
-    await indexService.createOrUpdatePhoneIndex(
-      phoneE164: record.phoneE164,
+      role: 'parent',
       schoolId: schoolId,
-      userType: 'parent',
-      userId: uid,
+      fullName: fullName,
+      email: email.isEmpty ? null : email,
+      relationshipLabel: relationshipLabel,
+      linkCode: linkCode,
     );
-
-    try {
-      await _linkingService.linkParentToStudent(
-        code: linkCode,
-        parentUserId: uid,
-        parentEmail: hasEmail ? email : null,
-      );
-    } on AlreadyLinkedException {
-      // Already linked — treat as success.
-    }
-
-    final fresh = await parentRef.get();
-    if (fresh.exists) {
-      NotificationService.instance
-          .onParentAuthenticated(UserModel.fromFirestore(fresh));
-    }
 
     await PhoneVerificationRecoveryService.instance.clear();
     if (!mounted) return;
+    if (outcome == MfaSignupOutcome.needsLogin) {
+      context.go('/auth/login');
+      return;
+    }
     context.go(AppRouter.getHomeRouteForRole(UserRole.parent));
   }
 

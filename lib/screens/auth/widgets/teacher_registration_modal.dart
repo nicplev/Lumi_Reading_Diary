@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:ui';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,7 +8,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/routing/app_router.dart';
-import '../../../core/services/user_school_index_service.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../core/theme/lumi_text_styles.dart';
 import '../../../core/widgets/lumi/lumi_buttons.dart';
@@ -120,7 +118,6 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
   final _schoolCodeService = SchoolCodeService();
   final _smsService = SmsVerificationService();
   final _auth = FirebaseAuth.instance;
-  final _firestore = FirebaseFirestore.instance;
 
   final _codeController = TextEditingController();
   final _firstNameController = TextEditingController();
@@ -491,7 +488,6 @@ setState(() {
   Future<void> _verifySmsAndFinish() async {
     if (!_smsCodeValid) return;
     final schoolId = _verifiedSchoolId;
-    final codeId = _verifiedCodeId;
     final verificationId = _verificationId;
     if (schoolId == null || verificationId == null) return;
 
@@ -514,75 +510,41 @@ setState(() {
             .trim();
 
     try {
-      await _smsService.linkPhoneAndEnrollMfa(
+      final outcome = await _smsService.completeMfaSignup(
         user: user,
         verificationId: verificationId,
         smsCode: _smsCodeController.text.trim(),
         phoneNumber: phone,
-      );
-
-      final indexService = UserSchoolIndexService();
-
-      final teacherUser = UserModel(
-        id: user.uid,
-        email: email,
+        role: 'teacher',
+        schoolId: schoolId,
         fullName: fullName,
-        role: UserRole.teacher,
-        schoolId: schoolId,
-        phoneNumber: phone,
-        phoneVerified: true,
-        createdAt: DateTime.now(),
-        lastLoginAt: DateTime.now(),
-      );
-
-      await _firestore
-          .collection('schools')
-          .doc(schoolId)
-          .collection('users')
-          .doc(user.uid)
-          .set({
-        ...teacherUser.toFirestore(),
-        'permissions': {
-          'notifications': {
-            'assignedClasses': true,
-            'assignedStudents': true,
-            'schedule': true,
-            'wholeSchool': false,
-          },
-        },
-      });
-
-      try {
-        await _firestore
-            .collection('schools')
-            .doc(schoolId)
-            .update({'teacherCount': FieldValue.increment(1)});
-      } catch (_) {
-        // Non-critical; continue.
-      }
-
-      await indexService.createOrUpdateIndex(
         email: email,
-        schoolId: schoolId,
-        userType: 'user',
-        userId: user.uid,
       );
 
-      if (codeId != null) {
-        try {
-          await _schoolCodeService.incrementCodeUsage(codeId);
-        } catch (_) {
-          // Non-critical; the account is created.
-        }
-      }
-
-      // Finished in-modal — drop any recovery record so a cold start doesn't
-      // route to the recovery screen for an already-completed signup.
+      // The server enrolled the factor AND wrote the teacher doc + index — the
+      // enrol revokes the client session, so finalisation must be server-side.
+      // Drop any recovery record so a cold start doesn't resume a done signup.
       unawaited(PhoneVerificationRecoveryService.instance.clear());
 
       if (!mounted) return;
+      if (outcome == MfaSignupOutcome.needsLogin) {
+        // Fully set up, but the session couldn't be re-established (MFA
+        // challenge on the custom token) — send the user to log in.
+        _goToLoginAfterSignup();
+        return;
+      }
       setState(() {
-        _createdTeacher = teacherUser;
+        _createdTeacher = UserModel(
+          id: user.uid,
+          email: email,
+          fullName: fullName,
+          role: UserRole.teacher,
+          schoolId: schoolId,
+          phoneNumber: phone,
+          phoneVerified: true,
+          createdAt: DateTime.now(),
+          lastLoginAt: DateTime.now(),
+        );
         _stage = _Stage.success;
       });
     } on FirebaseAuthException catch (e) {
@@ -627,6 +589,19 @@ setState(() {
       final route = AppRouter.getHomeRouteForRole(teacher.role);
       router.go(route, extra: teacher);
     }
+  }
+
+  /// Fallback for when the signup completed server-side but the custom-token
+  /// re-auth was MFA-challenged: the account is fully set up, so close the modal
+  /// and send the user to log in (email + password + SMS) to continue.
+  void _goToLoginAfterSignup() {
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+    Navigator.of(context).pop();
+    router.go('/auth/login');
+    messenger.showSnackBar(const SnackBar(
+      content: Text('Account created! Please log in to continue.'),
+    ));
   }
 
   // ---------------------------------------------------------------------------

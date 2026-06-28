@@ -1,25 +1,30 @@
 /**
- * Server-side phone second-factor enrollment.
+ * Server-side phone second-factor enrollment + signup finalisation.
  *
- * Identity Platform blocks CLIENT-side MFA enrollment until the account's
- * email is verified. Lumi enrolls phone MFA during signup — before the user
- * clicks the email verification link — so client enrollment fails with
- * `unverified-email` ("Need to verify email first before enrolling second
- * factors").
+ * Identity Platform blocks MFA enrollment until the account's email is verified
+ * — and this applies to the Admin SDK too, not just clients. Lumi enrolls phone
+ * MFA during signup (before the user verifies their email), so the client links
+ * the SMS-verified phone and calls this function, which:
+ *   1. enrolls the phone as a second factor (temporarily marking the email
+ *      verified just for the enroll, then restoring it so the app's
+ *      email-verification gate still bites);
+ *   2. unlinks the primary phone provider so the phone is a SECOND FACTOR ONLY;
+ *   3. FINALISES the signup server-side — writes the parent/teacher doc, the
+ *      userSchoolIndex entries, and (parent) links the student. This must be
+ *      server-side because enrolling MFA bumps `tokensValidAfterTime`, which
+ *      revokes the client's session — so the client can't write anything after
+ *      the enroll;
+ *   4. mints a custom token so the client can re-establish a session and land
+ *      on home (or, if custom-token sign-in is MFA-challenged, route to login —
+ *      the data is already finalised either way).
  *
- * Instead, the client verifies the phone via SMS and LINKS it to the account
- * (proving ownership), then calls this function. The Admin SDK is NOT subject
- * to the verified-email rule, so it can enroll the second factor. We then
- * unlink the primary phone provider so the phone is a SECOND FACTOR ONLY,
- * never a primary sign-in method. The email-verification gate elsewhere in the
- * app is unaffected.
- *
- * Idempotent and retry-safe: re-running with an already-enrolled phone skips
- * the enroll and just ensures the provider is unlinked.
+ * Idempotent and retry-safe.
  */
 
+import * as crypto from "crypto";
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
+import {linkParentToStudentCore} from "./parent_linking";
 
 const fns = functions.region("australia-southeast1");
 
@@ -42,8 +47,179 @@ function hasLinkedPhone(
   );
 }
 
+/** SHA-256 hex of [value]; mirrors UserSchoolIndexService in the app.
+ * @param {string} value The pre-normalised key (lowercased email / E.164 phone).
+ * @return {string} The hex digest used as the index doc id.
+ */
+function sha256Hex(value: string): string {
+  return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+/**
+ * Optional trimmed string, or null.
+ * @param {unknown} v The raw value.
+ * @return {string|null} Trimmed non-empty string, else null.
+ */
+function optStr(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const t = v.trim();
+  return t.length === 0 ? null : t;
+}
+
+/**
+ * Upserts a userSchoolIndex entry (email- or phone-keyed) for fast login
+ * school resolution. Doc id is sha256 of the normalised key.
+ * @param {string} key Normalised key (lowercased email or E.164 phone).
+ * @param {Record<string, unknown>} fields The index fields to write.
+ * @return {Promise<void>} Resolves when written.
+ */
+async function upsertIndex(
+  key: string,
+  fields: Record<string, unknown>,
+): Promise<void> {
+  await admin
+    .firestore()
+    .collection("userSchoolIndex")
+    .doc(sha256Hex(key))
+    .set(
+      {...fields, updatedAt: admin.firestore.FieldValue.serverTimestamp()},
+      {merge: true},
+    );
+}
+
+interface FinalizeContext {
+  schoolId: string;
+  fullName: string;
+  email: string | null;
+  phoneE164: string;
+  relationshipLabel: string | null;
+  linkCode: string | null;
+}
+
+/**
+ * Parent signup finalisation: writes the parent doc (if new), the email/phone
+ * indexes, and links the student via the shared link-core. All server-side, so
+ * it survives the session revocation that enrolling MFA causes.
+ * @param {string} uid The parent's UID.
+ * @param {FinalizeContext} ctx The signup context.
+ * @return {Promise<void>} Resolves when finalised.
+ */
+async function finalizeParent(
+  uid: string,
+  ctx: FinalizeContext,
+): Promise<void> {
+  const db = admin.firestore();
+  const parentRef = db
+    .collection("schools").doc(ctx.schoolId)
+    .collection("parents").doc(uid);
+
+  const snap = await parentRef.get();
+  if (!snap.exists) {
+    await parentRef.set({
+      email: ctx.email,
+      fullName: ctx.fullName,
+      role: "parent",
+      schoolId: ctx.schoolId,
+      linkedChildren: [],
+      classIds: [],
+      isActive: true,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      phoneNumber: ctx.phoneE164,
+      phoneVerified: true,
+      relationshipLabel: ctx.relationshipLabel,
+    });
+    try {
+      await db.collection("schools").doc(ctx.schoolId).update({
+        parentCount: admin.firestore.FieldValue.increment(1),
+      });
+    } catch (_) {
+      // Non-critical counter.
+    }
+  } else if (ctx.relationshipLabel) {
+    await parentRef.update({relationshipLabel: ctx.relationshipLabel});
+  }
+
+  if (ctx.email) {
+    await upsertIndex(ctx.email.toLowerCase(), {
+      email: ctx.email,
+      schoolId: ctx.schoolId,
+      userType: "parent",
+      userId: uid,
+    });
+  }
+  await upsertIndex(ctx.phoneE164, {
+    phoneNumber: ctx.phoneE164,
+    schoolId: ctx.schoolId,
+    userType: "parent",
+    userId: uid,
+  });
+
+  if (ctx.linkCode) {
+    try {
+      await linkParentToStudentCore(uid, ctx.linkCode.toUpperCase());
+    } catch (err) {
+      const kind = (err as {details?: {kind?: string}})?.details?.kind;
+      if (kind !== "already-linked") {
+        throw err; // invalid/used/revoked/expired code — surface to the client.
+      }
+    }
+  }
+}
+
+/**
+ * Teacher signup finalisation: writes the teacher user doc + email index.
+ * @param {string} uid The teacher's UID.
+ * @param {FinalizeContext} ctx The signup context.
+ * @return {Promise<void>} Resolves when finalised.
+ */
+async function finalizeTeacher(
+  uid: string,
+  ctx: FinalizeContext,
+): Promise<void> {
+  const db = admin.firestore();
+  await db
+    .collection("schools").doc(ctx.schoolId)
+    .collection("users").doc(uid)
+    .set({
+      email: ctx.email,
+      fullName: ctx.fullName,
+      role: "teacher",
+      schoolId: ctx.schoolId,
+      classIds: [],
+      isActive: true,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+      phoneNumber: ctx.phoneE164,
+      phoneVerified: true,
+      permissions: {
+        notifications: {
+          assignedClasses: true,
+          assignedStudents: true,
+          schedule: true,
+          wholeSchool: false,
+        },
+      },
+    }, {merge: true});
+
+  if (ctx.email) {
+    await upsertIndex(ctx.email.toLowerCase(), {
+      email: ctx.email,
+      schoolId: ctx.schoolId,
+      userType: "user",
+      userId: uid,
+    });
+  }
+  try {
+    await db.collection("schools").doc(ctx.schoolId).update({
+      teacherCount: admin.firestore.FieldValue.increment(1),
+    });
+  } catch (_) {
+    // Non-critical counter.
+  }
+}
+
 export const enrollLinkedPhoneAsMfa = fns
-  .runWith({timeoutSeconds: 20, memory: "128MB"})
+  .runWith({timeoutSeconds: 60, memory: "256MB"})
   .https.onCall(async (data, context) => {
     const uid = context.auth?.uid;
     if (!uid) {
@@ -66,6 +242,26 @@ export const enrollLinkedPhoneAsMfa = fns
         data.displayName.trim().slice(0, 64) :
         rawPhone;
 
+    // Optional signup-finalisation context. When `role` is present we finalise
+    // the whole signup server-side (the client's session is dead after enroll).
+    const role = data?.role === "parent" || data?.role === "teacher" ?
+      data.role :
+      null;
+    const ctx: FinalizeContext | null = role ? {
+      schoolId: optStr(data?.schoolId) ?? "",
+      fullName: optStr(data?.fullName) ?? "",
+      email: optStr(data?.email),
+      phoneE164: rawPhone,
+      relationshipLabel: optStr(data?.relationshipLabel),
+      linkCode: optStr(data?.linkCode),
+    } : null;
+    if (role && (!ctx?.schoolId)) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "schoolId is required when finalising signup.",
+      );
+    }
+
     const auth = admin.auth();
 
     // Require the linked phone as proof of ownership. Auth is read-after-write
@@ -75,9 +271,6 @@ export const enrollLinkedPhoneAsMfa = fns
       user = await auth.getUser(uid);
     } catch (err) {
       if ((err as {code?: string})?.code === "auth/user-not-found") {
-        // The signed-in account no longer exists (e.g. deleted server-side
-        // while the client still held a valid token). Surface clearly rather
-        // than as a generic INTERNAL.
         throw new functions.https.HttpsError(
           "unauthenticated",
           "Your session is no longer valid. Please sign in again.",
@@ -96,8 +289,7 @@ export const enrollLinkedPhoneAsMfa = fns
       );
     }
 
-    // Enroll as a second factor unless it already is (idempotent). At signup
-    // there are no existing factors; preserve any that exist just in case.
+    // ── Enroll as a second factor unless it already is (idempotent) ──────────
     const existingFactors = user.multiFactor?.enrolledFactors ?? [];
     const alreadyEnrolled = existingFactors.some(
       (f) =>
@@ -113,12 +305,9 @@ export const enrollLinkedPhoneAsMfa = fns
         factorId: "phone" as const,
       }));
 
-      // Identity Platform requires a VERIFIED email before a second factor can
-      // be enrolled — and this applies to the Admin SDK too, not just clients.
-      // To keep the app's email-verification gate intact (the user must still
-      // verify their email to get past the splash screen), mark the email
-      // verified ONLY for the enrol, then restore it in `finally`. The enrolled
-      // factor persists; emailVerified returns to false so the gate still bites.
+      // The verified-email rule applies to the Admin SDK too — mark the email
+      // verified ONLY for the enroll, then restore it so the splash gate still
+      // requires real verification.
       const restoreUnverified = user.emailVerified === false;
       if (restoreUnverified) {
         await auth.updateUser(uid, {emailVerified: true});
@@ -167,9 +356,7 @@ export const enrollLinkedPhoneAsMfa = fns
       }
     }
 
-    // Remove the primary phone provider so phone is a SECOND FACTOR only.
-    // Unlinking the provider does NOT remove the enrolled MFA factor (they are
-    // stored separately). Non-fatal if it fails — a retry will clean it up.
+    // Phone becomes a SECOND FACTOR only — unlink the primary phone provider.
     try {
       await auth.updateUser(uid, {providersToUnlink: ["phone"]});
     } catch (err) {
@@ -179,5 +366,27 @@ export const enrollLinkedPhoneAsMfa = fns
       });
     }
 
-    return {enrolled: true};
+    // ── Finalise the signup server-side (the client's session is now dead) ───
+    if (ctx) {
+      if (role === "parent") {
+        await finalizeParent(uid, ctx);
+      } else {
+        await finalizeTeacher(uid, ctx);
+      }
+    }
+
+    // Mint a custom token so the client can re-establish a session (the enroll
+    // revoked the old one) and reach home. Non-fatal if it fails — the client
+    // falls back to the login screen, and the data is already finalised.
+    let customToken: string | null = null;
+    try {
+      customToken = await auth.createCustomToken(uid);
+    } catch (err) {
+      functions.logger.error("enrollLinkedPhoneAsMfa custom token failed", {
+        uid,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    return {enrolled: true, finalised: ctx !== null, customToken};
   });

@@ -20,6 +20,16 @@ class SmsCodeHandle {
   });
 }
 
+/// Outcome of [SmsVerificationService.completeMfaSignup].
+enum MfaSignupOutcome {
+  /// A fresh session was re-established via the custom token — go to home.
+  sessionReady,
+
+  /// The custom-token sign-in couldn't complete (e.g. MFA-challenged). The
+  /// account is fully set up server-side; route the user to the login screen.
+  needsLogin,
+}
+
 /// Thin wrapper around Firebase's phone auth + multi-factor APIs so the
 /// registration and login flows stay focused on UI state instead of juggling
 /// four async callbacks.
@@ -154,23 +164,32 @@ class SmsVerificationService {
     await user.multiFactor.enroll(assertion, displayName: phoneNumber);
   }
 
-  /// Enrolls [phoneNumber] as a second factor on [user] WITHOUT requiring a
-  /// verified email.
+  /// Completes an email+password signup that needs phone MFA, WITHOUT requiring
+  /// a verified email, and finalises the account server-side.
   ///
-  /// Identity Platform blocks the direct client-side [enrollPhoneFactor] path
-  /// until the account's email is verified — but Lumi enrolls MFA during
-  /// signup, before the email link is clicked. This path instead proves phone
-  /// ownership by LINKING the SMS-verified credential, then enrolls the factor
-  /// via the `enrollLinkedPhoneAsMfa` Cloud Function (the Admin SDK is not
-  /// subject to that rule). The function also unlinks the primary phone
-  /// provider so the phone stays a second factor only. Pair with
-  /// [sendPrimaryPhoneCode] for the SMS send (no multi-factor session).
-  Future<void> linkPhoneAndEnrollMfa({
+  /// Identity Platform blocks MFA enrolment until the email is verified (Admin
+  /// SDK included), AND enrolling MFA revokes the client's session — so the
+  /// finalisation (parent/teacher doc + indexes + child link) must happen
+  /// server-side. This: proves phone ownership by LINKING the SMS-verified
+  /// credential, then calls `enrollLinkedPhoneAsMfa`, which enrols the factor,
+  /// unlinks the primary phone provider, finalises the signup, and returns a
+  /// custom token. We sign in with that token to re-establish a session.
+  ///
+  /// Returns [MfaSignupOutcome.sessionReady] when a fresh session was set up
+  /// (proceed to home), or [MfaSignupOutcome.needsLogin] when the custom-token
+  /// sign-in was MFA-challenged (the account is fully set up; route to login).
+  /// Pair with [sendPrimaryPhoneCode] for the SMS send (no multi-factor session).
+  Future<MfaSignupOutcome> completeMfaSignup({
     required User user,
     required String verificationId,
     required String smsCode,
     required String phoneNumber,
-    String? displayName,
+    required String role,
+    required String schoolId,
+    required String fullName,
+    String? email,
+    String? relationshipLabel,
+    String? linkCode,
   }) async {
     // Ensure the session is fresh before linking. A stale/expired token — which
     // happens when the app cold-starts onto a session whose account was deleted
@@ -234,30 +253,47 @@ class SmsVerificationService {
       }
     }
 
-    // Enroll server-side and unlink the primary phone provider. Re-shape any
-    // function error into a FirebaseAuthException so the existing
-    // [friendlyError] mapping + modal handling surface a clean message.
+    // Enroll + finalise the signup server-side (the client's session is dead
+    // after the enrol). Re-shape any function error into a FirebaseAuthException
+    // so the existing [friendlyError] mapping + modal handling surface a clean
+    // message.
+    final Map<String, dynamic> result;
     try {
-      await _functions
+      final resp = await _functions
           .httpsCallable('enrollLinkedPhoneAsMfa')
           .call<Map<String, dynamic>>({
         'phoneE164': phoneNumber,
-        if (displayName != null && displayName.isNotEmpty)
-          'displayName': displayName,
+        'displayName': phoneNumber,
+        'role': role,
+        'schoolId': schoolId,
+        'fullName': fullName,
+        if (email != null && email.isNotEmpty) 'email': email,
+        if (relationshipLabel != null) 'relationshipLabel': relationshipLabel,
+        if (linkCode != null) 'linkCode': linkCode,
       });
+      result = Map<String, dynamic>.from(resp.data as Map? ?? const {});
     } on FirebaseFunctionsException catch (e) {
       throw FirebaseAuthException(
         code: e.code == 'already-exists'
             ? 'second-factor-already-in-use'
             : 'mfa-enroll-failed',
-        message: e.message ??
-            'Could not set up phone verification. Please try again.',
+        message: e.message ?? 'Could not complete signup. Please try again.',
       );
     }
 
-    // Refresh local state so the enrolled factor + provider changes are
-    // reflected before the caller continues.
-    await user.reload();
+    // Re-establish a session with the returned custom token (the enrol revoked
+    // the old one). If the token sign-in is MFA-challenged, the account is still
+    // fully set up server-side — tell the caller to route to login.
+    final customToken = result['customToken'] as String?;
+    if (customToken == null || customToken.isEmpty) {
+      return MfaSignupOutcome.needsLogin;
+    }
+    try {
+      await _auth.signInWithCustomToken(customToken);
+      return MfaSignupOutcome.sessionReady;
+    } on FirebaseAuthException {
+      return MfaSignupOutcome.needsLogin;
+    }
   }
 
   /// Whether [user] already has an SMS factor enrolled. Used by the parent

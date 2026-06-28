@@ -802,22 +802,51 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         userId = cred.user!.uid;
         enrolledPhone = null; // not changing the enrolled phone
       } else {
-        // Email + MFA branch: enroll the phone we collected as a second
-        // factor on the freshly-created email/password account.
+        // Email + MFA branch: the server enrols the phone factor AND finalises
+        // the signup (parent doc + indexes + child link) — because enrolling
+        // MFA revokes the client session, so the client can't write afterwards.
+        // It returns a custom token we re-auth with to land on home.
         final user = _auth.currentUser;
         if (user == null) {
           setState(() => _errorMessage =
               'Your session expired. Please start registration again.');
           return;
         }
-        await _smsService.linkPhoneAndEnrollMfa(
+        final outcome = await _smsService.completeMfaSignup(
           user: user,
           verificationId: verificationId,
           smsCode: smsCode,
           phoneNumber: phone,
+          role: 'parent',
+          schoolId: code.schoolId,
+          fullName: fullName,
+          email: hasEmail ? email : null,
+          relationshipLabel: _relationshipLabel,
+          linkCode: code.code,
         );
-        userId = user.uid;
-        enrolledPhone = phone;
+        unawaited(PhoneVerificationRecoveryService.instance.clear());
+        if (!mounted) return;
+        if (outcome == MfaSignupOutcome.needsLogin) {
+          // Fully set up, but the session couldn't be re-established (MFA
+          // challenge on the custom token) — send the user to log in.
+          _goToLoginAfterSignup();
+          return;
+        }
+        // sessionReady: the server wrote the parent doc — read it for the
+        // success card, then show success. Server already did the rest.
+        final parentSnap = await _firestore
+            .collection('schools')
+            .doc(code.schoolId)
+            .collection('parents')
+            .doc(user.uid)
+            .get();
+        setState(() {
+          _createdParent =
+              parentSnap.exists ? UserModel.fromFirestore(parentSnap) : null;
+          _stage = _Stage.success;
+        });
+        AnalyticsService.instance.logParentLinkingCompleted();
+        return;
       }
 
       final indexService = UserSchoolIndexService();
@@ -953,6 +982,19 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       final route = AppRouter.getHomeRouteForRole(parent.role);
       router.go(route);
     }
+  }
+
+  /// Fallback for when the signup completed server-side but the custom-token
+  /// re-auth was MFA-challenged: the account is fully set up, so close the modal
+  /// and send the user to log in (phone or email + SMS) to continue.
+  void _goToLoginAfterSignup() {
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+    Navigator.of(context).pop();
+    router.go('/auth/login');
+    messenger.showSnackBar(const SnackBar(
+      content: Text('Account created! Please log in to continue.'),
+    ));
   }
 
   // ---------------------------------------------------------------------------
