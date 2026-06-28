@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
-const publicPaths = ['/api/auth/session', '/api/auth/logout'];
+// Unauthenticated routes: the session-cookie API endpoints, plus the public
+// legal/support pages (Privacy Policy, Terms of Use, Support) that the mobile
+// app links to and that Apple App Review must reach without signing in.
+const publicPaths = ['/api/auth/session', '/api/auth/logout', '/legal', '/support'];
 
 /**
  * API paths that MUST be reachable even with non-GET methods during an active
