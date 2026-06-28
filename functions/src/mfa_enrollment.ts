@@ -70,7 +70,21 @@ export const enrollLinkedPhoneAsMfa = fns
 
     // Require the linked phone as proof of ownership. Auth is read-after-write
     // consistent, but allow one short retry for propagation safety.
-    let user = await auth.getUser(uid);
+    let user: admin.auth.UserRecord;
+    try {
+      user = await auth.getUser(uid);
+    } catch (err) {
+      if ((err as {code?: string})?.code === "auth/user-not-found") {
+        // The signed-in account no longer exists (e.g. deleted server-side
+        // while the client still held a valid token). Surface clearly rather
+        // than as a generic INTERNAL.
+        throw new functions.https.HttpsError(
+          "unauthenticated",
+          "Your session is no longer valid. Please sign in again.",
+        );
+      }
+      throw err;
+    }
     if (!hasLinkedPhone(user, rawPhone)) {
       await new Promise((resolve) => setTimeout(resolve, 500));
       user = await auth.getUser(uid);
