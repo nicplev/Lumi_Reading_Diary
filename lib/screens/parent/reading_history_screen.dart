@@ -1081,7 +1081,12 @@ class _SessionRow extends StatelessWidget {
                       ),
                     ),
                   ],
-                  if (log.teacherComment != null) ...[
+                  // Surface the teacher's message as a prominent blue card only
+                  // while it's unread. Once the parent opens the log (which marks
+                  // the thread read via markCommentsRead) the card and the unread
+                  // dot both clear together — the message itself stays available
+                  // inside the session detail sheet's comment thread.
+                  if (hasUnread && log.teacherComment != null) ...[
                     const SizedBox(height: LumiTokens.space2),
                     Container(
                       padding: const EdgeInsets.all(LumiTokens.space2),
