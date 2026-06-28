@@ -14,6 +14,7 @@ import {
   validateNotificationAudience,
 } from "./notification_helpers";
 import {buildOnboardingEmail, buildOnboardingQrAttachments, buildStaffOnboardingEmail} from "./email_templates";
+import {lumiMascotAttachment} from "./email_assets";
 import {
   DEFAULT_ACHIEVEMENT_THRESHOLDS,
   computeAwardableAchievements,
@@ -1848,7 +1849,11 @@ export const processParentOnboardingEmail = fns
         });
 
         try {
-          const attachments = await buildOnboardingQrAttachments(entries);
+          // Inline images: the Lumi mascot (hero) + one QR per child.
+          const attachments = [
+            lumiMascotAttachment(),
+            ...(await buildOnboardingQrAttachments(entries)),
+          ];
           await sgMail.send({
             to: email,
             from: {email: senderEmail, name: `${schoolName} via Lumi`},
@@ -2007,6 +2012,7 @@ export const processStaffOnboardingEmail = fns
               from: {email: senderEmail, name: `${schoolName} via Lumi`},
               subject: emailSubject,
               html,
+              attachments: [lumiMascotAttachment()],
             });
             recipients.push({userId, email, status: "sent"});
             sentCount++;
