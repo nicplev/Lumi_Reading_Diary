@@ -74,7 +74,7 @@ export function ClassDetail({ schoolClass, levelOptions, classOptions = [], leve
       )}
       {activeTab === 'allocations' && <AllocationsTab classId={schoolClass.id} levelOptions={levelOptions} />}
       {activeTab === 'report' && (
-        <ClassReportTab classId={schoolClass.id} className={schoolClass.name} yearLevel={schoolClass.yearLevel} />
+        <ClassReportTab classId={schoolClass.id} className={schoolClass.name} yearLevel={schoolClass.yearLevel} levelsEnabled={levelsEnabled} />
       )}
     </div>
   );
