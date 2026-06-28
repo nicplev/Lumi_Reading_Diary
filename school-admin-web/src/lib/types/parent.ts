@@ -30,4 +30,12 @@ export interface LinkedStudent {
 
 export interface ParentWithStudents extends Parent {
   linkedStudents: LinkedStudent[];
+  /**
+   * True when this parent's Firebase Auth account no longer exists — the
+   * Firestore doc is orphaned (e.g. the Auth user was deleted out-of-band).
+   * Such a parent can't sign in, so the UI surfaces them as "Removed" rather
+   * than a misleading "Active". The parent list is otherwise purely
+   * Firestore-driven and never reflects Auth state.
+   */
+  authMissing?: boolean;
 }
