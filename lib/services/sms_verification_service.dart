@@ -321,6 +321,11 @@ class SmsVerificationService {
     // PhoneMultiFactorInfo.phoneNumber is E.164 when Firebase has it;
     // some platforms / privacy modes return a masked value. The gate
     // handles both cases — invalid E.164 falls through without enforcement.
+    if (kDebugMode) {
+      debugPrint('[phone-auth] sendLoginCode → hint phone="${hint.phoneNumber}" '
+          'factorId=${hint.factorId} enrollmentId=${hint.uid} '
+          'isValidE164=${isValidE164(hint.phoneNumber)}');
+    }
     await _checkRateLimit(phoneE164: hint.phoneNumber, purpose: 'login');
 
     final completer = Completer<SmsCodeHandle>();
@@ -331,6 +336,10 @@ class SmsVerificationService {
       forceResendingToken: forceResendingToken,
       verificationCompleted: (_) {},
       verificationFailed: (FirebaseAuthException e) {
+        if (kDebugMode) {
+          debugPrint('[phone-auth] sendLoginCode → verificationFailed '
+              'code=${e.code} message=${e.message}');
+        }
         if (!completer.isCompleted) completer.completeError(e);
       },
       codeSent: (verificationId, resendToken) {
