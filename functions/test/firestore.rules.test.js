@@ -1994,3 +1994,89 @@ test('access: student reads stay open so the app can render the lapsed screen', 
     db.collection('schools').doc('school_1').collection('students').doc('student_suspended').get(),
   );
 });
+
+// ── Teacher proxy logs: a teacher logs reading on behalf of a student ────────
+// Membership is verified against the CLASS document's teacher assignment, not
+// the teacher's denormalised user.classIds (which the portal seeds empty and
+// never syncs). The empty `classIds: []` on every teacher doc below is the
+// real-world state these tests must succeed in spite of.
+
+async function seedSchoolForTeacherProxy() {
+  await seedData(async (db) => {
+    await db.collection('schools').doc('school_1').set({
+      name: 'Lumi School One',
+      createdBy: 'admin_1',
+    });
+    // Co-teacher assignment via the teacherIds array (the common case).
+    await db.collection('schools').doc('school_1').collection('users').doc('teacher_array').set({
+      role: 'teacher', schoolId: 'school_1', classIds: [],
+    });
+    // Owner assignment via the singular teacherId field (legacy/owner case).
+    await db.collection('schools').doc('school_1').collection('users').doc('teacher_owner').set({
+      role: 'teacher', schoolId: 'school_1', classIds: [],
+    });
+    // A teacher who teaches a different class entirely.
+    await db.collection('schools').doc('school_1').collection('users').doc('teacher_other').set({
+      role: 'teacher', schoolId: 'school_1', classIds: [],
+    });
+    await db.collection('schools').doc('school_1').collection('classes').doc('class_1').set({
+      schoolId: 'school_1',
+      name: 'Test 1',
+      teacherId: 'teacher_owner',
+      teacherIds: ['teacher_array'],
+      studentIds: ['student_1'],
+      isActive: true,
+    });
+    await db.collection('schools').doc('school_1').collection('classes').doc('class_other').set({
+      schoolId: 'school_1',
+      name: 'Other',
+      teacherIds: ['teacher_other'],
+      studentIds: ['student_2'],
+      isActive: true,
+    });
+  });
+}
+
+function proxyLog(db, { logId, parentId, classId, loggedByRole = 'teacher' }) {
+  return db.collection('schools').doc('school_1').collection('readingLogs').doc(logId).set({
+    schoolId: 'school_1',
+    studentId: 'student_1',
+    parentId,
+    classId,
+    loggedByRole,
+    minutesRead: 15,
+    targetMinutes: 20,
+    status: 'completed',
+    bookTitles: ['Reading'],
+  });
+}
+
+test('proxy: a co-teacher (teacherIds) CAN log for a student in their class despite empty user.classIds', async () => {
+  await seedSchoolForTeacherProxy();
+  const db = authDb('teacher_array');
+  await assertSucceeds(proxyLog(db, { logId: 'p1', parentId: 'teacher_array', classId: 'class_1' }));
+});
+
+test('proxy: the owning teacher (teacherId) CAN log for a student in their class', async () => {
+  await seedSchoolForTeacherProxy();
+  const db = authDb('teacher_owner');
+  await assertSucceeds(proxyLog(db, { logId: 'p2', parentId: 'teacher_owner', classId: 'class_1' }));
+});
+
+test('proxy: a teacher CANNOT log for a class they do not teach', async () => {
+  await seedSchoolForTeacherProxy();
+  const db = authDb('teacher_other');
+  await assertFails(proxyLog(db, { logId: 'p3', parentId: 'teacher_other', classId: 'class_1' }));
+});
+
+test('proxy: parentId must be the teacher\'s own uid', async () => {
+  await seedSchoolForTeacherProxy();
+  const db = authDb('teacher_array');
+  await assertFails(proxyLog(db, { logId: 'p4', parentId: 'someone_else', classId: 'class_1' }));
+});
+
+test('proxy: a teacher cannot write a parent-shaped log (loggedByRole != teacher)', async () => {
+  await seedSchoolForTeacherProxy();
+  const db = authDb('teacher_array');
+  await assertFails(proxyLog(db, { logId: 'p5', parentId: 'teacher_array', classId: 'class_1', loggedByRole: 'parent' }));
+});

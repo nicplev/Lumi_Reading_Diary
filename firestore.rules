@@ -60,6 +60,23 @@ service cloud.firestore {
           get(/databases/$(database)/documents/schools/$(schoolId)/classes/$(classId)).data.studentIds.hasAny(linkedChildren);
     }
 
+    // Does the signed-in teacher own/co-teach `classId`? The class document's
+    // teacherId/teacherIds is the single source of truth for the teacher↔class
+    // relationship (it's what every other class rule and the portal's
+    // class-by-teacher query use). Checking it here — rather than a denormalised
+    // `classIds` on the teacher's user doc, which the school portal never keeps
+    // in sync on class create/update — is what keeps teacher-proxy logging working.
+    function teacherTeachesClass(schoolId, classId) {
+      let classPath = /databases/$(database)/documents/schools/$(schoolId)/classes/$(classId);
+      return classId is string &&
+          classId != '' &&
+          exists(classPath) &&
+          (
+            get(classPath).data.get('teacherId', '') == request.auth.uid ||
+            request.auth.uid in get(classPath).data.get('teacherIds', [])
+          );
+    }
+
     function parentCanReadAllocation(schoolId, allocationData) {
       let linkedChildren = linkedChildrenForSchool(schoolId);
 
@@ -374,13 +391,16 @@ service cloud.firestore {
         // (creator) so the existing ownership clauses in update/delete keep
         // working. `loggedByRole == 'teacher'` is the explicit proxy signal
         // and stops a teacher accidentally writing a parent-shaped log.
+        // Membership is verified against the class document's teacher
+        // assignment (see teacherTeachesClass) — the denormalised
+        // `classIds` on the teacher's user doc is created empty and never
+        // synced by the portal, so relying on it denied every proxy log.
         allow create: if isSignedIn() &&
             writeAllowedForDev() &&
             isTeacher(schoolId) &&
             request.resource.data.parentId == request.auth.uid &&
             request.resource.data.loggedByRole == 'teacher' &&
-            getUserData(schoolId).classIds != null &&
-            request.resource.data.classId in getUserData(schoolId).classIds;
+            teacherTeachesClass(schoolId, request.resource.data.classId);
 
         allow update: if writeAllowedForDev() &&
             (
