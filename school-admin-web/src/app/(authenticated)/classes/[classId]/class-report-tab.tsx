@@ -71,7 +71,7 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
     try {
       // Dynamic import keeps @react-pdf out of the main bundle until it's needed.
       const { downloadClassReportPdf } = await import('./class-report-pdf');
-      await downloadClassReportPdf(report, school?.displayName || school?.name);
+      await downloadClassReportPdf(report, school?.displayName || school?.name, levelsEnabled);
     } catch {
       toast('Could not generate the PDF', 'error');
     } finally {
