@@ -374,8 +374,10 @@ export function buildStaffOnboardingEmail(params: {
   const firstName = staffName.split(" ")[0] || staffName;
   const mascotSrc = `cid:${LUMI_MASCOT_CONTENT_ID}`;
   const hasTempPassword = !!tempPassword;
-  // Teachers join the mobile app with the school code; admins use the web portal.
-  const showSchoolCode = !!schoolCode && !isAdmin;
+  // Show the school code only on the self-register path (no temp password).
+  // Admin-created teachers log in directly with the password above, so the
+  // join code would just be noise — keep that email focused on logging in.
+  const showSchoolCode = !!schoolCode && !isAdmin && !hasTempPassword;
 
   const customMessageBlock = customMessage ?
     `
