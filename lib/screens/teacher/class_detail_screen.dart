@@ -21,6 +21,7 @@ import '../../data/models/school_model.dart';
 import '../../services/firebase_service.dart';
 import '../../services/platform_config_service.dart';
 import '../../services/reading_level_service.dart';
+import 'widgets/comprehension_question_sheet.dart';
 
 class ClassDetailScreen extends StatefulWidget {
   final ClassModel classModel;
@@ -427,12 +428,9 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: () => context.push(
-                      '/teacher/class-comprehension-question/${widget.classModel.id}',
-                      extra: {
-                        'teacher': widget.teacher,
-                        'classModel': widget.classModel,
-                      },
+                    onTap: () => showComprehensionQuestionSheet(
+                      context,
+                      classModel: widget.classModel,
                     ),
                     child: Padding(
                       padding:
