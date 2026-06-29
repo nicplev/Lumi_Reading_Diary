@@ -16,7 +16,9 @@ import '../../data/models/reading_level_option.dart';
 import '../../data/models/reading_group_model.dart';
 import '../../data/models/achievement_model.dart';
 import '../../data/models/student_model.dart';
+import '../../data/models/school_model.dart';
 import '../../services/firebase_service.dart';
+import '../../services/platform_config_service.dart';
 import '../../services/reading_level_service.dart';
 import '../../services/student_reading_level_service.dart';
 import 'widgets/comprehension_question_sheet.dart';
@@ -89,6 +91,10 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
   final _searchController = TextEditingController();
   List<ReadingLevelOption> _readingLevelOptions = const [];
   bool _levelsEnabled = true;
+  // Comprehension recording is gated by the school admin's setting and a
+  // platform kill switch — hide the per-class question editor unless both are
+  // on (it'd never reach parents otherwise).
+  bool _comprehensionEnabled = false;
 
   // Group filtering
   List<ReadingGroupModel> _groups = [];
@@ -103,6 +109,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
         ReadingLevelService(firestore: _firestore);
     _loadReadingLevelOptions();
     _loadGroups();
+    _loadComprehensionFlag();
   }
 
   @override
@@ -110,6 +117,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.teacher.schoolId != widget.teacher.schoolId) {
       _loadReadingLevelOptions(forceRefresh: true);
+      _loadComprehensionFlag();
     }
     if (oldWidget.selectedClass?.id != widget.selectedClass?.id) {
       _loadGroups();
@@ -123,6 +131,29 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// Resolve whether comprehension recording is enabled (school admin setting
+  /// AND the platform kill switch), gating the per-class question editor.
+  Future<void> _loadComprehensionFlag() async {
+    final schoolId = widget.teacher.schoolId;
+    if (schoolId == null || schoolId.isEmpty) return;
+    try {
+      // Platform kill switch fetched alongside; never throws (fails open).
+      final platformEnabledFuture =
+          PlatformConfigService().isComprehensionRecordingEnabled();
+      final doc =
+          await _firestore.collection('schools').doc(schoolId).get();
+      final platformEnabled = await platformEnabledFuture;
+      if (!mounted || !doc.exists) return;
+      final school = SchoolModel.fromFirestore(doc);
+      setState(() {
+        _comprehensionEnabled =
+            platformEnabled && school.comprehensionRecordingSettings.enabled;
+      });
+    } catch (_) {
+      // Default false; the button stays hidden.
+    }
   }
 
   Future<void> _loadGroups() async {
@@ -623,44 +654,44 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                 ),
               ),
             ),
-            _buildClassOptionsMenu(selectedClass),
+            // Always-visible editor for the per-class comprehension question,
+            // shown only when comprehension recording is enabled (school admin
+            // setting + platform kill switch) — otherwise it'd never reach
+            // parents.
+            if (_comprehensionEnabled) ...[
+              const SizedBox(width: 4),
+              _buildComprehensionButton(selectedClass),
+            ],
           ],
         ),
       ),
     );
   }
 
-  /// Overflow menu for per-class settings reachable from the class header.
-  /// Currently the comprehension prompt asked at the end of the parent's
-  /// reading-log wizard; kept as a menu so further class-level options can be
-  /// added here. (The editor screen existed but had no entry point — it was
-  /// only linked from the unreachable ClassDetailScreen.)
-  Widget _buildClassOptionsMenu(ClassModel selectedClass) {
-    return PopupMenuButton<String>(
-      tooltip: 'Class options',
-      icon: const Icon(Icons.more_vert_rounded,
-          size: 20, color: LumiTokens.muted),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
-      ),
-      onSelected: (value) {
-        if (value == 'comprehension') {
-          showComprehensionQuestionSheet(context, classModel: selectedClass);
-        }
-      },
-      itemBuilder: (context) => [
-        PopupMenuItem<String>(
-          value: 'comprehension',
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.mic_rounded, size: 18, color: LumiTokens.green),
-              const SizedBox(width: 10),
-              Text('Comprehension question', style: LumiType.body),
-            ],
-          ),
+  /// Header action that opens the comprehension-question editor sheet for the
+  /// selected class. (The editor was previously an orphaned full page reachable
+  /// only from the unused ClassDetailScreen.)
+  Widget _buildComprehensionButton(ClassModel selectedClass) {
+    return GestureDetector(
+      onTap: () =>
+          showComprehensionQuestionSheet(context, classModel: selectedClass),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.quiz_outlined, size: 14, color: LumiTokens.green),
+            const SizedBox(width: 5),
+            Text(
+              'Question',
+              style: LumiType.caption.copyWith(
+                color: LumiTokens.green,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
