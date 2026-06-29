@@ -214,7 +214,7 @@ class ServiceStatusController with WidgetsBindingObserver {
       }
     }
 
-    final future = _probe();
+    final future = _probe(forced: forced);
     _inFlight = future;
     return future.whenComplete(() {
       _inFlight = null;
@@ -231,7 +231,7 @@ class ServiceStatusController with WidgetsBindingObserver {
     });
   }
 
-  Future<ServiceStatusSnapshot> _probe() async {
+  Future<ServiceStatusSnapshot> _probe({bool forced = false}) async {
     // Re-check connectivity at probe time. The cached `_lastConnectivity`
     // can lag reality at cold start on iOS — `checkConnectivity()` in
     // `initialize()` sometimes returns `[none]` before the wifi state has
@@ -247,7 +247,15 @@ class ServiceStatusController with WidgetsBindingObserver {
     final l1 = !_lastConnectivity.contains(ConnectivityResult.none) ||
         _lastConnectivity.length > 1;
 
-    if (!l1) {
+    // A passive probe trusts connectivity_plus: if it reports no network,
+    // short-circuit to offline rather than spend a doomed round-trip. A FORCED
+    // probe (the user tapped "Try syncing now") does NOT trust it — as the
+    // checkConnectivity note above flags, connectivity_plus reports `[none]`
+    // stale on iOS after the network returns, which would otherwise leave a
+    // banked-up queue permanently gated (canWriteToFirebase=false). Fall
+    // through and let the authoritative L3 Firestore probe decide: it can only
+    // succeed if the backend genuinely answers, so there's no false positive.
+    if (!l1 && !forced) {
       final snap = _buildSnapshot(
         status: ServiceStatus.offline,
         deviceConnected: false,
@@ -315,7 +323,10 @@ class ServiceStatusController with WidgetsBindingObserver {
     final l2 = await l2Future;
     final snap = _buildSnapshot(
       status: l2 ? ServiceStatus.firebaseDown : ServiceStatus.offline,
-      deviceConnected: true,
+      // `l1 || l2`: a forced probe may have fallen through here with L1 false;
+      // if neither connectivity_plus nor the L2 internet HEAD got through, the
+      // device really is offline, so don't claim it's connected.
+      deviceConnected: l1 || l2,
       internetReachable: l2,
       firebaseReachable: false,
       latency: l3Stopwatch.elapsed,
