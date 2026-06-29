@@ -622,9 +622,50 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                 ),
               ),
             ),
+            _buildClassOptionsMenu(selectedClass),
           ],
         ),
       ),
+    );
+  }
+
+  /// Overflow menu for per-class settings reachable from the class header.
+  /// Currently the comprehension prompt asked at the end of the parent's
+  /// reading-log wizard; kept as a menu so further class-level options can be
+  /// added here. (The editor screen existed but had no entry point — it was
+  /// only linked from the unreachable ClassDetailScreen.)
+  Widget _buildClassOptionsMenu(ClassModel selectedClass) {
+    return PopupMenuButton<String>(
+      tooltip: 'Class options',
+      icon: const Icon(Icons.more_vert_rounded,
+          size: 20, color: LumiTokens.muted),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+      ),
+      onSelected: (value) {
+        if (value == 'comprehension') {
+          context.push(
+            '/teacher/class-comprehension-question/${selectedClass.id}',
+            extra: {
+              'teacher': widget.teacher,
+              'classModel': selectedClass,
+            },
+          );
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem<String>(
+          value: 'comprehension',
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.mic_rounded, size: 18, color: LumiTokens.green),
+              const SizedBox(width: 10),
+              Text('Comprehension question', style: LumiType.body),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
