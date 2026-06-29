@@ -289,28 +289,34 @@ class NotificationService {
     _navigateTo('/parent/home');
   }
 
-  /// SharedPreferences key for a child id pulled from a tapped reading
+  /// SharedPreferences key for the first child id from a tapped reading
   /// reminder. ParentHomeScreen consumes (and clears) this on init/resume to
   /// pre-select the child the parent was prompted about, so logging that
   /// child's reading is one tap away after the deep link.
   static const String pendingLogChildIdKey = 'pending_log_child_id';
 
-  /// Persist the first studentId from a tapped reading reminder and route
-  /// the user to the parent home. ParentHomeScreen does the actual
-  /// active-child selection so the controller stays the single owner of
-  /// that state.
+  /// SharedPreferences key for the FULL list of un-logged child ids from a
+  /// tapped reading reminder. ParentHomeScreen seeds the reminder queue from
+  /// this so a multi-child parent is walked through logging each child, not
+  /// just the first. Stored alongside [pendingLogChildIdKey].
+  static const String pendingLogChildIdsKey = 'pending_log_child_ids';
+
+  /// Persist the studentIds from a tapped reading reminder and route the user
+  /// to the parent home. The first id seeds the active-child selection; the
+  /// full list seeds the reminder queue so every un-logged child can be logged
+  /// in turn. ParentHomeScreen owns the actual selection/queue handoff.
   Future<void> _routeReadingReminderTap(Map<String, dynamic> data) async {
     final rawIds = data['studentIds'];
-    String? firstId;
-    if (rawIds is String && rawIds.isNotEmpty) {
-      firstId = rawIds.split(',').first.trim();
-    }
-    if (firstId != null && firstId.isNotEmpty) {
+    final ids = rawIds is String
+        ? rawIds.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
+        : <String>[];
+    if (ids.isNotEmpty) {
       try {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(pendingLogChildIdKey, firstId);
+        await prefs.setString(pendingLogChildIdKey, ids.first);
+        await prefs.setStringList(pendingLogChildIdsKey, ids);
       } catch (e) {
-        debugPrint('Could not persist pending log child id: $e');
+        debugPrint('Could not persist pending log child ids: $e');
       }
     }
     _navigateTo('/parent/home');

@@ -122,6 +122,34 @@ class ActiveChildController extends Notifier<String?> {
 final activeChildIdProvider =
     NotifierProvider<ActiveChildController, String?>(ActiveChildController.new);
 
+/// The un-logged child ids carried in from a tapped reading reminder, so the
+/// app can walk a multi-child parent through logging each one in turn.
+///
+/// In-memory only: it just needs to survive the log → success → next-child
+/// round trip within a session. A cold start (or no reminder tap) leaves it
+/// empty, and the home screen's per-child "tonight" card is the standing
+/// fallback for seeing who still needs logging.
+class PendingReminderChildrenController extends Notifier<List<String>> {
+  @override
+  List<String> build() => const <String>[];
+
+  /// Seed the queue from a tapped reminder's child ids.
+  void setAll(List<String> ids) => state = List.unmodifiable(ids);
+
+  /// Drop a child once it's been logged.
+  void remove(String childId) =>
+      state = List.unmodifiable(state.where((id) => id != childId));
+
+  void clear() => state = const <String>[];
+}
+
+/// Queue of children still to log from a tapped reading reminder. Empty unless
+/// a reminder was just tapped. See [PendingReminderChildrenController].
+final pendingReminderChildIdsProvider =
+    NotifierProvider<PendingReminderChildrenController, List<String>>(
+  PendingReminderChildrenController.new,
+);
+
 /// The resolved active child, reconciling the stored id against the live list.
 ///
 /// Falls back to the first child when the stored id is missing or no longer
