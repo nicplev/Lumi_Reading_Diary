@@ -560,9 +560,25 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(
-                onPressed: () => NotificationService.instance
-                    .sendReadingReminderTest(_reminderBody(
-                        _linkedChildren.map((c) => c.firstName).toList())),
+                onPressed: () async {
+                  final names =
+                      _linkedChildren.map((c) => c.firstName).toList();
+                  final ids = _linkedChildren.map((c) => c.id).toList();
+                  final sentPush = await NotificationService.instance
+                      .sendReadingReminderTest(
+                    schoolId: widget.user.schoolId ?? '',
+                    localBody: _reminderBody(names),
+                    studentIds: ids,
+                  );
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(sentPush
+                          ? 'Test reminder sent to this device'
+                          : 'Showing a local preview (push unavailable)'),
+                    ),
+                  );
+                },
                 icon: const Icon(Icons.send_outlined,
                     size: 16, color: LumiTokens.muted),
                 label: Text('Send test',

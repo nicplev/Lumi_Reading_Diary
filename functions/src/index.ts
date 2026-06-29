@@ -2702,3 +2702,92 @@ export const onCommentCreated = fns.firestore
 
     return null;
   });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Callable: sendTestReadingReminder
+// Sends a real FCM reading-reminder push to the calling parent's own device, so
+// the "Send test" button exercises the full pipeline (token + delivery + the
+// reading_reminder tap routing) — not just a local notification. Returns
+// {sent:false} when there's no token, so the client can fall back to a local
+// preview. Mirrors the body grammar of the scheduled sendReadingReminders.
+// ─────────────────────────────────────────────────────────────────────────────
+export const sendTestReadingReminder = fns
+  .runWith({timeoutSeconds: 30, memory: "256MB"})
+  .https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        "unauthenticated", "Sign-in required.");
+    }
+    const uid = context.auth.uid;
+    const schoolId = typeof data?.schoolId === "string" ? data.schoolId : "";
+    if (schoolId.length === 0) {
+      throw new functions.https.HttpsError(
+        "invalid-argument", "schoolId is required.");
+    }
+
+    const parentSnap = await db
+      .collection("schools").doc(schoolId)
+      .collection("parents").doc(uid)
+      .get();
+    if (!parentSnap.exists) {
+      throw new functions.https.HttpsError(
+        "not-found", "Parent profile not found.");
+    }
+    const parent = parentSnap.data() ?? {};
+    const token = parent.fcmToken as string | undefined;
+    // No push token registered on this device — let the client show a local
+    // preview instead. Not an error: it's the expected fallback path.
+    if (!token) return {sent: false, reason: "no-token"};
+
+    const childIds: string[] = Array.isArray(parent.linkedChildren) ?
+      (parent.linkedChildren as string[]) : [];
+
+    // Resolve first names for the body. A test names every linked child (so it
+    // always shows something), using the same grammar as the real reminder.
+    const names: string[] = [];
+    for (const cid of childIds) {
+      const sdoc = await db
+        .collection("schools").doc(schoolId)
+        .collection("students").doc(cid)
+        .get();
+      if (sdoc.exists) {
+        names.push((sdoc.data()?.firstName as string) || "your child");
+      }
+    }
+    let who: string;
+    if (names.length === 0) {
+      who = "your child";
+    } else if (names.length === 1) {
+      who = names[0];
+    } else if (names.length === 2) {
+      who = `${names[0]} and ${names[1]}`;
+    } else {
+      who = `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+    }
+    const body = `Don't forget to log ${who}'s reading today!`;
+
+    try {
+      await admin.messaging().send({
+        token,
+        notification: {title: "Time to read with Lumi! 📚", body},
+        data: {
+          type: "reading_reminder",
+          schoolId,
+          studentIds: childIds.join(","),
+        },
+        apns: {payload: {aps: {sound: "default"}}},
+        android: {
+          priority: "high" as const,
+          notification: {
+            sound: "default",
+            clickAction: "FLUTTER_NOTIFICATION_CLICK",
+          },
+        },
+      });
+      return {sent: true};
+    } catch (e) {
+      functions.logger.warn("sendTestReadingReminder send failed", {uid, e});
+      // Stale/invalid token — fall back to a local preview on the client.
+      return {sent: false, reason: "send-failed"};
+    }
+  });

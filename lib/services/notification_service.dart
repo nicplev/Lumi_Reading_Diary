@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/services/functions_instance.dart';
 import '../core/services/impersonation_service.dart';
 import '../data/models/user_model.dart';
 import '../data/providers/active_child_provider.dart';
@@ -557,14 +558,40 @@ class NotificationService {
     );
   }
 
-  /// Fire an immediate local copy of the reading reminder so a parent can see
-  /// exactly what they'll receive — same title, channel, and [body] (with all
-  /// their children's names) as the scheduled server reminder.
-  Future<void> sendReadingReminderTest(String body) async {
+  /// Send a test reading reminder. Tries a REAL FCM push to this device first
+  /// (so it exercises the token + server delivery + the reading_reminder tap
+  /// routing, including the multi-child flow), then falls back to an instant
+  /// local notification if the push can't be sent (no token / offline / error).
+  ///
+  /// [schoolId] scopes the parent doc the server reads for the device token;
+  /// [localBody] and [studentIds] build the local fallback (and its tap payload,
+  /// so a fallback tap still routes through the multi-child reminder flow).
+  /// Returns true if a real push was dispatched, false if it fell back local.
+  Future<bool> sendReadingReminderTest({
+    required String schoolId,
+    required String localBody,
+    required List<String> studentIds,
+  }) async {
+    if (schoolId.isNotEmpty) {
+      try {
+        final res = await lumiFunctions
+            .httpsCallable('sendTestReadingReminder')
+            .call({'schoolId': schoolId});
+        final data = res.data;
+        if (data is Map && data['sent'] == true) return true;
+      } catch (e) {
+        debugPrint('Test push failed, falling back to local preview: $e');
+      }
+    }
     await _showLocalNotification(
       title: 'Time to read with Lumi! 📚',
-      body: body,
+      body: localBody,
       channelId: _readingReminderChannel,
+      payload: jsonEncode({
+        'type': 'reading_reminder',
+        'studentIds': studentIds.join(','),
+      }),
     );
+    return false;
   }
 }
