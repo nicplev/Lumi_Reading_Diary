@@ -19,6 +19,7 @@ import '../../data/models/student_model.dart';
 import '../../services/firebase_service.dart';
 import '../../services/reading_level_service.dart';
 import '../../services/student_reading_level_service.dart';
+import 'widgets/comprehension_question_sheet.dart';
 
 /// Teacher Classroom Screen (Tab 2)
 ///
@@ -644,13 +645,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
       ),
       onSelected: (value) {
         if (value == 'comprehension') {
-          context.push(
-            '/teacher/class-comprehension-question/${selectedClass.id}',
-            extra: {
-              'teacher': widget.teacher,
-              'classModel': selectedClass,
-            },
-          );
+          showComprehensionQuestionSheet(context, classModel: selectedClass);
         }
       },
       itemBuilder: (context) => [
