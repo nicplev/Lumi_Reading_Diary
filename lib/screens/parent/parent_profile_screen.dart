@@ -38,8 +38,11 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
 
   bool _notificationsEnabled = true;
   TimeOfDay _reminderTime = const TimeOfDay(hour: 19, minute: 0);
-  // Selected weekdays (1=Mon..7=Sun). Empty = every day.
-  List<int> _reminderDays = [];
+  // Selected weekdays (1=Mon..7=Sun). Defaults to Mon–Thu: most families read
+  // on school nights, not Friday or the weekend. A full 7-day list means every
+  // day. (Legacy clients stored [] to mean "every day" — _loadPreferences
+  // migrates that to all 7 so it round-trips under this explicit-list model.)
+  List<int> _reminderDays = [1, 2, 3, 4];
   List<StudentModel> _linkedChildren = [];
   // Local copy of the parent's relationship label so edits reflect immediately
   // without needing the upstream UserModel to refresh.
@@ -73,7 +76,10 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
         }
       }
       if (preferences['reminderDays'] != null) {
-        _reminderDays = List<int>.from(preferences['reminderDays']);
+        final loaded = List<int>.from(preferences['reminderDays']);
+        // Legacy clients used [] to mean "every day"; surface that as all 7
+        // selected so the explicit-list model round-trips it correctly.
+        _reminderDays = loaded.isEmpty ? List<int>.from(_dayValues) : loaded;
       }
     });
   }
@@ -82,7 +88,7 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
     final prefs = <String, dynamic>{
       'notificationsEnabled': _notificationsEnabled,
       'reminderTime': '${_reminderTime.hour}:${_reminderTime.minute}',
-      'reminderDays': _reminderDays, // [] = every day
+      'reminderDays': _reminderDays, // explicit weekdays (1=Mon..7=Sun)
     };
     final schoolId = widget.user.schoolId;
 
@@ -503,7 +509,9 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
             ),
             const SizedBox(height: LumiTokens.space4),
             Text(
-              _reminderDays.isEmpty ? 'On these days (every day)' : 'On these days',
+              _reminderDays.length == 7
+                  ? 'On these days (every day)'
+                  : 'On these days',
               style: LumiType.caption,
             ),
             const SizedBox(height: LumiTokens.space2),
@@ -511,19 +519,18 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: List.generate(7, (index) {
                 final day = _dayValues[index];
-                final isSelected =
-                    _reminderDays.isEmpty || _reminderDays.contains(day);
+                final isSelected = _reminderDays.contains(day);
                 return GestureDetector(
                   onTap: () {
                     setState(() {
-                      if (_reminderDays.isEmpty) {
-                        _reminderDays = List.from(_dayValues)..remove(day);
-                      } else if (_reminderDays.contains(day)) {
-                        _reminderDays.remove(day);
+                      if (_reminderDays.contains(day)) {
+                        // Keep at least one day selected — switching reminders
+                        // fully off is the master toggle's job, not an empty
+                        // day list (which the server reads as "every day").
+                        if (_reminderDays.length > 1) _reminderDays.remove(day);
                       } else {
                         _reminderDays.add(day);
                         _reminderDays.sort();
-                        if (_reminderDays.length == 7) _reminderDays = [];
                       }
                     });
                     _updatePreferences();
@@ -553,7 +560,9 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(
-                onPressed: () => NotificationService.instance.testNotification(),
+                onPressed: () => NotificationService.instance
+                    .sendReadingReminderTest(_reminderBody(
+                        _linkedChildren.map((c) => c.firstName).toList())),
                 icon: const Icon(Icons.send_outlined,
                     size: 16, color: LumiTokens.muted),
                 label: Text('Send test',
@@ -574,19 +583,27 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
     );
   }
 
-  Widget _buildReminderPreview() {
-    final String exampleName;
-    final String suffix;
-    if (_linkedChildren.isEmpty) {
-      exampleName = 'your child';
-      suffix = '';
-    } else if (_linkedChildren.length == 1) {
-      exampleName = _linkedChildren.first.firstName;
-      suffix = '';
+  /// Builds the reminder body the same way the server does (the
+  /// `sendReadingReminders` Cloud Function), so the in-app preview and the
+  /// "Send test" notification match what's actually delivered — including how
+  /// multiple children are listed for a parent with several kids linked.
+  String _reminderBody(List<String> names) {
+    final String who;
+    if (names.isEmpty) {
+      who = 'your child';
+    } else if (names.length == 1) {
+      who = names.first;
+    } else if (names.length == 2) {
+      who = '${names[0]} and ${names[1]}';
     } else {
-      exampleName = _linkedChildren.first.firstName;
-      suffix = ' (and ${_linkedChildren.length - 1} more)';
+      who = '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
     }
+    return "Don't forget to log $who's reading today!";
+  }
+
+  Widget _buildReminderPreview() {
+    final body =
+        _reminderBody(_linkedChildren.map((c) => c.firstName).toList());
 
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -606,7 +623,7 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
           const SizedBox(width: LumiTokens.space2),
           Expanded(
             child: Text(
-              '"Don\'t forget to log $exampleName\'s reading today!"$suffix',
+              '"$body"',
               style: LumiType.caption.copyWith(fontStyle: FontStyle.italic),
             ),
           ),

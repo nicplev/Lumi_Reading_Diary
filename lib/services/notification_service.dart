@@ -550,4 +550,15 @@ class NotificationService {
       channelId: _generalChannel,
     );
   }
+
+  /// Fire an immediate local copy of the reading reminder so a parent can see
+  /// exactly what they'll receive — same title, channel, and [body] (with all
+  /// their children's names) as the scheduled server reminder.
+  Future<void> sendReadingReminderTest(String body) async {
+    await _showLocalNotification(
+      title: 'Time to read with Lumi! 📚',
+      body: body,
+      channelId: _readingReminderChannel,
+    );
+  }
 }

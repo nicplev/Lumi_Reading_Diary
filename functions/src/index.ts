@@ -1021,17 +1021,27 @@ async function processSchool(
     if (!p.fcmToken) continue;
     if (p.preferences?.notificationsEnabled === false) continue;
 
-    // Hour check (default 18 / 6 PM)
-    let prefHour = 18;
+    // Hour check (default 19 / 7 PM — matches the app's default time)
+    let prefHour = 19;
     if (p.preferences?.reminderTime) {
       const parts = (p.preferences.reminderTime as string).split(":");
-      prefHour = parseInt(parts[0], 10) || 18;
+      prefHour = parseInt(parts[0], 10) || 19;
     }
     if (prefHour !== localHour) continue;
 
-    // Day-of-week check (empty = every day)
-    const days: number[] = p.preferences?.reminderDays ?? [];
-    if (days.length > 0 && !days.includes(localWeekday)) continue;
+    // Day-of-week check. Unset → default Mon–Thu (the app's school-night
+    // default). A legacy empty list meant "every day", so honour that; any
+    // explicit list is used as-is.
+    const rawDays = p.preferences?.reminderDays;
+    let days: number[];
+    if (!Array.isArray(rawDays)) {
+      days = [1, 2, 3, 4];
+    } else if (rawDays.length === 0) {
+      days = [1, 2, 3, 4, 5, 6, 7];
+    } else {
+      days = rawDays as number[];
+    }
+    if (!days.includes(localWeekday)) continue;
 
     const children: string[] = p.linkedChildren ?? [];
     if (children.length === 0) continue;
