@@ -99,16 +99,24 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
   }
 
   /// If the user just tapped a reading-reminder notification,
-  /// NotificationService stored the child id in SharedPreferences. Adopt it
-  /// as the active child so logging that child's reading is one tap away,
-  /// then clear the key so it can't replay on a later cold start.
+  /// NotificationService stored the prompted child id(s) in SharedPreferences.
+  /// Seed the reminder queue (so a multi-child parent is guided through each
+  /// child after logging) and adopt the first as the active child, then clear
+  /// the keys so they can't replay on a later cold start.
   Future<void> _consumePendingReminderDeepLink() async {
     final prefs = await SharedPreferences.getInstance();
     final pendingId = prefs.getString(NotificationService.pendingLogChildIdKey);
-    if (pendingId == null || pendingId.isEmpty) return;
+    final pendingIds =
+        prefs.getStringList(NotificationService.pendingLogChildIdsKey);
+    final ids = (pendingIds != null && pendingIds.isNotEmpty)
+        ? pendingIds
+        : <String>[if (pendingId != null && pendingId.isNotEmpty) pendingId];
+    if (ids.isEmpty) return;
     await prefs.remove(NotificationService.pendingLogChildIdKey);
+    await prefs.remove(NotificationService.pendingLogChildIdsKey);
     if (!mounted) return;
-    await ref.read(activeChildIdProvider.notifier).select(pendingId);
+    ref.read(pendingReminderChildIdsProvider.notifier).setAll(ids);
+    await ref.read(activeChildIdProvider.notifier).select(ids.first);
   }
 
   @override

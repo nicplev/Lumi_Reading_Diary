@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../theme/lumi_tokens.dart';
@@ -20,6 +21,7 @@ import '../../data/models/school_model.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/parent_comment_settings.dart';
 import '../../data/models/comprehension_recording_settings.dart';
+import '../../data/providers/active_child_provider.dart';
 import '../../services/analytics_service.dart';
 import '../../services/firebase_service.dart';
 import '../../services/reading_log_service.dart';
@@ -29,7 +31,7 @@ import 'widgets/comprehension_recording_step.dart';
 
 /// Celebration screen shown after a reading log is successfully saved.
 /// Displays confetti, night count, streak info, and badge notifications.
-class ReadingSuccessScreen extends StatefulWidget {
+class ReadingSuccessScreen extends ConsumerStatefulWidget {
   final StudentModel student;
   final UserModel parent;
   final ReadingLogModel readingLog;
@@ -48,13 +50,32 @@ class ReadingSuccessScreen extends StatefulWidget {
   });
 
   @override
-  State<ReadingSuccessScreen> createState() => _ReadingSuccessScreenState();
+  ConsumerState<ReadingSuccessScreen> createState() =>
+      _ReadingSuccessScreenState();
 }
 
-class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
+class _ReadingSuccessScreenState extends ConsumerState<ReadingSuccessScreen>
     with TickerProviderStateMixin {
   late final AnimationController _confettiController;
   Timer? _autoNavigateTimer;
+
+  /// The next un-logged child from the reminder the parent tapped, if any.
+  /// Captured once in [initState] (after dropping the child we just logged) so
+  /// the screen nudges toward logging the next sibling instead of idling home.
+  String? _nextReminderChildId;
+
+  /// First name of [_nextReminderChildId], resolved live from the child list.
+  /// Null if there's no next child or it's no longer linked.
+  String? get _nextChildName {
+    final id = _nextReminderChildId;
+    if (id == null) return null;
+    final children =
+        ref.read(parentChildrenProvider).value ?? const <StudentModel>[];
+    for (final c in children) {
+      if (c.id == id) return c.firstName;
+    }
+    return null;
+  }
 
   // ─── Rec 2: progressive disclosure of feeling + comment ──────────
   // For a one-tap quick log the feeling/comment were skipped; offer them
@@ -144,6 +165,13 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
   @override
   void initState() {
     super.initState();
+    // Multi-child reminder: drop the child we just logged from the queue and
+    // capture the next one (if any) so we can nudge toward it rather than
+    // returning home and leaving a sibling silently un-logged.
+    ref.read(pendingReminderChildIdsProvider.notifier).remove(widget.student.id);
+    final remaining = ref.read(pendingReminderChildIdsProvider);
+    _nextReminderChildId = remaining.isNotEmpty ? remaining.first : null;
+
     _confettiController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 3),
@@ -159,7 +187,11 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
       LoggingEngagementService.instance.detailedLogCount().then((value) {
         if (mounted) setState(() => _detailedLogCount = value);
       });
-      _autoNavigateTimer = Timer(const Duration(seconds: 4), _goHome);
+      // Only auto-return home when there's no next child to nudge toward —
+      // otherwise the parent chooses when to move on.
+      if (_nextReminderChildId == null) {
+        _autoNavigateTimer = Timer(const Duration(seconds: 4), _goHome);
+      }
     }
   }
 
@@ -256,9 +288,62 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
   void _goHome() {
     _autoNavigateTimer?.cancel();
     _autoNavigateTimer = null;
-    if (mounted) {
-      context.go('/parent/home');
+    if (!mounted) return;
+    final nextId = _nextReminderChildId;
+    if (nextId != null) {
+      // Walk the parent to the next child from their reminder; the home screen's
+      // tonight card surfaces it ready to log. A stale id (child since
+      // unlinked) is harmless — activeChildProvider falls back to a valid child.
+      ref.read(activeChildIdProvider.notifier).select(nextId);
     }
+    context.go('/parent/home');
+  }
+
+  /// Stop the reminder walk-through early (detailed log already saved): clear
+  /// the queue and go straight home.
+  void _finishRemindersAndHome() {
+    ref.read(pendingReminderChildIdsProvider.notifier).clear();
+    _nextReminderChildId = null;
+    _goHome();
+  }
+
+  /// Stop the walk-through from the quick-log follow-up: clear the queue, then
+  /// save this child's optional note/recording before going home.
+  void _bailFollowUp() {
+    ref.read(pendingReminderChildIdsProvider.notifier).clear();
+    _nextReminderChildId = null;
+    _finishFollowUp();
+  }
+
+  /// CTA shown when the parent still has another child to log from the reminder
+  /// they tapped — advances to that child rather than returning home.
+  Widget _buildNextChildCta() {
+    final name = _nextChildName;
+    return Column(
+      children: [
+        Text(
+          name != null
+              ? 'Nice! $name still needs logging.'
+              : 'Nice! One more to log.',
+          style: LumiType.caption.copyWith(color: LumiTokens.muted),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 12),
+        LumiPrimaryButton(
+          onPressed: _goHome,
+          text: name != null ? 'Log $name next' : 'Log the next child',
+          isFullWidth: true,
+          icon: Icons.arrow_forward_rounded,
+          color: LumiTokens.red,
+        ),
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: _finishRemindersAndHome,
+          child: Text('Done for now',
+              style: LumiType.caption.copyWith(color: LumiTokens.muted)),
+        ),
+      ],
+    );
   }
 
   void _logAnalytics() {
@@ -451,25 +536,31 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
                           ).animate().fadeIn(delay: 700.ms),
                           const SizedBox(height: 16),
                         ],
-                        // Auto-returning indicator (tappable to skip)
-                        GestureDetector(
-                          onTap: _goHome,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: LumiTokens.muted,
+                        // From a multi-child reminder: nudge to the next child
+                        // rather than auto-returning home. Otherwise show the
+                        // usual auto-returning indicator (tappable to skip).
+                        if (_nextReminderChildId != null)
+                          _buildNextChildCta().animate().fadeIn(delay: 600.ms)
+                        else
+                          GestureDetector(
+                            onTap: _goHome,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: LumiTokens.muted,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text('Returning home…', style: LumiType.caption),
-                            ],
-                          ),
-                        ).animate().fadeIn(delay: 1200.ms),
+                                const SizedBox(width: 8),
+                                Text('Returning home…',
+                                    style: LumiType.caption),
+                              ],
+                            ),
+                          ).animate().fadeIn(delay: 1200.ms),
                       ],
                     ],
                   ),
@@ -616,13 +707,25 @@ class _ReadingSuccessScreenState extends State<ReadingSuccessScreen>
             ),
         ],
         const SizedBox(height: 20),
+        // From a multi-child reminder, "Done" saves this child and advances to
+        // the next; otherwise it just finishes and returns home.
         LumiPrimaryButton(
           onPressed: _finishFollowUp,
-          text: 'Done',
+          text: _nextReminderChildId != null
+              ? 'Log ${_nextChildName ?? 'the next child'} next'
+              : 'Done',
           isFullWidth: true,
-          icon: Icons.check,
+          icon: _nextReminderChildId != null
+              ? Icons.arrow_forward_rounded
+              : Icons.check,
           color: LumiTokens.red,
         ),
+        if (_nextReminderChildId != null)
+          TextButton(
+            onPressed: _bailFollowUp,
+            child: Text('Done for now',
+                style: LumiType.caption.copyWith(color: LumiTokens.muted)),
+          ),
       ],
     );
   }
