@@ -19,9 +19,9 @@ export function ParentLinksPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Parent Links"
-        title="Parent Links"
-        description="Manage parent connections and link codes"
+        eyebrow="Parents/Guardians"
+        title="Parents/Guardians"
+        description="Manage parent & guardian connections, link codes, and onboarding"
       />
 
       <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />

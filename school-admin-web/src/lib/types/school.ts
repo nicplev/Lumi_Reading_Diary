@@ -69,6 +69,14 @@ export interface ComprehensionRecordingSettings {
   enabled: boolean;
 }
 
+// Stored at `schools/{id}.settings.messaging`. Gates the parent↔teacher comment
+// threads attached to reading logs (the in-app "texting" between a parent and
+// their child's teacher). When disabled, the thread, composer, and unread
+// badges are hidden across the app for this school. Absent = enabled.
+export interface MessagingSettings {
+  enabled: boolean;
+}
+
 export interface AchievementThresholds {
   streak:      [number, number, number, number, number];
   books:       [number, number, number, number, number];

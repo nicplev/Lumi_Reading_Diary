@@ -15,11 +15,12 @@ import { useToast } from '@/components/lumi/toast';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useSchool, useUpdateSchool } from '@/lib/hooks/use-school';
 import { getReadingLevels } from '@/lib/types';
-import type { ReadingLevelSchema, ParentCommentSettings, ComprehensionRecordingSettings } from '@/lib/types';
+import type { ReadingLevelSchema, ParentCommentSettings, ComprehensionRecordingSettings, MessagingSettings } from '@/lib/types';
 import { ParentCommentSettingsSection, DEFAULT_PRESETS, type CommentPreviewState } from './parent-comment-settings';
 import { FloatingPhonePreview } from './floating-phone-preview';
 import { ComprehensionRecordingSettingsSection } from './comprehension-recording-settings';
 import { ComprehensionAudioCleanupSection } from './comprehension-audio-cleanup';
+import { MessagingSettingsSection } from './messaging-settings';
 import { RenewalsPage } from '../renewals/renewals-page';
 import type { RenewalRosterEntry, RenewalBatchSummary } from '@/lib/firestore/renewals';
 
@@ -43,7 +44,6 @@ const TIMEZONES = [
 
 const SETTINGS_TABS = [
   { id: 'school', label: 'School', icon: <Icon name="apartment" size={16} /> },
-  { id: 'academic', label: 'Academic', icon: <Icon name="menu_book" size={16} /> },
   { id: 'parent-app', label: 'Parent App', icon: <Icon name="smartphone" size={16} /> },
 ];
 
@@ -52,7 +52,7 @@ const SETTINGS_TABS = [
 // school admins. The internal id stays `renewals` so /settings?tab=renewals and
 // the /renewals redirect keep working.
 const RENEWALS_TAB = { id: 'renewals', label: 'Rollover', icon: <Icon name="autorenew" size={16} /> };
-const KNOWN_TAB_IDS = ['school', 'academic', 'parent-app', 'renewals'];
+const KNOWN_TAB_IDS = ['school', 'parent-app', 'renewals'];
 
 interface RenewalsData {
   currentYear: number;
@@ -116,6 +116,7 @@ export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
   const [savingQuiet, setSavingQuiet] = useState(false);
   const [savingComments, setSavingComments] = useState(false);
   const [savingComprehension, setSavingComprehension] = useState(false);
+  const [savingMessaging, setSavingMessaging] = useState(false);
 
   useEffect(() => {
     if (school) {
@@ -246,6 +247,18 @@ export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
     }
   };
 
+  const handleSaveMessaging = async (messagingSettings: MessagingSettings) => {
+    setSavingMessaging(true);
+    try {
+      await updateSchool.mutateAsync({ messagingSettings });
+      toast('Messaging settings updated', 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to save', 'error');
+    } finally {
+      setSavingMessaging(false);
+    }
+  };
+
 
   const updateTermDate = (key: string, value: string) => {
     setTermDates((prev) => ({ ...prev, [key]: value }));
@@ -311,122 +324,121 @@ export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
       {/* Tab Navigation */}
       <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 
-      {/* School Tab */}
+      {/* School Tab — school info, reading levels, and term dates */}
       {activeTab === 'school' && (
-        <Card>
-          <h2 className="text-lg font-bold text-ink mb-4">School Information</h2>
-          <div className="space-y-4">
-            <Input label="School Name" value={name} onChange={(e) => setName(e.target.value)} disabled={!isAdmin} />
-            <Input
-              label="Display Name"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              disabled={!isAdmin}
-              placeholder="Optional — shown in sidebar and headers"
-            />
-            <Input label="Address" value={address} onChange={(e) => setAddress(e.target.value)} disabled={!isAdmin} />
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="Contact Email" type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} disabled={!isAdmin} placeholder="Shown to parents in the app" />
-              <Input label="Contact Phone" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} disabled={!isAdmin} placeholder="Shown to parents in the app" />
-            </div>
-            <Select
-              label="Timezone"
-              options={TIMEZONES.map((tz) => ({ value: tz, label: tz.replace(/_/g, ' ') }))}
-              value={timezone}
-              onChange={setTimezone}
-              disabled={!isAdmin}
-            />
-            {isAdmin && (
-              <div className="flex justify-end">
-                <Button onClick={handleSaveInfo} loading={savingInfo} disabled={!name.trim()}>
-                  Save Info
-                </Button>
+        <div className="space-y-6">
+          <Card>
+            <h2 className="text-lg font-bold text-ink mb-4">School Information</h2>
+            <div className="space-y-4">
+              <Input label="School Name" value={name} onChange={(e) => setName(e.target.value)} disabled={!isAdmin} />
+              <Input
+                label="Display Name"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                disabled={!isAdmin}
+                placeholder="Optional — shown in sidebar and headers"
+              />
+              <Input label="Address" value={address} onChange={(e) => setAddress(e.target.value)} disabled={!isAdmin} />
+              <div className="grid grid-cols-2 gap-4">
+                <Input label="Contact Email" type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} disabled={!isAdmin} placeholder="Shown to parents in the app" />
+                <Input label="Contact Phone" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} disabled={!isAdmin} placeholder="Shown to parents in the app" />
               </div>
-            )}
-          </div>
-        </Card>
-      )}
+              <Select
+                label="Timezone"
+                options={TIMEZONES.map((tz) => ({ value: tz, label: tz.replace(/_/g, ' ') }))}
+                value={timezone}
+                onChange={setTimezone}
+                disabled={!isAdmin}
+              />
+              {isAdmin && (
+                <div className="flex justify-end">
+                  <Button onClick={handleSaveInfo} loading={savingInfo} disabled={!name.trim()}>
+                    Save Info
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Card>
 
-      {/* Academic Tab */}
-      {activeTab === 'academic' && (
-        <>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Reading Level Schema */}
-            <Card>
-              <h2 className="text-lg font-bold text-ink mb-4">Reading Level Schema</h2>
-              <div className="space-y-4">
+          {/* Reading Level Schema — compact row above Term Dates */}
+          <Card>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="sm:flex-1 sm:min-w-0">
+                <h2 className="text-lg font-bold text-ink">Reading Level Schema</h2>
+                <p className="text-sm text-muted">The level system used across the app and reports.</p>
+              </div>
+              <div className="sm:w-72 shrink-0">
                 <Select
-                  label="Schema"
                   options={LEVEL_SCHEMAS.map((s) => ({ value: s.value, label: `${s.label} — ${s.description}` }))}
                   value={levelSchema}
                   onChange={(v) => setLevelSchema(v as ReadingLevelSchema)}
                   disabled={!isAdmin}
                 />
-                {needsCustomLevels && (
+              </div>
+              {isAdmin && (
+                <Button onClick={handleSaveLevels} loading={savingLevels} className="shrink-0">
+                  Save Schema
+                </Button>
+              )}
+            </div>
+            {needsCustomLevels && (
+              <div className="mt-4">
+                <Input
+                  label="Custom Levels (comma-separated)"
+                  value={customLevels}
+                  onChange={(e) => setCustomLevels(e.target.value)}
+                  placeholder="e.g. Magenta, Red, Yellow, Blue, Green"
+                  disabled={!isAdmin}
+                />
+              </div>
+            )}
+            {previewLevels.length > 0 && (
+              <div className="mt-4">
+                <p className="text-sm font-semibold text-ink mb-2">Preview ({previewLevels.length} levels)</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {previewLevels.slice(0, 30).map((level) => (
+                    <Badge key={level} variant="default">{level}</Badge>
+                  ))}
+                  {previewLevels.length > 30 && (
+                    <Badge variant="default">+{previewLevels.length - 30} more</Badge>
+                  )}
+                </div>
+              </div>
+            )}
+          </Card>
+
+          {/* Term Dates */}
+          <Card>
+            <h2 className="text-lg font-bold text-ink mb-1">Term Dates</h2>
+            <p className="text-sm text-muted mb-4">Used for analytics, reporting periods, and term-based comparisons.</p>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
+              {[1, 2, 3, 4].map((term) => (
+                <div key={term} className="grid grid-cols-2 gap-4">
                   <Input
-                    label="Custom Levels (comma-separated)"
-                    value={customLevels}
-                    onChange={(e) => setCustomLevels(e.target.value)}
-                    placeholder="e.g. Magenta, Red, Yellow, Blue, Green"
+                    label={`Term ${term} Start`}
+                    type="date"
+                    value={termDates[`term${term}Start`] ? termDates[`term${term}Start`].split('T')[0] : ''}
+                    onChange={(e) => updateTermDate(`term${term}Start`, e.target.value)}
                     disabled={!isAdmin}
                   />
-                )}
-                {previewLevels.length > 0 && (
-                  <div>
-                    <p className="text-sm font-semibold text-ink mb-2">Preview ({previewLevels.length} levels)</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {previewLevels.slice(0, 30).map((level) => (
-                        <Badge key={level} variant="default">{level}</Badge>
-                      ))}
-                      {previewLevels.length > 30 && (
-                        <Badge variant="default">+{previewLevels.length - 30} more</Badge>
-                      )}
-                    </div>
-                  </div>
-                )}
-                {isAdmin && (
-                  <div className="flex justify-end">
-                    <Button onClick={handleSaveLevels} loading={savingLevels}>
-                      Save Schema
-                    </Button>
-                  </div>
-                )}
+                  <Input
+                    label={`Term ${term} End`}
+                    type="date"
+                    value={termDates[`term${term}End`] ? termDates[`term${term}End`].split('T')[0] : ''}
+                    onChange={(e) => updateTermDate(`term${term}End`, e.target.value)}
+                    disabled={!isAdmin}
+                  />
+                </div>
+              ))}
+            </div>
+            {isAdmin && (
+              <div className="flex justify-end mt-4">
+                <Button onClick={handleSaveTermDates} loading={savingTerms}>
+                  Save Term Dates
+                </Button>
               </div>
-            </Card>
-
-            {/* Term Dates */}
-            <Card>
-              <h2 className="text-lg font-bold text-ink mb-1">Term Dates</h2>
-              <p className="text-sm text-muted mb-4">Used for analytics, reporting periods, and term-based comparisons.</p>
-              <div className="space-y-4">
-                {[1, 2, 3, 4].map((term) => (
-                  <div key={term} className="grid grid-cols-2 gap-4">
-                    <Input
-                      label={`Term ${term} Start`}
-                      type="date"
-                      value={termDates[`term${term}Start`] ? termDates[`term${term}Start`].split('T')[0] : ''}
-                      onChange={(e) => updateTermDate(`term${term}Start`, e.target.value)}
-                      disabled={!isAdmin}
-                    />
-                    <Input
-                      label={`Term ${term} End`}
-                      type="date"
-                      value={termDates[`term${term}End`] ? termDates[`term${term}End`].split('T')[0] : ''}
-                      onChange={(e) => updateTermDate(`term${term}End`, e.target.value)}
-                      disabled={!isAdmin}
-                    />
-                  </div>
-                ))}
-                {isAdmin && (
-                  <div className="flex justify-end">
-                    <Button onClick={handleSaveTermDates} loading={savingTerms}>
-                      Save Term Dates
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </Card>
-          </div>
+            )}
+          </Card>
 
           {/* Schema Change Confirmation Dialog */}
           <ConfirmDialog
@@ -439,42 +451,68 @@ export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
             variant="warning"
             loading={savingLevels}
           />
-        </>
+        </div>
       )}
 
       {/* Parent App Tab */}
       {activeTab === 'parent-app' && (
         <div className="space-y-6">
-          {/* Quiet Hours */}
-          <Card className="max-w-md">
-            <h2 className="text-lg font-bold text-ink mb-1">Parent Notification Quiet Hours</h2>
-            <p className="text-sm text-muted mb-4">
-              Push notifications to parents are not sent during these hours (school timezone). Teachers are unaffected.
-            </p>
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Start Time"
-                type="time"
-                value={quietStart}
-                onChange={(e) => setQuietStart(e.target.value)}
-                disabled={!isAdmin}
-              />
-              <Input
-                label="End Time"
-                type="time"
-                value={quietEnd}
-                onChange={(e) => setQuietEnd(e.target.value)}
-                disabled={!isAdmin}
-              />
-            </div>
-            {isAdmin && (
-              <div className="flex justify-end mt-4">
-                <Button onClick={handleSaveQuietHours} loading={savingQuiet}>
-                  Save Quiet Hours
-                </Button>
+          {/* Parent communication channels: notification timing + messaging */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            {/* Quiet Hours */}
+            <Card>
+              <h2 className="text-lg font-bold text-ink mb-1">Parent Notification Quiet Hours</h2>
+              <p className="text-sm text-muted mb-4">
+                Push notifications to parents are not sent during these hours (school timezone). Teachers are unaffected.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  label="Start Time"
+                  type="time"
+                  value={quietStart}
+                  onChange={(e) => setQuietStart(e.target.value)}
+                  disabled={!isAdmin}
+                />
+                <Input
+                  label="End Time"
+                  type="time"
+                  value={quietEnd}
+                  onChange={(e) => setQuietEnd(e.target.value)}
+                  disabled={!isAdmin}
+                />
               </div>
-            )}
-          </Card>
+              {isAdmin && (
+                <div className="flex justify-end mt-4">
+                  <Button onClick={handleSaveQuietHours} loading={savingQuiet}>
+                    Save Quiet Hours
+                  </Button>
+                </div>
+              )}
+            </Card>
+
+            {/* Parent-Teacher Messaging */}
+            <MessagingSettingsSection
+              settings={school?.settings?.messaging as MessagingSettings | undefined}
+              isAdmin={isAdmin}
+              onSave={handleSaveMessaging}
+              saving={savingMessaging}
+            />
+          </div>
+
+          {/* Comprehension: recording step + recordings cleanup */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            {/* Comprehension Recording */}
+            <ComprehensionRecordingSettingsSection
+              settings={school?.settings?.comprehensionRecording as ComprehensionRecordingSettings | undefined}
+              isAdmin={isAdmin}
+              onSave={handleSaveComprehension}
+              saving={savingComprehension}
+              globallyDisabled={school?.platformFlags?.comprehensionRecordingEnabled === false}
+            />
+
+            {/* Comprehension Audio Cleanup */}
+            <ComprehensionAudioCleanupSection isAdmin={isAdmin} />
+          </div>
 
           {/* Parent Comments */}
           <ParentCommentSettingsSection
@@ -484,18 +522,6 @@ export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
             saving={savingComments}
             onPreviewChange={setCommentPreview}
           />
-
-          {/* Comprehension Recording */}
-          <ComprehensionRecordingSettingsSection
-            settings={school?.settings?.comprehensionRecording as ComprehensionRecordingSettings | undefined}
-            isAdmin={isAdmin}
-            onSave={handleSaveComprehension}
-            saving={savingComprehension}
-            globallyDisabled={school?.platformFlags?.comprehensionRecordingEnabled === false}
-          />
-
-          {/* Comprehension Audio Cleanup */}
-          <ComprehensionAudioCleanupSection isAdmin={isAdmin} />
 
           <FloatingPhonePreview
             enabled={commentPreview.enabled}

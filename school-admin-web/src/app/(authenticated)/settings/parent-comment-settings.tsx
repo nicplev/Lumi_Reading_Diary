@@ -116,7 +116,7 @@ export function ParentCommentSettingsSection({
         </p>
 
         {/* Enable toggle - always interactive */}
-        <label className="flex items-center gap-3 mb-6 cursor-pointer select-none">
+        <label className="flex items-center gap-3 mb-4 cursor-pointer select-none">
           <input
             type="checkbox"
             checked={enabled}
@@ -132,7 +132,7 @@ export function ParentCommentSettingsSection({
 
         <div className={enabled ? '' : 'opacity-40 pointer-events-none'}>
           {/* Free-text toggle */}
-          <label className="flex items-center gap-3 mb-6 cursor-pointer select-none">
+          <label className="flex items-center gap-3 mb-4 cursor-pointer select-none">
             <input
               type="checkbox"
               checked={freeTextEnabled}

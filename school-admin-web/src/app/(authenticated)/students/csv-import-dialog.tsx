@@ -11,6 +11,8 @@ import { useToast } from '@/components/lumi/toast';
 interface CSVImportDialogProps {
   open: boolean;
   onClose: () => void;
+  /** Render just the content + inline actions (no Modal shell), for hosting inside another modal. */
+  embedded?: boolean;
 }
 
 interface ParsedRow {
@@ -57,7 +59,7 @@ function parseCSV(text: string): { headers: string[]; rows: string[][] } {
   return { headers, rows };
 }
 
-export function CSVImportDialog({ open, onClose }: CSVImportDialogProps) {
+export function CSVImportDialog({ open, onClose, embedded }: CSVImportDialogProps) {
   const { toast } = useToast();
   const importStudents = useImportStudents();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -147,27 +149,22 @@ export function CSVImportDialog({ open, onClose }: CSVImportDialogProps) {
   const errorCount = parsedRows.filter((r) => r.error).length;
   const validCount = parsedRows.length - errorCount;
 
-  return (
-    <Modal
-      open={open}
-      onClose={handleClose}
-      title="Import Students from CSV"
-      size="lg"
-      footer={
-        step === 'upload' ? (
-          <Button variant="outline" onClick={handleClose}>Cancel</Button>
-        ) : step === 'preview' ? (
-          <>
-            <Button variant="outline" onClick={() => { setStep('upload'); setParsedRows([]); }}>Back</Button>
-            <Button onClick={handleImport} disabled={validCount === 0}>
-              Import {validCount} Student{validCount !== 1 ? 's' : ''}
-            </Button>
-          </>
-        ) : step === 'done' ? (
-          <Button onClick={handleClose}>Done</Button>
-        ) : undefined
-      }
-    >
+  const footer =
+    step === 'upload' ? (
+      <Button variant="outline" onClick={handleClose}>Cancel</Button>
+    ) : step === 'preview' ? (
+      <>
+        <Button variant="outline" onClick={() => { setStep('upload'); setParsedRows([]); }}>Back</Button>
+        <Button onClick={handleImport} disabled={validCount === 0}>
+          Import {validCount} Student{validCount !== 1 ? 's' : ''}
+        </Button>
+      </>
+    ) : step === 'done' ? (
+      <Button onClick={handleClose}>Done</Button>
+    ) : undefined;
+
+  const body = (
+    <>
       {step === 'upload' && (
         <div className="text-center py-8">
           <div className="flex justify-center mb-4 text-muted/50"><Icon name="upload_file" size={48} /></div>
@@ -295,6 +292,23 @@ export function CSVImportDialog({ open, onClose }: CSVImportDialogProps) {
           )}
         </div>
       )}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div>
+        {body}
+        {footer && (
+          <div className="mt-5 pt-4 border-t border-rule flex justify-end gap-3">{footer}</div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <Modal open={open} onClose={handleClose} title="Import Students from CSV" size="lg" footer={footer}>
+      {body}
     </Modal>
   );
 }

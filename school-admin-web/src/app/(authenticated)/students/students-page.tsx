@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/lumi/page-header';
 import { Button } from '@/components/lumi/button';
 import { SearchInput } from '@/components/lumi/search-input';
-import { FilterChip } from '@/components/lumi/filter-chip';
+import { Select } from '@/components/lumi/select';
 import { DataTable, type DataTableColumn } from '@/components/lumi/data-table';
 import { Avatar } from '@/components/lumi/avatar';
 import { Badge } from '@/components/lumi/badge';
@@ -16,7 +16,7 @@ import { KebabMenu } from '@/components/lumi/kebab-menu';
 import { ConfirmDialog } from '@/components/lumi/confirm-dialog';
 import { useToast } from '@/components/lumi/toast';
 import { StudentFormModal } from './student-form-modal';
-import { CSVImportDialog } from './csv-import-dialog';
+import { AddStudentsModal } from './add-students-modal';
 import { ResetCodeDevButton } from './reset-code-dev-button';
 import {
   useStudents,
@@ -28,7 +28,6 @@ import {
   useUpdateEnrollmentStatus,
 } from '@/lib/hooks/use-students';
 import type { SchoolClass, ReadingLevelOption, ReadingLevelSchema, EnrollmentStatus } from '@/lib/types';
-import { StatusEditorBadge } from '@/components/lumi/status-editor-badge';
 
 type SerializedClass = Omit<SchoolClass, 'createdAt'> & { createdAt: string };
 
@@ -60,8 +59,7 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
   const [enrollmentFilter, setEnrollmentFilter] = useState<EnrollmentFilter>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [showCreate, setShowCreate] = useState(false);
-  const [showImport, setShowImport] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
   const [pageSize, setPageSize] = useState(20);
 
   type StudentRow = NonNullable<typeof students>[number];
@@ -239,12 +237,22 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
       id: 'enrollment',
       header: 'Status',
       accessorFn: (row) => row.enrollmentStatus ?? 'not_enrolled',
-      cell: (_val, row) => (
-        <StatusEditorBadge
-          status={row.enrollmentStatus}
-          onChange={(next) => handleSingleEnrollment(row, next)}
-        />
-      ),
+      cell: (_val, row) => {
+        // Read-only at a glance. Subscription changes are an exception-only
+        // action (mid-year revoke, refund, correction) — they live in the row's
+        // ⋮ menu and the bulk bar, not as an always-on inline editor. Onboarding
+        // handles the start-of-year flow; Rollover handles the annual reset.
+        const subscribed =
+          row.enrollmentStatus === 'book_pack' || row.enrollmentStatus === 'direct_purchase';
+        return (
+          <span className="inline-flex items-center gap-1.5">
+            <Badge variant={subscribed ? 'success' : 'error'}>
+              {subscribed ? 'Subscribed' : 'Not Subscribed'}
+            </Badge>
+            {row.enrollmentStatus === 'direct_purchase' && <Badge variant="info">Direct</Badge>}
+          </span>
+        );
+      },
       sortable: true,
     },
     {
@@ -312,7 +320,7 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
   const handleCreate = async (data: { studentId?: string; firstName: string; lastName: string; classId: string; dateOfBirth?: string; currentReadingLevel?: string; parentEmail?: string }) => {
     try {
       await createStudent.mutateAsync(data);
-      setShowCreate(false);
+      setShowAdd(false);
       toast('Student created successfully', 'success');
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Failed to create student', 'error');
@@ -328,43 +336,40 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
         action={
           <div className="flex gap-2 items-center">
             <ResetCodeDevButton visible={devAccess} />
-            <Button variant="outline" onClick={() => setShowImport(true)}>Import CSV</Button>
-            <Button onClick={() => setShowCreate(true)}>Add Student</Button>
+            <Button onClick={() => setShowAdd(true)}>Add Students</Button>
           </div>
         }
       />
 
-      {/* Filters */}
-      <div className="space-y-3 mb-6">
-        <div className="flex flex-wrap gap-2">
-          {classes.map((c) => (
-            <FilterChip
-              key={c.id}
-              label={c.name || c.yearLevel || 'Unnamed Class'}
-              selected={classFilter.includes(c.id)}
-              count={students?.filter((s) => s.classId === c.id).length}
-              onClick={() =>
-                setClassFilter((prev) =>
-                  prev.includes(c.id) ? prev.filter((id) => id !== c.id) : [...prev, c.id]
-                )
-              }
-            />
-          ))}
+      {/* Filters — compact dropdowns so they don't dominate the page */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
+        <div className="flex-1">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search by name or student ID..." />
         </div>
-        <div className="flex flex-wrap gap-2">
-          {(['all', 'subscribed', 'not-subscribed'] as const).map((filter) => (
-            <FilterChip
-              key={filter}
-              label={
-                filter === 'all' ? 'All Status' :
-                filter === 'subscribed' ? 'Subscribed' : 'Not Subscribed'
-              }
-              selected={enrollmentFilter === filter}
-              onClick={() => setEnrollmentFilter(filter)}
-            />
-          ))}
+        <div className="sm:w-52 shrink-0">
+          <Select
+            options={[
+              { value: 'all', label: 'All classes' },
+              ...classes.map((c) => ({
+                value: c.id,
+                label: `${c.name || c.yearLevel || 'Unnamed Class'} (${students?.filter((s) => s.classId === c.id).length ?? 0})`,
+              })),
+            ]}
+            value={classFilter[0] ?? 'all'}
+            onChange={(v) => setClassFilter(v === 'all' ? [] : [v])}
+          />
         </div>
-        <SearchInput value={search} onChange={setSearch} placeholder="Search by name or student ID..." />
+        <div className="sm:w-44 shrink-0">
+          <Select
+            options={[
+              { value: 'all', label: 'All statuses' },
+              { value: 'subscribed', label: 'Subscribed' },
+              { value: 'not-subscribed', label: 'Not Subscribed' },
+            ]}
+            value={enrollmentFilter}
+            onChange={(v) => setEnrollmentFilter(v as EnrollmentFilter)}
+          />
+        </div>
       </div>
 
       {/* Bulk action bar */}
@@ -410,16 +415,16 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
             icon={<Icon name="person" size={40} />}
             title="No students found"
             description={search || classFilter.length > 0 ? 'Try adjusting your filters.' : 'Add your first student to get started.'}
-            action={!search && classFilter.length === 0 ? <Button onClick={() => setShowCreate(true)}>Add Student</Button> : undefined}
+            action={!search && classFilter.length === 0 ? <Button onClick={() => setShowAdd(true)}>Add Students</Button> : undefined}
           />
         }
       />
 
-      <StudentFormModal
-        open={showCreate}
-        onClose={() => setShowCreate(false)}
-        onSubmit={handleCreate}
-        loading={createStudent.isPending}
+      <AddStudentsModal
+        open={showAdd}
+        onClose={() => setShowAdd(false)}
+        onSubmitManual={handleCreate}
+        creating={createStudent.isPending}
         classes={classes}
         levelOptions={levelOptions}
       />
@@ -464,10 +469,6 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
         loading={bulkDeleteStudents.isPending}
       />
 
-      <CSVImportDialog
-        open={showImport}
-        onClose={() => setShowImport(false)}
-      />
     </div>
   );
 }

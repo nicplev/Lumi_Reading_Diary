@@ -250,8 +250,8 @@ export function UsersPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Users"
-        title="Users"
+        eyebrow="Staff"
+        title="Staff"
         description="Manage school staff"
         action={
           isAdmin ? (
