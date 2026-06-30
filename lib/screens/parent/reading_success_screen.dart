@@ -165,12 +165,23 @@ class _ReadingSuccessScreenState extends ConsumerState<ReadingSuccessScreen>
   @override
   void initState() {
     super.initState();
-    // Multi-child reminder: drop the child we just logged from the queue and
-    // capture the next one (if any) so we can nudge toward it rather than
-    // returning home and leaving a sibling silently un-logged.
-    ref.read(pendingReminderChildIdsProvider.notifier).remove(widget.student.id);
-    final remaining = ref.read(pendingReminderChildIdsProvider);
+    // Multi-child reminder: work out (read-only) whether there's a next
+    // un-logged sibling, treating the child we just logged as handled, so we
+    // can nudge toward it instead of leaving a sibling silently un-logged.
+    // The queue mutation that drops the logged child is deferred to after the
+    // first frame — Riverpod forbids modifying a provider during initState.
+    final queue = ref.read(pendingReminderChildIdsProvider);
+    final remaining = queue.where((id) => id != widget.student.id).toList();
     _nextReminderChildId = remaining.isNotEmpty ? remaining.first : null;
+    if (queue.contains(widget.student.id)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ref
+              .read(pendingReminderChildIdsProvider.notifier)
+              .remove(widget.student.id);
+        }
+      });
+    }
 
     _confettiController = AnimationController(
       vsync: this,
