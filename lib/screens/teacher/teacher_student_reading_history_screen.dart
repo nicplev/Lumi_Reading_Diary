@@ -491,7 +491,10 @@ class _TeacherStudentReadingHistoryScreenState
                       pending: !log.comprehensionAudioUploaded),
                 ],
                 const SizedBox(width: 8),
-                CommentAffordance(hasUnread: hasUnread),
+                CommentAffordance(
+                  hasUnread: hasUnread,
+                  schoolId: widget.student.schoolId,
+                ),
               ],
             ),
           ),

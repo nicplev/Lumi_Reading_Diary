@@ -141,6 +141,21 @@ service cloud.firestore {
       return !devReadOnly();
     }
 
+    // ── Per-school feature gates ────────────────────────────────────
+    // Server-side backstop for parent↔teacher messaging (the reading-log
+    // comment threads). One get() of the school doc — cached per request and
+    // only on the low-volume comment-create path — reads
+    // settings.messaging.enabled. Defaults to TRUE for legacy docs without the
+    // setting, so messaging fails OPEN: an enabled school is never blocked, and
+    // a school that has explicitly turned messaging off can't have comment
+    // threads created even by a stale or tampered client.
+    function messagingEnabled(schoolId) {
+      return get(/databases/$(database)/documents/schools/$(schoolId))
+          .data.get('settings', {})
+          .get('messaging', {})
+          .get('enabled', true);
+    }
+
     match /schools/{schoolId} {
       allow list: if isSignedIn();
       allow get: if belongsToSchool(schoolId) || isDevImpersonatingSchool(schoolId);
@@ -447,7 +462,11 @@ service cloud.firestore {
 
           // Teachers post as staff; parents post on their own child's log.
           // authorId is pinned to the caller so attribution can't be spoofed.
+          // messagingEnabled() is the server-side backstop to the app-side gate:
+          // a school that has turned parent↔teacher messaging off can't have new
+          // threads created regardless of client state.
           allow create: if writeAllowedForDev() &&
+              messagingEnabled(schoolId) &&
               request.resource.data.authorId == request.auth.uid &&
               (
                 (isTeacher(schoolId) &&

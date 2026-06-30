@@ -143,6 +143,8 @@ class DashboardWidgetRegistry {
       description: 'Unread replies from parents awaiting you',
       icon: Icons.mark_chat_unread_rounded,
       dataDependencies: {WidgetDataDependency.students},
+      // Hidden when the school has parent↔teacher messaging turned off.
+      isVisible: (ctx) => ctx.messagingEnabled,
       builder: (ctx) => DashboardUnreadCommentsCard(
         classModel: ctx.classModel,
         schoolId: ctx.schoolId,
