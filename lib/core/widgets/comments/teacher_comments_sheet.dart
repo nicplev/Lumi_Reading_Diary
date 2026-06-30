@@ -1,21 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
 import '../../../data/models/log_comment_model.dart';
 import '../../../data/models/reading_log_model.dart';
+import '../../../data/providers/school_settings_provider.dart';
 import '../audio/comprehension_audio_player.dart';
 import 'comment_thread.dart';
 
 /// A compact comment icon with an unread dot, shown on a reading-log row so a
 /// teacher can see at a glance which logs have an unanswered parent message.
-class CommentAffordance extends StatelessWidget {
+class CommentAffordance extends ConsumerWidget {
   final bool hasUnread;
+  final String schoolId;
 
-  const CommentAffordance({super.key, required this.hasUnread});
+  const CommentAffordance({
+    super.key,
+    required this.hasUnread,
+    required this.schoolId,
+  });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Hidden entirely when the school has turned parent↔teacher messaging off.
+    if (!ref.watch(messagingEnabledProvider(schoolId))) {
+      return const SizedBox.shrink();
+    }
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -104,6 +115,14 @@ void openTeacherCommentsSheet(
   required ReadingLogModel log,
   required String studentName,
 }) {
+  // Respect the school's messaging gate. The comment affordances that lead here
+  // are hidden when messaging is off, but this sheet also hosts the
+  // comprehension recording (a separate feature). So only bail when there's
+  // nothing else to show; when audio exists the sheet still opens and the thread
+  // inside is gated.
+  final messagingOn = ProviderScope.containerOf(context, listen: false)
+      .read(messagingEnabledProvider(log.schoolId));
+  if (!messagingOn && log.comprehensionAudioPath == null) return;
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -114,7 +133,7 @@ void openTeacherCommentsSheet(
 
 /// Bottom sheet hosting a reading log's comment thread for a teacher, with a
 /// composer that lifts above the keyboard.
-class TeacherCommentsSheet extends StatelessWidget {
+class TeacherCommentsSheet extends ConsumerWidget {
   final ReadingLogModel log;
   final String studentName;
 
@@ -125,7 +144,8 @@ class TeacherCommentsSheet extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final messagingOn = ref.watch(messagingEnabledProvider(log.schoolId));
     final books =
         log.bookTitles.isNotEmpty ? log.bookTitles.join(', ') : 'Free reading';
     return Padding(
@@ -155,14 +175,19 @@ class TeacherCommentsSheet extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                 child: Row(
                   children: [
-                    Icon(Icons.mode_comment_outlined,
-                        size: 20, color: LumiTokens.green),
+                    Icon(
+                        messagingOn
+                            ? Icons.mode_comment_outlined
+                            : Icons.mic_none_rounded,
+                        size: 20,
+                        color: LumiTokens.green),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Comments', style: LumiType.subhead),
+                          Text(messagingOn ? 'Comments' : 'Recording',
+                              style: LumiType.subhead),
                           Text(
                             '$studentName · $books',
                             style: LumiType.caption
@@ -195,13 +220,14 @@ class TeacherCommentsSheet extends StatelessWidget {
                         )
                       else
                         const _RecordingPendingNote(),
-                      const SizedBox(height: 16),
+                      if (messagingOn) const SizedBox(height: 16),
                     ],
-                    CommentThread(
-                      log: log,
-                      authorRole: CommentAuthorRole.teacher,
-                      accentColor: LumiTokens.green,
-                    ),
+                    if (messagingOn)
+                      CommentThread(
+                        log: log,
+                        authorRole: CommentAuthorRole.teacher,
+                        accentColor: LumiTokens.green,
+                      ),
                   ],
                 ),
               ),

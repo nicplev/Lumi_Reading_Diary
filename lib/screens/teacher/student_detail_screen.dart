@@ -2357,7 +2357,10 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               RecordingAffordance(pending: audioPending),
             ],
             const SizedBox(width: 10),
-            CommentAffordance(hasUnread: hasUnread),
+            CommentAffordance(
+              hasUnread: hasUnread,
+              schoolId: _currentStudent.schoolId,
+            ),
           ],
         ),
       ),

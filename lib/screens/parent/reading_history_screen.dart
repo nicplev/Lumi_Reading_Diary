@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
@@ -7,6 +8,7 @@ import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../../theme/section_theme.dart';
 import '../../data/models/reading_log_model.dart';
+import '../../data/providers/school_settings_provider.dart';
 import '../../services/book_lookup_service.dart';
 import '../../services/book_metadata_resolver.dart';
 import '../../services/firebase_service.dart';
@@ -956,17 +958,20 @@ class _DaySessionsCard extends StatelessWidget {
   }
 }
 
-class _SessionRow extends StatelessWidget {
+class _SessionRow extends ConsumerWidget {
   final ReadingLogModel log;
 
   const _SessionRow({required this.log});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final hasMultipleBooks = log.bookTitles.length > 1;
     final extraCount = log.bookTitles.length - 1;
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-    final hasUnread = uid.isNotEmpty && log.hasUnreadFor(uid, 'parent');
+    // No teacher-reply dot when the school has messaging turned off.
+    final messagingOn = ref.watch(messagingEnabledProvider(log.schoolId));
+    final hasUnread =
+        messagingOn && uid.isNotEmpty && log.hasUnreadFor(uid, 'parent');
     final feeling = log.childFeeling;
 
     return InkWell(

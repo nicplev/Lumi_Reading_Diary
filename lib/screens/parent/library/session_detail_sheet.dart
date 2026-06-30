@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/widgets/comments/comment_thread.dart';
 import '../../../data/models/log_comment_model.dart';
 import '../../../data/models/reading_log_model.dart';
+import '../../../data/providers/school_settings_provider.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
 import 'reading_feeling_visuals.dart';
@@ -26,13 +28,15 @@ void showSessionDetailSheet(BuildContext context, ReadingLogModel log) {
   );
 }
 
-class _SessionDetailSheet extends StatelessWidget {
+class _SessionDetailSheet extends ConsumerWidget {
   final ReadingLogModel log;
 
   const _SessionDetailSheet({required this.log});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Hide the parent↔teacher comment thread when the school has messaging off.
+    final messagingOn = ref.watch(messagingEnabledProvider(log.schoolId));
     return DraggableScrollableSheet(
       initialChildSize: 0.55,
       minChildSize: 0.25,
@@ -140,16 +144,18 @@ class _SessionDetailSheet extends StatelessWidget {
                     const SizedBox(height: LumiTokens.space2),
                     Text(log.notes!, style: LumiType.body),
                   ],
-                  const SizedBox(height: LumiTokens.space4),
-                  const _Label('Comments'),
-                  const SizedBox(height: LumiTokens.space2),
-                  CommentThread(
-                    log: log,
-                    authorRole: CommentAuthorRole.parent,
-                    accentColor: _accent,
-                  ),
-                  // Clear the keyboard inset so the composer stays visible.
-                  SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
+                  if (messagingOn) ...[
+                    const SizedBox(height: LumiTokens.space4),
+                    const _Label('Comments'),
+                    const SizedBox(height: LumiTokens.space2),
+                    CommentThread(
+                      log: log,
+                      authorRole: CommentAuthorRole.parent,
+                      accentColor: _accent,
+                    ),
+                    // Clear the keyboard inset so the composer stays visible.
+                    SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
+                  ],
                 ],
               ),
             ),

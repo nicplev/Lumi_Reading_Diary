@@ -31,6 +31,10 @@ class DashboardWidgetContext {
   // Achievements extracted during student fetch (sorted by earnedAt desc)
   final List<StudentAchievement> recentAchievements;
 
+  // Whether parent↔teacher messaging is enabled for this school. Gates the
+  // unread-comments ("Parent Comments") dashboard widget.
+  final bool messagingEnabled;
+
   const DashboardWidgetContext({
     required this.classModel,
     required this.schoolId,
@@ -44,5 +48,6 @@ class DashboardWidgetContext {
     this.readingGroups = const [],
     this.readingGroupsLoaded = false,
     this.recentAchievements = const [],
+    this.messagingEnabled = true,
   });
 }

@@ -17,6 +17,7 @@ import '../../../data/models/achievement_model.dart';
 import '../../../data/models/class_model.dart';
 import '../../../data/models/reading_group_model.dart';
 import '../../../data/models/reading_log_model.dart';
+import '../../../data/models/school_model.dart';
 import '../../../data/models/student_model.dart';
 import '../../../data/models/user_model.dart';
 import '../../../services/firebase_service.dart';
@@ -69,6 +70,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
   StreamSubscription<QuerySnapshot>? _readingGroupsSubscription;
   List<StudentAchievement> _recentAchievements = [];
   final ValueNotifier<int> _engagementResetSignal = ValueNotifier<int>(0);
+  bool _messagingEnabled = true;
 
   // Widget customisation
   late DashboardWidgetConfig _widgetConfig;
@@ -81,6 +83,28 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
         DashboardWidgetConfig.fromPreferences(widget.user.preferences);
     _computeHeroIntelligence();
     _fetchAllDependencies();
+    _loadMessagingFlag();
+  }
+
+  /// Loads the school's parent↔teacher messaging flag so the unread-comments
+  /// ("Parent Comments") widget can be hidden when an admin has turned
+  /// messaging off. Fails open (stays enabled) on any error.
+  Future<void> _loadMessagingFlag() async {
+    final schoolId = widget.user.schoolId;
+    if (schoolId == null || schoolId.isEmpty) return;
+    try {
+      final doc = await FirebaseService.instance.firestore
+          .collection('schools')
+          .doc(schoolId)
+          .get();
+      if (!mounted || !doc.exists) return;
+      final enabled = SchoolModel.fromFirestore(doc).messagingSettings.enabled;
+      if (enabled != _messagingEnabled) {
+        setState(() => _messagingEnabled = enabled);
+      }
+    } catch (_) {
+      // Keep the default (enabled); the widget stays visible.
+    }
   }
 
   @override
@@ -136,6 +160,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
         readingGroups: _readingGroups,
         readingGroupsLoaded: _readingGroupsLoaded,
         recentAchievements: _recentAchievements,
+        messagingEnabled: _messagingEnabled,
       );
 
   void _enterEditMode() {

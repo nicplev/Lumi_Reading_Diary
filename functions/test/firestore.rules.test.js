@@ -2080,3 +2080,34 @@ test('proxy: a teacher cannot write a parent-shaped log (loggedByRole != teacher
   const db = authDb('teacher_array');
   await assertFails(proxyLog(db, { logId: 'p5', parentId: 'teacher_array', classId: 'class_1', loggedByRole: 'parent' }));
 });
+
+// ── Parent↔teacher messaging gate (settings.messaging.enabled) ──────────
+// Server-side backstop: a school that has turned messaging off can't have new
+// comment threads created by any client. Default-on (absent setting) is already
+// covered by the comment tests above — seedSchoolForComments writes no setting.
+
+const teacherCommentDoc = {
+  authorId: 'teacher_1',
+  authorRole: 'teacher',
+  authorName: 'Ms Smith',
+  body: 'Great progress',
+  studentId: 'student_1',
+  parentId: 'parent_1',
+  createdAt: new Date(),
+};
+
+test('comments: blocked for both roles when school messaging is disabled', async () => {
+  await seedSchoolForComments();
+  await seedData((db) => db.collection('schools').doc('school_1')
+    .set({ settings: { messaging: { enabled: false } } }, { merge: true }));
+  await assertFails(commentRef(authDb('parent_1'), 'p_off').set(parentComment));
+  await assertFails(commentRef(authDb('teacher_1'), 't_off').set(teacherCommentDoc));
+});
+
+test('comments: allowed for both roles when school messaging is explicitly enabled', async () => {
+  await seedSchoolForComments();
+  await seedData((db) => db.collection('schools').doc('school_1')
+    .set({ settings: { messaging: { enabled: true } } }, { merge: true }));
+  await assertSucceeds(commentRef(authDb('parent_1'), 'p_on').set(parentComment));
+  await assertSucceeds(commentRef(authDb('teacher_1'), 't_on').set(teacherCommentDoc));
+});
