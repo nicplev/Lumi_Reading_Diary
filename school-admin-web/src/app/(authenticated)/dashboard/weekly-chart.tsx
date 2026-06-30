@@ -3,14 +3,19 @@
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface WeeklyChartProps {
-  data: Array<{ day: string; count: number }>;
+  data: Array<{ day: string; count: number; minutes?: number }>;
+  /** Which metric to plot. Defaults to logs (count). */
+  metric?: 'logs' | 'minutes';
 }
 
 // Dashboard is the Lumi Blue section — its data-viz reads in blue.
 const ACCENT = '#56C8E6';
 
-export function WeeklyChart({ data }: WeeklyChartProps) {
-  const maxValue = Math.max(...data.map(d => d.count), 1);
+export function WeeklyChart({ data, metric = 'logs' }: WeeklyChartProps) {
+  const isMinutes = metric === 'minutes';
+  const dataKey = isMinutes ? 'minutes' : 'count';
+  const unit = isMinutes ? 'min' : 'logs';
+  const maxValue = Math.max(...data.map((d) => (isMinutes ? d.minutes ?? 0 : d.count)), 1);
 
   return (
     <div className="h-[180px]">
@@ -45,12 +50,12 @@ export function WeeklyChart({ data }: WeeklyChartProps) {
               fontWeight: 600,
               boxShadow: '0 8px 24px -12px rgba(26,26,26,0.16)',
             }}
-            formatter={(value: number) => [`${value} logs`, 'Reading']}
+            formatter={(value: number) => [`${value} ${unit}`, isMinutes ? 'Minutes' : 'Reading']}
             cursor={{ stroke: 'rgba(86, 200, 230, 0.25)', strokeWidth: 1 }}
           />
           <Area
             type="monotone"
-            dataKey="count"
+            dataKey={dataKey}
             stroke={ACCENT}
             strokeWidth={2}
             fill="url(#readingGradient)"

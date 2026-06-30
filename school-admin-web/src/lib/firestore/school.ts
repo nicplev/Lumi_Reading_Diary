@@ -7,6 +7,7 @@ export async function updateSchool(
     termDates?: Record<string, string>;
     parentCommentSettings?: { enabled: boolean; freeTextEnabled: boolean; customPresets: { id: string; name: string; chips: string[] }[] };
     comprehensionRecordingSettings?: { enabled: boolean };
+    messagingSettings?: { enabled: boolean };
     achievementThresholds?: AchievementThresholds;
     achievementCustomization?: AchievementCustomization;
   }
@@ -30,6 +31,9 @@ export async function updateSchool(
   }
   if (data.comprehensionRecordingSettings !== undefined) {
     update['settings.comprehensionRecording'] = data.comprehensionRecordingSettings;
+  }
+  if (data.messagingSettings !== undefined) {
+    update['settings.messaging'] = data.messagingSettings;
   }
   if (data.achievementThresholds !== undefined) {
     update['settings.achievementThresholds'] = data.achievementThresholds;

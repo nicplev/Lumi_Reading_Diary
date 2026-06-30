@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { StatCard } from '@/components/lumi/stat-card';
 import { Card } from '@/components/lumi/card';
 import { PageHeader } from '@/components/lumi/page-header';
@@ -7,14 +8,15 @@ import { Button } from '@/components/lumi/button';
 import { Icon } from '@/components/lumi/icon';
 import { formatRelativeTime } from '@/lib/utils/formatters';
 import { sectionForPath } from '@/lib/theme/sections';
-import { WeeklyChart } from './weekly-chart';
+import { WeeklyClassChart } from './weekly-class-chart';
 import Link from 'next/link';
-import type { DashboardStats, WeeklyEngagement } from '@/lib/firestore/dashboard';
+import type { DashboardStats, WeeklyEngagement, WeeklyClassSeries } from '@/lib/firestore/dashboard';
 
 interface AdminDashboardProps {
   schoolName: string;
   stats: DashboardStats;
   weeklyEngagement: WeeklyEngagement[];
+  classSeries: WeeklyClassSeries;
   recentActivity: Array<{
     id: string;
     studentName: string;
@@ -27,13 +29,14 @@ interface AdminDashboardProps {
 // Each shortcut is tinted by the colour of the section it jumps to, so the
 // palette doubles as wayfinding rather than decoration.
 const shortcuts = [
-  { label: 'Add User',     href: '/users',        icon: <Icon name="person_add" size={20} /> },
+  { label: 'Add Staff',    href: '/users',        icon: <Icon name="person_add" size={20} /> },
   { label: 'Add Class',    href: '/classes',      icon: <Icon name="school" size={20} /> },
   { label: 'Reports',      href: '/analytics',    icon: <Icon name="bar_chart" size={20} /> },
-  { label: 'Parent Links', href: '/parent-links', icon: <Icon name="link" size={20} /> },
+  { label: 'Parents/Guardians', href: '/parent-links', icon: <Icon name="link" size={20} /> },
 ];
 
-export function AdminDashboard({ schoolName, stats, weeklyEngagement, recentActivity }: AdminDashboardProps) {
+export function AdminDashboard({ schoolName, stats, weeklyEngagement, classSeries, recentActivity }: AdminDashboardProps) {
+  const [metric, setMetric] = useState<'logs' | 'minutes'>('logs');
   const avg7 = weeklyEngagement.length
     ? weeklyEngagement.reduce((s, d) => s + d.count, 0) / weeklyEngagement.length
     : 0;
@@ -47,6 +50,7 @@ export function AdminDashboard({ schoolName, stats, weeklyEngagement, recentActi
       : `${activeDeltaPct > 0 ? '↑' : '↓'} ${Math.abs(activeDeltaPct)}% vs 7-day avg`;
 
   const weekTotal = weeklyEngagement.reduce((s, d) => s + d.count, 0);
+  const weekMinutes = weeklyEngagement.reduce((s, d) => s + (d.minutes ?? 0), 0);
   const weekRangeLabel = weeklyEngagement.length
     ? `${weeklyEngagement[0].day} – ${weeklyEngagement[weeklyEngagement.length - 1].day}`
     : '';
@@ -79,20 +83,47 @@ export function AdminDashboard({ schoolName, stats, weeklyEngagement, recentActi
         {/* Weekly Engagement Chart */}
         <div className="lg:col-span-2">
           <Card className="h-full flex flex-col">
-            <div className="flex items-start justify-between mb-4">
+            <div className="flex items-start justify-between mb-4 gap-3">
               <div>
                 <h2 className="text-lg font-bold text-ink">Weekly Reading Activity</h2>
                 {weekRangeLabel && (
                   <p className="text-xs text-muted mt-0.5">{weekRangeLabel}</p>
                 )}
               </div>
-              <div className="text-right">
-                <div className="font-display text-[22px] font-extrabold text-ink leading-tight">{weekTotal}</div>
-                <div className="text-xs text-muted">logs this week</div>
+              <div className="flex flex-col items-end gap-2">
+                {/* Toggle: glance at the same week as logs or minutes read */}
+                <div className="inline-flex rounded-full border border-rule bg-cream p-0.5 text-xs font-semibold">
+                  {(['logs', 'minutes'] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setMetric(m)}
+                      className={`px-2.5 py-1 rounded-full capitalize transition ${
+                        metric === m ? 'bg-paper text-ink shadow-card' : 'text-muted hover:text-ink'
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+                <div className="text-right">
+                  <div className="font-display text-[22px] font-extrabold text-ink leading-tight">
+                    {metric === 'minutes' ? weekMinutes : weekTotal}
+                  </div>
+                  <div className="text-xs text-muted">
+                    {metric === 'minutes' ? 'min this week' : 'logs this week'}
+                  </div>
+                </div>
               </div>
             </div>
             <div className="flex-1 min-h-0">
-              <WeeklyChart data={weeklyEngagement} />
+              {classSeries.classes.length > 0 ? (
+                <WeeklyClassChart classes={classSeries.classes} rows={classSeries.rows} metric={metric} />
+              ) : (
+                <div className="flex h-full min-h-[220px] items-center justify-center text-center">
+                  <p className="text-sm text-muted">No reading logged yet this week.</p>
+                </div>
+              )}
             </div>
           </Card>
         </div>

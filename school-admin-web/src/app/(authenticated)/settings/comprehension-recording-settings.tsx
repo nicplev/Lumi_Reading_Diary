@@ -57,7 +57,7 @@ export function ComprehensionRecordingSettingsSection({
         </div>
       )}
 
-      <label className="flex items-center gap-3 mb-6 cursor-pointer select-none">
+      <label className="flex items-center gap-3 mb-4 cursor-pointer select-none">
         <input
           type="checkbox"
           checked={globallyDisabled ? false : enabled}

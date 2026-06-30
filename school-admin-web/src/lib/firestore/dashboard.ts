@@ -10,6 +10,14 @@ export interface DashboardStats {
 export interface WeeklyEngagement {
   day: string;
   count: number;
+  minutes: number;
+}
+
+export interface WeeklyClassSeries {
+  /** Classes with at least one reading log this week, sorted by name. */
+  classes: { id: string; name: string }[];
+  /** One row per weekday; per class two keys: `${id}:count` and `${id}:minutes`. */
+  rows: Array<Record<string, number | string>>;
 }
 
 export interface RecentActivity {
@@ -104,6 +112,7 @@ export async function getWeeklyEngagement(schoolId: string): Promise<WeeklyEngag
     }
 
     const countByDay = new Map<number, number>();
+    const minutesByDay = new Map<number, number>();
     logsSnap.docs.forEach(doc => {
       const data = doc.data();
       // Handle both Timestamp and string date fields
@@ -119,11 +128,89 @@ export async function getWeeklyEngagement(schoolId: string): Promise<WeeklyEngag
       }
       const dayIndex = (date.getDay() + 6) % 7; // Mon=0
       countByDay.set(dayIndex, (countByDay.get(dayIndex) ?? 0) + 1);
+      const mins = typeof data.minutesRead === 'number' ? data.minutesRead : 0;
+      minutesByDay.set(dayIndex, (minutesByDay.get(dayIndex) ?? 0) + mins);
     });
 
-    return days.map((day, i) => ({ day, count: countByDay.get(i) ?? 0 }));
+    return days.map((day, i) => ({ day, count: countByDay.get(i) ?? 0, minutes: minutesByDay.get(i) ?? 0 }));
   } catch {
-    return days.map(day => ({ day, count: 0 }));
+    return days.map(day => ({ day, count: 0, minutes: 0 }));
+  }
+}
+
+/**
+ * Per-class weekly engagement — one series per class that has logged reading
+ * this week (count + minutes per day). Powers the admin dashboard's multi-line
+ * "how is each class tracking" chart. Classes with no activity this week are
+ * intentionally omitted to keep the chart legible.
+ */
+export async function getWeeklyClassEngagement(schoolId: string): Promise<WeeklyClassSeries> {
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const today = new Date();
+  const startOfWeek = new Date(today);
+  const dayOfWeek = today.getDay();
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  startOfWeek.setDate(today.getDate() + mondayOffset);
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  const emptyRows = () => days.map((day) => ({ day }) as Record<string, number | string>);
+
+  try {
+    let logsSnap = await adminDb
+      .collection('schools').doc(schoolId).collection('readingLogs')
+      .where('date', '>=', startOfWeek)
+      .get();
+    if (logsSnap.empty) {
+      logsSnap = await adminDb
+        .collection('schools').doc(schoolId).collection('readingLogs')
+        .where('createdAt', '>=', startOfWeek)
+        .get();
+    }
+    if (logsSnap.empty) return { classes: [], rows: emptyRows() };
+
+    // Resolve class names once.
+    const classesSnap = await adminDb.collection('schools').doc(schoolId).collection('classes').get();
+    const classNames = new Map<string, string>();
+    classesSnap.docs.forEach((d) => {
+      const data = d.data();
+      classNames.set(d.id, (data.name as string) || (data.yearLevel as string) || 'Class');
+    });
+
+    // Aggregate per class → 7-day count + minutes arrays (Mon=0).
+    const agg = new Map<string, { count: number[]; minutes: number[] }>();
+    logsSnap.docs.forEach((doc) => {
+      const data = doc.data();
+      const classId = data.classId as string | undefined;
+      if (!classId) return;
+      let date: Date;
+      if (data.date?.toDate) date = data.date.toDate();
+      else if (data.createdAt?.toDate) date = data.createdAt.toDate();
+      else if (typeof data.date === 'string') date = new Date(data.date);
+      else date = new Date();
+      const dayIndex = (date.getDay() + 6) % 7;
+      if (!agg.has(classId)) agg.set(classId, { count: Array(7).fill(0), minutes: Array(7).fill(0) });
+      const a = agg.get(classId)!;
+      a.count[dayIndex] += 1;
+      a.minutes[dayIndex] += typeof data.minutesRead === 'number' ? data.minutesRead : 0;
+    });
+
+    const classes = Array.from(agg.keys())
+      .map((id) => ({ id, name: classNames.get(id) ?? 'Unknown class' }))
+      .sort((x, y) => x.name.localeCompare(y.name));
+
+    const rows = days.map((day, i) => {
+      const row: Record<string, number | string> = { day };
+      for (const c of classes) {
+        const a = agg.get(c.id)!;
+        row[`${c.id}:count`] = a.count[i];
+        row[`${c.id}:minutes`] = a.minutes[i];
+      }
+      return row;
+    });
+
+    return { classes, rows };
+  } catch {
+    return { classes: [], rows: emptyRows() };
   }
 }
 
