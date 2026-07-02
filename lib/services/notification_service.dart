@@ -113,6 +113,11 @@ class NotificationService {
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
+      // iOS 14+ ignores the legacy alert flag; banner/list are what actually
+      // make a foreground local notification visible (e.g. the "push
+      // unavailable" preview fallback).
+      defaultPresentBanner: true,
+      defaultPresentList: true,
     );
 
     const initSettings = InitializationSettings(
@@ -196,6 +201,23 @@ class NotificationService {
       debugPrint('Error requesting notification permission: $e');
     }
 
+    // iOS suppresses system banners for pushes arriving while the app is in
+    // the foreground unless we opt in. Let the OS present the original FCM
+    // notification natively (banner + Notification Centre + sound); Android
+    // gets no system banner for foreground FCM, so it keeps the local
+    // re-show in _handleForegroundMessage instead.
+    if (!kIsWeb && Platform.isIOS) {
+      try {
+        await _messaging!.setForegroundNotificationPresentationOptions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      } catch (e) {
+        debugPrint('Error setting foreground presentation options: $e');
+      }
+    }
+
     // Handle foreground messages
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
 
@@ -228,6 +250,12 @@ class NotificationService {
   /// Handle foreground Firebase messages
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
     debugPrint('Foreground message: ${message.notification?.title}');
+
+    // iOS presents the FCM notification natively in the foreground (see
+    // setForegroundNotificationPresentationOptions in init) — re-showing it
+    // locally here would produce a duplicate banner. Tap routing for the
+    // native banner flows through onMessageOpenedApp → _handleMessageTap.
+    if (!kIsWeb && Platform.isIOS) return;
 
     // Determine channel based on message type
     String channelId = _generalChannel;
@@ -350,6 +378,9 @@ class NotificationService {
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
+      // presentAlert is ignored on iOS 14+ — banner/list control visibility.
+      presentBanner: true,
+      presentList: true,
     );
 
     final details = NotificationDetails(
