@@ -190,7 +190,12 @@ class _PhoneVerifyRecoveryScreenState extends State<PhoneVerifyRecoveryScreen> {
                 PhoneVerificationMode.phonePrimaryRegistration) {
               await _finishRegistration(uid: uid, record: record);
             } else {
-              await _finishLogin(uid: uid, record: record);
+              await _finishLogin(
+                uid: uid,
+                record: record,
+                signInCreatedUser:
+                    cred.additionalUserInfo?.isNewUser ?? false,
+              );
             }
           }
           break;
@@ -319,21 +324,41 @@ class _PhoneVerifyRecoveryScreenState extends State<PhoneVerifyRecoveryScreen> {
     context.go(AppRouter.getHomeRouteForRole(UserRole.parent));
   }
 
+  /// Phone OTP sign-in implicitly CREATES an Auth user when the number is
+  /// unknown. When this attempt minted a brand-new user that turns out to
+  /// have no Lumi profile, delete it again so failed logins don't strand
+  /// ghost phone-only accounts, then sign out.
+  Future<void> _discardPhoneSignIn(bool signInCreatedUser) async {
+    if (signInCreatedUser) {
+      try {
+        await FirebaseAuth.instance.currentUser?.delete();
+      } catch (_) {
+        // Best-effort — the sign-out below still ends the session.
+      }
+    }
+    await _firebaseService.signOut();
+  }
+
   /// Phone-login tail. Resolves the school via the phone hash, loads
   /// the user doc, clears the recovery record, and navigates.
+  ///
+  /// [signInCreatedUser] is true when the phone OTP sign-in minted a
+  /// brand-new Auth user (phone sign-in doubles as sign-up) — on failure
+  /// that ghost is deleted again rather than merely signed out.
   Future<void> _finishLogin({
     required String uid,
     required PendingPhoneVerification record,
+    bool signInCreatedUser = false,
   }) async {
     final indexService = UserSchoolIndexService();
     final indexResult =
         await indexService.lookupSchoolByPhone(record.phoneE164);
     if (indexResult == null) {
-      await _firebaseService.signOut();
+      await _discardPhoneSignIn(signInCreatedUser);
       await PhoneVerificationRecoveryService.instance.clear();
       if (!mounted) return;
       setState(() => _errorMessage =
-          'We couldn\'t find an account for that phone number. If you\'re new, tap "I have a code" to register.');
+          'We couldn\'t find an account for that phone number. If you\'re new, go back and register with your student code (parent) or school code (teacher).');
       return;
     }
 
@@ -347,7 +372,7 @@ class _PhoneVerifyRecoveryScreenState extends State<PhoneVerifyRecoveryScreen> {
         .doc(uid)
         .get();
     if (!doc.exists) {
-      await _firebaseService.signOut();
+      await _discardPhoneSignIn(signInCreatedUser);
       await PhoneVerificationRecoveryService.instance.clear();
       if (!mounted) return;
       setState(() => _errorMessage =
