@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '@/lib/firebase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { Icon } from '@/components/lumi/icon';
 import { useAuth } from '@/lib/auth/auth-context';
+import { characterImageSrc, randomCharacterId } from '@/lib/characters';
 
 function LoginForm() {
   const [email, setEmail] = useState('');
@@ -20,6 +21,14 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setSessionData } = useAuth();
+
+  // A different Lumi friend greets every visitor. Picked once on mount
+  // (client-only) so it's fresh on every page load and never collides with
+  // SSR hydration.
+  const [character, setCharacter] = useState<string | null>(null);
+  useEffect(() => {
+    setCharacter(randomCharacterId());
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,10 +93,22 @@ function LoginForm() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-cream px-4">
       <div className="w-full max-w-sm">
-        {/* Logo / Brand */}
+        {/* Logo / Brand — a surprise Lumi character greets each visitor */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-[var(--radius-xl)] bg-section/10 mb-4">
-            <span className="text-section"><Icon name="library_books" size={32} /></span>
+          <div className="flex justify-center mb-4">
+            {character ? (
+              <img
+                src={characterImageSrc(character) ?? ''}
+                alt=""
+                width={96}
+                height={96}
+                draggable={false}
+                className="w-24 h-24 object-contain animate-success-pop select-none"
+              />
+            ) : (
+              // Reserve the space before the client picks a character (avoids layout shift).
+              <span aria-hidden className="block w-24 h-24" />
+            )}
           </div>
           <h1 className="font-display text-[28px] font-extrabold tracking-tight text-ink">Lumi School</h1>
           <p className="text-muted text-sm mt-1">

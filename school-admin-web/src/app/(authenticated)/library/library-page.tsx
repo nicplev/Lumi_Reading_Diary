@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { PageHeader } from '@/components/lumi/page-header';
 import { Button } from '@/components/lumi/button';
 import { FilterChip } from '@/components/lumi/filter-chip';
@@ -11,7 +11,7 @@ import { BookCard } from '@/components/lumi/book-card';
 import { Badge } from '@/components/lumi/badge';
 import { Skeleton } from '@/components/lumi/skeleton';
 import { useToast } from '@/components/lumi/toast';
-import { useBooks, useDeleteBook } from '@/lib/hooks/use-books';
+import { useBooks, useIncompleteBooks, useDeleteBook } from '@/lib/hooks/use-books';
 import { useLibraryAssignments } from '@/lib/hooks/use-library-assignments';
 import { assignedStudentIdsForBook } from '@/lib/library/assignment-matching';
 import { BookFormModal } from './book-form-modal';
@@ -19,7 +19,7 @@ import { ContributeBookModal } from './contribute-book-modal';
 import { ConfirmDialog } from '@/components/lumi/confirm-dialog';
 import type { ReadingLevelOption } from '@/lib/types';
 
-type FilterType = 'all' | 'decodable' | 'library' | 'recent';
+type FilterType = 'all' | 'decodable' | 'library' | 'recent' | 'incomplete';
 
 interface LibraryPageProps {
   levelOptions: ReadingLevelOption[];
@@ -28,6 +28,7 @@ interface LibraryPageProps {
 export function LibraryPage({ levelOptions }: LibraryPageProps) {
   const { toast } = useToast();
   const { data: books, isLoading } = useBooks();
+  const { data: incompleteBooks } = useIncompleteBooks();
   const { data: assignments } = useLibraryAssignments();
   const deleteBook = useDeleteBook();
 
@@ -37,6 +38,13 @@ export function LibraryPage({ levelOptions }: LibraryPageProps) {
   const [showContribute, setShowContribute] = useState(false);
   const [editBookId, setEditBookId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+  // Dashboard "Library · N books need details" deep-links to ?filter=incomplete.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('filter') === 'incomplete') {
+      setFilter('incomplete');
+    }
+  }, []);
 
   // School-wide assigned count for the card badge; the per-class breakdown +
   // My-class/Whole-school filter live inside the book detail modal.
@@ -95,7 +103,9 @@ export function LibraryPage({ levelOptions }: LibraryPageProps) {
     setDeleteConfirm(null);
   };
 
-  const editBook = editBookId ? books?.find((b) => b.id === editBookId) : null;
+  const editBook = editBookId
+    ? [...(books ?? []), ...(incompleteBooks ?? [])].find((b) => b.id === editBookId) ?? null
+    : null;
 
   return (
     <div>
@@ -130,13 +140,77 @@ export function LibraryPage({ levelOptions }: LibraryPageProps) {
             onClick={() => setFilter(opt.value)}
           />
         ))}
+        {(incompleteBooks?.length ?? 0) > 0 && (
+          <FilterChip
+            label="Needs details"
+            count={incompleteBooks?.length ?? 0}
+            selected={filter === 'incomplete'}
+            onClick={() => setFilter('incomplete')}
+          />
+        )}
       </div>
 
       <div className="mb-6">
         <SearchInput value={search} onChange={setSearch} placeholder="Search by title, author, or ISBN..." />
       </div>
 
-      {isLoading ? (
+      {filter === 'incomplete' ? (
+        (incompleteBooks?.length ?? 0) === 0 ? (
+          <EmptyState
+            icon={<Icon name="check_circle" size={40} />}
+            title="No incomplete books"
+            description="Every book in your library has its details filled in."
+          />
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-muted">
+              These books were added by ISBN but never resolved. Fill in the missing details so they appear properly for students — or delete them.
+            </p>
+            {(incompleteBooks ?? []).map((book) => {
+              const missing = [
+                !book.title && 'Title',
+                !book.author && 'Author',
+                !book.coverImageUrl && 'Cover',
+              ].filter(Boolean) as string[];
+              return (
+                <div
+                  key={book.id}
+                  className="flex items-center gap-4 p-4 bg-paper rounded-[var(--radius-lg)] border border-rule shadow-card"
+                >
+                  <span className="inline-flex items-center justify-center w-12 h-12 rounded-[var(--radius-md)] bg-tint-yellow text-ink shrink-0">
+                    <Icon name="menu_book" size={24} />
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-ink truncate">{book.title || 'Untitled book'}</p>
+                    <p className="text-xs text-muted mb-2">{book.isbn ? `ISBN ${book.isbn}` : 'No ISBN on file'}</p>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-xs text-muted">Missing:</span>
+                      {missing.length > 0 ? (
+                        missing.map((m) => <Badge key={m} variant="warning">{m}</Badge>)
+                      ) : (
+                        <Badge variant="warning">Confirm details</Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button variant="outline" size="sm" onClick={() => setEditBookId(book.id)}>
+                      Add details
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDeleteConfirm(book.id)}
+                      className="text-error hover:text-error"
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
+      ) : isLoading ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="bg-paper rounded-[var(--radius-lg)] shadow-card overflow-hidden">

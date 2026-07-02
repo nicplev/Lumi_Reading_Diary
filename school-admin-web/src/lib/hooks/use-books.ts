@@ -20,6 +20,21 @@ export function useBooks() {
   });
 }
 
+/** Placeholder / unresolved books that useBooks() hides — for the Library
+ *  "Needs details" view. Shares the ['books'] key prefix so any book mutation's
+ *  invalidate({ queryKey: ['books'] }) refreshes this list too. */
+export function useIncompleteBooks() {
+  return useQuery<SerializedBook[]>({
+    queryKey: ['books', 'incomplete'],
+    queryFn: async () => {
+      const res = await fetch('/api/books/incomplete');
+      if (!res.ok) throw new Error('Failed to fetch incomplete books');
+      return res.json();
+    },
+    staleTime: 30 * 1000,
+  });
+}
+
 export function useBook(bookId: string) {
   return useQuery<SerializedBook>({
     queryKey: ['books', bookId],

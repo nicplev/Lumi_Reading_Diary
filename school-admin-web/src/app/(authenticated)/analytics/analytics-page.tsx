@@ -132,9 +132,14 @@ export function AnalyticsPage({ levelSchema, termDates }: AnalyticsPageProps) {
     ? aggregateWeekly(trend)
     : trend.map((p) => ({ label: formatShortDate(p.date), minutes: p.minutes, logs: p.logs }));
 
+  // Participation = distinct students who actually read in the selected period
+  // (metrics.uniqueReaders), over students in active classes. Clamped so an
+  // orphaned reader (logged but missing from every active-class roster) can't
+  // push it past 100%. Replaces the old `total − inactive` derivation, which
+  // mixed a period denominator with the period-independent 7-day at-risk list.
   const totalStudents = classes.reduce((sum, c) => sum + c.studentCount, 0);
-  const activeThisWeek = Math.max(totalStudents - atRisk.length, 0);
-  const participationPct = totalStudents > 0 ? Math.round((activeThisWeek / totalStudents) * 100) : 0;
+  const readersThisPeriod = metrics ? Math.min(metrics.uniqueReaders, totalStudents) : 0;
+  const participationPct = totalStudents > 0 ? Math.round((readersThisPeriod / totalStudents) * 100) : 0;
 
   const subtitle = formatSubtitle(period, termKey, termDates);
 
@@ -143,53 +148,56 @@ export function AnalyticsPage({ levelSchema, termDates }: AnalyticsPageProps) {
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
         <PageHeader eyebrow="Analytics" title="Analytics" description={subtitle} />
 
-        {/* Period toggle */}
-        <div className="flex items-center gap-1.5 flex-wrap shrink-0">
-          {(['5days', 'month', 'year'] as const).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                period === p
-                  ? 'bg-section text-on-section shadow-sm'
-                  : 'bg-cream text-muted hover:text-ink border border-rule'
-              }`}
-            >
-              {p === '5days' ? 'Last 5 Days' : p === 'month' ? 'This Month' : 'School Year'}
-            </button>
-          ))}
-
-          {configuredTerms.length > 0 && (
-            <div ref={dropdownRef} className="relative">
+        {/* Period filter — one segmented control so the term picker reads as a
+            member of the group, not a separate widget bolted alongside it */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="inline-flex items-center rounded-full border border-rule bg-cream p-0.5 text-xs font-semibold">
+            {(['5days', 'month', 'year'] as const).map((p) => (
               <button
-                onClick={() => { setPeriod('term'); setTermDropdownOpen((o) => !o); }}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1 ${
-                  period === 'term'
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={`px-3 py-1.5 rounded-full transition-all ${
+                  period === p
                     ? 'bg-section text-on-section shadow-sm'
-                    : 'bg-cream text-muted hover:text-ink border border-rule'
+                    : 'text-muted hover:text-ink'
                 }`}
               >
-                {period === 'term' ? `Term ${termKey.replace('term', '')}` : 'School Term'}
-                <Icon name="expand_more" size={14} />
+                {p === '5days' ? 'Last 5 Days' : p === 'month' ? 'This Month' : 'School Year'}
               </button>
-              {termDropdownOpen && (
-                <div className="absolute right-0 top-full mt-1 bg-paper border border-rule rounded-xl shadow-lg z-20 py-1 min-w-[100px]">
-                  {configuredTerms.map((i) => (
-                    <button
-                      key={i}
-                      onClick={() => { setTermKey(`term${i}`); setPeriod('term'); setTermDropdownOpen(false); }}
-                      className={`w-full text-left px-3 py-2 text-xs font-semibold hover:bg-cream transition-colors flex items-center justify-between gap-2 ${
-                        termKey === `term${i}` ? "text-section-strong" : 'text-ink'
-                      }`}
-                    >
-                      Term {i}
-                      {termKey === `term${i}` && period === 'term' && <Icon name="check" size={14} />}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+            ))}
+
+            {configuredTerms.length > 0 && (
+              <div ref={dropdownRef} className="relative">
+                <button
+                  onClick={() => { setPeriod('term'); setTermDropdownOpen((o) => !o); }}
+                  className={`px-3 py-1.5 rounded-full transition-all flex items-center gap-1 ${
+                    period === 'term'
+                      ? 'bg-section text-on-section shadow-sm'
+                      : 'text-muted hover:text-ink'
+                  }`}
+                >
+                  {period === 'term' ? `Term ${termKey.replace('term', '')}` : 'School Term'}
+                  <Icon name="expand_more" size={14} />
+                </button>
+                {termDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-2 bg-paper border border-rule rounded-xl shadow-lg z-20 py-1 min-w-[120px]">
+                    {configuredTerms.map((i) => (
+                      <button
+                        key={i}
+                        onClick={() => { setTermKey(`term${i}`); setPeriod('term'); setTermDropdownOpen(false); }}
+                        className={`w-full text-left px-3 py-2 text-xs font-semibold hover:bg-cream transition-colors flex items-center justify-between gap-2 ${
+                          termKey === `term${i}` && period === 'term' ? 'text-section-strong' : 'text-ink'
+                        }`}
+                      >
+                        Term {i}
+                        {termKey === `term${i}` && period === 'term' && <Icon name="check" size={14} />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {isFetching && (
             <div className="w-4 h-4 rounded-full border-2 border-section border-t-transparent animate-spin" />
@@ -212,10 +220,10 @@ export function AnalyticsPage({ levelSchema, termDates }: AnalyticsPageProps) {
             value={`${participationPct}%`}
             icon={<Icon name="groups" />}
             color="green"
-            subtitle={`${activeThisWeek} of ${totalStudents} students active`}
+            subtitle={`${readersThisPeriod} of ${totalStudents} students read`}
           />
           <StatCard
-            title="Avg Min / Student"
+            title="Avg minutes / student"
             value={metrics ? `${metrics.avgMinPerStudent}` : '—'}
             icon={<Icon name="trending_up" />}
             color="blue"
@@ -230,9 +238,8 @@ export function AnalyticsPage({ levelSchema, termDates }: AnalyticsPageProps) {
           />
         </div>
 
-        {/* Main grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Row 1: Trend charts */}
+        {/* Trend charts — fixed height, always aligned side by side */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <Card>
             <h3 className="text-lg font-bold text-ink mb-4">Reading Minutes Trend</h3>
             {chartData.length === 0 ? (
@@ -270,20 +277,29 @@ export function AnalyticsPage({ levelSchema, termDates }: AnalyticsPageProps) {
               </div>
             )}
           </Card>
-
-          {/* Row 2: At-risk + Class performance */}
-          <AtRiskSpotlightCard atRisk={atRisk} />
-          <ClassSnapshotCard classes={classes} />
-
-          {/* Row 3: Top readers + Top books */}
-          <TopReadersCard topReaders={topReaders} />
-          <TopBooksCard books={books} />
-
-          {/* Levels — full width, only when schema is set */}
-          {levelSchema !== 'none' && levels.length > 0 && (
-            <LevelsSection levels={levels} />
-          )}
         </div>
+
+        {/* Insights — Class Performance grows with the class list, so it gets its
+            own column while the shorter summary cards stack in the other. Keeps a
+            tall card from leaving dead space beside a short one (the gap the plain
+            grid left under Needs Attention). */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          <div className="flex flex-col gap-6 min-w-0">
+            <AtRiskSpotlightCard atRisk={atRisk} />
+            <TopReadersCard topReaders={topReaders} />
+            <TopBooksCard books={books} />
+          </div>
+          <div className="min-w-0">
+            <ClassSnapshotCard classes={classes} />
+          </div>
+        </div>
+
+        {/* Levels — only when schema is set */}
+        {levelSchema !== 'none' && levels.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start mt-6">
+            <LevelsSection levels={levels} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -300,19 +316,20 @@ function AtRiskSpotlightCard({ atRisk }: { atRisk: AtRiskStudent[] }) {
 
   return (
     <Card>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-1">
         <h3 className="text-lg font-bold text-ink">Needs Attention</h3>
         <Badge variant={atRisk.length > 0 ? 'error' : 'success'}>
           {atRisk.length} student{atRisk.length !== 1 ? 's' : ''}
         </Badge>
       </div>
+      <p className="text-xs text-muted mb-4">No reading in 7+ days · independent of the date range above</p>
 
       {atRisk.length === 0 ? (
         <div className="flex items-center gap-3 py-4 text-muted">
           <Icon name="check_circle" size={24} className="text-green-500" />
           <div>
             <p className="font-semibold text-ink text-sm">Everyone&apos;s reading on track</p>
-            <p className="text-xs">No students have been inactive this period.</p>
+            <p className="text-xs">No students have been inactive in the last 7 days.</p>
           </div>
         </div>
       ) : (
@@ -427,7 +444,10 @@ function TopReadersCard({ topReaders }: { topReaders: TopReader[] }) {
 
   return (
     <Card>
-      <h3 className="text-lg font-bold text-ink mb-4">Top Readers</h3>
+      <div className="flex items-baseline justify-between mb-4">
+        <h3 className="text-lg font-bold text-ink">Top Readers</h3>
+        <span className="text-xs text-muted">by minutes read</span>
+      </div>
       {top5.length === 0 ? (
         <EmptyState icon={<Icon name="emoji_events" size={40} />} title="No data" description="No reading stats available yet." />
       ) : (
