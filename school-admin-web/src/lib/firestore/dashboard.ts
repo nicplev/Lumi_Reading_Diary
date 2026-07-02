@@ -86,6 +86,180 @@ export async function getDashboardStats(schoolId: string): Promise<DashboardStat
   };
 }
 
+/**
+ * Operational signals for the admin dashboard — the "what needs my attention"
+ * counts that drive the Attention Required card, the overview-card subtitles and
+ * the Needs-attention tile. Every field is derived from collections the portal
+ * already owns (no new functions/rules/indexes): students, classes, the
+ * top-level studentLinkCodes (the parent-invite mechanism), scheduled
+ * notificationCampaigns, and users (for an accurate, drift-free staff count plus
+ * the temp-password-pending invite proxy). Each read is isolated so one failing
+ * query degrades to 0 rather than blanking the whole dashboard.
+ */
+export interface OperationalSummary {
+  /** Active staff docs (teachers + admins) — accurate count, not the drift-prone counter. */
+  activeStaff: number;
+  /** Staff issued a temp password who haven't logged in since (invite still pending). */
+  pendingStaffInvites: number;
+  /** Active students with no class (classId empty/unset). */
+  unassignedStudents: number;
+  /** Active students with no linked guardian. */
+  studentsWithoutGuardian: number;
+  /** Active classes with no assigned teacher. */
+  classesWithoutTeacher: number;
+  /** Live, non-expired parent link codes awaiting redemption. */
+  pendingParentInvites: number;
+  /** Announcements queued to send at a future time. */
+  scheduledAnnouncements: number;
+  // ── Setup-checklist signals (each is "has the school done this step yet") ──
+  /** Active classes. */
+  totalClasses: number;
+  /** Active teacher-role users (excludes admins, so it isn't trivially ≥1). */
+  activeTeachers: number;
+  /** Active students with at least one linked guardian. */
+  guardiansLinked: number;
+  /** Real (non-placeholder) books in the library. */
+  libraryBooks: number;
+  /** Placeholder / untitled books — added but never resolved to real metadata. */
+  incompleteBooks: number;
+}
+
+export async function getOperationalSummary(schoolId: string): Promise<OperationalSummary> {
+  const schoolRef = adminDb.collection('schools').doc(schoolId);
+
+  const [studentsSnap, classesSnap, linkSnap, campaignSnap, usersSnap, booksSnap] = await Promise.all([
+    schoolRef.collection('students').where('isActive', '==', true).get().catch(() => null),
+    schoolRef.collection('classes').where('isActive', '==', true).get().catch(() => null),
+    adminDb
+      .collection('studentLinkCodes')
+      .where('schoolId', '==', schoolId)
+      .where('status', '==', 'active')
+      .get()
+      .catch(() => null),
+    schoolRef.collection('notificationCampaigns').where('status', '==', 'scheduled').get().catch(() => null),
+    schoolRef.collection('users').get().catch(() => null),
+    schoolRef.collection('books').get().catch(() => null),
+  ]);
+
+  const now = new Date();
+
+  const unassignedStudents = (studentsSnap?.docs ?? []).filter((d) => {
+    const c = d.data().classId;
+    return !c || c === '';
+  }).length;
+
+  const studentsWithoutGuardian = (studentsSnap?.docs ?? []).filter((d) => {
+    const p = d.data().parentIds;
+    return !Array.isArray(p) || p.length === 0;
+  }).length;
+
+  const totalActiveStudents = studentsSnap?.size ?? 0;
+  const guardiansLinked = totalActiveStudents - studentsWithoutGuardian;
+
+  // Placeholder books = the same ones getBooks() hides (no title or an explicit
+  // placeholder flag) — added by ISBN but never resolved to real metadata.
+  const incompleteBooks = (booksSnap?.docs ?? []).filter((d) => {
+    const data = d.data();
+    return !data.title || data.metadata?.placeholder === true;
+  }).length;
+  const libraryBooks = (booksSnap?.size ?? 0) - incompleteBooks;
+
+  const activeTeachers = (usersSnap?.docs ?? []).filter((d) => {
+    const data = d.data();
+    return data.role === 'teacher' && data.isActive !== false;
+  }).length;
+
+  const classesWithoutTeacher = (classesSnap?.docs ?? []).filter((d) => {
+    const t = d.data().teacherIds;
+    return !Array.isArray(t) || t.length === 0;
+  }).length;
+
+  // Active codes only; drop any that are technically active but past expiry
+  // (the sweep cron may not have run yet).
+  const pendingParentInvites = (linkSnap?.docs ?? []).filter((d) => {
+    const e = d.data().expiresAt?.toDate?.();
+    return !e || e > now;
+  }).length;
+
+  const scheduledAnnouncements = campaignSnap?.size ?? 0;
+
+  const activeStaff = (usersSnap?.docs ?? []).filter((d) => d.data().isActive !== false).length;
+
+  // Pending staff invite = temp password issued and not logged in since (mirrors
+  // isTempPasswordPending in users.ts; the indicator self-clears on first login).
+  const pendingStaffInvites = (usersSnap?.docs ?? []).filter((d) => {
+    const data = d.data();
+    const tpc = data.tempPasswordCreatedAt?.toDate?.();
+    if (!tpc) return false;
+    const last = data.lastLoginAt?.toDate?.();
+    return !last || last < tpc;
+  }).length;
+
+  return {
+    activeStaff,
+    pendingStaffInvites,
+    unassignedStudents,
+    studentsWithoutGuardian,
+    classesWithoutTeacher,
+    pendingParentInvites,
+    scheduledAnnouncements,
+    totalClasses: classesSnap?.size ?? 0,
+    activeTeachers,
+    guardiansLinked,
+    libraryBooks,
+    incompleteBooks,
+  };
+}
+
+export interface WeeklyReadingSummary {
+  /** Total minutes read so far this week (Mon-anchored). */
+  minutes: number;
+  /** Reading-log count this week. */
+  logs: number;
+  /** Distinct students who logged at least once this week. */
+  uniqueReaders: number;
+}
+
+/**
+ * A single-number snapshot of this week's reading for the dashboard's compact
+ * "Reading this week" preview — the bridge into the full Analytics page. One
+ * this-week log scan (the same `date >=` index the rest of the dashboard uses),
+ * replacing the heavier per-class multi-line chart the dashboard used to draw.
+ */
+export async function getWeeklyReadingSummary(schoolId: string): Promise<WeeklyReadingSummary> {
+  const today = new Date();
+  const startOfWeek = new Date(today);
+  const dayOfWeek = today.getDay();
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  startOfWeek.setDate(today.getDate() + mondayOffset);
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  try {
+    let logsSnap = await adminDb
+      .collection('schools').doc(schoolId).collection('readingLogs')
+      .where('date', '>=', startOfWeek)
+      .get();
+    if (logsSnap.empty) {
+      logsSnap = await adminDb
+        .collection('schools').doc(schoolId).collection('readingLogs')
+        .where('createdAt', '>=', startOfWeek)
+        .get();
+    }
+
+    let minutes = 0;
+    const readers = new Set<string>();
+    logsSnap.docs.forEach((doc) => {
+      const data = doc.data();
+      minutes += typeof data.minutesRead === 'number' ? data.minutesRead : 0;
+      if (data.studentId) readers.add(data.studentId);
+    });
+
+    return { minutes, logs: logsSnap.size, uniqueReaders: readers.size };
+  } catch {
+    return { minutes: 0, logs: 0, uniqueReaders: 0 };
+  }
+}
+
 export async function getWeeklyEngagement(schoolId: string): Promise<WeeklyEngagement[]> {
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const today = new Date();

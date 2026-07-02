@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/lumi/page-header';
 import { Tabs } from '@/components/lumi/tabs';
 import { ParentConnectionsTab } from './parent-connections-tab';
@@ -15,6 +15,11 @@ const tabs = [
 
 export function ParentLinksPage() {
   const [activeTab, setActiveTab] = useState('connections');
+  // Dashboard's "parent invitations awaiting acceptance" deep-links to ?tab=codes.
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    if (tab && tabs.some((t) => t.id === tab)) setActiveTab(tab);
+  }, []);
 
   return (
     <div>

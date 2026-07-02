@@ -1,6 +1,6 @@
 import { getSession } from '@/lib/auth/session';
 import { redirect } from 'next/navigation';
-import { getDashboardStats, getWeeklyEngagement, getWeeklyClassEngagement, getRecentActivity, getTeacherDashboardData, getTeacherDashboardWidgets } from '@/lib/firestore/dashboard';
+import { getDashboardStats, getWeeklyEngagement, getWeeklyReadingSummary, getOperationalSummary, getTeacherDashboardData, getTeacherDashboardWidgets } from '@/lib/firestore/dashboard';
 import { getSchool } from '@/lib/firestore/school';
 import { AdminDashboard } from './admin-dashboard';
 import { TeacherDashboard } from './teacher-dashboard';
@@ -12,23 +12,18 @@ export default async function DashboardPage() {
   const school = await getSchool(session.schoolId);
 
   if (session.role === 'schoolAdmin') {
-    const [stats, weeklyEngagement, classSeries, recentActivity] = await Promise.all([
+    const [stats, weekly, operational] = await Promise.all([
       getDashboardStats(session.schoolId),
-      getWeeklyEngagement(session.schoolId),
-      getWeeklyClassEngagement(session.schoolId),
-      getRecentActivity(session.schoolId),
+      getWeeklyReadingSummary(session.schoolId),
+      getOperationalSummary(session.schoolId),
     ]);
 
     return (
       <AdminDashboard
         schoolName={school?.name ?? 'School'}
         stats={stats}
-        weeklyEngagement={weeklyEngagement}
-        classSeries={classSeries}
-        recentActivity={recentActivity.map(a => ({
-          ...a,
-          time: a.time.toISOString(),
-        }))}
+        weekly={weekly}
+        operational={operational}
       />
     );
   }

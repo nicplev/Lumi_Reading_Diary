@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/lumi/page-header';
 import { Button } from '@/components/lumi/button';
@@ -38,8 +38,20 @@ export function ClassesPage({ teachers, isAdmin }: ClassesPageProps) {
   const [showCreate, setShowCreate] = useState(false);
   const [editingClass, setEditingClass] = useState<SerializedClass | null>(null);
   const [deletingClass, setDeletingClass] = useState<SerializedClass | null>(null);
+  // Deep-link from the dashboard's "X classes without a teacher" attention row.
+  const [noTeacherOnly, setNoTeacherOnly] = useState(false);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('filter') === 'no-teacher') {
+      setNoTeacherOnly(true);
+      setViewMode('list');
+    }
+  }, []);
 
   const teacherMap = new Map(teachers.map((t) => [t.id, t.fullName]));
+
+  const visibleClasses = noTeacherOnly
+    ? (classes ?? []).filter((c) => c.teacherIds.length === 0)
+    : (classes ?? []);
 
   const columns: DataTableColumn<SerializedClass>[] = [
     {
@@ -150,18 +162,28 @@ export function ClassesPage({ teachers, isAdmin }: ClassesPageProps) {
         onChange={(id) => setViewMode(id as ViewMode)}
       />
 
+      {noTeacherOnly && (
+        <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-section/10 text-sm font-semibold text-section-strong">
+          <Icon name="filter_alt" size={16} />
+          Showing classes without a teacher
+          <button onClick={() => setNoTeacherOnly(false)} aria-label="Clear filter" className="hover:text-ink leading-none">
+            <Icon name="close" size={16} />
+          </button>
+        </div>
+      )}
+
       {viewMode === 'list' ? (
         <DataTable
           columns={columns}
-          data={classes ?? []}
+          data={visibleClasses}
           loading={isLoading}
           onRowClick={(row) => router.push(`/classes/${row.id}`)}
           emptyState={
             <EmptyState
               icon={<Icon name="school" size={40} />}
-              title="No classes yet"
-              description="Create your first class to get started."
-              action={<Button onClick={() => setShowCreate(true)}>Add Class</Button>}
+              title={noTeacherOnly ? 'No classes without a teacher' : 'No classes yet'}
+              description={noTeacherOnly ? 'Every class has a teacher assigned.' : 'Create your first class to get started.'}
+              action={noTeacherOnly ? undefined : <Button onClick={() => setShowCreate(true)}>Add Class</Button>}
             />
           }
         />

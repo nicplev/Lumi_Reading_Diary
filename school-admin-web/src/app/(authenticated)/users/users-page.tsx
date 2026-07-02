@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { PageHeader } from '@/components/lumi/page-header';
 import { Button } from '@/components/lumi/button';
 import { Badge } from '@/components/lumi/badge';
@@ -53,6 +53,14 @@ export function UsersPage() {
   const [rotateConfirm, setRotateConfirm] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [tab, setTab] = useState<'staff' | 'onboarding'>('staff');
+  // Deep-link from the dashboard's "staff haven't signed in yet" attention row.
+  const [pendingOnly, setPendingOnly] = useState(false);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('filter') === 'pending') {
+      setPendingOnly(true);
+      setTab('staff');
+    }
+  }, []);
 
   const staff = useMemo(() => {
     if (!allUsers) return [];
@@ -60,14 +68,18 @@ export function UsersPage() {
   }, [allUsers]);
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return staff;
-    const q = search.toLowerCase().trim();
-    return staff.filter(
-      (u) =>
-        u.fullName.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q)
-    );
-  }, [staff, search]);
+    let list = staff;
+    if (pendingOnly) list = list.filter(hasPendingTempPassword);
+    if (search.trim()) {
+      const q = search.toLowerCase().trim();
+      list = list.filter(
+        (u) =>
+          u.fullName.toLowerCase().includes(q) ||
+          u.email.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [staff, search, pendingOnly]);
 
   const handleDeactivate = async () => {
     if (!deactivateConfirm) return;
@@ -310,6 +322,16 @@ export function UsersPage() {
         <StaffOnboardingTab />
       ) : (
         <>
+          {pendingOnly && (
+            <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-section/10 text-sm font-semibold text-section-strong">
+              <Icon name="filter_alt" size={16} />
+              Showing staff who haven&apos;t signed in yet
+              <button onClick={() => setPendingOnly(false)} aria-label="Clear filter" className="hover:text-ink leading-none">
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+          )}
+
           <div className="mb-4">
             <SearchInput value={search} onChange={setSearch} placeholder="Search by name or email..." />
           </div>

@@ -56,3 +56,17 @@ export function characterImageSrc(characterId?: string | null): string | null {
   if (!characterId) return null;
   return CHARACTER_IDS.has(characterId) ? `/characters/${characterId}.png` : null;
 }
+
+/** Every known character id (PNG filename stem), as an array for random picks. */
+export const ALL_CHARACTER_IDS: readonly string[] = [...CHARACTER_IDS];
+
+/**
+ * A random character id. Pass the current id as `exclude` to guarantee a
+ * different friend (e.g. when reshuffling on tap).
+ */
+export function randomCharacterId(exclude?: string | null): string {
+  const pool = exclude
+    ? ALL_CHARACTER_IDS.filter((id) => id !== exclude)
+    : ALL_CHARACTER_IDS;
+  return pool[Math.floor(Math.random() * pool.length)];
+}

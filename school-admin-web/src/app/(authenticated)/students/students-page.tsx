@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/lumi/page-header';
 import { Button } from '@/components/lumi/button';
@@ -58,6 +58,13 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
   const [classFilter, setClassFilter] = useState<string[]>([]);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
   const [enrollmentFilter, setEnrollmentFilter] = useState<EnrollmentFilter>('all');
+  // Dashboard "Attention required" rows deep-link here with ?filter=… — apply it
+  // once on mount as a dismissible chip, independent of the regular filters.
+  const [deepFilter, setDeepFilter] = useState<'unassigned' | 'no-guardian' | null>(null);
+  useEffect(() => {
+    const f = new URLSearchParams(window.location.search).get('filter');
+    if (f === 'unassigned' || f === 'no-guardian') setDeepFilter(f);
+  }, []);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showAdd, setShowAdd] = useState(false);
   const [pageSize, setPageSize] = useState(20);
@@ -72,6 +79,12 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
   const filtered = useMemo(() => {
     if (!students) return [];
     let list = [...students];
+
+    if (deepFilter === 'unassigned') {
+      list = list.filter((s) => !s.classId);
+    } else if (deepFilter === 'no-guardian') {
+      list = list.filter((s) => s.parentIds.length === 0);
+    }
 
     if (classFilter.length > 0) {
       list = list.filter((s) => classFilter.includes(s.classId));
@@ -99,7 +112,7 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
     }
 
     return list;
-  }, [students, search, classFilter, quickFilter, enrollmentFilter]);
+  }, [students, search, classFilter, quickFilter, enrollmentFilter, deepFilter]);
 
   const toggleSelected = (id: string) => {
     setSelectedIds((prev) => {
@@ -399,6 +412,16 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
               Clear
             </Button>
           </div>
+        </div>
+      )}
+
+      {deepFilter && (
+        <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-section/10 text-sm font-semibold text-section-strong">
+          <Icon name="filter_alt" size={16} />
+          {deepFilter === 'unassigned' ? 'Showing unassigned students' : 'Showing students with no guardian'}
+          <button onClick={() => setDeepFilter(null)} aria-label="Clear filter" className="hover:text-ink leading-none">
+            <Icon name="close" size={16} />
+          </button>
         </div>
       )}
 

@@ -46,6 +46,24 @@ export async function getBooks(schoolId: string): Promise<Book[]> {
     .filter((b) => b.title && b.metadata?.placeholder !== true);
 }
 
+/**
+ * The inverse of getBooks: the placeholder / unresolved books it hides — added
+ * by ISBN but never resolved to real metadata (no title, or an explicit
+ * placeholder flag). Surfaced on the Library "Needs details" view so an admin
+ * can complete or delete them instead of leaving them silently invisible.
+ */
+export async function getIncompleteBooks(schoolId: string): Promise<Book[]> {
+  const snap = await adminDb
+    .collection('schools')
+    .doc(schoolId)
+    .collection('books')
+    .get();
+
+  return snap.docs
+    .map(toBook)
+    .filter((b) => !b.title || b.metadata?.placeholder === true);
+}
+
 export async function getBook(schoolId: string, bookId: string): Promise<Book | null> {
   const doc = await adminDb
     .collection('schools')
@@ -114,6 +132,12 @@ export async function updateBook(
   const update: Record<string, unknown> = { ...data };
   if (data.isbn !== undefined) {
     update.isbnNormalized = data.isbn ? normalizeIsbn(data.isbn) : null;
+  }
+  // A book given a real title is no longer an unresolved placeholder — clear the
+  // flag (dot-path, so the rest of metadata is preserved) so it leaves the
+  // "Needs details" view once completed.
+  if (typeof data.title === 'string' && data.title.trim()) {
+    update['metadata.placeholder'] = false;
   }
   await adminDb
     .collection('schools')

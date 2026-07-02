@@ -157,12 +157,39 @@ export async function updateStudent(
   studentId: string,
   data: Partial<Pick<Student, 'firstName' | 'lastName' | 'studentId' | 'classId' | 'currentReadingLevel' | 'parentEmail'>>
 ): Promise<void> {
-  await adminDb
+  const studentRef = adminDb
     .collection('schools')
     .doc(schoolId)
     .collection('students')
-    .doc(studentId)
-    .update(data);
+    .doc(studentId);
+
+  // When the edit changes a student's class, keep the class rosters
+  // (`class.studentIds`) in sync — same as moveStudentToClass. A bare
+  // `.update({ classId })` would leave the student in the OLD class's array and
+  // never add them to the new one, orphaning the id. That drift is exactly what
+  // makes analytics undercount "X of N students active" (the array-derived
+  // denominator silently loses reassigned students). The per-student `classId`
+  // stays the source of truth; the arrays are denormalised mirrors.
+  if (data.classId !== undefined) {
+    const snap = await studentRef.get();
+    const fromClassId = (snap.data()?.classId ?? '') as string;
+    const toClassId = data.classId ?? '';
+    if (fromClassId !== toClassId) {
+      const classesRef = adminDb.collection('schools').doc(schoolId).collection('classes');
+      const batch = adminDb.batch();
+      batch.update(studentRef, data);
+      if (fromClassId) {
+        batch.update(classesRef.doc(fromClassId), { studentIds: FieldValue.arrayRemove(studentId) });
+      }
+      if (toClassId) {
+        batch.update(classesRef.doc(toClassId), { studentIds: FieldValue.arrayUnion(studentId) });
+      }
+      await batch.commit();
+      return;
+    }
+  }
+
+  await studentRef.update(data);
 }
 
 export async function deleteStudent(schoolId: string, studentId: string): Promise<void> {

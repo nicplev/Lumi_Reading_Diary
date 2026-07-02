@@ -1,66 +1,93 @@
-'use client';
-
-import { useState } from 'react';
 import { StatCard } from '@/components/lumi/stat-card';
 import { Card } from '@/components/lumi/card';
 import { PageHeader } from '@/components/lumi/page-header';
 import { Button } from '@/components/lumi/button';
+import { Badge } from '@/components/lumi/badge';
 import { Icon } from '@/components/lumi/icon';
-import { formatRelativeTime } from '@/lib/utils/formatters';
 import { sectionForPath } from '@/lib/theme/sections';
-import { WeeklyClassChart } from './weekly-class-chart';
 import Link from 'next/link';
-import type { DashboardStats, WeeklyEngagement, WeeklyClassSeries } from '@/lib/firestore/dashboard';
+import type { DashboardStats, WeeklyReadingSummary, OperationalSummary } from '@/lib/firestore/dashboard';
 
 interface AdminDashboardProps {
   schoolName: string;
   stats: DashboardStats;
-  weeklyEngagement: WeeklyEngagement[];
-  classSeries: WeeklyClassSeries;
-  recentActivity: Array<{
-    id: string;
-    studentName: string;
-    action: string;
-    time: string;
-    bookTitle?: string;
-  }>;
+  weekly: WeeklyReadingSummary;
+  operational: OperationalSummary;
 }
 
-// Each shortcut is tinted by the colour of the section it jumps to, so the
-// palette doubles as wayfinding rather than decoration.
-const shortcuts = [
-  { label: 'Add Staff',    href: '/users',        icon: <Icon name="person_add" size={20} /> },
-  { label: 'Add Class',    href: '/classes',      icon: <Icon name="school" size={20} /> },
-  { label: 'Reports',      href: '/analytics',    icon: <Icon name="bar_chart" size={20} /> },
-  { label: 'Parents/Guardians', href: '/parent-links', icon: <Icon name="link" size={20} /> },
+const plural = (n: number) => (n === 1 ? '' : 's');
+
+// Verb-first quick actions — each jumps to the page where the action lives and
+// is tinted by that destination's section colour (palette doubles as wayfinding).
+const quickActions = [
+  { label: 'Add student',       href: '/students',     icon: 'person_add' },
+  { label: 'Invite parents',    href: '/parent-links', icon: 'family_restroom' },
+  { label: 'Send announcement', href: '/communication', icon: 'campaign' },
+  { label: 'Create class',      href: '/classes',      icon: 'add' },
 ];
 
-export function AdminDashboard({ schoolName, stats, weeklyEngagement, classSeries, recentActivity }: AdminDashboardProps) {
-  const [metric, setMetric] = useState<'logs' | 'minutes'>('logs');
-  const avg7 = weeklyEngagement.length
-    ? weeklyEngagement.reduce((s, d) => s + d.count, 0) / weeklyEngagement.length
-    : 0;
-  const activeDeltaPct = avg7 > 0
-    ? Math.round(((stats.activeStudentsToday - avg7) / avg7) * 100)
-    : null;
-  const activeSubtitle = activeDeltaPct === null
-    ? 'no activity yet'
-    : activeDeltaPct === 0
-      ? 'on par with 7-day avg'
-      : `${activeDeltaPct > 0 ? '↑' : '↓'} ${Math.abs(activeDeltaPct)}% vs 7-day avg`;
+export function AdminDashboard({ schoolName, stats, weekly, operational }: AdminDashboardProps) {
+  // ── Attention Required — one row per non-zero operational signal, deep-linked
+  // to where it gets resolved. Order = rough priority (blockers first). ───────
+  const attentionItems = [
+    operational.unassignedStudents > 0 && {
+      icon: 'person_off',
+      label: `${operational.unassignedStudents} student${plural(operational.unassignedStudents)} not assigned to a class`,
+      cta: 'Assign students',
+      href: '/students?filter=unassigned',
+    },
+    operational.classesWithoutTeacher > 0 && {
+      icon: 'school',
+      label: `${operational.classesWithoutTeacher} class${operational.classesWithoutTeacher === 1 ? '' : 'es'} without an assigned teacher`,
+      cta: 'Review classes',
+      href: '/classes?filter=no-teacher',
+    },
+    operational.studentsWithoutGuardian > 0 && {
+      icon: 'family_restroom',
+      label: `${operational.studentsWithoutGuardian} student${plural(operational.studentsWithoutGuardian)} with no linked guardian`,
+      cta: 'Review students',
+      href: '/students?filter=no-guardian',
+    },
+    operational.pendingParentInvites > 0 && {
+      icon: 'link',
+      label: `${operational.pendingParentInvites} parent invitation${plural(operational.pendingParentInvites)} awaiting acceptance`,
+      cta: 'View invitations',
+      href: '/parent-links?tab=codes',
+    },
+    operational.pendingStaffInvites > 0 && {
+      icon: 'badge',
+      label: `${operational.pendingStaffInvites} staff member${plural(operational.pendingStaffInvites)} hasn't signed in yet`,
+      cta: 'View staff',
+      href: '/users?filter=pending',
+    },
+  ].filter(Boolean) as Array<{ icon: string; label: string; cta: string; href: string }>;
 
-  const weekTotal = weeklyEngagement.reduce((s, d) => s + d.count, 0);
-  const weekMinutes = weeklyEngagement.reduce((s, d) => s + (d.minutes ?? 0), 0);
-  const weekRangeLabel = weeklyEngagement.length
-    ? `${weeklyEngagement[0].day} – ${weeklyEngagement[weeklyEngagement.length - 1].day}`
-    : '';
+  const attentionCount = attentionItems.length;
+
+  const participation = stats.totalStudents > 0
+    ? Math.round((weekly.uniqueReaders / stats.totalStudents) * 100)
+    : 0;
+
+  // ── Setup checklist — onboarding guidance that disappears once a school is
+  // fully set up (its "data-health" half would just duplicate Attention). ─────
+  const setupSteps = [
+    { label: 'Create your first class', done: operational.totalClasses > 0, href: '/classes' },
+    { label: 'Add teachers', done: operational.activeTeachers > 0, href: '/users' },
+    { label: 'Add students', done: stats.totalStudents > 0, href: '/students' },
+    { label: 'Connect guardians', done: operational.guardiansLinked > 0, href: '/parent-links' },
+    { label: 'Set up your library', done: operational.libraryBooks > 0, href: '/library' },
+  ];
+  const setupDone = setupSteps.filter((s) => s.done).length;
+  const setupComplete = setupDone === setupSteps.length;
+  const showSetup = !setupComplete;
+  const showLibraryCard = operational.incompleteBooks > 0;
 
   return (
     <div>
       <PageHeader
         eyebrow="Dashboard"
         title={schoolName}
-        description="School administration dashboard"
+        description="What's happening today and what needs your attention"
         action={
           <Link href="/analytics">
             <Button variant="outline" size="sm">
@@ -71,73 +98,101 @@ export function AdminDashboard({ schoolName, stats, weeklyEngagement, classSerie
         }
       />
 
-      {/* Stats Grid — section-blue throughout; icons + labels do the distinguishing */}
+      {/* Overview — structural counts with an operational note in the subtitle */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard title="Students"     value={stats.totalStudents}        icon={<Icon name="person" />}       color="blue" href="/students"  subtitle="enrolled" />
-        <StatCard title="Teachers"     value={stats.totalTeachers}        icon={<Icon name="badge" />}        color="blue" href="/users"     subtitle="on staff" />
-        <StatCard title="Classes"      value={stats.totalClasses}         icon={<Icon name="school" />}       color="blue" href="/classes"   subtitle="active" />
-        <StatCard title="Active Today" value={stats.activeStudentsToday}  icon={<Icon name="auto_stories" />} color="blue" href="/analytics" subtitle={activeSubtitle} />
+        <StatCard
+          title="Students"
+          value={stats.totalStudents}
+          icon={<Icon name="person" />}
+          color="blue"
+          href="/students"
+          subtitle={operational.unassignedStudents > 0 ? `${operational.unassignedStudents} unassigned` : 'all assigned'}
+        />
+        <StatCard
+          title="Staff"
+          value={operational.activeStaff}
+          icon={<Icon name="badge" />}
+          color="blue"
+          href="/users"
+          subtitle={operational.pendingStaffInvites > 0 ? `${operational.pendingStaffInvites} invite${plural(operational.pendingStaffInvites)} pending` : 'active'}
+        />
+        <StatCard
+          title="Classes"
+          value={stats.totalClasses}
+          icon={<Icon name="school" />}
+          color="blue"
+          href="/classes"
+          subtitle={operational.classesWithoutTeacher > 0 ? `${operational.classesWithoutTeacher} without staff` : 'all staffed'}
+        />
+        <StatCard
+          title="Needs attention"
+          value={attentionCount}
+          icon={<Icon name={attentionCount > 0 ? 'notification_important' : 'task_alt'} />}
+          color={attentionCount > 0 ? 'orange' : 'green'}
+          href="#attention"
+          subtitle={attentionCount > 0 ? `item${plural(attentionCount)} to review` : 'all clear'}
+        />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Weekly Engagement Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* Attention Required — the operational core */}
         <div className="lg:col-span-2">
-          <Card className="h-full flex flex-col">
-            <div className="flex items-start justify-between mb-4 gap-3">
-              <div>
-                <h2 className="text-lg font-bold text-ink">Weekly Reading Activity</h2>
-                {weekRangeLabel && (
-                  <p className="text-xs text-muted mt-0.5">{weekRangeLabel}</p>
-                )}
+          <Card id="attention" className="h-full flex flex-col scroll-mt-24">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-ink">Attention required</h2>
+              {attentionCount > 0 && <Badge variant="warning">{attentionCount}</Badge>}
+            </div>
+
+            {attentionCount === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-center py-10">
+                <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-success/10 text-success mb-3">
+                  <Icon name="task_alt" size={26} />
+                </span>
+                <p className="text-sm font-bold text-ink">You&apos;re all caught up</p>
+                <p className="text-xs text-muted mt-1">No students, classes or invitations need attention.</p>
               </div>
-              <div className="flex flex-col items-end gap-2">
-                {/* Toggle: glance at the same week as logs or minutes read */}
-                <div className="inline-flex rounded-full border border-rule bg-cream p-0.5 text-xs font-semibold">
-                  {(['logs', 'minutes'] as const).map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setMetric(m)}
-                      className={`px-2.5 py-1 rounded-full capitalize transition ${
-                        metric === m ? 'bg-paper text-ink shadow-card' : 'text-muted hover:text-ink'
-                      }`}
+            ) : (
+              <div className="space-y-2">
+                {attentionItems.map((item) => {
+                  const section = sectionForPath(item.href.split('?')[0]);
+                  return (
+                    <Link
+                      key={`${item.href}-${item.label}`}
+                      href={item.href}
+                      className="flex items-center gap-3 p-3 rounded-[var(--radius-md)] bg-cream hover:brightness-[0.97] transition"
                     >
-                      {m}
-                    </button>
-                  ))}
-                </div>
-                <div className="text-right">
-                  <div className="font-display text-[22px] font-extrabold text-ink leading-tight">
-                    {metric === 'minutes' ? weekMinutes : weekTotal}
-                  </div>
-                  <div className="text-xs text-muted">
-                    {metric === 'minutes' ? 'min this week' : 'logs this week'}
-                  </div>
-                </div>
+                      <span
+                        className="inline-flex items-center justify-center w-9 h-9 rounded-[var(--radius-md)] flex-shrink-0"
+                        style={{ backgroundColor: `${section.accent}1F`, color: section.accent }}
+                      >
+                        <Icon name={item.icon} size={20} />
+                      </span>
+                      <span className="flex-1 min-w-0 text-sm font-semibold text-ink">{item.label}</span>
+                      <span
+                        className="hidden sm:flex items-center gap-1 text-xs font-bold whitespace-nowrap flex-shrink-0"
+                        style={{ color: section.accentStrong }}
+                      >
+                        {item.cta}
+                        <Icon name="arrow_forward" size={14} />
+                      </span>
+                    </Link>
+                  );
+                })}
               </div>
-            </div>
-            <div className="flex-1 min-h-0">
-              {classSeries.classes.length > 0 ? (
-                <WeeklyClassChart classes={classSeries.classes} rows={classSeries.rows} metric={metric} />
-              ) : (
-                <div className="flex h-full min-h-[220px] items-center justify-center text-center">
-                  <p className="text-sm text-muted">No reading logged yet this week.</p>
-                </div>
-              )}
-            </div>
+            )}
           </Card>
         </div>
 
-        {/* Right column: Shortcuts + Recent Activity — matching Card containers */}
+        {/* Right column: quick actions + a bridge into Analytics */}
         <div className="flex flex-col gap-6 min-w-0">
           <Card>
-            <h2 className="text-lg font-bold text-ink mb-3">Shortcuts</h2>
+            <h2 className="text-lg font-bold text-ink mb-3">Quick actions</h2>
             <div className="grid grid-cols-2 gap-2">
-              {shortcuts.map((action) => {
+              {quickActions.map((action) => {
                 const accent = sectionForPath(action.href).accent;
                 return (
                   <Link
-                    key={action.href}
+                    key={action.href + action.label}
                     href={action.href}
                     className="flex items-center gap-2.5 p-2.5 rounded-[var(--radius-md)] bg-cream hover:brightness-[0.97] transition"
                   >
@@ -145,7 +200,7 @@ export function AdminDashboard({ schoolName, stats, weeklyEngagement, classSerie
                       className="inline-flex items-center justify-center w-8 h-8 rounded-[var(--radius-md)] flex-shrink-0"
                       style={{ backgroundColor: `${accent}1F`, color: accent }}
                     >
-                      {action.icon}
+                      <Icon name={action.icon} size={20} />
                     </span>
                     <span className="text-sm font-semibold text-ink truncate">{action.label}</span>
                   </Link>
@@ -154,42 +209,88 @@ export function AdminDashboard({ schoolName, stats, weeklyEngagement, classSerie
             </div>
           </Card>
 
-          <Card className="flex-1 flex flex-col min-h-0">
+          {/* Reading this week — compact snapshot that links to the full Analytics page */}
+          <Card>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-bold text-ink">Recent Activity</h2>
-              {recentActivity.length > 0 && (
-                <Link href="/analytics" className="text-xs font-semibold text-section hover:underline">
-                  View all
-                </Link>
-              )}
+              <h2 className="text-lg font-bold text-ink">Reading this week</h2>
+              <span className="text-section"><Icon name="auto_stories" size={20} /></span>
             </div>
-            {recentActivity.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center py-6">
-                <span className="text-muted/40 mb-2"><Icon name="history" size={28} /></span>
-                <p className="text-sm font-semibold text-ink">Nothing yet today</p>
-                <p className="text-xs text-muted mt-0.5">Activity appears here as students log books.</p>
-              </div>
-            ) : (
-              <ul className="space-y-3 overflow-y-auto flex-1 -mr-2 pr-2">
-                {recentActivity.map((activity) => (
-                  <li key={activity.id} className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-full bg-tint-blue flex items-center justify-center flex-shrink-0 text-lumi-blue-dark">
-                      <Icon name="menu_book" size={18} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-ink truncate">{activity.studentName}</p>
-                      <p className="text-xs text-muted truncate">
-                        {activity.action}{activity.bookTitle ? ` · ${activity.bookTitle}` : ''}
-                      </p>
-                    </div>
-                    <span className="text-xs text-muted flex-shrink-0 whitespace-nowrap">{formatRelativeTime(activity.time)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <div className="font-display text-[28px] font-extrabold text-ink leading-tight">
+              {weekly.minutes.toLocaleString()} <span className="text-base font-bold text-muted">min</span>
+            </div>
+            <p className="text-sm text-muted mt-1">
+              {participation}% participation · {weekly.uniqueReaders}/{stats.totalStudents} students read
+            </p>
+            <Link
+              href="/analytics"
+              className="inline-flex items-center gap-1 text-sm font-bold text-section-strong mt-4 hover:underline"
+            >
+              View full analytics
+              <Icon name="arrow_forward" size={15} />
+            </Link>
           </Card>
         </div>
       </div>
+
+      {(showSetup || showLibraryCard) && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start mt-6">
+          {showSetup && (
+            <Card className="lg:col-span-2">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h2 className="text-lg font-bold text-ink">Finish setting up</h2>
+                  <p className="text-xs text-muted mt-0.5">A few steps to get your school ready</p>
+                </div>
+                <span className="text-sm font-bold text-section-strong shrink-0">{setupDone}/{setupSteps.length}</span>
+              </div>
+              <div className="space-y-1.5">
+                {setupSteps.map((step) =>
+                  step.done ? (
+                    <div key={step.label} className="flex items-center gap-3 p-2.5">
+                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-success/10 text-success flex-shrink-0">
+                        <Icon name="check" size={18} />
+                      </span>
+                      <span className="flex-1 text-sm font-semibold text-muted line-through">{step.label}</span>
+                    </div>
+                  ) : (
+                    <Link
+                      key={step.label}
+                      href={step.href}
+                      className="flex items-center gap-3 p-2.5 rounded-[var(--radius-md)] bg-cream hover:brightness-[0.97] transition"
+                    >
+                      <span className="inline-flex w-7 h-7 rounded-full border-2 border-rule flex-shrink-0" />
+                      <span className="flex-1 text-sm font-semibold text-ink">{step.label}</span>
+                      <Icon name="arrow_forward" size={15} className="text-muted" />
+                    </Link>
+                  ),
+                )}
+              </div>
+            </Card>
+          )}
+
+          {showLibraryCard && (
+            <Card>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-bold text-ink">Library</h2>
+                <span className="text-section"><Icon name="menu_book" size={20} /></span>
+              </div>
+              <div className="font-display text-[28px] font-extrabold text-ink leading-tight">
+                {operational.incompleteBooks}
+              </div>
+              <p className="text-sm text-muted mt-1">
+                book{plural(operational.incompleteBooks)} need details — no title or cover yet
+              </p>
+              <Link
+                href="/library?filter=incomplete"
+                className="inline-flex items-center gap-1 text-sm font-bold text-section-strong mt-4 hover:underline"
+              >
+                Review incomplete books
+                <Icon name="arrow_forward" size={15} />
+              </Link>
+            </Card>
+          )}
+        </div>
+      )}
     </div>
   );
 }
