@@ -155,10 +155,10 @@ class _LoginScreenState extends State<LoginScreen> {
       final indexService = UserSchoolIndexService();
       final indexResult = await indexService.lookupSchoolByPhone(_phoneE164);
       if (indexResult == null) {
-        await _firebaseService.signOut();
+        await _discardPhoneSignIn(cred);
         if (!mounted) return;
         setState(() => _errorMessage =
-            'We couldn\'t find an account for that phone number. If you\'re new, tap "I have a code" to register.');
+            'We couldn\'t find an account for that phone number. If you\'re new, register below — parents join with a student code, teachers with a school code.');
         return;
       }
 
@@ -172,7 +172,7 @@ class _LoginScreenState extends State<LoginScreen> {
           .doc(uid)
           .get();
       if (!doc.exists) {
-        await _firebaseService.signOut();
+        await _discardPhoneSignIn(cred);
         if (!mounted) return;
         setState(() => _errorMessage =
             'Your profile is missing. Please contact your school administrator.');
@@ -201,6 +201,21 @@ class _LoginScreenState extends State<LoginScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  /// Phone OTP sign-in implicitly CREATES an Auth user when the number is
+  /// unknown. When this attempt minted a brand-new user that turns out to
+  /// have no Lumi profile, delete it again so failed logins don't strand
+  /// ghost phone-only accounts, then sign out.
+  Future<void> _discardPhoneSignIn(UserCredential cred) async {
+    if (cred.additionalUserInfo?.isNewUser == true) {
+      try {
+        await cred.user?.delete();
+      } catch (_) {
+        // Best-effort — the sign-out below still ends the session.
+      }
+    }
+    await _firebaseService.signOut();
   }
 
   void _toggleSignInMode() {
