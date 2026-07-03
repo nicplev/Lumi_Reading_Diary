@@ -135,6 +135,10 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
   String? _verifiedSchoolId;
   String? _verifiedSchoolName;
   String? _verifiedCodeId;
+  // The raw school code the teacher entered. Passed to signup finalisation so
+  // the server DERIVES + validates schoolId from it, rather than trusting the
+  // client-supplied _verifiedSchoolId (1.3).
+  String? _verifiedSchoolCode;
   UserModel? _createdTeacher;
 
   // SMS MFA state — once the auth user is created we must not recreate it
@@ -319,6 +323,7 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
         _verifiedSchoolId = details['schoolId'];
         _verifiedSchoolName = details['schoolName'];
         _verifiedCodeId = details['codeId'];
+        _verifiedSchoolCode = _codeController.text.trim().toUpperCase();
         _stage = _Stage.name;
       });
     } on SchoolCodeException catch (e) {
@@ -517,6 +522,7 @@ setState(() {
         phoneNumber: phone,
         role: 'teacher',
         schoolId: schoolId,
+        schoolCode: _verifiedSchoolCode,
         fullName: fullName,
         email: email,
       );

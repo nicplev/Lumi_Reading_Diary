@@ -190,6 +190,7 @@ class SmsVerificationService {
     String? email,
     String? relationshipLabel,
     String? linkCode,
+    String? schoolCode,
   }) async {
     // Ensure the session is fresh before linking. A stale/expired token — which
     // happens when the app cold-starts onto a session whose account was deleted
@@ -265,11 +266,15 @@ class SmsVerificationService {
         'phoneE164': phoneNumber,
         'displayName': phoneNumber,
         'role': role,
+        // schoolId is a transitional fallback — the server derives the school
+        // from schoolCode (teacher) / linkCode (parent) when present (1.3).
         'schoolId': schoolId,
         'fullName': fullName,
         if (email != null && email.isNotEmpty) 'email': email,
         if (relationshipLabel != null) 'relationshipLabel': relationshipLabel,
         if (linkCode != null) 'linkCode': linkCode,
+        if (schoolCode != null && schoolCode.isNotEmpty)
+          'schoolCode': schoolCode,
       });
       result = Map<String, dynamic>.from(resp.data as Map? ?? const {});
     } on FirebaseFunctionsException catch (e) {
@@ -293,6 +298,42 @@ class SmsVerificationService {
       return MfaSignupOutcome.sessionReady;
     } on FirebaseAuthException {
       return MfaSignupOutcome.needsLogin;
+    }
+  }
+
+  /// Finalises a phone-PRIMARY parent signup server-side.
+  ///
+  /// The phone-primary path signs in WITH the phone number (no MFA enroll), so
+  /// the client session stays live — but the parent doc + userSchoolIndex + the
+  /// child link are written by the `finalizeParentSignup` callable (Admin SDK)
+  /// so the client-side self-create can be denied by the security rules (1.3).
+  /// The server DERIVES the school from the link code; [schoolId] is only a
+  /// transitional fallback. Throws a FirebaseAuthException on failure so the
+  /// modal's existing error mapping surfaces a clean message.
+  Future<void> finalizeParentSignup({
+    required String phoneNumber,
+    required String linkCode,
+    required String fullName,
+    String? email,
+    String? relationshipLabel,
+    String? schoolId,
+  }) async {
+    try {
+      await _functions
+          .httpsCallable('finalizeParentSignup')
+          .call<Map<String, dynamic>>({
+        'phoneE164': phoneNumber,
+        'linkCode': linkCode,
+        'fullName': fullName,
+        if (schoolId != null && schoolId.isNotEmpty) 'schoolId': schoolId,
+        if (email != null && email.isNotEmpty) 'email': email,
+        if (relationshipLabel != null) 'relationshipLabel': relationshipLabel,
+      });
+    } on FirebaseFunctionsException catch (e) {
+      throw FirebaseAuthException(
+        code: 'parent-finalize-failed',
+        message: e.message ?? 'Could not complete signup. Please try again.',
+      );
     }
   }
 
