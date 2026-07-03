@@ -58,12 +58,6 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
         title: Text('Discover Books', style: LumiTextStyles.h3()),
         backgroundColor: AppColors.white,
         elevation: 0,
-        actions: [
-          LumiIconButton(
-            icon: Icons.search,
-            onPressed: _showSearch,
-          ),
-        ],
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
@@ -743,15 +737,6 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
         ),
       );
     }
-  }
-
-  void _showSearch() {
-    // Implement search functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Search feature coming soon!'),
-      ),
-    );
   }
 
   Future<void> _browseGenre(String genre) async {

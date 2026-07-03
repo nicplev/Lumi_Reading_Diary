@@ -138,7 +138,10 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
               .doc(widget.studentId)
               .snapshots(),
           builder: (context, snapshot) {
-            if (snapshot.hasError) return _ErrorState(snapshot.error.toString());
+            if (snapshot.hasError) {
+              return const _ErrorState(
+                  "Couldn't load achievements. Please try again shortly.");
+            }
             if (!snapshot.hasData) return const _LoadingState();
             if (!snapshot.data!.exists) {
               return const _ErrorState('Student data not found');
