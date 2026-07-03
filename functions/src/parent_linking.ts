@@ -413,6 +413,28 @@ export async function linkParentToStudentCore(
   });
 }
 
+/**
+ * Resolves the school (and student) a link code belongs to, running the shared
+ * validity ladder. Server-side signup finalisation (enrollLinkedPhoneAsMfa)
+ * DERIVES the parent's schoolId from the code they present rather than trusting
+ * a client-supplied `schoolId`, so a caller can't create a parent membership in
+ * an arbitrary school. Read-only — the redeem/consume still happens in
+ * [linkParentToStudentCore].
+ * @param {string} codeUpper The uppercased link code.
+ * @return {Promise<{schoolId: string, studentId: string}>} The code's school
+ *   and student ids.
+ */
+export async function resolveLinkCodeSchool(
+  codeUpper: string,
+): Promise<{schoolId: string; studentId: string}> {
+  const best = await findBestCodeForString(codeUpper);
+  if (!best) {
+    throw failedPrecondition("invalid-code", "Link code not recognised.");
+  }
+  assertLinkCodeUsable(best);
+  return {schoolId: best.schoolId, studentId: best.studentId};
+}
+
 export const linkParentToStudent = fns
   .runWith(parentLinkingRuntime({timeoutSeconds: 30, memory: "256MB"}))
   .https.onCall(async (data: LinkParentInput, context) => {

@@ -52,6 +52,11 @@ export {requestSmsVerification} from "./sms_rate_limit";
 // functions/src/mfa_enrollment.ts.
 export {enrollLinkedPhoneAsMfa} from "./mfa_enrollment";
 
+// Phone-primary parent signup finalisation (no MFA enroll). Writes the parent
+// doc + indexes + child link server-side so the client self-create can be
+// denied by the rules (1.3). See functions/src/mfa_enrollment.ts.
+export {finalizeParentSignup} from "./mfa_enrollment";
+
 admin.initializeApp();
 const db = admin.firestore();
 
