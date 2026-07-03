@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/inline_stream_error.dart';
 
 import '../../../../theme/lumi_tokens.dart';
 import '../../../../theme/lumi_typography.dart';
@@ -87,6 +88,9 @@ class _DashboardUnreadCommentsCardState
     return StreamBuilder<QuerySnapshot>(
       stream: _logsStream,
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const InlineStreamError(message: "Couldn't load parent comments.");
+        }
         final logs = snapshot.data?.docs
                 .map((doc) => ReadingLogModel.fromFirestore(doc))
                 .toList() ??

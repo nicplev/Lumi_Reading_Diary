@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../../core/widgets/inline_stream_error.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 
@@ -2188,6 +2189,12 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               .limit(20)
               .snapshots(),
           builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return InlineStreamError(
+                message: "Couldn't load reading history.",
+                onRetry: () => setState(() {}),
+              );
+            }
             if (!snapshot.hasData) {
               return const Padding(
                 padding: EdgeInsets.symmetric(vertical: 12),
