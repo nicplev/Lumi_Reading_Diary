@@ -58,8 +58,17 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       }
       final refreshedUser = firebaseService.auth.currentUser;
 
-      // Enforce email verification on returning sessions too
-      if (refreshedUser == null || !refreshedUser.emailVerified) {
+      // Enforce email verification on returning sessions — EXCEPT for phone-only
+      // accounts. Phone-primary signups (the promoted parent flow) have no email
+      // provider, so emailVerified is always false; their verified phone number
+      // IS their identity. Signing them out here forced a full phone + SMS
+      // re-verify on every cold start. (Email+MFA accounts unlink the primary
+      // phone at enrol, so phoneNumber is null for them and the email gate still
+      // applies.)
+      final phone = refreshedUser?.phoneNumber;
+      final hasPhonePrimary = phone != null && phone.isNotEmpty;
+      if (refreshedUser == null ||
+          (!refreshedUser.emailVerified && !hasPhonePrimary)) {
         await firebaseService.auth.signOut();
         if (!mounted) return;
         _navigateToLogin();
