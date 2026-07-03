@@ -110,6 +110,7 @@ export {renewStudents, annualRollover} from "./renewals";
 export {
   cleanupComprehensionAudio,
   deleteComprehensionAudio,
+  getComprehensionAudioUrl,
 } from "./comprehension_retention";
 
 /**

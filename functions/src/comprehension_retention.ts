@@ -283,3 +283,104 @@ export const deleteComprehensionAudio = fns
 
     return {deleted: true};
   });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// getComprehensionAudioUrl: mint a short-lived signed URL for playback.
+//
+// The comprehension recording is a child's voice — PII at rest. The Storage
+// object is NOT client-readable (storage.rules denies read on
+// comprehension_audio); this callable is the sole read path. It verifies the
+// caller is a teacher / school admin at the LOG'S school (playback is a
+// teacher-only surface — the per-log audio player lives in the teacher comments
+// sheet), then returns a 15-minute read-only signed URL. No enumeration: the
+// caller must already know a real schoolId + logId, and the authz check binds
+// the file to a log they can see.
+//
+// NOTE (deploy prerequisite): getSignedUrl requires the functions runtime
+// service account to be able to sign blobs — grant it
+// roles/iam.serviceAccountTokenCreator (or the iam.serviceAccounts.signBlob
+// permission) if signing fails with an IAM error. Verify on-device before
+// tightening the storage rule.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface AudioUrlInput {
+  schoolId?: unknown;
+  logId?: unknown;
+}
+
+const AUDIO_URL_TTL_MS = 15 * 60 * 1000;
+
+export const getComprehensionAudioUrl = fns
+  .runWith({timeoutSeconds: 30, memory: "256MB"})
+  .https.onCall(async (data: AudioUrlInput, context) => {
+    const uid = context.auth?.uid;
+    if (!uid) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "Sign in required"
+      );
+    }
+    const schoolId =
+      typeof data.schoolId === "string" ? data.schoolId.trim() : "";
+    const logId = typeof data.logId === "string" ? data.logId.trim() : "";
+    if (!schoolId || !logId) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "schoolId and logId are required"
+      );
+    }
+
+    const role = await resolveCallerRole(uid, schoolId);
+    if (!role) {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "Only teachers or school admins of this school can play recordings"
+      );
+    }
+
+    const snap = await admin
+      .firestore()
+      .collection("schools")
+      .doc(schoolId)
+      .collection("readingLogs")
+      .doc(logId)
+      .get();
+    if (!snap.exists) {
+      throw new functions.https.HttpsError("not-found", "Reading log not found");
+    }
+    const logData = snap.data() ?? {};
+    if (logData.comprehensionAudioUploaded !== true) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "This log has no recording."
+      );
+    }
+    const storagePath = logData.comprehensionAudioPath as string | undefined;
+    if (!storagePath) {
+      throw new functions.https.HttpsError(
+        "not-found",
+        "Recording file is missing."
+      );
+    }
+
+    const expiresAt = Date.now() + AUDIO_URL_TTL_MS;
+    try {
+      const [url] = await admin
+        .storage()
+        .bucket()
+        .file(storagePath)
+        .getSignedUrl({action: "read", expires: expiresAt});
+      return {url, expiresInSec: Math.floor(AUDIO_URL_TTL_MS / 1000)};
+    } catch (err) {
+      functions.logger.error("getComprehensionAudioUrl sign failed", {
+        uid,
+        schoolId,
+        logId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw new functions.https.HttpsError(
+        "internal",
+        "Could not prepare the recording for playback."
+      );
+    }
+  });

@@ -38,4 +38,32 @@ class ComprehensionAudioService {
     if (data is Map && data['deleted'] == true) return true;
     return false;
   }
+
+  /// Fetches a short-lived signed URL for a log's comprehension recording,
+  /// along with its lifetime in seconds.
+  ///
+  /// The recording is a child's voice — PII at rest — so the Storage object is
+  /// not client-readable; the `getComprehensionAudioUrl` callable authorizes
+  /// the caller against the log's school and returns a signed URL to play. The
+  /// URL expires (~15 min), so it is fetched on demand and cached only for its
+  /// stated lifetime.
+  Future<({String url, int expiresInSec})> getAudioUrl({
+    required String schoolId,
+    required String logId,
+  }) async {
+    final data = await _invoke('getComprehensionAudioUrl', {
+      'schoolId': schoolId,
+      'logId': logId,
+    });
+    if (data is Map &&
+        data['url'] is String &&
+        (data['url'] as String).isNotEmpty) {
+      final ttl = data['expiresInSec'];
+      return (
+        url: data['url'] as String,
+        expiresInSec: ttl is num ? ttl.toInt() : 600,
+      );
+    }
+    throw StateError('No playback URL returned');
+  }
 }
