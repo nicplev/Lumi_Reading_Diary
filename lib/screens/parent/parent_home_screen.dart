@@ -654,6 +654,7 @@ class _TodayCardState extends State<_TodayCard> {
         'parent': widget.parent,
         'readingLog': result.log,
         'updatedStats': result.updatedStats,
+        'savedOffline': result.savedOffline,
         'restDayApplied': result.restDayApplied,
       });
     } catch (_) {
@@ -1327,6 +1328,7 @@ class _TonightRowState extends State<_TonightRow> {
         'parent': widget.parent,
         'readingLog': result.log,
         'updatedStats': result.updatedStats,
+        'savedOffline': result.savedOffline,
         'restDayApplied': result.restDayApplied,
       });
     } catch (_) {

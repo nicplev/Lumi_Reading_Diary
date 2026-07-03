@@ -477,6 +477,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
           'parent': widget.parent,
           'readingLog': result.log,
           'updatedStats': result.updatedStats,
+          'savedOffline': result.savedOffline,
           'restDayApplied': result.restDayApplied,
         });
       }

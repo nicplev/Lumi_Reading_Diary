@@ -467,6 +467,7 @@ class AppRouter {
           final readingLog = params?['readingLog'] as ReadingLogModel?;
           final updatedStats = params?['updatedStats'] as Map<String, dynamic>?;
           final restDayApplied = params?['restDayApplied'] as bool? ?? false;
+          final savedOffline = params?['savedOffline'] as bool? ?? false;
           if (student == null || parent == null || readingLog == null) {
             return const LoginScreen();
           }
@@ -475,6 +476,7 @@ class AppRouter {
             parent: parent,
             readingLog: readingLog,
             updatedStats: updatedStats,
+            savedOffline: savedOffline,
             restDayApplied: restDayApplied,
           );
         },

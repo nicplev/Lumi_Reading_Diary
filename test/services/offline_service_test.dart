@@ -356,7 +356,7 @@ void main() {
 
     group('sync types and actions', () {
       test('SyncType enum has all expected values', () {
-        expect(SyncType.values.length, equals(7));
+        expect(SyncType.values.length, equals(8));
         expect(
           SyncType.values,
           containsAll([
@@ -367,6 +367,7 @@ void main() {
             SyncType.parentComment,
             SyncType.commentReply,
             SyncType.parentPrefs,
+            SyncType.childFeeling,
           ]),
         );
       });
@@ -561,6 +562,32 @@ void main() {
         final logDoc = await logRef.get();
         expect(logDoc.data()!['lastCommentPreview'], 'Thank you!');
         expect(logDoc.data()!['lastCommentByRole'], 'parent');
+      });
+
+      test('queued child feeling patches childFeeling onto the log', () async {
+        final fake = FakeFirebaseFirestore();
+        offlineService.firestoreForTest = fake;
+        goHealthy();
+
+        final logRef = fake
+            .collection('schools')
+            .doc('school-1')
+            .collection('readingLogs')
+            .doc('rl-feeling');
+        await logRef.set({'studentId': 'student-1', 'parentId': 'parent-1'});
+
+        await offlineService.enqueueChildFeeling(
+          logId: 'rl-feeling',
+          schoolId: 'school-1',
+          feeling: 'loved',
+        );
+        expect(offlineService.pendingSyncs.single.type, SyncType.childFeeling);
+
+        await offlineService.triggerSync();
+
+        expect(offlineService.pendingSyncs, isEmpty);
+        final logDoc = await logRef.get();
+        expect(logDoc.data()!['childFeeling'], 'loved');
       });
 
       test('transient failure keeps the item and persists backoff state',
