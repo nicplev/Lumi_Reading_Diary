@@ -231,6 +231,14 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
             await _assignAndAddToSession(result, schoolId);
           }
 
+        case IsbnLookupUnavailable():
+          setState(() {
+            _isProcessing = false;
+            _statusMessage =
+                "You're offline — can't look that book up right now. "
+                'Try again once you\'re connected.';
+          });
+
         case IsbnInvalid():
           break;
       }
