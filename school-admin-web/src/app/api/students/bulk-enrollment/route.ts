@@ -11,6 +11,9 @@ const bulkEnrollmentSchema = z.object({
 export async function POST(request: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (session.role !== 'schoolAdmin') {
+    return NextResponse.json({ error: 'Only school admins can update enrollment' }, { status: 403 });
+  }
 
   try {
     const body = await request.json();

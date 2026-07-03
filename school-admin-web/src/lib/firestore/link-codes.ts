@@ -140,8 +140,14 @@ export async function createLinkCode(
   };
 }
 
-export async function revokeLinkCode(codeId: string, revokedBy: string): Promise<void> {
-  await adminDb.collection('studentLinkCodes').doc(codeId).update({
+export async function revokeLinkCode(codeId: string, revokedBy: string, schoolId: string): Promise<void> {
+  const ref = adminDb.collection('studentLinkCodes').doc(codeId);
+  const snap = await ref.get();
+  // studentLinkCodes is a TOP-LEVEL collection, so a bare .doc(codeId) update
+  // would let a staff member of one school revoke another school's codes.
+  // Prove tenant ownership first (mirrors link-codes/reset).
+  if (!snap.exists || snap.data()?.schoolId !== schoolId) throw new Error('Code not found');
+  await ref.update({
     status: 'revoked',
     revokedBy,
     revokedAt: FieldValue.serverTimestamp(),
@@ -149,10 +155,12 @@ export async function revokeLinkCode(codeId: string, revokedBy: string): Promise
   });
 }
 
-export async function deleteLinkCode(codeId: string): Promise<void> {
+export async function deleteLinkCode(codeId: string, schoolId: string): Promise<void> {
   const ref = adminDb.collection('studentLinkCodes').doc(codeId);
   const snap = await ref.get();
-  if (!snap.exists) throw new Error('Code not found');
+  // Tenant ownership check — codeId is client-supplied against a top-level
+  // collection, so it must belong to the caller's school.
+  if (!snap.exists || snap.data()?.schoolId !== schoolId) throw new Error('Code not found');
   if (snap.data()?.status !== 'revoked') throw new Error('Only revoked codes can be permanently deleted');
   await ref.delete();
 }

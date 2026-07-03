@@ -14,12 +14,18 @@ const rowSchema = z.object({
 });
 
 const importSchema = z.object({
-  rows: z.array(rowSchema).min(1, 'At least one row is required'),
+  rows: z
+    .array(rowSchema)
+    .min(1, 'At least one row is required')
+    .max(500, 'Import at most 500 students at a time'),
 });
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (session.role !== 'schoolAdmin') {
+    return NextResponse.json({ error: 'Only school admins can import students' }, { status: 403 });
+  }
 
   try {
     const body = await request.json();
