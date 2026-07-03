@@ -166,6 +166,15 @@ export async function addTeacherComment(
   const trimmed = args.body.trim();
   if (!trimmed) throw new Error('Comment cannot be empty');
 
+  // Server-side backstop for the per-school messaging feature gate — mirrors
+  // the app + firestore.rules behaviour so a school that has turned messaging
+  // off can't have portal-originated comments delivered. Absent setting =
+  // enabled (fail open for legacy schools).
+  const schoolSnap = await adminDb.collection('schools').doc(schoolId).get();
+  if (schoolSnap.data()?.settings?.messaging?.enabled === false) {
+    throw new Error('Messaging is disabled for this school');
+  }
+
   const commentRef = logRef.collection('comments').doc();
   const batch = adminDb.batch();
   batch.set(commentRef, {
