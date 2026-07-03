@@ -306,9 +306,14 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
       if (isNew) HapticFeedback.mediumImpact();
       setState(() {
         if (isNew) _scanFlashTick++;
-        _statusMessage = isNew
-            ? 'Assigned "${book.title}" for this week.'
-            : 'Already assigned this week.';
+        if (result.queuedOffline) {
+          _statusMessage =
+              'Saved "${book.title}" — it\'ll assign once you\'re back online.';
+        } else {
+          _statusMessage = isNew
+              ? 'Assigned "${book.title}" for this week.'
+              : 'Already assigned this week.';
+        }
       });
     } catch (e) {
       if (!mounted) return;

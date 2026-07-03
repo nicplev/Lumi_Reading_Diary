@@ -204,10 +204,14 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
         _showBanner('"${book.title}" is already on your list.', LumiTokens.blue);
         return;
       case ScanClassification.renew:
-        await _persist(book, renewed: true);
+        final queued = await _persist(book, renewed: true);
         _addEntry(book, _KioskOutcome.renewed);
-        _showBanner('Renewed "${book.title}" for another week! 🎉',
-            LumiTokens.green);
+        _showBanner(
+          queued
+              ? 'Saved "${book.title}" — it\'ll renew once you\'re back online.'
+              : 'Renewed "${book.title}" for another week! 🎉',
+          queued ? LumiTokens.blue : LumiTokens.green,
+        );
         return;
       case ScanClassification.alreadyRead:
         final readAgain = await _showAlreadyReadSheet(book);
@@ -215,20 +219,32 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
           _refocus();
           return;
         }
-        await _persist(book);
+        final rereadQueued = await _persist(book);
         _addEntry(book, _KioskOutcome.reread);
-        _showBanner('Reading "${book.title}" again — nice!', LumiTokens.green);
+        _showBanner(
+          rereadQueued
+              ? 'Saved "${book.title}" — it\'ll sync when you\'re back online.'
+              : 'Reading "${book.title}" again — nice!',
+          rereadQueued ? LumiTokens.blue : LumiTokens.green,
+        );
         return;
       case ScanClassification.newBook:
-        await _persist(book);
+        final addQueued = await _persist(book);
         _addEntry(book, _KioskOutcome.added);
-        _showBanner('Added "${book.title}"!', LumiTokens.green);
+        _showBanner(
+          addQueued
+              ? 'Saved "${book.title}" — it\'ll add once you\'re back online.'
+              : 'Added "${book.title}"!',
+          addQueued ? LumiTokens.blue : LumiTokens.green,
+        );
         return;
     }
   }
 
-  Future<void> _persist(ScannedIsbnBook book, {bool renewed = false}) async {
-    await _service.assignResolvedBooks(
+  /// Returns true when the write was queued offline (will sync later) rather
+  /// than confirmed online.
+  Future<bool> _persist(ScannedIsbnBook book, {bool renewed = false}) async {
+    final result = await _service.assignResolvedBooks(
       schoolId: _schoolId,
       classId: widget.classModel.id,
       studentId: widget.student.id,
@@ -238,6 +254,7 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
       sessionId: _sessionId,
       renewedIsbns: renewed ? {book.isbn} : const <String>{},
     );
+    return result.queuedOffline;
   }
 
   void _addEntry(ScannedIsbnBook book, _KioskOutcome outcome) {

@@ -4,6 +4,7 @@ import '../core/services/service_status_controller.dart';
 import '../data/models/allocation_model.dart';
 import '../data/models/book_model.dart';
 import 'book_lookup_service.dart';
+import 'offline_service.dart';
 
 class IsbnAssignmentService {
   IsbnAssignmentService({
@@ -218,6 +219,64 @@ class IsbnAssignmentService {
     DateTime? targetDate,
     Set<String> renewedIsbns = const <String>{},
   }) async {
+    // Offline: the write runs a Firestore transaction, which throws with no
+    // connection (transactions can't run from cache) — so a scan used to be
+    // silently lost. Queue it and replay on reconnect (replayQueuedAssignment),
+    // mirroring the reading-log offline queue.
+    if (!ServiceStatusController.instance.current.canWriteToFirebase) {
+      await OfflineService.instance.enqueueAllocationAssignment(
+        schoolId: schoolId,
+        classId: classId,
+        studentId: studentId,
+        teacherId: teacherId,
+        books: books.map((b) => b.toMap()).toList(),
+        targetMinutes: targetMinutes,
+        sessionId: sessionId,
+        targetDateMs: targetDate?.millisecondsSinceEpoch,
+        renewedIsbns: renewedIsbns.toList(),
+      );
+      final referenceDate = targetDate ?? DateTime.now();
+      final allocationId = buildWeeklyAllocationId(
+        studentId: studentId,
+        weekStart: startOfWeek(referenceDate),
+      );
+      return IsbnAssignmentResult(
+        allocationId: allocationId,
+        processedBooks: books,
+        newlyAssignedBooks: books,
+        duplicateIsbns: const [],
+        invalidCodes: const [],
+        totalAssignedBooks: books.length,
+        queuedOffline: true,
+      );
+    }
+    return _writeResolvedBooks(
+      schoolId: schoolId,
+      classId: classId,
+      studentId: studentId,
+      teacherId: teacherId,
+      books: books,
+      targetMinutes: targetMinutes,
+      sessionId: sessionId,
+      targetDate: targetDate,
+      renewedIsbns: renewedIsbns,
+    );
+  }
+
+  /// The actual transaction write, WITHOUT the offline guard. Called by
+  /// [assignResolvedBooks] when online and by the offline drain replay (which
+  /// only runs on a healthy write path), so it always reaches Firestore.
+  Future<IsbnAssignmentResult> _writeResolvedBooks({
+    required String schoolId,
+    required String classId,
+    required String studentId,
+    required String teacherId,
+    required List<ScannedIsbnBook> books,
+    int targetMinutes = 20,
+    String? sessionId,
+    DateTime? targetDate,
+    Set<String> renewedIsbns = const <String>{},
+  }) async {
     final referenceDate = targetDate ?? DateTime.now();
     final weekStart = startOfWeek(referenceDate);
     final weekEnd = endOfWeek(referenceDate);
@@ -245,6 +304,31 @@ class IsbnAssignmentService {
       duplicateIsbns: summary.duplicateIsbns,
       invalidCodes: const [],
       totalAssignedBooks: summary.totalAssignedBooks,
+    );
+  }
+
+  /// Replays an assignment that was queued offline: deserialises the queued
+  /// payload and runs the write. The drain only fires on a healthy write path,
+  /// so this always writes (it deliberately skips the offline guard). Registered
+  /// on [OfflineService] at app startup.
+  Future<void> replayQueuedAssignment(Map<String, dynamic> data) async {
+    final books = ((data['books'] as List?) ?? const [])
+        .map((b) => ScannedIsbnBook.fromMap(b as Map))
+        .toList();
+    final targetDateMs = data['targetDateMs'] as int?;
+    await _writeResolvedBooks(
+      schoolId: data['schoolId'] as String,
+      classId: data['classId'] as String,
+      studentId: data['studentId'] as String,
+      teacherId: data['teacherId'] as String,
+      books: books,
+      targetMinutes: (data['targetMinutes'] as int?) ?? 20,
+      sessionId: data['sessionId'] as String?,
+      targetDate: targetDateMs != null
+          ? DateTime.fromMillisecondsSinceEpoch(targetDateMs)
+          : null,
+      renewedIsbns:
+          ((data['renewedIsbns'] as List?) ?? const []).whereType<String>().toSet(),
     );
   }
 
@@ -953,6 +1037,27 @@ class ScannedIsbnBook {
       isNewToLibrary: isNewToLibrary ?? this.isNewToLibrary,
     );
   }
+
+  /// Serialised form for the offline assignment sync queue.
+  Map<String, dynamic> toMap() => {
+        'isbn': isbn,
+        'title': title,
+        'author': author,
+        'coverImageUrl': coverImageUrl,
+        'bookId': bookId,
+        'resolvedFromCatalog': resolvedFromCatalog,
+        'isNewToLibrary': isNewToLibrary,
+      };
+
+  static ScannedIsbnBook fromMap(Map<dynamic, dynamic> map) => ScannedIsbnBook(
+        isbn: (map['isbn'] as String?) ?? '',
+        title: (map['title'] as String?) ?? '',
+        author: map['author'] as String?,
+        coverImageUrl: map['coverImageUrl'] as String?,
+        bookId: map['bookId'] as String?,
+        resolvedFromCatalog: map['resolvedFromCatalog'] as bool? ?? false,
+        isNewToLibrary: map['isNewToLibrary'] as bool? ?? false,
+      );
 }
 
 /// Result of resolving a single ISBN without creating placeholders.
@@ -992,6 +1097,7 @@ class IsbnAssignmentResult {
     required this.duplicateIsbns,
     required this.invalidCodes,
     required this.totalAssignedBooks,
+    this.queuedOffline = false,
   });
 
   final String allocationId;
@@ -1000,6 +1106,11 @@ class IsbnAssignmentResult {
   final List<String> duplicateIsbns;
   final List<String> invalidCodes;
   final int totalAssignedBooks;
+
+  /// True when the write couldn't reach Firebase and was queued for sync
+  /// instead — the caller should show a "saved, will sync" state rather than a
+  /// confirmed assignment.
+  final bool queuedOffline;
 }
 
 class ReassignmentResult {

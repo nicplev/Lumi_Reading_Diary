@@ -110,6 +110,21 @@ class OfflineService with WidgetsBindingObserver {
   @visibleForTesting
   Future<void> Function()? tokenRefreshForTest;
 
+  /// Replays an allocation assignment that was queued offline. Registered at
+  /// startup by IsbnAssignmentService (inverting the dependency so this
+  /// infrastructure service doesn't import the feature service). The allocation
+  /// upsert is a Firestore transaction with a non-trivial merge, so the drain
+  /// re-runs that write rather than reimplementing it. Until registered, a
+  /// queued item is treated as transient (retried), so an early-startup drain
+  /// before registration doesn't park it.
+  Future<void> Function(Map<String, dynamic> data)? _allocationReplay;
+
+  void registerAllocationReplay(
+    Future<void> Function(Map<String, dynamic> data) handler,
+  ) {
+    _allocationReplay = handler;
+  }
+
   /// Force a fresh ID token before a drain. On cold-start the queue can drain
   /// before Firebase Auth has minted a token for the restored session; a stale
   /// token makes Firestore reject writes with a transient `permission-denied`,
@@ -431,6 +446,45 @@ class OfflineService with WidgetsBindingObserver {
         'logId': logId,
         'schoolId': schoolId,
         'feeling': feeling,
+      },
+      createdAt: DateTime.now(),
+    );
+    await _enqueueAndPersist(sync);
+  }
+
+  /// Queue an ISBN-scan allocation write that couldn't run online (the upsert
+  /// is a Firestore transaction, which can't run from cache). [books] are
+  /// already serialised (ScannedIsbnBook.toMap) so this service stays
+  /// dependency-free of the feature layer. Keyed per (student, week, session)
+  /// so re-scans in the same session supersede rather than stack.
+  Future<void> enqueueAllocationAssignment({
+    required String schoolId,
+    required String classId,
+    required String studentId,
+    required String teacherId,
+    required List<Map<String, dynamic>> books,
+    required int targetMinutes,
+    String? sessionId,
+    int? targetDateMs,
+    List<String> renewedIsbns = const <String>[],
+  }) async {
+    final sessionKey = (sessionId != null && sessionId.isNotEmpty)
+        ? sessionId
+        : (targetDateMs?.toString() ?? 'now');
+    final sync = PendingSync(
+      id: 'alloc_${studentId}_$sessionKey',
+      type: SyncType.allocationAssignment,
+      action: SyncAction.update,
+      data: {
+        'schoolId': schoolId,
+        'classId': classId,
+        'studentId': studentId,
+        'teacherId': teacherId,
+        'books': books,
+        'targetMinutes': targetMinutes,
+        'sessionId': sessionId,
+        'targetDateMs': targetDateMs,
+        'renewedIsbns': renewedIsbns,
       },
       createdAt: DateTime.now(),
     );
@@ -792,6 +846,9 @@ class OfflineService with WidgetsBindingObserver {
       case SyncType.childFeeling:
         await _syncChildFeeling(item);
         break;
+      case SyncType.allocationAssignment:
+        await _syncAllocationAssignment(item);
+        break;
     }
   }
 
@@ -815,6 +872,8 @@ class OfflineService with WidgetsBindingObserver {
         return 5;
       case SyncType.parentPrefs:
         return 6;
+      case SyncType.allocationAssignment:
+        return 5;
     }
   }
 
@@ -1047,6 +1106,18 @@ class OfflineService with WidgetsBindingObserver {
       }
       rethrow;
     }
+  }
+
+  /// Replay a queued ISBN-scan allocation via the handler IsbnAssignmentService
+  /// registered at startup (it re-runs the transaction/merge online). If no
+  /// handler is registered yet (very early startup), throw so the item is kept
+  /// and retried rather than parked.
+  Future<void> _syncAllocationAssignment(PendingSync pendingSync) async {
+    final replay = _allocationReplay;
+    if (replay == null) {
+      throw Exception('Allocation replay handler not registered yet; will retry');
+    }
+    await replay(Map<String, dynamic>.from(pendingSync.data));
   }
 
   /// Replay a comment-thread reply composed offline: write the comment doc and
@@ -1389,6 +1460,7 @@ enum SyncType {
   commentReply,
   parentPrefs,
   childFeeling,
+  allocationAssignment,
 }
 
 enum SyncAction {
