@@ -1050,16 +1050,27 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
     final targetStudentIds = _selectAllStudents
         ? _students.map((s) => s.id).toList()
         : List<String>.from(_selectedStudentIds);
+    if (targetStudentIds.isEmpty) return conflicts;
+
+    // Fetch every target student's read-history in a few batched queries, then
+    // match books in memory — replaces the old N-students × M-books sequential
+    // reads (500+ round-trips for a "select-all" big class before the save).
+    final readByStudent = await service.readBookIdsForStudents(targetStudentIds);
 
     for (final studentId in targetStudentIds) {
+      final read = readByStudent[studentId] ?? const <String>{};
       for (final item in items) {
-        if (item.bookId == null && item.isbn == null) continue;
-        final hasRead = await service.studentHasPreviouslyReadBook(
-          studentId: studentId,
-          bookId: item.bookId,
-          isbn: item.isbn,
-        );
-        if (hasRead) {
+        // Same variant set the old studentHasPreviouslyReadBook checked.
+        final variants = <String>{};
+        if (item.bookId != null && item.bookId!.isNotEmpty) {
+          variants.add(item.bookId!);
+        }
+        if (item.isbn != null && item.isbn!.isNotEmpty) {
+          variants.add(item.isbn!);
+          variants.add('isbn_${item.isbn!}');
+        }
+        if (variants.isEmpty) continue;
+        if (variants.any(read.contains)) {
           final matches = _students.where((s) => s.id == studentId);
           final name = matches.isNotEmpty ? matches.first.firstName : studentId;
           conflicts
