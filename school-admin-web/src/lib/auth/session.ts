@@ -84,15 +84,8 @@ export async function getSession(): Promise<SessionData | null> {
       impersonation: payload.impersonation as ImpersonationSessionBlock | undefined,
     };
   } catch {
-    // Backward compat: try parsing as plain JSON (for existing sessions during rollout)
-    try {
-      const data = JSON.parse(cookie.value);
-      if (data.uid && data.schoolId && data.role) {
-        return data as SessionData;
-      }
-    } catch {
-      // Not valid JSON either
-    }
+    // Invalid or unsigned cookie — never trust it. (A plain-JSON fallback here
+    // would let anyone forge an admin session by setting the cookie by hand.)
     return null;
   }
 }
