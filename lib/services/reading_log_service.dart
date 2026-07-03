@@ -510,7 +510,10 @@ class ReadingLogService {
   ///
   /// Queues the write locally when Firebase isn't writable so a comment typed
   /// offline lands on reconnect (the drain creates the log first if needed).
-  Future<void> addComment(
+  /// Posts a comment. Returns `true` when it was queued OFFLINE (so the caller
+  /// can tell the user it will send later) and `false` when written online.
+  /// Throws on an online write failure so the caller can surface an error.
+  Future<bool> addComment(
     ReadingLogModel log, {
     required String body,
     required CommentAuthorRole authorRole,
@@ -518,7 +521,7 @@ class ReadingLogService {
     required String authorName,
   }) async {
     final trimmed = body.trim();
-    if (trimmed.isEmpty) return;
+    if (trimmed.isEmpty) return false;
 
     final roleName = authorRole.toString().split('.').last;
     final commentRef = _logRef(log).collection('comments').doc();
@@ -535,7 +538,7 @@ class ReadingLogService {
         studentId: log.studentId,
         parentId: log.parentId,
       );
-      return;
+      return true;
     }
 
     final comment = LogCommentModel(
@@ -557,6 +560,7 @@ class ReadingLogService {
       'lastCommentByRole': roleName,
     });
     await batch.commit();
+    return false;
   }
 
   /// Marks a log's thread as seen for [uid] (clears the unread badge).

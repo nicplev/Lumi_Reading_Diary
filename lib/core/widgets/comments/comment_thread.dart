@@ -89,7 +89,7 @@ class _CommentThreadState extends ConsumerState<CommentThread> {
 
     setState(() => _sending = true);
     try {
-      await _service.addComment(
+      final savedOffline = await _service.addComment(
         widget.log,
         body: text,
         authorRole: widget.authorRole,
@@ -97,6 +97,22 @@ class _CommentThreadState extends ConsumerState<CommentThread> {
         authorName: authorName,
       );
       _controller.clear();
+      if (mounted && savedOffline) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Saved — it'll send when you're back online."),
+          ),
+        );
+      }
+    } catch (_) {
+      // Keep the typed text so the user can retry rather than losing it.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Couldn't send your comment. Please try again."),
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _sending = false);
     }

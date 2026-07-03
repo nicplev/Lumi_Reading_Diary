@@ -98,12 +98,27 @@ class _ActiveAllocationsTabState extends State<ActiveAllocationsTab> {
     );
 
     if (confirm == true) {
-      await _allocationCrudService.updateAllocation(
-        schoolId: widget.teacher.schoolId!,
-        allocationId: allocation.id,
-        actorId: widget.teacher.id,
-        isActive: false,
-      );
+      try {
+        await _allocationCrudService.updateAllocation(
+          schoolId: widget.teacher.schoolId!,
+          allocationId: allocation.id,
+          actorId: widget.teacher.id,
+          isActive: false,
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Allocation removed.')),
+          );
+        }
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Couldn't remove the allocation. Please try again."),
+            ),
+          );
+        }
+      }
     }
   }
 
