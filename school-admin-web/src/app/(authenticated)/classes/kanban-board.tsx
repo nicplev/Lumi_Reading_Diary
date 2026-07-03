@@ -169,20 +169,27 @@ export function KanbanBoard({ teachers = [] }: KanbanBoardProps) {
 
   const handleSave = useCallback(async () => {
     const changes = Array.from(pendingChanges.values());
-    try {
-      await Promise.all(
-        changes.map((c) =>
-          moveStudent.mutateAsync({
-            studentId: c.studentId,
-            fromClassId: c.fromClassId,
-            toClassId: c.toClassId,
-          }),
-        ),
-      );
-      setPendingChanges(new Map());
-      toast(`${changes.length} change${changes.length !== 1 ? 's' : ''} saved`, 'success');
-    } catch {
-      toast('Some changes failed to save. Please try again.', 'error');
+    const settled = await Promise.allSettled(
+      changes.map((c) =>
+        moveStudent.mutateAsync({
+          studentId: c.studentId,
+          fromClassId: c.fromClassId,
+          toClassId: c.toClassId,
+        }),
+      ),
+    );
+    const failed = changes.filter((_, i) => settled[i].status === 'rejected');
+    const savedCount = changes.length - failed.length;
+    // Keep only the moves that DIDN'T persist so the board matches the server
+    // and the user retries just those — a student that already moved can't be
+    // moved again from its old class.
+    setPendingChanges(new Map(failed.map((c) => [c.studentId, c])));
+    if (failed.length === 0) {
+      toast(`${savedCount} change${savedCount !== 1 ? 's' : ''} saved`, 'success');
+    } else if (savedCount === 0) {
+      toast('Couldn’t save changes. Please try again.', 'error');
+    } else {
+      toast(`${savedCount} saved, ${failed.length} failed — retry the rest`, 'error');
     }
   }, [pendingChanges, moveStudent, toast]);
 

@@ -116,10 +116,17 @@ export function ReadingGroupOrganizer({
           writes.push(updateGroup.mutateAsync({ groupId: g.id, studentIds: newIds }));
         }
       }
-      await Promise.all(writes);
-      toast(`${moves.size} change${moves.size !== 1 ? 's' : ''} saved`, 'success');
-      setMoves(new Map());
-      onExit();
+      const settled = await Promise.allSettled(writes);
+      const failed = settled.filter((r) => r.status === 'rejected').length;
+      if (failed === 0) {
+        toast(`${moves.size} change${moves.size !== 1 ? 's' : ''} saved`, 'success');
+        setMoves(new Map());
+        onExit();
+      } else {
+        // updateGroup writes an absolute studentIds set (idempotent), so the
+        // staged moves are kept for a safe retry rather than silently lost.
+        toast(`${failed} group${failed !== 1 ? 's' : ''} failed to save — please retry`, 'error');
+      }
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Some changes failed to save', 'error');
     } finally {

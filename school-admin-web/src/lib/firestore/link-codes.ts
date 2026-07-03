@@ -169,18 +169,26 @@ export async function bulkCreateLinkCodes(
   schoolId: string,
   studentIds: string[],
   createdBy: string
-): Promise<StudentLinkCode[]> {
+): Promise<{ created: StudentLinkCode[]; failedStudentIds: string[] }> {
   const unique = [...new Set(studentIds)];
-  const results: StudentLinkCode[] = [];
+  const created: StudentLinkCode[] = [];
+  const failedStudentIds: string[] = [];
 
-  // Process in chunks of 25
+  // Each createLinkCode commits its own batch, so a chunk can partially
+  // succeed. Use allSettled so one failure doesn't abort the run (and throw
+  // away the codes already committed) — report exactly which students failed
+  // so the caller can retry ONLY those (a blind full retry would supersede the
+  // codes that already succeeded).
   for (let i = 0; i < unique.length; i += 25) {
     const chunk = unique.slice(i, i + 25);
-    const chunkResults = await Promise.all(
+    const settled = await Promise.allSettled(
       chunk.map((studentId) => createLinkCode(schoolId, studentId, createdBy))
     );
-    results.push(...chunkResults);
+    settled.forEach((r, idx) => {
+      if (r.status === 'fulfilled') created.push(r.value);
+      else failedStudentIds.push(chunk[idx]);
+    });
   }
 
-  return results;
+  return { created, failedStudentIds };
 }
