@@ -331,6 +331,53 @@ test('schoolOnboarding: admin can claim ownership during first setup update', as
   );
 });
 
+test('schoolOnboarding: anonymous demo create is shape-validated', async () => {
+  const anon = unauthDb();
+
+  // A genuine, well-formed demo request from the public form still works
+  // (the flow runs before any account exists).
+  await assertSucceeds(
+    anon.collection('schoolOnboarding').doc('good_1').set({
+      schoolName: 'Lumi School',
+      contactEmail: 'owner@school.test',
+      status: 'demo',
+      currentStep: 'schoolInfo',
+      createdAt: new Date(),
+      adminUserId: null,
+    }),
+  );
+
+  // Pre-claiming an admin owner is rejected (adminUserId is set later, only by
+  // the authenticated ownership-claim update).
+  await assertFails(
+    anon.collection('schoolOnboarding').doc('bad_admin').set({
+      schoolName: 'Lumi School',
+      contactEmail: 'owner@school.test',
+      status: 'demo',
+      createdAt: new Date(),
+      adminUserId: 'attacker',
+    }),
+  );
+
+  // Non-demo status / missing required fields are rejected.
+  await assertFails(
+    anon.collection('schoolOnboarding').doc('bad_status').set({
+      schoolName: 'Lumi School',
+      contactEmail: 'owner@school.test',
+      status: 'active',
+      createdAt: new Date(),
+      adminUserId: null,
+    }),
+  );
+  await assertFails(
+    anon.collection('schoolOnboarding').doc('bad_shape').set({
+      status: 'demo',
+      createdAt: new Date(),
+      adminUserId: null,
+    }),
+  );
+});
+
 test('books: teacher can read and write school-scoped books', async () => {
   await seedData(async (db) => {
     await db.collection('schools').doc('school_1').set({ name: 'Lumi School One', createdBy: 'admin_1' });
@@ -786,6 +833,60 @@ test('students: teacher can update student reading level fields', async () => {
         readingLevelSource: 'teacher',
         readingLevelUpdatedAt: new Date(),
       }),
+  );
+});
+
+test('students: staff cannot write the server-owned access map or parentIds', async () => {
+  await seedData(async (db) => {
+    await db.collection('schools').doc('school_1').set({
+      name: 'Lumi School',
+      createdBy: 'admin_1',
+      teacherCount: 1,
+      parentCount: 1,
+      studentCount: 1,
+    });
+    await db.collection('schools').doc('school_1').collection('users').doc('teacher_1').set({
+      role: 'teacher',
+      schoolId: 'school_1',
+      fullName: 'Teacher One',
+    });
+    await db.collection('schools').doc('school_1').collection('users').doc('admin_1').set({
+      role: 'schoolAdmin',
+      schoolId: 'school_1',
+    });
+    await db.collection('schools').doc('school_1').collection('students').doc('student_1').set({
+      schoolId: 'school_1',
+      classId: 'class_1',
+      firstName: 'Emma',
+      lastName: 'Wilson',
+      currentReadingLevel: 'A',
+      isActive: true,
+      createdAt: new Date(),
+    });
+  });
+
+  const studentRef = (db) =>
+    db.collection('schools').doc('school_1').collection('students').doc('student_1');
+
+  // Self-granting the entitlement is denied for BOTH teacher and admin — access
+  // is written only server-side (buildStudentAccess via Admin SDK).
+  await assertFails(
+    studentRef(authDb('teacher_1')).update({
+      access: { status: 'active', expiresAt: new Date(Date.now() + 31536000000) },
+    }),
+  );
+  await assertFails(
+    studentRef(authDb('admin_1')).update({ access: { status: 'active' } }),
+  );
+
+  // parentIds is owned by the linking system, not free-form staff writes.
+  await assertFails(
+    studentRef(authDb('teacher_1')).update({ parentIds: ['smuggled_parent'] }),
+  );
+
+  // A normal profile / reading-level edit still succeeds.
+  await assertSucceeds(
+    studentRef(authDb('teacher_1')).update({ currentReadingLevel: 'C' }),
   );
 });
 
