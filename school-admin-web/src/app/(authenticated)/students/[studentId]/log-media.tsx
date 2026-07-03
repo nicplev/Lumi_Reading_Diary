@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Icon } from '@/components/lumi/icon';
 
 function formatDuration(sec: number | null): string {
@@ -22,6 +23,7 @@ export function LogMedia({
   hasAudio: boolean;
   durationSec: number | null;
 }) {
+  const [failed, setFailed] = useState(false);
   if (!hasAudio) return null;
 
   return (
@@ -34,9 +36,21 @@ export function LogMedia({
             <span className="text-xs text-muted">{formatDuration(durationSec)}</span>
           ) : null}
         </div>
-        <audio controls preload="none" src={`/api/reading-logs/${logId}/audio`} className="w-full h-9">
-          Your browser does not support audio playback.
-        </audio>
+        {failed ? (
+          <p className="text-xs text-muted">
+            Recording unavailable — it may have been removed or you don&apos;t have access.
+          </p>
+        ) : (
+          <audio
+            controls
+            preload="none"
+            src={`/api/reading-logs/${logId}/audio`}
+            onError={() => setFailed(true)}
+            className="w-full h-9"
+          >
+            Your browser does not support audio playback.
+          </audio>
+        )}
       </div>
     </div>
   );

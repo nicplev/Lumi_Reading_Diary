@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useBreadcrumbs } from '@/components/layout/breadcrumb-context';
 import { Avatar } from '@/components/lumi/avatar';
+import { QueryError } from '@/components/lumi/query-error';
 import { Badge } from '@/components/lumi/badge';
 import { Button } from '@/components/lumi/button';
 import { Card } from '@/components/lumi/card';
@@ -34,7 +35,7 @@ interface StudentDetailProps {
 export function StudentDetail({ studentId, classId, levelOptions, levelsEnabled = true, className }: StudentDetailProps) {
   const { toast } = useToast();
   const { setOverride } = useBreadcrumbs();
-  const { data: student, isLoading } = useStudent(studentId);
+  const { data: student, isLoading, isError, refetch } = useStudent(studentId);
 
   // Set breadcrumb to show student name instead of Firestore ID
   useEffect(() => {
@@ -51,6 +52,15 @@ export function StudentDetail({ studentId, classId, levelOptions, levelsEnabled 
   const [expandedAllocation, setExpandedAllocation] = useState<string | null>(null);
   const [showLogModal, setShowLogModal] = useState(false);
   const [showIsbnModal, setShowIsbnModal] = useState(false);
+
+  if (isError) {
+    return (
+      <QueryError
+        message="We couldn't load this student's profile."
+        onRetry={() => refetch()}
+      />
+    );
+  }
 
   if (isLoading || !student) {
     return (
