@@ -308,6 +308,24 @@ export async function reactivateUser(schoolId: string, userId: string): Promise<
 }
 
 export async function resetUserPassword(userId: string, schoolId?: string): Promise<string> {
+  // Tenant scoping: when an admin resets another user (schoolId supplied), the
+  // target MUST be a member of that admin's school. Without this, a global
+  // adminAuth.getUser(userId) + generatePasswordResetLink lets any admin mint a
+  // working reset link for any user in any school (cross-tenant account
+  // takeover). The self-serve path (profile/reset-password) forces
+  // userId === session.uid and passes no schoolId, so it stays safe.
+  if (schoolId) {
+    const memberDoc = await adminDb
+      .collection('schools')
+      .doc(schoolId)
+      .collection('users')
+      .doc(userId)
+      .get();
+    if (!memberDoc.exists) {
+      throw new Error('User not found in this school');
+    }
+  }
+
   const user = await adminAuth.getUser(userId);
   if (!user.email) throw new Error('User has no email address');
   const link = await adminAuth.generatePasswordResetLink(user.email);
