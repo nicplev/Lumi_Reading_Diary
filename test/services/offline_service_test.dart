@@ -356,7 +356,7 @@ void main() {
 
     group('sync types and actions', () {
       test('SyncType enum has all expected values', () {
-        expect(SyncType.values.length, equals(8));
+        expect(SyncType.values.length, equals(9));
         expect(
           SyncType.values,
           containsAll([
@@ -368,6 +368,7 @@ void main() {
             SyncType.commentReply,
             SyncType.parentPrefs,
             SyncType.childFeeling,
+            SyncType.allocationAssignment,
           ]),
         );
       });
@@ -588,6 +589,72 @@ void main() {
         expect(offlineService.pendingSyncs, isEmpty);
         final logDoc = await logRef.get();
         expect(logDoc.data()!['childFeeling'], 'loved');
+      });
+
+      test('queued allocation assignment drains via the registered replay',
+          () async {
+        offlineService.firestoreForTest = FakeFirebaseFirestore();
+        goHealthy();
+
+        // The real replay is IsbnAssignmentService.replayQueuedAssignment (a
+        // Firestore transaction); here we stub it to assert the drain forwards
+        // the queued payload correctly and removes the item on success.
+        Map<String, dynamic>? replayed;
+        offlineService.registerAllocationReplay((data) async {
+          replayed = data;
+        });
+
+        await offlineService.enqueueAllocationAssignment(
+          schoolId: 'school-1',
+          classId: 'class-1',
+          studentId: 'student-1',
+          teacherId: 'teacher-1',
+          books: [
+            {'isbn': '9781234567890', 'title': 'A Book', 'resolvedFromCatalog': true},
+          ],
+          targetMinutes: 20,
+          sessionId: 'sess-1',
+          renewedIsbns: const ['9781234567890'],
+        );
+        expect(offlineService.pendingSyncs.single.type,
+            SyncType.allocationAssignment);
+
+        await offlineService.triggerSync();
+
+        expect(offlineService.pendingSyncs, isEmpty);
+        expect(replayed, isNotNull);
+        expect(replayed!['studentId'], 'student-1');
+        expect(replayed!['sessionId'], 'sess-1');
+        expect((replayed!['books'] as List).single['isbn'], '9781234567890');
+        expect(replayed!['renewedIsbns'], contains('9781234567890'));
+      });
+
+      test('queued allocation is retried (not parked) when no replay registered',
+          () async {
+        offlineService.firestoreForTest = FakeFirebaseFirestore();
+        goHealthy();
+        offlineService.registerAllocationReplay((_) async {}); // reset below
+        // Simulate "handler not yet registered" by draining before one is set.
+        // (registerAllocationReplay can't be un-set, so use a throwing stub.)
+        offlineService.registerAllocationReplay((_) async {
+          throw Exception('handler not registered yet');
+        });
+
+        await offlineService.enqueueAllocationAssignment(
+          schoolId: 'school-1',
+          classId: 'class-1',
+          studentId: 'student-x',
+          teacherId: 'teacher-1',
+          books: const [],
+          targetMinutes: 20,
+        );
+
+        await offlineService.triggerSync();
+
+        // Transient failure: kept + backed off, NOT parked.
+        final item = offlineService.pendingSyncs.single;
+        expect(item.needsAttention, isFalse);
+        expect(item.nextAttemptAt, isNotNull);
       });
 
       test('transient failure keeps the item and persists backoff state',

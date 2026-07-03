@@ -279,6 +279,10 @@ class _PendingRow extends StatelessWidget {
         return Icons.person_outline;
       case SyncType.allocation:
         return Icons.assignment_outlined;
+      case SyncType.childFeeling:
+        return Icons.sentiment_satisfied_outlined;
+      case SyncType.allocationAssignment:
+        return Icons.menu_book_outlined;
     }
   }
 
@@ -298,6 +302,10 @@ class _PendingRow extends StatelessWidget {
         return 'Child profile';
       case SyncType.allocation:
         return 'Allocation';
+      case SyncType.childFeeling:
+        return 'Reading feeling';
+      case SyncType.allocationAssignment:
+        return 'Book assignment';
     }
   }
 

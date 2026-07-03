@@ -19,6 +19,7 @@ import 'core/widgets/service_status_overlay.dart';
 import 'data/providers/remote_message_provider.dart';
 import 'services/firebase_service.dart';
 import 'services/offline_service.dart';
+import 'services/isbn_assignment_service.dart';
 import 'services/notification_service.dart';
 import 'services/crash_reporting_service.dart';
 import 'services/analytics_service.dart';
@@ -128,6 +129,12 @@ void main() async {
       // the status controller so the first drain has both available.
       try {
         await OfflineService.instance.initialize();
+        // Register the offline allocation-assignment replay: queued classroom
+        // scans drain by re-running the assignment transaction online (the
+        // dependency is inverted so OfflineService doesn't import the feature).
+        OfflineService.instance.registerAllocationReplay(
+          (data) => IsbnAssignmentService().replayQueuedAssignment(data),
+        );
       } catch (e) {
         debugPrint('Warning: OfflineService init failed: $e');
       }

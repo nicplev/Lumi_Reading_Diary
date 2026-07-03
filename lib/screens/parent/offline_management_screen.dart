@@ -332,6 +332,10 @@ String _syncTypeLabel(SyncType type) {
       return 'Child profile';
     case SyncType.allocation:
       return 'Allocation';
+    case SyncType.childFeeling:
+      return 'Reading feeling';
+    case SyncType.allocationAssignment:
+      return 'Book assignment';
   }
 }
 
