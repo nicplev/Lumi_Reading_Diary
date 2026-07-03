@@ -64,6 +64,7 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
   String? _cursor;
   bool _hasMore = true;
   bool _isLoading = false;
+  bool _loadingAll = false;
   Object? _loadError;
 
   // Header badge counts come from the server-maintained
@@ -142,6 +143,25 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
       _loadError = null;
     });
     await Future.wait([_loadCounts(), _loadNextPage()]);
+  }
+
+  /// Search filters the loaded books client-side, but pages load lazily (50 at
+  /// a time), so a title on an unfetched page read as "No books match". When a
+  /// search is active, drain the remaining pages once so the filter sees the
+  /// whole library. Guarded against re-entry and no-progress (concurrent
+  /// scroll load) so it can't busy-loop.
+  Future<void> _loadAllRemaining() async {
+    if (_loadingAll) return;
+    _loadingAll = true;
+    try {
+      while (_hasMore && mounted && _loadError == null) {
+        final before = _books.length;
+        await _loadNextPage();
+        if (_books.length == before) break; // no progress → stop
+      }
+    } finally {
+      _loadingAll = false;
+    }
   }
 
   Future<void> _loadHiddenBooks() async {
@@ -280,7 +300,14 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
                       child: _LibrarySearchBar(
                         controller: _searchController,
                         query: _searchQuery,
-                        onChanged: (v) => setState(() => _searchQuery = v),
+                        onChanged: (v) {
+                          setState(() => _searchQuery = v);
+                          // Searching must cover the whole library, not just
+                          // the pages scrolled-in so far.
+                          if (v.trim().isNotEmpty && _hasMore) {
+                            _loadAllRemaining();
+                          }
+                        },
                         onClear: () {
                           _searchController.clear();
                           setState(() => _searchQuery = '');
