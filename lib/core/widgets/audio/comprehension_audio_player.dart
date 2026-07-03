@@ -1,13 +1,19 @@
 import 'dart:async';
 
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../../../services/comprehension_audio_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/lumi_text_styles.dart';
+
+/// A cached signed URL and the moment it stops being valid.
+class _CachedUrl {
+  final String url;
+  final DateTime expiresAt;
+  const _CachedUrl(this.url, this.expiresAt);
+}
 
 /// Compact inline player for a child's comprehension recording, shown on the
 /// teacher's per-log row. Resolves the Storage download URL on demand and
@@ -18,27 +24,30 @@ import '../../theme/lumi_text_styles.dart';
 /// reply the teacher wants to leave about the recording.
 class ComprehensionAudioPlayer extends StatefulWidget {
   /// Firebase Storage object path, e.g.
-  /// `schools/{schoolId}/comprehension_audio/{logId}.m4a`.
+  /// `schools/{schoolId}/comprehension_audio/{logId}.m4a`. Used only as the
+  /// per-log cache key — the object is not client-readable (see [schoolId]).
   final String storagePath;
 
   /// Duration recorded on the log doc. Used as a fallback while the audio
   /// metadata is loading so the UI doesn't show 0:00 momentarily.
   final int? durationSec;
 
-  /// When non-null, a trash button is shown that calls
-  /// `deleteComprehensionAudio` for this log. The caller passes the school
-  /// and log ids so the callable can scope authorization. `onDeleted` lets
-  /// the parent screen refresh its local view once the server confirms.
-  final String? schoolId;
-  final String? logId;
+  /// School + log ids. Required: the recording is a child's voice — PII at rest
+  /// — so the Storage object is not client-readable. Playback goes through the
+  /// `getComprehensionAudioUrl` callable, which authorizes the caller against
+  /// the log's school and returns a short-lived signed URL. The same ids drive
+  /// the trash button (`deleteComprehensionAudio`); `onDeleted` lets the host
+  /// screen refresh once the server confirms.
+  final String schoolId;
+  final String logId;
   final VoidCallback? onDeleted;
 
   const ComprehensionAudioPlayer({
     super.key,
     required this.storagePath,
+    required this.schoolId,
+    required this.logId,
     this.durationSec,
-    this.schoolId,
-    this.logId,
     this.onDeleted,
   });
 
@@ -48,10 +57,12 @@ class ComprehensionAudioPlayer extends StatefulWidget {
 }
 
 class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
-  // Signed-URL cache. Firebase Storage URLs expire in ~1h which is more
-  // than enough for a session — sharing the map across instances avoids
-  // hammering Storage when the teacher scrolls a long list.
-  static final Map<String, String> _urlCache = {};
+  // Signed-URL cache keyed by storage path, shared across instances so a
+  // teacher scrolling a long list doesn't re-mint a URL on every rebuild.
+  // Entries carry their expiry — signed URLs are short-lived (~15 min), so a
+  // stale entry is dropped and re-fetched rather than served (which would fail
+  // playback mid-session).
+  static final Map<String, _CachedUrl> _urlCache = {};
 
   AudioPlayer? _player;
   StreamSubscription<PlayerState>? _stateSub;
@@ -73,11 +84,7 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
 
   Future<void> _initPlayer() async {
     try {
-      final url = _urlCache[widget.storagePath] ??
-          await FirebaseStorage.instance
-              .ref(widget.storagePath)
-              .getDownloadURL();
-      _urlCache[widget.storagePath] = url;
+      final url = await _resolveUrl();
 
       final player = AudioPlayer();
       final dur = await player.setUrl(url);
@@ -113,6 +120,26 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
     }
   }
 
+  /// Returns a playable signed URL, using the shared cache when the entry is
+  /// still comfortably valid, otherwise minting a fresh one via the callable.
+  Future<String> _resolveUrl() async {
+    final now = DateTime.now();
+    final cached = _urlCache[widget.storagePath];
+    if (cached != null &&
+        cached.expiresAt.isAfter(now.add(const Duration(seconds: 30)))) {
+      return cached.url;
+    }
+    final result = await ComprehensionAudioService().getAudioUrl(
+      schoolId: widget.schoolId,
+      logId: widget.logId,
+    );
+    _urlCache[widget.storagePath] = _CachedUrl(
+      result.url,
+      now.add(Duration(seconds: result.expiresInSec)),
+    );
+    return result.url;
+  }
+
   void _toggle() {
     final p = _player;
     if (p == null) return;
@@ -132,8 +159,7 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
     await _initPlayer();
   }
 
-  bool get _canDelete =>
-      widget.schoolId != null && widget.logId != null && !_deleting;
+  bool get _canDelete => !_deleting;
 
   Future<void> _confirmAndDelete() async {
     final messenger = ScaffoldMessenger.of(context);
@@ -164,8 +190,8 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
     try {
       await _player?.pause();
       await ComprehensionAudioService().deleteAudio(
-        schoolId: widget.schoolId!,
-        logId: widget.logId!,
+        schoolId: widget.schoolId,
+        logId: widget.logId,
       );
       _urlCache.remove(widget.storagePath);
       if (!mounted) return;
@@ -295,24 +321,22 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
             ],
           ),
         ),
-        if (widget.schoolId != null && widget.logId != null) ...[
-          const SizedBox(width: 4),
-          _deleting
-              ? const Padding(
-                  padding: EdgeInsets.all(8),
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                )
-              : IconButton(
-                  onPressed: _canDelete ? _confirmAndDelete : null,
-                  icon: const Icon(Icons.delete_outline_rounded,
-                      color: AppColors.charcoal, size: 20),
-                  tooltip: 'Delete recording',
+        const SizedBox(width: 4),
+        _deleting
+            ? const Padding(
+                padding: EdgeInsets.all(8),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
-        ],
+              )
+            : IconButton(
+                onPressed: _canDelete ? _confirmAndDelete : null,
+                icon: const Icon(Icons.delete_outline_rounded,
+                    color: AppColors.charcoal, size: 20),
+                tooltip: 'Delete recording',
+              ),
       ],
     );
   }
