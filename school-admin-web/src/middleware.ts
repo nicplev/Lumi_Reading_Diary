@@ -26,20 +26,12 @@ function getSecret() {
 }
 
 async function getSessionData(sessionValue: string): Promise<Record<string, unknown> | null> {
-  // Try JWT first
   try {
     const { payload } = await jwtVerify(sessionValue, getSecret());
     return payload as Record<string, unknown>;
   } catch {
-    // Backward compat: try plain JSON (for existing sessions during rollout)
-    try {
-      const data = JSON.parse(sessionValue);
-      if (data.uid && data.schoolId && data.role) {
-        return data;
-      }
-    } catch {
-      // Not valid JSON either
-    }
+    // Invalid or unsigned cookie — never trust it. (A plain-JSON fallback here
+    // would let anyone forge an admin session by setting the cookie by hand.)
     return null;
   }
 }
