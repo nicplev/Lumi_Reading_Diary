@@ -78,7 +78,7 @@ export function useDeleteLinkCode() {
 
 export function useBulkCreateLinkCodes() {
   const queryClient = useQueryClient();
-  return useMutation<{ count: number; codes: SerializedLinkCode[] }, Error, string[]>({
+  return useMutation<{ count: number; failedCount?: number; failedStudentIds?: string[]; codes: SerializedLinkCode[] }, Error, string[]>({
     mutationFn: async (studentIds: string[]) => {
       const res = await fetch('/api/link-codes/bulk', {
         method: 'POST',

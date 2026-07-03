@@ -127,7 +127,13 @@ export function ReadingGroupsTab({ classId, levelOptions }: ReadingGroupsTabProp
     setOrder(next);
     reorderGroups.mutate(
       { classId, orderedIds: next },
-      { onError: (e) => toast(e instanceof Error ? e.message : 'Failed to reorder', 'error') }
+      {
+        onError: (e) => {
+          // Roll back the optimistic reorder so the UI matches the server.
+          setOrder(ids);
+          toast(e instanceof Error ? e.message : 'Failed to reorder', 'error');
+        },
+      }
     );
   };
 

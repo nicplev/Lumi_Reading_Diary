@@ -59,8 +59,14 @@ export function GenerateCodeModal({ open, onClose }: GenerateCodeModalProps) {
     }
     try {
       const result = await bulkCreate.mutateAsync(classStudents.map((s) => s.id));
-      toast(`${result.count} codes generated`, 'success');
-      handleClose();
+      if (result.failedCount && result.failedCount > 0) {
+        // Partial success — some codes were created, the rest failed. Surface
+        // both so the admin knows codes exist and can retry the failures.
+        toast(`${result.count} codes generated, ${result.failedCount} failed — please retry`, 'error');
+      } else {
+        toast(`${result.count} codes generated`, 'success');
+        handleClose();
+      }
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Failed to generate codes', 'error');
     }

@@ -17,10 +17,17 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { studentIds } = bulkSchema.parse(body);
-    const codes = await bulkCreateLinkCodes(session.schoolId, studentIds, session.uid);
+    const { created, failedStudentIds } = await bulkCreateLinkCodes(session.schoolId, studentIds, session.uid);
+    // If nothing succeeded, treat it as a hard failure; otherwise report the
+    // partial result so the client can retry only the failed students.
+    if (created.length === 0) {
+      return NextResponse.json({ error: 'Failed to generate codes' }, { status: 500 });
+    }
     return NextResponse.json({
-      count: codes.length,
-      codes: codes.map((c) => ({
+      count: created.length,
+      failedCount: failedStudentIds.length,
+      failedStudentIds,
+      codes: created.map((c) => ({
         ...c,
         createdAt: c.createdAt.toISOString(),
         expiresAt: c.expiresAt.toISOString(),
