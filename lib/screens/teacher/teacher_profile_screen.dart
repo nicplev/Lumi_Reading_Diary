@@ -47,43 +47,30 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
 
   Future<void> _loadClasses() async {
     try {
-      final List<ClassModel> classes = [];
-
-      // Load classes where user is teacher - using nested structure
+      // `teacherIds` is the canonical list of ALL assigned teachers (primary +
+      // assistant), so one arrayContains query replaces the legacy
+      // teacherId + assistantTeacherId pair (which undercounted classes vs the
+      // rest of the app). Identical query to teacher_home / teacher_settings.
       final classQuery = await _firebaseService.firestore
           .collection('schools')
           .doc(widget.user.schoolId)
           .collection('classes')
-          .where('teacherId', isEqualTo: widget.user.id)
+          .where('teacherIds', arrayContains: widget.user.id)
           .where('isActive', isEqualTo: true)
           .get();
 
-      for (var doc in classQuery.docs) {
-        classes.add(ClassModel.fromFirestore(doc));
-      }
+      final classes = classQuery.docs
+          .map((doc) => ClassModel.fromFirestore(doc))
+          .toList();
 
-      // Also load classes where user is assistant teacher
-      final assistantQuery = await _firebaseService.firestore
-          .collection('schools')
-          .doc(widget.user.schoolId)
-          .collection('classes')
-          .where('assistantTeacherId', isEqualTo: widget.user.id)
-          .where('isActive', isEqualTo: true)
-          .get();
-
-      for (var doc in assistantQuery.docs) {
-        final classModel = ClassModel.fromFirestore(doc);
-        if (!classes.any((c) => c.id == classModel.id)) {
-          classes.add(classModel);
-        }
-      }
-
+      if (!mounted) return;
       setState(() {
         _classes = classes;
         _isLoading = false;
       });
     } catch (e) {
       debugPrint('Error loading classes: $e');
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
