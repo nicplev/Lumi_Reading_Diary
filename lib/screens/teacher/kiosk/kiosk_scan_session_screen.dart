@@ -171,6 +171,11 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
             "We couldn't find that book — ask your teacher.",
             LumiTokens.orange,
           );
+        case IsbnLookupUnavailable():
+          _showBanner(
+            "You're offline — try that book again once you're connected.",
+            LumiTokens.orange,
+          );
         case IsbnInvalid():
           _showBanner(
             "That doesn't look like a book barcode.",

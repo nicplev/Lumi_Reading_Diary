@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../core/services/service_status_controller.dart';
 import '../data/models/allocation_model.dart';
 import '../data/models/book_model.dart';
 import 'book_lookup_service.dart';
@@ -162,6 +163,7 @@ class IsbnAssignmentService {
     } catch (_) {}
 
     BookModel? resolved;
+    var lookupFailed = false;
     try {
       resolved = await _bookLookupService.lookupByIsbn(
         isbn: isbn,
@@ -172,6 +174,7 @@ class IsbnAssignmentService {
       );
     } catch (_) {
       resolved = null;
+      lookupFailed = true;
     }
 
     if (resolved != null && resolved.metadata?['placeholder'] != true) {
@@ -184,6 +187,16 @@ class IsbnAssignmentService {
         resolvedFromCatalog: true,
         isNewToLibrary: isNewToLibrary,
       ));
+    }
+
+    // Distinguish "couldn't check right now" (offline / lookup threw) from a
+    // genuinely unknown ISBN. Previously a network failure collapsed to
+    // IsbnNotFound, so a real book scanned offline read as "couldn't find that
+    // book." Only call it not-found when we could actually reach the catalog.
+    if (resolved == null &&
+        (lookupFailed ||
+            !ServiceStatusController.instance.current.canWriteToFirebase)) {
+      return IsbnLookupUnavailable(isbn);
     }
 
     return IsbnNotFound(isbn);
@@ -954,6 +967,15 @@ class IsbnResolved extends IsbnResolutionResult {
 
 class IsbnNotFound extends IsbnResolutionResult {
   const IsbnNotFound(this.isbn);
+  final String isbn;
+}
+
+/// The catalog couldn't be reached to resolve the ISBN (offline / lookup
+/// failed) — distinct from [IsbnNotFound], which means the catalog was reached
+/// and genuinely had no match. Lets the scanner say "you're offline" instead of
+/// mislabeling a real book as "couldn't find that book."
+class IsbnLookupUnavailable extends IsbnResolutionResult {
+  const IsbnLookupUnavailable(this.isbn);
   final String isbn;
 }
 
