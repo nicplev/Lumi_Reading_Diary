@@ -288,8 +288,8 @@ class _CacheCard extends StatelessWidget {
         shape: LumiBorders.shapeLarge,
         title: Text('Clear offline cache?', style: LumiTextStyles.h3()),
         content: Text(
-          "This will remove all offline data. You'll need to be online "
-          "to download it again. Any pending changes will be lost.",
+          "This clears the downloaded copy of your data so the app fetches it "
+          "fresh. Any unsynced changes are kept and will still upload.",
           style: LumiTextStyles.body(),
         ),
         actions: [
@@ -306,7 +306,9 @@ class _CacheCard extends StatelessWidget {
     );
 
     if (confirmed != true) return;
-    await OfflineService.instance.clearLocalData();
+    // Non-destructive: clears only the cached mirror of cloud data, preserving
+    // the pending-sync queue + drafts (clearLocalData() would wipe unsynced work).
+    await OfflineService.instance.clearCachedData();
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Cache cleared')),

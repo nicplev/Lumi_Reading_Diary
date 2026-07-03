@@ -439,9 +439,10 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
 
       if (!mounted) return;
 
+      debugPrint('Report generation failed: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error generating report: $e'),
+          content: const Text("Couldn't generate the report. Please try again."),
           backgroundColor: AppColors.error,
           duration: const Duration(seconds: 3),
         ),
@@ -457,9 +458,10 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
     } catch (e) {
       if (!mounted) return;
 
+      debugPrint('Report share failed: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error sharing report: $e'),
+          content: const Text("Couldn't share the report. Please try again."),
           backgroundColor: AppColors.error,
         ),
       );
@@ -474,9 +476,10 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
     } catch (e) {
       if (!mounted) return;
 
+      debugPrint('Report print failed: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error printing report: $e'),
+          content: const Text("Couldn't print the report. Please try again."),
           backgroundColor: AppColors.error,
         ),
       );

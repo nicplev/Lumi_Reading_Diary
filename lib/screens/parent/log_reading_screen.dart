@@ -269,14 +269,19 @@ class _LogReadingScreenState extends State<LogReadingScreen>
   /// allowed and stats aggregation sums them correctly.
   Future<void> _checkAlreadyLoggedToday() async {
     try {
+      // Only read today's logs — the old query pulled the child's ENTIRE
+      // reading history on every open just to check one day. Bounded by a
+      // date >= start-of-today filter (uses the studentId + date index).
+      final now = DateTime.now();
+      final startOfDay = DateTime(now.year, now.month, now.day);
       final snapshot = await _firebaseService.firestore
           .collection('schools')
           .doc(widget.student.schoolId)
           .collection('readingLogs')
           .where('studentId', isEqualTo: widget.student.id)
+          .where('date', isGreaterThanOrEqualTo: startOfDay)
           .get();
 
-      final now = DateTime.now();
       for (final doc in snapshot.docs) {
         final log = ReadingLogModel.fromFirestore(doc);
         final sameDay = log.date.year == now.year &&
