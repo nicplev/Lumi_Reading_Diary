@@ -417,32 +417,90 @@ export interface ImportResult {
   createdClassNames: string[];
 }
 
+/**
+ * Parse a date-of-birth cell from a CSV import into a valid Date, or null.
+ * Handles ISO `yyyy-mm-dd`, Australian `dd/mm/yyyy` (and `dd-mm-yyyy`, 2-digit
+ * years), and Excel serial numbers. Crucially it NEVER returns an Invalid Date:
+ * `new Date("22/05/2020")` yields Invalid Date, and writing that to Firestore
+ * throws "Value for argument \"seconds\" is not a valid integer", which used to
+ * fail the entire 400-row batch. Unrecognised cells return null so the student
+ * still imports (without a DOB) instead of nuking the import.
+ */
+export function parseImportDate(raw: string | undefined | null): Date | null {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (s === '') return null;
+
+  // Excel serial (days since the 1899-12-30 epoch). Bare integer, plausible range.
+  if (/^\d{1,6}$/.test(s)) {
+    const serial = parseInt(s, 10);
+    if (serial > 0 && serial < 200000) {
+      const d = new Date(Date.UTC(1899, 11, 30) + serial * 86400000);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    return null;
+  }
+
+  // Australian dd/mm/yyyy (or dd-mm-yyyy / dd.mm.yyyy, 2- or 4-digit year).
+  const au = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/);
+  if (au) {
+    const day = parseInt(au[1], 10);
+    const month = parseInt(au[2], 10);
+    let year = parseInt(au[3], 10);
+    if (year < 100) year += year < 50 ? 2000 : 1900;
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      const d = new Date(Date.UTC(year, month - 1, day));
+      // Reject overflow (e.g. 31/02 rolling into March).
+      if (d.getUTCMonth() === month - 1 && d.getUTCDate() === day) return d;
+    }
+    return null;
+  }
+
+  // ISO yyyy-mm-dd.
+  if (/^\d{4}-\d{1,2}-\d{1,2}/.test(s)) {
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // Anything else is ambiguous/locale-dependent — refuse rather than guess.
+  return null;
+}
+
 export async function importStudents(
   schoolId: string,
   rows: CSVRow[],
   createdBy: string
 ): Promise<ImportResult> {
   const result: ImportResult = { successCount: 0, errorCount: 0, errors: [], createdClassNames: [] };
+  const createdClassSet = new Set<string>();
 
-  // Pre-fetch existing classes
-  const classesSnap = await adminDb
-    .collection('schools')
-    .doc(schoolId)
-    .collection('classes')
-    .where('isActive', '==', true)
-    .get();
+  // Pre-fetch existing classes (name → id) and existing students keyed by their
+  // external studentId (for upsert — re-importing the same file must not create
+  // duplicates).
+  const [classesSnap, studentsSnap] = await Promise.all([
+    adminDb.collection('schools').doc(schoolId).collection('classes').where('isActive', '==', true).get(),
+    adminDb.collection('schools').doc(schoolId).collection('students').get(),
+  ]);
 
-  const classMap = new Map<string, string>(); // name → id
+  const classMap = new Map<string, string>(); // lowercased name → id
   classesSnap.docs.forEach((doc) => {
-    classMap.set(doc.data().name?.toLowerCase(), doc.id);
+    const name = doc.data().name;
+    if (typeof name === 'string') classMap.set(name.toLowerCase(), doc.id);
   });
 
-  // Process in batches of 400
+  const studentIdMap = new Map<string, string>(); // external studentId → doc id
+  studentsSnap.docs.forEach((doc) => {
+    const sid = doc.data().studentId;
+    if (typeof sid === 'string' && sid.trim() !== '') studentIdMap.set(sid.trim(), doc.id);
+  });
+
   const BATCH_SIZE = 400;
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     const chunk = rows.slice(i, i + BATCH_SIZE);
     const batch = adminDb.batch();
-    let studentCountDelta = 0;
+    let studentCountDelta = 0; // NEW students only (upserts don't change the count)
+    let committedInChunk = 0;
+    const classesCreatedThisChunk: Array<{ name: string; key: string }> = [];
 
     for (let j = 0; j < chunk.length; j++) {
       const row = chunk[j];
@@ -454,14 +512,24 @@ export async function importStudents(
         continue;
       }
 
-      // Find or create class
-      let classId = classMap.get(row.className.toLowerCase());
+      // Validate the date-of-birth PER ROW, before it can reach the batch —
+      // a bad cell nulls the DOB (with a per-row note) instead of throwing.
+      let dob: Date | null = null;
+      if (row.dateOfBirth && row.dateOfBirth.trim() !== '') {
+        dob = parseImportDate(row.dateOfBirth);
+        if (dob === null) {
+          result.errors.push({
+            row: rowIndex,
+            message: `Unrecognised date of birth "${row.dateOfBirth}" — imported without it (use dd/mm/yyyy or yyyy-mm-dd)`,
+          });
+        }
+      }
+
+      // Find or create the class.
+      const classKey = row.className.toLowerCase();
+      let classId = classMap.get(classKey);
       if (!classId) {
-        const classRef = adminDb
-          .collection('schools')
-          .doc(schoolId)
-          .collection('classes')
-          .doc();
+        const classRef = adminDb.collection('schools').doc(schoolId).collection('classes').doc();
         classId = classRef.id;
         batch.set(classRef, {
           name: row.className,
@@ -473,51 +541,71 @@ export async function importStudents(
           createdAt: new Date(),
           createdBy,
         });
-        classMap.set(row.className.toLowerCase(), classId);
-        result.createdClassNames.push(row.className);
+        classMap.set(classKey, classId);
+        classesCreatedThisChunk.push({ name: row.className, key: classKey });
       }
 
-      const studentRef = adminDb
-        .collection('schools')
-        .doc(schoolId)
-        .collection('students')
-        .doc();
+      const externalId = row.studentId?.trim() || '';
+      const existingDocId = externalId ? studentIdMap.get(externalId) : undefined;
 
-      batch.set(studentRef, {
-        studentId: row.studentId || null,
-        firstName: row.firstName,
-        lastName: row.lastName,
-        classId,
-        schoolId,
-        dateOfBirth: row.dateOfBirth ? new Date(row.dateOfBirth) : null,
-        currentReadingLevel: row.readingLevel || null,
-        parentEmail: row.parentEmail || null,
-        enrollmentStatus: 'not_enrolled',
-        parentIds: [],
-        isActive: true,
-        createdAt: new Date(),
-        enrolledAt: new Date(),
-        createdBy,
-        additionalInfo: row.parentEmail ? { pendingParentEmail: row.parentEmail } : {},
-        levelHistory: [],
-        stats: {
-          totalMinutesRead: 0,
-          totalBooksRead: 0,
-          currentStreak: 0,
-          longestStreak: 0,
-          averageMinutesPerDay: 0,
-          totalReadingDays: 0,
-        },
-      });
+      if (existingDocId) {
+        // Upsert: merge only the CSV-editable fields so re-import updates the
+        // student in place without resetting stats / parentIds / enrollment.
+        const studentRef = adminDb.collection('schools').doc(schoolId).collection('students').doc(existingDocId);
+        batch.set(
+          studentRef,
+          {
+            firstName: row.firstName,
+            lastName: row.lastName,
+            classId,
+            dateOfBirth: dob,
+            currentReadingLevel: row.readingLevel || null,
+            parentEmail: row.parentEmail || null,
+            updatedAt: new Date(),
+          },
+          { merge: true }
+        );
+        batch.update(
+          adminDb.collection('schools').doc(schoolId).collection('classes').doc(classId),
+          { studentIds: FieldValue.arrayUnion(existingDocId) }
+        );
+      } else {
+        const studentRef = adminDb.collection('schools').doc(schoolId).collection('students').doc();
+        batch.set(studentRef, {
+          studentId: externalId || null,
+          firstName: row.firstName,
+          lastName: row.lastName,
+          classId,
+          schoolId,
+          dateOfBirth: dob,
+          currentReadingLevel: row.readingLevel || null,
+          parentEmail: row.parentEmail || null,
+          enrollmentStatus: 'not_enrolled',
+          parentIds: [],
+          isActive: true,
+          createdAt: new Date(),
+          enrolledAt: new Date(),
+          createdBy,
+          additionalInfo: row.parentEmail ? { pendingParentEmail: row.parentEmail } : {},
+          levelHistory: [],
+          stats: {
+            totalMinutesRead: 0,
+            totalBooksRead: 0,
+            currentStreak: 0,
+            longestStreak: 0,
+            averageMinutesPerDay: 0,
+            totalReadingDays: 0,
+          },
+        });
+        batch.update(
+          adminDb.collection('schools').doc(schoolId).collection('classes').doc(classId),
+          { studentIds: FieldValue.arrayUnion(studentRef.id) }
+        );
+        if (externalId) studentIdMap.set(externalId, studentRef.id);
+        studentCountDelta++;
+      }
 
-      // Add student to class
-      batch.update(
-        adminDb.collection('schools').doc(schoolId).collection('classes').doc(classId),
-        { studentIds: FieldValue.arrayUnion(studentRef.id) }
-      );
-
-      studentCountDelta++;
-      result.successCount++;
+      committedInChunk++;
     }
 
     if (studentCountDelta > 0) {
@@ -528,11 +616,22 @@ export async function importStudents(
 
     try {
       await batch.commit();
+      // Only now that the write landed do we count successes and report the
+      // classes that were actually created (no phantom classes on failure).
+      result.successCount += committedInChunk;
+      for (const c of classesCreatedThisChunk) {
+        if (!createdClassSet.has(c.key)) {
+          createdClassSet.add(c.key);
+          result.createdClassNames.push(c.name);
+        }
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Batch write failed';
       result.errors.push({ row: i + 1, message: `Batch error: ${message}` });
-      result.errorCount += chunk.length;
-      result.successCount -= chunk.length;
+      result.errorCount += committedInChunk;
+      // Roll back the in-memory class additions so a later chunk / retry can
+      // recreate them (they weren't actually written).
+      for (const c of classesCreatedThisChunk) classMap.delete(c.key);
     }
   }
 
