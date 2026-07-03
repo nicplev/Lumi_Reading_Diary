@@ -247,10 +247,18 @@ export const enrollLinkedPhoneAsMfa = fns
     const role = data?.role === "parent" || data?.role === "teacher" ?
       data.role :
       null;
+    // Derive the email from the VERIFIED auth token, never from client `data`.
+    // Trusting data.email let a caller write an arbitrary email onto their
+    // membership doc and, worse, poison userSchoolIndex/{sha256(email)} for an
+    // address they don't own (hijacking that email's login school resolution).
+    // The token email is the address this account actually authenticated with.
+    const tokenEmail = optStr(
+      (context.auth?.token as {email?: unknown} | undefined)?.email,
+    );
     const ctx: FinalizeContext | null = role ? {
       schoolId: optStr(data?.schoolId) ?? "",
       fullName: optStr(data?.fullName) ?? "",
-      email: optStr(data?.email),
+      email: tokenEmail ?? optStr(data?.email),
       phoneE164: rawPhone,
       relationshipLabel: optStr(data?.relationshipLabel),
       linkCode: optStr(data?.linkCode),
