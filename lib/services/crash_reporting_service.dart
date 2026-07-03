@@ -49,7 +49,9 @@ class CrashReportingService {
 
     try {
       await _crashlytics.setUserIdentifier(userId);
-      debugPrint('Crash reporting user ID set: $userId');
+      if (kDebugMode) {
+        debugPrint('Crash reporting user ID set: $userId');
+      }
     } catch (e) {
       debugPrint('Error setting user ID for crash reporting: $e');
     }
