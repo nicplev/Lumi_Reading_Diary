@@ -416,6 +416,27 @@ class OfflineService with WidgetsBindingObserver {
     await _enqueueAndPersist(sync);
   }
 
+  /// Queue the child's feeling for a log that couldn't be patched online. Keyed
+  /// by logId so re-picking a feeling supersedes the last queued one.
+  Future<void> enqueueChildFeeling({
+    required String logId,
+    required String schoolId,
+    required String feeling,
+  }) async {
+    final sync = PendingSync(
+      id: 'feeling_$logId',
+      type: SyncType.childFeeling,
+      action: SyncAction.update,
+      data: {
+        'logId': logId,
+        'schoolId': schoolId,
+        'feeling': feeling,
+      },
+      createdAt: DateTime.now(),
+    );
+    await _enqueueAndPersist(sync);
+  }
+
   /// Queue a comprehension-audio upload composed offline (or that failed
   /// online and is falling back to the queue). The handler reads the file
   /// from [localFilePath], pushes it to [storagePath], then patches the
@@ -768,6 +789,9 @@ class OfflineService with WidgetsBindingObserver {
       case SyncType.parentPrefs:
         await _syncParentPrefs(item);
         break;
+      case SyncType.childFeeling:
+        await _syncChildFeeling(item);
+        break;
     }
   }
 
@@ -780,6 +804,8 @@ class OfflineService with WidgetsBindingObserver {
       case SyncType.comprehensionAudioUpload:
         return 1;
       case SyncType.parentComment:
+        return 2;
+      case SyncType.childFeeling:
         return 2;
       case SyncType.commentReply:
         return 3;
@@ -993,6 +1019,30 @@ class OfflineService with WidgetsBindingObserver {
         // The target log hasn't reached the server yet (its own create may
         // still be backing off). Keep retrying rather than quarantining —
         // re-thrown as a plain Exception so it's classified transient.
+        throw Exception('Target log $logId not yet present; will retry');
+      }
+      rethrow;
+    }
+  }
+
+  /// Replay a child feeling queued offline: patch `childFeeling` onto the log.
+  Future<void> _syncChildFeeling(PendingSync pendingSync) async {
+    final logId = pendingSync.data['logId'] as String?;
+    final schoolId = pendingSync.data['schoolId'] as String?;
+    final feeling = pendingSync.data['feeling'] as String?;
+    if (logId == null || schoolId == null || feeling == null) {
+      throw Exception('Missing logId/schoolId/feeling for child feeling sync');
+    }
+    final logRef = _firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('readingLogs')
+        .doc(logId);
+    try {
+      await logRef.update({'childFeeling': feeling});
+    } on FirebaseException catch (e) {
+      if (e.code == 'not-found') {
+        // Target log's own create may still be draining — retry, don't park.
         throw Exception('Target log $logId not yet present; will retry');
       }
       rethrow;
@@ -1338,6 +1388,7 @@ enum SyncType {
   parentComment,
   commentReply,
   parentPrefs,
+  childFeeling,
 }
 
 enum SyncAction {

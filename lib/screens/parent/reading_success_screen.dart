@@ -36,6 +36,9 @@ class ReadingSuccessScreen extends ConsumerStatefulWidget {
   final UserModel parent;
   final ReadingLogModel readingLog;
   final Map<String, dynamic>? updatedStats;
+  /// True when the log was queued offline (no server stats yet). The screen
+  /// then shows a "will sync" note and softens the server-computed night count.
+  final bool savedOffline;
 
   /// True when this log bridged a missed night via rest-day tolerance.
   final bool restDayApplied;
@@ -46,6 +49,7 @@ class ReadingSuccessScreen extends ConsumerStatefulWidget {
     required this.parent,
     required this.readingLog,
     this.updatedStats,
+    this.savedOffline = false,
     this.restDayApplied = false,
   });
 
@@ -445,9 +449,15 @@ class _ReadingSuccessScreenState extends ConsumerState<ReadingSuccessScreen>
 
                       const SizedBox(height: 8),
 
-                      // Night count
+                      // Night count — or, for an offline write, a "will sync"
+                      // note: the server-computed night count isn't available
+                      // yet (updatedStats is null offline), so showing it would
+                      // be stale / off-by-one.
                       Text(
-                        'Night $_totalNights complete',
+                        widget.savedOffline
+                            ? "Saved — we'll sync it when you're back online"
+                            : 'Night $_totalNights complete',
+                        textAlign: TextAlign.center,
                         style: LumiType.bodyL.copyWith(color: LumiTokens.muted),
                       ).animate().fadeIn(delay: 400.ms),
 

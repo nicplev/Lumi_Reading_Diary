@@ -328,9 +328,19 @@ class ReadingLogService {
     ReadingLogModel log,
     ReadingFeeling feeling,
   ) async {
-    await _logRef(log).update({
-      'childFeeling': feeling.toString().split('.').last,
-    });
+    final feelingName = feeling.toString().split('.').last;
+    // Offline: queue it (like attachComment / attachComprehension) so the
+    // child's feeling isn't silently lost when there's no connection — it was
+    // the only attach* method without an offline fallback.
+    if (!ServiceStatusController.instance.current.canWriteToFirebase) {
+      await OfflineService.instance.enqueueChildFeeling(
+        logId: log.id,
+        schoolId: log.schoolId,
+        feeling: feelingName,
+      );
+      return;
+    }
+    await _logRef(log).update({'childFeeling': feelingName});
   }
 
   /// Patches parent-comment fields onto an already-saved log document.

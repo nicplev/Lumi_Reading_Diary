@@ -88,7 +88,7 @@ class ComprehensionRecordingStep extends StatefulWidget {
 }
 
 class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   static const int _maxDurationSec = 60;
   static const int _warningAtSec = 55;
 
@@ -117,7 +117,25 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _tryRestoreDraft();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Backgrounding mid-record can truncate/corrupt the capture on iOS, and the
+    // preview player keeps running unheard. Stop the recording (preserving what
+    // was captured, in the confirm state) and pause playback when we leave the
+    // foreground.
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      if (_state == _RecordingState.recording) {
+        _stopRecording(autoStopped: true);
+      }
+      if (_playerIsPlaying) {
+        _player?.pause();
+      }
+    }
   }
 
   Future<void> _tryRestoreDraft() async {
@@ -134,6 +152,7 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _elapsedTimer?.cancel();
     _countdownTimer?.cancel();
     _amplitudeSub?.cancel();
@@ -186,8 +205,11 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
   }
 
   Future<void> _beginRecording() async {
-    final tempDir = await getTemporaryDirectory();
-    final path = '${tempDir.path}/comprehension_${widget.logId}.m4a';
+    // Write to the Documents directory, not getTemporaryDirectory(): iOS can
+    // reclaim the temp cache before an OFFLINE-queued upload drains, silently
+    // losing the recording. Documents persists until we explicitly delete it.
+    final dir = await getApplicationDocumentsDirectory();
+    final path = '${dir.path}/comprehension_${widget.logId}.m4a';
 
     await _recorder.start(
       const RecordConfig(
