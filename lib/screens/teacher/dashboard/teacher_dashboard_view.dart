@@ -436,38 +436,15 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
       final yesterday = today.subtract(const Duration(days: 1));
       final totalStudents = widget.selectedClass.studentIds.length;
 
-      // Fetch yesterday's logs for insight
-      final yesterdayLogs = await FirebaseService.instance.firestore
-          .collection('schools')
-          .doc(schoolId)
-          .collection('readingLogs')
-          .where('classId', isEqualTo: widget.selectedClass.id)
-          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(yesterday))
-          .where('date', isLessThan: Timestamp.fromDate(today))
-          .get();
-
-      final yesterdayStudents = yesterdayLogs.docs
-          .map((d) {
-            final data = d.data();
-            return data['studentId'] as String?;
-          })
-          .whereType<String>()
-          .toSet();
-
-      String? insight;
-      if (totalStudents > 0 && yesterdayStudents.length == totalStudents) {
-        insight = 'Everyone read yesterday!';
-      } else if (totalStudents > 0 && yesterdayStudents.isNotEmpty) {
-        final pct = (yesterdayStudents.length / totalStudents * 100).round();
-        insight = '$pct% of ${widget.selectedClass.name} read yesterday';
-      }
-
-      // Compute class streak + momentum with a single 30-day query
       final startOfWeek =
           DateTime(now.year, now.month, now.day - (now.weekday - 1));
       final startOfLastWeek = startOfWeek.subtract(const Duration(days: 7));
       final thirtyDaysAgo = today.subtract(const Duration(days: 30));
 
+      // ONE 30-day whole-class query feeds all of: yesterday's insight and the
+      // this-week/last-week momentum. Previously a separate yesterday-only query
+      // ran first — redundant, since the 30-day window already covers it, so a
+      // big-class dashboard did two full scans per class switch instead of one.
       final recentLogs = await FirebaseService.instance.firestore
           .collection('schools')
           .doc(schoolId)
@@ -477,22 +454,31 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
               isGreaterThanOrEqualTo: Timestamp.fromDate(thirtyDaysAgo))
           .get();
 
-      // Build set of students per week for momentum
+      final Set<String> yesterdayStudents = {};
       final Set<String> thisWeekStudents = {};
       final Set<String> lastWeekStudents = {};
 
       for (final doc in recentLogs.docs) {
         final data = doc.data();
         final date = (data['date'] as Timestamp).toDate();
-
         final studentId = data['studentId'] as String?;
-        if (studentId != null) {
-          if (!date.isBefore(startOfWeek)) {
-            thisWeekStudents.add(studentId);
-          } else if (!date.isBefore(startOfLastWeek)) {
-            lastWeekStudents.add(studentId);
-          }
+        if (studentId == null) continue;
+        if (!date.isBefore(yesterday) && date.isBefore(today)) {
+          yesterdayStudents.add(studentId);
         }
+        if (!date.isBefore(startOfWeek)) {
+          thisWeekStudents.add(studentId);
+        } else if (!date.isBefore(startOfLastWeek)) {
+          lastWeekStudents.add(studentId);
+        }
+      }
+
+      String? insight;
+      if (totalStudents > 0 && yesterdayStudents.length == totalStudents) {
+        insight = 'Everyone read yesterday!';
+      } else if (totalStudents > 0 && yesterdayStudents.isNotEmpty) {
+        final pct = (yesterdayStudents.length / totalStudents * 100).round();
+        insight = '$pct% of ${widget.selectedClass.name} read yesterday';
       }
 
       int? momentum;
