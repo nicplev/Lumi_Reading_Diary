@@ -61,16 +61,20 @@ class _DashboardUnreadCommentsCardState
   }
 
   void _initStream() {
-    // Reuse the (classId, date desc) index the Recent Reading card relies on,
-    // then filter to unread parent comments client-side — keeps this widget
-    // index-free. Recent comments sit on recent logs, so a window of the latest
-    // logs captures them.
+    // Order by lastCommentAt (not log date): a parent can reply on an OLDER
+    // log, and ordering by log date meant those replies fell outside the window
+    // for a busy class (80 logs ≈ under a day) — the card showed "Up to date"
+    // while the teacher missed replies. Ordering by comment time surfaces the
+    // most recently-commented logs regardless of log age. `orderBy` excludes
+    // logs with no comment (null lastCommentAt), so this only ever returns
+    // commented logs, which we then filter to unread-by-teacher client-side.
+    // Needs the (classId ASC, lastCommentAt DESC) composite index.
     _logsStream = FirebaseService.instance.firestore
         .collection('schools')
         .doc(widget.schoolId)
         .collection('readingLogs')
         .where('classId', isEqualTo: widget.classModel.id)
-        .orderBy('date', descending: true)
+        .orderBy('lastCommentAt', descending: true)
         .limit(80)
         .snapshots();
   }
