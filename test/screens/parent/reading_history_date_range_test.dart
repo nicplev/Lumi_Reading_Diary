@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lumi_reading_tracker/screens/parent/library/book_history_item.dart';
 import 'package:lumi_reading_tracker/screens/parent/reading_history_screen.dart';
 
 void main() {
@@ -22,10 +23,10 @@ void main() {
       expect(nextMonthStart, DateTime(2026, 4, 1));
     });
 
-    test('formatDurationMinutes produces compact readable strings', () {
-      expect(ReadingHistoryDateRange.formatDurationMinutes(15), '15m');
-      expect(ReadingHistoryDateRange.formatDurationMinutes(60), '1h');
-      expect(ReadingHistoryDateRange.formatDurationMinutes(95), '1h 35m');
+    test('formatReadingDuration produces compact readable strings', () {
+      expect(formatReadingDuration(15), '15m');
+      expect(formatReadingDuration(60), '1h');
+      expect(formatReadingDuration(95), '1h 35m');
     });
   });
 }
