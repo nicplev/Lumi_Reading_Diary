@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import '../core/services/assert_writable.dart';
+import '../core/services/functions_instance.dart';
 import '../data/models/school_code_model.dart';
 
 /// Exception thrown when school code validation fails
@@ -49,51 +51,45 @@ class SchoolCodeService {
       );
     }
 
-    // Source.server: bypass the offline cache. A freshly-rotated code won't
-    // be in the local cache, and a stale "no match" cache entry from a prior
-    // attempt would otherwise permanently block a valid code.
-    // Retry once on transient `unavailable` — the first server hit after a
-    // cold-start often errors; the immediate retry succeeds.
-    QuerySnapshot<Map<String, dynamic>> querySnapshot;
+    // Verify server-side by EXACT code (verifySchoolCode callable). Replaces
+    // the client `where('code','==',x)` query, which required an unauthenticated
+    // `list` rule on schoolCodes that let anyone paginate and harvest every
+    // active join code. The callable mirrors SchoolCodeModel.isValid /
+    // invalidReason and returns only the single matching school.
     try {
-      querySnapshot = await _firestore
-          .collection(_collectionName)
-          .where('code', isEqualTo: normalizedCode)
-          .limit(1)
-          .get(const GetOptions(source: Source.server));
-    } on FirebaseException catch (e) {
-      if (e.code != 'unavailable') rethrow;
-      await Future<void>.delayed(const Duration(milliseconds: 400));
-      querySnapshot = await _firestore
-          .collection(_collectionName)
-          .where('code', isEqualTo: normalizedCode)
-          .limit(1)
-          .get(const GetOptions(source: Source.server));
-    }
-
-    if (querySnapshot.docs.isEmpty) {
+      final callable = lumiFunctions.httpsCallable('verifySchoolCode');
+      final result =
+          await callable.call<Object?>(<String, dynamic>{'code': normalizedCode});
+      final data = result.data;
+      if (data is! Map) {
+        throw SchoolCodeException(
+          'This school code is no longer valid',
+          'code_invalid',
+        );
+      }
+      final map = data.map((key, value) => MapEntry(key.toString(), value));
+      return {
+        'schoolId': (map['schoolId'] as String?) ?? '',
+        'schoolName': (map['schoolName'] as String?) ?? '',
+        'codeId': (map['codeId'] as String?) ?? '',
+      };
+    } on FirebaseFunctionsException catch (e) {
+      // Transient network: let the caller's FirebaseException handler surface
+      // the offline message (FirebaseFunctionsException is a FirebaseException).
+      if (e.code == 'unavailable') rethrow;
+      final details = e.details;
+      String? kind;
+      if (details is Map) {
+        final rawKind = details['kind'];
+        if (rawKind is String) kind = rawKind;
+      }
+      // The callable's HttpsError message is already the friendly, user-facing
+      // text (mirrors invalidReason / the not-found copy).
       throw SchoolCodeException(
-        'Invalid school code. Please check the code and try again.',
-        'code_not_found',
+        e.message ?? 'This school code is no longer valid',
+        kind ?? 'code_invalid',
       );
     }
-
-    final codeDoc = querySnapshot.docs.first;
-    final schoolCode = SchoolCodeModel.fromFirestore(codeDoc);
-
-    // Check if code is valid
-    if (!schoolCode.isValid) {
-      throw SchoolCodeException(
-        schoolCode.invalidReason ?? 'This school code is no longer valid',
-        'code_invalid',
-      );
-    }
-
-    return {
-      'schoolId': schoolCode.schoolId,
-      'schoolName': schoolCode.schoolName,
-      'codeId': schoolCode.id,
-    };
   }
 
   /// Increments the usage count for a school code

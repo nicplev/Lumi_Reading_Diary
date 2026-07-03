@@ -86,6 +86,33 @@ class StudentLinkCodeModel {
     );
   }
 
+  /// Builds a model from the `verifyStudentLinkCode` callable's response
+  /// payload (a plain map, not a Firestore document). The callable only returns
+  /// codes that already passed the active/not-expired validation, so `status`
+  /// is [LinkCodeStatus.active]. Fields the confirmation UI doesn't need
+  /// (createdBy, intendedFor, …) fall back to defaults.
+  factory StudentLinkCodeModel.fromVerifyPayload(Map<String, dynamic> data) {
+    final rawExpires = data['expiresAt'];
+    final resolvedExpiresAt = rawExpires is String
+        ? (DateTime.tryParse(rawExpires) ??
+            DateTime.now().add(const Duration(days: 365)))
+        : DateTime.now().add(const Duration(days: 365));
+    final rawMetadata = data['metadata'];
+    return StudentLinkCodeModel(
+      id: (data['id'] as String?) ?? '',
+      studentId: (data['studentId'] as String?) ?? '',
+      schoolId: (data['schoolId'] as String?) ?? '',
+      code: (data['code'] as String?) ?? '',
+      status: LinkCodeStatus.active,
+      createdAt: DateTime.now(),
+      expiresAt: resolvedExpiresAt,
+      createdBy: '',
+      metadata: rawMetadata is Map
+          ? rawMetadata.map((k, v) => MapEntry(k.toString(), v))
+          : null,
+    );
+  }
+
   Map<String, dynamic> toFirestore() {
     return {
       'studentId': studentId,
