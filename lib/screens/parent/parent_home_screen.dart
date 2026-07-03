@@ -627,6 +627,19 @@ class _TodayCardState extends State<_TodayCard> {
   /// Records a default reading log for today in a single tap (Rec 1).
   Future<void> _handleQuickLog() async {
     if (_isQuickLogging) return;
+    // Access gate: the quick-log write bypasses the /parent/log-reading route's
+    // hasActiveAccess check, so when a school's licence lapses the parent would
+    // otherwise hit an endless "Couldn't log reading" loop. Route to the gate,
+    // which the router renders as AccessLockedScreen with a clear reason.
+    if (!student.hasActiveAccess) {
+      NavigationStateService().setTempData({
+        'parent': widget.parent,
+        'student': student,
+        'allocations': activeAllocations,
+      });
+      context.push('/parent/log-reading');
+      return;
+    }
     setState(() => _isQuickLogging = true);
     try {
       final result = await ReadingLogService.instance.logReading(
@@ -1294,6 +1307,12 @@ class _TonightRowState extends State<_TonightRow> {
 
   Future<void> _quickLog(List<AllocationModel> allocations) async {
     if (_isQuickLogging) return;
+    // Access gate — route to the log-reading gate (→ AccessLockedScreen) rather
+    // than attempting a write the licence no longer permits (endless retry).
+    if (!widget.student.hasActiveAccess) {
+      _openDetail(allocations);
+      return;
+    }
     setState(() => _isQuickLogging = true);
     try {
       final result = await ReadingLogService.instance.logReading(
