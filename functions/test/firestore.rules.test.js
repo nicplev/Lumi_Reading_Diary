@@ -46,7 +46,7 @@ function unauthDb() {
   return testEnv.unauthenticatedContext().firestore();
 }
 
-test('schoolCodes: unauthenticated validation query is bounded to limit(1)', async () => {
+test('schoolCodes: unauthenticated reads are denied (verification is server-side)', async () => {
   await seedData(async (db) => {
     await db.collection('schoolCodes').doc('code_1').set({
       code: 'ABC123',
@@ -59,12 +59,15 @@ test('schoolCodes: unauthenticated validation query is bounded to limit(1)', asy
     });
   });
 
-  await assertSucceeds(
+  // The old bounded unauthenticated `list` rule is gone — verification now
+  // goes through the verifySchoolCode callable. Both the exact-code query and
+  // a filter-less pagination attempt must be denied.
+  await assertFails(
     unauthDb().collection('schoolCodes').where('code', '==', 'ABC123').limit(1).get(),
   );
 
   await assertFails(
-    unauthDb().collection('schoolCodes').where('code', '==', 'ABC123').limit(2).get(),
+    unauthDb().collection('schoolCodes').limit(1).get(),
   );
 });
 
@@ -283,12 +286,16 @@ test('studentLinkCodes: parent verification query is bounded and role writes are
     });
   });
 
-  await assertSucceeds(
+  // The old bounded unauthenticated `list` rule is gone — verification now
+  // goes through the verifyStudentLinkCode callable. Both the exact-code query
+  // and a filter-less pagination attempt (the enumeration vector) must be
+  // denied to anonymous callers.
+  await assertFails(
     unauthDb().collection('studentLinkCodes').where('code', '==', 'ZXCV1234').limit(10).get(),
   );
 
   await assertFails(
-    unauthDb().collection('studentLinkCodes').where('code', '==', 'ZXCV1234').limit(11).get(),
+    unauthDb().collection('studentLinkCodes').limit(10).get(),
   );
 
   const parentDb = authDb('parent_1');
