@@ -1123,25 +1123,39 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     final assignmentService = IsbnAssignmentService();
     var keptCount = 0;
     var alreadyCount = 0;
+    var failedCount = 0;
 
+    // Per-book try/catch so one failure (e.g. offline mid-loop) doesn't abort
+    // the rest and leave a silent partial renew — report exactly what happened.
     for (final entry in selected) {
-      final result = await assignmentService.reassignBooksToNextCycle(
-        schoolId: widget.student.schoolId,
-        classId: widget.student.classId,
-        studentId: widget.student.id,
-        teacherId: widget.teacher.id,
-        itemsToKeep: [entry.item],
-        sourceAllocationId: entry.allocationId,
-        targetMinutes: entry.targetMinutes,
-      );
-      keptCount += result.keptCount;
-      alreadyCount += result.alreadyAssignedCount;
+      try {
+        final result = await assignmentService.reassignBooksToNextCycle(
+          schoolId: widget.student.schoolId,
+          classId: widget.student.classId,
+          studentId: widget.student.id,
+          teacherId: widget.teacher.id,
+          itemsToKeep: [entry.item],
+          sourceAllocationId: entry.allocationId,
+          targetMinutes: entry.targetMinutes,
+        );
+        keptCount += result.keptCount;
+        alreadyCount += result.alreadyAssignedCount;
+      } catch (_) {
+        failedCount++;
+      }
     }
 
     if (!mounted) return;
-    final message = alreadyCount > 0
-        ? '$keptCount book(s) kept for next week ($alreadyCount already assigned).'
-        : '$keptCount book(s) kept for next week.';
+    final String message;
+    if (failedCount == 0) {
+      message = alreadyCount > 0
+          ? '$keptCount book(s) kept for next week ($alreadyCount already assigned).'
+          : '$keptCount book(s) kept for next week.';
+    } else if (keptCount == 0) {
+      message = "Couldn't renew books. Please try again.";
+    } else {
+      message = '$keptCount book(s) kept, $failedCount failed — please retry.';
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
