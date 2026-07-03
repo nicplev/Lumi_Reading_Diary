@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/inline_stream_error.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../theme/lumi_tokens.dart';
@@ -147,6 +148,9 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
           StreamBuilder<QuerySnapshot>(
             stream: _weeklyStream,
             builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return const InlineStreamError(message: "Couldn't load this week's reading.");
+              }
               final logs = snapshot.data?.docs
                       .map((doc) => ReadingLogModel.fromFirestore(doc))
                       .toList() ??

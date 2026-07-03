@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/inline_stream_error.dart';
 
 import '../../../../theme/lumi_tokens.dart';
 import '../../../../theme/lumi_typography.dart';
@@ -144,6 +145,9 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
     return StreamBuilder<QuerySnapshot>(
       stream: _logsStream,
       builder: (context, logsSnapshot) {
+        if (logsSnapshot.hasError) {
+          return const InlineStreamError(message: "Couldn't load today's reading.");
+        }
         final logs = logsSnapshot.data?.docs
                 .map((doc) => ReadingLogModel.fromFirestore(doc))
                 .toList() ??
