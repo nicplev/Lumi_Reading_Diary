@@ -165,23 +165,42 @@ class ParentLinkingService {
   }
 
   // Create a co-parent invite code that an already-linked guardian can share
-  // with another guardian (e.g. a separated parent). The requester must
-  // already be linked to [studentId]; firestore.rules enforces this.
+  // with another guardian (e.g. a separated parent).
+  //
+  // Generation runs SERVER-side (createCoParentInvite callable): the server
+  // verifies the caller is a parent linked to [studentId], generates a unique
+  // code, supersedes any prior active co-parent invite, and writes the
+  // studentLinkCodes doc via the Admin SDK. The client no longer reads/writes
+  // studentLinkCodes here, so the unauthenticated `list` rule and the parent
+  // client-create rule can be removed. [parentUserId] is accepted for source
+  // compatibility but ignored — the server derives identity from auth.
   Future<StudentLinkCodeModel> createCoParentInviteCode({
     required String studentId,
     required String schoolId,
     required String parentUserId,
     int validityDays = 365,
     String? note,
-  }) {
-    return createLinkCode(
-      studentId: studentId,
-      schoolId: schoolId,
-      createdBy: parentUserId,
-      validityDays: validityDays,
-      intendedFor: LinkCodeIntent.coParentInvite,
-      note: note,
+  }) async {
+    assertWritable(
+      opLabel: 'parentLinking.createCoParentInvite',
+      collection: 'studentLinkCodes',
+      operation: 'create',
     );
+    final raw = await _invokeWithRetry(
+      'createCoParentInvite',
+      <String, dynamic>{
+        'schoolId': schoolId,
+        'studentId': studentId,
+        'validityDays': validityDays,
+        if (note != null) 'note': note,
+      },
+    );
+    if (raw is! Map) {
+      throw TransactionFailedException('Could not create co-parent invite.');
+    }
+    return StudentLinkCodeModel.fromVerifyPayload(
+      raw.map((key, value) => MapEntry(key.toString(), value)),
+    ).copyWith(intendedFor: LinkCodeIntent.coParentInvite);
   }
 
   // Generate codes for multiple students
