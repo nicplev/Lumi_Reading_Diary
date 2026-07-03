@@ -574,7 +574,7 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(sentPush
-                          ? 'Test reminder sent to this device'
+                          ? 'Test push sent — it should pop up at the top now'
                           : 'Showing a local preview (push unavailable)'),
                     ),
                   );
