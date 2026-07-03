@@ -63,6 +63,8 @@ void main() {
     setUp(() async {
       offlineService = OfflineService.instance;
       await offlineService.initialize();
+      // No live FirebaseAuth in unit tests — stub the pre-drain token refresh.
+      offlineService.tokenRefreshForTest = () async {};
     });
 
     group('saveReadingLogLocally', () {
@@ -584,11 +586,12 @@ void main() {
         expect(item.lastError, contains('unavailable'));
       });
 
-      test('permanent failure parks the item and stops retrying', () async {
+      test('a genuine permanent failure parks the item and stops retrying',
+          () async {
         goHealthy();
         offlineService.syncOneOverrideForTest = (_) async {
           throw FirebaseException(
-              plugin: 'cloud_firestore', code: 'permission-denied');
+              plugin: 'cloud_firestore', code: 'invalid-argument');
         };
 
         await offlineService.saveReadingLogLocally(_log('rl-perm'));
@@ -604,11 +607,55 @@ void main() {
         offlineService.syncOneOverrideForTest = (_) async {
           attempts++;
           throw FirebaseException(
-              plugin: 'cloud_firestore', code: 'permission-denied');
+              plugin: 'cloud_firestore', code: 'invalid-argument');
         };
         await offlineService.triggerSync();
         expect(attempts, equals(0));
         expect(offlineService.pendingSyncs, hasLength(1));
+      });
+
+      test('permission-denied is retried (not parked) on the first failure',
+          () async {
+        // A cold-start stale-token race surfaces as a transient
+        // permission-denied; parking it immediately would strand a recoverable
+        // write. It must stay queued with backoff on the first failure.
+        goHealthy();
+        offlineService.syncOneOverrideForTest = (_) async {
+          throw FirebaseException(
+              plugin: 'cloud_firestore', code: 'permission-denied');
+        };
+
+        await offlineService.saveReadingLogLocally(_log('rl-pd'));
+        await offlineService.triggerSync();
+
+        offlineService.reloadPendingFromDiskForTest();
+        final item = offlineService.pendingSyncs.single;
+        expect(item.needsAttention, isFalse);
+        expect(item.retryCount, equals(1));
+        expect(item.nextAttemptAt, isNotNull);
+        expect(item.lastError, contains('permission-denied'));
+      });
+
+      test('permission-denied parks once the retry limit is reached', () async {
+        // A persistent permission-denied (a real rules/auth rejection) must
+        // still park — just after the bounded retries, not on the first hit.
+        goHealthy();
+        offlineService.syncOneOverrideForTest = (_) async {
+          throw FirebaseException(
+              plugin: 'cloud_firestore', code: 'permission-denied');
+        };
+
+        await offlineService.saveReadingLogLocally(_log('rl-pd-park'));
+        // Pre-seed the retry count to just below the limit (3) so the next
+        // failure crosses it. nextAttemptAt stays null so the item is eligible.
+        offlineService.pendingSyncs.single.retryCount = 2;
+
+        await offlineService.triggerSync();
+
+        offlineService.reloadPendingFromDiskForTest();
+        final item = offlineService.pendingSyncs.single;
+        expect(item.retryCount, equals(3));
+        expect(item.needsAttention, isTrue);
       });
 
       test('corrupted payload trips the integrity check', () async {

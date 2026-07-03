@@ -6,6 +6,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:crypto/crypto.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/widgets.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -103,6 +104,25 @@ class OfflineService with WidgetsBindingObserver {
   /// it fully replaces the real per-type sync dispatch.
   @visibleForTesting
   Future<void> Function(PendingSync item)? syncOneOverrideForTest;
+
+  /// Override the pre-drain auth-token refresh so specs don't need a live
+  /// FirebaseAuth. When set, it replaces the real forced ID-token refresh.
+  @visibleForTesting
+  Future<void> Function()? tokenRefreshForTest;
+
+  /// Force a fresh ID token before a drain. On cold-start the queue can drain
+  /// before Firebase Auth has minted a token for the restored session; a stale
+  /// token makes Firestore reject writes with a transient `permission-denied`,
+  /// which we'd otherwise mis-classify as permanent and park a recoverable
+  /// write. Best-effort — the caller swallows failures so the drain proceeds.
+  Future<void> _refreshAuthToken() async {
+    final override = tokenRefreshForTest;
+    if (override != null) {
+      await override();
+      return;
+    }
+    await FirebaseAuth.instance.currentUser?.getIdToken(true);
+  }
 
   /// Broadcasts the current pending queue whenever it mutates. Drives the
   /// `pendingSyncProvider` so the global banner and detail sheet update
@@ -622,6 +642,16 @@ class OfflineService with WidgetsBindingObserver {
     _isSyncing = true;
     _broadcastQueue();
 
+    // Refresh the auth token before touching the backend so a cold-start stale
+    // token can't make Firestore reject writes with a transient
+    // `permission-denied`. Non-fatal — a failure here (offline, no user) must
+    // not block the drain; genuine per-item errors still classify correctly.
+    try {
+      await _refreshAuthToken();
+    } catch (e) {
+      debugPrint('[OfflineSync] pre-drain token refresh failed (non-fatal): $e');
+    }
+
     final syncedItems = <String>[];
     var anySuccess = false;
 
@@ -691,7 +721,7 @@ class OfflineService with WidgetsBindingObserver {
       ..lastAttemptAt = DateTime.now()
       ..lastError = _describeError(error);
 
-    if (_isPermanent(error)) {
+    if (_isPermanent(error, item.retryCount)) {
       // Won't succeed on retry (auth/rules/validation). Park it for the user
       // rather than dropping it or hammering the backend forever.
       item.needsAttention = true;
@@ -1161,10 +1191,23 @@ class OfflineService with WidgetsBindingObserver {
     'data-loss',
   };
 
-  bool _isPermanent(Object error) {
+  /// `permission-denied` is normally a genuine rules/auth rejection (permanent),
+  /// but a cold-start stale-token race can produce a TRANSIENT one that a fresh
+  /// token fixes. Give it a few bounded retries (backoff lets the refreshed
+  /// token land) before parking — so a recoverable write isn't stranded. A real
+  /// denial still parks once the retries are exhausted.
+  static const int _permissionDeniedRetryLimit = 3;
+
+  bool _isPermanent(Object error, int retryCount) {
     if (error is ComprehensionAudioMissingException) return true;
-    return error is FirebaseException &&
-        _permanentCodes.contains(error.code);
+    if (error is! FirebaseException) return false;
+    if (error.code == 'permission-denied' &&
+        retryCount < _permissionDeniedRetryLimit) {
+      // Not yet — retry a bounded number of times before treating it as a real
+      // denial. (Still in _permanentCodes, so it parks once the limit is hit.)
+      return false;
+    }
+    return _permanentCodes.contains(error.code);
   }
 
   String _describeError(Object error) {
