@@ -903,14 +903,32 @@ class OfflineService with WidgetsBindingObserver {
     switch (pendingSync.action) {
       case SyncAction.create:
       case SyncAction.update:
-        final existingDoc = await logRef.get();
-        if (existingDoc.exists) {
-          // Conflict (or a re-run after a half-completed sync): resolve by
-          // last-write-wins. The resolver owns the local-copy update.
-          await _resolveReadingLogConflict(log, existingDoc, logRef);
-          resolvedConflict = true;
-        } else {
-          await logRef.set(log.toFirestore());
+        {
+          // Existence check for conflict resolution. For an offline-created log
+          // the doc doesn't exist on the server yet, and a PARENT's get() on a
+          // missing readingLog is DENIED by the rules (they dereference
+          // `resource.data`, which is null for a missing doc → permission-denied,
+          // NOT a clean not-found). Treat a denied/not-found pre-check as "does
+          // not exist yet" and fall through to the create — which the parent IS
+          // allowed to do (linked + live access + parentId == uid). A genuine
+          // permission problem resurfaces on the set() below.
+          DocumentSnapshot<Map<String, dynamic>>? existingDoc;
+          try {
+            existingDoc = await logRef.get();
+          } on FirebaseException catch (e) {
+            if (e.code != 'permission-denied' && e.code != 'not-found') {
+              rethrow;
+            }
+            existingDoc = null;
+          }
+          if (existingDoc != null && existingDoc.exists) {
+            // Conflict (or a re-run after a half-completed sync): resolve by
+            // last-write-wins. The resolver owns the local-copy update.
+            await _resolveReadingLogConflict(log, existingDoc, logRef);
+            resolvedConflict = true;
+          } else {
+            await logRef.set(log.toFirestore());
+          }
         }
         break;
       case SyncAction.delete:
@@ -1013,9 +1031,12 @@ class OfflineService with WidgetsBindingObserver {
     } on FirebaseException catch (e) {
       debugPrint(
           '[CompAudioSync] step=firestore_patch failed logId=$logId code=${e.code} msg=${e.message}');
-      if (e.code == 'not-found') {
-        // The log create hasn't drained yet — re-throw as a generic
-        // Exception so it's classified transient, not permanent.
+      if (e.code == 'not-found' || e.code == 'permission-denied') {
+        // The log create hasn't drained yet, so the doc doesn't exist — and a
+        // parent UPDATE on a missing readingLog is DENIED by the rules
+        // (permission-denied), not a clean not-found. Either way it's transient:
+        // re-throw as a generic Exception so it's classified transient (retry),
+        // and the patch lands once the log create drains (priority 0).
         throw Exception('Target log $logId not yet present; will retry');
       }
       rethrow;
