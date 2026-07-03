@@ -14,7 +14,6 @@ import '../../data/models/class_model.dart';
 import '../../data/models/allocation_model.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../data/providers/user_provider.dart';
-import '../../data/providers/class_by_id_provider.dart';
 import '../../data/providers/student_by_id_provider.dart';
 import '../../services/firebase_service.dart';
 import '../services/navigation_state_service.dart';
@@ -43,7 +42,6 @@ import '../../screens/parent/reading_success_screen.dart';
 import '../../screens/parent/link_child_screen.dart';
 import '../../screens/teacher/teacher_home_screen.dart';
 import '../../screens/teacher/allocation/allocation_screen.dart';
-import '../../screens/teacher/class_detail_screen.dart';
 import '../../screens/teacher/reading_groups_screen.dart';
 import '../../screens/teacher/class_report_screen.dart';
 import '../../screens/teacher/teacher_profile_screen.dart';
@@ -512,18 +510,6 @@ class AppRouter {
         },
       ),
 
-      GoRoute(
-        path: '/teacher/class-detail/:classId',
-        name: 'class-detail',
-        builder: (context, state) => _classScopedTeacherRoute(
-          extra: state.extra,
-          classIdFromPath: state.pathParameters['classId']!,
-          child: (teacher, classModel) => ClassDetailScreen(
-            teacher: teacher,
-            classModel: classModel,
-          ),
-        ),
-      ),
 
       GoRoute(
         path: '/teacher/reading-groups',
@@ -842,58 +828,6 @@ Widget _userScopedRoute({
             user == null ? const LoginScreen() : child(user),
         loading: () => const _RouteLoadingScaffold(),
         error: (_, __) => const LoginScreen(),
-      );
-    },
-  );
-}
-
-/// Builds a teacher route that needs both a [UserModel] and a [ClassModel].
-/// Fast path: both come via `extra`. Otherwise the user resolves from
-/// [userProvider] and the class hydrates from [classByIdProvider] using
-/// [classIdFromPath]. Survives cold-start deep links.
-Widget _classScopedTeacherRoute({
-  required Object? extra,
-  required String classIdFromPath,
-  required Widget Function(UserModel teacher, ClassModel classModel) child,
-}) {
-  final params = extra is Map<String, dynamic> ? extra : null;
-  final extraUser = params?['teacher'] as UserModel?;
-  final extraClass = params?['classModel'] as ClassModel?;
-
-  if (extraUser != null && extraClass != null) {
-    return child(extraUser, extraClass);
-  }
-
-  return Consumer(
-    builder: (context, ref, _) {
-      final userAsync = extraUser != null
-          ? AsyncValue<UserModel?>.data(extraUser)
-          : ref.watch(userProvider);
-      return userAsync.when(
-        loading: () => const _RouteLoadingScaffold(),
-        error: (_, __) => const LoginScreen(),
-        data: (user) {
-          if (user == null) return const LoginScreen();
-          if (extraClass != null) return child(user, extraClass);
-          final schoolId = user.schoolId;
-          if (schoolId == null) {
-            return const _ResourceNotFoundScaffold(message: 'Class not found');
-          }
-          final classAsync = ref.watch(
-            classByIdProvider(
-              (schoolId: schoolId, classId: classIdFromPath),
-            ),
-          );
-          return classAsync.when(
-            loading: () => const _RouteLoadingScaffold(),
-            error: (_, __) => const _ResourceNotFoundScaffold(
-              message: 'Class not found',
-            ),
-            data: (classModel) => classModel == null
-                ? const _ResourceNotFoundScaffold(message: 'Class not found')
-                : child(user, classModel),
-          );
-        },
       );
     },
   );

@@ -107,9 +107,18 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
       });
     } catch (e) {
       debugPrint('Error loading classes: $e');
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
+      // Tell the teacher the load FAILED — otherwise a query error renders the
+      // same "no classes" empty state as a genuinely class-less teacher, who
+      // then assumes their classes vanished.
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Couldn't load your classes. Please try again."),
+        ),
+      );
     }
   }
 

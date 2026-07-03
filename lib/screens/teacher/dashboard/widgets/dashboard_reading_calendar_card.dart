@@ -54,15 +54,18 @@ class _DashboardReadingCalendarCardState
   }
 
   void _initStream() {
-    // Reuse the (classId, date desc) index; take a generous recent window and
-    // bucket by day client-side so no extra Firestore index is needed.
+    // Bound by DATE (the visible _weeks window), not a flat .limit(3000): for a
+    // big class 3000 docs can be under a month, so the older cells silently went
+    // blank. Windowing by date fills every visible day and only fetches the
+    // range currently shown. Uses the (classId, date) index.
+    final cutoff = DateTime.now().subtract(Duration(days: _weeks * 7));
     _logsStream = FirebaseService.instance.firestore
         .collection('schools')
         .doc(widget.schoolId)
         .collection('readingLogs')
         .where('classId', isEqualTo: widget.classModel.id)
+        .where('date', isGreaterThanOrEqualTo: cutoff)
         .orderBy('date', descending: true)
-        .limit(3000)
         .snapshots();
   }
 
@@ -186,6 +189,7 @@ class _DashboardReadingCalendarCardState
       onSelected: (w) => setState(() {
         _weeks = w;
         _selectedDay = null;
+        _initStream(); // re-window the query to the newly chosen range
       }),
       itemBuilder: (_) => [
         for (final w in _weekOptions)
