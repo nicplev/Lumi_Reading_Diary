@@ -68,7 +68,7 @@ test('schoolCodes: unauthenticated validation query is bounded to limit(1)', asy
   );
 });
 
-test('users: teacher can create only own profile doc', async () => {
+test('users: self-provision as teacher is denied (1.3)', async () => {
   await seedData(async (db) => {
     await db.collection('schools').doc('school_1').set({
       name: 'Lumi School',
@@ -81,7 +81,12 @@ test('users: teacher can create only own profile doc', async () => {
 
   const teacherDb = authDb('teacher_1');
 
-  await assertSucceeds(
+  // Self-create of a teacher user doc is DENIED (1.3). The legitimate teacher
+  // signup writes this doc server-side (finalizeTeacher, Admin SDK) after
+  // validating a school code. Self-provisioning was the "become a teacher of
+  // any school → isTeacher() reads the self-authored doc → all children's PII"
+  // escalation.
+  await assertFails(
     teacherDb.collection('schools').doc('school_1').collection('users').doc('teacher_1').set({
       email: 'teacher@example.com',
       fullName: 'Teacher One',
@@ -92,6 +97,7 @@ test('users: teacher can create only own profile doc', async () => {
     }),
   );
 
+  // And of course cannot create anyone else's doc either.
   await assertFails(
     teacherDb.collection('schools').doc('school_1').collection('users').doc('teacher_2').set({
       email: 'other@example.com',
@@ -101,6 +107,43 @@ test('users: teacher can create only own profile doc', async () => {
       createdAt: new Date(),
       isActive: true,
     }),
+  );
+});
+
+test('students: a parent-doc holder cannot self-append to parentIds (1.3)', async () => {
+  // Before 1.3, any account with a parent doc in the school could append its own
+  // UID to ANY student's parentIds (gated only on "has a parent doc", not a
+  // valid link code). That client path was removed — parentIds is written only
+  // by the linkParentToStudent callable (Admin SDK). Prove the client write is
+  // now denied even for a legitimate parent member.
+  await seedData(async (db) => {
+    await db.collection('schools').doc('school_1').set({
+      name: 'Lumi School',
+      createdBy: 'admin_1',
+      teacherCount: 0,
+      parentCount: 1,
+      studentCount: 1,
+    });
+    await db.collection('schools').doc('school_1').collection('parents').doc('parent_1').set({
+      role: 'parent',
+      schoolId: 'school_1',
+      fullName: 'Parent One',
+      linkedChildren: [],
+    });
+    await db.collection('schools').doc('school_1').collection('students').doc('student_1').set({
+      schoolId: 'school_1',
+      classId: 'class_1',
+      firstName: 'Emma',
+      lastName: 'Wilson',
+      parentIds: [],
+    });
+  });
+
+  await assertFails(
+    authDb('parent_1')
+      .collection('schools').doc('school_1')
+      .collection('students').doc('student_1')
+      .update({ parentIds: ['parent_1'] }),
   );
 });
 
