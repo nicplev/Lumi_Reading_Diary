@@ -227,6 +227,35 @@ function alreadyExists(kind: string, message: string) {
   return new functions.https.HttpsError("already-exists", message, {kind});
 }
 
+// Shared validation ladder for a link-code record. Throws the same typed
+// `failed-precondition` errors (with `kind`) that the Flutter client decodes in
+// `_mapHttpsError` (parent_linking_service.dart). Used by both the redeem
+// transaction and the read-only verify callable so the two never drift.
+function assertLinkCodeUsable(fresh: LinkCodeRecord): void {
+  if (fresh.status === "used") {
+    throw failedPrecondition("code-used", "This code has already been used.");
+  }
+  if (fresh.status === "revoked") {
+    throw failedPrecondition(
+      "code-revoked",
+      "This code has been revoked.",
+      fresh.revokeReason !== null ? {reason: fresh.revokeReason} : undefined
+    );
+  }
+  if (fresh.expiresAt === null) {
+    throw failedPrecondition("invalid-code", "Link code is malformed.");
+  }
+  if (fresh.status === "expired" || fresh.expiresAt < new Date()) {
+    throw failedPrecondition("code-expired", "This code has expired.");
+  }
+  if (fresh.status !== "active") {
+    throw failedPrecondition("invalid-code", "Link code is not active.");
+  }
+  if (fresh.schoolId.length === 0 || fresh.studentId.length === 0) {
+    throw failedPrecondition("invalid-code", "Link code is malformed.");
+  }
+}
+
 function permissionDenied(message: string) {
   return new functions.https.HttpsError("permission-denied", message);
 }
@@ -290,28 +319,7 @@ export async function linkParentToStudentCore(
     if (fresh.code !== codeUpper) {
       throw failedPrecondition("invalid-code", "Link code not recognised.");
     }
-    if (fresh.status === "used") {
-      throw failedPrecondition("code-used", "This code has already been used.");
-    }
-    if (fresh.status === "revoked") {
-      throw failedPrecondition(
-        "code-revoked",
-        "This code has been revoked.",
-        fresh.revokeReason !== null ? {reason: fresh.revokeReason} : undefined
-      );
-    }
-    if (fresh.expiresAt === null) {
-      throw failedPrecondition("invalid-code", "Link code is malformed.");
-    }
-    if (fresh.status === "expired" || fresh.expiresAt < new Date()) {
-      throw failedPrecondition("code-expired", "This code has expired.");
-    }
-    if (fresh.status !== "active") {
-      throw failedPrecondition("invalid-code", "Link code is not active.");
-    }
-    if (fresh.schoolId.length === 0 || fresh.studentId.length === 0) {
-      throw failedPrecondition("invalid-code", "Link code is malformed.");
-    }
+    assertLinkCodeUsable(fresh);
 
     // 2. Parent doc must already exist — the client creates it before
     //    calling this. Server never forks doc-shape ownership.
@@ -412,6 +420,51 @@ export const linkParentToStudent = fns
     const codeUpper = asNonEmptyString(data.code, "code").toUpperCase();
     await enforceRateLimit(uid);
     return linkParentToStudentCore(uid, codeUpper);
+  });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Callable: verifyStudentLinkCode  (read-only, exact-code lookup)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Replaces the client-side `where('code','==',x)` query the Flutter app used to
+// run against `studentLinkCodes` (which required an unauthenticated `list` rule
+// that let anyone paginate and harvest every child-link code). This callable
+// looks a code up by EXACT value and returns only that one record's public
+// fields — no enumeration is possible.
+//
+// Intentionally UNAUTHENTICATED: the parent app verifies a code at the very
+// start of registration, before the account exists (see parent_registration_
+// modal.dart). It throws the same typed `failed-precondition` errors (with
+// `kind`) as the redeem path, so the client's existing `_mapHttpsError` handles
+// expired/used/revoked/invalid identically.
+export const verifyStudentLinkCode = fns
+  .runWith(parentLinkingRuntime({timeoutSeconds: 15, memory: "128MB"}))
+  .https.onCall(async (data: {code?: unknown}) => {
+    const codeUpper = asNonEmptyString(data?.code, "code").toUpperCase();
+    const best = await findBestCodeForString(codeUpper);
+    if (!best) {
+      throw failedPrecondition("invalid-code", "Link code not recognised.");
+    }
+    assertLinkCodeUsable(best);
+
+    // Re-read the winning doc for the fields the confirmation UI needs
+    // (student name lives in `metadata`), which `parseCodeDoc` doesn't carry.
+    const snap = await db().collection(COLL_LINK_CODES).doc(best.id).get();
+    const raw = snap.data() ?? {};
+    const metadata =
+      raw.metadata && typeof raw.metadata === "object" ?
+        (raw.metadata as Record<string, unknown>) :
+        {};
+
+    return {
+      ok: true,
+      id: best.id,
+      code: best.code,
+      studentId: best.studentId,
+      schoolId: best.schoolId,
+      expiresAt: best.expiresAt ? best.expiresAt.toISOString() : null,
+      metadata,
+    };
   });
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -80,7 +80,13 @@ export {
 export {
   linkParentToStudent,
   unlinkParentFromStudent,
+  verifyStudentLinkCode,
 } from "./parent_linking";
+
+// Server-side, exact-code verification for parent link codes and school join
+// codes. Replaces the client-side collection queries that required the
+// unauthenticated `list` rules (enumeration risk). See code_verification.ts.
+export {verifySchoolCode} from "./code_verification";
 
 // Access/licensing lifecycle. T1 reacts to subscription changes to recompute
 // school.access + cascade student access. T2 (renewStudents callable) + T4
