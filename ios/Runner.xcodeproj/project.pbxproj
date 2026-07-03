@@ -13,6 +13,7 @@
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
 		5202FDBE2AE7E43B5CEF9A35 /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA9D7768B54EAF7E9E8CFC89 /* Pods_RunnerTests.framework */; };
+		4C9BB81A965D40E8B399CEE4 /* AppIconChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 814EED49BD6D4CE6A0309221 /* AppIconChannel.swift */; };
 		64F08346FA4B32B2ADF52DA2 /* SinglePageDocumentScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70588A8A70CA72B3F6A5BDC1 /* SinglePageDocumentScanner.swift */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		7E85F0A02F87DBE700D49089 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7E85F09F2F87DBE700D49089 /* WidgetKit.framework */; };
@@ -79,6 +80,7 @@
 		B19AC1A0000000000000F001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		6B4AD66C9BA0892211E199C4 /* Pods-RunnerTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.release.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.release.xcconfig"; sourceTree = "<group>"; };
 		70588A8A70CA72B3F6A5BDC1 /* SinglePageDocumentScanner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SinglePageDocumentScanner.swift; sourceTree = "<group>"; };
+		814EED49BD6D4CE6A0309221 /* AppIconChannel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppIconChannel.swift; sourceTree = "<group>"; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Release.xcconfig; path = Flutter/Release.xcconfig; sourceTree = "<group>"; };
@@ -217,6 +219,7 @@
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 				70588A8A70CA72B3F6A5BDC1 /* SinglePageDocumentScanner.swift */,
+				814EED49BD6D4CE6A0309221 /* AppIconChannel.swift */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -567,6 +570,7 @@
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 				64F08346FA4B32B2ADF52DA2 /* SinglePageDocumentScanner.swift in Sources */,
+				4C9BB81A965D40E8B399CEE4 /* AppIconChannel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -661,6 +665,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 7AFA3C8E1D35360C0083082E /* Release.xcconfig */;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIconBlueFace AppIconGreenFace AppIconYellowFace AppIconRedLumi AppIconBlueLumi AppIconLightBlueLumi AppIconGreenLumi AppIconOrangeLumi AppIconPinkLumi AppIconPurpleLumi AppIconYellowLumi";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
@@ -979,6 +984,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9740EEB21CF90195004384FC /* Debug.xcconfig */;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIconBlueFace AppIconGreenFace AppIconYellowFace AppIconRedLumi AppIconBlueLumi AppIconLightBlueLumi AppIconGreenLumi AppIconOrangeLumi AppIconPinkLumi AppIconPurpleLumi AppIconYellowLumi";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
@@ -1005,6 +1011,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 7AFA3C8E1D35360C0083082E /* Release.xcconfig */;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIconBlueFace AppIconGreenFace AppIconYellowFace AppIconRedLumi AppIconBlueLumi AppIconLightBlueLumi AppIconGreenLumi AppIconOrangeLumi AppIconPinkLumi AppIconPurpleLumi AppIconYellowLumi";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
