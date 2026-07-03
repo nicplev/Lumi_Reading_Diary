@@ -81,6 +81,7 @@ export {
   linkParentToStudent,
   unlinkParentFromStudent,
   verifyStudentLinkCode,
+  createCoParentInvite,
 } from "./parent_linking";
 
 // Server-side, exact-code verification for parent link codes and school join

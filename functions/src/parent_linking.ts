@@ -468,6 +468,163 @@ export const verifyStudentLinkCode = fns
   });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Callable: createCoParentInvite  (parent generates a co-parent invite code)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Moves co-parent-invite code generation server-side. The client used to
+// generate the code and write the `studentLinkCodes` doc directly, which
+// required (a) a client `where('code','==',x)` uniqueness read — served only by
+// the unauthenticated `list` rule (the enumeration hole) — and (b) a parent
+// client-create branch in the rules. This callable does both with the Admin SDK
+// (bypassing rules) after verifying the caller is a parent LINKED to the target
+// student, so those rule allowances can be removed.
+
+// Excludes visually-similar chars (mirrors _generateCode in the Flutter app).
+const LINK_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+function generateCandidateCode(): string {
+  let s = "";
+  for (let i = 0; i < 8; i++) {
+    s += LINK_CODE_ALPHABET.charAt(
+      Math.floor(Math.random() * LINK_CODE_ALPHABET.length)
+    );
+  }
+  return s;
+}
+
+async function generateUniqueLinkCode(): Promise<string> {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const candidate = generateCandidateCode();
+    const existing = await db()
+      .collection(COLL_LINK_CODES)
+      .where("code", "==", candidate)
+      .limit(1)
+      .get();
+    if (existing.empty) return candidate;
+  }
+  throw new functions.https.HttpsError(
+    "resource-exhausted",
+    "Could not generate a unique link code."
+  );
+}
+
+interface CreateCoParentInviteInput {
+  schoolId?: unknown;
+  studentId?: unknown;
+  note?: unknown;
+  validityDays?: unknown;
+}
+
+export const createCoParentInvite = fns
+  .runWith(parentLinkingRuntime({timeoutSeconds: 30, memory: "256MB"}))
+  .https.onCall(async (data: CreateCoParentInviteInput, context) => {
+    const {uid} = requireAuthed(context);
+    const schoolId = asNonEmptyString(data.schoolId, "schoolId");
+    const studentId = asNonEmptyString(data.studentId, "studentId");
+    const note = asOptionalString(data.note, "note");
+    const validityDays =
+      typeof data.validityDays === "number" &&
+      data.validityDays > 0 &&
+      data.validityDays <= 3650 ?
+        Math.floor(data.validityDays) :
+        365;
+
+    await enforceRateLimit(uid);
+
+    // Authorization: caller must be a parent of this school linked to the
+    // target student. Mirrors the old rules guard (parent member + already
+    // linked to studentId), now enforced server-side.
+    const parentSnap = await db()
+      .collection("schools").doc(schoolId)
+      .collection("parents").doc(uid)
+      .get();
+    if (!parentSnap.exists) {
+      throw permissionDenied(
+        "Only a linked parent can create a co-parent invite."
+      );
+    }
+    const linkedChildren = Array.isArray(parentSnap.data()?.linkedChildren) ?
+      (parentSnap.data()?.linkedChildren as string[]) :
+      [];
+    if (!linkedChildren.includes(studentId)) {
+      throw permissionDenied("You are not linked to this student.");
+    }
+
+    // Student metadata so the invited co-parent sees the child's name.
+    const studentRef = db()
+      .collection("schools").doc(schoolId)
+      .collection("students").doc(studentId);
+    const studentSnap = await studentRef.get();
+    if (!studentSnap.exists) {
+      throw notFound("student-missing", "Student not found.");
+    }
+    const s = studentSnap.data() ?? {};
+    const firstName = typeof s.firstName === "string" ? s.firstName : "";
+    const lastName = typeof s.lastName === "string" ? s.lastName : "";
+    const metadata = {
+      studentFirstName: firstName,
+      studentLastName: lastName,
+      studentFullName: `${firstName} ${lastName}`.trim(),
+    };
+
+    const code = await generateUniqueLinkCode();
+    const now = admin.firestore.Timestamp.now();
+    const expiresAt = admin.firestore.Timestamp.fromMillis(
+      now.toMillis() + validityDays * 24 * 60 * 60 * 1000
+    );
+
+    // Supersede existing active co_parent_invite codes for this student (one
+    // active invite per student). Staff-issued codes are a different channel
+    // and are left untouched — mirrors createLinkCode's supersede policy.
+    const activeSnap = await db()
+      .collection(COLL_LINK_CODES)
+      .where("studentId", "==", studentId)
+      .where("status", "==", "active")
+      .limit(10)
+      .get();
+
+    const batch = db().batch();
+    for (const doc of activeSnap.docs) {
+      const intendedFor =
+        (doc.data().intendedFor as string | undefined) ?? "staff_issued";
+      if (intendedFor !== "co_parent_invite") continue;
+      batch.update(doc.ref, {
+        status: "revoked",
+        revokedBy: uid,
+        revokedAt: admin.firestore.FieldValue.serverTimestamp(),
+        revokeReason: "Superseded by newly generated link code",
+      });
+    }
+
+    const newRef = db().collection(COLL_LINK_CODES).doc();
+    batch.set(newRef, {
+      studentId,
+      schoolId,
+      code,
+      status: "active",
+      createdAt: now,
+      expiresAt,
+      createdBy: uid,
+      metadata,
+      intendedFor: "co_parent_invite",
+      note: note ?? null,
+    });
+    await batch.commit();
+
+    return {
+      ok: true,
+      id: newRef.id,
+      code,
+      studentId,
+      schoolId,
+      expiresAt: expiresAt.toDate().toISOString(),
+      metadata,
+      intendedFor: "co_parent_invite",
+      note: note ?? null,
+    };
+  });
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Callable: unlinkParentFromStudent
 // ─────────────────────────────────────────────────────────────────────────────
 

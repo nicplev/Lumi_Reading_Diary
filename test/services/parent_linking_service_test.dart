@@ -250,21 +250,23 @@ void main() {
         expect(diff, inInclusiveRange(6, 7));
       });
 
-      test('handles student without existing document gracefully', () async {
-        // School exists but student does not
+      test('refuses to issue a code for a nonexistent student', () async {
+        // School exists but student does not. createLinkCode must refuse —
+        // an orphan code would strand a parent at "student-missing" inside
+        // linkParentToStudent with no recovery path.
         await firestore
             .collection('schools')
             .doc('school_1')
             .set({'name': 'Lumi'});
 
-        final code = await service.createLinkCode(
-          studentId: 'nonexistent_student',
-          schoolId: 'school_1',
-          createdBy: 'admin_1',
+        await expectLater(
+          () => service.createLinkCode(
+            studentId: 'nonexistent_student',
+            schoolId: 'school_1',
+            createdBy: 'admin_1',
+          ),
+          throwsA(isA<StateError>()),
         );
-
-        expect(code.code, hasLength(8));
-        expect(code.metadata, isNull);
       });
     });
 
@@ -317,113 +319,157 @@ void main() {
     // ── verifyCode ──
 
     group('verifyCode', () {
-      test('returns valid active code', () async {
-        await seedLinkCode();
+      // verifyCode now forwards to the verifyStudentLinkCode callable (exact
+      // code lookup) rather than querying studentLinkCodes directly. These
+      // tests cover the client wrapper: it upper-cases the code, forwards it,
+      // builds the model from the payload, and maps the server's typed errors.
+      Map<String, dynamic> verifyPayload({
+        String id = 'code_1',
+        String code = 'QWER5678',
+        String studentId = 'student_1',
+        String schoolId = 'school_1',
+        Map<String, dynamic>? metadata,
+      }) =>
+          <String, dynamic>{
+            'ok': true,
+            'id': id,
+            'code': code,
+            'studentId': studentId,
+            'schoolId': schoolId,
+            'expiresAt':
+                DateTime.now().add(const Duration(days: 30)).toIso8601String(),
+            'metadata':
+                metadata ?? <String, dynamic>{'studentFullName': 'Sam Booker'},
+          };
+
+      void stubVerifyFailure({required String code, String? kind, String? reason}) {
+        invoker.queueFailure(
+          'verifyStudentLinkCode',
+          FirebaseFunctionsException(
+            code: code,
+            message: 'simulated',
+            details: <String, Object?>{
+              if (kind != null) 'kind': kind,
+              if (reason != null) 'reason': reason,
+            },
+          ),
+        );
+      }
+
+      test('returns valid active code from the callable', () async {
+        invoker.queueSuccess('verifyStudentLinkCode', verifyPayload());
 
         final verified = await service.verifyCode('QWER5678');
         expect(verified.code, 'QWER5678');
         expect(verified.status.name, 'active');
+        expect(verified.studentId, 'student_1');
       });
 
-      test('verifies code case-insensitively', () async {
-        await seedLinkCode(code: 'ABCD1234');
+      test('upper-cases the code before forwarding', () async {
+        invoker.queueSuccess(
+            'verifyStudentLinkCode', verifyPayload(code: 'ABCD1234'));
 
-        final verified = await service.verifyCode('abcd1234');
-        expect(verified.code, 'ABCD1234');
+        await service.verifyCode('abcd1234');
+        expect(invoker.calls['verifyStudentLinkCode']!.single['code'],
+            'ABCD1234');
       });
 
-      test('throws InvalidCodeException for nonexistent code', () async {
+      test('maps failed-precondition/invalid-code to InvalidCodeException',
+          () async {
+        stubVerifyFailure(code: 'failed-precondition', kind: 'invalid-code');
         await expectLater(
           () => service.verifyCode('DOESNTEXIST'),
           throwsA(isA<InvalidCodeException>()),
         );
       });
 
-      test('throws CodeAlreadyUsedException for used code', () async {
-        await seedLinkCode(
-          code: 'USED0001',
-          status: 'used',
-          usedBy: 'parent_1',
-        );
-
+      test('maps failed-precondition/code-used to CodeAlreadyUsedException',
+          () async {
+        stubVerifyFailure(code: 'failed-precondition', kind: 'code-used');
         await expectLater(
           () => service.verifyCode('USED0001'),
           throwsA(isA<CodeAlreadyUsedException>()),
         );
       });
 
-      test('throws CodeRevokedException for revoked code', () async {
-        await firestore.collection('studentLinkCodes').doc('revoked_1').set({
-          'studentId': 'student_1',
-          'schoolId': 'school_1',
-          'code': 'REVK0001',
-          'status': 'revoked',
-          'createdBy': 'admin_1',
-          'createdAt': Timestamp.now(),
-          'expiresAt':
-              Timestamp.fromDate(DateTime.now().add(const Duration(days: 30))),
-          'revokedBy': 'admin_1',
-          'revokeReason': 'Student transferred',
-        });
-
+      test('maps failed-precondition/code-revoked to CodeRevokedException',
+          () async {
+        stubVerifyFailure(
+            code: 'failed-precondition',
+            kind: 'code-revoked',
+            reason: 'Student transferred');
         await expectLater(
           () => service.verifyCode('REVK0001'),
           throwsA(isA<CodeRevokedException>()),
         );
       });
 
-      test('throws CodeExpiredException for expired code', () async {
-        await firestore.collection('studentLinkCodes').doc('expired_1').set({
-          'studentId': 'student_1',
-          'schoolId': 'school_1',
-          'code': 'EXPD0001',
-          'status': 'expired',
-          'createdBy': 'admin_1',
-          'createdAt': Timestamp.fromDate(
-              DateTime.now().subtract(const Duration(days: 400))),
-          'expiresAt': Timestamp.fromDate(
-              DateTime.now().subtract(const Duration(days: 35))),
-        });
-
+      test('maps failed-precondition/code-expired to CodeExpiredException',
+          () async {
+        stubVerifyFailure(code: 'failed-precondition', kind: 'code-expired');
         await expectLater(
           () => service.verifyCode('EXPD0001'),
           throwsA(isA<CodeExpiredException>()),
         );
       });
 
-      test('prefers active record when legacy duplicates exist', () async {
-        final now = DateTime.now();
-
-        await firestore.collection('studentLinkCodes').doc('legacy_used').set({
-          'studentId': 'student_1',
-          'schoolId': 'school_1',
-          'code': 'ABCD2345',
-          'status': 'used',
-          'createdBy': 'admin_1',
-          'createdAt':
-              Timestamp.fromDate(now.subtract(const Duration(days: 5))),
-          'expiresAt': Timestamp.fromDate(now.add(const Duration(days: 30))),
-          'usedBy': 'parent_old',
-          'usedAt': Timestamp.fromDate(now.subtract(const Duration(days: 4))),
-        });
-
-        await firestore
-            .collection('studentLinkCodes')
-            .doc('active_latest')
-            .set({
-          'studentId': 'student_1',
-          'schoolId': 'school_1',
-          'code': 'ABCD2345',
-          'status': 'active',
-          'createdBy': 'admin_1',
-          'createdAt':
-              Timestamp.fromDate(now.subtract(const Duration(days: 1))),
-          'expiresAt': Timestamp.fromDate(now.add(const Duration(days: 30))),
-        });
+      test('returns the id carried in the callable payload', () async {
+        invoker.queueSuccess('verifyStudentLinkCode',
+            verifyPayload(id: 'active_latest', code: 'ABCD2345'));
 
         final verified = await service.verifyCode('ABCD2345');
         expect(verified.id, equals('active_latest'));
         expect(verified.status.name, equals('active'));
+      });
+    });
+
+    // ── createCoParentInviteCode ──
+
+    group('createCoParentInviteCode', () {
+      test('forwards schoolId/studentId/validityDays to the callable', () async {
+        invoker.queueSuccess('createCoParentInvite', <String, dynamic>{
+          'ok': true,
+          'id': 'invite_1',
+          'code': 'CPAR5678',
+          'studentId': 'student_1',
+          'schoolId': 'school_1',
+          'expiresAt':
+              DateTime.now().add(const Duration(days: 365)).toIso8601String(),
+          'metadata': <String, dynamic>{'studentFullName': 'Sam Booker'},
+          'intendedFor': 'co_parent_invite',
+        });
+
+        final code = await service.createCoParentInviteCode(
+          studentId: 'student_1',
+          schoolId: 'school_1',
+          parentUserId: 'parent_1',
+        );
+
+        expect(code.code, 'CPAR5678');
+        expect(code.isCoParentInvite, isTrue);
+        final sent = invoker.calls['createCoParentInvite']!.single;
+        expect(sent['schoolId'], 'school_1');
+        expect(sent['studentId'], 'student_1');
+        expect(sent['validityDays'], 365);
+      });
+
+      test('maps permission-denied to TransactionFailedException', () async {
+        invoker.queueFailure(
+          'createCoParentInvite',
+          FirebaseFunctionsException(
+            code: 'permission-denied',
+            message: 'You are not linked to this student.',
+          ),
+        );
+
+        await expectLater(
+          () => service.createCoParentInviteCode(
+            studentId: 'student_1',
+            schoolId: 'school_1',
+            parentUserId: 'parent_1',
+          ),
+          throwsA(isA<TransactionFailedException>()),
+        );
       });
     });
 
