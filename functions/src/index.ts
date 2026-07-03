@@ -2244,6 +2244,21 @@ export const deleteStudentWithCascade = fns.https.onCall(
       );
     }
 
+    // Authorization: caller must be a school admin or teacher of THIS school.
+    // Without this, any signed-in user could delete any child (and cascade-
+    // delete linked parents' Auth accounts) in any school. Mirrors the staff
+    // check in backfillGuardianProfiles.
+    const callerDoc = await db
+      .doc(`schools/${schoolId}/users/${context.auth.uid}`)
+      .get();
+    const callerRole = callerDoc.exists ? callerDoc.data()!.role : null;
+    if (callerRole !== "schoolAdmin" && callerRole !== "teacher") {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "Only school staff can delete students."
+      );
+    }
+
     const studentRef = db.doc(`schools/${schoolId}/students/${studentId}`);
     const studentDoc = await studentRef.get();
     if (!studentDoc.exists) {
@@ -2253,9 +2268,12 @@ export const deleteStudentWithCascade = fns.https.onCall(
     const studentData = studentDoc.data()!;
     const parentIds: string[] = studentData.parentIds ?? [];
 
-    // 1. Clean up each linked parent
+    // 1. Clean up each linked parent. Parent docs live under `parents/`, not
+    //    `users/` (see getUserData in firestore.rules and linkParentToStudent).
+    //    Reading `users/${parentId}` here always missed, so parents were never
+    //    actually cleaned up — the cascade silently `continue`d.
     for (const parentId of parentIds) {
-      const parentRef = db.doc(`schools/${schoolId}/users/${parentId}`);
+      const parentRef = db.doc(`schools/${schoolId}/parents/${parentId}`);
       const parentDoc = await parentRef.get();
       if (!parentDoc.exists) continue;
 
