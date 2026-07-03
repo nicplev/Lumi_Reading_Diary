@@ -187,6 +187,7 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
       CrashReportingService.instance
           .setCustomKey('onboarding_last_step', 'completed');
 
+      if (!mounted) return;
       setState(() {
         _currentStep = 3;
       });
@@ -203,15 +204,18 @@ class _SchoolRegistrationWizardState extends State<SchoolRegistrationWizard> {
         StackTrace.current,
         reason: 'School setup failed during onboarding',
       );
+      if (!mounted) return;
       setState(() {
         _errorMessage =
             'Setup could not be completed. Please review details and retry. '
             'If this keeps failing, use a different admin email and contact support.\n\n$e';
       });
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 

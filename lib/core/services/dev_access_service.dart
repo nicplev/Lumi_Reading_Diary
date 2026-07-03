@@ -99,11 +99,13 @@ class DevAccessService extends ChangeNotifier {
       // Dev access just stays off; no need to pollute logs.
       if (_activeEmail != email) return;
       _setAccess(false);
-      if (e.code != 'unavailable') {
+      if (e.code != 'unavailable' && kDebugMode) {
         debugPrint('[DevAccessService] lookup failed for $email: $e');
       }
     } catch (e, st) {
-      debugPrint('[DevAccessService] lookup failed for $email: $e\n$st');
+      if (kDebugMode) {
+        debugPrint('[DevAccessService] lookup failed for $email: $e\n$st');
+      }
       if (_activeEmail != email) return;
       _setAccess(false);
     }

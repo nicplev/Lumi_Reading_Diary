@@ -528,7 +528,9 @@ class NotificationService {
       final token = await _messaging!.getToken();
       if (token != null) {
         await _persistToken(token, schoolId, userId);
-        debugPrint('FCM token saved for parent $userId in school $schoolId');
+        if (kDebugMode) {
+          debugPrint('FCM token saved for parent $userId in school $schoolId');
+        }
       }
     } catch (e) {
       // APNS token not available on iOS Simulator - expected
