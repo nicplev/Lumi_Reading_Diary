@@ -121,18 +121,38 @@ export function resolvePeriod(
 
 // --- Query Functions ---
 
+type LogDoc = FirebaseFirestore.QueryDocumentSnapshot<FirebaseFirestore.DocumentData>;
+
+/**
+ * Fetch a school's reading logs in [startDate, endDate] ONCE. The analytics
+ * route used to run this identical scan 5× (metrics, trend, class comparison,
+ * top readers, popular books); for a "year" period on a big school that meant
+ * five full-year collection scans per page load → timeouts that surfaced as a
+ * misleading "No data". The route now fetches once and passes the docs to each
+ * aggregator (which still fall back to their own fetch when called standalone).
+ */
+export async function fetchReadingLogsInRange(
+  schoolId: string,
+  startDate: Date,
+  endDate: Date,
+): Promise<LogDoc[]> {
+  const snap = await adminDb
+    .collection('schools').doc(schoolId).collection('readingLogs')
+    .where('date', '>=', startDate)
+    .where('date', '<=', endDate)
+    .get();
+  return snap.docs;
+}
+
 export async function getReadingMetrics(
   schoolId: string,
   startDate: Date,
   endDate: Date,
   weekdaysOnly: boolean = false,
+  prefetchedLogs?: LogDoc[],
 ): Promise<ReadingMetrics> {
   try {
-    const logsSnap = await adminDb
-      .collection('schools').doc(schoolId).collection('readingLogs')
-      .where('date', '>=', startDate)
-      .where('date', '<=', endDate)
-      .get();
+    const logDocs = prefetchedLogs ?? (await fetchReadingLogsInRange(schoolId, startDate, endDate));
 
     let totalMinutes = 0;
     let totalBooks = 0;
@@ -140,7 +160,7 @@ export async function getReadingMetrics(
     let totalLogs = 0;
     const readers = new Set<string>();
 
-    for (const doc of logsSnap.docs) {
+    for (const doc of logDocs) {
       const d = doc.data();
       const logDate: Date = d.date?.toDate?.() ?? new Date(0);
       if (weekdaysOnly && isWeekend(logDate)) continue;
@@ -167,17 +187,14 @@ export async function getEngagementTrend(
   startDate: Date,
   endDate: Date,
   weekdaysOnly: boolean = false,
+  prefetchedLogs?: LogDoc[],
 ): Promise<EngagementPoint[]> {
   try {
-    const logsSnap = await adminDb
-      .collection('schools').doc(schoolId).collection('readingLogs')
-      .where('date', '>=', startDate)
-      .where('date', '<=', endDate)
-      .get();
+    const logDocs = prefetchedLogs ?? (await fetchReadingLogsInRange(schoolId, startDate, endDate));
 
     const byDate = new Map<string, { minutes: number; logs: number }>();
 
-    for (const doc of logsSnap.docs) {
+    for (const doc of logDocs) {
       const d = doc.data();
       const logDate: Date = d.date?.toDate?.() ?? new Date();
       if (weekdaysOnly && isWeekend(logDate)) continue;
@@ -240,6 +257,7 @@ export async function getClassComparison(
   startDate: Date,
   endDate: Date,
   weekdaysOnly: boolean = false,
+  prefetchedLogs?: LogDoc[],
 ): Promise<ClassComparisonRow[]> {
   try {
     const classesSnap = await adminDb
@@ -250,15 +268,11 @@ export async function getClassComparison(
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const logsSnap = await adminDb
-      .collection('schools').doc(schoolId).collection('readingLogs')
-      .where('date', '>=', startDate)
-      .where('date', '<=', endDate)
-      .get();
+    const logDocs = prefetchedLogs ?? (await fetchReadingLogsInRange(schoolId, startDate, endDate));
 
     const logsByClass = new Map<string, { minutes: number; bookTitles: Set<string>; completed: number; total: number; todayReaders: Set<string> }>();
 
-    for (const doc of logsSnap.docs) {
+    for (const doc of logDocs) {
       const d = doc.data();
       const logDate: Date = d.date?.toDate?.() ?? new Date(0);
       if (weekdaysOnly && isWeekend(logDate)) continue;
@@ -354,17 +368,15 @@ export async function getTopReaders(
   endDate: Date,
   weekdaysOnly: boolean = false,
   limit: number = 10,
+  prefetchedLogs?: LogDoc[],
 ): Promise<TopReader[]> {
   try {
-    const [studentsSnap, classesSnap, logsSnap] = await Promise.all([
+    const [studentsSnap, classesSnap, logDocs] = await Promise.all([
       adminDb.collection('schools').doc(schoolId).collection('students')
         .where('isActive', '==', true)
         .get(),
       adminDb.collection('schools').doc(schoolId).collection('classes').get(),
-      adminDb.collection('schools').doc(schoolId).collection('readingLogs')
-        .where('date', '>=', startDate)
-        .where('date', '<=', endDate)
-        .get(),
+      prefetchedLogs ? Promise.resolve(prefetchedLogs) : fetchReadingLogsInRange(schoolId, startDate, endDate),
     ]);
 
     const classNames = new Map<string, string>();
@@ -375,7 +387,7 @@ export async function getTopReaders(
     const booksByStudent = new Map<string, Set<string>>();
     const minutesByStudent = new Map<string, number>();
 
-    for (const doc of logsSnap.docs) {
+    for (const doc of logDocs) {
       const d = doc.data();
       const logDate: Date = d.date?.toDate?.() ?? new Date(0);
       if (weekdaysOnly && isWeekend(logDate)) continue;
@@ -419,17 +431,14 @@ export async function getPopularBooks(
   endDate: Date,
   weekdaysOnly: boolean = false,
   limit: number = 15,
+  prefetchedLogs?: LogDoc[],
 ): Promise<PopularBook[]> {
   try {
-    const logsSnap = await adminDb
-      .collection('schools').doc(schoolId).collection('readingLogs')
-      .where('date', '>=', startDate)
-      .where('date', '<=', endDate)
-      .get();
+    const logDocs = prefetchedLogs ?? (await fetchReadingLogsInRange(schoolId, startDate, endDate));
 
     const counts = new Map<string, number>();
 
-    for (const doc of logsSnap.docs) {
+    for (const doc of logDocs) {
       const d = doc.data();
       const logDate: Date = d.date?.toDate?.() ?? new Date(0);
       if (weekdaysOnly && isWeekend(logDate)) continue;

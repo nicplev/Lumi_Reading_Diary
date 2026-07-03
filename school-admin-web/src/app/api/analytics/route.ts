@@ -9,6 +9,7 @@ import {
   getAtRiskStudents,
   getTopReaders,
   getPopularBooks,
+  fetchReadingLogsInRange,
   resolvePeriod,
 } from '@/lib/firestore/analytics';
 
@@ -34,14 +35,21 @@ export async function GET(request: NextRequest) {
 
     const { startDate, endDate, weekdaysOnly } = resolvePeriod(period, termKey, termDates);
 
+    // Fetch the period's reading logs ONCE and share them across every
+    // log-based aggregator — was 5 identical full-period scans per load
+    // (5× a full-year scan on "year"), which timed out on big schools and
+    // surfaced as a misleading "No data". levels + atRisk read `students`, not
+    // logs, so they keep their own reads.
+    const logDocs = await fetchReadingLogsInRange(session.schoolId, startDate, endDate);
+
     const [metrics, trend, levels, classes, atRisk, topReaders, books] = await Promise.all([
-      getReadingMetrics(session.schoolId, startDate, endDate, weekdaysOnly),
-      getEngagementTrend(session.schoolId, startDate, endDate, weekdaysOnly),
+      getReadingMetrics(session.schoolId, startDate, endDate, weekdaysOnly, logDocs),
+      getEngagementTrend(session.schoolId, startDate, endDate, weekdaysOnly, logDocs),
       getLevelDistribution(session.schoolId),
-      getClassComparison(session.schoolId, startDate, endDate, weekdaysOnly),
+      getClassComparison(session.schoolId, startDate, endDate, weekdaysOnly, logDocs),
       getAtRiskStudents(session.schoolId, 7),
-      getTopReaders(session.schoolId, startDate, endDate, weekdaysOnly, 10),
-      getPopularBooks(session.schoolId, startDate, endDate, weekdaysOnly, 15),
+      getTopReaders(session.schoolId, startDate, endDate, weekdaysOnly, 10, logDocs),
+      getPopularBooks(session.schoolId, startDate, endDate, weekdaysOnly, 15, logDocs),
     ]);
 
     return NextResponse.json({ metrics, trend, levels, classes, atRisk, topReaders, books });
