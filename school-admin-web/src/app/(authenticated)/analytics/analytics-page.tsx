@@ -6,6 +6,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import { PageHeader } from '@/components/lumi/page-header';
+import { QueryError } from '@/components/lumi/query-error';
 import { StatCard } from '@/components/lumi/stat-card';
 import { Card } from '@/components/lumi/card';
 import { Badge } from '@/components/lumi/badge';
@@ -106,7 +107,7 @@ export function AnalyticsPage({ levelSchema, termDates }: AnalyticsPageProps) {
   const [termDropdownOpen, setTermDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const { data, isFetching } = useAnalytics(period, period === 'term' ? termKey : undefined);
+  const { data, isFetching, isError, refetch } = useAnalytics(period, period === 'term' ? termKey : undefined);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -145,6 +146,13 @@ export function AnalyticsPage({ levelSchema, termDates }: AnalyticsPageProps) {
 
   return (
     <div>
+      {isError && (
+        <QueryError
+          className="mb-6"
+          message="We couldn't load analytics — the figures below may be incomplete."
+          onRetry={() => refetch()}
+        />
+      )}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
         <PageHeader eyebrow="Analytics" title="Analytics" description={subtitle} />
 

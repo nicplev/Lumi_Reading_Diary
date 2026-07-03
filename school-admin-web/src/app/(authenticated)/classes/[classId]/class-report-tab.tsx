@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Card } from '@/components/lumi/card';
+import { QueryError } from '@/components/lumi/query-error';
 import { Button } from '@/components/lumi/button';
 import { Badge } from '@/components/lumi/badge';
 import { Icon } from '@/components/lumi/icon';
@@ -61,7 +62,7 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
   const [to, setTo] = useState(isoToday());
   const [presetKey, setPresetKey] = useState('30');
 
-  const { data: report, isLoading } = useClassReport(classId, from, to);
+  const { data: report, isLoading, isError, refetch } = useClassReport(classId, from, to);
   const { toast } = useToast();
   const [downloading, setDownloading] = useState(false);
 
@@ -142,7 +143,13 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
         </div>
       </div>
 
-      {isLoading || !report ? (
+      {isError ? (
+        <QueryError
+          className="my-6"
+          message="We couldn't build this class report."
+          onRetry={() => refetch()}
+        />
+      ) : isLoading || !report ? (
         <p className="text-sm text-muted py-10 text-center">Building report…</p>
       ) : (
         <div id="class-report" className="space-y-6">

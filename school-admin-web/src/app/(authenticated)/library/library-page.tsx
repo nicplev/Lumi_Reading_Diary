@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { PageHeader } from '@/components/lumi/page-header';
+import { QueryError } from '@/components/lumi/query-error';
 import { Button } from '@/components/lumi/button';
 import { FilterChip } from '@/components/lumi/filter-chip';
 import { SearchInput } from '@/components/lumi/search-input';
@@ -27,7 +28,7 @@ interface LibraryPageProps {
 
 export function LibraryPage({ levelOptions }: LibraryPageProps) {
   const { toast } = useToast();
-  const { data: books, isLoading } = useBooks();
+  const { data: books, isLoading, isError, refetch } = useBooks();
   const { data: incompleteBooks } = useIncompleteBooks();
   const { data: assignments } = useLibraryAssignments();
   const deleteBook = useDeleteBook();
@@ -210,6 +211,12 @@ export function LibraryPage({ levelOptions }: LibraryPageProps) {
             })}
           </div>
         )
+      ) : isError ? (
+        <QueryError
+          className="my-6"
+          message="We couldn't load the library."
+          onRetry={() => refetch()}
+        />
       ) : isLoading ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (

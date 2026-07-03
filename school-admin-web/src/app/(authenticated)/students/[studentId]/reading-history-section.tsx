@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Card } from '@/components/lumi/card';
+import { QueryError } from '@/components/lumi/query-error';
 import { Tabs } from '@/components/lumi/tabs';
 import { Icon } from '@/components/lumi/icon';
 import { EmptyState } from '@/components/lumi/empty-state';
@@ -94,7 +95,7 @@ export function ReadingHistorySection({ studentId }: { studentId: string }) {
     return appliedCustom ?? { from: startOfDaysAgo(7), to: endOfToday() };
   }, [preset, appliedCustom]);
 
-  const { data: logs, isLoading, isFetching } = useReadingLogs(studentId, range);
+  const { data: logs, isLoading, isFetching, isError, refetch } = useReadingLogs(studentId, range);
 
   const canApplyCustom = !!customFrom && !!customTo && customFrom <= customTo;
   const applyCustom = () => {
@@ -217,7 +218,12 @@ export function ReadingHistorySection({ studentId }: { studentId: string }) {
           <SearchInput value={search} onChange={setSearch} placeholder="Search by book title…" />
         </div>
 
-        {isLoading ? (
+        {isError ? (
+          <QueryError
+            message="We couldn't load this reading history."
+            onRetry={() => refetch()}
+          />
+        ) : isLoading ? (
           <p className="text-sm text-muted py-6 text-center">Loading reading history…</p>
         ) : filtered.length === 0 ? (
           <EmptyState
