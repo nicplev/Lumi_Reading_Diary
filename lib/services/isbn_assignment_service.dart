@@ -688,6 +688,41 @@ class IsbnAssignmentService {
   /// the given bookId or isbn. Checks multiple ID variants to handle both
   /// scanner-sourced ('isbn_{isbn}') and library-sourced (school book ID) formats.
   /// Always returns false on any error so a check failure never blocks assignment.
+  /// Batched replacement for calling [studentHasPreviouslyReadBook] once per
+  /// (student × book): returns, for each student, the set of `bookId` values in
+  /// their reading history. Callers then check any number of books in memory
+  /// instead of doing N-students × M-books sequential point reads (which was
+  /// ~500 serial Firestore reads before a "select-all" allocation save).
+  /// Reads in `whereIn` batches of 30 (the Firestore cap) → ceil(N/30) queries.
+  Future<Map<String, Set<String>>> readBookIdsForStudents(
+    List<String> studentIds,
+  ) async {
+    final result = <String, Set<String>>{
+      for (final id in studentIds) id: <String>{},
+    };
+    for (var i = 0; i < studentIds.length; i += 30) {
+      final end =
+          i + 30 > studentIds.length ? studentIds.length : i + 30;
+      final chunk = studentIds.sublist(i, end);
+      if (chunk.isEmpty) continue;
+      try {
+        final snap = await _firestore
+            .collection('bookReadingHistory')
+            .where('studentId', whereIn: chunk)
+            .get();
+        for (final doc in snap.docs) {
+          final data = doc.data();
+          final sid = data['studentId'] as String?;
+          final bid = data['bookId'] as String?;
+          if (sid != null && bid != null) result[sid]?.add(bid);
+        }
+      } catch (_) {
+        // Degrade gracefully — matches the old per-read catch returning false.
+      }
+    }
+    return result;
+  }
+
   Future<bool> studentHasPreviouslyReadBook({
     required String studentId,
     String? bookId,
