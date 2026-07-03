@@ -24,7 +24,8 @@
 import * as crypto from "crypto";
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
-import {linkParentToStudentCore} from "./parent_linking";
+import {linkParentToStudentCore, resolveLinkCodeSchool} from "./parent_linking";
+import {resolveSchoolCode} from "./code_verification";
 
 const fns = functions.region("australia-southeast1");
 
@@ -255,13 +256,48 @@ export const enrollLinkedPhoneAsMfa = fns
     const tokenEmail = optStr(
       (context.auth?.token as {email?: unknown} | undefined)?.email,
     );
+    const linkCode = optStr(data?.linkCode);
+
+    // Derive schoolId server-side from a validated JOIN CREDENTIAL, never from a
+    // bare client `data.schoolId` (1.3). A teacher must present a valid school
+    // code; a parent's school comes from their (valid) student link code. This
+    // is the gate that stops an authenticated caller provisioning a membership
+    // into an arbitrary school — the teacher case is the high-severity one
+    // (school membership grants broad read access to the school's students).
+    //
+    // Transitional fallback: pre-1.3 clients that send only `data.schoolId`
+    // keep working until the app adopts the credential fields AND the rules
+    // deploy (1.3-rules) denies client self-create. Remove the fallback then.
+    let derivedSchoolId: string | null = null;
+    if (role === "teacher") {
+      const schoolCode = optStr(data?.schoolCode);
+      if (schoolCode) {
+        // Read-only — the school code is NOT consumed, so this is retry-safe.
+        derivedSchoolId = (await resolveSchoolCode(schoolCode)).schoolId;
+      }
+    } else if (role === "parent" && linkCode) {
+      try {
+        derivedSchoolId =
+          (await resolveLinkCodeSchool(linkCode.toUpperCase())).schoolId;
+      } catch (err) {
+        // On a retry the link code is already "used" (we consumed it on the
+        // first run), so re-resolution throws `code-used`. That's the idempotent
+        // path — the parent doc and link already exist — so fall through to
+        // data.schoolId (which equals the code's school for a real signup).
+        // Any OTHER validity failure (invalid/revoked/expired) is fatal here,
+        // before we touch MFA, so a bad code can't half-finalise a signup.
+        const kind = (err as {details?: {kind?: string}})?.details?.kind;
+        if (kind !== "code-used") throw err;
+      }
+    }
+
     const ctx: FinalizeContext | null = role ? {
-      schoolId: optStr(data?.schoolId) ?? "",
+      schoolId: derivedSchoolId ?? optStr(data?.schoolId) ?? "",
       fullName: optStr(data?.fullName) ?? "",
       email: tokenEmail ?? optStr(data?.email),
       phoneE164: rawPhone,
       relationshipLabel: optStr(data?.relationshipLabel),
-      linkCode: optStr(data?.linkCode),
+      linkCode,
     } : null;
     if (role && (!ctx?.schoolId)) {
       throw new functions.https.HttpsError(
@@ -397,4 +433,101 @@ export const enrollLinkedPhoneAsMfa = fns
     }
 
     return {enrolled: true, finalised: ctx !== null, customToken};
+  });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Callable: finalizeParentSignup  (phone-PRIMARY parent — no MFA enroll)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// The phone-primary parent signup path (parent_registration_modal.dart) signs
+// in WITH the phone number as the primary credential — there is no MFA enroll,
+// so the client session stays live and the client USED to write the parent doc
+// + userSchoolIndex + child link itself. That client self-create is exactly
+// what the 1.3 rules deploy removes. This callable performs the same
+// finalisation server-side (Admin SDK), DERIVING schoolId from the presented
+// link code so a caller can't mint a parent membership in an arbitrary school.
+//
+// Proof of ownership: the caller's token must carry `phone_number` equal to the
+// finalised phone (they signed in with it). Idempotent — finalizeParent no-ops
+// the doc write when it already exists and swallows an already-linked child.
+interface FinalizeParentSignupInput {
+  linkCode?: unknown;
+  fullName?: unknown;
+  phoneE164?: unknown;
+  email?: unknown;
+  relationshipLabel?: unknown;
+  schoolId?: unknown; // transitional fallback only — see enroll derivation.
+}
+
+export const finalizeParentSignup = fns
+  .runWith({timeoutSeconds: 60, memory: "256MB"})
+  .https.onCall(async (data: FinalizeParentSignupInput, context) => {
+    const uid = context.auth?.uid;
+    if (!uid) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "You must be signed in to finalise signup.",
+      );
+    }
+
+    const rawPhone =
+      typeof data?.phoneE164 === "string" ? data.phoneE164.trim() : "";
+    if (!E164_REGEX.test(rawPhone)) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "phoneE164 must be in E.164 format (e.g. +61400000000).",
+      );
+    }
+    // Proof of phone ownership: a phone-primary parent signed in WITH this
+    // number, so the verified token must carry it. This stops a caller
+    // finalising a parent doc under a phone they don't own.
+    const tokenPhone = optStr(
+      (context.auth?.token as {phone_number?: unknown} | undefined)
+        ?.phone_number,
+    );
+    if (tokenPhone !== rawPhone) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "Phone number does not match the signed-in account.",
+      );
+    }
+
+    const linkCode = optStr(data?.linkCode);
+    // Derive schoolId from the validated link code (1.3), with the same
+    // retry-safe `code-used` fallthrough as the enroll path. Transitional
+    // fallback to data.schoolId until the app adopts + the rules deploy lands.
+    let derivedSchoolId: string | null = null;
+    if (linkCode) {
+      try {
+        derivedSchoolId =
+          (await resolveLinkCodeSchool(linkCode.toUpperCase())).schoolId;
+      } catch (err) {
+        const kind = (err as {details?: {kind?: string}})?.details?.kind;
+        if (kind !== "code-used") throw err;
+      }
+    }
+
+    // Phone-primary accounts have no verified email; keep the client-supplied
+    // email (unchanged behaviour — this callable is a client→server MOVE, not an
+    // email-verification change). Email-index trust is tracked separately.
+    const tokenEmail = optStr(
+      (context.auth?.token as {email?: unknown} | undefined)?.email,
+    );
+    const ctx: FinalizeContext = {
+      schoolId: derivedSchoolId ?? optStr(data?.schoolId) ?? "",
+      fullName: optStr(data?.fullName) ?? "",
+      email: tokenEmail ?? optStr(data?.email),
+      phoneE164: rawPhone,
+      relationshipLabel: optStr(data?.relationshipLabel),
+      linkCode,
+    };
+    if (!ctx.schoolId) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "schoolId is required to finalise signup.",
+      );
+    }
+
+    await finalizeParent(uid, ctx);
+    return {finalised: true, schoolId: ctx.schoolId};
   });

@@ -44,6 +44,83 @@ function parseExpiresAt(raw: unknown): Date | null {
   return null;
 }
 
+export interface ResolvedSchoolCode {
+  codeId: string;
+  schoolId: string;
+  schoolName: string;
+  ref: FirebaseFirestore.DocumentReference;
+}
+
+// Resolves a school code by EXACT value and runs the validity ladder (mirrors
+// SchoolCodeModel.isValid / invalidReason). Throws the same typed HttpsErrors
+// (with `kind`) as `verifySchoolCode`. Read-only — never mutates the code doc.
+//
+// Shared by the `verifySchoolCode` callable (teacher app verifies at the start
+// of registration) and server-side teacher signup finalisation
+// (enrollLinkedPhoneAsMfa), so the school code is the entitlement credential the
+// server DERIVES schoolId from — a caller can no longer provision themselves
+// into an arbitrary school by passing a bare `schoolId`.
+export async function resolveSchoolCode(
+  rawCode: string
+): Promise<ResolvedSchoolCode> {
+  const normalized =
+    (typeof rawCode === "string" ? rawCode : "").toUpperCase().trim();
+
+  if (normalized.length === 0) {
+    throw invalidArgument("empty_code", "School code cannot be empty.");
+  }
+  if (normalized.length < 6) {
+    throw invalidArgument(
+      "code_too_short",
+      "School code must be at least 6 characters."
+    );
+  }
+
+  const snap = await admin
+    .firestore()
+    .collection(COLL_SCHOOL_CODES)
+    .where("code", "==", normalized)
+    .limit(1)
+    .get();
+
+  if (snap.empty) {
+    throw notFound(
+      "code_not_found",
+      "Invalid school code. Please check the code and try again."
+    );
+  }
+
+  const doc = snap.docs[0];
+  const d = doc.data() ?? {};
+
+  const isActive = d.isActive === true;
+  if (!isActive) {
+    throw failedPrecondition(
+      "code_inactive",
+      "This school code has been deactivated."
+    );
+  }
+  const expiresAt = parseExpiresAt(d.expiresAt);
+  if (expiresAt !== null && expiresAt < new Date()) {
+    throw failedPrecondition("code_expired", "This school code has expired.");
+  }
+  const maxUsages = typeof d.maxUsages === "number" ? d.maxUsages : null;
+  const usageCount = typeof d.usageCount === "number" ? d.usageCount : 0;
+  if (maxUsages !== null && usageCount >= maxUsages) {
+    throw failedPrecondition(
+      "code_max_usage",
+      "This school code has reached its maximum usage limit."
+    );
+  }
+
+  return {
+    codeId: doc.id,
+    schoolId: String(d.schoolId ?? ""),
+    schoolName: String(d.schoolName ?? ""),
+    ref: doc.ref,
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Callable: verifySchoolCode  (read-only, exact-code lookup)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -61,61 +138,11 @@ export const verifySchoolCode = fns
   .runWith(runtime({timeoutSeconds: 15, memory: "128MB"}))
   .https.onCall(async (data: {code?: unknown}) => {
     const raw = typeof data?.code === "string" ? data.code : "";
-    const normalized = raw.toUpperCase().trim();
-
-    if (normalized.length === 0) {
-      throw invalidArgument("empty_code", "School code cannot be empty.");
-    }
-    if (normalized.length < 6) {
-      throw invalidArgument(
-        "code_too_short",
-        "School code must be at least 6 characters."
-      );
-    }
-
-    const snap = await admin
-      .firestore()
-      .collection(COLL_SCHOOL_CODES)
-      .where("code", "==", normalized)
-      .limit(1)
-      .get();
-
-    if (snap.empty) {
-      throw notFound(
-        "code_not_found",
-        "Invalid school code. Please check the code and try again."
-      );
-    }
-
-    const doc = snap.docs[0];
-    const d = doc.data() ?? {};
-
-    // Validity ladder — mirrors SchoolCodeModel.isValid / invalidReason.
-    const isActive = d.isActive === true;
-    if (!isActive) {
-      throw failedPrecondition(
-        "code_inactive",
-        "This school code has been deactivated."
-      );
-    }
-    const expiresAt = parseExpiresAt(d.expiresAt);
-    if (expiresAt !== null && expiresAt < new Date()) {
-      throw failedPrecondition("code_expired", "This school code has expired.");
-    }
-    const maxUsages =
-      typeof d.maxUsages === "number" ? d.maxUsages : null;
-    const usageCount = typeof d.usageCount === "number" ? d.usageCount : 0;
-    if (maxUsages !== null && usageCount >= maxUsages) {
-      throw failedPrecondition(
-        "code_max_usage",
-        "This school code has reached its maximum usage limit."
-      );
-    }
-
+    const resolved = await resolveSchoolCode(raw);
     return {
       ok: true,
-      schoolId: String(d.schoolId ?? ""),
-      schoolName: String(d.schoolName ?? ""),
-      codeId: doc.id,
+      schoolId: resolved.schoolId,
+      schoolName: resolved.schoolName,
+      codeId: resolved.codeId,
     };
   });
