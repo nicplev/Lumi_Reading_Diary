@@ -200,7 +200,14 @@ service cloud.firestore {
             isTeacher(schoolId) ||
             isDevImpersonatingSchool(schoolId);
 
-        // Non-admins can only create their own user doc.
+        // Teacher self-create was REMOVED (1.3). The legitimate teacher signup
+        // writes this doc SERVER-SIDE via enrollLinkedPhoneAsMfa /
+        // finalizeTeacher (Admin SDK, bypasses rules) after validating a school
+        // code — no Flutter client SDK path creates a teacher doc. Self-create
+        // let any account holder become a teacher of any school (isTeacher()
+        // reads exactly this self-authored doc → all children's PII). The only
+        // client creates that remain: an existing school admin provisioning
+        // staff, and the first-admin bootstrap of a school they created.
         allow create: if isSignedIn() &&
             writeAllowedForDev() &&
             request.resource.data.schoolId == schoolId &&
@@ -208,14 +215,9 @@ service cloud.firestore {
               isSchoolAdmin(schoolId) ||
               (
                 request.auth.uid == userId &&
-                (
-                  request.resource.data.role == 'teacher' ||
-                  (
-                    request.resource.data.role == 'schoolAdmin' &&
-                    exists(/databases/$(database)/documents/schools/$(schoolId)) &&
-                    get(/databases/$(database)/documents/schools/$(schoolId)).data.createdBy == request.auth.uid
-                  )
-                )
+                request.resource.data.role == 'schoolAdmin' &&
+                exists(/databases/$(database)/documents/schools/$(schoolId)) &&
+                get(/databases/$(database)/documents/schools/$(schoolId)).data.createdBy == request.auth.uid
               )
             );
 
@@ -258,7 +260,15 @@ service cloud.firestore {
             isTeacher(schoolId) ||
             isDevImpersonatingSchool(schoolId);
 
-        // Non-admins can only create their own parent doc.
+        // Parent self-create REMAINS (unlike teacher self-create, removed in
+        // 1.3). The phone-primary and email+MFA parent signups now finalise
+        // server-side (finalizeParentSignup / enrollLinkedPhoneAsMfa), but the
+        // existing-MFA parent who links a child at a NEW school still
+        // client-creates their parent membership there. Residual risk is low: a
+        // bare parent doc has empty `linkedChildren`, which gates every child
+        // PII / allocation read, and parentIds self-append was removed below.
+        // Closing this fully needs a server path for cross-school existing-MFA
+        // linking (or a pendingParent/{uid} server marker).
         allow create: if isSignedIn() &&
             writeAllowedForDev() &&
             request.resource.data.schoolId == schoolId &&
@@ -337,13 +347,13 @@ service cloud.firestore {
         allow delete: if (isSchoolAdmin(schoolId) || isTeacher(schoolId)) &&
             writeAllowedForDev();
 
-        // Parent linking: parent can only append their own UID to parentIds.
-        allow update: if isSignedIn() &&
-            writeAllowedForDev() &&
-            exists(/databases/$(database)/documents/schools/$(schoolId)/parents/$(request.auth.uid)) &&
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['parentIds']) &&
-            request.resource.data.parentIds.hasAll(resource.data.parentIds) &&
-            request.auth.uid in request.resource.data.parentIds;
+        // Parent linking writes `parentIds` SERVER-SIDE only, via the
+        // linkParentToStudent callable (Admin SDK, TOCTOU-safe code validation
+        // — see parent_linking.ts). The old client self-append rule was REMOVED
+        // (1.3): no client writes parentIds directly, and self-append (gated
+        // only on "caller has a parent doc in the school") let any parent-doc
+        // holder pollute an arbitrary student's parentIds without a valid link
+        // code.
 
         // Profile character: a linked parent can set only their child's
         // characterId (the profile mascot they pick in-app).
