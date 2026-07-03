@@ -490,23 +490,27 @@ class _ClassReportScreenState extends State<ClassReportScreen> {
           .map((doc) => StudentModel.fromFirestore(doc))
           .toList();
 
-      // Fetch reading logs for all students
-      final allReadingLogs = <String, List<ReadingLogModel>>{};
-      for (final student in students) {
-        final logSnap = await firestore
-            .collection('schools')
-            .doc(schoolId)
-            .collection('readingLogs')
-            .where('studentId', isEqualTo: student.id)
-            .where('date',
-                isGreaterThanOrEqualTo: Timestamp.fromDate(_startDate))
-            .where('date',
-                isLessThanOrEqualTo: Timestamp.fromDate(_endDate))
-            .orderBy('date', descending: true)
-            .get();
-        allReadingLogs[student.id] = logSnap.docs
-            .map((doc) => ReadingLogModel.fromFirestore(doc))
-            .toList();
+      // Fetch every reading log for the class in ONE query, then bucket by
+      // student. This was an N+1: one awaited query PER student, so a 100-student
+      // class did 100 serial round-trips before the PDF could render. A single
+      // classId + date-range query (the pattern the dashboard/calendar already
+      // use) collapses that to one read. Results are date-desc, so each bucket
+      // stays date-desc like the old per-student orderBy.
+      final allReadingLogs = <String, List<ReadingLogModel>>{
+        for (final student in students) student.id: <ReadingLogModel>[],
+      };
+      final logSnap = await firestore
+          .collection('schools')
+          .doc(schoolId)
+          .collection('readingLogs')
+          .where('classId', isEqualTo: widget.classModel.id)
+          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(_startDate))
+          .where('date', isLessThanOrEqualTo: Timestamp.fromDate(_endDate))
+          .orderBy('date', descending: true)
+          .get();
+      for (final doc in logSnap.docs) {
+        final log = ReadingLogModel.fromFirestore(doc);
+        allReadingLogs[log.studentId]?.add(log);
       }
 
       // Generate the PDF
