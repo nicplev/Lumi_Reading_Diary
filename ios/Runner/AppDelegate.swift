@@ -23,6 +23,11 @@ import FirebaseAuth
     } else {
       NSLog("[CoverScanner] skipping native scanner registration (iOS < 13)")
     }
+    if let registrar = self.registrar(forPlugin: "AppIconChannel") {
+      AppIconChannel.register(with: registrar)
+    } else {
+      NSLog("[AppIcon] SKIPPED registration: registrar(forPlugin:) returned nil")
+    }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 

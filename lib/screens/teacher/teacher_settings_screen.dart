@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/config/dev_access.dart';
+import '../../core/services/app_icon_service.dart';
 import '../../core/services/dev_access_service.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
@@ -499,6 +500,15 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
                   label: 'About',
                   onTap: _showAboutDialog,
                 ),
+                // The app-icon pack is still in testing — visible only to
+                // dev-access accounts until it ships publicly. iOS-only.
+                if (hasDevAccess() && AppIconService.isSupportedPlatform)
+                  TeacherSettingsItem(
+                    icon: Icons.apps,
+                    iconBgColor: LumiTokens.muted,
+                    label: 'App Icon',
+                    onTap: () => context.push('/settings/app-icon'),
+                  ),
               ],
             )
                 .animate()

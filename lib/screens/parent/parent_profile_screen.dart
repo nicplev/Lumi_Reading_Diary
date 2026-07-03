@@ -3,6 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/config/dev_access.dart';
+import '../../core/services/app_icon_service.dart';
+import '../../core/services/dev_access_service.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
@@ -36,6 +39,11 @@ class ParentProfileScreen extends ConsumerStatefulWidget {
 class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
   final FirebaseService _firebaseService = FirebaseService.instance;
 
+  /// Dev-access flag — gates surfaces still in development (see the teacher
+  /// settings screen for the same pattern). Source of truth is the
+  /// `devAccessEmails` allowlist managed in the super-admin portal.
+  final DevAccessService _devAccess = DevAccessService.instance;
+
   bool _notificationsEnabled = true;
   TimeOfDay _reminderTime = const TimeOfDay(hour: 19, minute: 0);
   // Selected weekdays (1=Mon..7=Sun). Defaults to Mon–Thu: most families read
@@ -58,6 +66,19 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
     _linkedChildren =
         ref.read(parentChildrenProvider).value ?? const <StudentModel>[];
     _loadPreferences();
+    // Rebuild if dev-access flips (e.g. the Firestore lookup resolves after a
+    // session resume, or a super-admin grants/revokes access).
+    _devAccess.addListener(_onDevAccessChanged);
+  }
+
+  @override
+  void dispose() {
+    _devAccess.removeListener(_onDevAccessChanged);
+    super.dispose();
+  }
+
+  void _onDevAccessChanged() {
+    if (mounted) setState(() {});
   }
 
   void _loadPreferences() {
@@ -675,6 +696,15 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
             title: 'About Lumi',
             onTap: _showAboutDialog,
           ),
+          // The app-icon pack is still in testing — visible only to
+          // dev-access accounts until it ships publicly. iOS-only.
+          if (hasDevAccess() && AppIconService.isSupportedPlatform)
+            _SettingsRow(
+              icon: Icons.apps,
+              title: 'App icon',
+              subtitle: 'Choose your Lumi Home Screen icon',
+              onTap: () => context.push('/settings/app-icon'),
+            ),
         ],
       ),
     );

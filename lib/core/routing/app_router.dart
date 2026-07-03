@@ -34,6 +34,7 @@ import '../../screens/parent/student_goals_screen.dart';
 import '../../screens/parent/achievements_screen.dart';
 import '../../screens/parent/progress_screen.dart';
 import '../../screens/parent/offline_management_screen.dart';
+import '../../screens/shared/app_icon_screen.dart';
 import '../../screens/shared/service_status_screen.dart';
 import '../../screens/parent/student_report_screen.dart';
 import '../../screens/parent/book_browser_screen.dart';
@@ -411,6 +412,16 @@ class AppRouter {
         path: '/settings/service-status',
         name: 'service-status',
         builder: (context, state) => const ServiceStatusScreen(),
+      ),
+
+      // App-icon pack is still in testing — dev-access accounts only, like
+      // /dev/impersonate. Drop the redirect to release it publicly.
+      GoRoute(
+        path: '/settings/app-icon',
+        name: 'app-icon',
+        redirect: (context, state) =>
+            hasDevAccess() ? null : '/auth/login',
+        builder: (context, state) => const AppIconScreen(),
       ),
 
       GoRoute(
