@@ -784,13 +784,39 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
 
       if (isPhonePrimary) {
         // Phone-primary branch: signInWithCredential creates the account
-        // (Firebase Auth uses the phone number as the credential).
+        // (Firebase Auth uses the phone number as the credential). The session
+        // stays live (no MFA enroll), but finalisation goes SERVER-SIDE via
+        // finalizeParentSignup — the parent doc + indexes + child link are
+        // written by the Admin SDK, deriving schoolId from the link code, so the
+        // client-side self-create can be denied by the rules (1.3).
         final cred = await _smsService.signInWithPhoneCode(
           verificationId: verificationId,
           smsCode: smsCode,
         );
-        userId = cred.user!.uid;
-        enrolledPhone = phone;
+        final uid = cred.user!.uid;
+        await _smsService.finalizeParentSignup(
+          phoneNumber: phone,
+          linkCode: code.code,
+          fullName: fullName,
+          email: hasEmail ? email : null,
+          relationshipLabel: _relationshipLabel,
+          schoolId: code.schoolId,
+        );
+        unawaited(PhoneVerificationRecoveryService.instance.clear());
+        if (!mounted) return;
+        final parentSnap = await _firestore
+            .collection('schools')
+            .doc(code.schoolId)
+            .collection('parents')
+            .doc(uid)
+            .get();
+        setState(() {
+          _createdParent =
+              parentSnap.exists ? UserModel.fromFirestore(parentSnap) : null;
+          _stage = _Stage.success;
+        });
+        AnalyticsService.instance.logParentLinkingCompleted();
+        return;
       } else if (resolver != null) {
         // Existing-MFA branch: resolveSignIn completes the login; phone stays
         // whatever was previously enrolled.
