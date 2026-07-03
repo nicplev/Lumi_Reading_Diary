@@ -323,7 +323,18 @@ service cloud.firestore {
             writeAllowedForDev() &&
             request.resource.data.schoolId == schoolId;
 
-        allow update, delete: if (isSchoolAdmin(schoolId) || isTeacher(schoolId)) &&
+        // Staff may edit student profile / reading-level fields, but NOT the
+        // server-owned `access` entitlement map (writing access.status='active'
+        // would bypass the licensing gate) nor `parentIds` (owned by the parent
+        // linking system / Admin SDK). Those are written only via Cloud
+        // Functions (buildStudentAccess, linkParentToStudent), which bypass
+        // rules. `access` is set legitimately server-side only.
+        allow update: if (isSchoolAdmin(schoolId) || isTeacher(schoolId)) &&
+            writeAllowedForDev() &&
+            !request.resource.data.diff(resource.data).affectedKeys()
+                .hasAny(['access', 'parentIds']);
+
+        allow delete: if (isSchoolAdmin(schoolId) || isTeacher(schoolId)) &&
             writeAllowedForDev();
 
         // Parent linking: parent can only append their own UID to parentIds.
@@ -604,7 +615,20 @@ service cloud.firestore {
     }
 
     match /schoolOnboarding/{onboardingId} {
-      allow create: if writeAllowedForDev();
+      // Demo-request create is intentionally reachable by an ANONYMOUS visitor
+      // (the public "request a demo" form runs before any account exists), so
+      // we can't require isSignedIn() here. Instead validate the shape: it must
+      // look like a genuine demo request and must NOT pre-claim an admin owner
+      // (adminUserId is set later, only by the authenticated ownership-claim
+      // update below). This stops anonymous callers writing arbitrary docs.
+      allow create: if writeAllowedForDev() &&
+          request.resource.data.schoolName is string &&
+          request.resource.data.schoolName.size() > 0 &&
+          request.resource.data.contactEmail is string &&
+          request.resource.data.contactEmail.size() > 0 &&
+          request.resource.data.status == 'demo' &&
+          request.resource.data.createdAt is timestamp &&
+          request.resource.data.get('adminUserId', null) == null;
 
       allow get, list: if isSignedIn() &&
           (
