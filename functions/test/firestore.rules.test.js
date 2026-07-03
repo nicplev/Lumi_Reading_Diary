@@ -2139,6 +2139,45 @@ test('access: student reads stay open so the app can render the lapsed screen', 
   );
 });
 
+// Reproduces the offline reading-log drain permission-denied bug. When the
+// OfflineService drains an offline-created log, the doc doesn't exist on the
+// server yet. A parent GET or UPDATE on a NON-EXISTENT readingLog is DENIED —
+// the parent rules dereference `resource.data`, which is null for a missing doc
+// (→ permission-denied, not a clean not-found). So `_syncReadingLog`'s
+// existence-check get() throws before it reaches the create, and
+// `_syncComprehensionAudio`'s update() on the missing log is denied too. The
+// CREATE itself is allowed — which is why "tolerate the denied pre-check and go
+// straight to create" fixes the drain.
+test('readingLogs offline-drain: parent get/update on a NON-EXISTENT log is denied, create is allowed', async () => {
+  await seedSchoolWithAccessStates();
+  const parentDb = authDb('parent_1');
+  const missingRef = parentDb
+    .collection('schools').doc('school_1')
+    .collection('readingLogs').doc('log_offline_not_yet_synced');
+
+  // 1. The existence-check get() the drain runs first — denied on a missing doc.
+  await assertFails(missingRef.get());
+
+  // 2. The comprehension-audio patch — update() on the missing doc — also denied
+  //    (the drain only classifies `not-found` as transient, so this surfaces as
+  //    permission-denied and blocks the retry).
+  await assertFails(missingRef.update({ comprehensionAudioUploaded: true }));
+
+  // 3. But the parent IS allowed to CREATE that same log (linked + live access +
+  //    parentId == uid) — so proceeding to create despite the denied pre-check
+  //    resolves the drain.
+  await assertSucceeds(
+    missingRef.set({
+      schoolId: 'school_1',
+      studentId: 'student_active',
+      parentId: 'parent_1',
+      minutesRead: 20,
+      status: 'completed',
+      bookTitles: ['Reading'],
+    }),
+  );
+});
+
 // ── Teacher proxy logs: a teacher logs reading on behalf of a student ────────
 // Membership is verified against the CLASS document's teacher assignment, not
 // the teacher's denormalised user.classIds (which the portal seeds empty and
