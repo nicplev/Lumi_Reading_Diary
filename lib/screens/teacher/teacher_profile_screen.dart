@@ -137,7 +137,6 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                             value: '${_classes.length}', label: 'Classes'),
                         ProfileStat(
                             value: '$_totalStudents', label: 'Students'),
-                        ProfileStat(value: '0', label: 'Reports'),
                       ],
               ),
             ),
@@ -296,17 +295,6 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                         context,
                         userId: widget.user.id,
                         userRole: widget.user.role.name,
-                      );
-                    },
-                  ),
-                  TeacherSettingsItem(
-                    icon: Icons.download_outlined,
-                    iconBgColor: AppColors.mintGreen.withValues(alpha: 0.2),
-                    label: 'Export Reports',
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('Export Reports coming soon')),
                       );
                     },
                   ),

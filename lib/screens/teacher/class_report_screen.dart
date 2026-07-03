@@ -537,11 +537,12 @@ class _ClassReportScreenState extends State<ClassReportScreen> {
         _isGenerating = false;
       });
 
+      debugPrint('Class report generation failed: $e');
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error generating report: $e'),
+          content: const Text("Couldn't generate the report. Please try again."),
           backgroundColor: AppColors.error,
           duration: const Duration(seconds: 3),
         ),
