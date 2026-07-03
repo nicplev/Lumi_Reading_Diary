@@ -217,87 +217,29 @@ class ParentLinkingService {
     return codes;
   }
 
-  // Verify and retrieve link code
+  // Verify and retrieve a link code via the server-side callable.
+  //
+  // Looks the code up by EXACT value server-side (verifyStudentLinkCode) rather
+  // than running a client `where('code','==',x)` query. That client query
+  // required an unauthenticated `list` rule on studentLinkCodes, which let
+  // anyone paginate and harvest every child-link code. The callable returns
+  // only the single matching record (no enumeration) and throws the same typed
+  // errors the collection path did — mapped by [_mapHttpsError]:
+  //   invalid-code → InvalidCodeException, code-used → CodeAlreadyUsedException,
+  //   code-revoked → CodeRevokedException, code-expired → CodeExpiredException.
+  // Transient `unavailable` surfaces as NetworkUnavailableException (retry).
   Future<StudentLinkCodeModel> verifyCode(String code) async {
     final normalizedCode = code.toUpperCase().trim();
-
-    // Prefer server reads to avoid stale empty-cache false negatives on the
-    // parent's first verify. Firestore's gRPC channel can be transiently
-    // 'unavailable' (e.g. right after a dismissed modal) — Firestore itself
-    // recommends retry with backoff. If all server attempts fail, fall back
-    // to cache so an earlier successful verify in this app session can still
-    // resolve the code even while the network stays flaky.
-    final codesRef = _firestore
-        .collection('studentLinkCodes')
-        .where('code', isEqualTo: normalizedCode)
-        .limit(10);
-
-    QuerySnapshot<Map<String, dynamic>>? query;
-    var serverUnavailable = false;
-
-    for (var attempt = 1; attempt <= 2; attempt++) {
-      try {
-        query = await codesRef.get(const GetOptions(source: Source.server));
-        break;
-      } on FirebaseException catch (e) {
-        if (e.code == 'unavailable') {
-          serverUnavailable = true;
-          if (attempt < 2) {
-            await Future.delayed(Duration(milliseconds: 400 * attempt));
-            continue;
-          }
-        } else {
-          rethrow;
-        }
-      }
-    }
-
-    // Server stayed unreachable across retries — fall back to local cache.
-    query ??= await codesRef.get(const GetOptions(source: Source.cache));
-
-    if (query.docs.isEmpty) {
-      if (serverUnavailable) {
-        throw NetworkUnavailableException();
-      }
+    final raw = await _invokeWithRetry(
+      'verifyStudentLinkCode',
+      <String, dynamic>{'code': normalizedCode},
+    );
+    if (raw is! Map) {
       throw InvalidCodeException();
     }
-
-    final parsedCodes =
-        query.docs.map(StudentLinkCodeModel.fromFirestore).toList()
-          ..sort((a, b) {
-            final aPriority = _priorityForCode(a);
-            final bPriority = _priorityForCode(b);
-            if (aPriority != bPriority) return aPriority.compareTo(bPriority);
-            return b.createdAt.compareTo(a.createdAt);
-          });
-
-    final bestCode = parsedCodes.first;
-
-    if (bestCode.status == LinkCodeStatus.active && !bestCode.isExpired) {
-      return bestCode;
-    }
-
-    if (bestCode.status == LinkCodeStatus.used) {
-      throw CodeAlreadyUsedException();
-    }
-
-    if (bestCode.status == LinkCodeStatus.revoked) {
-      throw CodeRevokedException(reason: bestCode.revokeReason);
-    }
-
-    if (bestCode.status == LinkCodeStatus.expired || bestCode.isExpired) {
-      throw CodeExpiredException();
-    }
-
-    throw InvalidCodeException();
-  }
-
-  int _priorityForCode(StudentLinkCodeModel code) {
-    if (code.status == LinkCodeStatus.active && !code.isExpired) return 0;
-    if (code.status == LinkCodeStatus.used) return 1;
-    if (code.status == LinkCodeStatus.revoked) return 2;
-    if (code.status == LinkCodeStatus.expired || code.isExpired) return 3;
-    return 4;
+    return StudentLinkCodeModel.fromVerifyPayload(
+      raw.map((key, value) => MapEntry(key.toString(), value)),
+    );
   }
 
   // Link parent to student using a code.
