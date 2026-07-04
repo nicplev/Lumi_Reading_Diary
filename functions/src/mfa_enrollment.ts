@@ -29,6 +29,14 @@ import {resolveSchoolCode} from "./code_verification";
 
 const fns = functions.region("australia-southeast1");
 
+// App Check enforcement, opt-in via env var (default OFF). These callables fire
+// during signup — before the account is fully set up — so enforcement must NOT
+// be flipped on until the client attestation rollout is verified in the App
+// Check console, else new signups break (1.6). App Check attests the APP, not
+// the account, so an unverified-email/pre-finalise caller still attests fine.
+const MFA_ENROLLMENT_APP_CHECK_ENFORCED =
+  process.env.MFA_ENROLLMENT_APP_CHECK_ENFORCED === "true";
+
 const E164_REGEX = /^\+[1-9]\d{7,14}$/;
 
 /**
@@ -220,7 +228,12 @@ async function finalizeTeacher(
 }
 
 export const enrollLinkedPhoneAsMfa = fns
-  .runWith({timeoutSeconds: 60, memory: "256MB"})
+  .runWith({
+    timeoutSeconds: 60,
+    memory: "256MB",
+    enforceAppCheck: MFA_ENROLLMENT_APP_CHECK_ENFORCED,
+    consumeAppCheckToken: MFA_ENROLLMENT_APP_CHECK_ENFORCED,
+  })
   .https.onCall(async (data, context) => {
     const uid = context.auth?.uid;
     if (!uid) {
@@ -460,7 +473,12 @@ interface FinalizeParentSignupInput {
 }
 
 export const finalizeParentSignup = fns
-  .runWith({timeoutSeconds: 60, memory: "256MB"})
+  .runWith({
+    timeoutSeconds: 60,
+    memory: "256MB",
+    enforceAppCheck: MFA_ENROLLMENT_APP_CHECK_ENFORCED,
+    consumeAppCheckToken: MFA_ENROLLMENT_APP_CHECK_ENFORCED,
+  })
   .https.onCall(async (data: FinalizeParentSignupInput, context) => {
     const uid = context.auth?.uid;
     if (!uid) {

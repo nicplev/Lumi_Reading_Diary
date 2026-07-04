@@ -36,6 +36,16 @@ import {
 
 const fns = functions.region("australia-southeast1");
 
+// App Check enforcement, opt-in via env var (default OFF). Matches
+// code_verification.ts / impersonation.ts — flip a flag only AFTER the client
+// attestation rollout is verified in the App Check console, else a
+// half-rolled-out App Check locks out real clients (1.6). App Check attests the
+// APP, not the account, so it's safe on unauthenticated/pre-account calls too.
+const DELETE_STUDENT_APP_CHECK_ENFORCED =
+  process.env.DELETE_STUDENT_APP_CHECK_ENFORCED === "true";
+const NOTIFICATION_CAMPAIGN_APP_CHECK_ENFORCED =
+  process.env.NOTIFICATION_CAMPAIGN_APP_CHECK_ENFORCED === "true";
+
 // Library counts denormalization. Maintains schools/{id}/libraryMeta/counts
 // so the paginated library screen can render header badges without reading
 // the full books collection. See functions/src/library_counts.ts.
@@ -790,7 +800,12 @@ async function dispatchNotificationCampaign(
 }
 
 export const createNotificationCampaign = fns
-  .runWith({timeoutSeconds: 60, memory: "256MB"})
+  .runWith({
+    timeoutSeconds: 60,
+    memory: "256MB",
+    enforceAppCheck: NOTIFICATION_CAMPAIGN_APP_CHECK_ENFORCED,
+    consumeAppCheckToken: NOTIFICATION_CAMPAIGN_APP_CHECK_ENFORCED,
+  })
   .https.onCall(async (rawData: NotificationCampaignPayload, context) => {
     const senderId = context.auth?.uid;
     if (!senderId) {
@@ -2240,8 +2255,12 @@ export const reconcileStatsScheduled = fns
  * - Revokes any active link codes for the student
  * - Deletes the student document
  */
-export const deleteStudentWithCascade = fns.https.onCall(
-  async (data, context) => {
+export const deleteStudentWithCascade = fns
+  .runWith({
+    enforceAppCheck: DELETE_STUDENT_APP_CHECK_ENFORCED,
+    consumeAppCheckToken: DELETE_STUDENT_APP_CHECK_ENFORCED,
+  })
+  .https.onCall(async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError(
         "unauthenticated",
@@ -2337,7 +2356,7 @@ export const deleteStudentWithCascade = fns.https.onCall(
 
     return {success: true, parentsCleaned: parentIds.length};
   }
-);
+  );
 
 /**
  * Scheduled: Process pending user deletions after the 24-hour cool-off period.
