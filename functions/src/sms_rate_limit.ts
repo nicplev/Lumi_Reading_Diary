@@ -19,6 +19,12 @@ import * as functions from "firebase-functions";
 
 const fns = functions.region("australia-southeast1");
 
+// App Check enforcement, opt-in via env var (default OFF). Flip only after the
+// client attestation rollout is verified (1.6). App Check attests the APP, not
+// the account, so it's safe here even though this callable's `login`-purpose
+// path runs mid-MFA where the caller may be unauthenticated.
+const SMS_APP_CHECK_ENFORCED = process.env.SMS_APP_CHECK_ENFORCED === "true";
+
 const RATE_LIMIT_CONFIG_DOC = "platformConfig/smsRateLimits";
 const DEFAULT_MAX_PER_DAY = 5;
 const WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -83,7 +89,12 @@ function phoneToDocId(phoneE164: string): string {
 }
 
 export const requestSmsVerification = fns
-  .runWith({timeoutSeconds: 15, memory: "128MB"})
+  .runWith({
+    timeoutSeconds: 15,
+    memory: "128MB",
+    enforceAppCheck: SMS_APP_CHECK_ENFORCED,
+    consumeAppCheckToken: SMS_APP_CHECK_ENFORCED,
+  })
   .https.onCall(async (data, context) => {
     const phone = normalizePhone(data?.phoneE164);
     const purpose = typeof data?.purpose === "string" ? data.purpose : "";
