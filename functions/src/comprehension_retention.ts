@@ -7,7 +7,7 @@
 //
 // Mirrors the scheduled-pubsub pattern used by impersonation.ts:849.
 
-import * as functions from "firebase-functions";
+import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 
 const fns = functions.region("australia-southeast1");
