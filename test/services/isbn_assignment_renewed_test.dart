@@ -1,5 +1,7 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lumi_reading_tracker/core/models/service_status.dart';
+import 'package:lumi_reading_tracker/core/services/service_status_controller.dart';
 import 'package:lumi_reading_tracker/services/isbn_assignment_service.dart';
 
 /// Verifies that [IsbnAssignmentService.assignResolvedBooks] tags an item's
@@ -17,6 +19,16 @@ void main() {
   setUp(() {
     firestore = FakeFirebaseFirestore();
     service = IsbnAssignmentService(firestore: firestore);
+    // These assert the ONLINE write path (they read the written allocation
+    // back). assignResolvedBooks queues offline unless the status is healthy,
+    // so mark it healthy — matches reading_log_service_test.
+    ServiceStatusController.instance
+        .debugSetCurrent(ServiceStatusSnapshot.healthy());
+  });
+
+  tearDown(() {
+    ServiceStatusController.instance
+        .debugSetCurrent(ServiceStatusSnapshot.unknown());
   });
 
   Future<Map<String, dynamic>?> itemMetadata() async {

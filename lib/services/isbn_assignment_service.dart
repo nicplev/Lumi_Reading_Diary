@@ -224,42 +224,94 @@ class IsbnAssignmentService {
     // silently lost. Queue it and replay on reconnect (replayQueuedAssignment),
     // mirroring the reading-log offline queue.
     if (!ServiceStatusController.instance.current.canWriteToFirebase) {
-      await OfflineService.instance.enqueueAllocationAssignment(
+      return _queueAssignmentOffline(
         schoolId: schoolId,
         classId: classId,
         studentId: studentId,
         teacherId: teacherId,
-        books: books.map((b) => b.toMap()).toList(),
+        books: books,
         targetMinutes: targetMinutes,
         sessionId: sessionId,
-        targetDateMs: targetDate?.millisecondsSinceEpoch,
-        renewedIsbns: renewedIsbns.toList(),
-      );
-      final referenceDate = targetDate ?? DateTime.now();
-      final allocationId = buildWeeklyAllocationId(
-        studentId: studentId,
-        weekStart: startOfWeek(referenceDate),
-      );
-      return IsbnAssignmentResult(
-        allocationId: allocationId,
-        processedBooks: books,
-        newlyAssignedBooks: books,
-        duplicateIsbns: const [],
-        invalidCodes: const [],
-        totalAssignedBooks: books.length,
-        queuedOffline: true,
+        targetDate: targetDate,
+        renewedIsbns: renewedIsbns,
       );
     }
-    return _writeResolvedBooks(
+    try {
+      return await _writeResolvedBooks(
+        schoolId: schoolId,
+        classId: classId,
+        studentId: studentId,
+        teacherId: teacherId,
+        books: books,
+        targetMinutes: targetMinutes,
+        sessionId: sessionId,
+        targetDate: targetDate,
+        renewedIsbns: renewedIsbns,
+      );
+    } on FirebaseException catch (e) {
+      // The health signal said we could write, but the transaction couldn't
+      // reach the backend (connectivity dropped between the check and the
+      // commit, or the health probe simply lagged reality). A transaction can't
+      // buffer to the local cache like a plain set() — it throws instead of
+      // deferring — so without this the scan would surface a generic error and
+      // be lost unless the teacher re-scanned. Re-queue it instead. The replay
+      // is idempotent: _upsertWeeklyAllocation dedupes by ACTIVE ISBN, so even a
+      // write that secretly committed before its ack failed won't double-add.
+      if (e.code == 'unavailable' || e.code == 'deadline-exceeded') {
+        return _queueAssignmentOffline(
+          schoolId: schoolId,
+          classId: classId,
+          studentId: studentId,
+          teacherId: teacherId,
+          books: books,
+          targetMinutes: targetMinutes,
+          sessionId: sessionId,
+          targetDate: targetDate,
+          renewedIsbns: renewedIsbns,
+        );
+      }
+      rethrow;
+    }
+  }
+
+  /// Enqueues an assignment for offline replay and returns the queued result.
+  /// Shared by the offline-guard branch and the network-failure fallback in
+  /// [assignResolvedBooks] so both paths serialise + shape the result identically.
+  Future<IsbnAssignmentResult> _queueAssignmentOffline({
+    required String schoolId,
+    required String classId,
+    required String studentId,
+    required String teacherId,
+    required List<ScannedIsbnBook> books,
+    int targetMinutes = 20,
+    String? sessionId,
+    DateTime? targetDate,
+    Set<String> renewedIsbns = const <String>{},
+  }) async {
+    await OfflineService.instance.enqueueAllocationAssignment(
       schoolId: schoolId,
       classId: classId,
       studentId: studentId,
       teacherId: teacherId,
-      books: books,
+      books: books.map((b) => b.toMap()).toList(),
       targetMinutes: targetMinutes,
       sessionId: sessionId,
-      targetDate: targetDate,
-      renewedIsbns: renewedIsbns,
+      targetDateMs: targetDate?.millisecondsSinceEpoch,
+      renewedIsbns: renewedIsbns.toList(),
+    );
+    final referenceDate = targetDate ?? DateTime.now();
+    final allocationId = buildWeeklyAllocationId(
+      studentId: studentId,
+      weekStart: startOfWeek(referenceDate),
+    );
+    return IsbnAssignmentResult(
+      allocationId: allocationId,
+      processedBooks: books,
+      newlyAssignedBooks: books,
+      duplicateIsbns: const [],
+      invalidCodes: const [],
+      totalAssignedBooks: books.length,
+      queuedOffline: true,
     );
   }
 
