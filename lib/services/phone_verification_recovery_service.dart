@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 /// Which auth flow generated the pending verification. The recovery
@@ -104,6 +106,10 @@ class PhoneVerificationRecoveryService {
   static const String _boxName = 'phone_verification_recovery';
   static const String _recordKey = 'pending';
 
+  /// Secure-storage key under which the base64 Hive AES key lives (Keychain
+  /// on iOS / Keystore-backed EncryptedSharedPreferences on Android).
+  static const String _cipherKeyName = 'phone_verification_recovery_key';
+
   /// Records older than this are treated as stale and cleared on read.
   /// Firebase verification IDs typically expire after ~60 seconds; we
   /// give a generous buffer for slow networks and OS pauses.
@@ -121,11 +127,12 @@ class PhoneVerificationRecoveryService {
   Future<void> initialize() async {
     if (_initialized) return;
     try {
-      _box = await Hive.openBox<dynamic>(_boxName);
+      final cipher = await _resolveCipher();
+      _box = await _openEncryptedBox(cipher);
       _initialized = true;
       if (kDebugMode) {
         debugPrint(
-            '[phone-recovery] initialized box=$_boxName hasPending=${_box?.get(_recordKey) != null}');
+            '[phone-recovery] initialized box=$_boxName (encrypted) hasPending=${_box?.get(_recordKey) != null}');
       }
     } catch (e) {
       // Recovery is a safety net — if Hive fails to open we'd rather
@@ -133,6 +140,46 @@ class PhoneVerificationRecoveryService {
       if (kDebugMode) {
         debugPrint('[phone-recovery] init failed: $e');
       }
+    }
+  }
+
+  /// Resolves the AES cipher, minting + persisting a fresh 256-bit key in
+  /// secure storage (Keychain / Keystore) on first run. The record this box
+  /// holds carries signup PII (email, name, link code, phone), so it must be
+  /// encrypted at rest — `allowBackup=false` alone doesn't protect a rooted
+  /// or jailbroken device.
+  Future<HiveAesCipher> _resolveCipher() async {
+    const storage = FlutterSecureStorage(
+      aOptions: AndroidOptions(encryptedSharedPreferences: true),
+      iOptions: IOSOptions(
+        accessibility: KeychainAccessibility.first_unlock,
+      ),
+    );
+    final existing = await storage.read(key: _cipherKeyName);
+    if (existing != null) {
+      return HiveAesCipher(base64Decode(existing));
+    }
+    final key = Hive.generateSecureKey();
+    await storage.write(key: _cipherKeyName, value: base64Encode(key));
+    return HiveAesCipher(key);
+  }
+
+  /// Opens the box with [cipher]. If a pre-existing box on disk was written
+  /// unencrypted (an app upgraded from before 3.1) or with a key we no longer
+  /// hold, opening with a cipher throws — in that case we wipe and recreate.
+  /// Safe: the box only ever holds a single record with a <5-minute TTL, so
+  /// the worst case is one in-flight verification is dropped and the user
+  /// re-requests the SMS code.
+  Future<Box<dynamic>> _openEncryptedBox(HiveAesCipher cipher) async {
+    try {
+      return await Hive.openBox<dynamic>(_boxName, encryptionCipher: cipher);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint(
+            '[phone-recovery] encrypted open failed, wiping legacy box: $e');
+      }
+      await Hive.deleteBoxFromDisk(_boxName);
+      return Hive.openBox<dynamic>(_boxName, encryptionCipher: cipher);
     }
   }
 
