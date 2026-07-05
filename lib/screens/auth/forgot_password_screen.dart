@@ -69,7 +69,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   String _getErrorMessage(String code) {
     switch (code) {
       case 'user-not-found':
-        return 'No user found with this email address.';
+        return 'No account found for this email. If you signed up with a phone '
+            'number, go back and use "Log in with phone" — password reset only '
+            'works for email accounts.';
       case 'invalid-email':
         return 'Please enter a valid email address.';
       default:
