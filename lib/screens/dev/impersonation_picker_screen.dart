@@ -290,9 +290,9 @@ class _PrivacyNotice extends StatelessWidget {
           Expanded(
             child: Text(
               'You are about to view real school data in READ-ONLY mode. '
-              'Every session and action is logged to the super-admin audit '
-              'trail and can be reviewed by the school at any time. '
-              'Writes are blocked in three layers.',
+              'This session is logged to the super-admin audit trail and can '
+              'be reviewed by the school at any time. Writes are blocked in '
+              'three layers (the app, security rules, and Cloud Functions).',
               style: TextStyle(fontSize: 12, height: 1.35),
             ),
           ),
