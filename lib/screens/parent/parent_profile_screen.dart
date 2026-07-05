@@ -242,20 +242,11 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
           const SizedBox(height: LumiTokens.space4),
           Row(
             children: [
-              Container(
+              Image.asset(
+                'assets/characters/red lumi (default).png',
                 width: 64,
                 height: 64,
-                decoration: const BoxDecoration(
-                  color: LumiTokens.tintGreen,
-                  shape: BoxShape.circle,
-                ),
-                padding: const EdgeInsets.all(8),
-                child: Image.asset(
-                  'assets/characters/red lumi (default).png',
-                  width: 48,
-                  height: 48,
-                  fit: BoxFit.contain,
-                ),
+                fit: BoxFit.contain,
               ),
               const SizedBox(width: LumiTokens.space4),
               Expanded(
@@ -960,7 +951,7 @@ class _HeaderChip extends StatelessWidget {
         vertical: LumiTokens.space1,
       ),
       decoration: BoxDecoration(
-        color: LumiTokens.tintGreen,
+        border: Border.all(color: LumiTokens.green, width: 1.5),
         borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
       ),
       child: Row(
