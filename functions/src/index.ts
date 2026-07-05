@@ -1,4 +1,6 @@
 import * as functions from "firebase-functions/v1";
+import {setGlobalOptions} from "firebase-functions/v2";
+import {onSchedule} from "firebase-functions/v2/scheduler";
 import {defineSecret} from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import sgMail from "@sendgrid/mail";
@@ -36,6 +38,19 @@ import {
 } from "./stats_aggregation";
 
 const fns = functions.region("australia-southeast1");
+
+// ── Gen2 migration (Phase 6) ────────────────────────────────────────────────
+// Global defaults for every v2 (Gen2) function as it's migrated off the v1
+// `fns` builder. Region matches the v1 functions. serviceAccount is PINNED to
+// the App Engine default SA (the Gen1 runtime SA) so every existing IAM grant
+// carries over unchanged — notably the getComprehensionAudioUrl signBlob grant
+// and all Firestore/Storage permissions — instead of Gen2's Compute Engine
+// default SA. This call only affects v2 functions; the v1 `fns`-built functions
+// are unaffected during the coexistence period.
+setGlobalOptions({
+  region: "australia-southeast1",
+  serviceAccount: "lumi-ninc-au@appspot.gserviceaccount.com",
+});
 
 // App Check enforcement, opt-in via env var (default OFF). Matches
 // code_verification.ts / impersonation.ts — flip a flag only AFTER the client
@@ -1322,11 +1337,14 @@ async function pruneStaleTokensForSchool(
  * Weekly sweep to drop FCM tokens that haven't refreshed in 30 days.
  * Runs Mondays at 04:00 UTC — off-peak across LON/NYC/SYD.
  */
-export const pruneStaleFcmTokens = fns
-  .runWith({timeoutSeconds: 540, memory: "512MB"})
-  .pubsub.schedule("0 4 * * 1")
-  .timeZone("UTC")
-  .onRun(async () => {
+export const pruneStaleFcmTokens = onSchedule(
+  {
+    schedule: "0 4 * * 1",
+    timeZone: "UTC",
+    timeoutSeconds: 540,
+    memory: "512MiB",
+  },
+  async () => {
     const cutoff = admin.firestore.Timestamp.fromMillis(
       Date.now() - FCM_TOKEN_STALE_DAYS * 24 * 60 * 60 * 1000,
     );
@@ -1346,7 +1364,6 @@ export const pruneStaleFcmTokens = fns
         schools: schoolsSnap.size,
         removed: total,
       });
-      return null;
     } catch (error) {
       functions.logger.error("Error in pruneStaleFcmTokens", {
         error: error instanceof Error ? error.message : String(error),
