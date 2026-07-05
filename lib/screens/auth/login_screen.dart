@@ -15,7 +15,6 @@ import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_input.dart';
-import '../../core/widgets/lumi_mascot.dart';
 import '../../core/routing/app_router.dart';
 import '../../data/models/user_model.dart';
 import '../../services/firebase_service.dart';
@@ -652,8 +651,8 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 const SizedBox(height: 12),
 
-                // Lumi mascot — small, no message pill. Long-press (5s)
-                // reveals the DEV-only surface.
+                // Welcome illustration — long-press (5s) reveals the
+                // DEV-only surface.
                 Center(
                   child: Animate(
                     effects: const [
@@ -673,9 +672,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           },
                         ),
                       },
-                      child: const LumiMascot(
-                        variant: LumiVariant.login,
-                        size: 88,
+                      child: Image.asset(
+                        'assets/UI Lumi/lumi welcome.png',
+                        height: 128,
+                        fit: BoxFit.contain,
                       ),
                     ),
                   ),
