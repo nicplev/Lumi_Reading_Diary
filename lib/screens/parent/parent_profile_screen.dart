@@ -183,17 +183,16 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Keep the local children list in sync with the live provider.
+    // Keep the local children list in sync with the live provider. Adopt
+    // every emission: an id-set-only comparison here used to discard
+    // content-only changes (e.g. the characterId written at the end of the
+    // link-a-child flow), leaving a stale initials avatar on the child row.
     ref.listen<AsyncValue<List<StudentModel>>>(
       parentChildrenProvider,
       (_, next) {
         final children = next.value;
         if (children == null || !mounted) return;
-        final sameSet = children.length == _linkedChildren.length &&
-            children.every(
-              (c) => _linkedChildren.any((existing) => existing.id == c.id),
-            );
-        if (!sameSet) setState(() => _linkedChildren = children);
+        setState(() => _linkedChildren = children);
       },
     );
 
@@ -251,7 +250,12 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
                   shape: BoxShape.circle,
                 ),
                 padding: const EdgeInsets.all(8),
-                child: const LumiMascot(variant: LumiVariant.parent, size: 48),
+                child: Image.asset(
+                  'assets/characters/red lumi (default).png',
+                  width: 48,
+                  height: 48,
+                  fit: BoxFit.contain,
+                ),
               ),
               const SizedBox(width: LumiTokens.space4),
               Expanded(

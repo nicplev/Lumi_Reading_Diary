@@ -156,6 +156,7 @@ flutter:
     - assets/staff_characters/
     - assets/lumi/
     - assets/app_icons/
+    - assets/UI Lumi/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

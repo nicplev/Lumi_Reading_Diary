@@ -712,11 +712,22 @@ class _TodayCardState extends State<_TodayCard> {
               ],
             ),
             LumiGap.m,
-            Text(
-              hasLoggedToday
-                  ? '${student.firstName} — all done!'
-                  : "${student.firstName}'s reading",
-              style: LumiType.subhead,
+            // Avatar keeps the child visible on single-child accounts, where
+            // the switcher chips and multi-child rows (the only other places
+            // it appears on Home) are hidden.
+            Row(
+              children: [
+                StudentAvatar.fromStudent(student, size: 40),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    hasLoggedToday
+                        ? '${student.firstName} — all done!'
+                        : "${student.firstName}'s reading",
+                    style: LumiType.subhead,
+                  ),
+                ),
+              ],
             ),
             LumiGap.s,
             if (hasLoggedToday) ...[

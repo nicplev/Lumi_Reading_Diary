@@ -309,7 +309,12 @@ service cloud.firestore {
           allow get, list: if (isSignedIn() && request.auth.uid == parentId) ||
               isDevImpersonatingSchool(schoolId);
 
-          allow create, delete: if false;
+          allow create: if false;
+
+          // Parents may clear their own inbox (swipe-to-dismiss & Clear all).
+          allow delete: if isSignedIn() &&
+              writeAllowedForDev() &&
+              request.auth.uid == parentId;
 
           allow update: if isSignedIn() &&
               writeAllowedForDev() &&
