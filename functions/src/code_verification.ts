@@ -134,7 +134,7 @@ export async function resolveSchoolCode(
 // start of registration, before the account exists (teacher_registration_
 // modal.dart). Validity mirrors SchoolCodeModel.isValid / invalidReason exactly.
 export const verifySchoolCode = onCall(
-  runtime({timeoutSeconds: 15, memory: "128MiB"}),
+  runtime({timeoutSeconds: 15, memory: "256MiB"}),
   async (request) => {
     const data: {code?: unknown} = request.data;
     const raw = typeof data?.code === "string" ? data.code : "";

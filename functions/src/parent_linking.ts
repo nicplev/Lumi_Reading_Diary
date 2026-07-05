@@ -462,7 +462,7 @@ export const linkParentToStudent = onCall(
 // `kind`) as the redeem path, so the client's existing `_mapHttpsError` handles
 // expired/used/revoked/invalid identically.
 export const verifyStudentLinkCode = onCall(
-  parentLinkingRuntime({timeoutSeconds: 15, memory: "128MiB"}),
+  parentLinkingRuntime({timeoutSeconds: 15, memory: "256MiB"}),
   async (request) => {
     const data: {code?: unknown} = request.data;
     const codeUpper = asNonEmptyString(data?.code, "code").toUpperCase();

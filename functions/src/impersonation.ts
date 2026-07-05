@@ -439,7 +439,7 @@ export const startImpersonationSession = onCall(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const endImpersonationSession = onCall(
-  impersonationRuntime({timeoutSeconds: 15, memory: "128MiB"}),
+  impersonationRuntime({timeoutSeconds: 15, memory: "256MiB"}),
   async (request) => {
     const data: {sessionId?: unknown} = request.data;
     const {uid} = requireAuthed(request);
@@ -489,7 +489,7 @@ export const endImpersonationSession = onCall(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const revokeImpersonationSession = onCall(
-  impersonationRuntime({timeoutSeconds: 15, memory: "128MiB"}),
+  impersonationRuntime({timeoutSeconds: 15, memory: "256MiB"}),
   async (request) => {
     const data: {sessionId?: unknown; reason?: unknown} = request.data;
     const {uid} = await requireSuperAdminAuth(request);
@@ -530,7 +530,7 @@ export const revokeImpersonationSession = onCall(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const reportImpersonationActivity = onCall(
-  impersonationRuntime({timeoutSeconds: 10, memory: "128MiB"}),
+  impersonationRuntime({timeoutSeconds: 10, memory: "256MiB"}),
   async (request) => {
     const data: {sessionId?: unknown; eventType?: unknown; details?: unknown} = request.data;
     const {uid} = requireAuthed(request);
@@ -602,7 +602,7 @@ export const reportImpersonationActivity = onCall(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const reportBlockedWrite = onCall(
-  impersonationRuntime({timeoutSeconds: 10, memory: "128MiB"}),
+  impersonationRuntime({timeoutSeconds: 10, memory: "256MiB"}),
   async (request) => {
     const data: {
       sessionId?: unknown;

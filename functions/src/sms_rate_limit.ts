@@ -89,7 +89,7 @@ function phoneToDocId(phoneE164: string): string {
 
 export const requestSmsVerification = onCall({
   timeoutSeconds: 15,
-  memory: "128MiB",
+  memory: "256MiB",
   enforceAppCheck: SMS_APP_CHECK_ENFORCED,
   consumeAppCheckToken: SMS_APP_CHECK_ENFORCED,
 }, async (request) => {
