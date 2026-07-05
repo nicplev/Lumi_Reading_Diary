@@ -381,6 +381,22 @@ export const startImpersonationSession = fns
       context
     );
 
+    // Mint the token FIRST. It is the only step that can fail on
+    // infrastructure grounds (createCustomToken needs the runtime service
+    // account's Token Creator role). Doing it before any Firestore write means
+    // a failure returns an error to the caller without leaving an orphaned
+    // "active" session doc + session_started audit entry behind.
+    const customToken = await admin.auth().createCustomToken(devUid, {
+      devImpersonating: true,
+      impersonationSchoolId: targetSchoolId,
+      impersonationUserId: targetUserId,
+      impersonationRole: targetRole,
+      impersonationSessionId: sessionId,
+      devReadOnly: true,
+      devUid,
+      devEmail,
+    });
+
     await sessionRef.set({
       devUid,
       devEmail,
@@ -407,17 +423,6 @@ export const startImpersonationSession = fns
       targetUserId,
       eventType: "session_started",
       details: {targetRole, reason, clientInfo},
-    });
-
-    const customToken = await admin.auth().createCustomToken(devUid, {
-      devImpersonating: true,
-      impersonationSchoolId: targetSchoolId,
-      impersonationUserId: targetUserId,
-      impersonationRole: targetRole,
-      impersonationSessionId: sessionId,
-      devReadOnly: true,
-      devUid,
-      devEmail,
     });
 
     return {
