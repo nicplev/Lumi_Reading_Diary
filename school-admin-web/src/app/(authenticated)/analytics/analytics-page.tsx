@@ -14,6 +14,7 @@ import { EmptyState } from '@/components/lumi/empty-state';
 import { Icon } from '@/components/lumi/icon';
 import { ReadingLevelPill } from '@/components/lumi/reading-level-pill';
 import { Avatar } from '@/components/lumi/avatar';
+import { ClassEngagementChart } from '@/components/lumi/class-engagement-chart';
 import { useAnalytics, type AnalyticsPeriod } from '@/lib/hooks/use-analytics';
 import type {
   EngagementPoint,
@@ -105,6 +106,7 @@ export function AnalyticsPage({ levelSchema, termDates }: AnalyticsPageProps) {
   const [period, setPeriod] = useState<AnalyticsPeriod>('month');
   const [termKey, setTermKey] = useState<string>(() => detectCurrentTerm(termDates));
   const [termDropdownOpen, setTermDropdownOpen] = useState(false);
+  const [classMetric, setClassMetric] = useState<'logs' | 'minutes'>('logs');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const { data, isFetching, isError, refetch } = useAnalytics(period, period === 'term' ? termKey : undefined);
@@ -132,6 +134,13 @@ export function AnalyticsPage({ levelSchema, termDates }: AnalyticsPageProps) {
   const chartData = trend.length > 14
     ? aggregateWeekly(trend)
     : trend.map((p) => ({ label: formatShortDate(p.date), minutes: p.minutes, logs: p.logs }));
+
+  // Per-class comparison series — same day/week bucketing as the aggregate
+  // trend so the multi-line chart lines up with the charts beside it.
+  const classSeries = data?.classTrend ?? { classes: [], points: [] };
+  const classChartRows = classSeries.points.length > 14
+    ? aggregateClassWeekly(classSeries.points, classSeries.classes)
+    : classSeries.points.map((p) => ({ ...p, label: formatShortDate(String(p.date)) }));
 
   // Participation = distinct students who actually read in the selected period
   // (metrics.uniqueReaders), over students in active classes. Clamped so an
@@ -245,6 +254,38 @@ export function AnalyticsPage({ levelSchema, termDates }: AnalyticsPageProps) {
             subtitle="haven't read in 7+ days"
           />
         </div>
+
+        {/* Class comparison — one coloured line per class, at-a-glance. */}
+        <Card className="mb-6">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <h3 className="text-lg font-bold text-ink">Class Comparison</h3>
+              <p className="text-xs text-muted mt-0.5">
+                Reading {classMetric === 'minutes' ? 'minutes' : 'logs'} per class over this period
+              </p>
+            </div>
+            <div className="inline-flex items-center rounded-full border border-rule bg-cream p-0.5 text-xs font-semibold shrink-0">
+              {(['logs', 'minutes'] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setClassMetric(m)}
+                  className={`px-3 py-1.5 rounded-full transition-all ${
+                    classMetric === m ? 'bg-section text-on-section shadow-sm' : 'text-muted hover:text-ink'
+                  }`}
+                >
+                  {m === 'logs' ? 'Logs' : 'Minutes'}
+                </button>
+              ))}
+            </div>
+          </div>
+          {classSeries.classes.length === 0 ? (
+            <EmptyState icon={<Icon name="show_chart" size={40} />} title="No class activity" description="No reading logs by class in this period." />
+          ) : (
+            <div className="h-[320px]">
+              <ClassEngagementChart classes={classSeries.classes} rows={classChartRows} metric={classMetric} xKey="label" />
+            </div>
+          )}
+        </Card>
 
         {/* Trend charts — fixed height, always aligned side by side */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -610,6 +651,27 @@ function aggregateWeekly(points: EngagementPoint[]): { label: string; minutes: n
     const startDate = formatShortDate(chunk[0].date);
     const endDate = formatShortDate(chunk[chunk.length - 1].date);
     weeks.push({ label: `${startDate}-${endDate}`, minutes, logs });
+  }
+  return weeks;
+}
+
+// Weekly buckets for the per-class series — same 7-day chunking as
+// aggregateWeekly, summing each `${classId}:logs` / `${classId}:minutes` key.
+function aggregateClassWeekly(
+  points: Array<Record<string, number | string>>,
+  classes: { id: string; name: string }[],
+): Array<Record<string, number | string>> {
+  const weeks: Array<Record<string, number | string>> = [];
+  for (let i = 0; i < points.length; i += 7) {
+    const chunk = points.slice(i, i + 7);
+    const row: Record<string, number | string> = {
+      label: `${formatShortDate(String(chunk[0].date))}-${formatShortDate(String(chunk[chunk.length - 1].date))}`,
+    };
+    for (const c of classes) {
+      row[`${c.id}:logs`] = chunk.reduce((s, p) => s + Number(p[`${c.id}:logs`] ?? 0), 0);
+      row[`${c.id}:minutes`] = chunk.reduce((s, p) => s + Number(p[`${c.id}:minutes`] ?? 0), 0);
+    }
+    weeks.push(row);
   }
   return weeks;
 }

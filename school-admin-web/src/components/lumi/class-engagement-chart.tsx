@@ -8,10 +8,13 @@ interface ClassMeta {
   name: string;
 }
 
-interface WeeklyClassChartProps {
+interface ClassEngagementChartProps {
   classes: ClassMeta[];
+  /** Rows keyed by [xKey] plus `${classId}:logs` and `${classId}:minutes`. */
   rows: Array<Record<string, number | string>>;
   metric: 'logs' | 'minutes';
+  /** X-axis field on each row (e.g. 'label' for the analytics buckets). */
+  xKey?: string;
 }
 
 // Distinct, readable-on-cream line colours (Lumi tokens + a couple of extras),
@@ -30,29 +33,31 @@ const PALETTE = [
 ];
 
 /**
- * Multi-line weekly chart — one coloured line per active class, so a school
+ * Multi-line class-comparison chart — one coloured line per class, so a school
  * admin can see at a glance how each class is tracking. The metric toggle
  * (logs / minutes) switches every line at once. Hovering a legend entry
  * highlights that class and dims the rest.
+ *
+ * Restored from the pre-#203 dashboard onto the analytics page, where it now
+ * follows the term/period selector via [rows].
  */
-export function WeeklyClassChart({ classes, rows, metric }: WeeklyClassChartProps) {
+export function ClassEngagementChart({ classes, rows, metric, xKey = 'label' }: ClassEngagementChartProps) {
   const [hovered, setHovered] = useState<string | null>(null);
-  const suffix = metric === 'minutes' ? 'minutes' : 'count';
   const unit = metric === 'minutes' ? 'min' : 'logs';
 
   const maxValue = Math.max(
     1,
-    ...rows.flatMap((r) => classes.map((c) => Number(r[`${c.id}:${suffix}`] ?? 0))),
+    ...rows.flatMap((r) => classes.map((c) => Number(r[`${c.id}:${metric}`] ?? 0))),
   );
 
   return (
-    <div className="h-full min-h-[220px]">
+    <div className="h-full min-h-[240px]">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={rows} margin={{ top: 5, right: 5, bottom: 5, left: -15 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E5E2DC" vertical={false} />
           <XAxis
-            dataKey="day"
-            tick={{ fill: '#6B6B6B', fontSize: 12, fontWeight: 600 }}
+            dataKey={xKey}
+            tick={{ fill: '#6B6B6B', fontSize: 11, fontWeight: 600 }}
             tickLine={false}
             axisLine={{ stroke: '#E5E2DC' }}
           />
@@ -87,7 +92,7 @@ export function WeeklyClassChart({ classes, rows, metric }: WeeklyClassChartProp
             <Line
               key={c.id}
               type="monotone"
-              dataKey={`${c.id}:${suffix}`}
+              dataKey={`${c.id}:${metric}`}
               name={c.name}
               stroke={PALETTE[i % PALETTE.length]}
               strokeWidth={2}

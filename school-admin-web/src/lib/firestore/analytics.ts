@@ -17,6 +17,18 @@ export interface EngagementPoint {
   logs: number;
 }
 
+export interface ClassEngagementSeries {
+  /** Classes with at least one log in the period, sorted by name. */
+  classes: { id: string; name: string }[];
+  /**
+   * One entry per day in range (weekends skipped when weekdaysOnly). Each has
+   * `date` (ISO yyyy-mm-dd) plus, per class, `${classId}:logs` and
+   * `${classId}:minutes`. The client buckets these to weeks when the range is
+   * long, mirroring the aggregate trend chart.
+   */
+  points: Array<Record<string, number | string>>;
+}
+
 export interface LevelBucket {
   level: string;
   count: number;
@@ -223,6 +235,80 @@ export async function getEngagementTrend(
     return result;
   } catch {
     return [];
+  }
+}
+
+/**
+ * Per-class engagement over the period — the multi-line "class comparison"
+ * series (one line per class). Mirrors getEngagementTrend's daily bucketing and
+ * gap-filling, but splits each day by classId. Reuses the prefetched logs, so
+ * it adds no readingLogs scan (just one classes read to resolve names).
+ */
+export async function getClassEngagementTrend(
+  schoolId: string,
+  startDate: Date,
+  endDate: Date,
+  weekdaysOnly: boolean = false,
+  prefetchedLogs?: LogDoc[],
+): Promise<ClassEngagementSeries> {
+  try {
+    const logDocs = prefetchedLogs ?? (await fetchReadingLogsInRange(schoolId, startDate, endDate));
+
+    // Aggregate per (dateKey → classId → totals).
+    const byDate = new Map<string, Map<string, { logs: number; minutes: number }>>();
+    const activeClassIds = new Set<string>();
+    for (const doc of logDocs) {
+      const d = doc.data();
+      const classId = d.classId as string | undefined;
+      if (!classId) continue;
+      const logDate: Date = d.date?.toDate?.() ?? new Date();
+      if (weekdaysOnly && isWeekend(logDate)) continue;
+      const key = logDate.toISOString().split('T')[0];
+      activeClassIds.add(classId);
+      let dayMap = byDate.get(key);
+      if (!dayMap) { dayMap = new Map(); byDate.set(key, dayMap); }
+      const cur = dayMap.get(classId) ?? { logs: 0, minutes: 0 };
+      cur.logs += 1;
+      cur.minutes += d.minutesRead ?? 0;
+      dayMap.set(classId, cur);
+    }
+
+    if (activeClassIds.size === 0) return { classes: [], points: [] };
+
+    // Resolve names for the classes that have activity.
+    const classesSnap = await adminDb.collection('schools').doc(schoolId).collection('classes').get();
+    const classNames = new Map<string, string>();
+    classesSnap.docs.forEach((c) => {
+      const data = c.data();
+      classNames.set(c.id, (data.name as string) || (data.yearLevel as string) || 'Class');
+    });
+    const classes = Array.from(activeClassIds)
+      .map((id) => ({ id, name: classNames.get(id) ?? 'Unknown class' }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    // Fill each day in range (skipping weekends when weekdaysOnly).
+    const points: Array<Record<string, number | string>> = [];
+    const current = new Date(startDate);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    while (current <= end) {
+      if (!weekdaysOnly || !isWeekend(current)) {
+        const key = current.toISOString().split('T')[0];
+        const dayMap = byDate.get(key);
+        const point: Record<string, number | string> = { date: key };
+        for (const c of classes) {
+          const v = dayMap?.get(c.id);
+          point[`${c.id}:logs`] = v?.logs ?? 0;
+          point[`${c.id}:minutes`] = v?.minutes ?? 0;
+        }
+        points.push(point);
+      }
+      current.setDate(current.getDate() + 1);
+    }
+
+    return { classes, points };
+  } catch {
+    return { classes: [], points: [] };
   }
 }
 
