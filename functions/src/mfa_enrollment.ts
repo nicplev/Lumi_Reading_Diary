@@ -24,10 +24,9 @@
 import * as crypto from "crypto";
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions/v1";
+import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {linkParentToStudentCore, resolveLinkCodeSchool} from "./parent_linking";
 import {resolveSchoolCode} from "./code_verification";
-
-const fns = functions.region("australia-southeast1");
 
 // App Check enforcement, opt-in via env var (default OFF). These callables fire
 // during signup — before the account is fully set up — so enforcement must NOT
@@ -227,17 +226,18 @@ async function finalizeTeacher(
   }
 }
 
-export const enrollLinkedPhoneAsMfa = fns
-  .runWith({
+export const enrollLinkedPhoneAsMfa = onCall(
+  {
     timeoutSeconds: 60,
-    memory: "256MB",
+    memory: "256MiB",
     enforceAppCheck: MFA_ENROLLMENT_APP_CHECK_ENFORCED,
     consumeAppCheckToken: MFA_ENROLLMENT_APP_CHECK_ENFORCED,
-  })
-  .https.onCall(async (data, context) => {
-    const uid = context.auth?.uid;
+  },
+  async (request) => {
+    const data = request.data;
+    const uid = request.auth?.uid;
     if (!uid) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "unauthenticated",
         "You must be signed in to enroll a second factor.",
       );
@@ -246,7 +246,7 @@ export const enrollLinkedPhoneAsMfa = fns
     const rawPhone =
       typeof data?.phoneE164 === "string" ? data.phoneE164.trim() : "";
     if (!E164_REGEX.test(rawPhone)) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "invalid-argument",
         "phoneE164 must be in E.164 format (e.g. +61400000000).",
       );
@@ -267,7 +267,7 @@ export const enrollLinkedPhoneAsMfa = fns
     // address they don't own (hijacking that email's login school resolution).
     // The token email is the address this account actually authenticated with.
     const tokenEmail = optStr(
-      (context.auth?.token as {email?: unknown} | undefined)?.email,
+      (request.auth?.token as {email?: unknown} | undefined)?.email,
     );
     const linkCode = optStr(data?.linkCode);
 
@@ -313,7 +313,7 @@ export const enrollLinkedPhoneAsMfa = fns
       linkCode,
     } : null;
     if (role && (!ctx?.schoolId)) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "invalid-argument",
         "schoolId is required when finalising signup.",
       );
@@ -328,7 +328,7 @@ export const enrollLinkedPhoneAsMfa = fns
       user = await auth.getUser(uid);
     } catch (err) {
       if ((err as {code?: string})?.code === "auth/user-not-found") {
-        throw new functions.https.HttpsError(
+        throw new HttpsError(
           "unauthenticated",
           "Your session is no longer valid. Please sign in again.",
         );
@@ -340,7 +340,7 @@ export const enrollLinkedPhoneAsMfa = fns
       user = await auth.getUser(uid);
     }
     if (!hasLinkedPhone(user, rawPhone)) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "failed-precondition",
         "Phone number is not verified for this account.",
       );
@@ -384,7 +384,7 @@ export const enrollLinkedPhoneAsMfa = fns
           code.includes("second-factor-already-in-use") ||
           code.includes("already-exists")
         ) {
-          throw new functions.https.HttpsError(
+          throw new HttpsError(
             "already-exists",
             "This phone number is already set up as a second factor on " +
               "another account.",
@@ -395,7 +395,7 @@ export const enrollLinkedPhoneAsMfa = fns
           code,
           error: err instanceof Error ? err.message : String(err),
         });
-        throw new functions.https.HttpsError(
+        throw new HttpsError(
           "internal",
           "Could not enroll the phone as a second factor.",
         );
@@ -472,17 +472,18 @@ interface FinalizeParentSignupInput {
   schoolId?: unknown; // transitional fallback only — see enroll derivation.
 }
 
-export const finalizeParentSignup = fns
-  .runWith({
+export const finalizeParentSignup = onCall(
+  {
     timeoutSeconds: 60,
-    memory: "256MB",
+    memory: "256MiB",
     enforceAppCheck: MFA_ENROLLMENT_APP_CHECK_ENFORCED,
     consumeAppCheckToken: MFA_ENROLLMENT_APP_CHECK_ENFORCED,
-  })
-  .https.onCall(async (data: FinalizeParentSignupInput, context) => {
-    const uid = context.auth?.uid;
+  },
+  async (request) => {
+    const data: FinalizeParentSignupInput = request.data;
+    const uid = request.auth?.uid;
     if (!uid) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "unauthenticated",
         "You must be signed in to finalise signup.",
       );
@@ -491,7 +492,7 @@ export const finalizeParentSignup = fns
     const rawPhone =
       typeof data?.phoneE164 === "string" ? data.phoneE164.trim() : "";
     if (!E164_REGEX.test(rawPhone)) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "invalid-argument",
         "phoneE164 must be in E.164 format (e.g. +61400000000).",
       );
@@ -500,11 +501,11 @@ export const finalizeParentSignup = fns
     // number, so the verified token must carry it. This stops a caller
     // finalising a parent doc under a phone they don't own.
     const tokenPhone = optStr(
-      (context.auth?.token as {phone_number?: unknown} | undefined)
+      (request.auth?.token as {phone_number?: unknown} | undefined)
         ?.phone_number,
     );
     if (tokenPhone !== rawPhone) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "failed-precondition",
         "Phone number does not match the signed-in account.",
       );
@@ -529,7 +530,7 @@ export const finalizeParentSignup = fns
     // email (unchanged behaviour — this callable is a client→server MOVE, not an
     // email-verification change). Email-index trust is tracked separately.
     const tokenEmail = optStr(
-      (context.auth?.token as {email?: unknown} | undefined)?.email,
+      (request.auth?.token as {email?: unknown} | undefined)?.email,
     );
     const ctx: FinalizeContext = {
       schoolId: derivedSchoolId ?? optStr(data?.schoolId) ?? "",
@@ -540,7 +541,7 @@ export const finalizeParentSignup = fns
       linkCode,
     };
     if (!ctx.schoolId) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "invalid-argument",
         "schoolId is required to finalise signup.",
       );

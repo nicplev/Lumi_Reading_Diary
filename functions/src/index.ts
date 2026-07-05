@@ -41,8 +41,6 @@ import {
   runReconcilePass,
 } from "./stats_aggregation";
 
-const fns = functions.region("australia-southeast1");
-
 // App Check enforcement, opt-in via env var (default OFF). Matches
 // code_verification.ts / impersonation.ts — flip a flag only AFTER the client
 // attestation rollout is verified in the App Check console, else a
@@ -807,16 +805,17 @@ async function dispatchNotificationCampaign(
   }
 }
 
-export const createNotificationCampaign = fns
-  .runWith({
+export const createNotificationCampaign = onCall(
+  {
     timeoutSeconds: 60,
-    memory: "256MB",
+    memory: "256MiB",
     enforceAppCheck: NOTIFICATION_CAMPAIGN_APP_CHECK_ENFORCED,
     consumeAppCheckToken: NOTIFICATION_CAMPAIGN_APP_CHECK_ENFORCED,
-  })
-  .https.onCall(async (rawData: NotificationCampaignPayload, context) => {
-    assertNotReadOnly(context);
-    const senderId = context.auth?.uid;
+  },
+  async (request) => {
+    const rawData: NotificationCampaignPayload = request.data;
+    assertNotReadOnly(request);
+    const senderId = request.auth?.uid;
     if (!senderId) {
       throw new functions.https.HttpsError("unauthenticated", "You must be signed in.");
     }
@@ -1490,9 +1489,10 @@ export const detectAchievements = onDocumentUpdated(
  * Params: `{ schoolId: string, studentId?: string }`. Omit studentId to process
  * the whole school. Caller must be a schoolAdmin of that school.
  */
-export const backfillAchievements = fns.https.onCall(async (data, context) => {
-  assertNotReadOnly(context);
-  if (!context.auth) {
+export const backfillAchievements = onCall(async (request) => {
+  const data = request.data;
+  assertNotReadOnly(request);
+  if (!request.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated", "Must be signed in.",
     );
@@ -1507,7 +1507,7 @@ export const backfillAchievements = fns.https.onCall(async (data, context) => {
   }
 
   const callerDoc = await db
-    .doc(`schools/${schoolId}/users/${context.auth.uid}`)
+    .doc(`schools/${schoolId}/users/${request.auth.uid}`)
     .get();
   if (!callerDoc.exists || callerDoc.data()?.role !== "schoolAdmin") {
     throw new functions.https.HttpsError(
@@ -2299,14 +2299,15 @@ export const reconcileStatsScheduled = onSchedule(
  * - Revokes any active link codes for the student
  * - Deletes the student document
  */
-export const deleteStudentWithCascade = fns
-  .runWith({
+export const deleteStudentWithCascade = onCall(
+  {
     enforceAppCheck: DELETE_STUDENT_APP_CHECK_ENFORCED,
     consumeAppCheckToken: DELETE_STUDENT_APP_CHECK_ENFORCED,
-  })
-  .https.onCall(async (data, context) => {
-    assertNotReadOnly(context);
-    if (!context.auth) {
+  },
+  async (request) => {
+    const data = request.data;
+    assertNotReadOnly(request);
+    if (!request.auth) {
       throw new functions.https.HttpsError(
         "unauthenticated",
         "Must be signed in."
@@ -2326,7 +2327,7 @@ export const deleteStudentWithCascade = fns
     // delete linked parents' Auth accounts) in any school. Mirrors the staff
     // check in backfillGuardianProfiles.
     const callerDoc = await db
-      .doc(`schools/${schoolId}/users/${context.auth.uid}`)
+      .doc(`schools/${schoolId}/users/${request.auth.uid}`)
       .get();
     const callerRole = callerDoc.exists ? callerDoc.data()!.role : null;
     if (callerRole !== "schoolAdmin" && callerRole !== "teacher") {
@@ -2374,7 +2375,7 @@ export const deleteStudentWithCascade = fns
           // Audit trail so a stray "Don't forget to log <name>'s reading"
           // notification can be traced back to the mutation that introduced it.
           linkedChildrenUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          linkedChildrenUpdatedBy: `cascade:deleteStudent:${context.auth.uid}`,
+          linkedChildrenUpdatedBy: `cascade:deleteStudent:${request.auth.uid}`,
         });
       }
     }
@@ -2401,7 +2402,7 @@ export const deleteStudentWithCascade = fns
 
     return {success: true, parentsCleaned: parentIds.length};
   }
-  );
+);
 
 /**
  * Scheduled: Process pending user deletions after the 24-hour cool-off period.
@@ -2617,10 +2618,11 @@ export const refreshGuardianProfilesOnLink = onDocumentWritten(
  * the given school and writes their projection onto each linked student. Safe
  * to re-run — writes are idempotent.
  */
-export const backfillGuardianProfiles = fns.https.onCall(
-  async (data, context) => {
-    assertNotReadOnly(context);
-    if (!context.auth) {
+export const backfillGuardianProfiles = onCall(
+  async (request) => {
+    const data = request.data;
+    assertNotReadOnly(request);
+    if (!request.auth) {
       throw new functions.https.HttpsError(
         "unauthenticated",
         "Must be signed in."
@@ -2635,7 +2637,7 @@ export const backfillGuardianProfiles = fns.https.onCall(
     }
 
     const callerDoc = await db
-      .doc(`schools/${schoolId}/users/${context.auth.uid}`)
+      .doc(`schools/${schoolId}/users/${request.auth.uid}`)
       .get();
     if (!callerDoc.exists || callerDoc.data()!.role !== "schoolAdmin") {
       throw new functions.https.HttpsError(

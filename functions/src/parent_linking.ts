@@ -1,9 +1,8 @@
 import * as functions from "firebase-functions/v1";
+import {onCall, CallableOptions} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import {assertNotReadOnly} from "./read_only_guard";
 import {buildStudentAccess, isActiveSubscriptionStatus} from "./access";
-
-const fns = functions.region("australia-southeast1");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -23,8 +22,8 @@ const APP_CHECK_ENFORCED =
   process.env.PARENT_LINKING_APP_CHECK_ENFORCED === "true";
 
 function parentLinkingRuntime(
-  opts: Pick<functions.RuntimeOptions, "timeoutSeconds" | "memory">
-): functions.RuntimeOptions {
+  opts: Pick<CallableOptions, "timeoutSeconds" | "memory">
+): CallableOptions {
   return {
     ...opts,
     enforceAppCheck: APP_CHECK_ENFORCED,
@@ -436,11 +435,12 @@ export async function resolveLinkCodeSchool(
   return {schoolId: best.schoolId, studentId: best.studentId};
 }
 
-export const linkParentToStudent = fns
-  .runWith(parentLinkingRuntime({timeoutSeconds: 30, memory: "256MB"}))
-  .https.onCall(async (data: LinkParentInput, context) => {
-    assertNotReadOnly(context);
-    const {uid} = requireAuthed(context);
+export const linkParentToStudent = onCall(
+  parentLinkingRuntime({timeoutSeconds: 30, memory: "256MiB"}),
+  async (request) => {
+    const data: LinkParentInput = request.data;
+    assertNotReadOnly(request);
+    const {uid} = requireAuthed(request);
     const codeUpper = asNonEmptyString(data.code, "code").toUpperCase();
     await enforceRateLimit(uid);
     return linkParentToStudentCore(uid, codeUpper);
@@ -461,9 +461,10 @@ export const linkParentToStudent = fns
 // modal.dart). It throws the same typed `failed-precondition` errors (with
 // `kind`) as the redeem path, so the client's existing `_mapHttpsError` handles
 // expired/used/revoked/invalid identically.
-export const verifyStudentLinkCode = fns
-  .runWith(parentLinkingRuntime({timeoutSeconds: 15, memory: "128MB"}))
-  .https.onCall(async (data: {code?: unknown}) => {
+export const verifyStudentLinkCode = onCall(
+  parentLinkingRuntime({timeoutSeconds: 15, memory: "128MiB"}),
+  async (request) => {
+    const data: {code?: unknown} = request.data;
     const codeUpper = asNonEmptyString(data?.code, "code").toUpperCase();
     const best = await findBestCodeForString(codeUpper);
     if (!best) {
@@ -539,11 +540,12 @@ interface CreateCoParentInviteInput {
   validityDays?: unknown;
 }
 
-export const createCoParentInvite = fns
-  .runWith(parentLinkingRuntime({timeoutSeconds: 30, memory: "256MB"}))
-  .https.onCall(async (data: CreateCoParentInviteInput, context) => {
-    assertNotReadOnly(context);
-    const {uid} = requireAuthed(context);
+export const createCoParentInvite = onCall(
+  parentLinkingRuntime({timeoutSeconds: 30, memory: "256MiB"}),
+  async (request) => {
+    const data: CreateCoParentInviteInput = request.data;
+    assertNotReadOnly(request);
+    const {uid} = requireAuthed(request);
     const schoolId = asNonEmptyString(data.schoolId, "schoolId");
     const studentId = asNonEmptyString(data.studentId, "studentId");
     const note = asOptionalString(data.note, "note");
@@ -676,11 +678,12 @@ async function callerCanUnlink(
   return role === "teacher" || role === "schoolAdmin";
 }
 
-export const unlinkParentFromStudent = fns
-  .runWith(parentLinkingRuntime({timeoutSeconds: 15, memory: "256MB"}))
-  .https.onCall(async (data: UnlinkParentInput, context) => {
-    assertNotReadOnly(context);
-    const {uid} = requireAuthed(context);
+export const unlinkParentFromStudent = onCall(
+  parentLinkingRuntime({timeoutSeconds: 15, memory: "256MiB"}),
+  async (request) => {
+    const data: UnlinkParentInput = request.data;
+    assertNotReadOnly(request);
+    const {uid} = requireAuthed(request);
     const schoolId = asNonEmptyString(data.schoolId, "schoolId");
     const studentId = asNonEmptyString(data.studentId, "studentId");
     const parentUserId = asNonEmptyString(data.parentUserId, "parentUserId");

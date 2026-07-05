@@ -8,11 +8,10 @@
 // Mirrors the scheduled-pubsub pattern used by impersonation.ts:849.
 
 import * as functions from "firebase-functions/v1";
+import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
 import {assertNotReadOnly} from "./read_only_guard";
-
-const fns = functions.region("australia-southeast1");
 
 const RETENTION_DOC = "platformConfig/comprehensionRetention";
 const BATCH_SIZE = 500;
@@ -215,13 +214,14 @@ async function resolveCallerRole(
   return null;
 }
 
-export const deleteComprehensionAudio = fns
-  .runWith({timeoutSeconds: 30, memory: "256MB"})
-  .https.onCall(async (data: DeleteOneInput, context) => {
-    assertNotReadOnly(context);
-    const uid = context.auth?.uid;
+export const deleteComprehensionAudio = onCall(
+  {timeoutSeconds: 30, memory: "256MiB"},
+  async (request) => {
+    const data: DeleteOneInput = request.data;
+    assertNotReadOnly(request);
+    const uid = request.auth?.uid;
     if (!uid) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "unauthenticated",
         "Sign in required"
       );
@@ -230,7 +230,7 @@ export const deleteComprehensionAudio = fns
       typeof data.schoolId === "string" ? data.schoolId.trim() : "";
     const logId = typeof data.logId === "string" ? data.logId.trim() : "";
     if (!schoolId || !logId) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "invalid-argument",
         "schoolId and logId are required"
       );
@@ -238,7 +238,7 @@ export const deleteComprehensionAudio = fns
 
     const role = await resolveCallerRole(uid, schoolId);
     if (!role) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "permission-denied",
         "Only teachers or school admins of this school can delete recordings"
       );
@@ -252,7 +252,7 @@ export const deleteComprehensionAudio = fns
       .doc(logId);
     const snap = await logRef.get();
     if (!snap.exists) {
-      throw new functions.https.HttpsError("not-found", "Reading log not found");
+      throw new HttpsError("not-found", "Reading log not found");
     }
     const logData = snap.data() ?? {};
     if (logData.comprehensionAudioUploaded !== true) {
@@ -272,7 +272,7 @@ export const deleteComprehensionAudio = fns
         admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    const callerEmail = context.auth?.token?.email as string | undefined;
+    const callerEmail = request.auth?.token?.email as string | undefined;
     await db.collection("adminAuditLog").add({
       action: "comprehensionAudio.manualDelete",
       performedBy: uid,
@@ -316,12 +316,13 @@ interface AudioUrlInput {
 
 const AUDIO_URL_TTL_MS = 15 * 60 * 1000;
 
-export const getComprehensionAudioUrl = fns
-  .runWith({timeoutSeconds: 30, memory: "256MB"})
-  .https.onCall(async (data: AudioUrlInput, context) => {
-    const uid = context.auth?.uid;
+export const getComprehensionAudioUrl = onCall(
+  {timeoutSeconds: 30, memory: "256MiB"},
+  async (request) => {
+    const data: AudioUrlInput = request.data;
+    const uid = request.auth?.uid;
     if (!uid) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "unauthenticated",
         "Sign in required"
       );
@@ -330,7 +331,7 @@ export const getComprehensionAudioUrl = fns
       typeof data.schoolId === "string" ? data.schoolId.trim() : "";
     const logId = typeof data.logId === "string" ? data.logId.trim() : "";
     if (!schoolId || !logId) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "invalid-argument",
         "schoolId and logId are required"
       );
@@ -338,7 +339,7 @@ export const getComprehensionAudioUrl = fns
 
     const role = await resolveCallerRole(uid, schoolId);
     if (!role) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "permission-denied",
         "Only teachers or school admins of this school can play recordings"
       );
@@ -352,18 +353,18 @@ export const getComprehensionAudioUrl = fns
       .doc(logId)
       .get();
     if (!snap.exists) {
-      throw new functions.https.HttpsError("not-found", "Reading log not found");
+      throw new HttpsError("not-found", "Reading log not found");
     }
     const logData = snap.data() ?? {};
     if (logData.comprehensionAudioUploaded !== true) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "failed-precondition",
         "This log has no recording."
       );
     }
     const storagePath = logData.comprehensionAudioPath as string | undefined;
     if (!storagePath) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "not-found",
         "Recording file is missing."
       );
@@ -384,7 +385,7 @@ export const getComprehensionAudioUrl = fns
         logId,
         error: err instanceof Error ? err.message : String(err),
       });
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "internal",
         "Could not prepare the recording for playback."
       );

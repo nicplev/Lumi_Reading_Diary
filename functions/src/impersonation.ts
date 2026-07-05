@@ -1,11 +1,10 @@
 import * as functions from "firebase-functions/v1";
+import {onCall, HttpsError, CallableOptions} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import {onDocumentDeleted} from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
 import {createHash} from "crypto";
 import {isSuperAdmin} from "./super_admin";
-
-const fns = functions.region("australia-southeast1");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -36,8 +35,8 @@ const COLL_DEV_ACCESS = "devAccessEmails";
 const APP_CHECK_ENFORCED = process.env.IMPERSONATION_APP_CHECK_ENFORCED === "true";
 
 function impersonationRuntime(
-  opts: Pick<functions.RuntimeOptions, "timeoutSeconds" | "memory">
-): functions.RuntimeOptions {
+  opts: Pick<CallableOptions, "timeoutSeconds" | "memory">
+): CallableOptions {
   return {
     ...opts,
     enforceAppCheck: APP_CHECK_ENFORCED,
@@ -301,10 +300,11 @@ interface StartImpersonationInput {
   clientInfo?: unknown;
 }
 
-export const startImpersonationSession = fns
-  .runWith(impersonationRuntime({timeoutSeconds: 30, memory: "256MB"}))
-  .https.onCall(async (data: StartImpersonationInput, context) => {
-    const {uid: devUid, email: devEmail} = await requireDevAccess(context);
+export const startImpersonationSession = onCall(
+  impersonationRuntime({timeoutSeconds: 30, memory: "256MiB"}),
+  async (request) => {
+    const data: StartImpersonationInput = request.data;
+    const {uid: devUid, email: devEmail} = await requireDevAccess(request);
 
     const targetSchoolId = asNonEmptyString(data.targetSchoolId, "targetSchoolId");
     const targetUserId = asNonEmptyString(data.targetUserId, "targetUserId");
@@ -312,20 +312,20 @@ export const startImpersonationSession = fns
     const reasonRaw = asString(data.reason, "reason");
     const reason = reasonRaw.trim();
     if (reason.length < MIN_REASON_CHARS) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "invalid-argument",
         `reason must be at least ${MIN_REASON_CHARS} characters.`
       );
     }
     if (reason.length > MAX_REASON_CHARS) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "invalid-argument",
         `reason must be ${MAX_REASON_CHARS} characters or fewer.`
       );
     }
 
     if (targetUserId === devUid) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "failed-precondition",
         "Cannot impersonate yourself."
       );
@@ -333,11 +333,11 @@ export const startImpersonationSession = fns
 
     const schoolSnap = await db().collection("schools").doc(targetSchoolId).get();
     if (!schoolSnap.exists) {
-      throw new functions.https.HttpsError("not-found", "Target school not found.");
+      throw new HttpsError("not-found", "Target school not found.");
     }
     const schoolData = schoolSnap.data() ?? {};
     if (schoolData.active === false) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "failed-precondition",
         "Target school is offboarded."
       );
@@ -348,21 +348,21 @@ export const startImpersonationSession = fns
       .collection("users").doc(targetUserId)
       .get();
     if (!userSnap.exists) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "not-found",
         "Target user not found in school."
       );
     }
     const userData = userSnap.data() ?? {};
     if (userData.role !== targetRole) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "failed-precondition",
         `Target user's role (${userData.role}) does not match requested role.`
       );
     }
     // Defensive: never impersonate a super-admin-typed user doc.
     if (userData.role === "superAdmin") {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "permission-denied",
         "Cannot impersonate a super-admin."
       );
@@ -380,7 +380,7 @@ export const startImpersonationSession = fns
     const devEmailHash = hashEmail(devEmail);
     const clientInfo = clientInfoFromContext(
       data as Record<string, unknown>,
-      context
+      request
     );
 
     // Mint the token FIRST. It is the only step that can fail on
@@ -438,23 +438,24 @@ export const startImpersonationSession = fns
 // Callable: endImpersonationSession
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const endImpersonationSession = fns
-  .runWith(impersonationRuntime({timeoutSeconds: 15, memory: "128MB"}))
-  .https.onCall(async (data: {sessionId?: unknown}, context) => {
-    const {uid} = requireAuthed(context);
+export const endImpersonationSession = onCall(
+  impersonationRuntime({timeoutSeconds: 15, memory: "128MiB"}),
+  async (request) => {
+    const data: {sessionId?: unknown} = request.data;
+    const {uid} = requireAuthed(request);
     const sessionId = asNonEmptyString(data.sessionId, "sessionId");
 
     const ref = db().collection(COLL_SESSIONS).doc(sessionId);
     const snap = await ref.get();
     if (!snap.exists) {
-      throw new functions.https.HttpsError("not-found", "Session not found.");
+      throw new HttpsError("not-found", "Session not found.");
     }
     const sd = snap.data() ?? {};
 
     const isOwner = sd.devUid === uid;
     const isSuper = await isSuperAdmin(uid);
     if (!isOwner && !isSuper) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "permission-denied",
         "Only the session owner or a super-admin can end this session."
       );
@@ -487,17 +488,18 @@ export const endImpersonationSession = fns
 // Callable: revokeImpersonationSession (super-admin only)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const revokeImpersonationSession = fns
-  .runWith(impersonationRuntime({timeoutSeconds: 15, memory: "128MB"}))
-  .https.onCall(async (data: {sessionId?: unknown; reason?: unknown}, context) => {
-    const {uid} = await requireSuperAdminAuth(context);
+export const revokeImpersonationSession = onCall(
+  impersonationRuntime({timeoutSeconds: 15, memory: "128MiB"}),
+  async (request) => {
+    const data: {sessionId?: unknown; reason?: unknown} = request.data;
+    const {uid} = await requireSuperAdminAuth(request);
     const sessionId = asNonEmptyString(data.sessionId, "sessionId");
     const reason = asNonEmptyString(data.reason, "reason");
 
     const ref = db().collection(COLL_SESSIONS).doc(sessionId);
     const snap = await ref.get();
     if (!snap.exists) {
-      throw new functions.https.HttpsError("not-found", "Session not found.");
+      throw new HttpsError("not-found", "Session not found.");
     }
     const sd = snap.data() ?? {};
     if (sd.status !== "active") {
@@ -527,128 +529,122 @@ export const revokeImpersonationSession = fns
 // Callable: reportImpersonationActivity
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const reportImpersonationActivity = fns
-  .runWith(impersonationRuntime({timeoutSeconds: 10, memory: "128MB"}))
-  .https.onCall(
-    async (
-      data: {sessionId?: unknown; eventType?: unknown; details?: unknown},
-      context
-    ) => {
-      const {uid} = requireAuthed(context);
-      const sessionId = asNonEmptyString(data.sessionId, "sessionId");
-      const eventTypeRaw = asNonEmptyString(data.eventType, "eventType");
-      const allowedFromClient: EventType[] = ["screen_viewed", "export_requested"];
-      if (!allowedFromClient.includes(eventTypeRaw as EventType)) {
-        throw new functions.https.HttpsError(
-          "invalid-argument",
-          "eventType is not reportable from the client."
-        );
-      }
-      const eventType = eventTypeRaw as EventType;
-
-      const ref = db().collection(COLL_SESSIONS).doc(sessionId);
-      const snap = await ref.get();
-      if (!snap.exists) {
-        throw new functions.https.HttpsError("not-found", "Session not found.");
-      }
-      const sd = snap.data() ?? {};
-      if (sd.devUid !== uid) {
-        throw new functions.https.HttpsError(
-          "permission-denied",
-          "You do not own this session."
-        );
-      }
-      if (sd.status !== "active") {
-        throw new functions.https.HttpsError(
-          "failed-precondition",
-          `Session status is ${sd.status}.`
-        );
-      }
-
-      // Per-session-per-minute ceiling to guard against log storms.
-      const oneMinAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 60_000);
-      const recentCount = await db()
-        .collection(COLL_AUDIT)
-        .where("sessionId", "==", sessionId)
-        .where("timestamp", ">=", oneMinAgo)
-        .count()
-        .get();
-      if (recentCount.data().count >= MAX_ACTIVITY_EVENTS_PER_MINUTE) {
-        throw new functions.https.HttpsError(
-          "resource-exhausted",
-          "Activity log rate limit exceeded."
-        );
-      }
-
-      const details = typeof data.details === "object" && data.details !== null ?
-        (data.details as Record<string, unknown>) :
-        {};
-
-      await writeAuditEvent({
-        sessionId,
-        devUid: String(sd.devUid),
-        devEmail: String(sd.devEmail),
-        targetSchoolId: String(sd.targetSchoolId ?? ""),
-        targetUserId: String(sd.targetUserId ?? ""),
-        eventType,
-        details,
-      });
-
-      return {ok: true};
+export const reportImpersonationActivity = onCall(
+  impersonationRuntime({timeoutSeconds: 10, memory: "128MiB"}),
+  async (request) => {
+    const data: {sessionId?: unknown; eventType?: unknown; details?: unknown} = request.data;
+    const {uid} = requireAuthed(request);
+    const sessionId = asNonEmptyString(data.sessionId, "sessionId");
+    const eventTypeRaw = asNonEmptyString(data.eventType, "eventType");
+    const allowedFromClient: EventType[] = ["screen_viewed", "export_requested"];
+    if (!allowedFromClient.includes(eventTypeRaw as EventType)) {
+      throw new HttpsError(
+        "invalid-argument",
+        "eventType is not reportable from the client."
+      );
     }
-  );
+    const eventType = eventTypeRaw as EventType;
+
+    const ref = db().collection(COLL_SESSIONS).doc(sessionId);
+    const snap = await ref.get();
+    if (!snap.exists) {
+      throw new HttpsError("not-found", "Session not found.");
+    }
+    const sd = snap.data() ?? {};
+    if (sd.devUid !== uid) {
+      throw new HttpsError(
+        "permission-denied",
+        "You do not own this session."
+      );
+    }
+    if (sd.status !== "active") {
+      throw new HttpsError(
+        "failed-precondition",
+        `Session status is ${sd.status}.`
+      );
+    }
+
+    // Per-session-per-minute ceiling to guard against log storms.
+    const oneMinAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 60_000);
+    const recentCount = await db()
+      .collection(COLL_AUDIT)
+      .where("sessionId", "==", sessionId)
+      .where("timestamp", ">=", oneMinAgo)
+      .count()
+      .get();
+    if (recentCount.data().count >= MAX_ACTIVITY_EVENTS_PER_MINUTE) {
+      throw new HttpsError(
+        "resource-exhausted",
+        "Activity log rate limit exceeded."
+      );
+    }
+
+    const details = typeof data.details === "object" && data.details !== null ?
+      (data.details as Record<string, unknown>) :
+      {};
+
+    await writeAuditEvent({
+      sessionId,
+      devUid: String(sd.devUid),
+      devEmail: String(sd.devEmail),
+      targetSchoolId: String(sd.targetSchoolId ?? ""),
+      targetUserId: String(sd.targetUserId ?? ""),
+      eventType,
+      details,
+    });
+
+    return {ok: true};
+  }
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Callable: reportBlockedWrite
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const reportBlockedWrite = fns
-  .runWith(impersonationRuntime({timeoutSeconds: 10, memory: "128MB"}))
-  .https.onCall(
-    async (
-      data: {
-        sessionId?: unknown;
-        collection?: unknown;
-        docId?: unknown;
-        operation?: unknown;
-        reason?: unknown;
-      },
-      context
-    ) => {
-      const {uid} = requireAuthed(context);
-      const sessionId = asNonEmptyString(data.sessionId, "sessionId");
+export const reportBlockedWrite = onCall(
+  impersonationRuntime({timeoutSeconds: 10, memory: "128MiB"}),
+  async (request) => {
+    const data: {
+      sessionId?: unknown;
+      collection?: unknown;
+      docId?: unknown;
+      operation?: unknown;
+      reason?: unknown;
+    } = request.data;
+    const {uid} = requireAuthed(request);
+    const sessionId = asNonEmptyString(data.sessionId, "sessionId");
 
-      const ref = db().collection(COLL_SESSIONS).doc(sessionId);
-      const snap = await ref.get();
-      if (!snap.exists) {
-        throw new functions.https.HttpsError("not-found", "Session not found.");
-      }
-      const sd = snap.data() ?? {};
-      if (sd.devUid !== uid) {
-        throw new functions.https.HttpsError(
-          "permission-denied",
-          "You do not own this session."
-        );
-      }
-
-      await writeAuditEvent({
-        sessionId,
-        devUid: String(sd.devUid),
-        devEmail: String(sd.devEmail),
-        targetSchoolId: String(sd.targetSchoolId ?? ""),
-        targetUserId: String(sd.targetUserId ?? ""),
-        eventType: "write_blocked_client",
-        details: {
-          collection: typeof data.collection === "string" ? data.collection : null,
-          docId: typeof data.docId === "string" ? data.docId : null,
-          operation: typeof data.operation === "string" ? data.operation : null,
-          reason: typeof data.reason === "string" ? data.reason : null,
-        },
-      });
-
-      return {ok: true};
+    const ref = db().collection(COLL_SESSIONS).doc(sessionId);
+    const snap = await ref.get();
+    if (!snap.exists) {
+      throw new HttpsError("not-found", "Session not found.");
     }
-  );
+    const sd = snap.data() ?? {};
+    if (sd.devUid !== uid) {
+      throw new HttpsError(
+        "permission-denied",
+        "You do not own this session."
+      );
+    }
+
+    await writeAuditEvent({
+      sessionId,
+      devUid: String(sd.devUid),
+      devEmail: String(sd.devEmail),
+      targetSchoolId: String(sd.targetSchoolId ?? ""),
+      targetUserId: String(sd.targetUserId ?? ""),
+      eventType: "write_blocked_client",
+      details: {
+        collection: typeof data.collection === "string" ? data.collection : null,
+        docId: typeof data.docId === "string" ? data.docId : null,
+        operation: typeof data.operation === "string" ? data.operation : null,
+        reason: typeof data.reason === "string" ? data.reason : null,
+      },
+    });
+
+    return {ok: true};
+  }
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Callable: exportImpersonationAudit (super-admin only)
@@ -677,10 +673,11 @@ function csvEscape(value: unknown): string {
   return s;
 }
 
-export const exportImpersonationAudit = fns
-  .runWith(impersonationRuntime({timeoutSeconds: 60, memory: "512MB"}))
-  .https.onCall(async (data: ExportInput, context) => {
-    const {uid: superUid, email: superEmail} = await requireSuperAdminAuth(context);
+export const exportImpersonationAudit = onCall(
+  impersonationRuntime({timeoutSeconds: 60, memory: "512MiB"}),
+  async (request) => {
+    const data: ExportInput = request.data;
+    const {uid: superUid, email: superEmail} = await requireSuperAdminAuth(request);
 
     // Rate-limit exports: count meta-audit events in the last hour.
     const oneHourAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 3600_000);
@@ -692,7 +689,7 @@ export const exportImpersonationAudit = fns
       .count()
       .get();
     if (recentExports.data().count >= MAX_AUDIT_EXPORTS_PER_HOUR) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "resource-exhausted",
         `Export limit reached (${MAX_AUDIT_EXPORTS_PER_HOUR}/hour).`
       );
@@ -787,10 +784,10 @@ export const exportImpersonationAudit = fns
 // We do NOT widen Firestore rules for devs to list /schools directly — going
 // through a callable keeps the surface area tight.
 
-export const listImpersonableSchools = fns
-  .runWith(impersonationRuntime({timeoutSeconds: 15, memory: "256MB"}))
-  .https.onCall(async (_data, context) => {
-    await requireDevAccess(context);
+export const listImpersonableSchools = onCall(
+  impersonationRuntime({timeoutSeconds: 15, memory: "256MiB"}),
+  async (request) => {
+    await requireDevAccess(request);
 
     const snap = await db()
       .collection("schools")
@@ -820,10 +817,11 @@ interface ListUsersInput {
   role?: unknown; // 'teacher' | 'schoolAdmin'
 }
 
-export const listImpersonableUsers = fns
-  .runWith(impersonationRuntime({timeoutSeconds: 15, memory: "256MB"}))
-  .https.onCall(async (data: ListUsersInput, context) => {
-    await requireDevAccess(context);
+export const listImpersonableUsers = onCall(
+  impersonationRuntime({timeoutSeconds: 15, memory: "256MiB"}),
+  async (request) => {
+    const data: ListUsersInput = request.data;
+    await requireDevAccess(request);
     const schoolId = asNonEmptyString(data.schoolId, "schoolId");
     const role = assertRole(data.role);
 
