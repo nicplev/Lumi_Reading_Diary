@@ -3,6 +3,7 @@
 import "./global_options";
 import * as functions from "firebase-functions/v1";
 import {onSchedule} from "firebase-functions/v2/scheduler";
+import {onDocumentWritten, onDocumentCreated, onDocumentUpdated} from "firebase-functions/v2/firestore";
 import {defineSecret} from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import sgMail from "@sendgrid/mail";
@@ -136,10 +137,11 @@ export {
  * log doc and relies on this trigger to recompute the student's stats from
  * the remaining logs.
  */
-export const aggregateStudentStats = fns.firestore
-  .document("schools/{schoolId}/readingLogs/{logId}")
-  .onWrite(async (change, context) => {
-    const schoolId = context.params.schoolId;
+export const aggregateStudentStats = onDocumentWritten(
+  {document: "schools/{schoolId}/readingLogs/{logId}", concurrency: 1},
+  async (event) => {
+    if (!event.data) return;
+    const schoolId = event.params.schoolId;
 
     // When the incremental flag is on, dispatch to the O(1)-reads path.
     // The new path self-heals (falls back to full recompute) if a student's
@@ -147,16 +149,16 @@ export const aggregateStudentStats = fns.firestore
     const incremental = await readIncrementalConfig();
     if (incremental.studentStats) {
       try {
-        await applyStudentStatsDelta(change, schoolId);
+        await applyStudentStatsDelta(event.data, schoolId);
       } catch (err) {
         functions.logger.error("applyStudentStatsDelta failed", {
           schoolId,
-          logId: context.params.logId,
+          logId: event.params.logId,
           error: err instanceof Error ? err.message : String(err),
         });
         throw err;
       }
-      return null;
+      return;
     }
 
     // Legacy path: full re-aggregation. Retained as the authoritative
@@ -164,19 +166,19 @@ export const aggregateStudentStats = fns.firestore
     // observed clean for at least one reconciler cycle.
     // On delete, change.after.exists is false; pull studentId from the
     // pre-delete snapshot so we still know which student's stats to recompute.
-    const log = change.after.exists ? change.after.data() : change.before.data();
+    const log = event.data.after.exists ? event.data.after.data() : event.data.before.data();
 
     if (!log) {
       functions.logger.warn("Reading log write event with no before or after data", {
-        logId: context.params.logId,
+        logId: event.params.logId,
       });
-      return null;
+      return;
     }
 
     const studentId = log.studentId;
     if (!studentId) {
-      functions.logger.warn("Reading log has no studentId", {logId: context.params.logId});
-      return null;
+      functions.logger.warn("Reading log has no studentId", {logId: event.params.logId});
+      return;
     }
 
     const studentRef = db.doc(`schools/${schoolId}/students/${studentId}`);
@@ -270,7 +272,7 @@ export const aggregateStudentStats = fns.firestore
         currentStreak,
       });
 
-      return null;
+      return;
     } catch (error) {
       functions.logger.error("Error aggregating student stats", {
         studentId,
@@ -956,16 +958,17 @@ export const createNotificationCampaign = fns
     }
   });
 
-export const processQueuedNotificationCampaign = fns.firestore
-  .document("schools/{schoolId}/notificationCampaigns/{campaignId}")
-  .onCreate(async (snapshot, context) => {
-    const campaign = snapshot.data() as NotificationCampaignData;
+export const processQueuedNotificationCampaign = onDocumentCreated(
+  {document: "schools/{schoolId}/notificationCampaigns/{campaignId}", concurrency: 1},
+  async (event) => {
+    if (!event.data) return;
+    const campaign = event.data.data() as NotificationCampaignData;
     if (campaign.status !== "queued") {
-      return null;
+      return;
     }
 
-    await dispatchNotificationCampaign(context.params.schoolId, snapshot.ref);
-    return null;
+    await dispatchNotificationCampaign(event.params.schoolId, event.data.ref);
+    return;
   });
 
 export const dispatchScheduledNotificationCampaigns = onSchedule(
@@ -1402,12 +1405,13 @@ async function resolveAchievementThresholds(
  * Awards all 14 tier achievements + the first_log special achievement, on
  * current state (idempotent — never double-awards thanks to arrayUnion).
  */
-export const detectAchievements = fns.firestore
-  .document("schools/{schoolId}/students/{studentId}")
-  .onUpdate(async (change, context) => {
-    const schoolId = context.params.schoolId;
-    const studentId = context.params.studentId;
-    const newData = change.after.data();
+export const detectAchievements = onDocumentUpdated(
+  {document: "schools/{schoolId}/students/{studentId}", concurrency: 1},
+  async (event) => {
+    if (!event.data) return;
+    const schoolId = event.params.schoolId;
+    const studentId = event.params.studentId;
+    const newData = event.data.after.data();
     const newStats = newData.stats || {};
 
     const thresholds = await resolveAchievementThresholds(schoolId);
@@ -1422,7 +1426,7 @@ export const detectAchievements = fns.firestore
     const awardable = computeAwardableAchievements(
       newStats, earnedIds, thresholds,
     );
-    if (awardable.length === 0) return null;
+    if (awardable.length === 0) return;
 
     // Concrete timestamp, NOT serverTimestamp() — Firestore rejects the
     // serverTimestamp() sentinel inside array elements (arrayUnion), which
@@ -1432,7 +1436,7 @@ export const detectAchievements = fns.firestore
     }));
 
     // Write all new achievements in a single update.
-    await change.after.ref.update({
+    await event.data.after.ref.update({
       achievements: admin.firestore.FieldValue.arrayUnion(...toAward),
     });
 
@@ -1470,7 +1474,7 @@ export const detectAchievements = fns.firestore
       }
     }
 
-    return null;
+    return;
   });
 
 /**
@@ -1557,11 +1561,12 @@ export const backfillAchievements = fns.https.onCall(async (data, context) => {
  * Validate Reading Log
  * Server-side validation before allowing log creation
  */
-export const validateReadingLog = fns.firestore
-  .document("schools/{schoolId}/readingLogs/{logId}")
-  .onCreate(async (snapshot, context) => {
-    const schoolId = context.params.schoolId;
-    const logData = snapshot.data();
+export const validateReadingLog = onDocumentCreated(
+  {document: "schools/{schoolId}/readingLogs/{logId}", concurrency: 1},
+  async (event) => {
+    if (!event.data) return;
+    const schoolId = event.params.schoolId;
+    const logData = event.data.data();
 
     // Validation rules
     const validationErrors: string[] = [];
@@ -1592,23 +1597,23 @@ export const validateReadingLog = fns.firestore
 
     // If validation fails, mark the log as invalid
     if (validationErrors.length > 0) {
-      await snapshot.ref.update({
+      await event.data.ref.update({
         validationStatus: "invalid",
         validationErrors: validationErrors,
       });
 
       functions.logger.warn("Invalid reading log detected", {
-        logId: context.params.logId,
+        logId: event.params.logId,
         errors: validationErrors,
       });
     } else {
-      await snapshot.ref.update({
+      await event.data.ref.update({
         validationStatus: "valid",
         validatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     }
 
-    return null;
+    return;
   });
 
 /**
@@ -1754,15 +1759,21 @@ interface OnboardingEmailRecipient {
   skippedReason?: string;
 }
 
-export const processParentOnboardingEmail = fns
-  .runWith({timeoutSeconds: 120, memory: "512MB", secrets: [sendgridApiKey, sendgridSenderEmail]})
-  .firestore.document("schools/{schoolId}/parentOnboardingEmails/{emailId}")
-  .onCreate(async (snapshot, context) => {
-    const data = snapshot.data();
-    if (data.status !== "queued") return null;
+export const processParentOnboardingEmail = onDocumentCreated(
+  {
+    document: "schools/{schoolId}/parentOnboardingEmails/{emailId}",
+    concurrency: 1,
+    timeoutSeconds: 120,
+    memory: "512MiB",
+    secrets: [sendgridApiKey, sendgridSenderEmail],
+  },
+  async (event) => {
+    if (!event.data) return;
+    const data = event.data.data();
+    if (data.status !== "queued") return;
 
-    const schoolId = context.params.schoolId;
-    const docRef = snapshot.ref;
+    const schoolId = event.params.schoolId;
+    const docRef = event.data.ref;
 
     // Claim the document
     await docRef.update({status: "processing"});
@@ -1775,7 +1786,7 @@ export const processParentOnboardingEmail = fns
           status: "failed",
           errorSummary: "SendGrid API key not configured",
         });
-        return null;
+        return;
       }
       sgMail.setApiKey(sendgridKey);
 
@@ -1977,7 +1988,7 @@ export const processParentOnboardingEmail = fns
       });
     }
 
-    return null;
+    return;
   });
 
 // URL of the school admin portal (Firebase Hosting "school" target).
@@ -1993,15 +2004,21 @@ interface StaffEmailRecipient {
   skippedReason?: string;
 }
 
-export const processStaffOnboardingEmail = fns
-  .runWith({timeoutSeconds: 120, memory: "512MB", secrets: [sendgridApiKey, sendgridSenderEmail]})
-  .firestore.document("schools/{schoolId}/staffOnboardingEmails/{emailId}")
-  .onCreate(async (snapshot, context) => {
-    const data = snapshot.data();
-    if (data.status !== "queued") return null;
+export const processStaffOnboardingEmail = onDocumentCreated(
+  {
+    document: "schools/{schoolId}/staffOnboardingEmails/{emailId}",
+    concurrency: 1,
+    timeoutSeconds: 120,
+    memory: "512MiB",
+    secrets: [sendgridApiKey, sendgridSenderEmail],
+  },
+  async (event) => {
+    if (!event.data) return;
+    const data = event.data.data();
+    if (data.status !== "queued") return;
 
-    const schoolId = context.params.schoolId;
-    const docRef = snapshot.ref;
+    const schoolId = event.params.schoolId;
+    const docRef = event.data.ref;
 
     // Claim the document
     await docRef.update({status: "processing"});
@@ -2013,7 +2030,7 @@ export const processStaffOnboardingEmail = fns
           status: "failed",
           errorSummary: "SendGrid API key not configured",
         });
-        return null;
+        return;
       }
       sgMail.setApiKey(sendgridKey);
 
@@ -2159,13 +2176,14 @@ export const processStaffOnboardingEmail = fns
       });
     }
 
-    return null;
+    return;
   });
 
-export const updateClassStats = fns.firestore
-  .document("schools/{schoolId}/readingLogs/{logId}")
-  .onWrite(async (change, context) => {
-    const schoolId = context.params.schoolId;
+export const updateClassStats = onDocumentWritten(
+  {document: "schools/{schoolId}/readingLogs/{logId}", concurrency: 1},
+  async (event) => {
+    if (!event.data) return;
+    const schoolId = event.params.schoolId;
 
     // Incremental path: read the class doc once, apply per-log delta. Old
     // code reads every counted log for every student in the class on every
@@ -2173,42 +2191,42 @@ export const updateClassStats = fns.firestore
     const incremental = await readIncrementalConfig();
     if (incremental.classStats) {
       try {
-        await applyClassStatsDelta(change, schoolId);
+        await applyClassStatsDelta(event.data, schoolId);
       } catch (err) {
         functions.logger.error("applyClassStatsDelta failed", {
           schoolId,
-          logId: context.params.logId,
+          logId: event.params.logId,
           error: err instanceof Error ? err.message : String(err),
         });
         throw err;
       }
-      return null;
+      return;
     }
 
     // Legacy full-recompute path below.
-    const log = change.after.exists ? change.after.data() : null;
+    const log = event.data.after.exists ? event.data.after.data() : null;
 
-    if (!log) return null;
+    if (!log) return;
 
     const studentDoc = await db
       .doc(`schools/${schoolId}/students/${log.studentId}`)
       .get();
 
     const studentData = studentDoc.data();
-    if (!studentData?.classId) return null;
+    if (!studentData?.classId) return;
 
     const classId = studentData.classId;
 
     // Get student IDs from the class document
     const classDoc = await db.doc(`schools/${schoolId}/classes/${classId}`).get();
-    if (!classDoc.exists) return null;
+    if (!classDoc.exists) return;
 
     const classData = classDoc.data() ?? {};
     const classStudentIds: string[] = Array.isArray(classData.studentIds) ?
       classData.studentIds.filter((id: unknown): id is string => typeof id === "string") :
       [];
 
-    if (classStudentIds.length === 0) return null;
+    if (classStudentIds.length === 0) return;
 
     // Aggregate class stats — batch in chunks of 30 (Firestore `in` limit)
     let totalMinutes = 0;
@@ -2237,7 +2255,7 @@ export const updateClassStats = fns.firestore
       "stats.lastUpdated": admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    return null;
+    return;
   });
 
 /**
@@ -2459,14 +2477,15 @@ const guardianProjection = (
  * edits, linking, unlinking, and account deletion in one handler. Writes
  * students only — no trigger loop.
  */
-export const syncGuardianProfiles = fns.firestore
-  .document("schools/{schoolId}/parents/{parentId}")
-  .onWrite(async (change, context) => {
-    const schoolId = context.params.schoolId;
-    const parentId = context.params.parentId;
+export const syncGuardianProfiles = onDocumentWritten(
+  {document: "schools/{schoolId}/parents/{parentId}", concurrency: 1},
+  async (event) => {
+    if (!event.data) return;
+    const schoolId = event.params.schoolId;
+    const parentId = event.params.parentId;
 
-    const before = change.before.exists ? change.before.data()! : null;
-    const after = change.after.exists ? change.after.data()! : null;
+    const before = event.data.before.exists ? event.data.before.data()! : null;
+    const after = event.data.after.exists ? event.data.after.data()! : null;
 
     const beforeChildren: string[] = before?.linkedChildren ?? [];
     const afterChildren: string[] = after?.linkedChildren ?? [];
@@ -2479,7 +2498,7 @@ export const syncGuardianProfiles = fns.firestore
         beforeChildren.length === afterChildren.length &&
         beforeChildren.every((id) => afterChildren.includes(id));
       if (sameName && sameLabel && sameChildren) {
-        return null;
+        return;
       }
     }
 
@@ -2520,7 +2539,7 @@ export const syncGuardianProfiles = fns.firestore
         err
       );
     }
-    return null;
+    return;
   });
 
 /**
@@ -2531,14 +2550,15 @@ export const syncGuardianProfiles = fns.firestore
  * co-parent is added. Loop-safe: writing guardianProfiles does not change
  * parentIds, so the re-trigger sees no change and no-ops.
  */
-export const refreshGuardianProfilesOnLink = fns.firestore
-  .document("schools/{schoolId}/students/{studentId}")
-  .onWrite(async (change, context) => {
-    const schoolId = context.params.schoolId;
+export const refreshGuardianProfilesOnLink = onDocumentWritten(
+  {document: "schools/{schoolId}/students/{studentId}", concurrency: 1},
+  async (event) => {
+    if (!event.data) return;
+    const schoolId = event.params.schoolId;
 
-    const before = change.before.exists ? change.before.data()! : null;
-    const after = change.after.exists ? change.after.data()! : null;
-    if (!after) return null; // Student deleted — nothing to maintain.
+    const before = event.data.before.exists ? event.data.before.data()! : null;
+    const after = event.data.after.exists ? event.data.after.data()! : null;
+    if (!after) return; // Student deleted — nothing to maintain.
 
     const beforeParents: string[] = before?.parentIds ?? [];
     const afterParents: string[] = after.parentIds ?? [];
@@ -2548,9 +2568,9 @@ export const refreshGuardianProfilesOnLink = fns.firestore
     const sameParents =
       beforeParents.length === afterParents.length &&
       beforeParents.every((id) => afterParents.includes(id));
-    if (sameParents) return null;
+    if (sameParents) return;
 
-    const studentRef = change.after.ref;
+    const studentRef = event.data.after.ref;
     const profileField = (parentId: string) =>
       new admin.firestore.FieldPath("guardianProfiles", parentId);
     const batch = db.batch();
@@ -2584,11 +2604,11 @@ export const refreshGuardianProfilesOnLink = fns.firestore
     } catch (err) {
       functions.logger.warn(
         "refreshGuardianProfilesOnLink: failed for student " +
-          context.params.studentId,
+          event.params.studentId,
         err
       );
     }
-    return null;
+    return;
   });
 
 /**
@@ -2677,21 +2697,22 @@ export const backfillGuardianProfiles = fns.https.onCall(
  * parent reply surfaces as an in-app unread badge instead (handled client-side
  * via the log's denormalized `lastComment*` fields).
  */
-export const onCommentCreated = fns.firestore
-  .document("schools/{schoolId}/readingLogs/{logId}/comments/{commentId}")
-  .onCreate(async (snap, context) => {
-    const {schoolId, logId} = context.params as {
+export const onCommentCreated = onDocumentCreated(
+  {document: "schools/{schoolId}/readingLogs/{logId}/comments/{commentId}", concurrency: 1},
+  async (event) => {
+    if (!event.data) return;
+    const {schoolId, logId} = event.params as {
       schoolId: string;
       logId: string;
     };
-    const comment = snap.data() ?? {};
+    const comment = event.data.data() ?? {};
 
     // Only teacher comments drive a push; parent replies show as an in-app
     // badge (no staff tokens exist yet).
-    if (comment.authorRole !== "teacher") return null;
+    if (comment.authorRole !== "teacher") return;
 
-    const logRef = snap.ref.parent.parent;
-    if (!logRef) return null;
+    const logRef = event.data.ref.parent.parent;
+    if (!logRef) return;
 
     const body = typeof comment.body === "string" ? comment.body : "";
     const authorName =
@@ -2708,24 +2729,24 @@ export const onCommentCreated = fns.firestore
 
     const parentId =
       typeof comment.parentId === "string" ? comment.parentId : "";
-    if (!parentId) return null;
+    if (!parentId) return;
 
     // Teacher-proxy logs store the teacher's own UID in `parentId`. If the
     // recipient is the comment author, there's no real parent to notify.
-    if (parentId === comment.authorId) return null;
+    if (parentId === comment.authorId) return;
 
     const parentSnap = await db
       .doc(`schools/${schoolId}/parents/${parentId}`)
       .get();
-    if (!parentSnap.exists) return null;
+    if (!parentSnap.exists) return;
     const parentData = parentSnap.data() ?? {};
-    if (parentData.isActive === false) return null;
+    if (parentData.isActive === false) return;
 
     const pushEnabled =
       parentData.preferences?.pushNotificationsEnabled !== false;
     const token =
       typeof parentData.fcmToken === "string" ? parentData.fcmToken : undefined;
-    if (!pushEnabled || !token) return null;
+    if (!pushEnabled || !token) return;
 
     // Respect the school's quiet hours (the thread + badge still land; only the
     // push is suppressed).
@@ -2737,7 +2758,7 @@ export const onCommentCreated = fns.firestore
         schoolId,
         logId,
       });
-      return null;
+      return;
     }
 
     const studentId = String(comment.studentId ?? "");
@@ -2779,7 +2800,7 @@ export const onCommentCreated = fns.firestore
       });
     }
 
-    return null;
+    return;
   });
 
 // ─────────────────────────────────────────────────────────────────────────────

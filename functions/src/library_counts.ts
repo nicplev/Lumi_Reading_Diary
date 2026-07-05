@@ -20,8 +20,7 @@
 
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions/v1";
-
-const fns = functions.region("australia-southeast1");
+import {onDocumentWritten} from "firebase-functions/v2/firestore";
 
 const UNRECOGNISED_BOOK_TITLE = "Unrecognised Book";
 
@@ -93,17 +92,18 @@ async function seedLibraryCounts(schoolId: string): Promise<void> {
     });
 }
 
-export const maintainLibraryCounts = fns.firestore
-  .document("schools/{schoolId}/books/{bookId}")
-  .onWrite(async (change, context) => {
-    const schoolId = context.params.schoolId;
+export const maintainLibraryCounts = onDocumentWritten(
+  {document: "schools/{schoolId}/books/{bookId}", concurrency: 1},
+  async (event) => {
+    if (!event.data) return;
+    const schoolId = event.params.schoolId;
     const db = admin.firestore();
     const countsRef = db
       .collection("schools").doc(schoolId)
       .collection("libraryMeta").doc("counts");
 
-    const beforeData = change.before.exists ? change.before.data() : undefined;
-    const afterData = change.after.exists ? change.after.data() : undefined;
+    const beforeData = event.data.before.exists ? event.data.before.data() : undefined;
+    const afterData = event.data.after.exists ? event.data.after.data() : undefined;
 
     const beforeDisplayable = isDisplayable(beforeData);
     const afterDisplayable = isDisplayable(afterData);
@@ -118,7 +118,7 @@ export const maintainLibraryCounts = fns.firestore
     if (!beforeDecodable && afterDecodable) deltaDecodable = 1;
     else if (beforeDecodable && !afterDecodable) deltaDecodable = -1;
 
-    if (deltaTotal === 0 && deltaDecodable === 0) return null;
+    if (deltaTotal === 0 && deltaDecodable === 0) return;
 
     // Self-heal: if the counts doc doesn't exist yet, seed it via a full
     // scan that already includes this write's after-state, and return
@@ -133,7 +133,7 @@ export const maintainLibraryCounts = fns.firestore
           error: err instanceof Error ? err.message : String(err),
         });
       }
-      return null;
+      return;
     }
 
     try {
@@ -145,10 +145,10 @@ export const maintainLibraryCounts = fns.firestore
     } catch (err) {
       functions.logger.error("maintainLibraryCounts update failed", {
         schoolId,
-        bookId: context.params.bookId,
+        bookId: event.params.bookId,
         error: err instanceof Error ? err.message : String(err),
       });
       throw err;
     }
-    return null;
+    return;
   });

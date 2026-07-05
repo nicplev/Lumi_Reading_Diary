@@ -1,5 +1,6 @@
 import * as functions from "firebase-functions/v1";
 import {onSchedule} from "firebase-functions/v2/scheduler";
+import {onDocumentDeleted} from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
 import {createHash} from "crypto";
 import {isSuperAdmin} from "./super_admin";
@@ -900,17 +901,18 @@ export const expireImpersonationSessions = onSchedule(
 // Trigger: onDelete(devAccessEmails/{hash}) → revoke active sessions
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const revokeOnDevAccessRemoval = fns.firestore
-  .document("devAccessEmails/{emailHash}")
-  .onDelete(async (_snap, context) => {
-    const emailHash = context.params.emailHash as string;
+export const revokeOnDevAccessRemoval = onDocumentDeleted(
+  {document: "devAccessEmails/{emailHash}", concurrency: 1},
+  async (event) => {
+    if (!event.data) return;
+    const emailHash = event.params.emailHash as string;
     const q = await db()
       .collection(COLL_SESSIONS)
       .where("devEmailHash", "==", emailHash)
       .where("status", "==", "active")
       .get();
     if (q.empty) {
-      return null;
+      return;
     }
     const batch = db().batch();
     const endedAt = admin.firestore.FieldValue.serverTimestamp();
@@ -938,7 +940,7 @@ export const revokeOnDevAccessRemoval = fns.firestore
       emailHash,
       count: q.size,
     });
-    return null;
+    return;
   });
 
 // ─────────────────────────────────────────────────────────────────────────────

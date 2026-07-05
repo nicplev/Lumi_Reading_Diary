@@ -1,11 +1,10 @@
 import * as functions from "firebase-functions/v1";
+import {onDocumentWritten} from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
 import {
   buildSchoolAccess,
   isActiveSubscriptionStatus,
 } from "./access";
-
-const fns = functions.region("australia-southeast1");
 
 const STUDENT_BATCH = 400;
 
@@ -75,14 +74,15 @@ async function cascadeStudentAccess(
  * on the year currently in session, so editing a historical row can never
  * suspend a live school.
  */
-export const onSchoolSubscriptionWrite = fns.firestore
-  .document("schoolSubscriptions/{subId}")
-  .onWrite(async (change, context) => {
-    const after = change.after.exists ? change.after.data() : null;
+export const onSchoolSubscriptionWrite = onDocumentWritten(
+  {document: "schoolSubscriptions/{subId}", concurrency: 1},
+  async (event) => {
+    if (!event.data) return;
+    const after = event.data.after.exists ? event.data.after.data() : null;
     if (!after) {
       // Row deleted — leave materialised access as-is; suspension is an
       // explicit action, not a side effect of cleanup.
-      return null;
+      return;
     }
 
     const schoolId = after.schoolId as string | undefined;
@@ -90,9 +90,9 @@ export const onSchoolSubscriptionWrite = fns.firestore
     const status = after.status as string | undefined;
     if (!schoolId || typeof year !== "number" || !status) {
       functions.logger.warn("onSchoolSubscriptionWrite: malformed row", {
-        subId: context.params.subId,
+        subId: event.params.subId,
       });
-      return null;
+      return;
     }
 
     const liveYear = await currentAcademicYear();
@@ -101,17 +101,17 @@ export const onSchoolSubscriptionWrite = fns.firestore
         `onSchoolSubscriptionWrite: row year ${year} != live year ${liveYear}; ` +
         "skipping cascade.",
       );
-      return null;
+      return;
     }
 
     const active = isActiveSubscriptionStatus(status);
 
     // Skip if nothing material changed (status active/inactive unchanged).
-    const before = change.before.exists ? change.before.data() : null;
+    const before = event.data.before.exists ? event.data.before.data() : null;
     if (before) {
       const wasActive = isActiveSubscriptionStatus(before.status as string);
       if (wasActive === active && before.academicYear === year) {
-        return null;
+        return;
       }
     }
 
@@ -131,5 +131,5 @@ export const onSchoolSubscriptionWrite = fns.firestore
       `onSchoolSubscriptionWrite: school ${schoolId} year ${year} -> ` +
       `${active ? "active" : "suspended"}; cascaded ${cascaded} student(s).`,
     );
-    return null;
+    return;
   });
