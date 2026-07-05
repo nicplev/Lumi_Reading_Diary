@@ -201,9 +201,13 @@ class ImpersonationService extends ChangeNotifier {
       await _functions
           .httpsCallable('endImpersonationSession')
           .call<Map<Object?, Object?>>({'sessionId': session.sessionId});
-    } on FirebaseFunctionsException catch (e) {
-      // Best-effort — local teardown must still run.
-      debugPrint('[Impersonation] end() function call failed: ${e.code}');
+    } catch (e) {
+      // Best-effort, and deliberately catches EVERYTHING (function errors,
+      // timeouts, PlatformException, network drops). Local teardown must run
+      // no matter how the call fails — otherwise a flaky network on exit would
+      // strand a live impersonation session (claims + signed-in dev) until the
+      // next app restart or the server TTL.
+      debugPrint('[Impersonation] end() function call failed: $e');
     }
 
     await _localCleanup();
