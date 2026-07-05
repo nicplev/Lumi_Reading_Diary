@@ -14,6 +14,7 @@ import {
   validateNotificationAudience,
 } from "./notification_helpers";
 import {buildOnboardingEmail, buildOnboardingQrAttachments, buildStaffOnboardingEmail} from "./email_templates";
+import {assertNotReadOnly} from "./read_only_guard";
 import {lumiMascotAttachment} from "./email_assets";
 import {generateTempPassword} from "./temp_password";
 import {
@@ -807,6 +808,7 @@ export const createNotificationCampaign = fns
     consumeAppCheckToken: NOTIFICATION_CAMPAIGN_APP_CHECK_ENFORCED,
   })
   .https.onCall(async (rawData: NotificationCampaignPayload, context) => {
+    assertNotReadOnly(context);
     const senderId = context.auth?.uid;
     if (!senderId) {
       throw new functions.https.HttpsError("unauthenticated", "You must be signed in.");
@@ -1472,6 +1474,7 @@ export const detectAchievements = fns.firestore
  * the whole school. Caller must be a schoolAdmin of that school.
  */
 export const backfillAchievements = fns.https.onCall(async (data, context) => {
+  assertNotReadOnly(context);
   if (!context.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated", "Must be signed in.",
@@ -2261,6 +2264,7 @@ export const deleteStudentWithCascade = fns
     consumeAppCheckToken: DELETE_STUDENT_APP_CHECK_ENFORCED,
   })
   .https.onCall(async (data, context) => {
+    assertNotReadOnly(context);
     if (!context.auth) {
       throw new functions.https.HttpsError(
         "unauthenticated",
@@ -2570,6 +2574,7 @@ export const refreshGuardianProfilesOnLink = fns.firestore
  */
 export const backfillGuardianProfiles = fns.https.onCall(
   async (data, context) => {
+    assertNotReadOnly(context);
     if (!context.auth) {
       throw new functions.https.HttpsError(
         "unauthenticated",
@@ -2764,6 +2769,7 @@ export const onCommentCreated = fns.firestore
 export const sendTestReadingReminder = fns
   .runWith({timeoutSeconds: 30, memory: "256MB"})
   .https.onCall(async (data, context) => {
+    assertNotReadOnly(context);
     if (!context.auth) {
       throw new functions.https.HttpsError(
         "unauthenticated", "Sign-in required.");

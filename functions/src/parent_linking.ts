@@ -1,5 +1,6 @@
 import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
+import {assertNotReadOnly} from "./read_only_guard";
 import {buildStudentAccess, isActiveSubscriptionStatus} from "./access";
 
 const fns = functions.region("australia-southeast1");
@@ -438,6 +439,7 @@ export async function resolveLinkCodeSchool(
 export const linkParentToStudent = fns
   .runWith(parentLinkingRuntime({timeoutSeconds: 30, memory: "256MB"}))
   .https.onCall(async (data: LinkParentInput, context) => {
+    assertNotReadOnly(context);
     const {uid} = requireAuthed(context);
     const codeUpper = asNonEmptyString(data.code, "code").toUpperCase();
     await enforceRateLimit(uid);
@@ -540,6 +542,7 @@ interface CreateCoParentInviteInput {
 export const createCoParentInvite = fns
   .runWith(parentLinkingRuntime({timeoutSeconds: 30, memory: "256MB"}))
   .https.onCall(async (data: CreateCoParentInviteInput, context) => {
+    assertNotReadOnly(context);
     const {uid} = requireAuthed(context);
     const schoolId = asNonEmptyString(data.schoolId, "schoolId");
     const studentId = asNonEmptyString(data.studentId, "studentId");
@@ -676,6 +679,7 @@ async function callerCanUnlink(
 export const unlinkParentFromStudent = fns
   .runWith(parentLinkingRuntime({timeoutSeconds: 15, memory: "256MB"}))
   .https.onCall(async (data: UnlinkParentInput, context) => {
+    assertNotReadOnly(context);
     const {uid} = requireAuthed(context);
     const schoolId = asNonEmptyString(data.schoolId, "schoolId");
     const studentId = asNonEmptyString(data.studentId, "studentId");

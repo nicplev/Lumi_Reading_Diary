@@ -9,6 +9,7 @@
 
 import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
+import {assertNotReadOnly} from "./read_only_guard";
 
 const fns = functions.region("australia-southeast1");
 
@@ -213,6 +214,7 @@ async function resolveCallerRole(
 export const deleteComprehensionAudio = fns
   .runWith({timeoutSeconds: 30, memory: "256MB"})
   .https.onCall(async (data: DeleteOneInput, context) => {
+    assertNotReadOnly(context);
     const uid = context.auth?.uid;
     if (!uid) {
       throw new functions.https.HttpsError(

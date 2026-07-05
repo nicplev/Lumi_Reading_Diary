@@ -1,5 +1,6 @@
 import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
+import {assertNotReadOnly} from "./read_only_guard";
 import {
   buildSchoolAccess,
   buildStudentAccess,
@@ -81,6 +82,7 @@ interface RenewInput {
 export const renewStudents = fns
   .runWith({timeoutSeconds: 120, memory: "256MB"})
   .https.onCall(async (data: RenewInput, context) => {
+    assertNotReadOnly(context);
     if (!context.auth) {
       throw new functions.https.HttpsError(
         "unauthenticated",
