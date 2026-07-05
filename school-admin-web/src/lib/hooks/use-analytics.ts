@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import type {
   ReadingMetrics,
   EngagementPoint,
+  ClassEngagementSeries,
   LevelBucket,
   ClassComparisonRow,
   AtRiskStudent,
@@ -14,6 +15,7 @@ import type {
 export interface AnalyticsData {
   metrics: ReadingMetrics;
   trend: EngagementPoint[];
+  classTrend: ClassEngagementSeries;
   levels: LevelBucket[];
   classes: ClassComparisonRow[];
   atRisk: AtRiskStudent[];

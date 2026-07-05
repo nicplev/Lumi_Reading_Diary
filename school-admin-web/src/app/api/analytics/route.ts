@@ -4,6 +4,7 @@ import { getSchool } from '@/lib/firestore/school';
 import {
   getReadingMetrics,
   getEngagementTrend,
+  getClassEngagementTrend,
   getLevelDistribution,
   getClassComparison,
   getAtRiskStudents,
@@ -42,9 +43,10 @@ export async function GET(request: NextRequest) {
     // logs, so they keep their own reads.
     const logDocs = await fetchReadingLogsInRange(session.schoolId, startDate, endDate);
 
-    const [metrics, trend, levels, classes, atRisk, topReaders, books] = await Promise.all([
+    const [metrics, trend, classTrend, levels, classes, atRisk, topReaders, books] = await Promise.all([
       getReadingMetrics(session.schoolId, startDate, endDate, weekdaysOnly, logDocs),
       getEngagementTrend(session.schoolId, startDate, endDate, weekdaysOnly, logDocs),
+      getClassEngagementTrend(session.schoolId, startDate, endDate, weekdaysOnly, logDocs),
       getLevelDistribution(session.schoolId),
       getClassComparison(session.schoolId, startDate, endDate, weekdaysOnly, logDocs),
       getAtRiskStudents(session.schoolId, 7),
@@ -52,7 +54,7 @@ export async function GET(request: NextRequest) {
       getPopularBooks(session.schoolId, startDate, endDate, weekdaysOnly, 15, logDocs),
     ]);
 
-    return NextResponse.json({ metrics, trend, levels, classes, atRisk, topReaders, books });
+    return NextResponse.json({ metrics, trend, classTrend, levels, classes, atRisk, topReaders, books });
   } catch {
     return NextResponse.json({ error: 'Failed to fetch analytics' }, { status: 500 });
   }
