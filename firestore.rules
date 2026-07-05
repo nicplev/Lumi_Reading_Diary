@@ -127,9 +127,26 @@ service cloud.firestore {
           && request.auth.token.get('impersonationSessionId', '').size() > 0;
     }
 
+    // Reads the live session doc named by the token's sessionId claim and
+    // confirms it is still active, targets THIS school, and hasn't expired.
+    // This is what makes super-admin revocation and the 30-min TTL take effect
+    // immediately: the claims alone would otherwise keep granting read access
+    // for the full ~1h ID-token lifetime, outliving the session. Costs one
+    // get() per impersonated read (dev-only, low volume); normal users never
+    // reach it because isDevImpersonating() short-circuits to false first.
+    function impersonationSessionLive(schoolId) {
+      let sid = request.auth.token.get('impersonationSessionId', '');
+      let session = get(/databases/$(database)/documents/devImpersonationSessions/$(sid));
+      return session != null
+          && session.data.status == 'active'
+          && session.data.targetSchoolId == schoolId
+          && request.time < session.data.expiresAt;
+    }
+
     function isDevImpersonatingSchool(schoolId) {
       return isDevImpersonating()
-          && request.auth.token.get('impersonationSchoolId', '') == schoolId;
+          && request.auth.token.get('impersonationSchoolId', '') == schoolId
+          && impersonationSessionLive(schoolId);
     }
 
     function devReadOnly() {

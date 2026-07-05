@@ -1298,8 +1298,23 @@ function impersonationClaims(overrides = {}) {
   };
 }
 
-async function seedTwoSchools() {
+// `session` seeds devImpersonationSessions/{SESSION_ID}. Defaults to an active,
+// unexpired session targeting SCHOOL_A (what the rules now require for reads).
+// Pass overrides to simulate expired/revoked, or `null` to omit the doc.
+async function seedTwoSchools(session = {}) {
   await seedData(async (db) => {
+    if (session !== null) {
+      await db.collection('devImpersonationSessions').doc(SESSION_ID).set({
+        devUid: DEV_UID,
+        devEmail: DEV_EMAIL,
+        targetSchoolId: SCHOOL_A,
+        targetUserId: TEACHER_A_UID,
+        status: 'active',
+        startedAt: new Date(),
+        expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+        ...session,
+      });
+    }
     await db.collection('schools').doc(SCHOOL_A).set({
       name: 'Lumi A',
       createdBy: 'admin_a',
@@ -1507,6 +1522,44 @@ test('impersonation: dev can read target school top-level doc', async () => {
   const db = authDb(DEV_UID, impersonationClaims());
   await assertSucceeds(
     db.collection('schools').doc(SCHOOL_A).get(),
+  );
+});
+
+// ── Session-doc enforcement: revoke / expiry take effect immediately ─────────
+
+test('impersonation: valid claims but NO session doc denies reads', async () => {
+  await seedTwoSchools(null); // omit devImpersonationSessions/{SESSION_ID}
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('schools').doc(SCHOOL_A)
+      .collection('students').doc(STUDENT_A_ID).get(),
+  );
+});
+
+test('impersonation: revoked session denies reads despite live claims', async () => {
+  await seedTwoSchools({ status: 'revoked' });
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('schools').doc(SCHOOL_A)
+      .collection('students').doc(STUDENT_A_ID).get(),
+  );
+});
+
+test('impersonation: expired session denies reads despite live claims', async () => {
+  await seedTwoSchools({ expiresAt: new Date(Date.now() - 60 * 1000) });
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('schools').doc(SCHOOL_A)
+      .collection('students').doc(STUDENT_A_ID).get(),
+  );
+});
+
+test('impersonation: session doc for a different school denies reads', async () => {
+  await seedTwoSchools({ targetSchoolId: SCHOOL_B });
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertFails(
+    db.collection('schools').doc(SCHOOL_A)
+      .collection('students').doc(STUDENT_A_ID).get(),
   );
 });
 
