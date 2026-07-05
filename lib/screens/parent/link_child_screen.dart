@@ -4,15 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/exceptions/linking_exceptions.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/lumi_borders.dart';
 import '../../core/theme/lumi_spacing.dart';
-import '../../core/theme/lumi_text_styles.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_card.dart';
 import '../../core/widgets/lumi/lumi_input.dart';
-import '../../core/widgets/lumi_mascot.dart';
 import '../../theme/lumi_tokens.dart';
+import '../../theme/lumi_typography.dart';
 import '../../data/models/student_link_code_model.dart';
 import '../../data/models/user_model.dart';
 import '../../data/providers/active_child_provider.dart';
@@ -169,8 +166,8 @@ class _LinkChildScreenState extends ConsumerState<LinkChildScreen> {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: AppColors.charcoal),
-        title: Text('Link a child', style: LumiTextStyles.h3()),
+        iconTheme: const IconThemeData(color: LumiTokens.ink),
+        title: Text('Link a child', style: LumiType.subhead),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -191,20 +188,24 @@ class _LinkChildScreenState extends ConsumerState<LinkChildScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         LumiGap.m,
-        const Center(child: LumiMascot(variant: LumiVariant.parent, size: 120)),
+        Center(
+          child: Image.asset(
+            'assets/UI Lumi/Lumi wKIds.png',
+            height: 140,
+            fit: BoxFit.contain,
+          ),
+        ),
         LumiGap.m,
         Text(
           'Add another child',
-          style: LumiTextStyles.h2(color: AppColors.charcoal),
+          style: LumiType.heading,
           textAlign: TextAlign.center,
         ),
         LumiGap.xs,
         Text(
           'Enter the 8-character code from your child\'s school, or scan '
           'the QR code from their welcome email.',
-          style: LumiTextStyles.bodyLarge(
-            color: AppColors.charcoal.withValues(alpha: 0.7),
-          ),
+          style: LumiType.body.copyWith(color: LumiTokens.muted, height: 1.4),
           textAlign: TextAlign.center,
         ),
         LumiGap.l,
@@ -214,13 +215,14 @@ class _LinkChildScreenState extends ConsumerState<LinkChildScreen> {
           autofocus: true,
           maxLength: 8,
           enabled: !_busy,
+          accentColor: LumiTokens.green,
           textInputAction: TextInputAction.done,
           inputFormatters: [_UpperCaseTextFormatter()],
           prefixIcon: IconButton(
             onPressed: _busy ? null : _openScanner,
             tooltip: 'Scan QR code',
             icon: const Icon(Icons.qr_code_scanner, size: 22),
-            color: AppColors.charcoal,
+            color: LumiTokens.ink,
           ),
           onChanged: (_) {
             if (_errorMessage != null) {
@@ -249,11 +251,17 @@ class _LinkChildScreenState extends ConsumerState<LinkChildScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         LumiGap.m,
-        const Center(child: LumiMascot(variant: LumiVariant.parent, size: 120)),
+        Center(
+          child: Image.asset(
+            'assets/UI Lumi/Lumi wKIds.png',
+            height: 140,
+            fit: BoxFit.contain,
+          ),
+        ),
         LumiGap.m,
         Text(
           'Is this your child?',
-          style: LumiTextStyles.h2(color: AppColors.charcoal),
+          style: LumiType.heading,
           textAlign: TextAlign.center,
         ),
         LumiGap.m,
@@ -276,13 +284,11 @@ class _LinkChildScreenState extends ConsumerState<LinkChildScreen> {
                   children: [
                     Text(
                       _studentName,
-                      style: LumiTextStyles.h3(color: AppColors.charcoal),
+                      style: LumiType.subhead,
                     ),
                     Text(
                       'Ready to link to your account',
-                      style: LumiTextStyles.bodySmall(
-                        color: AppColors.charcoal.withValues(alpha: 0.6),
-                      ),
+                      style: LumiType.caption.copyWith(color: LumiTokens.muted),
                     ),
                   ],
                 ),
@@ -356,15 +362,13 @@ class _LinkChildScreenState extends ConsumerState<LinkChildScreen> {
         LumiGap.m,
         Text(
           'Pick a character for $_studentFirstName',
-          style: LumiTextStyles.h2(color: AppColors.charcoal),
+          style: LumiType.heading,
           textAlign: TextAlign.center,
         ),
         LumiGap.xs,
         Text(
           "They'll see this character in the app. You can change it anytime.",
-          style: LumiTextStyles.bodyLarge(
-            color: AppColors.charcoal.withValues(alpha: 0.7),
-          ),
+          style: LumiType.body.copyWith(color: LumiTokens.muted, height: 1.4),
           textAlign: TextAlign.center,
         ),
         LumiGap.l,
@@ -404,29 +408,27 @@ class _LinkChildScreenState extends ConsumerState<LinkChildScreen> {
           child: Container(
             width: 88,
             height: 88,
-            decoration: BoxDecoration(
-              color: AppColors.success.withValues(alpha: 0.12),
+            decoration: const BoxDecoration(
+              color: LumiTokens.tintGreen,
               shape: BoxShape.circle,
             ),
             child: const Icon(
               Icons.check_rounded,
               size: 52,
-              color: AppColors.success,
+              color: LumiTokens.green,
             ),
           ),
         ),
         LumiGap.m,
         Text(
           '$_studentName is linked!',
-          style: LumiTextStyles.h2(color: AppColors.charcoal),
+          style: LumiType.heading,
           textAlign: TextAlign.center,
         ),
         LumiGap.xs,
         Text(
           'You can now track their reading from your home screen.',
-          style: LumiTextStyles.bodyLarge(
-            color: AppColors.charcoal.withValues(alpha: 0.7),
-          ),
+          style: LumiType.body.copyWith(color: LumiTokens.muted, height: 1.4),
           textAlign: TextAlign.center,
         ),
         LumiGap.l,
@@ -452,22 +454,22 @@ class _ErrorBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.error.withValues(alpha: 0.08),
-        borderRadius: LumiBorders.medium,
+        color: LumiTokens.red.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
         border: Border.all(
-          color: AppColors.error.withValues(alpha: 0.35),
+          color: LumiTokens.red.withValues(alpha: 0.35),
           width: 1,
         ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.error_outline, size: 18, color: AppColors.error),
+          const Icon(Icons.error_outline, size: 18, color: LumiTokens.red),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
-              style: LumiTextStyles.bodySmall(color: AppColors.error),
+              style: LumiType.caption.copyWith(color: LumiTokens.red),
             ),
           ),
         ],
