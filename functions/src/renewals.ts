@@ -1,4 +1,5 @@
 import * as functions from "firebase-functions/v1";
+import {onSchedule} from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
 import {assertNotReadOnly} from "./read_only_guard";
 import {
@@ -178,16 +179,18 @@ export const renewStudents = fns
  * The absolute `access.expiresAt` is the backstop — even if this never runs,
  * access lapses on schedule. This job is the tidy-up + whole-school reconcile.
  */
-export const annualRollover = fns.pubsub
-  .schedule(`0 2 ${ROLLOVER_DAY} 1 *`) // 02:00 on 25 January
-  .timeZone(DEFAULT_TIMEZONE)
-  .onRun(async () => {
+export const annualRollover = onSchedule(
+  {
+    schedule: `0 2 ${ROLLOVER_DAY} 1 *`, // 02:00 on 25 January
+    timeZone: DEFAULT_TIMEZONE,
+  },
+  async () => {
     const cfgRef = db().collection("config").doc("academicYear");
     const cfgSnap = await cfgRef.get();
     const priorYear = (cfgSnap.data()?.currentAcademicYear as number | undefined);
     if (typeof priorYear !== "number") {
       functions.logger.error("annualRollover: config/academicYear missing; aborting.");
-      return null;
+      return;
     }
     const newYear = priorYear + 1;
 
@@ -247,7 +250,7 @@ export const annualRollover = fns.pubsub
       `suspended ${suspendedSchools} unpaid school(s); ` +
       `expired/suspended ${expiredStudents} student(s).`,
     );
-    return null;
+    return;
   });
 
 /**
