@@ -3,12 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/lumi_text_styles.dart';
 import '../../core/theme/lumi_spacing.dart';
-import '../../core/theme/lumi_borders.dart';
-import '../../core/widgets/lumi/lumi_buttons.dart';
-import '../../core/widgets/lumi_mascot.dart';
+import '../../theme/lumi_tokens.dart';
+import '../../theme/lumi_typography.dart';
 
 /// Shown when a school-admin account signs into the mobile app. School
 /// administration lives entirely in the separate web portal, so the mobile
@@ -29,11 +26,10 @@ class AdminUseWebPortalScreen extends StatelessWidget {
     await Clipboard.setData(const ClipboardData(text: _portalUrl));
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Portal link copied to clipboard!'),
-          backgroundColor: AppColors.success,
+        const SnackBar(
+          content: Text('Portal link copied to clipboard!'),
           behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
+          duration: Duration(seconds: 2),
         ),
       );
     }
@@ -42,7 +38,7 @@ class AdminUseWebPortalScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.offWhite,
+      backgroundColor: LumiTokens.cream,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -52,7 +48,6 @@ class AdminUseWebPortalScreen extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Lumi Mascot
                   Animate(
                     effects: const [
                       ScaleEffect(
@@ -60,9 +55,10 @@ class AdminUseWebPortalScreen extends StatelessWidget {
                         curve: Curves.elasticOut,
                       ),
                     ],
-                    child: const LumiMascot(
-                      variant: LumiVariant.welcome,
-                      size: 180,
+                    child: Image.asset(
+                      'assets/staff_characters/la_blue.png',
+                      height: 180,
+                      fit: BoxFit.contain,
                     ),
                   ),
 
@@ -71,7 +67,7 @@ class AdminUseWebPortalScreen extends StatelessWidget {
                   // Title
                   Text(
                     'Manage Your School on the Web',
-                    style: LumiTextStyles.h1(color: AppColors.charcoal),
+                    style: LumiType.heading,
                     textAlign: TextAlign.center,
                   ).animate().fadeIn(delay: 200.ms),
 
@@ -80,8 +76,9 @@ class AdminUseWebPortalScreen extends StatelessWidget {
                   // Subtitle
                   Text(
                     'The school administration dashboard now lives in the Lumi web portal. Open it in your browser to manage staff, classes, students and reports.',
-                    style: LumiTextStyles.bodyLarge(
-                      color: AppColors.charcoal.withValues(alpha: 0.7),
+                    style: LumiType.body.copyWith(
+                      color: LumiTokens.muted,
+                      height: 1.4,
                     ),
                     textAlign: TextAlign.center,
                   ).animate().fadeIn(delay: 400.ms),
@@ -89,10 +86,25 @@ class AdminUseWebPortalScreen extends StatelessWidget {
                   LumiGap.xl,
 
                   // Open Portal button
-                  LumiPrimaryButton(
+                  FilledButton.icon(
                     onPressed: _launchPortal,
-                    text: 'Open Web Portal',
-                    icon: Icons.open_in_new,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: LumiTokens.blue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(LumiTokens.radiusLarge),
+                      ),
+                    ),
+                    icon: const Icon(Icons.open_in_new, size: 20),
+                    label: Text(
+                      'Open Web Portal',
+                      style: LumiType.button.copyWith(color: Colors.white),
+                    ),
                   ).animate().fadeIn(delay: 600.ms),
 
                   LumiGap.xs,
@@ -100,8 +112,15 @@ class AdminUseWebPortalScreen extends StatelessWidget {
                   // Copy link
                   TextButton.icon(
                     onPressed: () => _copyToClipboard(context),
-                    icon: const Icon(Icons.copy, size: 18),
-                    label: const Text('Copy portal link'),
+                    icon:
+                        const Icon(Icons.copy, size: 18, color: LumiTokens.blue),
+                    label: Text(
+                      'Copy portal link',
+                      style: LumiType.caption.copyWith(
+                        color: LumiTokens.blue,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ).animate().fadeIn(delay: 700.ms),
 
                   LumiGap.l,
@@ -110,17 +129,14 @@ class AdminUseWebPortalScreen extends StatelessWidget {
                   Container(
                     padding: LumiPadding.allS,
                     decoration: BoxDecoration(
-                      color: AppColors.white,
-                      borderRadius: LumiBorders.medium,
-                      border: Border.all(
-                        color: AppColors.charcoal.withValues(alpha: 0.12),
-                      ),
+                      color: LumiTokens.paper,
+                      borderRadius:
+                          BorderRadius.circular(LumiTokens.radiusMedium),
+                      border: Border.all(color: LumiTokens.rule),
                     ),
                     child: Text(
                       _portalUrl,
-                      style: LumiTextStyles.bodyMedium(
-                        color: AppColors.charcoal.withValues(alpha: 0.8),
-                      ),
+                      style: LumiType.body.copyWith(color: LumiTokens.muted),
                       textAlign: TextAlign.center,
                     ),
                   ).animate().fadeIn(delay: 800.ms),
@@ -128,10 +144,22 @@ class AdminUseWebPortalScreen extends StatelessWidget {
                   LumiGap.xl,
 
                   // Back Button
-                  LumiSecondaryButton(
+                  OutlinedButton.icon(
                     onPressed: () => context.go('/auth/login'),
-                    text: 'Back to Login',
-                    icon: Icons.arrow_back,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: LumiTokens.ink,
+                      side: const BorderSide(color: LumiTokens.rule),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(LumiTokens.radiusPill),
+                      ),
+                    ),
+                    icon: const Icon(Icons.arrow_back, size: 18),
+                    label: Text('Back to Login', style: LumiType.button),
                   ).animate().fadeIn(delay: 900.ms),
                 ],
               ),
