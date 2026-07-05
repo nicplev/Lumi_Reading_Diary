@@ -1,5 +1,6 @@
 import * as functions from "firebase-functions/v1";
 import {onSchedule} from "firebase-functions/v2/scheduler";
+import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import {assertNotReadOnly} from "./read_only_guard";
 import {
@@ -11,8 +12,6 @@ import {
   DEFAULT_TIMEZONE,
   ROLLOVER_DAY,
 } from "./access";
-
-const fns = functions.region("australia-southeast1");
 
 const STUDENT_BATCH = 400;
 
@@ -80,27 +79,28 @@ interface RenewInput {
  * staff at the school AND the school's subscription for that year to be active —
  * a school must both pay and select to renew (fail-closed by construction).
  */
-export const renewStudents = fns
-  .runWith({timeoutSeconds: 120, memory: "256MB"})
-  .https.onCall(async (data: RenewInput, context) => {
-    assertNotReadOnly(context);
-    if (!context.auth) {
-      throw new functions.https.HttpsError(
+export const renewStudents = onCall(
+  {timeoutSeconds: 120, memory: "256MiB"},
+  async (request) => {
+    const data: RenewInput = request.data;
+    assertNotReadOnly(request);
+    if (!request.auth) {
+      throw new HttpsError(
         "unauthenticated",
         "Sign-in required.",
       );
     }
-    const uid = context.auth.uid;
+    const uid = request.auth.uid;
     const schoolId = asNonEmptyString(data.schoolId, "schoolId");
     const academicYear = Number(data.academicYear);
     if (!Number.isInteger(academicYear)) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "invalid-argument",
         "academicYear must be an integer.",
       );
     }
     if (!Array.isArray(data.studentIds) || data.studentIds.length === 0) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "invalid-argument",
         "studentIds must be a non-empty array.",
       );
@@ -108,13 +108,13 @@ export const renewStudents = fns
     const studentIds = data.studentIds.map((s) => asNonEmptyString(s, "studentId"));
 
     if (!(await callerIsStaff(uid, schoolId))) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "permission-denied",
         "Only school staff may renew students.",
       );
     }
     if (!(await schoolSubActive(schoolId, academicYear))) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "failed-precondition",
         "School subscription is not active for that year.",
       );

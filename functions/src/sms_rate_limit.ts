@@ -16,8 +16,7 @@
 
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions/v1";
-
-const fns = functions.region("australia-southeast1");
+import {onCall, HttpsError} from "firebase-functions/v2/https";
 
 // App Check enforcement, opt-in via env var (default OFF). Flip only after the
 // client attestation rollout is verified (1.6). App Check attests the APP, not
@@ -88,89 +87,88 @@ function phoneToDocId(phoneE164: string): string {
   return encodeURIComponent(phoneE164);
 }
 
-export const requestSmsVerification = fns
-  .runWith({
-    timeoutSeconds: 15,
-    memory: "128MB",
-    enforceAppCheck: SMS_APP_CHECK_ENFORCED,
-    consumeAppCheckToken: SMS_APP_CHECK_ENFORCED,
-  })
-  .https.onCall(async (data, context) => {
-    const phone = normalizePhone(data?.phoneE164);
-    const purpose = typeof data?.purpose === "string" ? data.purpose : "";
-    if (!ALLOWED_PURPOSES.includes(purpose)) {
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        `purpose must be one of: ${ALLOWED_PURPOSES.join(", ")}.`,
-      );
-    }
+export const requestSmsVerification = onCall({
+  timeoutSeconds: 15,
+  memory: "256MiB",
+  enforceAppCheck: SMS_APP_CHECK_ENFORCED,
+  consumeAppCheckToken: SMS_APP_CHECK_ENFORCED,
+}, async (request) => {
+  const data = request.data;
+  const phone = normalizePhone(data?.phoneE164);
+  const purpose = typeof data?.purpose === "string" ? data.purpose : "";
+  if (!ALLOWED_PURPOSES.includes(purpose)) {
+    throw new HttpsError(
+      "invalid-argument",
+      `purpose must be one of: ${ALLOWED_PURPOSES.join(", ")}.`,
+    );
+  }
 
-    const config = await readConfig();
-    if (!config.enabled) {
-      // Gate is opted-out (the default). Fail open — don't block users
-      // while the rollout is still in monitoring mode.
-      return {ok: true, remainingToday: -1, gateEnabled: false};
-    }
+  const config = await readConfig();
+  if (!config.enabled) {
+    // Gate is opted-out (the default). Fail open — don't block users
+    // while the rollout is still in monitoring mode.
+    return {ok: true, remainingToday: -1, gateEnabled: false};
+  }
 
-    const db = admin.firestore();
-    const docRef = db.collection("smsRateLimits").doc(phoneToDocId(phone));
+  const db = admin.firestore();
+  const docRef = db.collection("smsRateLimits").doc(phoneToDocId(phone));
 
-    let allowed = false;
-    let remainingToday = 0;
+  let allowed = false;
+  let remainingToday = 0;
 
-    try {
-      await db.runTransaction(async (tx) => {
-        const snap = await tx.get(docRef);
-        const existing = snap.data() ?? {};
-        const windowStart = existing.windowStart as
-          | admin.firestore.Timestamp
-          | undefined;
-        const existingCount =
-          typeof existing.count === "number" ? existing.count : 0;
+  try {
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(docRef);
+      const existing = snap.data() ?? {};
+      const windowStart = existing.windowStart as
+        | admin.firestore.Timestamp
+        | undefined;
+      const existingCount =
+        typeof existing.count === "number" ? existing.count : 0;
 
-        const now = admin.firestore.Timestamp.now();
-        const inWindow = windowStart ?
-          now.toMillis() - windowStart.toMillis() < WINDOW_MS :
-          false;
+      const now = admin.firestore.Timestamp.now();
+      const inWindow = windowStart ?
+        now.toMillis() - windowStart.toMillis() < WINDOW_MS :
+        false;
 
-        const currentCount = inWindow ? existingCount : 0;
+      const currentCount = inWindow ? existingCount : 0;
 
-        if (currentCount >= config.maxPerDay) {
-          allowed = false;
-          remainingToday = 0;
-          return;
-        }
+      if (currentCount >= config.maxPerDay) {
+        allowed = false;
+        remainingToday = 0;
+        return;
+      }
 
-        const newCount = currentCount + 1;
-        tx.set(docRef, {
-          count: newCount,
-          windowStart: inWindow && windowStart ? windowStart : now,
-          lastSentAt: now,
-          lastPurpose: purpose,
-          lastCaller: context.auth?.uid ?? null,
-        });
-
-        allowed = true;
-        remainingToday = Math.max(0, config.maxPerDay - newCount);
+      const newCount = currentCount + 1;
+      tx.set(docRef, {
+        count: newCount,
+        windowStart: inWindow && windowStart ? windowStart : now,
+        lastSentAt: now,
+        lastPurpose: purpose,
+        lastCaller: request.auth?.uid ?? null,
       });
-    } catch (err) {
-      functions.logger.error("requestSmsVerification transaction failed", {
-        phoneTail: phone.slice(-4),
-        error: err instanceof Error ? err.message : String(err),
-      });
-      // Internal error in our own code shouldn't lock the user out — fall
-      // through and let the SMS attempt go through. If this becomes a
-      // pattern, flip the policy to closed.
-      return {ok: true, remainingToday: -1, gateEnabled: true, fallthrough: true};
-    }
 
-    if (!allowed) {
-      throw new functions.https.HttpsError(
-        "resource-exhausted",
-        "Too many verification codes sent to this number recently. " +
-          "Please try again in 24 hours.",
-      );
-    }
+      allowed = true;
+      remainingToday = Math.max(0, config.maxPerDay - newCount);
+    });
+  } catch (err) {
+    functions.logger.error("requestSmsVerification transaction failed", {
+      phoneTail: phone.slice(-4),
+      error: err instanceof Error ? err.message : String(err),
+    });
+    // Internal error in our own code shouldn't lock the user out — fall
+    // through and let the SMS attempt go through. If this becomes a
+    // pattern, flip the policy to closed.
+    return {ok: true, remainingToday: -1, gateEnabled: true, fallthrough: true};
+  }
 
-    return {ok: true, remainingToday, gateEnabled: true};
-  });
+  if (!allowed) {
+    throw new HttpsError(
+      "resource-exhausted",
+      "Too many verification codes sent to this number recently. " +
+        "Please try again in 24 hours.",
+    );
+  }
+
+  return {ok: true, remainingToday, gateEnabled: true};
+});

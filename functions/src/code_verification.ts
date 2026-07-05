@@ -1,7 +1,6 @@
 import * as functions from "firebase-functions/v1";
+import {onCall, CallableOptions} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
-
-const fns = functions.region("australia-southeast1");
 
 const COLL_SCHOOL_CODES = "schoolCodes";
 
@@ -13,8 +12,8 @@ const APP_CHECK_ENFORCED =
   process.env.CODE_VERIFICATION_APP_CHECK_ENFORCED === "true";
 
 function runtime(
-  opts: Pick<functions.RuntimeOptions, "timeoutSeconds" | "memory">
-): functions.RuntimeOptions {
+  opts: Pick<CallableOptions, "timeoutSeconds" | "memory">
+): CallableOptions {
   return {
     ...opts,
     enforceAppCheck: APP_CHECK_ENFORCED,
@@ -134,9 +133,10 @@ export async function resolveSchoolCode(
 // Intentionally UNAUTHENTICATED: the teacher app verifies the school code at the
 // start of registration, before the account exists (teacher_registration_
 // modal.dart). Validity mirrors SchoolCodeModel.isValid / invalidReason exactly.
-export const verifySchoolCode = fns
-  .runWith(runtime({timeoutSeconds: 15, memory: "128MB"}))
-  .https.onCall(async (data: {code?: unknown}) => {
+export const verifySchoolCode = onCall(
+  runtime({timeoutSeconds: 15, memory: "256MiB"}),
+  async (request) => {
+    const data: {code?: unknown} = request.data;
     const raw = typeof data?.code === "string" ? data.code : "";
     const resolved = await resolveSchoolCode(raw);
     return {
