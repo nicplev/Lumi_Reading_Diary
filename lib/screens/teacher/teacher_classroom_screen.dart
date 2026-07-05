@@ -897,7 +897,9 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
         child: _buildEmptyStateCard(
           title: 'No students in this class yet',
           message:
-              'This page becomes your daily workspace once students are added to the class.',
+              'Your school admin adds students to classes — through the school '
+              'portal or a roster import. Once they\'re added, this page becomes '
+              'your daily workspace.',
           actionLabel:
               widget.classes.length > 1 ? 'Choose Another Class' : 'Refresh',
           onAction: () {
