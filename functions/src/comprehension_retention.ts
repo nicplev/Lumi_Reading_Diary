@@ -8,6 +8,7 @@
 // Mirrors the scheduled-pubsub pattern used by impersonation.ts:849.
 
 import * as functions from "firebase-functions/v1";
+import {onSchedule} from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
 import {assertNotReadOnly} from "./read_only_guard";
 
@@ -161,11 +162,14 @@ async function performCleanup(
   return stats;
 }
 
-export const cleanupComprehensionAudio = fns
-  .runWith({timeoutSeconds: 540, memory: "512MB"})
-  .pubsub.schedule("every 24 hours")
-  .timeZone("Australia/Sydney")
-  .onRun(async () => {
+export const cleanupComprehensionAudio = onSchedule(
+  {
+    schedule: "every 24 hours",
+    timeZone: "Australia/Sydney",
+    timeoutSeconds: 540,
+    memory: "512MiB",
+  },
+  async () => {
     const result = await performCleanup(
       "system:cleanupComprehensionAudio",
       null
@@ -175,7 +179,7 @@ export const cleanupComprehensionAudio = fns
     } else {
       functions.logger.info("comprehensionAudio.retention.completed", result);
     }
-    return null;
+    return;
   });
 
 // ─────────────────────────────────────────────────────────────────────────────

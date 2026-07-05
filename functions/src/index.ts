@@ -1,5 +1,7 @@
+// MUST be first: sets v2 global options (region + pinned SA) before any
+// function in any file is defined. See functions/src/global_options.ts.
+import "./global_options";
 import * as functions from "firebase-functions/v1";
-import {setGlobalOptions} from "firebase-functions/v2";
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import {defineSecret} from "firebase-functions/params";
 import * as admin from "firebase-admin";
@@ -38,19 +40,6 @@ import {
 } from "./stats_aggregation";
 
 const fns = functions.region("australia-southeast1");
-
-// ── Gen2 migration (Phase 6) ────────────────────────────────────────────────
-// Global defaults for every v2 (Gen2) function as it's migrated off the v1
-// `fns` builder. Region matches the v1 functions. serviceAccount is PINNED to
-// the App Engine default SA (the Gen1 runtime SA) so every existing IAM grant
-// carries over unchanged — notably the getComprehensionAudioUrl signBlob grant
-// and all Firestore/Storage permissions — instead of Gen2's Compute Engine
-// default SA. This call only affects v2 functions; the v1 `fns`-built functions
-// are unaffected during the coexistence period.
-setGlobalOptions({
-  region: "australia-southeast1",
-  serviceAccount: "lumi-ninc-au@appspot.gserviceaccount.com",
-});
 
 // App Check enforcement, opt-in via env var (default OFF). Matches
 // code_verification.ts / impersonation.ts — flip a flag only AFTER the client
@@ -979,14 +968,17 @@ export const processQueuedNotificationCampaign = fns.firestore
     return null;
   });
 
-export const dispatchScheduledNotificationCampaigns = fns
-  .runWith({timeoutSeconds: 300, memory: "512MB"})
-  // Worst-case scheduling latency: a campaign with scheduledFor=10:01 fires
-  // at 10:05 instead of 10:01. Acceptable for non-urgent broadcasts and
-  // cuts invocations + collectionGroup scans by 80%.
-  .pubsub.schedule("every 5 minutes")
-  .timeZone("UTC")
-  .onRun(async () => {
+export const dispatchScheduledNotificationCampaigns = onSchedule(
+  {
+    // Worst-case scheduling latency: a campaign with scheduledFor=10:01 fires
+    // at 10:05 instead of 10:01. Acceptable for non-urgent broadcasts and
+    // cuts invocations + collectionGroup scans by 80%.
+    schedule: "every 5 minutes",
+    timeZone: "UTC",
+    timeoutSeconds: 300,
+    memory: "512MiB",
+  },
+  async () => {
     const now = admin.firestore.Timestamp.now();
     const dueCampaigns = await db
       .collectionGroup("notificationCampaigns")
@@ -1009,7 +1001,7 @@ export const dispatchScheduledNotificationCampaigns = fns
       await dispatchNotificationCampaign(schoolId, doc.ref);
     });
 
-    return null;
+    return;
   });
 
 /**
@@ -1242,11 +1234,14 @@ async function processSchool(
  * Firestore reads per school ≈ parents(with token) + unlogged_students + log_checks
  * (NOT all students × all logs like the naive approach)
  */
-export const sendReadingReminders = fns
-  .runWith({timeoutSeconds: 300, memory: "512MB"})
-  .pubsub.schedule("0 * * * *") // Every hour on the hour
-  .timeZone("UTC")
-  .onRun(async () => {
+export const sendReadingReminders = onSchedule(
+  {
+    schedule: "0 * * * *", // Every hour on the hour
+    timeZone: "UTC",
+    timeoutSeconds: 300,
+    memory: "512MiB",
+  },
+  async () => {
     const utcNow = new Date();
     functions.logger.info("sendReadingReminders tick", {utcHour: utcNow.getUTCHours()});
 
@@ -1269,7 +1264,7 @@ export const sendReadingReminders = fns
         ...totals,
       });
 
-      return null;
+      return;
     } catch (error) {
       functions.logger.error("Error in sendReadingReminders", {
         error: error instanceof Error ? error.message : String(error),
@@ -1620,9 +1615,16 @@ export const validateReadingLog = fns.firestore
  * Clean up expired link codes
  * Runs daily to remove old codes
  */
-export const cleanupExpiredLinkCodes = fns.pubsub
-  .schedule("0 2 * * *") // 2 AM daily
-  .onRun(async () => {
+export const cleanupExpiredLinkCodes = onSchedule(
+  {
+    schedule: "0 2 * * *", // 2 AM daily
+    // PRESERVE the Gen1 effective timezone exactly. This job had no explicit
+    // .timeZone(), so its deployed Cloud Scheduler job runs in
+    // America/Los_Angeles (the v1 default). Setting it here keeps the run time
+    // unchanged — Gen2 onSchedule would otherwise use a different default.
+    timeZone: "America/Los_Angeles",
+  },
+  async () => {
     const now = admin.firestore.Timestamp.now();
 
     try {
@@ -1648,7 +1650,7 @@ export const cleanupExpiredLinkCodes = fns.pubsub
         functions.logger.info(`Expired ${count} link codes`);
       }
 
-      return null;
+      return;
     } catch (error) {
       functions.logger.error("Error cleaning up expired codes", {
         error: error instanceof Error ? error.message : String(error),
@@ -2248,11 +2250,14 @@ export const updateClassStats = fns.firestore
  * students) this only reconciles the first 5K each Sunday; raise the
  * budgets or shard by school once monitoring tells us drift is rare.
  */
-export const reconcileStatsScheduled = fns
-  .runWith({timeoutSeconds: 540, memory: "512MB"})
-  .pubsub.schedule("0 3 * * 0") // Sunday 03:00 UTC
-  .timeZone("UTC")
-  .onRun(async () => {
+export const reconcileStatsScheduled = onSchedule(
+  {
+    schedule: "0 3 * * 0", // Sunday 03:00 UTC
+    timeZone: "UTC",
+    timeoutSeconds: 540,
+    memory: "512MiB",
+  },
+  async () => {
     try {
       const result = await runReconcilePass({
         studentBudget: 5000,
@@ -2265,7 +2270,7 @@ export const reconcileStatsScheduled = fns
       });
       throw err;
     }
-    return null;
+    return;
   });
 
 /**
@@ -2384,10 +2389,12 @@ export const deleteStudentWithCascade = fns
  * Runs hourly. For each user in pendingUserDeletions whose scheduledDeletionAt has passed,
  * permanently deletes the Firebase Auth account and Firestore user document.
  */
-export const processPendingUserDeletions = fns.pubsub
-  .schedule("0 * * * *") // Every hour on the hour
-  .timeZone("UTC")
-  .onRun(async () => {
+export const processPendingUserDeletions = onSchedule(
+  {
+    schedule: "0 * * * *", // Every hour on the hour
+    timeZone: "UTC",
+  },
+  async () => {
     const now = admin.firestore.Timestamp.now();
 
     const snap = await db
@@ -2395,7 +2402,7 @@ export const processPendingUserDeletions = fns.pubsub
       .where("scheduledDeletionAt", "<=", now)
       .get();
 
-    if (snap.empty) return null;
+    if (snap.empty) return;
 
     let deleted = 0;
     for (const doc of snap.docs) {
@@ -2427,7 +2434,7 @@ export const processPendingUserDeletions = fns.pubsub
     }
 
     functions.logger.info(`processPendingUserDeletions: deleted ${deleted} users`);
-    return null;
+    return;
   });
 
 // Build the minimal guardian projection denormalized onto student docs.

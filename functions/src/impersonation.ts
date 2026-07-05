@@ -1,4 +1,5 @@
 import * as functions from "firebase-functions/v1";
+import {onSchedule} from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
 import {createHash} from "crypto";
 import {isSuperAdmin} from "./super_admin";
@@ -853,9 +854,9 @@ export const listImpersonableUsers = fns
 // Scheduled: expireImpersonationSessions
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const expireImpersonationSessions = fns.pubsub
-  .schedule("every 5 minutes")
-  .onRun(async () => {
+export const expireImpersonationSessions = onSchedule(
+  {schedule: "every 5 minutes"},
+  async () => {
     const now = admin.firestore.Timestamp.now();
     const snap = await db()
       .collection(COLL_SESSIONS)
@@ -865,7 +866,7 @@ export const expireImpersonationSessions = fns.pubsub
       .get();
 
     if (snap.empty) {
-      return null;
+      return;
     }
 
     const batch = db().batch();
@@ -892,7 +893,7 @@ export const expireImpersonationSessions = fns.pubsub
     }
 
     functions.logger.info("impersonation.expired", {count: snap.size});
-    return null;
+    return;
   });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -957,9 +958,9 @@ export const revokeOnDevAccessRemoval = fns.firestore
 const ANOMALY_SCHOOLS_PER_HOUR = 5;
 const ANOMALY_SESSIONS_PER_HOUR = 4;
 
-export const monitorImpersonationAnomalies = fns.pubsub
-  .schedule("every 60 minutes")
-  .onRun(async () => {
+export const monitorImpersonationAnomalies = onSchedule(
+  {schedule: "every 60 minutes"},
+  async () => {
     const oneHourAgo = admin.firestore.Timestamp.fromMillis(
       Date.now() - 60 * 60 * 1000
     );
@@ -971,7 +972,7 @@ export const monitorImpersonationAnomalies = fns.pubsub
       .get();
 
     if (snap.empty) {
-      return null;
+      return;
     }
 
     // Group by devUid → { sessionCount, schoolIds }.
@@ -1024,5 +1025,5 @@ export const monitorImpersonationAnomalies = fns.pubsub
       devsScanned: perDev.size,
       flagged,
     });
-    return null;
+    return;
   });
