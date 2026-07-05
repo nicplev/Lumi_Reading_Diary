@@ -134,162 +134,174 @@ export function AdminDashboard({ schoolName, stats, weekly, operational }: Admin
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* Attention Required — the operational core */}
-        <div className="lg:col-span-2">
-          <Card id="attention" className="h-full flex flex-col scroll-mt-24">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-ink">Attention required</h2>
-              {attentionCount > 0 && <Badge variant="warning">{attentionCount}</Badge>}
+      {/* Row 1 — the operational core (hero) beside the shortcuts rail. */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start mb-6">
+        {/* Attention Required */}
+        <Card id="attention" className="lg:col-span-2 scroll-mt-24">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-ink">Attention required</h2>
+            {attentionCount > 0 && <Badge variant="warning">{attentionCount}</Badge>}
+          </div>
+
+          {attentionCount === 0 ? (
+            <div className="flex flex-col items-center justify-center text-center py-12">
+              <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-success/10 text-success mb-3">
+                <Icon name="task_alt" size={26} />
+              </span>
+              <p className="text-sm font-bold text-ink">You&apos;re all caught up</p>
+              <p className="text-xs text-muted mt-1">No students, classes or invitations need attention.</p>
             </div>
-
-            {attentionCount === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center py-10">
-                <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-success/10 text-success mb-3">
-                  <Icon name="task_alt" size={26} />
-                </span>
-                <p className="text-sm font-bold text-ink">You&apos;re all caught up</p>
-                <p className="text-xs text-muted mt-1">No students, classes or invitations need attention.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {attentionItems.map((item) => {
-                  const section = sectionForPath(item.href.split('?')[0]);
-                  return (
-                    <Link
-                      key={`${item.href}-${item.label}`}
-                      href={item.href}
-                      className="flex items-center gap-3 p-3 rounded-[var(--radius-md)] bg-cream hover:brightness-[0.97] transition"
-                    >
-                      <span
-                        className="inline-flex items-center justify-center w-9 h-9 rounded-[var(--radius-md)] flex-shrink-0"
-                        style={{ backgroundColor: `${section.accent}1F`, color: section.accent }}
-                      >
-                        <Icon name={item.icon} size={20} />
-                      </span>
-                      <span className="flex-1 min-w-0 text-sm font-semibold text-ink">{item.label}</span>
-                      <span
-                        className="hidden sm:flex items-center gap-1 text-xs font-bold whitespace-nowrap flex-shrink-0"
-                        style={{ color: section.accentStrong }}
-                      >
-                        {item.cta}
-                        <Icon name="arrow_forward" size={14} />
-                      </span>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </Card>
-        </div>
-
-        {/* Right column: quick actions + a bridge into Analytics */}
-        <div className="flex flex-col gap-6 min-w-0">
-          <Card>
-            <h2 className="text-lg font-bold text-ink mb-3">Quick actions</h2>
-            <div className="grid grid-cols-2 gap-2">
-              {quickActions.map((action) => {
-                const accent = sectionForPath(action.href).accent;
+          ) : (
+            <div className="space-y-2">
+              {attentionItems.map((item) => {
+                const section = sectionForPath(item.href.split('?')[0]);
                 return (
                   <Link
-                    key={action.href + action.label}
-                    href={action.href}
-                    className="flex items-center gap-2.5 p-2.5 rounded-[var(--radius-md)] bg-cream hover:brightness-[0.97] transition"
+                    key={`${item.href}-${item.label}`}
+                    href={item.href}
+                    className="flex items-center gap-3 p-3 rounded-[var(--radius-md)] bg-cream hover:brightness-[0.97] transition"
                   >
                     <span
-                      className="inline-flex items-center justify-center w-8 h-8 rounded-[var(--radius-md)] flex-shrink-0"
-                      style={{ backgroundColor: `${accent}1F`, color: accent }}
+                      className="inline-flex items-center justify-center w-9 h-9 rounded-[var(--radius-md)] flex-shrink-0"
+                      style={{ backgroundColor: `${section.accent}1F`, color: section.accent }}
                     >
-                      <Icon name={action.icon} size={20} />
+                      <Icon name={item.icon} size={20} />
                     </span>
-                    <span className="text-sm font-semibold text-ink truncate">{action.label}</span>
+                    <span className="flex-1 min-w-0 text-sm font-semibold text-ink">{item.label}</span>
+                    <span
+                      className="hidden sm:flex items-center gap-1 text-xs font-bold whitespace-nowrap flex-shrink-0"
+                      style={{ color: section.accentStrong }}
+                    >
+                      {item.cta}
+                      <Icon name="arrow_forward" size={14} />
+                    </span>
                   </Link>
                 );
               })}
             </div>
-          </Card>
+          )}
+        </Card>
 
-          {/* Reading this week — compact snapshot that links to the full Analytics page */}
-          <Card>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-bold text-ink">Reading this week</h2>
-              <span className="text-section"><Icon name="auto_stories" size={20} /></span>
-            </div>
-            <div className="font-display text-[28px] font-extrabold text-ink leading-tight">
-              {weekly.minutes.toLocaleString()} <span className="text-base font-bold text-muted">min</span>
-            </div>
-            <p className="text-sm text-muted mt-1">
-              {participation}% participation · {weekly.uniqueReaders}/{stats.totalStudents} students read
-            </p>
+        {/* Quick actions — verb-first shortcuts, tinted by destination section */}
+        <Card>
+          <h2 className="text-lg font-bold text-ink mb-3">Quick actions</h2>
+          <div className="grid grid-cols-1 gap-2">
+            {quickActions.map((action) => {
+              const accent = sectionForPath(action.href).accent;
+              return (
+                <Link
+                  key={action.href + action.label}
+                  href={action.href}
+                  className="flex items-center gap-3 p-3 rounded-[var(--radius-md)] bg-cream hover:brightness-[0.97] transition"
+                >
+                  <span
+                    className="inline-flex items-center justify-center w-9 h-9 rounded-[var(--radius-md)] flex-shrink-0"
+                    style={{ backgroundColor: `${accent}1F`, color: accent }}
+                  >
+                    <Icon name={action.icon} size={20} />
+                  </span>
+                  <span className="flex-1 min-w-0 text-sm font-semibold text-ink truncate">{action.label}</span>
+                  <Icon name="arrow_forward" size={15} className="text-muted flex-shrink-0" />
+                </Link>
+              );
+            })}
+          </div>
+        </Card>
+      </div>
+
+      {/* Row 2 — reading engagement, widened; Library health tucks alongside so
+          neither card is ever stranded in a lonely column. */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start mb-6">
+        <Card className={showLibraryCard ? 'lg:col-span-2' : 'lg:col-span-3'}>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-ink">Reading this week</h2>
             <Link
               href="/analytics"
-              className="inline-flex items-center gap-1 text-sm font-bold text-section-strong mt-4 hover:underline"
+              className="inline-flex items-center gap-1 text-sm font-bold text-section-strong hover:underline"
             >
               View full analytics
               <Icon name="arrow_forward" size={15} />
             </Link>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-end gap-6">
+            <div className="shrink-0">
+              <div className="font-display text-[32px] font-extrabold text-ink leading-none">
+                {weekly.minutes.toLocaleString()} <span className="text-base font-bold text-muted">min</span>
+              </div>
+              <p className="text-xs text-muted mt-2">logged across the school this week</p>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between text-sm mb-1.5">
+                <span className="font-semibold text-ink">{participation}% participation</span>
+                <span className="text-muted">{weekly.uniqueReaders}/{stats.totalStudents} students read</span>
+              </div>
+              <div className="h-2.5 rounded-full bg-cream overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-section transition-all"
+                  style={{ width: `${Math.min(100, participation)}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {showLibraryCard && (
+          <Card>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold text-ink">Library</h2>
+              <span className="text-section"><Icon name="menu_book" size={20} /></span>
+            </div>
+            <div className="font-display text-[28px] font-extrabold text-ink leading-tight">
+              {operational.incompleteBooks}
+            </div>
+            <p className="text-sm text-muted mt-1">
+              book{plural(operational.incompleteBooks)} need details — no title or cover yet
+            </p>
+            <Link
+              href="/library?filter=incomplete"
+              className="inline-flex items-center gap-1 text-sm font-bold text-section-strong mt-4 hover:underline"
+            >
+              Review incomplete books
+              <Icon name="arrow_forward" size={15} />
+            </Link>
           </Card>
-        </div>
+        )}
       </div>
 
-      {(showSetup || showLibraryCard) && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start mt-6">
-          {showSetup && (
-            <Card className="lg:col-span-2">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h2 className="text-lg font-bold text-ink">Finish setting up</h2>
-                  <p className="text-xs text-muted mt-0.5">A few steps to get your school ready</p>
+      {/* Onboarding setup — full width with a two-column checklist so it fills
+          the row instead of leaving a stranded half. Hidden once fully set up. */}
+      {showSetup && (
+        <Card>
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <h2 className="text-lg font-bold text-ink">Finish setting up</h2>
+              <p className="text-xs text-muted mt-0.5">A few steps to get your school ready</p>
+            </div>
+            <span className="text-sm font-bold text-section-strong shrink-0">{setupDone}/{setupSteps.length}</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
+            {setupSteps.map((step) =>
+              step.done ? (
+                <div key={step.label} className="flex items-center gap-3 p-2.5">
+                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-success/10 text-success flex-shrink-0">
+                    <Icon name="check" size={18} />
+                  </span>
+                  <span className="flex-1 text-sm font-semibold text-muted line-through">{step.label}</span>
                 </div>
-                <span className="text-sm font-bold text-section-strong shrink-0">{setupDone}/{setupSteps.length}</span>
-              </div>
-              <div className="space-y-1.5">
-                {setupSteps.map((step) =>
-                  step.done ? (
-                    <div key={step.label} className="flex items-center gap-3 p-2.5">
-                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-success/10 text-success flex-shrink-0">
-                        <Icon name="check" size={18} />
-                      </span>
-                      <span className="flex-1 text-sm font-semibold text-muted line-through">{step.label}</span>
-                    </div>
-                  ) : (
-                    <Link
-                      key={step.label}
-                      href={step.href}
-                      className="flex items-center gap-3 p-2.5 rounded-[var(--radius-md)] bg-cream hover:brightness-[0.97] transition"
-                    >
-                      <span className="inline-flex w-7 h-7 rounded-full border-2 border-rule flex-shrink-0" />
-                      <span className="flex-1 text-sm font-semibold text-ink">{step.label}</span>
-                      <Icon name="arrow_forward" size={15} className="text-muted" />
-                    </Link>
-                  ),
-                )}
-              </div>
-            </Card>
-          )}
-
-          {showLibraryCard && (
-            <Card>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-bold text-ink">Library</h2>
-                <span className="text-section"><Icon name="menu_book" size={20} /></span>
-              </div>
-              <div className="font-display text-[28px] font-extrabold text-ink leading-tight">
-                {operational.incompleteBooks}
-              </div>
-              <p className="text-sm text-muted mt-1">
-                book{plural(operational.incompleteBooks)} need details — no title or cover yet
-              </p>
-              <Link
-                href="/library?filter=incomplete"
-                className="inline-flex items-center gap-1 text-sm font-bold text-section-strong mt-4 hover:underline"
-              >
-                Review incomplete books
-                <Icon name="arrow_forward" size={15} />
-              </Link>
-            </Card>
-          )}
-        </div>
+              ) : (
+                <Link
+                  key={step.label}
+                  href={step.href}
+                  className="flex items-center gap-3 p-2.5 rounded-[var(--radius-md)] bg-cream hover:brightness-[0.97] transition"
+                >
+                  <span className="inline-flex w-7 h-7 rounded-full border-2 border-rule flex-shrink-0" />
+                  <span className="flex-1 text-sm font-semibold text-ink">{step.label}</span>
+                  <Icon name="arrow_forward" size={15} className="text-muted" />
+                </Link>
+              ),
+            )}
+          </div>
+        </Card>
       )}
     </div>
   );
