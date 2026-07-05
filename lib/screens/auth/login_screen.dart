@@ -1073,21 +1073,23 @@ class _MfaCodeDialogState extends State<_MfaCodeDialog> {
         ? 'Enter the 6-digit code sent to ${widget.phoneHint}.'
         : 'Enter the 6-digit code we just sent to your phone.';
     return AlertDialog(
+      backgroundColor: LumiTokens.paper,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
       ),
-      title: const Text('Verify it\'s you'),
+      title: Text('Verify it\'s you', style: LumiType.subhead),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(subtitle, style: LumiType.caption),
+          Text(subtitle, style: LumiType.body.copyWith(color: LumiTokens.muted)),
           const SizedBox(height: 16),
           LumiInput(
             controller: _codeController,
             label: 'SMS code',
             keyboardType: TextInputType.number,
             autofocus: true,
+            accentColor: LumiTokens.red,
             autofillHints: const [AutofillHints.oneTimeCode],
             inputFormatters: [
               FilteringTextInputFormatter.digitsOnly,
@@ -1109,7 +1111,10 @@ class _MfaCodeDialogState extends State<_MfaCodeDialog> {
                       }
                     },
               child: Text(_resending ? 'Sending…' : 'Resend code',
-                  style: LumiType.caption),
+                  style: LumiType.caption.copyWith(
+                    color: _resending ? LumiTokens.muted : LumiTokens.red,
+                    fontWeight: FontWeight.w600,
+                  )),
             ),
           ),
         ],
@@ -1117,13 +1122,20 @@ class _MfaCodeDialogState extends State<_MfaCodeDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text('Cancel',
+              style: LumiType.button.copyWith(color: LumiTokens.muted)),
         ),
-        FilledButton(
+        TextButton(
           onPressed: _codeValid
               ? () => Navigator.of(context).pop(_codeController.text.trim())
               : null,
-          child: const Text('Verify'),
+          child: Text('Verify',
+              style: LumiType.button.copyWith(
+                color: _codeValid
+                    ? LumiTokens.red
+                    : LumiTokens.muted.withValues(alpha: 0.5),
+                fontWeight: FontWeight.w700,
+              )),
         ),
       ],
     );

@@ -75,7 +75,36 @@ class _ParentNotificationsScreenState
       ),
     );
     if (confirmed == true && mounted) {
-      await _service.clearAllParentNotifications(widget.user);
+      try {
+        await _service.clearAllParentNotifications(widget.user);
+      } catch (_) {
+        // The stream re-emits the server state, so the list restores itself —
+        // just tell the user why.
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Couldn't clear notifications. Please try again."),
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _dismissNotification(String notificationId) async {
+    try {
+      await _service.deleteParentNotification(
+        user: widget.user,
+        notificationId: notificationId,
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Couldn't dismiss that notification."),
+          ),
+        );
+      }
     }
   }
 
@@ -135,10 +164,7 @@ class _ParentNotificationsScreenState
                           ),
                         ),
                         onDismissed: (_) {
-                          _service.deleteParentNotification(
-                            user: widget.user,
-                            notificationId: notification.id,
-                          );
+                          _dismissNotification(notification.id);
                         },
                         child: _NotificationCard(
                           notification: notification,

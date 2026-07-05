@@ -1201,6 +1201,29 @@ test('parent notifications: parent can read and mark own inbox items read only',
         schoolId: 'school_1',
       }),
   );
+
+  // Only the owning parent can delete inbox items (Clear all / swipe-dismiss).
+  await assertFails(
+    otherParentDb
+      .collection('schools')
+      .doc('school_1')
+      .collection('parents')
+      .doc('parent_1')
+      .collection('notifications')
+      .doc('campaign_1')
+      .delete(),
+  );
+
+  await assertSucceeds(
+    parentDb
+      .collection('schools')
+      .doc('school_1')
+      .collection('parents')
+      .doc('parent_1')
+      .collection('notifications')
+      .doc('campaign_1')
+      .delete(),
+  );
 });
 
 test('legacy top-level notifications are blocked for clients', async () => {

@@ -8,9 +8,7 @@ import 'package:rive/rive.dart' hide Animation;
 import '../../core/theme/app_theme.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
-import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_skeleton.dart';
-import '../../core/widgets/lumi_mascot.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/class_model.dart';
 import '../../services/firebase_service.dart';
@@ -446,40 +444,34 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
               child: Center(
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(28),
+                  padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
                     color: LumiTokens.paper,
-                    borderRadius: BorderRadius.circular(28),
+                    borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
                     border: Border.all(color: LumiTokens.rule),
                     boxShadow: LumiTokens.shadowCard,
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        width: 92,
-                        height: 92,
-                        decoration: BoxDecoration(
-                          color: LumiTokens.tintBlue,
-                          borderRadius: BorderRadius.circular(28),
-                        ),
-                        child: const Center(
-                          child: LumiMascot(
-                            variant: LumiVariant.teacher,
-                            size: 66,
-                          ),
-                        ),
+                      Image.asset(
+                        'assets/UI Lumi/lumi welcome.png',
+                        height: 150,
+                        fit: BoxFit.contain,
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 20),
                       Text(
                         'No Classes Assigned',
-                        style: LumiType.heading,
+                        style: LumiType.subhead,
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 10),
                       Text(
                         'Your dashboard is ready, but you need an active class before classroom and library workflows become useful.',
-                        style: LumiType.body.copyWith(color: LumiTokens.muted),
+                        style: LumiType.body.copyWith(
+                          color: LumiTokens.muted,
+                          height: 1.4,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 12),
@@ -488,16 +480,31 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                         style: LumiType.body.copyWith(
                           color: LumiTokens.muted,
                           fontSize: 14,
+                          height: 1.4,
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 28),
-                      LumiPrimaryButton(
-                        onPressed: _loadClasses,
-                        text: 'Refresh Classes',
-                        color: LumiTokens.blue,
-                        isFullWidth: true,
-                        borderRadius: BorderRadius.circular(18),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: _loadClasses,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: LumiTokens.blue,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius:
+                                  BorderRadius.circular(LumiTokens.radiusLarge),
+                            ),
+                          ),
+                          icon: const Icon(Icons.refresh_rounded, size: 20),
+                          label: Text(
+                            'Refresh Classes',
+                            style: LumiType.button
+                                .copyWith(color: Colors.white),
+                          ),
+                        ),
                       ),
                     ],
                   ),

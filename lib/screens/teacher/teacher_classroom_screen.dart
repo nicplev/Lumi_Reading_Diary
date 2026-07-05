@@ -14,7 +14,6 @@ import '../../data/models/user_model.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/reading_level_option.dart';
 import '../../data/models/reading_group_model.dart';
-import '../../data/models/achievement_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/school_model.dart';
 import '../../services/firebase_service.dart';
@@ -1130,40 +1129,6 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
         ? (_parseGroupColor(group.color) ?? LumiTokens.muted)
         : LumiTokens.muted.withValues(alpha: 0.5);
 
-    // Next achievement goal for this student
-    final stats = student.stats;
-    String? nextAchievementLabel;
-    if (stats != null) {
-      final nearest = AchievementTemplates.nearestUnearned(
-        currentStreak: stats.currentStreak,
-        totalBooksRead: stats.totalBooksRead,
-        totalMinutesRead: stats.totalMinutesRead,
-        totalReadingDays: stats.totalReadingDays,
-        earnedAchievementIds: student.earnedAchievementIds,
-        minProgress: 0.0,
-      );
-      if (nearest != null) {
-        final int current;
-        switch (nearest.achievement.requirementType) {
-          case 'streak':  current = stats.currentStreak;    break;
-          case 'books':   current = stats.totalBooksRead;   break;
-          case 'minutes': current = stats.totalMinutesRead; break;
-          case 'days':    current = stats.totalReadingDays; break;
-          default:        current = nearest.achievement.requiredValue;
-        }
-        final remaining = nearest.achievement.requiredValue - current;
-        if (remaining > 0) {
-          final unit = switch (nearest.achievement.requirementType) {
-            'books'   => remaining == 1 ? 'book'   : 'books',
-            'minutes' => remaining == 1 ? 'minute' : 'minutes',
-            _         => remaining == 1 ? 'day'    : 'days',
-          };
-          nextAchievementLabel =
-              '$remaining more $unit to earn "${nearest.achievement.name}"';
-        }
-      }
-    }
-
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
@@ -1288,17 +1253,6 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                   ],
                                 ],
                               ),
-                              if (nextAchievementLabel != null) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  nextAchievementLabel,
-                                  style: LumiType.caption.copyWith(
-                                    color: const Color(0xFF7C3AED),
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
                             ],
                           ),
                         ),
