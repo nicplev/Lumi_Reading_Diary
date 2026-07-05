@@ -4,6 +4,7 @@ import "./global_options";
 import * as functions from "firebase-functions/v1";
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import {onDocumentWritten, onDocumentCreated, onDocumentUpdated} from "firebase-functions/v2/firestore";
+import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {defineSecret} from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import sgMail from "@sendgrid/mail";
@@ -2811,18 +2812,19 @@ export const onCommentCreated = onDocumentCreated(
 // {sent:false} when there's no token, so the client can fall back to a local
 // preview. Mirrors the body grammar of the scheduled sendReadingReminders.
 // ─────────────────────────────────────────────────────────────────────────────
-export const sendTestReadingReminder = fns
-  .runWith({timeoutSeconds: 30, memory: "256MB"})
-  .https.onCall(async (data, context) => {
-    assertNotReadOnly(context);
-    if (!context.auth) {
-      throw new functions.https.HttpsError(
+export const sendTestReadingReminder = onCall(
+  {timeoutSeconds: 30, memory: "256MiB"},
+  async (request) => {
+    assertNotReadOnly(request);
+    if (!request.auth) {
+      throw new HttpsError(
         "unauthenticated", "Sign-in required.");
     }
-    const uid = context.auth.uid;
+    const uid = request.auth.uid;
+    const data = request.data;
     const schoolId = typeof data?.schoolId === "string" ? data.schoolId : "";
     if (schoolId.length === 0) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "invalid-argument", "schoolId is required.");
     }
 
@@ -2831,7 +2833,7 @@ export const sendTestReadingReminder = fns
       .collection("parents").doc(uid)
       .get();
     if (!parentSnap.exists) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "not-found", "Parent profile not found.");
     }
     const parent = parentSnap.data() ?? {};
