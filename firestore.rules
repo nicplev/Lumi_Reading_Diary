@@ -361,10 +361,14 @@ service cloud.firestore {
         // linking system / Admin SDK). Those are written only via Cloud
         // Functions (buildStudentAccess, linkParentToStudent), which bypass
         // rules. `access` is set legitimately server-side only.
+        // `autoAward` is the weekly Top Reader award — written ONLY by the
+        // topReaderAward Cloud Function (Admin SDK); clients must not spoof it.
+        // (`manualAward`, the teacher's special award, is intentionally NOT
+        // blocked — teachers set it from the app.)
         allow update: if (isSchoolAdmin(schoolId) || isTeacher(schoolId)) &&
             writeAllowedForDev() &&
             !request.resource.data.diff(resource.data).affectedKeys()
-                .hasAny(['access', 'parentIds']);
+                .hasAny(['access', 'parentIds', 'autoAward']);
 
         allow delete: if (isSchoolAdmin(schoolId) || isTeacher(schoolId)) &&
             writeAllowedForDev();

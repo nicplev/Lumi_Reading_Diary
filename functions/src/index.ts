@@ -115,6 +115,7 @@ export {verifySchoolCode} from "./code_verification";
 // functions/src/access.ts for the shared AU boundary math.
 export {onSchoolSubscriptionWrite} from "./subscriptions";
 export {renewStudents, annualRollover} from "./renewals";
+export {topReaderAward} from "./top_reader_award";
 
 // Daily cleanup for comprehension audio + per-row teacher/school-admin
 // trash button. The cron is driven by /platformConfig/comprehensionRetention
