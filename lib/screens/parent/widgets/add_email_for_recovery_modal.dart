@@ -4,9 +4,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/services/user_school_index_service.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/lumi_text_styles.dart';
 import '../../../core/widgets/lumi/lumi_buttons.dart';
+import '../../../core/widgets/lumi/lumi_input.dart';
+import '../../../theme/lumi_tokens.dart';
 import '../../../data/models/user_model.dart';
 import '../../../services/firebase_service.dart';
 import '../../../services/sms_verification_service.dart';
@@ -27,7 +28,7 @@ class AddEmailForRecoveryModal extends StatefulWidget {
     return showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.white,
+      backgroundColor: LumiTokens.paper,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -254,7 +255,7 @@ class _AddEmailForRecoveryModalState extends State<AddEmailForRecoveryModal>
         height: 4,
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
-          color: AppColors.charcoal.withValues(alpha: 0.15),
+          color: LumiTokens.ink.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(2),
         ),
       ),
@@ -275,23 +276,21 @@ class _AddEmailForRecoveryModalState extends State<AddEmailForRecoveryModal>
         const SizedBox(height: 8),
         Text(
           'We\'ll send a verification link to this email. You\'ll be able to sign in with email + password if you ever lose your phone.',
-          style: LumiTextStyles.bodySmall(
-            color: AppColors.charcoal.withValues(alpha: 0.7),
-          ),
+          style: LumiTextStyles.bodySmall(color: LumiTokens.muted),
         ),
         const SizedBox(height: 20),
         Form(
           key: _formKey,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           child: Column(
             children: [
-              TextFormField(
+              LumiInput(
                 controller: _emailController,
+                hintText: 'Email',
                 keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  hintText: 'you@example.com',
-                ),
-                autovalidateMode: AutovalidateMode.onUserInteraction,
+                accentColor: LumiTokens.red,
+                autofillHints: const [AutofillHints.email],
+                textInputAction: TextInputAction.next,
                 validator: (v) {
                   final t = v?.trim() ?? '';
                   if (t.isEmpty) return 'Please enter your email.';
@@ -302,14 +301,13 @@ class _AddEmailForRecoveryModalState extends State<AddEmailForRecoveryModal>
                 },
               ),
               const SizedBox(height: 12),
-              TextFormField(
+              LumiInput(
                 controller: _passwordController,
+                hintText: 'Create a password',
                 obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Create a password',
-                  hintText: 'At least 6 characters',
-                ),
-                autovalidateMode: AutovalidateMode.onUserInteraction,
+                accentColor: LumiTokens.red,
+                autofillHints: const [AutofillHints.newPassword],
+                textInputAction: TextInputAction.next,
                 validator: (v) {
                   if ((v ?? '').length < 6) {
                     return 'At least 6 characters.';
@@ -318,13 +316,14 @@ class _AddEmailForRecoveryModalState extends State<AddEmailForRecoveryModal>
                 },
               ),
               const SizedBox(height: 12),
-              TextFormField(
+              LumiInput(
                 controller: _confirmController,
+                hintText: 'Confirm password',
                 obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Confirm password',
-                ),
-                autovalidateMode: AutovalidateMode.onUserInteraction,
+                accentColor: LumiTokens.red,
+                autofillHints: const [AutofillHints.newPassword],
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _submit(),
                 validator: (v) {
                   if (v != _passwordController.text) {
                     return 'Passwords don\'t match.';
@@ -339,7 +338,7 @@ class _AddEmailForRecoveryModalState extends State<AddEmailForRecoveryModal>
           const SizedBox(height: 12),
           Text(
             _errorMessage!,
-            style: LumiTextStyles.bodySmall(color: AppColors.error),
+            style: LumiTextStyles.bodySmall(color: LumiTokens.red),
           ),
         ],
         const SizedBox(height: 20),
@@ -348,9 +347,13 @@ class _AddEmailForRecoveryModalState extends State<AddEmailForRecoveryModal>
           text: 'Send verification link',
           isFullWidth: true,
         ),
+        const SizedBox(height: 4),
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Not now'),
+          child: Text(
+            'Not now',
+            style: LumiTextStyles.button(color: LumiTokens.muted),
+          ),
         ),
       ],
     );
@@ -372,15 +375,13 @@ class _AddEmailForRecoveryModalState extends State<AddEmailForRecoveryModal>
       children: [
         _buildGrabber(),
         const Icon(Icons.mark_email_unread_rounded,
-            size: 56, color: AppColors.rosePink),
+            size: 56, color: LumiTokens.red),
         const SizedBox(height: 16),
         Text('Check your inbox', style: LumiTextStyles.h2(), textAlign: TextAlign.center),
         const SizedBox(height: 8),
         Text(
           'We sent a verification link to ${_pendingEmail ?? "your email"}. Tap the link, then come back here — this screen will update on its own.',
-          style: LumiTextStyles.bodySmall(
-            color: AppColors.charcoal.withValues(alpha: 0.7),
-          ),
+          style: LumiTextStyles.bodySmall(color: LumiTokens.muted),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 24),
@@ -400,7 +401,7 @@ class _AddEmailForRecoveryModalState extends State<AddEmailForRecoveryModal>
           const SizedBox(height: 8),
           Text(
             _errorMessage!,
-            style: LumiTextStyles.bodySmall(color: AppColors.error),
+            style: LumiTextStyles.bodySmall(color: LumiTokens.red),
             textAlign: TextAlign.center,
           ),
         ],
@@ -415,15 +416,13 @@ class _AddEmailForRecoveryModalState extends State<AddEmailForRecoveryModal>
       children: [
         _buildGrabber(),
         const Icon(Icons.check_circle_rounded,
-            size: 64, color: AppColors.success),
+            size: 64, color: LumiTokens.green),
         const SizedBox(height: 12),
         Text('Email verified', style: LumiTextStyles.h2()),
         const SizedBox(height: 4),
         Text(
           'You can now sign in with email + password too.',
-          style: LumiTextStyles.bodySmall(
-            color: AppColors.charcoal.withValues(alpha: 0.7),
-          ),
+          style: LumiTextStyles.bodySmall(color: LumiTokens.muted),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 20),
