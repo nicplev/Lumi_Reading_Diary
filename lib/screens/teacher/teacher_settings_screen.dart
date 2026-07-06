@@ -417,6 +417,12 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
                   label: 'Reading Groups',
                   onTap: () => _navigateWithClass('/teacher/reading-groups'),
                 ),
+                TeacherSettingsItem(
+                  icon: Icons.emoji_events,
+                  iconBgColor: LumiTokens.muted,
+                  label: 'Awards',
+                  onTap: () => _navigateWithClass('/teacher/awards'),
+                ),
                 // Class Reports is still in development — visible only to
                 // dev-access accounts until it ships in a later update.
                 if (hasDevAccess())

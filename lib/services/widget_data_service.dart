@@ -483,6 +483,9 @@ class _ChildPayload {
     return _ChildPayload(
       studentId: student.id,
       firstName: student.firstName,
+      // NB: keeps the chosen character (not displayCharacterId) — the native
+      // home-screen widget bundles its own character assets and has no
+      // gold/special award art, so an award id would render blank there.
       characterId: student.characterId ?? 'character_default',
       currentStreak: student.stats?.currentStreak ?? 0,
       lastReadingDate: student.stats?.lastReadingDate != null
