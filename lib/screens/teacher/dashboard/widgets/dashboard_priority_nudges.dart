@@ -242,7 +242,7 @@ class _NudgeRow extends StatelessWidget {
         child: Row(
           children: [
             StudentAvatar(
-              characterId: student.characterId,
+              characterId: student.displayCharacterId,
               initial: initials,
               avatarColor: avatarColor,
               size: 36,

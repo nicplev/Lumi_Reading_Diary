@@ -40,7 +40,10 @@ class StudentAvatar extends StatelessWidget {
 
     return StudentAvatar(
       key: key,
-      characterId: student.characterId,
+      // displayCharacterId applies any active award character (Top Reader /
+      // special) over the chosen character, so the award shows everywhere this
+      // factory is used — including the class kiosk.
+      characterId: student.displayCharacterId,
       initial: initial,
       avatarColor: color,
       size: size,

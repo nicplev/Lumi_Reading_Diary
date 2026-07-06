@@ -68,10 +68,26 @@ class LumiCharacters {
     LumiCharacter(id: 'yellow_ninja', displayName: 'Yellow Ninja', assetPath: 'assets/characters/yellow_ninja.png'),
   ];
 
-  /// Returns the character with [id], or null if not found.
+  /// Award characters — assigned by the reading-awards feature, NOT chosen by
+  /// students. Kept out of [all] so they never appear in the character picker,
+  /// but resolved by [findById] so they render wherever a profile character is
+  /// shown. Assets live in `assets/special lumi/` (declared in pubspec.yaml).
+  static const String goldLumiId = 'gold_lumi';
+  static const String specialLumiId = 'special_lumi';
+
+  static const List<LumiCharacter> awards = [
+    LumiCharacter(id: goldLumiId, displayName: 'Gold Lumi', assetPath: 'assets/special lumi/Gold Lumi.png'),
+    LumiCharacter(id: specialLumiId, displayName: 'Special Lumi', assetPath: 'assets/special lumi/Special Lumi.png'),
+  ];
+
+  /// Returns the character with [id] (searching selectable [all] then [awards]),
+  /// or null if not found.
   static LumiCharacter? findById(String? id) {
     if (id == null) return null;
     for (final c in all) {
+      if (c.id == id) return c;
+    }
+    for (final c in awards) {
       if (c.id == id) return c;
     }
     return null;

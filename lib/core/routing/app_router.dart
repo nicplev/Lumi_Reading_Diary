@@ -43,6 +43,7 @@ import '../../screens/parent/link_child_screen.dart';
 import '../../screens/teacher/teacher_home_screen.dart';
 import '../../screens/teacher/allocation/allocation_screen.dart';
 import '../../screens/teacher/reading_groups_screen.dart';
+import '../../screens/teacher/awards_screen.dart';
 import '../../screens/teacher/class_report_screen.dart';
 import '../../screens/teacher/teacher_profile_screen.dart';
 import '../../screens/teacher/student_detail_screen.dart';
@@ -529,6 +530,26 @@ class AppRouter {
           return _userScopedRoute(
             extra: state.extra,
             child: (_) => ReadingGroupsScreen(classModel: classModel),
+          );
+        },
+      ),
+
+      GoRoute(
+        path: '/teacher/awards',
+        name: 'teacher-awards',
+        builder: (context, state) {
+          final params = state.extra is Map<String, dynamic>
+              ? state.extra as Map<String, dynamic>
+              : null;
+          final classModel = params?['classModel'] as ClassModel?;
+          if (classModel == null) {
+            return const _ResourceNotFoundScaffold(
+              message: 'Pick a class first',
+            );
+          }
+          return _userScopedRoute(
+            extra: state.extra,
+            child: (_) => AwardsScreen(classModel: classModel),
           );
         },
       ),

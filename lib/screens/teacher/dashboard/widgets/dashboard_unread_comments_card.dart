@@ -236,7 +236,7 @@ class _UnreadCommentRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             StudentAvatar(
-              characterId: student?.characterId,
+              characterId: student?.displayCharacterId,
               initial: _initials(student),
               avatarColor: avatarColor,
               size: 34,

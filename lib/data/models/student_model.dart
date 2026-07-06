@@ -16,6 +16,17 @@ class StudentModel {
   final DateTime? dateOfBirth;
   final String? profileImageUrl;
   final String? characterId;
+
+  /// Weekly "Top Reader" award. Written EXCLUSIVELY by the topReaderAward Cloud
+  /// Function (server-only — security rules block client writes, like [access]).
+  /// Carries the gold award character; overrides [characterId] for display.
+  final StudentAward? autoAward;
+
+  /// Teacher-assigned "special" award. Written by teachers from the app.
+  /// Carries the special award character and a custom label; takes display
+  /// precedence over [autoAward]. See [displayCharacterId].
+  final StudentAward? manualAward;
+
   final bool isActive;
   final DateTime createdAt;
   final DateTime? enrolledAt;
@@ -59,6 +70,8 @@ class StudentModel {
     this.dateOfBirth,
     this.profileImageUrl,
     this.characterId,
+    this.autoAward,
+    this.manualAward,
     this.isActive = true,
     required this.createdAt,
     this.enrolledAt,
@@ -80,6 +93,19 @@ class StudentModel {
   bool get hasActiveAccess => access?.isActive ?? false;
 
   String get fullName => '$firstName $lastName';
+
+  /// The character to render wherever the profile character is shown. A
+  /// teacher-assigned [manualAward] wins, then the weekly [autoAward], then the
+  /// student's own [characterId]. This is the single override point consumed by
+  /// [StudentAvatar.fromStudent].
+  String? get displayCharacterId =>
+      manualAward?.characterId ?? autoAward?.characterId ?? characterId;
+
+  /// True when an award character is currently overriding the chosen character.
+  bool get hasActiveAward => manualAward != null || autoAward != null;
+
+  /// The active award's label, if any (manual takes precedence over auto).
+  String? get activeAwardName => manualAward?.name ?? autoAward?.name;
 
   factory StudentModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -104,6 +130,14 @@ class StudentModel {
           : null,
       profileImageUrl: data['profileImageUrl'],
       characterId: data['characterId'] as String?,
+      autoAward: data['autoAward'] != null
+          ? StudentAward.fromMap(
+              Map<String, dynamic>.from(data['autoAward'] as Map))
+          : null,
+      manualAward: data['manualAward'] != null
+          ? StudentAward.fromMap(
+              Map<String, dynamic>.from(data['manualAward'] as Map))
+          : null,
       isActive: data['isActive'] ?? true,
       createdAt: data['createdAt'] != null
           ? (data['createdAt'] as Timestamp).toDate()
@@ -159,6 +193,10 @@ class StudentModel {
           dateOfBirth != null ? Timestamp.fromDate(dateOfBirth!) : null,
       'profileImageUrl': profileImageUrl,
       if (characterId != null) 'characterId': characterId,
+      // Awards round-trip on a full-document write; their authoritative writers
+      // are the topReaderAward function (auto) and the teacher app (manual).
+      if (autoAward != null) 'autoAward': autoAward!.toMap(),
+      if (manualAward != null) 'manualAward': manualAward!.toMap(),
       'isActive': isActive,
       'createdAt': Timestamp.fromDate(createdAt),
       'enrolledAt': enrolledAt != null ? Timestamp.fromDate(enrolledAt!) : null,
@@ -193,6 +231,8 @@ class StudentModel {
     DateTime? dateOfBirth,
     String? profileImageUrl,
     String? characterId,
+    StudentAward? autoAward,
+    StudentAward? manualAward,
     bool? isActive,
     DateTime? createdAt,
     DateTime? enrolledAt,
@@ -224,6 +264,8 @@ class StudentModel {
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       characterId: characterId ?? this.characterId,
+      autoAward: autoAward ?? this.autoAward,
+      manualAward: manualAward ?? this.manualAward,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       enrolledAt: enrolledAt ?? this.enrolledAt,
@@ -236,6 +278,57 @@ class StudentModel {
       earnedAchievementIds: earnedAchievementIds ?? this.earnedAchievementIds,
       guardianProfiles: guardianProfiles ?? this.guardianProfiles,
     );
+  }
+}
+
+/// A reading award currently held by a student. Used for both the weekly
+/// auto "Top Reader" award (`autoAward`, server-written) and the teacher's
+/// manual "special" award (`manualAward`). [characterId] is a [LumiCharacters]
+/// award id (e.g. `gold_lumi` / `special_lumi`).
+class StudentAward {
+  final String characterId;
+
+  /// Award label at time of assignment (e.g. "Reader of the Week"). Snapshotted
+  /// so the display doesn't need a class-config lookup at render time.
+  final String name;
+
+  final DateTime? awardedAt;
+
+  /// Teacher uid for the manual award; null for the auto award.
+  final String? awardedBy;
+
+  /// ISO date (yyyy-MM-dd) of the Monday the auto award's week starts; null for
+  /// the manual award.
+  final String? weekOf;
+
+  StudentAward({
+    required this.characterId,
+    required this.name,
+    this.awardedAt,
+    this.awardedBy,
+    this.weekOf,
+  });
+
+  factory StudentAward.fromMap(Map<String, dynamic> map) {
+    return StudentAward(
+      characterId: map['characterId'] as String? ?? '',
+      name: map['name'] as String? ?? '',
+      awardedAt: map['awardedAt'] != null
+          ? (map['awardedAt'] as Timestamp).toDate()
+          : null,
+      awardedBy: map['awardedBy'] as String?,
+      weekOf: map['weekOf'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'characterId': characterId,
+      'name': name,
+      if (awardedAt != null) 'awardedAt': Timestamp.fromDate(awardedAt!),
+      if (awardedBy != null) 'awardedBy': awardedBy,
+      if (weekOf != null) 'weekOf': weekOf,
+    };
   }
 }
 

@@ -106,6 +106,38 @@ class ClassModel {
     return (raw == null || raw.isEmpty) ? defaultComprehensionQuestion : raw;
   }
 
+  // ── Reading awards (per class) ──────────────────────────────────────────
+  // Config stored at `classes/{classId}.settings.awards`. The award *holder*
+  // lives on the student doc (autoAward / manualAward); this is only the names
+  // + the auto-award on/off switch the teacher controls.
+
+  static const String defaultTopReaderName = 'Reader of the Week';
+  static const String defaultSpecialAwardName = 'Special Award';
+
+  Map<String, dynamic>? get _awards =>
+      settings?['awards'] as Map<String, dynamic>?;
+
+  /// Whether the weekly auto "Top Reader" award runs for this class. Opt-in:
+  /// defaults to false so no class gets a surprise gold character.
+  bool get topReaderEnabled =>
+      (_awards?['topReader'] as Map<String, dynamic>?)?['enabled'] == true;
+
+  /// Teacher-customised name for the auto award (falls back to the default).
+  String get topReaderName {
+    final raw =
+        ((_awards?['topReader'] as Map<String, dynamic>?)?['name'] as String?)
+            ?.trim();
+    return (raw == null || raw.isEmpty) ? defaultTopReaderName : raw;
+  }
+
+  /// Teacher-customised name for the manual "special" award.
+  String get specialAwardName {
+    final raw =
+        ((_awards?['special'] as Map<String, dynamic>?)?['name'] as String?)
+            ?.trim();
+    return (raw == null || raw.isEmpty) ? defaultSpecialAwardName : raw;
+  }
+
   ClassModel copyWith({
     String? id,
     String? schoolId,

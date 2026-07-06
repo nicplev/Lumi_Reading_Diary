@@ -162,7 +162,7 @@ class _DashboardRecentReadingCardState
                         group: group,
                         studentName: student?.firstName ?? '?',
                         initials: _getInitials(student),
-                        characterId: student?.characterId,
+                        characterId: student?.displayCharacterId,
                         onTap: student == null
                             ? null
                             : () => context.push(
