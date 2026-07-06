@@ -10,5 +10,6 @@ void main() {
   test('parent-header and empty-state artwork are bundled', () async {
     await rootBundle.load('assets/characters/red lumi (default).png');
     await rootBundle.load('assets/UI Lumi/lumi welcome.png');
+    await rootBundle.load('assets/UI Lumi/password+lock.png');
   });
 }
