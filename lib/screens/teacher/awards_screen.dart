@@ -415,9 +415,24 @@ class _AwardsScreenState extends State<AwardsScreen> {
           autofocus: true,
           maxLength: 40,
           textCapitalization: TextCapitalization.words,
+          cursorColor: LumiTokens.green,
+          style: LumiType.body,
           decoration: InputDecoration(
             hintText: defaultName,
-            border: const OutlineInputBorder(),
+            hintStyle: LumiType.body.copyWith(color: LumiTokens.muted),
+            filled: true,
+            fillColor: LumiTokens.cream,
+            counterStyle: LumiType.caption.copyWith(color: LumiTokens.muted),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+              borderSide: const BorderSide(color: LumiTokens.rule),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+              borderSide: const BorderSide(color: LumiTokens.green, width: 2),
+            ),
           ),
         ),
         actions: [
