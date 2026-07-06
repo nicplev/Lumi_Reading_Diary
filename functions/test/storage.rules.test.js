@@ -12,7 +12,7 @@ const {
   assertSucceeds,
   assertFails,
 } = require('@firebase/rules-unit-testing');
-const { ref, uploadBytes } = require('firebase/storage');
+const { ref, uploadBytes, getBytes } = require('firebase/storage');
 
 // Must match the --project passed to `firebase emulators:exec` in the
 // test:rules:storage script: the Storage emulator resolves the
@@ -77,9 +77,15 @@ test('comprehension audio: upload allowed when flag enabled', async () => {
   await assertSucceeds(uploadBytes(audioRef('parent_1'), AUDIO_BYTES, AUDIO_METADATA));
 });
 
-test('comprehension audio: upload denied while kill switch is off', async () => {
+test('comprehension audio: storage rules do NOT enforce the kill switch (app-side)', async () => {
+  // The kill switch (platformConfig/comprehensionRecording) is enforced app-side
+  // via PlatformConfigService — NOT in storage rules. The cross-service
+  // firestore.get() this rule used to run silently failed under lumi-ninc-au
+  // (every upload → unauthorized), so the rule was reduced to trust
+  // auth + size + contentType (see storage.rules comment). At the rule level,
+  // therefore, an upload with the flag OFF still succeeds.
   await seedFlag(false);
-  await assertFails(uploadBytes(audioRef('parent_1'), AUDIO_BYTES, AUDIO_METADATA));
+  await assertSucceeds(uploadBytes(audioRef('parent_1'), AUDIO_BYTES, AUDIO_METADATA));
 });
 
 test('comprehension audio: unauthenticated upload denied regardless of flag', async () => {
@@ -93,4 +99,18 @@ test('comprehension audio: non-audio content type denied even when enabled', asy
   await assertFails(
     uploadBytes(audioRef('parent_1'), AUDIO_BYTES, { contentType: 'image/jpeg' }),
   );
+});
+
+test('comprehension audio: direct authenticated read is denied (signed-URL only)', async () => {
+  // The object is seeded with rules disabled, then a normal authed client tries
+  // to read it directly — denied (2.2). Playback must go through the
+  // getComprehensionAudioUrl callable's signed URL, which bypasses these rules.
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await uploadBytes(
+      ref(context.storage(), AUDIO_PATH),
+      AUDIO_BYTES,
+      AUDIO_METADATA,
+    );
+  });
+  await assertFails(getBytes(audioRef('teacher_1')));
 });
