@@ -938,6 +938,59 @@ test('students: staff cannot write the server-owned access map or parentIds', as
   await assertSucceeds(
     studentRef(authDb('teacher_1')).update({ currentReadingLevel: 'C' }),
   );
+
+  // manualAward (the teacher's special award) IS a teacher-writable field.
+  await assertSucceeds(
+    studentRef(authDb('teacher_1')).update({
+      manualAward: { characterId: 'special_lumi', name: 'Star Reader', awardedBy: 'teacher_1' },
+    }),
+  );
+
+  // autoAward (the weekly Top Reader) is server-only — staff cannot spoof it.
+  await assertFails(
+    studentRef(authDb('teacher_1')).update({
+      autoAward: { characterId: 'gold_lumi', name: 'Reader of the Week' },
+    }),
+  );
+  await assertFails(
+    studentRef(authDb('admin_1')).update({
+      autoAward: { characterId: 'gold_lumi', name: 'Reader of the Week' },
+    }),
+  );
+});
+
+test('classes: teacher of the class can write award settings', async () => {
+  await seedData(async (db) => {
+    await db.collection('schools').doc('school_1').set({
+      name: 'Lumi School', createdBy: 'admin_1',
+    });
+    await db.collection('schools').doc('school_1').collection('users').doc('teacher_1').set({
+      role: 'teacher', schoolId: 'school_1',
+    });
+    await db.collection('schools').doc('school_1').collection('users').doc('teacher_2').set({
+      role: 'teacher', schoolId: 'school_1',
+    });
+    await db.collection('schools').doc('school_1').collection('classes').doc('class_1').set({
+      schoolId: 'school_1', name: '3A', teacherId: 'teacher_1', teacherIds: ['teacher_1'],
+      studentIds: [], isActive: true, createdBy: 'teacher_1',
+    });
+  });
+
+  const classRef = (db) =>
+    db.collection('schools').doc('school_1').collection('classes').doc('class_1');
+
+  // The class's own teacher may configure the awards.
+  await assertSucceeds(
+    classRef(authDb('teacher_1')).update({
+      'settings.awards.topReader.enabled': true,
+      'settings.awards.topReader.name': 'Reader of the Week',
+    }),
+  );
+
+  // A teacher who is NOT on this class cannot.
+  await assertFails(
+    classRef(authDb('teacher_2')).update({ 'settings.awards.special.name': 'Nope' }),
+  );
 });
 
 test('readingLevelEvents: parent cannot read staff-only student level history', async () => {
