@@ -1067,6 +1067,40 @@ class _MfaCodeDialogState extends State<_MfaCodeDialog> {
   bool get _codeValid =>
       RegExp(r'^\d{6}$').hasMatch(_codeController.text.trim());
 
+  /// Recovery guidance for a parent who can no longer receive the SMS (e.g.
+  /// their phone number changed). Self-service factor reset isn't possible
+  /// without the old factor, so we point them at the school / support rather
+  /// than leaving Resend/Cancel as the only options (a hard lockout).
+  void _showCantReceiveHelp(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: LumiTokens.paper,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+        ),
+        title: Text('Trouble with your code?', style: LumiType.subhead),
+        content: Text(
+          "Check that your phone has signal, then tap Resend.\n\n"
+          "If your phone number has changed and you can no longer receive "
+          "codes, your school can reset your account access — contact your "
+          "school office, or email support@lumi-reading.com.",
+          style: LumiType.body.copyWith(color: LumiTokens.muted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Got it',
+                style: LumiType.button.copyWith(
+                  color: LumiTokens.red,
+                  fontWeight: FontWeight.w700,
+                )),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final subtitle = widget.phoneHint != null && widget.phoneHint!.isNotEmpty
@@ -1114,6 +1148,23 @@ class _MfaCodeDialogState extends State<_MfaCodeDialog> {
                   style: LumiType.caption.copyWith(
                     color: _resending ? LumiTokens.muted : LumiTokens.red,
                     fontWeight: FontWeight.w600,
+                  )),
+            ),
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              onPressed: () => _showCantReceiveHelp(context),
+              child: Text("Can't receive the code?",
+                  style: LumiType.caption.copyWith(
+                    color: LumiTokens.muted,
+                    fontWeight: FontWeight.w600,
+                    decoration: TextDecoration.underline,
                   )),
             ),
           ),

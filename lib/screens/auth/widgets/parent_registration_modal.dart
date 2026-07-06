@@ -12,6 +12,7 @@ import '../../../core/exceptions/linking_exceptions.dart';
 import '../../../core/routing/app_router.dart';
 import '../../../core/services/user_school_index_service.dart';
 import '../../../theme/lumi_tokens.dart';
+import '../../../theme/lumi_typography.dart';
 import '../../../core/theme/lumi_text_styles.dart';
 import '../../../core/widgets/lumi/lumi_buttons.dart';
 import '../../../core/widgets/lumi/lumi_input.dart';
@@ -1032,7 +1033,18 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
     final media = MediaQuery.of(context);
     final maxCardHeight = media.size.height * 0.82;
 
-    return SafeArea(
+    // Guard an accidental dismiss once an auth account exists but signup isn't
+    // finalised (a bare account with no parent doc → the parent then hits
+    // `email-already-in-use` on re-registration, a hard-to-escape dead end).
+    return PopScope(
+      canPop: _pendingUserId == null || _stage == _Stage.success,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final navigator = Navigator.of(context);
+        final leave = await _confirmAbandon();
+        if (leave && mounted) navigator.pop();
+      },
+      child: SafeArea(
       top: false,
       child: Padding(
         padding: EdgeInsets.only(
@@ -1081,7 +1093,45 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
           duration: 450.ms,
           curve: Curves.easeOutCubic,
         )
-        .fadeIn(duration: 300.ms);
+        .fadeIn(duration: 300.ms),
+    );
+  }
+
+  /// Confirms an intentional abandon after the account exists but signup is
+  /// unfinished. Returns true only if the user explicitly chooses to leave.
+  Future<bool> _confirmAbandon() async {
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: LumiTokens.paper,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+        ),
+        title: Text('Finish setting up?', style: LumiType.subhead),
+        content: Text(
+          "Your account was created but setup isn't finished. If you leave now "
+          "you'll need to log in with this email and password to complete it — "
+          "signing up again will say the email is already in use.",
+          style: LumiType.body.copyWith(color: LumiTokens.muted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('Keep going',
+                style: LumiType.button.copyWith(
+                  color: LumiTokens.red,
+                  fontWeight: FontWeight.w700,
+                )),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text('Leave',
+                style: LumiType.button.copyWith(color: LumiTokens.muted)),
+          ),
+        ],
+      ),
+    );
+    return leave ?? false;
   }
 
   Widget _buildFormCard() {
