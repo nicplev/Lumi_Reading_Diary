@@ -29,7 +29,7 @@ enum LumiVariant {
     LumiVariant.linking => 'assets/lumi/Lumi_Linking.png',
     LumiVariant.forgot => 'assets/lumi/Lumi_forgot.png',
     LumiVariant.promo => 'assets/lumi/Lumi_Promo.png',
-    LumiVariant.splash => 'assets/lumi/Lumi_Splash_Screem.png',
+    LumiVariant.splash => 'assets/lumi/Lumi_Splash_Screen.png',
   };
 }
 

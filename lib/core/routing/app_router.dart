@@ -969,7 +969,7 @@ class _BookCoverOverlay extends StatelessWidget {
                 ],
               ),
               child: Image.asset(
-                'assets/lumi/Lumi_Splash_Screem.png',
+                'assets/lumi/Lumi_Splash_Screen.png',
                 fit: BoxFit.cover,
               ),
             ),

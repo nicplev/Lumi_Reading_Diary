@@ -139,7 +139,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         children: [
           Positioned.fill(
             child: Image.asset(
-              'assets/lumi/Lumi_Splash_Screem.png',
+              'assets/lumi/Lumi_Splash_Screen.png',
               fit: BoxFit.cover,
             ),
           ),
