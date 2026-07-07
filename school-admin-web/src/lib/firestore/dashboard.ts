@@ -267,16 +267,30 @@ export async function getWeeklyReadingSummary(schoolId: string): Promise<WeeklyR
   }
 }
 
-export async function getWeeklyEngagement(schoolId: string): Promise<WeeklyEngagement[]> {
+/**
+ * Per-weekday log counts + minutes for one Monday-anchored school-local week.
+ * `weekOffset` selects the week: 0 = this week, -1 = last week, etc — the
+ * dashboard's timeframe selector drives it (a teacher checking Monday morning
+ * flips to last week instead of staring at an empty chart).
+ */
+export async function getWeeklyEngagement(
+  schoolId: string,
+  weekOffset = 0,
+): Promise<WeeklyEngagement[]> {
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const tz = await getSchoolTimezone(schoolId);
-  const startOfWeek = startOfLocalWeek(new Date(), tz);
+  const now = new Date();
+  const thisMondayStr = shiftDateStr(localDateString(now, tz), -localWeekdayIndex(now, tz));
+  const weekStartStr = shiftDateStr(thisMondayStr, 7 * weekOffset);
+  const startOfWeek = zonedDayStart(weekStartStr, tz);
+  const endOfWeek = zonedDayStart(shiftDateStr(weekStartStr, 7), tz);
 
   try {
     // Try date field first
     let logsSnap = await adminDb
       .collection('schools').doc(schoolId).collection('readingLogs')
       .where('date', '>=', startOfWeek)
+      .where('date', '<', endOfWeek)
       .get();
 
     // Fallback to createdAt if date field yields no results
@@ -284,6 +298,7 @@ export async function getWeeklyEngagement(schoolId: string): Promise<WeeklyEngag
       logsSnap = await adminDb
         .collection('schools').doc(schoolId).collection('readingLogs')
         .where('createdAt', '>=', startOfWeek)
+        .where('createdAt', '<', endOfWeek)
         .get();
     }
 
