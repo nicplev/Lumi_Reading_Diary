@@ -1,4 +1,14 @@
 import { adminDb } from '@/lib/firebase/admin';
+import {
+  DEFAULT_TIMEZONE,
+  getSchoolTimezone,
+  localDateString,
+  localWeekdayIndex,
+  shiftDateStr,
+  startOfLocalDay,
+  startOfLocalWeek,
+  zonedDayStart,
+} from '@/lib/school-time';
 
 export interface DashboardStats {
   totalStudents: number;
@@ -51,9 +61,10 @@ export async function getDashboardStats(schoolId: string): Promise<DashboardStat
     }
   }
 
-  // Count active students today
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Count active students today (school-local day, not server midnight)
+  const tz = typeof schoolData?.timezone === 'string' && schoolData.timezone
+    ? schoolData.timezone : DEFAULT_TIMEZONE;
+  const today = startOfLocalDay(new Date(), tz);
 
   let activeStudentsToday = 0;
   try {
@@ -227,12 +238,8 @@ export interface WeeklyReadingSummary {
  * replacing the heavier per-class multi-line chart the dashboard used to draw.
  */
 export async function getWeeklyReadingSummary(schoolId: string): Promise<WeeklyReadingSummary> {
-  const today = new Date();
-  const startOfWeek = new Date(today);
-  const dayOfWeek = today.getDay();
-  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  startOfWeek.setDate(today.getDate() + mondayOffset);
-  startOfWeek.setHours(0, 0, 0, 0);
+  const tz = await getSchoolTimezone(schoolId);
+  const startOfWeek = startOfLocalWeek(new Date(), tz);
 
   try {
     let logsSnap = await adminDb
@@ -262,13 +269,8 @@ export async function getWeeklyReadingSummary(schoolId: string): Promise<WeeklyR
 
 export async function getWeeklyEngagement(schoolId: string): Promise<WeeklyEngagement[]> {
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const today = new Date();
-  const startOfWeek = new Date(today);
-  // Fix Sunday edge case: getDay() returns 0 for Sunday
-  const dayOfWeek = today.getDay();
-  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  startOfWeek.setDate(today.getDate() + mondayOffset);
-  startOfWeek.setHours(0, 0, 0, 0);
+  const tz = await getSchoolTimezone(schoolId);
+  const startOfWeek = startOfLocalWeek(new Date(), tz);
 
   try {
     // Try date field first
@@ -300,7 +302,7 @@ export async function getWeeklyEngagement(schoolId: string): Promise<WeeklyEngag
       } else {
         date = new Date();
       }
-      const dayIndex = (date.getDay() + 6) % 7; // Mon=0
+      const dayIndex = localWeekdayIndex(date, tz); // Mon=0, school-local
       countByDay.set(dayIndex, (countByDay.get(dayIndex) ?? 0) + 1);
       const mins = typeof data.minutesRead === 'number' ? data.minutesRead : 0;
       minutesByDay.set(dayIndex, (minutesByDay.get(dayIndex) ?? 0) + mins);
@@ -320,12 +322,8 @@ export async function getWeeklyEngagement(schoolId: string): Promise<WeeklyEngag
  */
 export async function getWeeklyClassEngagement(schoolId: string): Promise<WeeklyClassSeries> {
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const today = new Date();
-  const startOfWeek = new Date(today);
-  const dayOfWeek = today.getDay();
-  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  startOfWeek.setDate(today.getDate() + mondayOffset);
-  startOfWeek.setHours(0, 0, 0, 0);
+  const tz = await getSchoolTimezone(schoolId);
+  const startOfWeek = startOfLocalWeek(new Date(), tz);
 
   const emptyRows = () => days.map((day) => ({ day }) as Record<string, number | string>);
 
@@ -361,7 +359,7 @@ export async function getWeeklyClassEngagement(schoolId: string): Promise<Weekly
       else if (data.createdAt?.toDate) date = data.createdAt.toDate();
       else if (typeof data.date === 'string') date = new Date(data.date);
       else date = new Date();
-      const dayIndex = (date.getDay() + 6) % 7;
+      const dayIndex = localWeekdayIndex(date, tz); // Mon=0, school-local
       if (!agg.has(classId)) agg.set(classId, { count: Array(7).fill(0), minutes: Array(7).fill(0) });
       const a = agg.get(classId)!;
       a.count[dayIndex] += 1;
@@ -458,8 +456,8 @@ export async function getTeacherDashboardData(schoolId: string, userId: string):
     .where('isActive', '==', true)
     .get();
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const tz = await getSchoolTimezone(schoolId);
+  const today = startOfLocalDay(new Date(), tz);
 
   // Collect all student IDs and class IDs upfront
   const allStudentIds: string[] = [];
@@ -675,10 +673,7 @@ export async function getTeacherDashboardWidgets(
     } catch { /* ignore */ }
   }
 
-  const startOfWeek = new Date();
-  const dow = startOfWeek.getDay();
-  startOfWeek.setDate(startOfWeek.getDate() + (dow === 0 ? -6 : 1 - dow));
-  startOfWeek.setHours(0, 0, 0, 0);
+  const startOfWeek = startOfLocalWeek(new Date(), await getSchoolTimezone(schoolId));
 
   const minutesByStudent = new Map<string, number>();
   const parentComments: TeacherParentComment[] = [];
@@ -848,13 +843,11 @@ export async function getTeacherReadingCalendar(
   const classIds = new Set(classesSnap.docs.map((d) => d.id));
   if (classIds.size === 0) return [];
 
+  const tz = await getSchoolTimezone(schoolId);
   const span = weeks * 7;
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  start.setDate(start.getDate() - (span - 1));
-
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const dateKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const todayStr = localDateString(new Date(), tz);
+  const startStr = shiftDateStr(todayStr, -(span - 1));
+  const start = zonedDayStart(startStr, tz);
 
   const counts = new Map<string, number>();
   try {
@@ -867,21 +860,16 @@ export async function getTeacherReadingCalendar(
       if (!classIds.has(d.classId)) continue;
       const when: Date | null = d.date?.toDate?.() ?? d.createdAt?.toDate?.() ?? null;
       if (!when) continue;
-      const key = dateKey(when);
+      const key = localDateString(when, tz);
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
   } catch { /* ignore */ }
 
-  // Emit every day in the window (including zero-count days) so the heatmap grid
-  // is complete and weekday-aligned in the component.
+  // Emit every school-local day in the window (including zero-count days) so
+  // the heatmap grid is complete and weekday-aligned in the component.
   const out: ReadingCalendarDay[] = [];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const cursor = new Date(start);
-  while (cursor <= today) {
-    const key = dateKey(cursor);
-    out.push({ date: key, count: counts.get(key) ?? 0 });
-    cursor.setDate(cursor.getDate() + 1);
+  for (let ds = startStr; ds <= todayStr; ds = shiftDateStr(ds, 1)) {
+    out.push({ date: ds, count: counts.get(ds) ?? 0 });
   }
   return out;
 }
