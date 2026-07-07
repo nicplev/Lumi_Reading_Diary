@@ -2,14 +2,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/widgets/lumi/student_avatar.dart';
 import '../../../data/models/class_model.dart';
 import '../../../data/models/student_model.dart';
 import '../../../data/models/user_model.dart';
+import '../../../services/firebase_service.dart';
 import '../../../services/isbn_assignment_service.dart';
+import '../../../services/kiosk_pin_service.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
+import 'kiosk_pin_dialogs.dart';
 import 'kiosk_scan_session_screen.dart';
 
 /// In-classroom kiosk roster. A teacher launches this on a shared iPad for one
@@ -50,6 +54,9 @@ class _ClassroomKioskScreenState extends State<ClassroomKioskScreen> {
       SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     }
     _loadScannedThisWeek();
+    // Offer the optional exit PIN once, after the first frame (the teacher is
+    // present at launch — that's the moment to lock the kiosk down).
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOfferExitPin());
   }
 
   @override
@@ -63,7 +70,178 @@ class _ClassroomKioskScreenState extends State<ClassroomKioskScreen> {
     super.dispose();
   }
 
+  String get _teacherId => widget.teacher.id;
+
+  /// One-time launch offer to set an exit PIN (skippable; manageable later via
+  /// the lock button in the app bar).
+  Future<void> _maybeOfferExitPin() async {
+    final pins = KioskPinService.instance;
+    if (await pins.hasPin(_teacherId) || await pins.wasOffered(_teacherId)) {
+      return;
+    }
+    await pins.markOffered(_teacherId);
+    if (!mounted) return;
+
+    final wantsPin = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Lock the kiosk with a PIN?', style: LumiType.subhead),
+        content: Text(
+          'Without a PIN, a student can tap Exit and land in your teacher '
+          'account. A $kKioskPinLength-digit exit PIN keeps the kiosk locked '
+          'to this screen. You can set or change it later with the lock '
+          'button up top.',
+          style: LumiType.body,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Not now',
+                style: LumiType.button.copyWith(color: LumiTokens.muted)),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Set PIN', style: LumiType.button),
+          ),
+        ],
+      ),
+    );
+    if (wantsPin != true || !mounted) return;
+
+    final pin = await showKioskPinSetupDialog(context);
+    if (pin != null) {
+      await pins.setPin(_teacherId, pin);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Exit PIN set for this device')),
+        );
+      }
+    }
+  }
+
+  /// Set / change / remove the exit PIN. Changing or removing always requires
+  /// the current PIN first. (Setting a first PIN is deliberately open — the
+  /// worst a mischievous student can do is lock the kiosk, which the teacher
+  /// recovers from via Forgot PIN → sign out.)
+  Future<void> _manageExitPin() async {
+    final pins = KioskPinService.instance;
+    final current = await pins.getPin(_teacherId);
+    if (!mounted) return;
+
+    if (current == null) {
+      final pin = await showKioskPinSetupDialog(context);
+      if (pin != null) {
+        await pins.setPin(_teacherId, pin);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Exit PIN set for this device')),
+          );
+        }
+      }
+      return;
+    }
+
+    final entry = await showKioskPinEntryDialog(
+      context,
+      correctPin: current,
+      title: 'Enter current PIN',
+      subtitle: 'Manage the exit PIN for this device.',
+    );
+    if (entry != KioskPinEntryResult.verified || !mounted) return;
+
+    final action = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text('Exit PIN', style: LumiType.subhead),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'change'),
+            child: Text('Change PIN', style: LumiType.body),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'remove'),
+            child: Text('Remove PIN',
+                style: LumiType.body.copyWith(color: LumiTokens.red)),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel',
+                style: LumiType.body.copyWith(color: LumiTokens.muted)),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+
+    if (action == 'change') {
+      final pin = await showKioskPinSetupDialog(context);
+      if (pin != null) await pins.setPin(_teacherId, pin);
+    } else if (action == 'remove') {
+      await pins.clearPin(_teacherId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Exit PIN removed')),
+        );
+      }
+    }
+  }
+
+  /// Forgot-PIN recovery: signing out is the only way past a lost PIN — safe,
+  /// because signing back in needs the teacher's credentials.
+  Future<void> _forgotPinSignOut() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Sign out to reset?', style: LumiType.subhead),
+        content: Text(
+          "Signing out removes this device's exit PIN and returns to the "
+          "login screen. You'll need your password to sign back in.",
+          style: LumiType.body,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel', style: LumiType.button),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: LumiTokens.red,
+              foregroundColor: LumiTokens.paper,
+            ),
+            child: Text('Sign Out', style: LumiType.button),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    await KioskPinService.instance.clearPin(_teacherId);
+    await FirebaseService.instance.signOut();
+    if (mounted) context.go('/auth/login');
+  }
+
   Future<void> _confirmExit() async {
+    // With a PIN set, the PIN itself is the exit gate.
+    final pin = await KioskPinService.instance.getPin(_teacherId);
+    if (!mounted) return;
+    if (pin != null) {
+      final result = await showKioskPinEntryDialog(
+        context,
+        correctPin: pin,
+        title: 'Enter PIN to exit',
+        subtitle: 'This returns to the teacher app.',
+        allowForgot: true,
+      );
+      if (!mounted) return;
+      if (result == KioskPinEntryResult.verified) {
+        Navigator.of(context).pop();
+      } else if (result == KioskPinEntryResult.forgot) {
+        await _forgotPinSignOut();
+      }
+      return;
+    }
+
     final shouldExit = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -138,6 +316,11 @@ class _ClassroomKioskScreenState extends State<ClassroomKioskScreen> {
           title: Text('${widget.classModel.name} • Scan-in',
               style: LumiType.subhead),
           actions: [
+            IconButton(
+              tooltip: 'Exit PIN',
+              icon: const Icon(Icons.lock_outline_rounded),
+              onPressed: _manageExitPin,
+            ),
             IconButton(
               tooltip: 'Exit kiosk',
               icon: const Icon(Icons.close_rounded),
