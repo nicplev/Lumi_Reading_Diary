@@ -121,6 +121,24 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Defense-in-depth: this is a parent-only screen. If a non-parent (e.g. a
+    // teacher whose session briefly resolved to /parent/home during the async
+    // auth redirect, or an iOS widget deep link) reaches it, bounce them to
+    // their own home instead of rendering the parent "no children" state —
+    // guarantees a teacher never sees this screen.
+    if (widget.user.role != UserRole.parent) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!context.mounted) return;
+        context.go(widget.user.role == UserRole.teacher
+            ? '/teacher/home'
+            : '/auth/admin-portal');
+      });
+      return const Scaffold(
+        backgroundColor: LumiTokens.cream,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     // Keep the iOS/Android home-screen widget in sync with the child list.
     ref.listen<AsyncValue<List<StudentModel>>>(
       parentChildrenProvider,
@@ -533,7 +551,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const LumiMascot(
-              variant: LumiVariant.parent,
+              variant: LumiVariant.linking,
               size: 150,
             ),
             LumiGap.m,
