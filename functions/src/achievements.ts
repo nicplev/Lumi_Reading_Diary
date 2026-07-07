@@ -7,7 +7,8 @@
 
 // Keep in sync with AchievementThresholds.defaults in
 // lib/data/models/achievement_model.dart. readingDays is the primary
-// (cumulative "nights read") reward ladder; streak tiers are no longer awarded.
+// (cumulative "nights read") reward ladder; streak tiers and books tiers are
+// no longer awarded (books kept here only for legacy threshold configs).
 export const DEFAULT_ACHIEVEMENT_THRESHOLDS = {
   streak: [5, 10, 20, 50, 100],
   books: [5, 10, 25, 50, 100],
@@ -29,6 +30,13 @@ export interface AchievementTierMeta {
 // secondary signal that earns no rewards — cumulative "nights read" (DAYS_TIERS)
 // is the reward ladder, so a missed night never costs a child a badge. Streak
 // badges earned under the old system remain on student docs and still render.
+
+// NOTE: books tiers are intentionally NOT awarded either. "Books read" cannot
+// be tracked honestly — totalBooksRead counts bookTitles per log (a novel read
+// across 10 nights scores 10; free-text titles dedupe nothing), so a books
+// ladder rewards re-logging, not reading. Rewards key on minutes and
+// cumulative nights instead. Books badges earned under the old system remain
+// on student docs and still render; the tier metadata stays for that.
 
 /* eslint-disable max-len */
 export const BOOKS_TIERS: AchievementTierMeta[] = [
@@ -121,8 +129,8 @@ export function computeAwardableAchievements(
     }
   };
 
-  // Streaks deliberately award nothing (see DAYS_TIERS note above).
-  checkTiers(BOOKS_TIERS, thresholds.books, num(stats.totalBooksRead));
+  // Streaks and books deliberately award nothing (see the notes above the
+  // tier tables) — minutes and cumulative nights are the reward ladders.
   checkTiers(MINUTES_TIERS, thresholds.minutes, num(stats.totalMinutesRead));
   checkTiers(DAYS_TIERS, thresholds.readingDays, num(stats.totalReadingDays));
 
