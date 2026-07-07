@@ -79,6 +79,27 @@ export async function getCurrentAcademicYear(): Promise<number> {
   return academicYearForDate(new Date());
 }
 
+/**
+ * Whether a materialised `student.access` map is live right now: status
+ * 'active' AND not past its hard expiry. Mirrors StudentModel.isActive
+ * (app) and studentAccessLive (rules). A missing/legacy map is NOT live.
+ */
+export function isStudentAccessLive(
+  access: unknown,
+  now: Date = new Date()
+): boolean {
+  if (access == null || typeof access !== 'object') return false;
+  const a = access as { status?: unknown; expiresAt?: unknown };
+  if (a.status !== 'active') return false;
+  const raw = a.expiresAt as { toDate?: () => Date } | Date | string | undefined;
+  const expiry =
+    raw instanceof Date ? raw :
+    typeof raw === 'string' ? new Date(raw) :
+    typeof raw?.toDate === 'function' ? raw.toDate() : null;
+  if (!(expiry instanceof Date) || isNaN(expiry.getTime())) return false;
+  return expiry.getTime() > now.getTime();
+}
+
 /** Whether the school's subscription for `year` grants active access. */
 export async function isSchoolSubActive(
   schoolId: string,
@@ -104,4 +125,33 @@ export function isRenewalWindowOpen(targetYear: number, now: Date = new Date()):
   const closesAt = closesNaive - timezoneOffsetMs(new Date(closesNaive));
   const t = now.getTime();
   return t >= opensAt && t < closesAt;
+}
+
+export interface RenewalReminder {
+  /** Show the dashboard reminder at all. */
+  due: boolean;
+  /** Escalate the copy — the last few weeks before the 31 Jan expiry. */
+  urgent: boolean;
+  /** The academic year renewal should carry students INTO. */
+  targetYear: number;
+}
+
+/**
+ * Whether the admin dashboard should nudge about annual renewal. The current
+ * cohort's access hard-expires ~31 Jan; renewal into the next year should
+ * happen before that. Reminder runs 1 Dec → the 31 Jan cliff (school-local),
+ * turning urgent once January starts. Outside that window it's silent — the
+ * Renewals page is always available for off-cycle exceptions.
+ */
+export function renewalReminder(now: Date = new Date()): RenewalReminder {
+  const year = academicYearForDate(now); // pre-rollover Jan still = prior cohort
+  const month = localPart(now, { month: 'numeric' });
+  const day = localPart(now, { day: 'numeric' });
+  const inDecember = month === 12;
+  const inJanuaryBeforeCliff = month === 1 && day <= 31;
+  return {
+    due: inDecember || inJanuaryBeforeCliff,
+    urgent: inJanuaryBeforeCliff,
+    targetYear: year + 1,
+  };
 }

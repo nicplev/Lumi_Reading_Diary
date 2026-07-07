@@ -9,6 +9,11 @@ import {
   startOfLocalWeek,
   zonedDayStart,
 } from '@/lib/school-time';
+import {
+  getCurrentAcademicYear,
+  isSchoolSubActive,
+  isStudentAccessLive,
+} from '@/lib/access';
 
 export interface DashboardStats {
   totalStudents: number;
@@ -133,6 +138,14 @@ export interface OperationalSummary {
   libraryBooks: number;
   /** Placeholder / untitled books — added but never resolved to real metadata. */
   incompleteBooks: number;
+  // ── Access entitlement (the fail-closed Day-1 blocker) ──────────────────────
+  /** Active students whose `access` map isn't live — their parents can't log. */
+  studentsWithoutAccess: number;
+  /** The academic year the portal would activate access for. */
+  currentAcademicYear: number;
+  /** Whether the school subscription for the current year is active (→ the
+   *  admin can self-activate; if false they must contact Lumi). */
+  subActiveForCurrentYear: boolean;
 }
 
 export async function getOperationalSummary(schoolId: string): Promise<OperationalSummary> {
@@ -166,6 +179,22 @@ export async function getOperationalSummary(schoolId: string): Promise<Operation
 
   const totalActiveStudents = studentsSnap?.size ?? 0;
   const guardiansLinked = totalActiveStudents - studentsWithoutGuardian;
+
+  // Access entitlement: how many active students can't have reading logged
+  // because their `access` map isn't live (the fail-closed Day-1 blocker),
+  // and whether the admin can self-activate (subscription active) or must
+  // contact Lumi. Two tiny extra reads (year config + one subscription doc).
+  const studentsWithoutAccess = (studentsSnap?.docs ?? []).filter(
+    (d) => !isStudentAccessLive(d.data().access, now)
+  ).length;
+  let currentAcademicYear = new Date().getUTCFullYear();
+  let subActiveForCurrentYear = false;
+  try {
+    currentAcademicYear = await getCurrentAcademicYear();
+    subActiveForCurrentYear = await isSchoolSubActive(schoolId, currentAcademicYear);
+  } catch {
+    // Non-fatal — the card just shows "contact Lumi" if we can't confirm.
+  }
 
   // Placeholder books = the same ones getBooks() hides (no title or an explicit
   // placeholder flag) — added by ISBN but never resolved to real metadata.
@@ -219,6 +248,9 @@ export async function getOperationalSummary(schoolId: string): Promise<Operation
     guardiansLinked,
     libraryBooks,
     incompleteBooks,
+    studentsWithoutAccess,
+    currentAcademicYear,
+    subActiveForCurrentYear,
   };
 }
 

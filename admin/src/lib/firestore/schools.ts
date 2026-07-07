@@ -119,7 +119,7 @@ export async function getSchool(
     secondaryColor: data.secondaryColor,
     levelSchema: data.levelSchema ?? "aToZ",
     customLevels: data.customLevels,
-    timezone: data.timezone ?? "Pacific/Auckland",
+    timezone: data.timezone ?? "Australia/Sydney",
     address: data.address,
     contactEmail: data.contactEmail,
     contactPhone: data.contactPhone,
