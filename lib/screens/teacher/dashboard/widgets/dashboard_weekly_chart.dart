@@ -5,6 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/inline_stream_error.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../theme/lumi_tokens.dart';
 import '../../../../theme/lumi_typography.dart';
@@ -32,17 +33,25 @@ class DashboardWeeklyChart extends StatefulWidget {
 }
 
 class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
+  static const String _offsetPrefsKey = 'dashboard_week_offset';
+
   late Stream<QuerySnapshot> _weeklyStream;
   late DateTime _startOfWeek;
-  int? _lastWeekTotal;
-  int? _lastWeekDayCount;
-  bool _lastWeekLoaded = false;
+
+  /// Monday-anchored week being shown: 0 = this week, -1 = last week. The
+  /// Monday-morning ritual is "who read last week?" — exactly when the
+  /// current week's chart is empty, so the timeframe is selectable.
+  int _weekOffset = 0;
+  int? _prevWeekTotal;
+  int? _prevWeekDayCount;
+  bool _prevWeekLoaded = false;
 
   @override
   void initState() {
     super.initState();
     _initStream();
-    _fetchLastWeekData();
+    _fetchComparisonWeekData();
+    _restoreSavedOffset();
   }
 
   @override
@@ -51,13 +60,40 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
     if (oldWidget.classModel.id != widget.classModel.id ||
         oldWidget.schoolId != widget.schoolId) {
       _initStream();
-      _fetchLastWeekData();
+      _fetchComparisonWeekData();
+    }
+  }
+
+  Future<void> _restoreSavedOffset() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getInt(_offsetPrefsKey) ?? 0;
+      if (mounted && saved != _weekOffset && (saved == 0 || saved == -1)) {
+        _setWeekOffset(saved, persist: false);
+      }
+    } catch (_) {
+      // Preference restore is a nicety — default to this week.
+    }
+  }
+
+  void _setWeekOffset(int offset, {bool persist = true}) {
+    setState(() {
+      _weekOffset = offset;
+      _initStream();
+    });
+    _fetchComparisonWeekData();
+    if (persist) {
+      SharedPreferences.getInstance()
+          .then((p) => p.setInt(_offsetPrefsKey, offset))
+          .catchError((_) => true);
     }
   }
 
   void _initStream() {
     final now = DateTime.now();
-    _startOfWeek = DateTime(now.year, now.month, now.day - (now.weekday - 1));
+    _startOfWeek = DateTime(
+        now.year, now.month, now.day - (now.weekday - 1) + 7 * _weekOffset);
+    final endOfWeek = _startOfWeek.add(const Duration(days: 7));
 
     _weeklyStream = FirebaseService.instance.firestore
         .collection('schools')
@@ -66,16 +102,19 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
         .where('classId', isEqualTo: widget.classModel.id)
         .where('date',
             isGreaterThanOrEqualTo: Timestamp.fromDate(_startOfWeek))
+        .where('date', isLessThan: Timestamp.fromDate(endOfWeek))
         .snapshots();
   }
 
-  Future<void> _fetchLastWeekData() async {
+  /// Fetch the week *before* the displayed one, for the trend footer.
+  Future<void> _fetchComparisonWeekData() async {
+    final requestOffset = _weekOffset;
     try {
       final now = DateTime.now();
-      final startOfThisWeek =
-          DateTime(now.year, now.month, now.day - (now.weekday - 1));
-      final startOfLastWeek =
-          startOfThisWeek.subtract(const Duration(days: 7));
+      final startOfShownWeek = DateTime(
+          now.year, now.month, now.day - (now.weekday - 1) + 7 * requestOffset);
+      final startOfPrevWeek =
+          startOfShownWeek.subtract(const Duration(days: 7));
 
       final snapshot = await FirebaseService.instance.firestore
           .collection('schools')
@@ -83,11 +122,12 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
           .collection('readingLogs')
           .where('classId', isEqualTo: widget.classModel.id)
           .where('date',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfLastWeek))
-          .where('date', isLessThan: Timestamp.fromDate(startOfThisWeek))
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfPrevWeek))
+          .where('date', isLessThan: Timestamp.fromDate(startOfShownWeek))
           .get();
 
-      if (!mounted) return;
+      // A stale response for a different offset must not clobber the footer.
+      if (!mounted || requestOffset != _weekOffset) return;
 
       final logs = snapshot.docs
           .map((doc) => ReadingLogModel.fromFirestore(doc))
@@ -104,13 +144,15 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
       final daysWithData = studentsByDay.keys.length;
 
       setState(() {
-        _lastWeekTotal = total;
-        _lastWeekDayCount = daysWithData;
-        _lastWeekLoaded = true;
+        _prevWeekTotal = total;
+        _prevWeekDayCount = daysWithData;
+        _prevWeekLoaded = true;
       });
     } catch (e) {
-      debugPrint('Error fetching last week data: $e');
-      setState(() => _lastWeekLoaded = true);
+      debugPrint('Error fetching comparison week data: $e');
+      if (mounted && requestOffset == _weekOffset) {
+        setState(() => _prevWeekLoaded = true);
+      }
     }
   }
 
@@ -132,10 +174,16 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Weekly Reading Activity', style: LumiType.subhead),
-              Text(
-                'This week',
-                style: LumiType.caption.copyWith(color: LumiTokens.muted),
+              Flexible(
+                child: Text('Weekly Reading Activity', style: LumiType.subhead),
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _weekChip('This week', 0),
+                  const SizedBox(width: 6),
+                  _weekChip('Last week', -1),
+                ],
               ),
             ],
           ),
@@ -176,7 +224,9 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
                 completionByDay[i] = studentsByDay[i]!.length;
               }
 
-              final todayIndex = DateTime.now().weekday - 1;
+              // Past weeks are complete — every day counts, none is "today".
+              final todayIndex =
+                  _weekOffset == 0 ? DateTime.now().weekday - 1 : 6;
               final totalWeek =
                   completionByDay.values.fold<int>(0, (a, b) => a + b);
 
@@ -308,7 +358,7 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
   ) {
     return List.generate(7, (index) {
       final count = completionByDay[index]?.toDouble() ?? 0;
-      final isToday = index == todayIndex;
+      final isToday = _weekOffset == 0 && index == todayIndex;
       final isFuture = index > todayIndex;
 
       return BarChartGroupData(
@@ -339,7 +389,7 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
           getTitlesWidget: (value, meta) {
             const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
             final index = value.toInt();
-            final isToday = index == todayIndex;
+            final isToday = _weekOffset == 0 && index == todayIndex;
             final isFuture = index > todayIndex;
             return Padding(
               padding: const EdgeInsets.only(top: 8),
@@ -365,7 +415,6 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
           getTitlesWidget: (value, meta) {
             final index = value.toInt();
             final count = completionByDay[index] ?? 0;
-            final todayIndex = DateTime.now().weekday - 1;
             if (count == 0 || index > todayIndex) {
               return const SizedBox.shrink();
             }
@@ -389,6 +438,28 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
     );
   }
 
+  /// Compact pill for the This week / Last week timeframe toggle.
+  Widget _weekChip(String label, int offset) {
+    final selected = _weekOffset == offset;
+    return GestureDetector(
+      onTap: selected ? null : () => _setWeekOffset(offset),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: selected ? LumiTokens.blue : LumiTokens.cream,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          label,
+          style: LumiType.caption.copyWith(
+            color: selected ? LumiTokens.paper : LumiTokens.muted,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildFooter(int avgPerDay, int totalStudents) {
     // Week-over-week trend in students, not a percentage — a % on small class
     // sizes overstates tiny changes (0.75 → 1 student reads as "+33%").
@@ -396,20 +467,21 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
     Color? trendColor;
     IconData? trendIcon;
 
-    if (_lastWeekLoaded && _lastWeekTotal != null && _lastWeekDayCount != null) {
-      final lastAvg = _lastWeekDayCount! > 0
-          ? (_lastWeekTotal! / _lastWeekDayCount!).round()
+    // Compared against the week before the one on screen.
+    final vsLabel =
+        _weekOffset == 0 ? 'than last week' : 'than the week before';
+    if (_prevWeekLoaded && _prevWeekTotal != null && _prevWeekDayCount != null) {
+      final lastAvg = _prevWeekDayCount! > 0
+          ? (_prevWeekTotal! / _prevWeekDayCount!).round()
           : 0;
       final diff = avgPerDay - lastAvg;
       if (diff > 0) {
-        trendText =
-            diff == 1 ? '1 more than last week' : '$diff more than last week';
+        trendText = diff == 1 ? '1 more $vsLabel' : '$diff more $vsLabel';
         trendColor = LumiTokens.green;
         trendIcon = Icons.trending_up_rounded;
       } else if (diff < 0) {
         final n = diff.abs();
-        trendText =
-            n == 1 ? '1 fewer than last week' : '$n fewer than last week';
+        trendText = n == 1 ? '1 fewer $vsLabel' : '$n fewer $vsLabel';
         trendColor = LumiTokens.red;
         trendIcon = Icons.trending_down_rounded;
       }
@@ -459,7 +531,9 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
         const LumiMascot(variant: LumiVariant.teacherWhy, size: 48),
         const SizedBox(height: 8),
         Text(
-          "Your class's reading week starts here",
+          _weekOffset == 0
+              ? "Your class's reading week starts here"
+              : 'No reading was logged that week',
           style: LumiType.body.copyWith(
             fontWeight: FontWeight.w600,
             fontSize: 15,
@@ -515,7 +589,9 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            "Everyone's read this week",
+            _weekOffset == 0
+                ? "Everyone's read this week"
+                : 'Everyone read that week',
             style: LumiType.caption.copyWith(
               color: LumiTokens.green,
               fontWeight: FontWeight.w700,
