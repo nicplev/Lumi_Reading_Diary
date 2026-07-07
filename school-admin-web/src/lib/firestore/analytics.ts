@@ -1,4 +1,11 @@
 import { adminDb } from '@/lib/firebase/admin';
+import {
+  calendarDaysBetween,
+  isWeekendDateStr,
+  localDateString,
+  shiftDateStr,
+  startOfLocalDay,
+} from '@/lib/time-core';
 
 // --- Types ---
 
@@ -73,63 +80,29 @@ export interface PopularBook {
 }
 
 // --- Helpers ---
+// Period resolution (server-clock-free) lives in '@/lib/analytics-period'.
+// Every date below is bucketed in the SCHOOL's timezone: the tz parameter on
+// each aggregator comes from the school doc (see the analytics API route).
 
-function daysAgo(days: number): Date {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  d.setHours(0, 0, 0, 0);
-  return d;
+/** School-local "YYYY-MM-DD" of a log's date, or null when the log has none. */
+function logDayKey(d: FirebaseFirestore.DocumentData, tz: string): string | null {
+  const ts: Date | undefined = d.date?.toDate?.();
+  return ts ? localDateString(ts, tz) : null;
 }
 
-function isWeekend(date: Date): boolean {
-  const day = date.getDay();
-  return day === 0 || day === 6;
+/**
+ * Whether a log should be skipped under a weekdays-only period. Logs without
+ * a date are kept (they can't be classified, and totals shouldn't lose them).
+ */
+function skipAsWeekend(
+  weekdaysOnly: boolean,
+  dayKey: string | null,
+): boolean {
+  return weekdaysOnly && dayKey !== null && isWeekendDateStr(dayKey);
 }
 
-export function resolvePeriod(
-  period: string,
-  termKey: string | null,
-  termDates: Record<string, Date>,
-  now: Date = new Date(),
-): { startDate: Date; endDate: Date; weekdaysOnly: boolean } {
-  if (period === '5days') {
-    const weekdays: Date[] = [];
-    const d = new Date(now);
-    while (weekdays.length < 5) {
-      d.setDate(d.getDate() - 1);
-      if (!isWeekend(d)) weekdays.push(new Date(d));
-    }
-    const start = new Date(weekdays[weekdays.length - 1]);
-    start.setHours(0, 0, 0, 0);
-    return { startDate: start, endDate: now, weekdaysOnly: true };
-  }
-
-  if (period === 'month') {
-    const start = new Date(now.getFullYear(), now.getMonth(), 1);
-    return { startDate: start, endDate: now, weekdaysOnly: true };
-  }
-
-  if (period === 'term' && termKey) {
-    const start = termDates[`${termKey}Start`];
-    const end = termDates[`${termKey}End`] ?? now;
-    return { startDate: start, endDate: end > now ? now : end, weekdaysOnly: false };
-  }
-
-  // year — derived from earliest term start to latest term end
-  const termStarts = Object.entries(termDates)
-    .filter(([k]) => k.endsWith('Start'))
-    .map(([, v]) => v)
-    .filter(Boolean)
-    .sort((a, b) => a.getTime() - b.getTime());
-  const termEnds = Object.entries(termDates)
-    .filter(([k]) => k.endsWith('End'))
-    .map(([, v]) => v)
-    .filter(Boolean)
-    .sort((a, b) => b.getTime() - a.getTime());
-  const yearStart = termStarts[0] ?? new Date(now.getFullYear(), 0, 1);
-  const yearEnd = termEnds[0] ?? now;
-  return { startDate: yearStart, endDate: yearEnd > now ? now : yearEnd, weekdaysOnly: false };
-}
+/** Belt-and-braces bound on gap-fill loops (resolvePeriod already caps spans). */
+const MAX_FILL_DAYS = 810;
 
 // --- Query Functions ---
 
@@ -160,7 +133,8 @@ export async function getReadingMetrics(
   schoolId: string,
   startDate: Date,
   endDate: Date,
-  weekdaysOnly: boolean = false,
+  weekdaysOnly: boolean,
+  tz: string,
   prefetchedLogs?: LogDoc[],
 ): Promise<ReadingMetrics> {
   try {
@@ -174,8 +148,7 @@ export async function getReadingMetrics(
 
     for (const doc of logDocs) {
       const d = doc.data();
-      const logDate: Date = d.date?.toDate?.() ?? new Date(0);
-      if (weekdaysOnly && isWeekend(logDate)) continue;
+      if (skipAsWeekend(weekdaysOnly, logDayKey(d, tz))) continue;
       totalMinutes += d.minutesRead ?? 0;
       if (Array.isArray(d.bookTitles)) totalBooks += d.bookTitles.length;
       if (d.status === 'completed') completedCount++;
@@ -198,7 +171,8 @@ export async function getEngagementTrend(
   schoolId: string,
   startDate: Date,
   endDate: Date,
-  weekdaysOnly: boolean = false,
+  weekdaysOnly: boolean,
+  tz: string,
   prefetchedLogs?: LogDoc[],
 ): Promise<EngagementPoint[]> {
   try {
@@ -208,28 +182,28 @@ export async function getEngagementTrend(
 
     for (const doc of logDocs) {
       const d = doc.data();
-      const logDate: Date = d.date?.toDate?.() ?? new Date();
-      if (weekdaysOnly && isWeekend(logDate)) continue;
-      const key = logDate.toISOString().split('T')[0];
+      const key = logDayKey(d, tz);
+      if (key === null) continue; // undated logs can't sit on a date axis
+      if (skipAsWeekend(weekdaysOnly, key)) continue;
       const existing = byDate.get(key) ?? { minutes: 0, logs: 0 };
       existing.minutes += d.minutesRead ?? 0;
       existing.logs += 1;
       byDate.set(key, existing);
     }
 
-    // Fill in days (skipping weekends when weekdaysOnly)
+    // Fill in every school-local day in range (skipping weekends when
+    // weekdaysOnly) so charts show explicit zero days. Iterating date STRINGS
+    // keeps the fill keys aligned with the log keys above — iterating instants
+    // and taking their UTC date drifted a day for tz east of UTC.
     const result: EngagementPoint[] = [];
-    const current = new Date(startDate);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
-
-    while (current <= end) {
-      if (!weekdaysOnly || !isWeekend(current)) {
-        const key = current.toISOString().split('T')[0];
-        const data = byDate.get(key) ?? { minutes: 0, logs: 0 };
-        result.push({ date: key, ...data });
+    const endKey = localDateString(endDate, tz);
+    let cursor = localDateString(startDate, tz);
+    for (let i = 0; cursor <= endKey && i < MAX_FILL_DAYS; i++) {
+      if (!weekdaysOnly || !isWeekendDateStr(cursor)) {
+        const data = byDate.get(cursor) ?? { minutes: 0, logs: 0 };
+        result.push({ date: cursor, ...data });
       }
-      current.setDate(current.getDate() + 1);
+      cursor = shiftDateStr(cursor, 1);
     }
 
     return result;
@@ -248,7 +222,8 @@ export async function getClassEngagementTrend(
   schoolId: string,
   startDate: Date,
   endDate: Date,
-  weekdaysOnly: boolean = false,
+  weekdaysOnly: boolean,
+  tz: string,
   prefetchedLogs?: LogDoc[],
 ): Promise<ClassEngagementSeries> {
   try {
@@ -261,9 +236,9 @@ export async function getClassEngagementTrend(
       const d = doc.data();
       const classId = d.classId as string | undefined;
       if (!classId) continue;
-      const logDate: Date = d.date?.toDate?.() ?? new Date();
-      if (weekdaysOnly && isWeekend(logDate)) continue;
-      const key = logDate.toISOString().split('T')[0];
+      const key = logDayKey(d, tz);
+      if (key === null) continue;
+      if (skipAsWeekend(weekdaysOnly, key)) continue;
       activeClassIds.add(classId);
       let dayMap = byDate.get(key);
       if (!dayMap) { dayMap = new Map(); byDate.set(key, dayMap); }
@@ -286,16 +261,15 @@ export async function getClassEngagementTrend(
       .map((id) => ({ id, name: classNames.get(id) ?? 'Unknown class' }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    // Fill each day in range (skipping weekends when weekdaysOnly).
+    // Fill each school-local day in range (skipping weekends when
+    // weekdaysOnly) — date-string iteration, matching getEngagementTrend.
     const points: Array<Record<string, number | string>> = [];
-    const current = new Date(startDate);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
-    while (current <= end) {
-      if (!weekdaysOnly || !isWeekend(current)) {
-        const key = current.toISOString().split('T')[0];
-        const dayMap = byDate.get(key);
-        const point: Record<string, number | string> = { date: key };
+    const endKey = localDateString(endDate, tz);
+    let cursor = localDateString(startDate, tz);
+    for (let i = 0; cursor <= endKey && i < MAX_FILL_DAYS; i++) {
+      if (!weekdaysOnly || !isWeekendDateStr(cursor)) {
+        const dayMap = byDate.get(cursor);
+        const point: Record<string, number | string> = { date: cursor };
         for (const c of classes) {
           const v = dayMap?.get(c.id);
           point[`${c.id}:logs`] = v?.logs ?? 0;
@@ -303,7 +277,7 @@ export async function getClassEngagementTrend(
         }
         points.push(point);
       }
-      current.setDate(current.getDate() + 1);
+      cursor = shiftDateStr(cursor, 1);
     }
 
     return { classes, points };
@@ -342,7 +316,8 @@ export async function getClassComparison(
   schoolId: string,
   startDate: Date,
   endDate: Date,
-  weekdaysOnly: boolean = false,
+  weekdaysOnly: boolean,
+  tz: string,
   prefetchedLogs?: LogDoc[],
 ): Promise<ClassComparisonRow[]> {
   try {
@@ -351,8 +326,8 @@ export async function getClassComparison(
       .where('isActive', '==', true)
       .get();
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // "Read today" starts at the school-local midnight, not the server's.
+    const today = startOfLocalDay(new Date(), tz);
 
     const logDocs = prefetchedLogs ?? (await fetchReadingLogsInRange(schoolId, startDate, endDate));
 
@@ -361,7 +336,7 @@ export async function getClassComparison(
     for (const doc of logDocs) {
       const d = doc.data();
       const logDate: Date = d.date?.toDate?.() ?? new Date(0);
-      if (weekdaysOnly && isWeekend(logDate)) continue;
+      if (skipAsWeekend(weekdaysOnly, logDayKey(d, tz))) continue;
       const cid = d.classId ?? '';
       const existing = logsByClass.get(cid) ?? { minutes: 0, bookTitles: new Set(), completed: 0, total: 0, todayReaders: new Set() };
       existing.minutes += d.minutesRead ?? 0;
@@ -403,7 +378,11 @@ export async function getClassComparison(
   }
 }
 
-export async function getAtRiskStudents(schoolId: string, daysThreshold: number = 7): Promise<AtRiskStudent[]> {
+export async function getAtRiskStudents(
+  schoolId: string,
+  daysThreshold: number,
+  tz: string,
+): Promise<AtRiskStudent[]> {
   try {
     const studentsSnap = await adminDb
       .collection('schools').doc(schoolId).collection('students')
@@ -418,14 +397,17 @@ export async function getAtRiskStudents(schoolId: string, daysThreshold: number 
       classNames.set(doc.id, doc.data().name ?? '');
     }
 
-    const now = new Date();
+    // Calendar days in the school's timezone — "read yesterday evening" is 1
+    // day ago even if fewer than 24 hours have elapsed. (The old elapsed-ms
+    // floor undercounted by up to a day.) Future-dated data clamps to 0.
+    const todayStr = localDateString(new Date(), tz);
     const results: AtRiskStudent[] = [];
 
     for (const doc of studentsSnap.docs) {
       const d = doc.data();
       const lastDate = d.stats?.lastReadingDate?.toDate?.() ?? null;
       const daysSince = lastDate
-        ? Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24))
+        ? Math.max(0, calendarDaysBetween(localDateString(lastDate, tz), todayStr))
         : 999;
 
       if (daysSince >= daysThreshold) {
@@ -452,7 +434,8 @@ export async function getTopReaders(
   schoolId: string,
   startDate: Date,
   endDate: Date,
-  weekdaysOnly: boolean = false,
+  weekdaysOnly: boolean,
+  tz: string,
   limit: number = 10,
   prefetchedLogs?: LogDoc[],
 ): Promise<TopReader[]> {
@@ -475,8 +458,7 @@ export async function getTopReaders(
 
     for (const doc of logDocs) {
       const d = doc.data();
-      const logDate: Date = d.date?.toDate?.() ?? new Date(0);
-      if (weekdaysOnly && isWeekend(logDate)) continue;
+      if (skipAsWeekend(weekdaysOnly, logDayKey(d, tz))) continue;
       const sid = d.studentId ?? '';
       if (!sid) continue;
       if (!booksByStudent.has(sid)) booksByStudent.set(sid, new Set());
@@ -515,7 +497,8 @@ export async function getPopularBooks(
   schoolId: string,
   startDate: Date,
   endDate: Date,
-  weekdaysOnly: boolean = false,
+  weekdaysOnly: boolean,
+  tz: string,
   limit: number = 15,
   prefetchedLogs?: LogDoc[],
 ): Promise<PopularBook[]> {
@@ -526,8 +509,7 @@ export async function getPopularBooks(
 
     for (const doc of logDocs) {
       const d = doc.data();
-      const logDate: Date = d.date?.toDate?.() ?? new Date(0);
-      if (weekdaysOnly && isWeekend(logDate)) continue;
+      if (skipAsWeekend(weekdaysOnly, logDayKey(d, tz))) continue;
       const titles = d.bookTitles;
       if (Array.isArray(titles)) {
         for (const title of titles) {
