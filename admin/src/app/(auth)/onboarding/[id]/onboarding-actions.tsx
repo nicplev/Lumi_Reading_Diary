@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Link2, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
+import { ArrowRight, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import type { OnboardingDetail } from "@/lib/firestore/onboarding";
 
 const STATUSES = [
@@ -32,33 +33,42 @@ interface OnboardingActionsProps {
 export function OnboardingActions({ onboarding }: OnboardingActionsProps) {
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [newStatus, setNewStatus] = useState(onboarding.status);
-  const [schoolId, setSchoolId] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const performAction = async (
     body: Record<string, string>,
     actionName: string
   ) => {
     setLoading(actionName);
-    setError(null);
-
     try {
       const res = await fetch(`/api/onboarding/${onboarding.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Action failed");
-      }
-
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Action failed");
       router.refresh();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      toast.error(err instanceof Error ? err.message : "Action failed");
     } finally {
+      setLoading(null);
+    }
+  };
+
+  const runDelete = async () => {
+    setLoading("delete");
+    try {
+      const res = await fetch(`/api/onboarding/${onboarding.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Delete failed");
+      toast.success("Request deleted");
+      router.push("/onboarding");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Delete failed");
       setLoading(null);
     }
   };
@@ -69,17 +79,9 @@ export function OnboardingActions({ onboarding }: OnboardingActionsProps) {
         <CardTitle>Actions</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {error && (
-          <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-            {error}
-          </div>
-        )}
-
-        <div className="flex flex-wrap gap-4">
+        <div className="flex flex-wrap items-end gap-4">
           <Button
-            onClick={() =>
-              performAction({ action: "advanceStep" }, "advance")
-            }
+            onClick={() => performAction({ action: "advanceStep" }, "advance")}
             disabled={
               loading !== null || onboarding.currentStep === "completed"
             }
@@ -95,7 +97,10 @@ export function OnboardingActions({ onboarding }: OnboardingActionsProps) {
           <div className="flex items-end gap-2">
             <div className="space-y-1">
               <Label className="text-xs">Change Status</Label>
-              <Select value={newStatus} onValueChange={(v) => v && setNewStatus(v)}>
+              <Select
+                value={newStatus}
+                onValueChange={(v) => v && setNewStatus(v)}
+              >
                 <SelectTrigger className="w-[180px]">
                   <SelectValue />
                 </SelectTrigger>
@@ -122,34 +127,28 @@ export function OnboardingActions({ onboarding }: OnboardingActionsProps) {
             </Button>
           </div>
 
-          {!onboarding.schoolId && (
-            <div className="flex items-end gap-2">
-              <div className="space-y-1">
-                <Label className="text-xs">Link to School</Label>
-                <Input
-                  placeholder="School ID"
-                  value={schoolId}
-                  onChange={(e) => setSchoolId(e.target.value)}
-                  className="w-[200px]"
-                />
-              </div>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  performAction(
-                    { action: "linkSchool", schoolId },
-                    "link"
-                  )
-                }
-                disabled={loading !== null || !schoolId}
-              >
-                <Link2 className="mr-2 h-4 w-4" />
-                Link
-              </Button>
-            </div>
-          )}
+          <Button
+            variant="ghost"
+            className="text-destructive"
+            onClick={() => setConfirmDelete(true)}
+            disabled={loading !== null}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete
+          </Button>
         </div>
       </CardContent>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Delete onboarding request"
+        description={`Permanently remove the request for ${onboarding.schoolName}? This does not touch any provisioned school — only the pipeline record.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={runDelete}
+        loading={loading === "delete"}
+      />
     </Card>
   );
 }
