@@ -114,6 +114,29 @@ test('parseTermDates drops malformed entries and keeps valid ranges', () => {
   ]);
 });
 
+test('parseTermDates reads the portal settings map shape (termNStart/termNEnd Timestamps)', () => {
+  // The portal stores date-only picks as UTC-midnight values; mimic Firestore
+  // Timestamps with toDate().
+  const ts = (iso) => ({ toDate: () => new Date(`${iso}T00:00:00Z`) });
+  const parsed = parseTermDates({
+    term2Start: ts('2026-04-20'), term2End: ts('2026-06-26'),
+    term1Start: ts('2026-01-28'), term1End: ts('2026-04-02'),
+    term3Start: ts('2026-07-13'),                     // missing End → dropped
+    term4Start: ts('2026-10-06'), term4End: 'garbage', // bad End → dropped
+  });
+  // Sorted by start date, incomplete/bad terms dropped.
+  assert.deepEqual(parsed, [
+    { start: '2026-01-28', end: '2026-04-02' },
+    { start: '2026-04-20', end: '2026-06-26' },
+  ]);
+  // ISO strings and JS Dates are accepted too.
+  assert.deepEqual(parseTermDates({
+    term1Start: '2026-01-28T00:00:00', term1End: new Date('2026-04-02T00:00:00Z'),
+  }), [{ start: '2026-01-28', end: '2026-04-02' }]);
+  // Empty map → no terms (every day counts).
+  assert.deepEqual(parseTermDates({}), []);
+});
+
 test('buildIsCountingDay: empty terms → every day counts; ranges are inclusive', () => {
   const always = buildIsCountingDay([]);
   assert.equal(always('2026-01-01'), true);

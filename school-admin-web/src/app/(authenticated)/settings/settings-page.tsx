@@ -410,7 +410,12 @@ export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
           {/* Term Dates */}
           <Card>
             <h2 className="text-lg font-bold text-ink mb-1">Term Dates</h2>
-            <p className="text-sm text-muted mb-4">Used for analytics, reporting periods, and term-based comparisons.</p>
+            <p className="text-sm text-muted mb-4">
+              Used for analytics, reporting periods, and term-based comparisons — and for
+              reading streaks: days in the school holidays never break a student&apos;s streak,
+              and the weekly Top Reader award pauses over all-holiday weeks. Keep these
+              up to date each year.
+            </p>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
               {[1, 2, 3, 4].map((term) => (
                 <div key={term} className="grid grid-cols-2 gap-4">

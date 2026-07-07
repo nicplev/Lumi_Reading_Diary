@@ -27,25 +27,67 @@ export interface TermRange {
 const TERM_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * Defensively parse a school doc's `termDates` field. Entries must be
- * objects with `start`/`end` "YYYY-MM-DD" strings and start ≤ end; anything
- * malformed is silently dropped so bad portal data can never break streaks.
+ * Coerce a term-date value (Firestore Timestamp, JS Date, or ISO string) to
+ * the calendar date it was entered as. The portal's date-only inputs are
+ * stored as UTC midnight (`new Date("YYYY-MM-DD")`), so the UTC date string
+ * is the exact day the admin picked.
+ * @param {unknown} v The raw value from the school document.
+ * @return {string | null} "YYYY-MM-DD", or null if unparseable.
+ */
+function coerceTermDateStr(v: unknown): string | null {
+  if (typeof v === "string") {
+    const m = v.match(/^\d{4}-\d{2}-\d{2}/);
+    return m ? m[0] : null;
+  }
+  const maybe = v as {toDate?: () => Date} | Date | null | undefined;
+  const d =
+    maybe instanceof Date ? maybe :
+      typeof maybe?.toDate === "function" ? maybe.toDate() : null;
+  if (!(d instanceof Date) || isNaN(d.getTime())) return null;
+  return d.toISOString().split("T")[0];
+}
+
+/**
+ * Defensively parse a school doc's `termDates` field. Two shapes are
+ * accepted, and anything malformed is silently dropped so bad data can never
+ * break streaks:
+ *  - The portal settings shape (what schools actually have):
+ *    `{term1Start, term1End, term2Start, ...}` with Timestamp/Date/ISO values.
+ *  - An array of `{start, end}` "YYYY-MM-DD" ranges.
+ * Ranges with start > end are dropped.
  * @param {unknown} raw The raw `termDates` field from the school document.
  * @return {TermRange[]} The valid term ranges (possibly empty).
  */
 export function parseTermDates(raw: unknown): TermRange[] {
-  if (!Array.isArray(raw)) return [];
   const out: TermRange[] = [];
-  for (const item of raw) {
-    if (typeof item !== "object" || item === null) continue;
-    const rec = item as Record<string, unknown>;
-    const start = rec.start;
-    const end = rec.end;
-    if (typeof start !== "string" || typeof end !== "string") continue;
-    if (!TERM_DATE_RE.test(start) || !TERM_DATE_RE.test(end)) continue;
-    if (start > end) continue;
-    out.push({start, end});
+
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      if (typeof item !== "object" || item === null) continue;
+      const rec = item as Record<string, unknown>;
+      const start = rec.start;
+      const end = rec.end;
+      if (typeof start !== "string" || typeof end !== "string") continue;
+      if (!TERM_DATE_RE.test(start) || !TERM_DATE_RE.test(end)) continue;
+      if (start > end) continue;
+      out.push({start, end});
+    }
+    return out;
   }
+
+  if (typeof raw === "object" && raw !== null) {
+    const rec = raw as Record<string, unknown>;
+    for (const key of Object.keys(rec)) {
+      const m = key.match(/^term(\d+)Start$/);
+      if (!m) continue;
+      const start = coerceTermDateStr(rec[key]);
+      const end = coerceTermDateStr(rec[`term${m[1]}End`]);
+      if (!start || !end || start > end) continue;
+      out.push({start, end});
+    }
+    out.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
+  }
+
   return out;
 }
 
