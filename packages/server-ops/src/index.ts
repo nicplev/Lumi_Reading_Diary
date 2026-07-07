@@ -6,6 +6,7 @@ export * from "./createSchoolUser";
 export * from "./updateStudentReadingLevel";
 export * from "./createSchool";
 export * from "./manageSchoolUserAuth";
+export * from "./manageParentAccount";
 export * from "./grantDevAccess";
 export * from "./setComprehensionRecordingFlag";
 export * from "./setComprehensionRetentionConfig";
