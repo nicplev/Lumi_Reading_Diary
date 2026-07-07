@@ -42,14 +42,7 @@ service firebase.storage {
     // firebase_storage/unauthorized. App-side enforcement is the source of
     // truth; the storage rule trusts auth + size + contentType.
     match /schools/{schoolId}/comprehension_audio/{fileName} {
-      // NOT client-readable (2.2). A child's voice is PII at rest; the old
-      // `read: if request.auth != null` let ANY authed user fetch ANY child's
-      // recording given the path. Playback now goes through the
-      // `getComprehensionAudioUrl` callable, which authorizes the caller against
-      // the log's school and returns a short-lived signed URL (signed URLs
-      // bypass these rules). GATED: deploy only once the app build that fetches
-      // via the callable is adopted — older installs still read directly.
-      allow read: if false;
+      allow read: if request.auth != null;
 
       allow create, update: if request.auth != null
                            && request.resource.size < 2 * 1024 * 1024
