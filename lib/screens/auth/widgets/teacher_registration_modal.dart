@@ -167,6 +167,14 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
   final _smsFocusNode = FocusNode();
   final _passwordFocusNode = FocusNode();
   final _confirmFocusNode = FocusNode();
+  // Dedicated nodes for the progressive-reveal "peek" fields (the password
+  // shown under a valid email, the confirm shown under a valid password).
+  // They must NOT reuse the same-field node from the next stage: during the
+  // AnimatedSwitcher cross-fade both instances mount at once, so a shared node
+  // is attached twice and the outgoing peek's disposal rips focus off the
+  // freshly-focused field — dropping the keyboard.
+  final _passwordPeekFocusNode = FocusNode();
+  final _confirmPeekFocusNode = FocusNode();
 
   @override
   void initState() {
@@ -187,13 +195,15 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
     _lastNameController.addListener(_updateLastNameVisibility);
     // Progressive reveal: when the user taps into the revealed "peek" field,
     // commit the stage advance so the previous field compacts to a chip.
-    _passwordFocusNode.addListener(() {
-      if (_passwordFocusNode.hasFocus && _stage == _Stage.email && _emailValid) {
+    _passwordPeekFocusNode.addListener(() {
+      if (_passwordPeekFocusNode.hasFocus &&
+          _stage == _Stage.email &&
+          _emailValid) {
         _advance(_Stage.password);
       }
     });
-    _confirmFocusNode.addListener(() {
-      if (_confirmFocusNode.hasFocus &&
+    _confirmPeekFocusNode.addListener(() {
+      if (_confirmPeekFocusNode.hasFocus &&
           _stage == _Stage.password &&
           _passwordValid) {
         _advance(_Stage.confirm);
@@ -212,6 +222,8 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
     _smsFocusNode.dispose();
     _passwordFocusNode.dispose();
     _confirmFocusNode.dispose();
+    _passwordPeekFocusNode.dispose();
+    _confirmPeekFocusNode.dispose();
     _codeController.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();
@@ -1124,7 +1136,7 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
                   child: LumiPasswordInput(
                     accentColor: LumiTokens.red,
                     controller: _passwordController,
-                    focusNode: _passwordFocusNode,
+                    focusNode: _passwordPeekFocusNode,
                     autofillHints: const [AutofillHints.newPassword],
                     hintText: 'Password (at least 8 characters)',
                   )
@@ -1169,7 +1181,7 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
                   child: LumiPasswordInput(
                     accentColor: LumiTokens.red,
                     controller: _confirmController,
-                    focusNode: _confirmFocusNode,
+                    focusNode: _confirmPeekFocusNode,
                     autofillHints: const [AutofillHints.newPassword],
                     hintText: 'Confirm password',
                   )
