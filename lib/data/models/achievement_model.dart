@@ -292,6 +292,10 @@ class AchievementTemplates {
     {'id': 'streak_t5', 'name': 'Century Champion', 'icon': '💯',  'rarity': 'legendary'},
   ];
 
+  // Books tiers are RETIRED (mirror of functions/src/achievements.ts): the
+  // server no longer awards them because books-read isn't honestly trackable.
+  // Metadata stays so legacy earned badges keep rendering; the achievements
+  // screen never shows books tiers as locked goals.
   static const _booksMeta = [
     {'id': 'books_t1', 'name': 'Book Beginner',  'icon': '📖',  'rarity': 'common'},
     {'id': 'books_t2', 'name': 'Book Collector', 'icon': '📚',  'rarity': 'uncommon'},
