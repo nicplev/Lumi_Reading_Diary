@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/widgets/lumi/lumi_buttons.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
 
@@ -8,6 +9,11 @@ import '../../../theme/lumi_typography.dart';
 enum KioskPinEntryResult { verified, cancelled, forgot }
 
 const int kKioskPinLength = 4;
+
+/// Shared new-UI dialog chrome: rounded paper card, generous insets.
+final RoundedRectangleBorder kKioskDialogShape = RoundedRectangleBorder(
+  borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+);
 
 InputDecoration _pinDecoration({String? errorText}) => InputDecoration(
       counterText: '',
@@ -80,6 +86,9 @@ class _PinSetupDialogState extends State<_PinSetupDialog> {
   Widget build(BuildContext context) {
     final confirming = _firstEntry != null;
     return AlertDialog(
+      backgroundColor: LumiTokens.paper,
+      surfaceTintColor: Colors.transparent,
+      shape: kKioskDialogShape,
       title: Text(
         confirming ? 'Confirm the PIN' : 'Choose an exit PIN',
         style: LumiType.subhead,
@@ -108,15 +117,16 @@ class _PinSetupDialogState extends State<_PinSetupDialog> {
           ),
         ],
       ),
+      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       actions: [
-        TextButton(
+        LumiTextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text('Cancel',
-              style: LumiType.button.copyWith(color: LumiTokens.muted)),
+          text: 'Cancel',
+          color: LumiTokens.muted,
         ),
-        FilledButton(
+        LumiPrimaryButton(
           onPressed: _submit,
-          child: Text(confirming ? 'Save PIN' : 'Next', style: LumiType.button),
+          text: confirming ? 'Save PIN' : 'Next',
         ),
       ],
     );
@@ -186,6 +196,9 @@ class _PinEntryDialogState extends State<_PinEntryDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      backgroundColor: LumiTokens.paper,
+      surfaceTintColor: Colors.transparent,
+      shape: kKioskDialogShape,
       title: Text(widget.title, style: LumiType.subhead),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -212,26 +225,25 @@ class _PinEntryDialogState extends State<_PinEntryDialog> {
           if (widget.allowForgot)
             Align(
               alignment: Alignment.centerRight,
-              child: TextButton(
+              child: LumiTextButton(
                 onPressed: () =>
                     Navigator.pop(context, KioskPinEntryResult.forgot),
-                child: Text(
-                  'Forgot PIN?',
-                  style: LumiType.caption.copyWith(color: LumiTokens.muted),
-                ),
+                text: 'Forgot PIN?',
+                color: LumiTokens.muted,
               ),
             ),
         ],
       ),
+      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       actions: [
-        TextButton(
+        LumiTextButton(
           onPressed: () => Navigator.pop(context, KioskPinEntryResult.cancelled),
-          child: Text('Cancel',
-              style: LumiType.button.copyWith(color: LumiTokens.muted)),
+          text: 'Cancel',
+          color: LumiTokens.muted,
         ),
-        FilledButton(
+        LumiPrimaryButton(
           onPressed: _submit,
-          child: Text('Unlock', style: LumiType.button),
+          text: 'Unlock',
         ),
       ],
     );

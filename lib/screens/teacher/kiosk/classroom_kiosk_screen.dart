@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/widgets/lumi/lumi_buttons.dart';
 import '../../../core/widgets/lumi/student_avatar.dart';
 import '../../../data/models/class_model.dart';
 import '../../../data/models/student_model.dart';
@@ -85,23 +86,27 @@ class _ClassroomKioskScreenState extends State<ClassroomKioskScreen> {
     final wantsPin = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: LumiTokens.paper,
+        surfaceTintColor: Colors.transparent,
+        shape: kKioskDialogShape,
         title: Text('Lock the kiosk with a PIN?', style: LumiType.subhead),
         content: Text(
           'Without a PIN, a student can tap Exit and land in your teacher '
           'account. A $kKioskPinLength-digit exit PIN keeps the kiosk locked '
           'to this screen. You can set or change it later with the lock '
           'button up top.',
-          style: LumiType.body,
+          style: LumiType.body.copyWith(color: LumiTokens.muted),
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         actions: [
-          TextButton(
+          LumiTextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Not now',
-                style: LumiType.button.copyWith(color: LumiTokens.muted)),
+            text: 'Not now',
+            color: LumiTokens.muted,
           ),
-          FilledButton(
+          LumiPrimaryButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Set PIN', style: LumiType.button),
+            text: 'Set PIN',
           ),
         ],
       ),
@@ -152,18 +157,26 @@ class _ClassroomKioskScreenState extends State<ClassroomKioskScreen> {
     final action = await showDialog<String>(
       context: context,
       builder: (ctx) => SimpleDialog(
+        backgroundColor: LumiTokens.paper,
+        surfaceTintColor: Colors.transparent,
+        shape: kKioskDialogShape,
+        contentPadding: const EdgeInsets.fromLTRB(8, 16, 8, 12),
+        titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 4),
         title: Text('Exit PIN', style: LumiType.subhead),
         children: [
           SimpleDialogOption(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
             onPressed: () => Navigator.pop(ctx, 'change'),
             child: Text('Change PIN', style: LumiType.body),
           ),
           SimpleDialogOption(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
             onPressed: () => Navigator.pop(ctx, 'remove'),
             child: Text('Remove PIN',
                 style: LumiType.body.copyWith(color: LumiTokens.red)),
           ),
           SimpleDialogOption(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
             onPressed: () => Navigator.pop(ctx),
             child: Text('Cancel',
                 style: LumiType.body.copyWith(color: LumiTokens.muted)),
@@ -192,24 +205,26 @@ class _ClassroomKioskScreenState extends State<ClassroomKioskScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: LumiTokens.paper,
+        surfaceTintColor: Colors.transparent,
+        shape: kKioskDialogShape,
         title: Text('Sign out to reset?', style: LumiType.subhead),
         content: Text(
           "Signing out removes this device's exit PIN and returns to the "
           "login screen. You'll need your password to sign back in.",
-          style: LumiType.body,
+          style: LumiType.body.copyWith(color: LumiTokens.muted),
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         actions: [
-          TextButton(
+          LumiTextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel', style: LumiType.button),
+            text: 'Cancel',
+            color: LumiTokens.muted,
           ),
-          FilledButton(
+          LumiPrimaryButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: LumiTokens.red,
-              foregroundColor: LumiTokens.paper,
-            ),
-            child: Text('Sign Out', style: LumiType.button),
+            text: 'Sign Out',
+            color: LumiTokens.red,
           ),
         ],
       ),
@@ -245,24 +260,26 @@ class _ClassroomKioskScreenState extends State<ClassroomKioskScreen> {
     final shouldExit = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: LumiTokens.paper,
+        surfaceTintColor: Colors.transparent,
+        shape: kKioskDialogShape,
         title: Text('Exit scan-in?', style: LumiType.subhead),
         content: Text(
           'This returns to the teacher app. Students should not normally leave '
           'this screen.',
-          style: LumiType.body,
+          style: LumiType.body.copyWith(color: LumiTokens.muted),
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         actions: [
-          TextButton(
+          LumiTextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Stay', style: LumiType.button),
+            text: 'Stay',
+            color: LumiTokens.muted,
           ),
-          FilledButton(
+          LumiPrimaryButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: LumiTokens.red,
-              foregroundColor: LumiTokens.paper,
-            ),
-            child: Text('Exit', style: LumiType.button),
+            text: 'Exit',
+            color: LumiTokens.red,
           ),
         ],
       ),

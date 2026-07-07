@@ -199,6 +199,15 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
               if (snapshot.hasError) {
                 return const InlineStreamError(message: "Couldn't load this week's reading.");
               }
+              // While the (re-created) stream is still loading — e.g. right
+              // after toggling This week / Last week — hold a stable
+              // placeholder instead of momentarily rendering the empty state.
+              // Without this, the new stream resets to zero logs for a frame
+              // and the "No reading was logged" mascot flashed on every switch.
+              if (snapshot.connectionState == ConnectionState.waiting &&
+                  !snapshot.hasData) {
+                return _buildLoadingState();
+              }
               final logs = snapshot.data?.docs
                       .map((doc) => ReadingLogModel.fromFirestore(doc))
                       .toList() ??
@@ -518,6 +527,58 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
             ),
         ],
       ),
+    );
+  }
+
+  /// Stable skeleton shown while the (re-created) week stream is loading —
+  /// mirrors the loaded layout (chart area + footer) with faint ghost bars so
+  /// switching This week / Last week never flashes the empty-state mascot or
+  /// jumps the card height.
+  Widget _buildLoadingState() {
+    const ghostHeights = [0.45, 0.7, 0.55, 0.8, 0.4, 0.3, 0.25];
+    const maxBarHeight = 120.0;
+
+    return Column(
+      children: [
+        SizedBox(
+          height: 170,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: List.generate(7, (index) {
+              return Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Container(
+                    width: 24,
+                    height: maxBarHeight * ghostHeights[index],
+                    decoration: BoxDecoration(
+                      color: LumiTokens.blue.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    ['M', 'T', 'W', 'T', 'F', 'S', 'S'][index],
+                    style: LumiType.caption.copyWith(
+                      color: LumiTokens.muted.withValues(alpha: 0.4),
+                    ),
+                  ),
+                ],
+              );
+            }),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          width: double.infinity,
+          height: 40,
+          decoration: BoxDecoration(
+            color: LumiTokens.cream,
+            borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+          ),
+        ),
+      ],
     );
   }
 
