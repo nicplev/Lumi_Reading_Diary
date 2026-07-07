@@ -157,9 +157,24 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
   static const _lastNameRevealDelay = Duration(milliseconds: 300);
 
   // Persistent focus nodes — shared across stage builds so focus survives the
-  // AnimatedSwitcher transition when progressive reveal advances the stage.
+  // AnimatedSwitcher transition when a stage advance mounts the next field.
+  // `autofocus` is a no-op mid-transition (the outgoing field still holds
+  // focus), so `_focusStageField` hands focus over explicitly instead.
+  final _codeFocusNode = FocusNode();
+  final _firstNameFocusNode = FocusNode();
+  final _emailFocusNode = FocusNode();
+  final _phoneFocusNode = FocusNode();
+  final _smsFocusNode = FocusNode();
   final _passwordFocusNode = FocusNode();
   final _confirmFocusNode = FocusNode();
+  // Dedicated nodes for the progressive-reveal "peek" fields (the password
+  // shown under a valid email, the confirm shown under a valid password).
+  // They must NOT reuse the same-field node from the next stage: during the
+  // AnimatedSwitcher cross-fade both instances mount at once, so a shared node
+  // is attached twice and the outgoing peek's disposal rips focus off the
+  // freshly-focused field — dropping the keyboard.
+  final _passwordPeekFocusNode = FocusNode();
+  final _confirmPeekFocusNode = FocusNode();
 
   @override
   void initState() {
@@ -180,13 +195,15 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
     _lastNameController.addListener(_updateLastNameVisibility);
     // Progressive reveal: when the user taps into the revealed "peek" field,
     // commit the stage advance so the previous field compacts to a chip.
-    _passwordFocusNode.addListener(() {
-      if (_passwordFocusNode.hasFocus && _stage == _Stage.email && _emailValid) {
+    _passwordPeekFocusNode.addListener(() {
+      if (_passwordPeekFocusNode.hasFocus &&
+          _stage == _Stage.email &&
+          _emailValid) {
         _advance(_Stage.password);
       }
     });
-    _confirmFocusNode.addListener(() {
-      if (_confirmFocusNode.hasFocus &&
+    _confirmPeekFocusNode.addListener(() {
+      if (_confirmPeekFocusNode.hasFocus &&
           _stage == _Stage.password &&
           _passwordValid) {
         _advance(_Stage.confirm);
@@ -198,8 +215,15 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
   void dispose() {
     _lastNameRevealTimer?.cancel();
     _resendTicker?.cancel();
+    _codeFocusNode.dispose();
+    _firstNameFocusNode.dispose();
+    _emailFocusNode.dispose();
+    _phoneFocusNode.dispose();
+    _smsFocusNode.dispose();
     _passwordFocusNode.dispose();
     _confirmFocusNode.dispose();
+    _passwordPeekFocusNode.dispose();
+    _confirmPeekFocusNode.dispose();
     _codeController.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();
@@ -326,6 +350,7 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
         _verifiedSchoolCode = _codeController.text.trim().toUpperCase();
         _stage = _Stage.name;
       });
+      _focusStageField(_Stage.name);
     } on SchoolCodeException catch (e) {
       if (!mounted) return;
       setState(() => _errorMessage = e.message);
@@ -360,9 +385,36 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
   }
 
   void _advance(_Stage next) {
-setState(() {
+    setState(() {
       _errorMessage = null;
       _stage = next;
+    });
+    _focusStageField(next);
+  }
+
+  /// Hands keyboard focus to the incoming stage's primary field after the
+  /// frame that mounts it. Driven explicitly rather than via `autofocus`
+  /// because a stage change fired by the "Next" button leaves the *outgoing*
+  /// field focused while the AnimatedSwitcher cross-fades — so the incoming
+  /// field's `autofocus` is skipped and the keyboard visibly drops.
+  void _focusStageField(_Stage stage) {
+    final node = switch (stage) {
+      _Stage.code => _codeFocusNode,
+      _Stage.name => _firstNameFocusNode,
+      _Stage.email => _emailFocusNode,
+      _Stage.password => _passwordFocusNode,
+      _Stage.confirm => _confirmFocusNode,
+      _Stage.phone => _phoneFocusNode,
+      _Stage.sms => _smsFocusNode,
+      _Stage.success => null,
+    };
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (node != null) {
+        node.requestFocus();
+      } else {
+        FocusManager.instance.primaryFocus?.unfocus();
+      }
     });
   }
 
@@ -384,6 +436,7 @@ setState(() {
       _errorMessage = null;
       _stage = prev;
     });
+    _focusStageField(prev);
   }
 
   /// Creates the Firebase Auth user (first press) and dispatches an SMS
@@ -460,6 +513,7 @@ setState(() {
         _resendToken = handle.resendToken;
         _stage = _Stage.sms;
       });
+      _focusStageField(_Stage.sms);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       // `email-already-in-use` / weak password surface before we ever touch
@@ -468,11 +522,13 @@ setState(() {
       if (e.code == 'email-already-in-use' ||
           e.code == 'invalid-email' ||
           e.code == 'weak-password') {
+        final target =
+            e.code == 'weak-password' ? _Stage.password : _Stage.email;
         setState(() {
           _errorMessage = _authErrorMessage(e.code);
-          _stage =
-              e.code == 'weak-password' ? _Stage.password : _Stage.email;
+          _stage = target;
         });
+        _focusStageField(target);
       } else {
         setState(
             () => _errorMessage = SmsVerificationService.friendlyError(e));
@@ -619,13 +675,28 @@ setState(() {
     final media = MediaQuery.of(context);
     final maxCardHeight = media.size.height * 0.82;
 
-    return SafeArea(
+    return PopScope(
+      // Lock the route while busy so a stray backdrop tap during the
+      // reCAPTCHA→SMS gap can't dispose the modal mid-verify, and guard an
+      // accidental abandon once the auth account exists but signup isn't
+      // finalised (re-registering would then hit `email-already-in-use`).
+      canPop: !_busy && (_pendingUserId == null || _stage == _Stage.success),
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop || _busy) return;
+        final navigator = Navigator.of(context);
+        final leave = await _confirmAbandon();
+        if (leave && mounted) navigator.pop();
+      },
+      child: SafeArea(
       top: false,
       child: Padding(
-        padding: EdgeInsets.only(
+        // NB: no `media.viewInsets.bottom` — the overlay Scaffold already has
+        // `resizeToAvoidBottomInset: true`, so adding it again double-lifted
+        // the card off the keyboard.
+        padding: const EdgeInsets.only(
           left: 16,
           right: 16,
-          bottom: 24 + media.viewInsets.bottom,
+          bottom: 24,
         ),
         child: ConstrainedBox(
           constraints: BoxConstraints(maxHeight: maxCardHeight),
@@ -668,7 +739,44 @@ setState(() {
           duration: 450.ms,
           curve: Curves.easeOutCubic,
         )
-        .fadeIn(duration: 300.ms);
+        .fadeIn(duration: 300.ms),
+    );
+  }
+
+  /// Confirms an intentional abandon after the account exists but signup is
+  /// unfinished. Returns true only if the user explicitly chooses to leave.
+  Future<bool> _confirmAbandon() async {
+    // No account created yet → nothing to orphan, let the pop through.
+    if (_pendingUserId == null || _stage == _Stage.success) return true;
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: LumiTokens.paper,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+        ),
+        title: Text('Finish setting up?', style: LumiTextStyles.h3()),
+        content: Text(
+          "Your account was created but setup isn't finished. If you leave now "
+          "you'll need to log in with this email and password to complete it — "
+          "signing up again will say the email is already in use.",
+          style: LumiTextStyles.body(color: LumiTokens.muted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('Keep going',
+                style: LumiTextStyles.button(color: LumiTokens.red)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text('Leave',
+                style: LumiTextStyles.button(color: LumiTokens.muted)),
+          ),
+        ],
+      ),
+    );
+    return leave ?? false;
   }
 
   Widget _buildFormCard() {
@@ -676,6 +784,7 @@ setState(() {
       behavior: HitTestBehavior.opaque,
       onTap: () {},
       child: Container(
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: LumiTokens.paper,
           borderRadius: BorderRadius.circular(24),
@@ -687,30 +796,95 @@ setState(() {
             ),
           ],
         ),
-        child: AnimatedSize(
-          duration: const Duration(milliseconds: 350),
-          curve: Curves.easeOutCubic,
-          alignment: Alignment.bottomCenter,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-            child: Column(
+        child: Stack(
+          children: [
+            Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildHeader(),
-                const SizedBox(height: 16),
-                ..._buildCompletedChips(),
-                if (_errorMessage != null) ...[
-                  _ErrorBanner(message: _errorMessage!),
-                  const SizedBox(height: 12),
-                ],
-                _buildActiveInput(),
-                const SizedBox(height: 20),
-                _buildPrimaryAction(),
+                // Scrollable content: grows with the accumulating chips and
+                // scrolls once it outgrows the height cap. Kept separate from
+                // the footer so the button below is always reachable.
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                    child: AnimatedSize(
+                      duration: const Duration(milliseconds: 350),
+                      curve: Curves.easeOutCubic,
+                      alignment: Alignment.bottomCenter,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildHeader(),
+                          const SizedBox(height: 16),
+                          ..._buildCompletedChips(),
+                          if (_errorMessage != null) ...[
+                            _ErrorBanner(message: _errorMessage!),
+                            const SizedBox(height: 12),
+                          ],
+                          _buildActiveInput(),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // Pinned footer: the primary action (and its loading spinner)
+                // never scrolls out of view on the tall later stages.
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                  child: _buildPrimaryAction(),
+                ),
               ],
             ),
-          ),
+            // Blocking busy overlay: an always-visible spinner plus a
+            // tap-swallowing scrim over the reCAPTCHA→SMS gap.
+            if (_busy)
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {},
+                  child: _buildBusyScrim(),
+                ),
+              ),
+          ],
         ),
+      ),
+    );
+  }
+
+  /// Contextual label under the busy spinner so the wait reads as progress.
+  String get _busyLabel => switch (_stage) {
+        _Stage.code => 'Verifying school code…',
+        _Stage.phone => 'Sending code…',
+        _Stage.sms => 'Verifying…',
+        _ => 'Please wait…',
+      };
+
+  Widget _buildBusyScrim() {
+    return Container(
+      color: LumiTokens.paper.withValues(alpha: 0.82),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: 34,
+            height: 34,
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              valueColor: AlwaysStoppedAnimation<Color>(LumiTokens.red),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _busyLabel,
+            textAlign: TextAlign.center,
+            style: LumiTextStyles.bodySmall(
+              color: LumiTokens.ink.withValues(alpha: 0.75),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -870,9 +1044,11 @@ setState(() {
         LumiInput(
           accentColor: LumiTokens.red,
           controller: _codeController,
+          focusNode: _codeFocusNode,
           hintText: 'e.g. LUMI2024',
           autofocus: true,
           textInputAction: TextInputAction.done,
+          textCapitalization: TextCapitalization.characters,
           inputFormatters: [
             _UpperCaseFormatter(),
           ],
@@ -888,9 +1064,11 @@ setState(() {
         LumiInput(
           accentColor: LumiTokens.red,
           controller: _firstNameController,
+          focusNode: _firstNameFocusNode,
           hintText: 'First name',
-          autofocus: true,
           textInputAction: TextInputAction.next,
+          textCapitalization: TextCapitalization.words,
+          autofillHints: const [AutofillHints.givenName],
           errorText: _firstNameController.text.isNotEmpty && !_firstValid
               ? 'Enter a valid first name'
               : null,
@@ -907,6 +1085,8 @@ setState(() {
                     controller: _lastNameController,
                     hintText: 'Last name',
                     textInputAction: TextInputAction.done,
+                    textCapitalization: TextCapitalization.words,
+                    autofillHints: const [AutofillHints.familyName],
                     errorText: _lastNameController.text.isNotEmpty &&
                             !_lastValid
                         ? 'Enter a valid last name'
@@ -937,10 +1117,11 @@ setState(() {
         LumiInput(
           accentColor: LumiTokens.red,
           controller: _emailController,
+          focusNode: _emailFocusNode,
           hintText: 'you@example.com',
-          autofocus: true,
           keyboardType: TextInputType.emailAddress,
           textInputAction: TextInputAction.next,
+          autofillHints: const [AutofillHints.email],
           errorText: _emailController.text.isNotEmpty && !_emailValid
               ? 'Enter a valid email address'
               : null,
@@ -955,7 +1136,7 @@ setState(() {
                   child: LumiPasswordInput(
                     accentColor: LumiTokens.red,
                     controller: _passwordController,
-                    focusNode: _passwordFocusNode,
+                    focusNode: _passwordPeekFocusNode,
                     autofillHints: const [AutofillHints.newPassword],
                     hintText: 'Password (at least 8 characters)',
                   )
@@ -1000,7 +1181,7 @@ setState(() {
                   child: LumiPasswordInput(
                     accentColor: LumiTokens.red,
                     controller: _confirmController,
-                    focusNode: _confirmFocusNode,
+                    focusNode: _confirmPeekFocusNode,
                     autofillHints: const [AutofillHints.newPassword],
                     hintText: 'Confirm password',
                   )
@@ -1047,10 +1228,11 @@ setState(() {
         LumiInput(
           accentColor: LumiTokens.red,
           controller: _phoneController,
+          focusNode: _phoneFocusNode,
           hintText: '0400 000 000',
-          autofocus: true,
           keyboardType: TextInputType.phone,
           textInputAction: TextInputAction.done,
+          autofillHints: const [AutofillHints.telephoneNumber],
           helperText: 'Australian mobile only.',
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'[\d\s]')),
@@ -1077,12 +1259,18 @@ setState(() {
         LumiInput(
           accentColor: LumiTokens.red,
           controller: _smsCodeController,
+          focusNode: _smsFocusNode,
           hintText: '123456',
-          autofocus: true,
           keyboardType: TextInputType.number,
-          maxLength: 6,
           textInputAction: TextInputAction.done,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          // Lets iOS surface the incoming SMS code as a one-tap QuickType
+          // suggestion above the keyboard.
+          autofillHints: const [AutofillHints.oneTimeCode],
+          // Cap at 6 without the "0/6" counter badge.
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(6),
+          ],
           onChanged: (_) {
             // Auto-submit once the full 6-digit code is in — most SMS UX
             // flows do this so the user doesn't hunt for the verify button.
