@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Card } from '@/components/lumi/card';
 import { QueryError } from '@/components/lumi/query-error';
 import { Button } from '@/components/lumi/button';
@@ -12,15 +12,32 @@ import { useSchool } from '@/lib/hooks/use-school';
 import { useClassReport } from '@/lib/hooks/use-reports';
 import { useToast } from '@/components/lumi/toast';
 
-function isoToday(): string {
-  const d = new Date();
+function isoLocal(d: Date): string {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
+function isoToday(): string {
+  return isoLocal(new Date());
 }
 
 function isoDaysAgo(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() - days);
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  return isoLocal(d);
+}
+
+/** Monday of the week `offsetWeeks` from this one (0 = this week, -1 = last). */
+function isoMonday(offsetWeeks: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + offsetWeeks * 7);
+  return isoLocal(d);
+}
+
+/** Sunday ending the week `offsetWeeks` from this one. */
+function isoSunday(offsetWeeks: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + offsetWeeks * 7 + 6);
+  return isoLocal(d);
 }
 
 function formatDate(iso: string): string {
@@ -31,8 +48,10 @@ function formatDate(iso: string): string {
   });
 }
 
-const PRESETS: { key: string; label: string; from: () => string }[] = [
-  { key: '7', label: 'Last 7 days', from: () => isoDaysAgo(7) },
+// A preset without `to` runs through today.
+const PRESETS: { key: string; label: string; from: () => string; to?: () => string }[] = [
+  { key: 'this-week', label: 'This week', from: () => isoMonday(0) },
+  { key: 'last-week', label: 'Last week', from: () => isoMonday(-1), to: () => isoSunday(-1) },
   { key: '30', label: 'Last 30 days', from: () => isoDaysAgo(30) },
   { key: '90', label: 'Last term (90 days)', from: () => isoDaysAgo(90) },
   { key: 'year', label: 'This year', from: () => `${new Date().getFullYear()}-01-01` },
@@ -66,6 +85,32 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
   const { toast } = useToast();
   const [downloading, setDownloading] = useState(false);
 
+  type SortKey = 'name' | 'minutes' | 'sessions' | 'readingDays' | 'metPct' | 'lastRead';
+  const [sortKey, setSortKey] = useState<SortKey>('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const sortedStudents = useMemo(() => {
+    if (!report) return [];
+    const rows = [...report.students];
+    rows.sort((a, b) => {
+      const cmp =
+        sortKey === 'name' ? a.name.localeCompare(b.name) :
+        sortKey === 'lastRead' ? (a.lastRead ?? '').localeCompare(b.lastRead ?? '') :
+        a[sortKey] - b[sortKey];
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return rows;
+  }, [report, sortKey, sortDir]);
+  const toggleSort = (key: SortKey) => {
+    if (key === sortKey) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      // Numbers read best largest-first on first click; names A→Z.
+      setSortDir(key === 'name' ? 'asc' : 'desc');
+    }
+  };
+  const sortMark = (key: SortKey) => (sortKey === key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '');
+
   const handleDownloadPdf = async () => {
     if (!report) return;
     setDownloading(true);
@@ -85,7 +130,32 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
     if (!preset) return;
     setPresetKey(key);
     setFrom(preset.from());
-    setTo(isoToday());
+    setTo(preset.to ? preset.to() : isoToday());
+  };
+
+  const handleDownloadCsv = () => {
+    if (!report) return;
+    const esc = (v: string | number | null) => {
+      const s = String(v ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = [
+      ['Student', 'Minutes', 'Sessions', 'Reading days', 'Met target %', 'Last read', 'Reading level'],
+      ...report.students.map((r) => [
+        r.name, r.minutes, r.sessions, r.readingDays, r.metPct, r.lastRead ?? '', r.currentReadingLevel ?? '',
+      ]),
+    ];
+    const csv = rows.map((row) => row.map(esc).join(',')).join('\r\n');
+    const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safeClass = (className || 'class').replace(/[^\w-]+/g, '-');
+    a.href = url;
+    a.download = `reading-report-${safeClass}-${from}-to-${to}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -106,6 +176,9 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => window.print()} disabled={!report}>
               Print
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleDownloadCsv} disabled={!report}>
+              Export CSV
             </Button>
             <Button size="sm" onClick={handleDownloadPdf} loading={downloading} disabled={!report}>
               Download PDF
@@ -172,7 +245,7 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
             <Metric label="Met target" value={`${report.targetMetRate}%`} />
             <Metric label="Total minutes" value={report.totalMinutes} />
             <Metric label="Avg min / student" value={report.avgMinutesPerStudent} />
-            <Metric label="Books read" value={report.totalBooks} />
+            <Metric label="Reading days" value={report.totalReadingDays} />
             <Metric label="Sessions" value={report.totalSessions} />
           </div>
 
@@ -238,6 +311,57 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
                   ))}
                 </tbody>
               </table>
+            )}
+          </Card>
+
+          {/* All students — the full roster, so no one is invisible in the report */}
+          <Card>
+            <h2 className="text-lg font-bold text-ink mb-3">All students</h2>
+            {report.students.length === 0 ? (
+              <p className="text-sm text-muted">No students in this class.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-muted border-b border-rule select-none">
+                      <th className="py-2 font-semibold cursor-pointer" onClick={() => toggleSort('name')}>
+                        Student{sortMark('name')}
+                      </th>
+                      <th className="py-2 font-semibold text-right cursor-pointer" onClick={() => toggleSort('minutes')}>
+                        Minutes{sortMark('minutes')}
+                      </th>
+                      <th className="py-2 font-semibold text-right cursor-pointer" onClick={() => toggleSort('sessions')}>
+                        Sessions{sortMark('sessions')}
+                      </th>
+                      <th className="py-2 font-semibold text-right cursor-pointer" onClick={() => toggleSort('readingDays')}>
+                        Days{sortMark('readingDays')}
+                      </th>
+                      <th className="py-2 font-semibold text-right cursor-pointer" onClick={() => toggleSort('metPct')}>
+                        Met target{sortMark('metPct')}
+                      </th>
+                      <th className="py-2 font-semibold text-right cursor-pointer" onClick={() => toggleSort('lastRead')}>
+                        Last read{sortMark('lastRead')}
+                      </th>
+                      {levelsEnabled && <th className="py-2 font-semibold text-right">Level</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedStudents.map((r) => (
+                      <tr key={r.id} className="border-b border-rule/60">
+                        <td className="py-2 text-ink font-medium">{r.name}</td>
+                        <td className="py-2 text-right">{r.minutes}</td>
+                        <td className="py-2 text-right">{r.sessions}</td>
+                        <td className="py-2 text-right">{r.readingDays}</td>
+                        <td className="py-2 text-right">{r.sessions > 0 ? `${r.metPct}%` : '—'}</td>
+                        <td className="py-2 text-right">{r.lastRead ? formatDate(r.lastRead) : '—'}</td>
+                        {levelsEnabled && (
+                          <td className="py-2 text-right">{r.currentReadingLevel ?? '—'}</td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </Card>
 
