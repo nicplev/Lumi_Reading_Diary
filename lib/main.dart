@@ -59,19 +59,25 @@ void main() async {
         options: DefaultFirebaseOptions.currentPlatform,
       );
 
-      // DEBUG ONLY: let configured Firebase test phone numbers work on the iOS
-      // Simulator. The Simulator can't receive the silent push used for phone
-      // app-verification, so it falls back to reCAPTCHA / a real send and then
-      // rejects the fixed test code. This flag skips app verification so the
-      // console test numbers (e.g. +61400000000 → 123456) sign in directly.
-      // Safe now that MFA enrolment is server-side (Admin SDK) — the flag's
-      // only known issue was the OLD client multiFactor.enroll endpoint, which
-      // signup no longer uses. NEVER enabled in release builds. (Note: with
-      // this on, only configured test numbers work in debug — not real ones.)
-      if (kDebugMode && !kIsWeb) {
+      // OPT-IN: skip phone app-verification so configured Firebase test numbers
+      // (e.g. +61400000000 → 123456) sign in directly on the iOS Simulator,
+      // which can't receive the silent push used for real app-verification.
+      //
+      // CRITICAL — off by default. With this on, ONLY console test numbers work;
+      // a real number fails with `missing-client-identifier`. The previous
+      // `if (kDebugMode)` guard applied it to EVERY debug build, so a debug
+      // build sideloaded onto a real phone couldn't sign up with a real number.
+      // A physical device (even a debug build) does app-verification for real,
+      // so it must stay on. Enable for simulator/test-number runs only with:
+      //   flutter run --dart-define=LUMI_DISABLE_APP_VERIFICATION=true
+      // NEVER put this in .dart_define.json (that file feeds release builds).
+      const disableAppVerification =
+          bool.fromEnvironment('LUMI_DISABLE_APP_VERIFICATION');
+      if (kDebugMode && !kIsWeb && disableAppVerification) {
         try {
           await FirebaseAuth.instance
               .setSettings(appVerificationDisabledForTesting: true);
+          debugPrint('[phone-auth] app verification disabled for testing');
         } catch (e) {
           debugPrint('Warning: phone-auth test settings not applied: $e');
         }
