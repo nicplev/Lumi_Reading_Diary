@@ -29,10 +29,13 @@ import {
   type AchievementThresholdSet,
 } from "./achievements";
 import {
+  MAX_REST_DAYS,
+  buildIsCountingDay,
   computeGentleStreak,
   computeLongestStreak,
   countInWindow,
   localDateString,
+  parseTermDates,
   shiftDays,
 } from "./dateUtils";
 import {DEFAULT_TIMEZONE} from "./access";
@@ -198,7 +201,10 @@ export const aggregateStudentStats = onDocumentWritten(
       // sendReadingReminders / getLocalTime). A 23:30 local log must count as
       // that night, not the next UTC day.
       const schoolSnap = await db.collection("schools").doc(schoolId).get();
-      const tz = schoolSnap.data()?.timezone ?? DEFAULT_TIMEZONE;
+      const schoolData = schoolSnap.data() ?? {};
+      const tz = schoolData.timezone ?? DEFAULT_TIMEZONE;
+      const isCountingDay =
+        buildIsCountingDay(parseTermDates(schoolData.termDates));
 
       // Prior longestStreak — read so we can guarantee it never decreases
       // ("nothing earned is lost", even if the streak definition changes later).
@@ -229,8 +235,10 @@ export const aggregateStudentStats = onDocumentWritten(
 
       // Gentle, forgiving streak: tolerates up to 2 missed days, computed fresh
       // from the local-day set. A missed night never resets it to zero on its
-      // own — see computeGentleStreak in ./dateUtils.
-      const {currentStreak, restDaysRemaining} = computeGentleStreak(readingDates, today);
+      // own, and school-holiday days (outside termDates) never count against
+      // it — see computeGentleStreak in ./dateUtils.
+      const {currentStreak, restDaysRemaining} =
+        computeGentleStreak(readingDates, today, MAX_REST_DAYS, isCountingDay);
 
       // Longest streak is monotonic — guard so it can never decrease.
       const longestStreak = Math.max(

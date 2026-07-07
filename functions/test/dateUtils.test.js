@@ -7,6 +7,9 @@ const {
   computeGentleStreak,
   computeLongestStreak,
   countInWindow,
+  parseTermDates,
+  buildIsCountingDay,
+  MAX_REST_DAYS,
 } = require('../lib/dateUtils.js');
 
 // ─── localDateString — timezone bucketing (the core off-by-one fix) ───────────
@@ -71,14 +74,94 @@ test('three missed nights in a row end the streak (gaps behind it do not count)'
   assert.deepEqual(computeGentleStreak(reads, TODAY), { currentStreak: 1, restDaysRemaining: 2 });
 });
 
-test('streak is not live if the last read was more than a day ago', () => {
+test('streak stays live while still bridgeable (last read up to 3 days back)', () => {
+  // A Friday reader must not see 0 on Sunday: reading tonight would still
+  // bridge the gap, so the streak keeps displaying.
   const reads = new Set([ago(2), ago(3)]);
+  assert.deepEqual(computeGentleStreak(reads, TODAY), { currentStreak: 2, restDaysRemaining: 2 });
+  // Last read exactly maxRestDays+1 back — the last day it is still live.
+  const fri = new Set([ago(3), ago(4)]);
+  assert.deepEqual(computeGentleStreak(fri, TODAY), { currentStreak: 2, restDaysRemaining: 2 });
+});
+
+test('streak goes to 0 once the gap is no longer bridgeable', () => {
+  // 4 counting days since the last read: even reading tonight could not
+  // bridge the 3 misses in between, so the streak is dead.
+  const reads = new Set([ago(4), ago(5)]);
   assert.deepEqual(computeGentleStreak(reads, TODAY), { currentStreak: 0, restDaysRemaining: 2 });
 });
 
 test('reading yesterday (not yet today) keeps the streak live without burning a rest day', () => {
   const reads = new Set([ago(1), ago(2), ago(3)]);
   assert.deepEqual(computeGentleStreak(reads, TODAY), { currentStreak: 3, restDaysRemaining: 2 });
+});
+
+// ─── term dates — holiday-aware streaks ───────────────────────────────────────
+
+test('parseTermDates drops malformed entries and keeps valid ranges', () => {
+  assert.deepEqual(parseTermDates(undefined), []);
+  assert.deepEqual(parseTermDates('nope'), []);
+  assert.deepEqual(parseTermDates([
+    { start: '2026-04-20', end: '2026-06-26' },        // valid
+    { start: '2026-07-13', end: '2026-09-18', label: 'Term 3' }, // valid, extra key ok
+    { start: '2026-06-26', end: '2026-04-20' },        // start > end → dropped
+    { start: '20-04-2026', end: '2026-06-26' },        // bad format → dropped
+    { start: '2026-04-20' },                            // missing end → dropped
+    null,                                               // → dropped
+  ]), [
+    { start: '2026-04-20', end: '2026-06-26' },
+    { start: '2026-07-13', end: '2026-09-18' },
+  ]);
+});
+
+test('buildIsCountingDay: empty terms → every day counts; ranges are inclusive', () => {
+  const always = buildIsCountingDay([]);
+  assert.equal(always('2026-01-01'), true);
+  const inTerm = buildIsCountingDay([{ start: '2026-04-20', end: '2026-06-26' }]);
+  assert.equal(inTerm('2026-04-20'), true);  // first day inclusive
+  assert.equal(inTerm('2026-06-26'), true);  // last day inclusive
+  assert.equal(inTerm('2026-04-19'), false); // day before
+  assert.equal(inTerm('2026-06-27'), false); // day after
+});
+
+// Term ends Fri 2026-06-05; holidays until term 2 starts Mon 2026-06-22.
+const TERMS = buildIsCountingDay(parseTermDates([
+  { start: '2026-05-01', end: '2026-06-05' },
+  { start: '2026-06-22', end: '2026-08-28' },
+]));
+
+test('a streak survives (and displays) right through a term break', () => {
+  // Read the last 3 days of term, then nothing — mid-holidays the streak
+  // still shows because zero counting days have elapsed.
+  const reads = new Set(['2026-06-03', '2026-06-04', '2026-06-05']);
+  const midBreak = computeGentleStreak(reads, '2026-06-14', MAX_REST_DAYS, TERMS);
+  assert.deepEqual(midBreak, { currentStreak: 3, restDaysRemaining: 2 });
+  // First day back is a leading-edge unread day — still live, still 3.
+  const firstDayBack = computeGentleStreak(reads, '2026-06-22', MAX_REST_DAYS, TERMS);
+  assert.deepEqual(firstDayBack, { currentStreak: 3, restDaysRemaining: 2 });
+});
+
+test('reading across a break joins into one streak without spending rest days', () => {
+  // End of term 1 + first two nights of term 2: the 16 holiday days between
+  // are free, so this is one continuous streak of 4.
+  const reads = new Set([
+    '2026-06-04', '2026-06-05', '2026-06-22', '2026-06-23',
+  ]);
+  const result = computeGentleStreak(reads, '2026-06-23', MAX_REST_DAYS, TERMS);
+  assert.deepEqual(result, { currentStreak: 4, restDaysRemaining: 2 });
+});
+
+test('reading ON holiday days still extends the streak', () => {
+  const reads = new Set(['2026-06-05', '2026-06-10', '2026-06-12']);
+  const result = computeGentleStreak(reads, '2026-06-12', MAX_REST_DAYS, TERMS);
+  assert.deepEqual(result, { currentStreak: 3, restDaysRemaining: 2 });
+});
+
+test('in-term misses still spend rest days as before, holidays or not', () => {
+  // Back in term 2: read Mon 22nd, skip Tue-Thu (3 counting misses) → dead.
+  const reads = new Set(['2026-06-22']);
+  const result = computeGentleStreak(reads, '2026-06-26', MAX_REST_DAYS, TERMS);
+  assert.deepEqual(result, { currentStreak: 0, restDaysRemaining: 2 });
 });
 
 // ─── computeLongestStreak — monotonic, same tolerance, can exceed current ─────
