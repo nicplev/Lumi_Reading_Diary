@@ -2,7 +2,11 @@ import * as functions from "firebase-functions/v1";
 import {onCall, CallableOptions} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import {assertNotReadOnly} from "./read_only_guard";
-import {buildStudentAccess, isActiveSubscriptionStatus} from "./access";
+import {
+  academicYearForDate,
+  buildStudentAccess,
+  isActiveSubscriptionStatus,
+} from "./access";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -350,22 +354,28 @@ export async function linkParentToStudentCore(
     const cfgSnap = await tx.get(
       db().collection("config").doc("academicYear"),
     );
-    const currentYear = cfgSnap.data()?.currentAcademicYear as
+    // Prefer the configured year, but DERIVE it from today when the config
+    // doc is missing rather than silently skipping the grant. The old
+    // behaviour ("no config → no access, no error") stranded the very first
+    // family on the lapsed-access screen if config/academicYear hadn't been
+    // seeded — the single worst Day-1 failure. Deriving keeps the grant path
+    // alive; the subscription check below is still the real gate.
+    const configuredYear = cfgSnap.data()?.currentAcademicYear as
         | number
         | undefined;
-    let subActive = false;
-    if (typeof currentYear === "number") {
-      const subSnap = await tx.get(
-        db()
-          .collection("schoolSubscriptions")
-          .doc(`${fresh.schoolId}_${currentYear}`),
-      );
-      subActive =
-          subSnap.exists &&
-          isActiveSubscriptionStatus(subSnap.data()?.status as string);
-    }
+    const currentYear =
+        typeof configuredYear === "number" ?
+          configuredYear :
+          academicYearForDate(new Date());
+    const subSnap = await tx.get(
+      db()
+        .collection("schoolSubscriptions")
+        .doc(`${fresh.schoolId}_${currentYear}`),
+    );
+    const subActive =
+        subSnap.exists &&
+        isActiveSubscriptionStatus(subSnap.data()?.status as string);
     const grantAccess =
-        typeof currentYear === "number" &&
         subActive &&
         !studentAccessAlreadyLive(studentSnap.data());
 
@@ -382,7 +392,7 @@ export async function linkParentToStudentCore(
     };
     if (grantAccess) {
       studentUpdate.access = buildStudentAccess({
-        academicYear: currentYear as number,
+        academicYear: currentYear,
         source: "book_pack_assumed",
         grantedBy: uid,
       });
