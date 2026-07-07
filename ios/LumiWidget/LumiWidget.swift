@@ -25,7 +25,64 @@ struct LumiWidget: Widget {
                 }
         }
         .configurationDisplayName("Lumi Reading")
-        .description("Track your child's daily reading and streak.")
+        .description("Parent and guardian widget for logging a child's daily reading.")
+        .supportedFamilies([.systemSmall])
+    }
+}
+
+struct LumiTeacherTodayWidget: Widget {
+    static let kind = "LumiTeacherTodayWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(
+            kind: Self.kind,
+            provider: LumiTeacherWidgetProvider(kind: .today)
+        ) { entry in
+            LumiTeacherWidgetEntryView(entry: entry)
+                .containerBackground(for: .widget) {
+                    Color.lumiCream
+                }
+        }
+        .configurationDisplayName("Lumi Class Today")
+        .description("Teacher-only widget showing today's class reading percentage.")
+        .supportedFamilies([.systemSmall])
+    }
+}
+
+struct LumiTeacherTopReadersWidget: Widget {
+    static let kind = "LumiTeacherTopReadersWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(
+            kind: Self.kind,
+            provider: LumiTeacherWidgetProvider(kind: .topReaders)
+        ) { entry in
+            LumiTeacherWidgetEntryView(entry: entry)
+                .containerBackground(for: .widget) {
+                    Color.lumiCream
+                }
+        }
+        .configurationDisplayName("Lumi Top Readers")
+        .description("Teacher-only widget showing top readers in your selected class.")
+        .supportedFamilies([.systemSmall])
+    }
+}
+
+struct LumiTeacherCalendarWidget: Widget {
+    static let kind = "LumiTeacherCalendarWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(
+            kind: Self.kind,
+            provider: LumiTeacherWidgetProvider(kind: .readingCalendar)
+        ) { entry in
+            LumiTeacherWidgetEntryView(entry: entry)
+                .containerBackground(for: .widget) {
+                    Color.lumiCream
+                }
+        }
+        .configurationDisplayName("Lumi Reading Calendar")
+        .description("Teacher-only widget showing a six-week class reading heatmap.")
         .supportedFamilies([.systemSmall])
     }
 }
@@ -36,5 +93,8 @@ struct LumiWidget: Widget {
 struct LumiWidgetBundle: WidgetBundle {
     var body: some Widget {
         LumiWidget()
+        LumiTeacherTodayWidget()
+        LumiTeacherTopReadersWidget()
+        LumiTeacherCalendarWidget()
     }
 }

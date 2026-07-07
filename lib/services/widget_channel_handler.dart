@@ -10,6 +10,7 @@ import 'package:home_widget/home_widget.dart';
 /// URL format: `lumi://widget/{action}?childId={studentId}`
 ///   `lumi://widget/log`  → opens LogReadingScreen (pre-selects child)
 ///   `lumi://widget/home` → opens ParentHomeScreen (pre-selects child)
+///   `lumi://widget/teacher` → opens TeacherHomeScreen
 class WidgetChannelHandler {
   WidgetChannelHandler._();
 
@@ -32,16 +33,20 @@ class WidgetChannelHandler {
     // For `lumi://widget/home`, scheme=lumi, host=widget, path=/home — so the
     // action lives in pathSegments, not uri.host.
     final action = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : '';
-
-    switch (action) {
-      case 'log':
-        // Store child ID in query so the route builder can pre-select the child.
-        // The route uses NavigationStateService; we pass childId via query param
-        // and let ParentHomeScreen handle navigation into log-reading for that child.
-        router.go('/parent/home?widgetChildId=$childId');
-      case 'home':
-      default:
-        router.go('/parent/home?widgetChildId=$childId');
+    if (action == 'teacher') {
+      router.go('/teacher/home');
+      return;
     }
+
+    final route = Uri(
+      path: '/parent/home',
+      queryParameters: {
+        if (childId.isNotEmpty) 'widgetChildId': childId,
+        'widgetAction': action == 'log' ? 'log' : 'home',
+        'widgetTap': DateTime.now().millisecondsSinceEpoch.toString(),
+      },
+    ).toString();
+
+    router.go(route);
   }
 }
