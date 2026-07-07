@@ -65,7 +65,7 @@ function ClassReportDocument({ report, schoolName, levelsEnabled }: { report: Cl
           <Metric label="Met target" value={`${report.targetMetRate}%`} />
           <Metric label="Total minutes" value={report.totalMinutes} />
           <Metric label="Avg min/student" value={report.avgMinutesPerStudent} />
-          <Metric label="Books read" value={report.totalBooks} />
+          <Metric label="Reading days" value={report.totalReadingDays} />
           <Metric label="Sessions" value={report.totalSessions} />
         </View>
 
@@ -113,6 +113,34 @@ function ClassReportDocument({ report, schoolName, levelsEnabled }: { report: Cl
                   <Text style={[styles.cell, { width: '17%' }]}>{r.minutes}</Text>
                   <Text style={[styles.cell, { width: '13%' }]}>{r.readingDays}</Text>
                   <Text style={[styles.cell, { width: '20%' }]}>{r.issue}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>All students</Text>
+          {report.students.length === 0 ? (
+            <Text style={styles.cell}>No students in this class.</Text>
+          ) : (
+            <View>
+              <View style={styles.row}>
+                <Text style={[styles.th, { width: '34%' }]}>Student</Text>
+                <Text style={[styles.th, { width: '13%' }]}>Minutes</Text>
+                <Text style={[styles.th, { width: '13%' }]}>Sessions</Text>
+                <Text style={[styles.th, { width: '10%' }]}>Days</Text>
+                <Text style={[styles.th, { width: '14%' }]}>Met target</Text>
+                <Text style={[styles.th, { width: '16%' }]}>Last read</Text>
+              </View>
+              {report.students.map((r) => (
+                <View style={styles.row} key={r.id} wrap={false}>
+                  <Text style={[styles.cell, { width: '34%' }]}>{r.name}</Text>
+                  <Text style={[styles.cell, { width: '13%' }]}>{r.minutes}</Text>
+                  <Text style={[styles.cell, { width: '13%' }]}>{r.sessions}</Text>
+                  <Text style={[styles.cell, { width: '10%' }]}>{r.readingDays}</Text>
+                  <Text style={[styles.cell, { width: '14%' }]}>{r.sessions > 0 ? `${r.metPct}%` : '—'}</Text>
+                  <Text style={[styles.cell, { width: '16%' }]}>{r.lastRead ? fmtDate(r.lastRead) : '—'}</Text>
                 </View>
               ))}
             </View>

@@ -1,6 +1,7 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { getClass } from './classes';
 import { getStudents } from './students';
+import { getSchoolTimezone, localDateString } from '@/lib/school-time';
 
 export interface ClassReportStudentRow {
   id: string;
@@ -10,6 +11,8 @@ export interface ClassReportStudentRow {
   readingDays: number;
   books: number;
   metPct: number;
+  /** School-local "YYYY-MM-DD" of the most recent log in range, or null. */
+  lastRead: string | null;
   currentReadingLevel: string | null;
 }
 
@@ -34,17 +37,17 @@ export interface ClassReport {
   avgMinutesPerStudent: number;
   totalBooks: number;
   totalSessions: number;
+  /** Sum of every student's distinct reading days in range. */
+  totalReadingDays: number;
   studentsMetTarget: number;
   targetMetRate: number;
   longestStreak: number;
   popularLevel: string | null;
+  /** Every student in the class (name-sorted) — the full-roster table/CSV. */
+  students: ClassReportStudentRow[];
   topReaders: ClassReportStudentRow[];
   needsSupport: ClassReportSupportRow[];
   levelDistribution: { level: string; count: number }[];
-}
-
-function dayKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
 }
 
 interface Acc {
@@ -53,6 +56,7 @@ interface Acc {
   days: Set<string>;
   books: Set<string>;
   met: number;
+  lastRead: Date | null;
 }
 
 /**
@@ -69,9 +73,10 @@ export async function getClassReport(
   startDate: Date,
   endDate: Date
 ): Promise<ClassReport> {
-  const [cls, students] = await Promise.all([
+  const [cls, students, tz] = await Promise.all([
     getClass(schoolId, classId),
     getStudents(schoolId, { classId, isActive: true }),
+    getSchoolTimezone(schoolId),
   ]);
 
   const defaultTarget = cls?.defaultMinutesTarget ?? 20;
@@ -92,12 +97,16 @@ export async function getClassReport(
     const d = doc.data();
     const sid: string = d.studentId ?? '';
     if (!sid) continue;
-    const a = acc.get(sid) ?? { minutes: 0, sessions: 0, days: new Set(), books: new Set(), met: 0 };
+    const a = acc.get(sid) ??
+      { minutes: 0, sessions: 0, days: new Set(), books: new Set(), met: 0, lastRead: null };
     const mins: number = d.minutesRead ?? 0;
     a.minutes += mins;
     a.sessions += 1;
     const dt: Date | null = d.date?.toDate?.() ?? null;
-    if (dt) a.days.add(dayKey(dt));
+    if (dt) {
+      a.days.add(localDateString(dt, tz));
+      if (!a.lastRead || dt > a.lastRead) a.lastRead = dt;
+    }
     if (Array.isArray(d.bookTitles)) {
       for (const t of d.bookTitles) {
         if (typeof t === 'string' && t.trim()) {
@@ -123,9 +132,11 @@ export async function getClassReport(
       readingDays: a?.days.size ?? 0,
       books: a?.books.size ?? 0,
       metPct: sessions > 0 ? Math.round(((a?.met ?? 0) / sessions) * 100) : 0,
+      lastRead: a?.lastRead ? localDateString(a.lastRead, tz) : null,
       currentReadingLevel: s.currentReadingLevel ?? null,
     };
   });
+  rows.sort((x, y) => x.name.localeCompare(y.name));
 
   const totalStudents = students.length;
   const activeReaders = rows.filter((r) => r.minutes > 0).length;
@@ -149,6 +160,8 @@ export async function getClassReport(
     .sort((a, b) => b.minutes - a.minutes)
     .slice(0, 10);
 
+  // Deliberately uncapped: silently dropping struggling students past a
+  // top-10 was worse than a longer list (the full roster is in `students`).
   const needsSupport: ClassReportSupportRow[] = rows
     .filter((r) => r.sessions === 0 || r.readingDays < 3 || r.metPct < 50)
     .map((r) => ({
@@ -157,8 +170,7 @@ export async function getClassReport(
       minutes: r.minutes,
       readingDays: r.readingDays,
       issue: r.sessions === 0 ? 'No reading logged' : r.readingDays < 3 ? 'Low engagement' : 'Not meeting targets',
-    }))
-    .slice(0, 10);
+    }));
 
   return {
     classId,
@@ -173,10 +185,12 @@ export async function getClassReport(
     avgMinutesPerStudent: totalStudents > 0 ? Math.round(totalMinutes / totalStudents) : 0,
     totalBooks: classBooks.size,
     totalSessions,
+    totalReadingDays: rows.reduce((sum, r) => sum + r.readingDays, 0),
     studentsMetTarget,
     targetMetRate: totalStudents > 0 ? Math.round((studentsMetTarget / totalStudents) * 100) : 0,
     longestStreak,
     popularLevel,
+    students: rows,
     topReaders,
     needsSupport,
     levelDistribution,
