@@ -81,18 +81,7 @@ export const topReaderAward = onSchedule(
   },
   async () => {
     const db = admin.firestore();
-    const tz = DEFAULT_TIMEZONE;
-    const {firstDay, lastDay, weekOf} = previousWeek(new Date(), tz);
-
-    // Generous UTC query window (±margin) so no local-week log is missed
-    // regardless of tz offset; precise membership is decided in memory by the
-    // local date string.
-    const queryStart = admin.firestore.Timestamp.fromDate(
-      new Date(`${shiftDays(firstDay, -1)}T00:00:00Z`),
-    );
-    const queryEnd = admin.firestore.Timestamp.fromDate(
-      new Date(`${shiftDays(lastDay, 2)}T00:00:00Z`),
-    );
+    const now = new Date();
 
     let batch = db.batch();
     let inBatch = 0;
@@ -108,6 +97,25 @@ export const topReaderAward = onSchedule(
 
     const schools = await db.collection("schools").get();
     for (const school of schools.docs) {
+      // The week is measured in the SCHOOL's own timezone so e.g. a
+      // Sunday-evening log in Perth never slips into Sydney's Monday. The
+      // cron fire time stays pinned to Sydney — by 05:00 AEST it is already
+      // Monday morning everywhere in Australia.
+      const rawTz = school.get("timezone");
+      const tz =
+        typeof rawTz === "string" && rawTz.length > 0 ? rawTz : DEFAULT_TIMEZONE;
+      const {firstDay, lastDay, weekOf} = previousWeek(now, tz);
+
+      // Generous UTC query window (±margin) so no local-week log is missed
+      // regardless of tz offset; precise membership is decided in memory by
+      // the local date string.
+      const queryStart = admin.firestore.Timestamp.fromDate(
+        new Date(`${shiftDays(firstDay, -1)}T00:00:00Z`),
+      );
+      const queryEnd = admin.firestore.Timestamp.fromDate(
+        new Date(`${shiftDays(lastDay, 2)}T00:00:00Z`),
+      );
+
       const studentsCol = school.ref.collection("students");
       const logsCol = school.ref.collection("readingLogs");
       let classes;
@@ -204,9 +212,6 @@ export const topReaderAward = onSchedule(
 
     await flush(true);
     functions.logger.info("topReaderAward complete", {
-      weekOf,
-      firstDay,
-      lastDay,
       awarded,
       cleared,
     });
