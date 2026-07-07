@@ -18,9 +18,15 @@ Legend: 🧑‍💻 = you (console/portal/terminal) · ✅ = verify before movin
 
 ## 2. School setup
 
-- [ ] 🧑‍💻 Create the school (super-admin portal) **and** its
-      `schoolSubscriptions/{schoolId}_{year}` row with status `active`
-      (or let §3 seed a `comp` row for beta).
+- [ ] 🧑‍💻 Create the school (super-admin portal). Leave **"Activate School
+      Access now"** ticked (default) to switch the school on with a free `comp`
+      subscription for the current year in the same step — that's the master
+      on-switch, so future parent-links auto-grant and §3 becomes a formality.
+      Untick it only for a real prospect you'll bill deliberately later.
+- [ ] 🧑‍💻 To turn a school on/off later (e.g. temp demo access), set its
+      subscription status on the school's **Subscription tab** — `comp`/`paid`
+      switches it on (and provisions any un-provisioned students); `unpaid`/
+      `cancelled` suspends it.
 - [ ] 🧑‍💻 School portal → **Settings**:
       - [ ] `Timezone` set (e.g. `Australia/Sydney`) — drives streaks,
             reminders, dashboards, Top Reader week.

@@ -9,6 +9,8 @@ import {
 } from "@/lib/firestore/school-subscriptions";
 import { upsertSubscriptionSchema } from "@/lib/validations/school-subscription";
 import { logAuditEvent } from "@/lib/firestore/audit-log";
+import { provisionUnprovisionedStudents } from "@/lib/firestore/access-grants";
+import { isActiveSubscriptionStatus } from "@lumi/types";
 
 // GET /api/school-subscriptions?schoolId=...        -> all rows for one school
 // GET /api/school-subscriptions?academicYear=2026   -> all schools for one year
@@ -63,6 +65,23 @@ export async function POST(request: Request) {
       updatedBy: session.uid,
     });
 
+    // Turning a school ON: also provision students who were imported but never
+    // got an access record, so activating actually lights everyone up (not
+    // just future parent-links). Suspended/expired students are left to the
+    // onSchoolSubscriptionWrite cascade (restore) + renewals. Non-fatal.
+    let provisioned = 0;
+    if (isActiveSubscriptionStatus(parsed.status)) {
+      try {
+        provisioned = await provisionUnprovisionedStudents(
+          parsed.schoolId,
+          parsed.academicYear,
+          session.uid
+        );
+      } catch (provErr) {
+        console.error("Provision-on-activate failed:", provErr);
+      }
+    }
+
     logAuditEvent({
       action: "schoolSubscription.upsert",
       performedBy: session.uid,
@@ -70,10 +89,10 @@ export async function POST(request: Request) {
       targetType: "schoolSubscription",
       targetId: id,
       schoolId: parsed.schoolId,
-      after: parsed as Record<string, unknown>,
+      after: { ...parsed, provisioned } as Record<string, unknown>,
     }).catch(console.error);
 
-    return NextResponse.json({ id, success: true }, { status: 200 });
+    return NextResponse.json({ id, success: true, provisioned }, { status: 200 });
   } catch (error: unknown) {
     if (error instanceof Error && error.name === "ZodError") {
       return NextResponse.json(
