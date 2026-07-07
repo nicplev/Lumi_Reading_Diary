@@ -25,13 +25,16 @@ import {
   type CreateSchoolInput,
 } from "@/lib/validations/school";
 
+// Australia/Sydney first — it's the product default (streaks, reminders,
+// Top Reader week and the whole access model all default to it), so a new
+// school should land on it unless deliberately changed.
 const TIMEZONES = [
-  "Pacific/Auckland",
   "Australia/Sydney",
   "Australia/Melbourne",
   "Australia/Brisbane",
   "Australia/Adelaide",
   "Australia/Perth",
+  "Pacific/Auckland",
 ];
 
 export function CreateSchoolForm() {
@@ -51,7 +54,7 @@ export function CreateSchoolForm() {
       contactEmail: "",
       contactPhone: "",
       address: "",
-      timezone: "Pacific/Auckland",
+      timezone: "Australia/Sydney",
     },
   });
 
@@ -126,7 +129,7 @@ export function CreateSchoolForm() {
           <div className="space-y-2">
             <Label>Timezone *</Label>
             <Select
-              defaultValue="Pacific/Auckland"
+              defaultValue="Australia/Sydney"
               onValueChange={(v) => v && setValue("timezone", v)}
             >
               <SelectTrigger>

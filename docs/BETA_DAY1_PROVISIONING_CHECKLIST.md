@@ -9,9 +9,11 @@ Legend: 🧑‍💻 = you (console/portal/terminal) · ✅ = verify before movin
 
 ## 1. Platform prerequisites (once, not per school)
 
-- [ ] 🧑‍💻 `config/academicYear` exists with the current `currentAcademicYear`.
-      Without it, parent-link auto-grants **silently no-op** and the January
-      rollover aborts. (The backfill script in §3 creates it if missing.)
+- [ ] 🧑‍💻 `config/academicYear` — **now self-healing.** Parent-link auto-grants
+      derive the year from today when it's missing (no longer a silent no-op),
+      and the portal "Activate access" button (§3) creates it. Still worth
+      confirming it exists with the right `currentAcademicYear` for the annual
+      rollover cron.
 - [ ] ✅ Firebase console → Firestore → `config/academicYear` shows the right year.
 
 ## 2. School setup
@@ -29,7 +31,21 @@ Legend: 🧑‍💻 = you (console/portal/terminal) · ✅ = verify before movin
 - [ ] 🧑‍💻 Import students (portal → Students → CSV import) and assign classes +
       teachers.
 
-## 3. Access entitlement (THE landmine)
+## 3. Access entitlement (was THE landmine — now self-serve)
+
+**Primary path — the portal (no terminal):** the school subscription row
+(§2) must be active, then on the **admin dashboard** a card appears —
+*"N students can't log reading yet"* → **Activate reading for N students**.
+One click grants every imported student access for the current year. It's
+idempotent (re-click any time; already-active students are skipped) and also
+fires automatically when you **Mark a student subscribed**.
+
+- [ ] ✅ On the admin dashboard, confirm the access card is **gone** (or shows
+      0) after activating — that means every active student can log reading.
+- [ ] If the card says *"contact Lumi"* instead of showing a button, the
+      school subscription for the year isn't active yet — fix §2 first.
+
+**Fallback — the ops script** (bulk across many schools, or no portal access):
 
 ```bash
 npm --prefix functions run build          # once, so lib/access.js exists
@@ -42,10 +58,9 @@ node functions/scripts/backfill-access.cjs --school <schoolId>
 
 - [ ] ✅ Spot-check 2–3 `schools/{id}/students/{id}` docs: `access.status ==
       'active'`, `academicYear` current, `expiresAt` ≈ next 31 Jan.
-- [ ] ✅ `school.access.status == 'active'`.
-- [ ] Students imported **later** get access when their parent links (auto
-      `book_pack_assumed` grant) — but only because §1 + the subscription row
-      exist. Re-run the backfill after any bulk mid-year import.
+- [ ] Students imported **later** get access automatically when their parent
+      links (the grant now derives the year even if config is missing) — or
+      re-run the dashboard **Activate** after a bulk mid-year import.
 
 ## 4. Families
 
