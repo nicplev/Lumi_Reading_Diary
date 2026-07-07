@@ -160,9 +160,15 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
             };
 
             // Build displayable templates (streak excluded — never awarded).
+            // Books tiers are retired too (books-read isn't honestly
+            // trackable, so the server stopped awarding them): show a books
+            // badge only if it was already earned — never as a locked goal.
             final templates = AchievementTemplates
                 .generateTemplates(_thresholds, customization: _customization)
                 .where((t) => t.category != AchievementCategory.streak)
+                .where((t) =>
+                    t.category != AchievementCategory.books ||
+                    earnedById.containsKey(t.id))
                 .toList();
 
             final earnedCount =
