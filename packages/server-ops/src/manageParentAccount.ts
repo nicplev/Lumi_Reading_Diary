@@ -16,13 +16,14 @@ import { logAuditEvent, ServerOpsValidationError, type Actor } from "./audit";
 const paramsSchema = z.object({
   schoolId: z.string().min(1, "schoolId is required"),
   parentId: z.string().min(1, "parentId is required"),
-  action: z.enum(["disable", "enable", "resetPassword", "delete"]),
+  action: z.enum(["disable", "enable", "resetPassword", "resetMfa", "delete"]),
 });
 
 export type ParentAccountAction =
   | "disable"
   | "enable"
   | "resetPassword"
+  | "resetMfa"
   | "delete";
 
 export interface ManageParentAccountParams {
@@ -319,6 +320,20 @@ export async function manageParentAccount(
       );
     }
     resetLink = await auth.generatePasswordResetLink(email);
+  } else if (action === "resetMfa") {
+    // Clear every enrolled second factor, freeing the phone for re-enrolment
+    // without deleting the account (support: lost phone; testing: re-enrol the
+    // same number). enrolledFactors: null is the Admin SDK's clear-all.
+    try {
+      await auth.updateUser(parentId, {
+        multiFactor: { enrolledFactors: null },
+      });
+    } catch (e) {
+      if (!isUserNotFound(e)) throw e;
+    }
+    await parentRef.update({ phoneVerified: false }).catch(() => {
+      // Parent doc may be gone / lack the field; not fatal.
+    });
   } else {
     deletion = await deleteParentAccount(auth, db, schoolId, parentId);
   }
@@ -348,4 +363,138 @@ function isUserNotFound(e: unknown): boolean {
     e !== null &&
     (e as { code?: string }).code === "auth/user-not-found"
   );
+}
+
+// ---------------------------------------------------------------------------
+// Bulk delete — clearing out a batch of (typically test) parents in one call.
+// ---------------------------------------------------------------------------
+
+const bulkParamsSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        schoolId: z.string().min(1, "schoolId is required"),
+        parentId: z.string().min(1, "parentId is required"),
+      })
+    )
+    .min(1, "At least one parent is required"),
+});
+
+// Hard ceiling so a runaway request can't fan out into thousands of Auth
+// deletions; anything above is dropped and logged, never silently truncated.
+const BULK_DELETE_LIMIT = 200;
+// Each delete is several Firestore ops + an Auth mutation; cap in-flight work.
+const BULK_DELETE_CONCURRENCY = 10;
+
+export interface BulkDeleteItemResult {
+  schoolId: string;
+  parentId: string;
+  ok: boolean;
+  error?: string;
+  freed?: { email?: string; phones: string[] };
+}
+
+export interface BulkDeleteParentsResult {
+  success: true;
+  requested: number;
+  processed: number;
+  truncated: boolean;
+  deleted: number;
+  failed: number;
+  results: BulkDeleteItemResult[];
+}
+
+/** Run fn over items with a fixed concurrency, collecting settled results. */
+async function mapSettled<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>
+): Promise<PromiseSettledResult<R>[]> {
+  const results = new Array<PromiseSettledResult<R>>(items.length);
+  let cursor = 0;
+  async function worker(): Promise<void> {
+    while (cursor < items.length) {
+      const i = cursor++;
+      try {
+        results[i] = { status: "fulfilled", value: await fn(items[i]) };
+      } catch (reason) {
+        results[i] = { status: "rejected", reason };
+      }
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, () => worker())
+  );
+  return results;
+}
+
+/**
+ * Delete many parent accounts, each via the same full teardown as the single
+ * delete (so each frees its email + MFA phone). One item failing never sinks
+ * the batch — every result is reported. Audited once as a summary.
+ */
+export async function bulkDeleteParents(
+  auth: Auth,
+  db: Firestore,
+  actor: Actor,
+  params: { items: { schoolId: string; parentId: string }[] }
+): Promise<BulkDeleteParentsResult> {
+  const parsed = bulkParamsSchema.safeParse(params);
+  if (!parsed.success) {
+    throw new ServerOpsValidationError(
+      parsed.error.issues.map((e) => e.message).join(", ")
+    );
+  }
+
+  const requested = parsed.data.items.length;
+  const items = parsed.data.items.slice(0, BULK_DELETE_LIMIT);
+  const truncated = requested > items.length;
+  if (truncated) {
+    console.warn(
+      `[server-ops] bulkDeleteParents capped at ${BULK_DELETE_LIMIT}; ` +
+        `${requested - items.length} item(s) skipped`
+    );
+  }
+
+  const settled = await mapSettled(items, BULK_DELETE_CONCURRENCY, (it) =>
+    deleteParentAccount(auth, db, it.schoolId, it.parentId)
+  );
+
+  const results: BulkDeleteItemResult[] = settled.map((res, i) => {
+    const { schoolId, parentId } = items[i];
+    if (res.status === "fulfilled") {
+      return { schoolId, parentId, ok: true, freed: res.value.freed };
+    }
+    return {
+      schoolId,
+      parentId,
+      ok: false,
+      error:
+        res.reason instanceof Error ? res.reason.message : String(res.reason),
+    };
+  });
+
+  const deleted = results.filter((r) => r.ok).length;
+  const failed = results.length - deleted;
+
+  await logAuditEvent(db, {
+    action: "parent.bulkDelete",
+    performedBy: actor.uid,
+    performedByEmail: actor.email,
+    targetType: "parent",
+    targetId: `bulk:${items.length}`,
+    after: { requested, processed: items.length, truncated, deleted, failed },
+  }).catch((e) => {
+    console.error("[server-ops] audit log failed for parent.bulkDelete", e);
+  });
+
+  return {
+    success: true,
+    requested,
+    processed: items.length,
+    truncated,
+    deleted,
+    failed,
+    results,
+  };
 }

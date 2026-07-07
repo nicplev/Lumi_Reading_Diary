@@ -98,7 +98,7 @@ export function SchoolDetailTabs({
         />
       </TabsContent>
       <TabsContent value="parents">
-        <SchoolParentsTab parents={parents} />
+        <SchoolParentsTab schoolId={school.id} parents={parents} />
       </TabsContent>
     </Tabs>
   );
