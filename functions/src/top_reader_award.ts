@@ -8,6 +8,7 @@ import {
   shiftDays,
 } from "./dateUtils";
 import {DEFAULT_TIMEZONE} from "./access";
+import {isInvalidatedLog} from "./stats_aggregation";
 
 /**
  * Weekly "Top Reader" award. Every Monday it looks at the week that just ended
@@ -198,6 +199,7 @@ export const topReaderAward = onSchedule(
             for (const log of logs.docs) {
               const d = log.data();
               if (!COUNTED_STATUSES.has(d.status)) continue;
+              if (isInvalidatedLog(d)) continue; // flagged logs can't win gold
               const dt = d.date?.toDate?.();
               if (!dt) continue;
               const ds = localDateString(dt, tz);
