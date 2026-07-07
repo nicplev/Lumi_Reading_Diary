@@ -424,6 +424,17 @@ service cloud.firestore {
       }
 
       match /readingLogs/{logId} {
+        // Minutes must be a sane integer. Every legit client sends 5-120;
+        // validateReadingLog flags 1-240 violations after the fact, but the
+        // aggregators shouldn't have to rely on that for obviously forged
+        // writes. Checked on create AND content updates (a log could
+        // otherwise be created valid and edited to 99999 later).
+        function minutesInBounds() {
+          return request.resource.data.minutesRead is int &&
+              request.resource.data.minutesRead >= 1 &&
+              request.resource.data.minutesRead <= 240;
+        }
+
         allow get, list: if isSchoolAdmin(schoolId) ||
             isTeacher(schoolId) ||
             isDevImpersonatingSchool(schoolId);
@@ -441,6 +452,7 @@ service cloud.firestore {
         // `access` to render the "access lapsed — contact your school" screen.
         allow create: if isSignedIn() &&
             writeAllowedForDev() &&
+            minutesInBounds() &&
             getUserData(schoolId).linkedChildren != null &&
             request.resource.data.studentId in getUserData(schoolId).linkedChildren &&
             request.resource.data.parentId == request.auth.uid &&
@@ -459,12 +471,14 @@ service cloud.firestore {
         // synced by the portal, so relying on it denied every proxy log.
         allow create: if isSignedIn() &&
             writeAllowedForDev() &&
+            minutesInBounds() &&
             isTeacher(schoolId) &&
             request.resource.data.parentId == request.auth.uid &&
             request.resource.data.loggedByRole == 'teacher' &&
             teacherTeachesClass(schoolId, request.resource.data.classId);
 
         allow update: if writeAllowedForDev() &&
+            minutesInBounds() &&
             (
               (isSignedIn() && resource.data.parentId == request.auth.uid) ||
               isSchoolAdmin(schoolId) ||
@@ -685,19 +699,17 @@ service cloud.firestore {
     }
 
     match /studentLinkCodes/{codeId} {
-      // Parent verification path: small bounded query for code lookup.
-      // Allows both unauthenticated (initial verify) and authenticated
-      // (linking transaction re-verify after account creation) access.
-      allow list: if request.query.limit != null &&
-          request.query.limit > 0 &&
-          request.query.limit <= 10;
+      // Verification is server-side only: the verifyStudentLinkCode /
+      // linkParentToStudent / createCoParentInvite callables (Admin SDK) look
+      // codes up by exact value. There is deliberately NO unauthenticated
+      // `list` rule — a bounded unauthenticated list let anyone paginate and
+      // harvest every child-link code.
 
       allow get: if isSignedIn() &&
           (
             isSchoolAdmin(resource.data.schoolId) ||
             isTeacher(resource.data.schoolId) ||
-            resource.data.usedBy == request.auth.uid ||
-            isParentMember(resource.data.schoolId)
+            resource.data.usedBy == request.auth.uid
           );
 
       allow list: if isSignedIn() &&
@@ -707,22 +719,16 @@ service cloud.firestore {
             resource.data.usedBy == request.auth.uid
           );
 
+      // Co-parent invites are created by the createCoParentInvite callable
+      // (Admin SDK), which verifies the caller is a parent linked to the
+      // student — so parents no longer create link codes from the client.
+      // Only staff may create a code directly.
       allow create: if isSignedIn() &&
           writeAllowedForDev() &&
           request.resource.data.createdBy == request.auth.uid &&
           (
             isSchoolAdmin(request.resource.data.schoolId) ||
-            isTeacher(request.resource.data.schoolId) ||
-            (
-              // An existing guardian inviting a co-parent into their own
-              // student. Forced to the co_parent_invite channel, and the
-              // requester must already be linked to the target student —
-              // so this grants no access they don't already have.
-              isParentMember(request.resource.data.schoolId) &&
-              request.resource.data.intendedFor == 'co_parent_invite' &&
-              getUserData(request.resource.data.schoolId).linkedChildren != null &&
-              request.resource.data.studentId in getUserData(request.resource.data.schoolId).linkedChildren
-            )
+            isTeacher(request.resource.data.schoolId)
           );
 
       allow update: if isSignedIn() &&
@@ -756,8 +762,11 @@ service cloud.firestore {
     }
 
     match /schoolCodes/{codeId} {
-      // Teacher registration validation path: bounded, unauthenticated query.
-      allow list: if !isSignedIn() && request.query.limit == 1;
+      // Teacher registration validation is server-side only: the
+      // verifySchoolCode callable (Admin SDK) looks a code up by exact value.
+      // There is deliberately NO unauthenticated `list` rule — a bounded
+      // unauthenticated list let anyone paginate and harvest every active
+      // school join code (feeding self-provision-as-teacher).
 
       allow get: if isSignedIn() &&
           (

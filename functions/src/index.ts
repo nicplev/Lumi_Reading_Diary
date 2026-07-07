@@ -42,6 +42,7 @@ import {DEFAULT_TIMEZONE} from "./access";
 import {
   applyClassStatsDelta,
   applyStudentStatsDelta,
+  isInvalidatedLog,
   readIncrementalConfig,
   runReconcilePass,
 } from "./stats_aggregation";
@@ -219,6 +220,7 @@ export const aggregateStudentStats = onDocumentWritten(
 
       logsSnapshot.docs.forEach((doc) => {
         const logData = doc.data();
+        if (isInvalidatedLog(logData)) return;
         totalMinutesRead += logData.minutesRead || 0;
         totalBooksRead += (logData.bookTitles?.length || 0);
 
@@ -2263,6 +2265,7 @@ export const updateClassStats = onDocumentWritten(
 
       logsSnapshot.docs.forEach((doc) => {
         const logData = doc.data();
+        if (isInvalidatedLog(logData)) return;
         totalMinutes += logData.minutesRead || 0;
         totalBooks += logData.bookTitles?.length || 0;
         uniqueStudents.add(logData.studentId);

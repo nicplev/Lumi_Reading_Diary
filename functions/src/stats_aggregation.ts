@@ -37,6 +37,20 @@ import {DEFAULT_TIMEZONE} from "./access";
 
 const COUNTED_STATUSES = ["completed", "partial"];
 
+/**
+ * Whether validateReadingLog has flagged this log invalid (e.g. minutesRead
+ * outside 1–240, unlinked parent). Invalid logs are excluded from every stat
+ * and award — before this check they were flagged AND still counted, so a
+ * 600-minute log inflated totals and could win Top Reader.
+ * @param {FirebaseFirestore.DocumentData | null | undefined} logData Log data.
+ * @return {boolean} True when the log must not be counted.
+ */
+export function isInvalidatedLog(
+  logData: FirebaseFirestore.DocumentData | null | undefined,
+): boolean {
+  return String(logData?.validationStatus ?? "") === "invalid";
+}
+
 const incrementalAggregationDoc = () =>
   admin.firestore().doc("platformConfig/incrementalAggregation");
 
@@ -84,6 +98,7 @@ function extractCountedFields(
   if (!logData) return null;
   const status = String(logData.status ?? "");
   if (!COUNTED_STATUSES.includes(status)) return null;
+  if (isInvalidatedLog(logData)) return null;
   const date = logData.date as admin.firestore.Timestamp | undefined;
   if (!date) return null;
   const localDate = localDateString(date.toDate(), tz);
@@ -138,6 +153,7 @@ export async function reconcileStudentStats(
 
   logsSnap.docs.forEach((doc) => {
     const data = doc.data();
+    if (isInvalidatedLog(data)) return;
     totalMinutesRead += Number(data.minutesRead) || 0;
     totalBooksRead += Array.isArray(data.bookTitles) ? data.bookTitles.length : 0;
     const ts = data.date as admin.firestore.Timestamp | undefined;
@@ -363,6 +379,7 @@ export async function reconcileClassStats(
 
     logsSnap.docs.forEach((doc) => {
       const data = doc.data();
+      if (isInvalidatedLog(data)) return;
       totalMinutes += Number(data.minutesRead) || 0;
       totalBooks += Array.isArray(data.bookTitles) ? data.bookTitles.length : 0;
       if (typeof data.studentId === "string") activeStudentIds.add(data.studentId);
@@ -417,14 +434,16 @@ export async function applyClassStatsDelta(
   }
 
   const beforeCounted =
-    before && COUNTED_STATUSES.includes(String(before.status ?? "")) ?
+    before && COUNTED_STATUSES.includes(String(before.status ?? "")) &&
+    !isInvalidatedLog(before) ?
       {
         minutes: Number(before.minutesRead) || 0,
         books: Array.isArray(before.bookTitles) ? before.bookTitles.length : 0,
       } :
       null;
   const afterCounted =
-    after && COUNTED_STATUSES.includes(String(after.status ?? "")) ?
+    after && COUNTED_STATUSES.includes(String(after.status ?? "")) &&
+    !isInvalidatedLog(after) ?
       {
         minutes: Number(after.minutesRead) || 0,
         books: Array.isArray(after.bookTitles) ? after.bookTitles.length : 0,
