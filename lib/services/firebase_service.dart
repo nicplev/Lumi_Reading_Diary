@@ -36,8 +36,14 @@ class FirebaseService {
   Stream<User?> get userChanges => _auth.userChanges();
   User? get currentUser => _auth.currentUser;
 
+  // True once initialize() has completed — guards the late-final assignments
+  // so a bootstrap retry after a later init step failed can re-run the whole
+  // chain without throwing LateInitializationError here.
+  bool _initialized = false;
+
   // Initialize Firebase
   Future<void> initialize() async {
+    if (_initialized) return;
     try {
       // Initialize Firebase services
       _auth = FirebaseAuth.instance;
@@ -59,6 +65,7 @@ class FirebaseService {
         );
       }
 
+      _initialized = true;
       debugPrint('Firebase services initialized successfully');
     } catch (e) {
       debugPrint('Error initializing Firebase services: $e');
