@@ -365,8 +365,8 @@ school name, contact person/email/phone, **estimated student & teacher counts**,
 
 1. Landing → **Talk to Sales** (or "Get volume/district pricing").
 2. Lead form (`DemoRequestScreen`) → onboarding record (`demo`/`interested`).
-3. Lumi CS / KAKA rep follows up → demo → **quote** (wholesale per-student) → **contract /
-   PO / invoice**.
+3. Lumi CS / KAKA rep follows up → demo (run it per **[demo-playbook.md](demo-playbook.md)**)
+   → **quote** (wholesale per-student) → **contract / PO / invoice**.
 4. **White-glove setup** by CS via `school-admin-web/`: create school, import roster (CSV),
    configure reading levels, train staff, bulk-issue parent codes → `setupInProgress` →
    `active`.
