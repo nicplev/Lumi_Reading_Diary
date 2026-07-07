@@ -1,5 +1,20 @@
 import { adminDb } from '@/lib/firebase/admin';
+import { DEFAULT_TIMEZONE } from '@/lib/time-core';
 import type { School, ReadingLevelSchema, AchievementThresholds, AchievementCustomization } from '@/lib/types';
+
+/**
+ * Coerce a stored term-date value (Timestamp, Date, or ISO string) to a Date,
+ * or null when unparseable — one malformed entry must never make getSchool
+ * (and everything downstream, like the analytics route) throw.
+ */
+function coerceTermDate(v: unknown): Date | null {
+  const maybe = v as { toDate?: () => Date } | Date | string | null | undefined;
+  const d =
+    maybe instanceof Date ? maybe :
+    typeof maybe === 'string' ? new Date(maybe) :
+    typeof maybe?.toDate === 'function' ? maybe.toDate() : null;
+  return d instanceof Date && !isNaN(d.getTime()) ? d : null;
+}
 
 export async function updateSchool(
   schoolId: string,
@@ -42,8 +57,14 @@ export async function updateSchool(
     update['settings.achievementCustomization'] = data.achievementCustomization;
   }
   if (data.termDates !== undefined) {
+    // Drop empty/invalid values instead of writing Invalid Dates (which the
+    // Admin SDK rejects, failing the whole save when an admin clears a field).
+    // The map is replaced wholesale, so a dropped key IS the cleared state.
     update.termDates = Object.fromEntries(
-      Object.entries(data.termDates).map(([k, v]) => [k, new Date(v)])
+      Object.entries(data.termDates)
+        .map(([k, v]) => [k, v ? new Date(v) : null] as const)
+        .filter((e): e is readonly [string, Date] =>
+          e[1] instanceof Date && !isNaN(e[1].getTime()))
     );
   }
 
@@ -65,10 +86,14 @@ export async function getSchool(schoolId: string): Promise<School | null> {
     customLevels: data.customLevels,
     levelColors: data.levelColors,
     termDates: Object.fromEntries(
-      Object.entries(data.termDates ?? {}).map(([k, v]) => [k, (v as { toDate: () => Date }).toDate()])
+      Object.entries(data.termDates ?? {})
+        .map(([k, v]) => [k, coerceTermDate(v)] as const)
+        .filter((e): e is readonly [string, Date] => e[1] !== null)
     ),
     quietHours: data.quietHours ?? {},
-    timezone: data.timezone ?? 'UTC',
+    // Default matches the functions-side DEFAULT_TIMEZONE (Australia/Sydney)
+    // so an unset school buckets days the same way everywhere.
+    timezone: data.timezone ?? DEFAULT_TIMEZONE,
     address: data.address,
     contactEmail: data.contactEmail,
     contactPhone: data.contactPhone,
