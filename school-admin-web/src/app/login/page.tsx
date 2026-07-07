@@ -1,7 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import {
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  getMultiFactorResolver,
+  PhoneAuthProvider,
+  PhoneMultiFactorGenerator,
+  RecaptchaVerifier,
+  type MultiFactorResolver,
+  type MultiFactorError,
+  type MultiFactorInfo,
+  type PhoneMultiFactorInfo,
+  type User,
+} from 'firebase/auth';
 import { auth } from '@/lib/firebase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
@@ -18,6 +30,13 @@ function LoginForm() {
   const [forgotMode, setForgotMode] = useState(false);
   const [resetMessage, setResetMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [resetLoading, setResetLoading] = useState(false);
+  // SMS second-factor challenge state (staff who enrolled MFA in the app).
+  const [mfaResolver, setMfaResolver] = useState<MultiFactorResolver | null>(null);
+  const [mfaPhoneHint, setMfaPhoneHint] = useState<MultiFactorInfo | null>(null);
+  const [mfaVerificationId, setMfaVerificationId] = useState('');
+  const [mfaCode, setMfaCode] = useState('');
+  const [mfaSending, setMfaSending] = useState(false);
+  const [mfaLoading, setMfaLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setSessionData } = useAuth();
@@ -30,6 +49,102 @@ function LoginForm() {
     setCharacter(randomCharacterId());
   }, []);
 
+  // Mint the server session cookie and enter the portal (shared by the
+  // password path and the MFA path).
+  const finishLogin = async (user: User) => {
+    const idToken = await user.getIdToken();
+
+    const res = await fetch('/api/auth/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    });
+
+    const sessionData = await res.json();
+    if (!res.ok) {
+      throw new Error(sessionData.error || 'Login failed');
+    }
+
+    // Inject session data directly into AuthContext to avoid race condition
+    setSessionData(sessionData);
+
+    const from = searchParams.get('from') || '/dashboard';
+    router.push(from);
+    router.refresh();
+  };
+
+  // Send (or resend) the SMS code for the second factor. The invisible
+  // reCAPTCHA needs a live DOM container — #mfa-recaptcha is always rendered.
+  const sendMfaCode = async (resolver: MultiFactorResolver, hint: MultiFactorInfo) => {
+    setMfaSending(true);
+    setError('');
+    try {
+      const verifier = new RecaptchaVerifier(auth, 'mfa-recaptcha', { size: 'invisible' });
+      try {
+        const provider = new PhoneAuthProvider(auth);
+        const verificationId = await provider.verifyPhoneNumber(
+          { multiFactorHint: hint, session: resolver.session },
+          verifier,
+        );
+        setMfaVerificationId(verificationId);
+      } finally {
+        verifier.clear();
+        // The container must be empty before a verifier can bind to it again.
+        const el = document.getElementById('mfa-recaptcha');
+        if (el) el.innerHTML = '';
+      }
+    } catch {
+      setError('Could not send the verification code. Please try again.');
+    } finally {
+      setMfaSending(false);
+    }
+  };
+
+  const startMfaChallenge = async (err: MultiFactorError) => {
+    const resolver = getMultiFactorResolver(auth, err);
+    const hint = resolver.hints.find((h) => h.factorId === PhoneMultiFactorGenerator.FACTOR_ID);
+    if (!hint) {
+      setError('This account uses a second factor this portal does not support yet.');
+      return;
+    }
+    setMfaResolver(resolver);
+    setMfaPhoneHint(hint);
+    setMfaCode('');
+    await sendMfaCode(resolver, hint);
+  };
+
+  const cancelMfa = () => {
+    setMfaResolver(null);
+    setMfaPhoneHint(null);
+    setMfaVerificationId('');
+    setMfaCode('');
+    setError('');
+  };
+
+  const handleMfaSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mfaResolver || !mfaVerificationId) return;
+    setError('');
+    setMfaLoading(true);
+    try {
+      const phoneCredential = PhoneAuthProvider.credential(mfaVerificationId, mfaCode.trim());
+      const assertion = PhoneMultiFactorGenerator.assertion(phoneCredential);
+      const credential = await mfaResolver.resolveSignIn(assertion);
+      await finishLogin(credential.user);
+    } catch (err) {
+      const code = (err as { code?: string })?.code ?? '';
+      if (code === 'auth/invalid-verification-code') {
+        setError("That code didn't match. Check the SMS and try again.");
+      } else if (code === 'auth/code-expired') {
+        setError('That code has expired — tap "Resend code" for a new one.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Verification failed. Please try again.');
+      }
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -37,27 +152,17 @@ function LoginForm() {
 
     try {
       const credential = await signInWithEmailAndPassword(auth, email, password);
-      const idToken = await credential.user.getIdToken();
-
-      const res = await fetch('/api/auth/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
-      });
-
-      const sessionData = await res.json();
-      if (!res.ok) {
-        throw new Error(sessionData.error || 'Login failed');
-      }
-
-      // Inject session data directly into AuthContext to avoid race condition
-      setSessionData(sessionData);
-
-      const from = searchParams.get('from') || '/dashboard';
-      router.push(from);
-      router.refresh();
+      await finishLogin(credential.user);
     } catch (err) {
-      if (err instanceof Error) {
+      const code = (err as { code?: string })?.code ?? '';
+      if (code === 'auth/multi-factor-auth-required') {
+        // Staff with SMS MFA (enrolled via the app) land here — run the challenge.
+        try {
+          await startMfaChallenge(err as MultiFactorError);
+        } catch {
+          setError('Could not start two-step verification. Please try again.');
+        }
+      } else if (err instanceof Error) {
         if (err.message.includes('auth/invalid-credential') || err.message.includes('auth/wrong-password') || err.message.includes('auth/user-not-found')) {
           setError('Invalid email or password');
         } else {
@@ -112,11 +217,84 @@ function LoginForm() {
           </div>
           <h1 className="font-display text-[28px] font-extrabold tracking-tight text-ink">Lumi School</h1>
           <p className="text-muted text-sm mt-1">
-            {forgotMode ? 'Reset your password' : 'Sign in to your school portal'}
+            {mfaResolver
+              ? 'Two-step verification'
+              : forgotMode
+                ? 'Reset your password'
+                : 'Sign in to your school portal'}
           </p>
         </div>
 
-        {forgotMode ? (
+        {mfaResolver ? (
+          /* SMS second-factor challenge */
+          <form onSubmit={handleMfaSubmit} className="space-y-4">
+            {error && (
+              <div className="bg-error/10 text-error text-sm rounded-[var(--radius-md)] px-4 py-3">
+                {error}
+              </div>
+            )}
+
+            <p className="text-sm text-muted">
+              We sent a 6-digit code by SMS
+              {(mfaPhoneHint as PhoneMultiFactorInfo | null)?.phoneNumber
+                ? ` to ${(mfaPhoneHint as PhoneMultiFactorInfo).phoneNumber}`
+                : ' to your enrolled phone'}
+              . Enter it below to finish signing in.
+            </p>
+
+            <div>
+              <label htmlFor="mfa-code" className="block text-sm font-semibold text-ink mb-1.5">
+                Verification code
+              </label>
+              <input
+                id="mfa-code"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]*"
+                maxLength={6}
+                value={mfaCode}
+                onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
+                placeholder="123456"
+                required
+                autoFocus
+                className="w-full px-4 py-3 rounded-[var(--radius-md)] border border-rule bg-paper text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-section/30 focus:border-section transition-colors text-[15px] tracking-[0.3em] text-center"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={mfaLoading || mfaSending || mfaCode.length < 6}
+              className="w-full py-3 px-4 rounded-[var(--radius-md)] bg-section text-white font-bold text-[15px] hover:bg-lumi-red-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-card flex items-center justify-center gap-2"
+            >
+              {mfaLoading && (
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              )}
+              {mfaLoading ? 'Verifying...' : 'Verify & Sign In'}
+            </button>
+
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                disabled={mfaSending}
+                onClick={() => mfaResolver && mfaPhoneHint && sendMfaCode(mfaResolver, mfaPhoneHint)}
+                className="text-sm text-section hover:text-lumi-red-dark font-semibold transition-colors py-2 disabled:opacity-50"
+              >
+                {mfaSending ? 'Sending…' : 'Resend code'}
+              </button>
+              <button
+                type="button"
+                onClick={cancelMfa}
+                className="text-sm text-muted hover:text-ink font-semibold transition-colors py-2"
+              >
+                Back to sign in
+              </button>
+            </div>
+          </form>
+        ) : forgotMode ? (
           /* Forgot Password Form */
           <form onSubmit={handleResetPassword} className="space-y-4">
             {resetMessage && (
@@ -246,6 +424,10 @@ function LoginForm() {
             </p>
           </>
         )}
+
+        {/* Invisible reCAPTCHA anchor for the SMS second factor — must always
+            be in the DOM before a challenge starts. */}
+        <div id="mfa-recaptcha" />
       </div>
     </div>
   );
