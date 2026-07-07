@@ -30,6 +30,7 @@ import {
   countInWindow,
   localDateString,
 } from "./dateUtils";
+import {DEFAULT_TIMEZONE} from "./access";
 
 const COUNTED_STATUSES = ["completed", "partial"];
 
@@ -120,7 +121,7 @@ export async function reconcileStudentStats(
     .get();
 
   const schoolSnap = await db.collection("schools").doc(schoolId).get();
-  const tz = String(schoolSnap.data()?.timezone ?? "Europe/London");
+  const tz = String(schoolSnap.data()?.timezone ?? DEFAULT_TIMEZONE);
 
   const priorLongest =
     (await studentRef.get()).data()?.stats?.longestStreak ?? 0;
@@ -201,7 +202,7 @@ export async function applyStudentStatsDelta(
   const studentRef = db.doc(`schools/${schoolId}/students/${studentId}`);
 
   const schoolSnap = await db.collection("schools").doc(schoolId).get();
-  const tz = String(schoolSnap.data()?.timezone ?? "Europe/London");
+  const tz = String(schoolSnap.data()?.timezone ?? DEFAULT_TIMEZONE);
 
   const beforeCounted = extractCountedFields(before, tz);
   const afterCounted = extractCountedFields(after, tz);

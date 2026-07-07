@@ -33,7 +33,9 @@ import {
   computeLongestStreak,
   countInWindow,
   localDateString,
+  shiftDays,
 } from "./dateUtils";
+import {DEFAULT_TIMEZONE} from "./access";
 import {
   applyClassStatsDelta,
   applyStudentStatsDelta,
@@ -196,7 +198,7 @@ export const aggregateStudentStats = onDocumentWritten(
       // sendReadingReminders / getLocalTime). A 23:30 local log must count as
       // that night, not the next UTC day.
       const schoolSnap = await db.collection("schools").doc(schoolId).get();
-      const tz = schoolSnap.data()?.timezone ?? "Europe/London";
+      const tz = schoolSnap.data()?.timezone ?? DEFAULT_TIMEZONE;
 
       // Prior longestStreak — read so we can guarantee it never decreases
       // ("nothing earned is lost", even if the streak definition changes later).
@@ -1030,7 +1032,7 @@ async function processSchool(
   schoolData: FirebaseFirestore.DocumentData,
   utcNow: Date,
 ): Promise<{sent: number; failed: number; stale: number}> {
-  const schoolTz = schoolData.timezone || "Europe/London";
+  const schoolTz = schoolData.timezone || DEFAULT_TIMEZONE;
   const {hour: localHour, weekday: localWeekday} = getLocalTime(utcNow, schoolTz);
 
   // Quiet hours check
@@ -1094,14 +1096,18 @@ async function processSchool(
   if (eligible.length === 0) return {sent: 0, failed: 0, stale: 0};
 
   // ---- Step 3: Check which students logged today ----
-  // Use batched `in` queries on readingLogs (max 30 per query)
-  const today = new Date(utcNow);
-  today.setHours(0, 0, 0, 0);
-  const todayTs = admin.firestore.Timestamp.fromDate(today);
-
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowTs = admin.firestore.Timestamp.fromDate(tomorrow);
+  // Use batched `in` queries on readingLogs (max 30 per query).
+  // "Today" is the SCHOOL-LOCAL calendar day, not UTC: query a generous UTC
+  // window (±1 day) and decide membership in memory by the local date string
+  // (same pattern as topReaderAward) — a 23:30 local log must count as
+  // tonight, not tomorrow, or the family gets a redundant reminder.
+  const todayStr = localDateString(utcNow, schoolTz);
+  const windowStartTs = admin.firestore.Timestamp.fromDate(
+    new Date(`${shiftDays(todayStr, -1)}T00:00:00Z`),
+  );
+  const windowEndTs = admin.firestore.Timestamp.fromDate(
+    new Date(`${shiftDays(todayStr, 2)}T00:00:00Z`),
+  );
 
   const loggedToday = new Set<string>();
   const studentIdBatches = chunk([...allStudentIds], FIRESTORE_IN_LIMIT);
@@ -1110,11 +1116,16 @@ async function processSchool(
     const snap = await db
       .collection(`schools/${schoolId}/readingLogs`)
       .where("studentId", "in", batch)
-      .where("date", ">=", todayTs)
-      .where("date", "<", tomorrowTs)
-      .select("studentId")
+      .where("date", ">=", windowStartTs)
+      .where("date", "<", windowEndTs)
+      .select("studentId", "date")
       .get();
-    snap.docs.forEach((d) => loggedToday.add(d.data().studentId as string));
+    snap.docs.forEach((d) => {
+      const ts = d.data().date as admin.firestore.Timestamp | undefined;
+      const dt = ts?.toDate?.();
+      if (!dt || localDateString(dt, schoolTz) !== todayStr) return;
+      loggedToday.add(d.data().studentId as string);
+    });
   }));
 
   // ---- Step 4: Fetch student first names for un-logged children ----
