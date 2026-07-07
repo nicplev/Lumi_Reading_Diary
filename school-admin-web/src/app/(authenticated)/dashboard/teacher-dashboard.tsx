@@ -4,7 +4,7 @@ import { StatCard } from '@/components/lumi/stat-card';
 import { Badge } from '@/components/lumi/badge';
 import { Icon } from '@/components/lumi/icon';
 import { Avatar } from '@/components/lumi/avatar';
-import { WeeklyChart } from './weekly-chart';
+import { WeeklyEngagementCard } from './weekly-engagement-card';
 import { EngagementRing } from './widgets/engagement-ring';
 import { SentimentBar } from './widgets/sentiment-bar';
 import { RecentReading } from './widgets/recent-reading';
@@ -78,9 +78,14 @@ export function TeacherDashboard({ userName, data, weeklyEngagement, widgets }: 
   const widgetDefs: DashboardWidgetDef[] = [
     {
       id: 'weekly',
-      title: 'This week',
+      title: 'Weekly reading',
       size: 'lg',
-      body: <WeeklyChart data={weeklyEngagement} />,
+      body: (
+        <WeeklyEngagementCard
+          initialThisWeek={weeklyEngagement}
+          storageKey={`lumi-dashboard-week-offset:${user?.uid ?? 'anon'}`}
+        />
+      ),
     },
     {
       id: 'engagement',
