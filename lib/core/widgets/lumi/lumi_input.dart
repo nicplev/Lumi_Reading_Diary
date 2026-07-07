@@ -38,6 +38,7 @@ class LumiInput extends StatefulWidget {
   final FormFieldValidator<String>? validator;
   final List<TextInputFormatter>? inputFormatters;
   final TextInputAction? textInputAction;
+  final TextCapitalization textCapitalization;
   final FocusNode? focusNode;
   final bool autofocus;
 
@@ -74,6 +75,7 @@ class LumiInput extends StatefulWidget {
     this.validator,
     this.inputFormatters,
     this.textInputAction,
+    this.textCapitalization = TextCapitalization.none,
     this.focusNode,
     this.autofocus = false,
     this.borderless = false,
@@ -138,6 +140,7 @@ class _LumiInputState extends State<LumiInput> {
           validator: widget.validator,
           inputFormatters: widget.inputFormatters,
           textInputAction: widget.textInputAction,
+          textCapitalization: widget.textCapitalization,
           autofocus: widget.autofocus,
           autofillHints: widget.autofillHints,
           style: LumiTextStyles.body(),

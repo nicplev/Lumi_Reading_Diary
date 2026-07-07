@@ -145,7 +145,14 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
   static const _lastNameRevealDelay = Duration(milliseconds: 300);
 
   // Persistent focus nodes — shared across stage builds so focus survives the
-  // AnimatedSwitcher transition when progressive reveal advances the stage.
+  // AnimatedSwitcher transition when a stage advance mounts the next field.
+  // `autofocus` is a no-op mid-transition (the outgoing field still holds
+  // focus), so `_focusStageField` hands focus over explicitly instead.
+  final _codeFocusNode = FocusNode();
+  final _firstNameFocusNode = FocusNode();
+  final _emailFocusNode = FocusNode();
+  final _phoneFocusNode = FocusNode();
+  final _smsFocusNode = FocusNode();
   final _passwordFocusNode = FocusNode();
   final _confirmFocusNode = FocusNode();
 
@@ -193,6 +200,11 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
     }
     _lastNameRevealTimer?.cancel();
     _resendTicker?.cancel();
+    _codeFocusNode.dispose();
+    _firstNameFocusNode.dispose();
+    _emailFocusNode.dispose();
+    _phoneFocusNode.dispose();
+    _smsFocusNode.dispose();
     _passwordFocusNode.dispose();
     _confirmFocusNode.dispose();
     _codeController.dispose();
@@ -364,6 +376,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         _studentInfo = metadata;
         _stage = _Stage.name;
       });
+      _focusStageField(_Stage.name);
       AnalyticsService.instance.logParentCodeVerified();
     } on LinkingException catch (e) {
       if (!mounted) return;
@@ -407,6 +420,38 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       _errorMessage = null;
       _stage = next;
     });
+    _focusStageField(next);
+  }
+
+  /// Hands keyboard focus to the incoming stage's primary field after the
+  /// frame that mounts it. Driven explicitly rather than via `autofocus`
+  /// because a stage change fired by the "Next" button leaves the *outgoing*
+  /// field focused while the AnimatedSwitcher cross-fades — so the incoming
+  /// field's `autofocus` is skipped and the keyboard visibly drops (the
+  /// "screen and keyboard shift up and down, field loses focus" bug). Stages
+  /// with no text field (relationship chips, success) dismiss the keyboard.
+  void _focusStageField(_Stage stage) {
+    final node = switch (stage) {
+      _Stage.code => _codeFocusNode,
+      _Stage.name => _firstNameFocusNode,
+      _Stage.email => _emailFocusNode,
+      _Stage.password => _passwordFocusNode,
+      _Stage.confirm => _confirmFocusNode,
+      _Stage.phone => _phoneFocusNode,
+      _Stage.sms => _smsFocusNode,
+      _Stage.relationship => null,
+      _Stage.success => null,
+    };
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (node != null) {
+        node.requestFocus();
+      } else {
+        // No field on this stage — drop the keyboard so it doesn't hover
+        // over the relationship chips or the success screen.
+        FocusManager.instance.primaryFocus?.unfocus();
+      }
+    });
   }
 
   void _goBack() {
@@ -434,6 +479,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       _errorMessage = null;
       _stage = prev;
     });
+    _focusStageField(prev);
   }
 
   /// Phone stage → email stage. Fails fast if the phone is already
@@ -453,10 +499,14 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         return;
       }
       setState(() => _stage = _Stage.email);
+      _focusStageField(_Stage.email);
     } catch (_) {
       // Don't block on a transient index read failure — let the user
       // continue and surface any real conflict at SMS-send time.
-      if (mounted) setState(() => _stage = _Stage.email);
+      if (mounted) {
+        setState(() => _stage = _Stage.email);
+        _focusStageField(_Stage.email);
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -551,6 +601,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         _resendToken = handle.resendToken;
         _stage = _Stage.sms;
       });
+      _focusStageField(_Stage.sms);
       if (kDebugMode) {
         debugPrint(
             '[phone-auth] modal._sendPrimaryPhoneSms → success → stage=sms authFlow=phonePrimary');
@@ -665,6 +716,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
                 _resendToken = loginHandle.resendToken;
                 _stage = _Stage.sms;
               });
+              _focusStageField(_Stage.sms);
               return;
             } on FirebaseAuthException catch (signInError) {
               if (signInError.code == 'wrong-password' ||
@@ -741,6 +793,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         _resendToken = handle.resendToken;
         _stage = _Stage.sms;
       });
+      _focusStageField(_Stage.sms);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       setState(() => _errorMessage = SmsVerificationService.friendlyError(e));
@@ -1037,9 +1090,13 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
     // finalised (a bare account with no parent doc → the parent then hits
     // `email-already-in-use` on re-registration, a hard-to-escape dead end).
     return PopScope(
-      canPop: _pendingUserId == null || _stage == _Stage.success,
+      // Also lock the route while busy: on iOS the reCAPTCHA Safari sheet
+      // hands back to a blank gap before `codeSent` arrives, and a stray
+      // backdrop tap during that gap would dispose the modal mid-verify
+      // (silently failing the signup). The busy scrim reinforces this.
+      canPop: !_busy && (_pendingUserId == null || _stage == _Stage.success),
       onPopInvokedWithResult: (didPop, _) async {
-        if (didPop) return;
+        if (didPop || _busy) return;
         final navigator = Navigator.of(context);
         final leave = await _confirmAbandon();
         if (leave && mounted) navigator.pop();
@@ -1047,10 +1104,13 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       child: SafeArea(
       top: false,
       child: Padding(
-        padding: EdgeInsets.only(
+        // NB: no `media.viewInsets.bottom` here — the overlay's Scaffold
+        // already has `resizeToAvoidBottomInset: true`, so adding it again
+        // double-lifted the card off the keyboard.
+        padding: const EdgeInsets.only(
           left: 16,
           right: 16,
-          bottom: 24 + media.viewInsets.bottom,
+          bottom: 24,
         ),
         child: ConstrainedBox(
           constraints: BoxConstraints(maxHeight: maxCardHeight),
@@ -1139,6 +1199,7 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
       behavior: HitTestBehavior.opaque,
       onTap: () {},
       child: Container(
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: LumiTokens.paper,
           borderRadius: BorderRadius.circular(24),
@@ -1150,30 +1211,101 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
             ),
           ],
         ),
-        child: AnimatedSize(
-          duration: const Duration(milliseconds: 350),
-          curve: Curves.easeOutCubic,
-          alignment: Alignment.bottomCenter,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-            child: Column(
+        child: Stack(
+          children: [
+            Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildHeader(),
-                const SizedBox(height: 16),
-                ..._buildCompletedChips(),
-                if (_errorMessage != null) ...[
-                  _ErrorBanner(message: _errorMessage!),
-                  const SizedBox(height: 12),
-                ],
-                _buildActiveInput(),
-                const SizedBox(height: 20),
-                _buildPrimaryAction(),
+                // Scrollable content: grows with the accumulating chips and
+                // scrolls once it outgrows the height cap. Kept separate from
+                // the footer so the button below is always reachable.
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                    child: AnimatedSize(
+                      duration: const Duration(milliseconds: 350),
+                      curve: Curves.easeOutCubic,
+                      alignment: Alignment.bottomCenter,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildHeader(),
+                          const SizedBox(height: 16),
+                          ..._buildCompletedChips(),
+                          if (_errorMessage != null) ...[
+                            _ErrorBanner(message: _errorMessage!),
+                            const SizedBox(height: 12),
+                          ],
+                          _buildActiveInput(),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // Pinned footer: the primary action (and its loading spinner)
+                // never scrolls out of view — the root cause of "can't tell
+                // the app is loading" on the tall later stages.
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                  child: _buildPrimaryAction(),
+                ),
               ],
             ),
-          ),
+            // Blocking busy overlay: a centred, always-visible spinner plus a
+            // tap-swallowing scrim. Covers the long reCAPTCHA→SMS gap where
+            // the modal would otherwise look frozen and a stray tap could
+            // dismiss it or interrupt the in-flight verification.
+            if (_busy)
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {},
+                  child: _buildBusyScrim(),
+                ),
+              ),
+          ],
         ),
+      ),
+    );
+  }
+
+  /// Contextual label under the busy spinner so the wait reads as progress,
+  /// not a hang. Mirrors the action each stage's primary button kicks off.
+  String get _busyLabel => switch (_stage) {
+        _Stage.code => 'Checking code…',
+        _Stage.phone => 'Checking number…',
+        _Stage.email => 'Sending code…',
+        _Stage.confirm => 'Sending code…',
+        _Stage.sms => 'Verifying…',
+        _ => 'Please wait…',
+      };
+
+  Widget _buildBusyScrim() {
+    return Container(
+      color: LumiTokens.paper.withValues(alpha: 0.82),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: 34,
+            height: 34,
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              valueColor: AlwaysStoppedAnimation<Color>(LumiTokens.red),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _busyLabel,
+            textAlign: TextAlign.center,
+            style: LumiTextStyles.bodySmall(
+              color: LumiTokens.ink.withValues(alpha: 0.75),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1344,10 +1476,11 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         LumiInput(
           accentColor: LumiTokens.red,
           controller: _codeController,
+          focusNode: _codeFocusNode,
           hintText: 'e.g. ABC12345',
           autofocus: true,
-          maxLength: 8,
           textInputAction: TextInputAction.done,
+          textCapitalization: TextCapitalization.characters,
           prefixIcon: IconButton(
             onPressed: _busy ? null : _openQrScanner,
             tooltip: 'Scan QR code',
@@ -1355,8 +1488,11 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
             color: LumiTokens.ink,
             splashRadius: 18,
           ),
+          // LengthLimitingTextInputFormatter instead of `maxLength` so the
+          // field caps at 8 without the distracting "0/8" counter badge.
           inputFormatters: [
             _UpperCaseFormatter(),
+            LengthLimitingTextInputFormatter(8),
           ],
         ),
       ],
@@ -1370,9 +1506,11 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         LumiInput(
           accentColor: LumiTokens.red,
           controller: _firstNameController,
+          focusNode: _firstNameFocusNode,
           hintText: 'First name',
-          autofocus: true,
           textInputAction: TextInputAction.next,
+          textCapitalization: TextCapitalization.words,
+          autofillHints: const [AutofillHints.givenName],
           errorText: _firstNameController.text.isNotEmpty && !_firstValid
               ? 'Enter a valid first name'
               : null,
@@ -1389,6 +1527,8 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
                     controller: _lastNameController,
                     hintText: 'Last name',
                     textInputAction: TextInputAction.done,
+                    textCapitalization: TextCapitalization.words,
+                    autofillHints: const [AutofillHints.familyName],
                     errorText:
                         _lastNameController.text.isNotEmpty && !_lastValid
                             ? 'Enter a valid last name'
@@ -1487,10 +1627,11 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         LumiInput(
           accentColor: LumiTokens.red,
           controller: _emailController,
+          focusNode: _emailFocusNode,
           hintText: 'you@example.com',
-          autofocus: true,
           keyboardType: TextInputType.emailAddress,
           textInputAction: TextInputAction.next,
+          autofillHints: const [AutofillHints.email],
           errorText: _emailController.text.isNotEmpty && !_emailValid
               ? 'Enter a valid email address'
               : null,
@@ -1621,10 +1762,11 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         LumiInput(
           accentColor: LumiTokens.red,
           controller: _phoneController,
+          focusNode: _phoneFocusNode,
           hintText: '0400 000 000',
-          autofocus: true,
           keyboardType: TextInputType.phone,
           textInputAction: TextInputAction.done,
+          autofillHints: const [AutofillHints.telephoneNumber],
           helperText: 'Australian mobile only.',
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'[\d\s]')),
@@ -1654,12 +1796,18 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
         LumiInput(
           accentColor: LumiTokens.red,
           controller: _smsCodeController,
+          focusNode: _smsFocusNode,
           hintText: '123456',
-          autofocus: true,
           keyboardType: TextInputType.number,
-          maxLength: 6,
           textInputAction: TextInputAction.done,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          // Lets iOS surface the incoming SMS code as a one-tap QuickType
+          // suggestion above the keyboard.
+          autofillHints: const [AutofillHints.oneTimeCode],
+          // Cap at 6 without the "0/6" counter badge (see code field).
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(6),
+          ],
           onChanged: (_) {
             if (_smsCodeValid && !_busy) {
               _verifySmsAndFinish();
