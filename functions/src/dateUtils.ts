@@ -15,6 +15,57 @@
 /** Max missed days a gentle streak can bridge before it ends. */
 export const MAX_REST_DAYS = 2;
 
+/** Hard cap on backward day-walks so malformed data can never loop long. */
+const WALK_CAP_DAYS = 400;
+
+/** A school-term date range, inclusive local "YYYY-MM-DD" strings. */
+export interface TermRange {
+  start: string;
+  end: string;
+}
+
+const TERM_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Defensively parse a school doc's `termDates` field. Entries must be
+ * objects with `start`/`end` "YYYY-MM-DD" strings and start ≤ end; anything
+ * malformed is silently dropped so bad portal data can never break streaks.
+ * @param {unknown} raw The raw `termDates` field from the school document.
+ * @return {TermRange[]} The valid term ranges (possibly empty).
+ */
+export function parseTermDates(raw: unknown): TermRange[] {
+  if (!Array.isArray(raw)) return [];
+  const out: TermRange[] = [];
+  for (const item of raw) {
+    if (typeof item !== "object" || item === null) continue;
+    const rec = item as Record<string, unknown>;
+    const start = rec.start;
+    const end = rec.end;
+    if (typeof start !== "string" || typeof end !== "string") continue;
+    if (!TERM_DATE_RE.test(start) || !TERM_DATE_RE.test(end)) continue;
+    if (start > end) continue;
+    out.push({start, end});
+  }
+  return out;
+}
+
+/**
+ * Predicate for "does this local day count toward streak gaps?". Days inside
+ * any term range count; days outside every range (school holidays) are free —
+ * they never burn rest days and never break a streak, though reading on them
+ * still extends the streak. No/empty term dates ⇒ every day counts (the
+ * behaviour before term dates existed).
+ * @param {TermRange[]} termDates Valid term ranges (see parseTermDates).
+ * @return {function(string): boolean} The counting-day predicate.
+ */
+export function buildIsCountingDay(
+  termDates: TermRange[],
+): (dateStr: string) => boolean {
+  if (termDates.length === 0) return () => true;
+  return (dateStr) =>
+    termDates.some((t) => dateStr >= t.start && dateStr <= t.end);
+}
+
 /**
  * Format a Date as "YYYY-MM-DD" in the given IANA timezone.
  * Falls back to the UTC date if the timezone is invalid (mirrors getLocalTime).
@@ -63,18 +114,27 @@ function dayNumber(dateStr: string): number {
  * Stateless, forgiving "gentle streak".
  *
  * Walks backward from `today` over the set of local reading-date strings,
- * tolerating up to `maxRestDays` total missed days before the streak ends. A
- * tolerated gap does NOT add to the count — so 5 reads with one gap in the
- * middle yields a streak of 5 spanning 6 calendar days.
+ * tolerating up to `maxRestDays` total missed *counting* days before the
+ * streak ends. A tolerated gap does NOT add to the count — so 5 reads with
+ * one gap in the middle yields a streak of 5 spanning 6 calendar days.
  *
- * The streak is only "live" if the most recent reading day is today or
- * yesterday; otherwise it is 0 (mirrors the app's active-streak gate). Unread
- * days at the leading edge (e.g. today, before tonight's log) never burn a rest
- * day.
+ * `isCountingDay` (default: every day counts) marks school-holiday days as
+ * non-counting: they never burn rest days and never break a streak, but a
+ * read ON a holiday day still extends the streak — holiday reading is
+ * rewarded, never required.
+ *
+ * The streak is "live" exactly while it is still continuable: the counting-day
+ * gap since the last read (up to and including today) must be ≤
+ * maxRestDays + 1, i.e. reading tonight would still bridge it. (This replaces
+ * the old "read today or yesterday" gate, which zeroed a Friday-reader's
+ * streak on Sunday even though Monday's log would have continued it.) Unread
+ * days at the leading edge never burn a rest day.
  *
  * @param {Set<string>} readingDates Local "YYYY-MM-DD" days the student read.
  * @param {string} today Today's local date as "YYYY-MM-DD".
- * @param {number} maxRestDays Max missed days the streak can bridge.
+ * @param {number} maxRestDays Max missed counting days the streak can bridge.
+ * @param {function(string): boolean} isCountingDay Whether a local day
+ *   counts toward gaps (see buildIsCountingDay). Defaults to always-true.
  * @return {{currentStreak: number, restDaysRemaining: number}} The live streak
  *   and how many rest days remain (maxRestDays minus gaps bridged within it).
  */
@@ -82,22 +142,41 @@ export function computeGentleStreak(
   readingDates: Set<string>,
   today: string,
   maxRestDays: number = MAX_REST_DAYS,
+  isCountingDay: (dateStr: string) => boolean = () => true,
 ): {currentStreak: number; restDaysRemaining: number} {
   if (readingDates.size === 0) {
     return {currentStreak: 0, restDaysRemaining: maxRestDays};
   }
 
-  // Not live unless the student read today or yesterday.
-  if (!readingDates.has(today) && !readingDates.has(shiftDays(today, -1))) {
+  // Most recent reading day on or before today (future-dated logs are
+  // ignored — the walk below starts at today).
+  let lastRead: string | null = null;
+  for (const d of readingDates) {
+    if (d <= today && (lastRead === null || d > lastRead)) lastRead = d;
+  }
+  if (lastRead === null) {
     return {currentStreak: 0, restDaysRemaining: maxRestDays};
+  }
+
+  // Liveness: the gap of counting days after lastRead, up to and including
+  // today, must still be bridgeable by reading tonight.
+  let gap = 0;
+  let walked = 0;
+  let cursor = today;
+  while (cursor > lastRead) {
+    if (isCountingDay(cursor)) gap++;
+    if (gap > maxRestDays + 1 || ++walked > WALK_CAP_DAYS) {
+      return {currentStreak: 0, restDaysRemaining: maxRestDays};
+    }
+    cursor = shiftDays(cursor, -1);
   }
 
   const earliest = [...readingDates].sort()[0];
 
   let streak = 0;
-  let bridgedGaps = 0; // missed days confirmed to sit *between* counted reads
-  let pendingMisses = 0; // missed days since the last counted read
-  let cursor = today;
+  let bridgedGaps = 0; // missed counting days sitting *between* counted reads
+  let pendingMisses = 0; // missed counting days since the last counted read
+  cursor = today;
 
   while (cursor >= earliest) {
     if (readingDates.has(cursor)) {
@@ -106,8 +185,9 @@ export function computeGentleStreak(
       streak++;
       bridgedGaps += pendingMisses;
       pendingMisses = 0;
-    } else if (streak > 0) {
-      // Only count gaps once the streak has actually started.
+    } else if (streak > 0 && isCountingDay(cursor)) {
+      // Only counting (in-term) misses spend the budget, and only once the
+      // streak has actually started — leading-edge unread days are free.
       pendingMisses++;
       // Budget blown — no earlier read could attach, so stop early.
       if (bridgedGaps + pendingMisses > maxRestDays) break;
@@ -125,6 +205,11 @@ export function computeGentleStreak(
  * Longest gentle streak ever achieved, using the same ≤maxRestDays tolerance.
  * Implemented as a sliding window over the sorted unique days: a window is valid
  * while the missed days within it (span minus reads) stays within budget.
+ *
+ * Deliberately holiday-blind (no isCountingDay): being conservative across
+ * term breaks is fine because longestStreak is monotonic — callers guard it
+ * with max(prior, longest, currentStreak), and a live cross-holiday
+ * currentStreak feeds that max while it is running.
  * @param {Set<string>} readingDates Local "YYYY-MM-DD" days the student read.
  * @param {number} maxRestDays Max missed days a run can bridge.
  * @return {number} The longest tolerant run of reading days.

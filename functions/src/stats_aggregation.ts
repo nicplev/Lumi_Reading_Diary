@@ -25,10 +25,13 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions/v1";
 import {
+  MAX_REST_DAYS,
+  buildIsCountingDay,
   computeGentleStreak,
   computeLongestStreak,
   countInWindow,
   localDateString,
+  parseTermDates,
 } from "./dateUtils";
 import {DEFAULT_TIMEZONE} from "./access";
 
@@ -121,7 +124,9 @@ export async function reconcileStudentStats(
     .get();
 
   const schoolSnap = await db.collection("schools").doc(schoolId).get();
-  const tz = String(schoolSnap.data()?.timezone ?? DEFAULT_TIMEZONE);
+  const schoolData = schoolSnap.data() ?? {};
+  const tz = String(schoolData.timezone ?? DEFAULT_TIMEZONE);
+  const isCountingDay = buildIsCountingDay(parseTermDates(schoolData.termDates));
 
   const priorLongest =
     (await studentRef.get()).data()?.stats?.longestStreak ?? 0;
@@ -146,7 +151,7 @@ export async function reconcileStudentStats(
 
   const today = localDateString(new Date(), tz);
   const {currentStreak, restDaysRemaining} = computeGentleStreak(
-    readingDatesSet, today,
+    readingDatesSet, today, MAX_REST_DAYS, isCountingDay,
   );
   const longestStreak = Math.max(
     priorLongest,
@@ -202,7 +207,9 @@ export async function applyStudentStatsDelta(
   const studentRef = db.doc(`schools/${schoolId}/students/${studentId}`);
 
   const schoolSnap = await db.collection("schools").doc(schoolId).get();
-  const tz = String(schoolSnap.data()?.timezone ?? DEFAULT_TIMEZONE);
+  const schoolData = schoolSnap.data() ?? {};
+  const tz = String(schoolData.timezone ?? DEFAULT_TIMEZONE);
+  const isCountingDay = buildIsCountingDay(parseTermDates(schoolData.termDates));
 
   const beforeCounted = extractCountedFields(before, tz);
   const afterCounted = extractCountedFields(after, tz);
@@ -257,7 +264,7 @@ export async function applyStudentStatsDelta(
 
   const today = localDateString(new Date(), tz);
   const {currentStreak, restDaysRemaining} =
-    computeGentleStreak(readingDates, today);
+    computeGentleStreak(readingDates, today, MAX_REST_DAYS, isCountingDay);
   const longestStreak = Math.max(
     Number(stats.longestStreak) || 0,
     computeLongestStreak(readingDates),
