@@ -12,7 +12,7 @@ const {
   assertSucceeds,
   assertFails,
 } = require('@firebase/rules-unit-testing');
-const { ref, uploadBytes } = require('firebase/storage');
+const { ref, uploadBytes, getBytes } = require('firebase/storage');
 
 // Must match the --project passed to `firebase emulators:exec` in the
 // test:rules:storage script: the Storage emulator resolves the
@@ -99,4 +99,18 @@ test('comprehension audio: non-audio content type denied even when enabled', asy
   await assertFails(
     uploadBytes(audioRef('parent_1'), AUDIO_BYTES, { contentType: 'image/jpeg' }),
   );
+});
+
+test('comprehension audio: direct authenticated read is denied (signed-URL only)', async () => {
+  // The object is seeded with rules disabled, then a normal authed client tries
+  // to read it directly — denied (2.2). Playback must go through the
+  // getComprehensionAudioUrl callable's signed URL, which bypasses these rules.
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await uploadBytes(
+      ref(context.storage(), AUDIO_PATH),
+      AUDIO_BYTES,
+      AUDIO_METADATA,
+    );
+  });
+  await assertFails(getBytes(audioRef('teacher_1')));
 });
