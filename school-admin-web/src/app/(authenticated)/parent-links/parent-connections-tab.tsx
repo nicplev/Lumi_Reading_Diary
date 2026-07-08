@@ -140,6 +140,7 @@ export function ParentConnectionsTab() {
         columns={columns}
         data={filtered}
         loading={isLoading}
+        pageSizeOptions={[10, 20, 50, 100]}
         emptyState={
           <EmptyState
             icon={<Icon name="family_restroom" size={40} />}
