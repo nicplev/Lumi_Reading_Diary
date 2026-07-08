@@ -66,14 +66,58 @@ interface ClassReportTabProps {
   levelsEnabled?: boolean;
 }
 
-function Metric({ label, value }: { label: string; value: string | number }) {
+// Bento tile / section-header colourways — soft brand tints with a matching
+// dark accent for the icon. Keeps the report on the Lumi palette while giving
+// each metric its own colour so the page reads as a lively dashboard, not a
+// grey spreadsheet.
+const TILE_STYLES = {
+  blue: { tile: 'bg-tint-blue', icon: 'text-lumi-blue-dark' },
+  green: { tile: 'bg-tint-green', icon: 'text-lumi-green-dark' },
+  red: { tile: 'bg-tint-red', icon: 'text-lumi-red-dark' },
+  yellow: { tile: 'bg-tint-yellow', icon: 'text-lumi-yellow-dark' },
+  orange: { tile: 'bg-tint-orange', icon: 'text-lumi-orange' },
+} as const;
+type TileColor = keyof typeof TILE_STYLES;
+
+function BentoMetric({
+  label,
+  value,
+  icon,
+  color,
+}: {
+  label: string;
+  value: string | number;
+  icon: string;
+  color: TileColor;
+}) {
+  const s = TILE_STYLES[color];
   return (
-    <div className="rounded-[var(--radius-md)] border border-rule p-4">
-      <p className="text-xs font-semibold text-muted uppercase tracking-wide">{label}</p>
-      <p className="text-2xl font-bold text-ink mt-1">{value}</p>
+    <div className={`rounded-[var(--radius-md)] p-4 ${s.tile}`}>
+      <span
+        className={`inline-flex items-center justify-center w-9 h-9 rounded-[var(--radius-sm)] bg-paper/70 ${s.icon} mb-2`}
+      >
+        <Icon name={icon} size={20} />
+      </span>
+      <p className="text-2xl font-extrabold text-ink leading-none">{value}</p>
+      <p className="text-[11px] font-semibold text-ink/70 uppercase tracking-wide mt-1">{label}</p>
     </div>
   );
 }
+
+function SectionHeader({ icon, title, color }: { icon: string; title: string; color: TileColor }) {
+  const s = TILE_STYLES[color];
+  return (
+    <div className="flex items-center gap-2.5 mb-4">
+      <span className={`inline-flex items-center justify-center w-8 h-8 rounded-[var(--radius-sm)] ${s.tile} ${s.icon}`}>
+        <Icon name={icon} size={18} />
+      </span>
+      <h2 className="text-lg font-extrabold text-ink">{title}</h2>
+    </div>
+  );
+}
+
+// Gold / silver / bronze for the top-3 readers; plain muted number after that.
+const RANK_BADGE = ['bg-lumi-yellow text-ink', 'bg-rule text-ink', 'bg-lumi-orange text-white'];
 
 export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = true }: ClassReportTabProps) {
   const { data: school } = useSchool();
@@ -117,7 +161,7 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
     try {
       // Dynamic import keeps @react-pdf out of the main bundle until it's needed.
       const { downloadClassReportPdf } = await import('./class-report-pdf');
-      await downloadClassReportPdf(report, school?.displayName || school?.name, levelsEnabled);
+      await downloadClassReportPdf(report, school?.displayName || school?.name, levelsEnabled, school?.logoUrl);
     } catch {
       toast('Could not generate the PDF', 'error');
     } finally {
@@ -226,39 +270,63 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
         <p className="text-sm text-muted py-10 text-center">Building report…</p>
       ) : (
         <div id="class-report" className="space-y-6">
-          {/* Report header */}
-          <div className="border-b border-rule pb-4">
-            {school?.displayName || school?.name ? (
-              <p className="text-sm text-muted">{school.displayName || school.name}</p>
-            ) : null}
-            <h1 className="text-2xl font-bold text-ink">Class Reading Report</h1>
-            <p className="text-sm text-muted mt-0.5">
-              {[className, yearLevel].filter(Boolean).join(' · ')} · {formatDate(from)} – {formatDate(to)}
-            </p>
+          {/* Branded report header — school logo on a section-accent band. */}
+          <div className="rounded-[var(--radius-lg)] overflow-hidden border border-rule shadow-card">
+            <div className="bg-section px-6 py-5 flex items-center gap-4">
+              {school?.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={school.logoUrl}
+                  alt=""
+                  className="w-14 h-14 rounded-[var(--radius-md)] bg-paper object-contain p-1 shrink-0"
+                />
+              ) : (
+                <span className="inline-flex items-center justify-center w-14 h-14 rounded-[var(--radius-md)] bg-paper/20 text-on-section shrink-0">
+                  <Icon name="local_fire_department" size={30} />
+                </span>
+              )}
+              <div className="min-w-0">
+                {school?.displayName || school?.name ? (
+                  <p className="text-on-section/85 text-sm font-semibold truncate">
+                    {school.displayName || school.name}
+                  </p>
+                ) : null}
+                <h1 className="text-on-section text-2xl font-extrabold leading-tight">Class Reading Report</h1>
+              </div>
+              <span className="ml-auto hidden sm:inline-flex items-center gap-1.5 text-on-section/90 shrink-0">
+                <Icon name="local_fire_department" size={18} />
+                <span className="font-display font-extrabold tracking-tight">Lumi</span>
+              </span>
+            </div>
+            <div className="bg-paper px-6 py-3 border-t border-rule">
+              <p className="text-sm text-muted">
+                {[className, yearLevel].filter(Boolean).join(' · ')} · {formatDate(from)} – {formatDate(to)}
+              </p>
+            </div>
           </div>
 
-          {/* Headline metrics */}
+          {/* Headline metrics — colourful bento tiles */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Metric label="Students" value={report.totalStudents} />
-            <Metric label="Active readers" value={report.activeReaders} />
-            <Metric label="Engagement" value={`${report.engagementRate}%`} />
-            <Metric label="Met target" value={`${report.targetMetRate}%`} />
-            <Metric label="Total minutes" value={report.totalMinutes} />
-            <Metric label="Avg min / student" value={report.avgMinutesPerStudent} />
-            <Metric label="Reading days" value={report.totalReadingDays} />
-            <Metric label="Sessions" value={report.totalSessions} />
+            <BentoMetric label="Students" value={report.totalStudents} icon="groups" color="blue" />
+            <BentoMetric label="Active readers" value={report.activeReaders} icon="auto_stories" color="green" />
+            <BentoMetric label="Engagement" value={`${report.engagementRate}%`} icon="trending_up" color="red" />
+            <BentoMetric label="Met target" value={`${report.targetMetRate}%`} icon="flag" color="yellow" />
+            <BentoMetric label="Total minutes" value={report.totalMinutes} icon="schedule" color="blue" />
+            <BentoMetric label="Avg min / student" value={report.avgMinutesPerStudent} icon="timelapse" color="green" />
+            <BentoMetric label="Reading days" value={report.totalReadingDays} icon="calendar_month" color="orange" />
+            <BentoMetric label="Sessions" value={report.totalSessions} icon="menu_book" color="red" />
           </div>
 
           {/* Top readers */}
           <Card>
-            <h2 className="text-lg font-bold text-ink mb-3">Top readers</h2>
+            <SectionHeader icon="emoji_events" title="Top readers" color="yellow" />
             {report.topReaders.length === 0 ? (
               <p className="text-sm text-muted">No reading recorded in this period.</p>
             ) : (
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-muted border-b border-rule">
-                    <th className="py-2 font-semibold w-8">#</th>
+                    <th className="py-2 font-semibold w-10">#</th>
                     <th className="py-2 font-semibold">Student</th>
                     <th className="py-2 font-semibold text-right">Minutes</th>
                     <th className="py-2 font-semibold text-right">Days</th>
@@ -268,7 +336,15 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
                 <tbody>
                   {report.topReaders.map((r, i) => (
                     <tr key={r.id} className="border-b border-rule/60">
-                      <td className="py-2 text-muted">{i + 1}</td>
+                      <td className="py-2">
+                        <span
+                          className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                            i < 3 ? RANK_BADGE[i] : 'text-muted'
+                          }`}
+                        >
+                          {i + 1}
+                        </span>
+                      </td>
                       <td className="py-2 text-ink font-medium">{r.name}</td>
                       <td className="py-2 text-right">{r.minutes}</td>
                       <td className="py-2 text-right">{r.readingDays}</td>
@@ -282,7 +358,7 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
 
           {/* Needs support */}
           <Card>
-            <h2 className="text-lg font-bold text-ink mb-3">Students needing support</h2>
+            <SectionHeader icon="volunteer_activism" title="Students needing support" color="orange" />
             {report.needsSupport.length === 0 ? (
               <div className="flex items-center gap-2 text-sm text-lumi-green-dark">
                 <Icon name="check_circle" size={18} />
@@ -316,7 +392,7 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
 
           {/* All students — the full roster, so no one is invisible in the report */}
           <Card>
-            <h2 className="text-lg font-bold text-ink mb-3">All students</h2>
+            <SectionHeader icon="groups" title="All students" color="blue" />
             {report.students.length === 0 ? (
               <p className="text-sm text-muted">No students in this class.</p>
             ) : (
@@ -347,7 +423,7 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
                   </thead>
                   <tbody>
                     {sortedStudents.map((r) => (
-                      <tr key={r.id} className="border-b border-rule/60">
+                      <tr key={r.id} className="border-b border-rule/60 even:bg-cream/60">
                         <td className="py-2 text-ink font-medium">{r.name}</td>
                         <td className="py-2 text-right">{r.minutes}</td>
                         <td className="py-2 text-right">{r.sessions}</td>
@@ -368,7 +444,7 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
           {/* Reading level distribution — only when the school has reading levels enabled */}
           {levelsEnabled && (
           <Card>
-            <h2 className="text-lg font-bold text-ink mb-3">Reading levels</h2>
+            <SectionHeader icon="stacked_bar_chart" title="Reading levels" color="green" />
             {report.levelDistribution.length === 0 ? (
               <p className="text-sm text-muted">No students in this class.</p>
             ) : (
@@ -406,11 +482,12 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
         </div>
       )}
 
-      {/* Print only the report region. */}
+      {/* Print only the report region. `print-color-adjust: exact` forces the
+          browser to keep the branded backgrounds/logo instead of stripping them. */}
       <style
         dangerouslySetInnerHTML={{
           __html:
-            '@media print { body * { visibility: hidden !important; } #class-report, #class-report * { visibility: visible !important; } #class-report { position: absolute; left: 0; top: 0; width: 100%; padding: 24px; } }',
+            '@media print { body * { visibility: hidden !important; } #class-report, #class-report * { visibility: visible !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } #class-report { position: absolute; left: 0; top: 0; width: 100%; padding: 24px; } #class-report > * { break-inside: avoid; } }',
         }}
       />
     </div>
