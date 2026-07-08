@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/lumi/page-header';
 import { Button } from '@/components/lumi/button';
@@ -230,6 +231,15 @@ export function RenewalsPage({
           early or one-off case if you need to.
         </Card>
       )}
+
+      <Card className="p-4 text-sm text-ink">
+        <span className="font-semibold">Rolling into a new year?</span> Start with the{' '}
+        <Link href="/students/rollover" className="text-section font-semibold hover:underline">
+          Annual Rollover Import
+        </Link>{' '}
+        — it moves every student to their new class from your school system&apos;s class
+        lists and handles graduates and leavers. Then come back here to grant {targetYear} access.
+      </Card>
 
       {!subActive && (
         <Card className="border-error/40 bg-error/5 p-4 text-sm">
