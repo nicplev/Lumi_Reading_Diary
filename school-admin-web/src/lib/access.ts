@@ -71,6 +71,33 @@ export function nextYearLevel(current: string | null | undefined): {
   return { next: YEAR_LADDER[idx + 1], graduated: false, changed: true };
 }
 
+/**
+ * Ladder decision for renewals, honouring the rollover import's authority
+ * marker. When the import wrote a student's year level it also stamps
+ * `additionalInfo.yearLevelSetForYear` with the target academic year; a
+ * renewal into that year (or earlier) must NOT bump the level again — the
+ * double-bump would silently skip the student a grade. `>=` keeps a late or
+ * repeated renewal click safe too. Schools that don't use the import never
+ * carry the marker, so the existing bump behaviour is unchanged.
+ */
+export function yearLevelForRenewal(
+  currentYearLevel: string | null | undefined,
+  yearLevelSetForYear: unknown,
+  targetAcademicYear: number
+): { next: string | null; graduated: boolean; changed: boolean; setByImport: boolean } {
+  if (typeof yearLevelSetForYear === 'number' && yearLevelSetForYear >= targetAcademicYear) {
+    return {
+      next: currentYearLevel ?? null,
+      // Still flag top-of-ladder students as graduating — the import set the
+      // level, but the renewal roster must keep de-selecting graduates.
+      graduated: nextYearLevel(currentYearLevel).graduated,
+      changed: false,
+      setByImport: true,
+    };
+  }
+  return { ...nextYearLevel(currentYearLevel), setByImport: false };
+}
+
 /** Current academic year from config/academicYear, else derived from today. */
 export async function getCurrentAcademicYear(): Promise<number> {
   const cfg = await adminDb.collection('config').doc('academicYear').get();
