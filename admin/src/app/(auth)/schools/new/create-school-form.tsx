@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -25,19 +26,26 @@ import {
   type CreateSchoolInput,
 } from "@/lib/validations/school";
 
+// Australia/Sydney first — it's the product default (streaks, reminders,
+// Top Reader week and the whole access model all default to it), so a new
+// school should land on it unless deliberately changed.
 const TIMEZONES = [
-  "Pacific/Auckland",
   "Australia/Sydney",
   "Australia/Melbourne",
   "Australia/Brisbane",
   "Australia/Adelaide",
   "Australia/Perth",
+  "Pacific/Auckland",
 ];
 
 export function CreateSchoolForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Activate reading access (a free "comp" subscription for the current year)
+  // as part of creating the school. Default ON for beta/demo — untick it for a
+  // real prospect you'll bill deliberately later.
+  const [activateAccess, setActivateAccess] = useState(true);
 
   const {
     register,
@@ -51,7 +59,7 @@ export function CreateSchoolForm() {
       contactEmail: "",
       contactPhone: "",
       address: "",
-      timezone: "Pacific/Auckland",
+      timezone: "Australia/Sydney",
     },
   });
 
@@ -63,7 +71,7 @@ export function CreateSchoolForm() {
       const res = await fetch("/api/schools", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, activateAccess }),
       });
 
       if (!res.ok) {
@@ -126,7 +134,7 @@ export function CreateSchoolForm() {
           <div className="space-y-2">
             <Label>Timezone *</Label>
             <Select
-              defaultValue="Pacific/Auckland"
+              defaultValue="Australia/Sydney"
               onValueChange={(v) => v && setValue("timezone", v)}
             >
               <SelectTrigger>
@@ -148,6 +156,22 @@ export function CreateSchoolForm() {
               id="subscriptionPlan"
               {...register("subscriptionPlan")}
               placeholder="e.g. free, basic, premium"
+            />
+          </div>
+
+          <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+            <div className="space-y-0.5">
+              <Label htmlFor="activateAccess">Activate School Access now</Label>
+              <p className="text-sm text-muted-foreground">
+                Turns reading on immediately with a free (comp) subscription for
+                the current year, so students can log reading as soon as their
+                parents link. Leave off to set up billing manually later.
+              </p>
+            </div>
+            <Switch
+              id="activateAccess"
+              checked={activateAccess}
+              onCheckedChange={setActivateAccess}
             />
           </div>
 

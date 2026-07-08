@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -34,8 +36,14 @@ class FirebaseService {
   Stream<User?> get userChanges => _auth.userChanges();
   User? get currentUser => _auth.currentUser;
 
+  // True once initialize() has completed — guards the late-final assignments
+  // so a bootstrap retry after a later init step failed can re-run the whole
+  // chain without throwing LateInitializationError here.
+  bool _initialized = false;
+
   // Initialize Firebase
   Future<void> initialize() async {
+    if (_initialized) return;
     try {
       // Initialize Firebase services
       _auth = FirebaseAuth.instance;
@@ -57,6 +65,7 @@ class FirebaseService {
         );
       }
 
+      _initialized = true;
       debugPrint('Firebase services initialized successfully');
     } catch (e) {
       debugPrint('Error initializing Firebase services: $e');
@@ -168,7 +177,38 @@ class FirebaseService {
       // Drop any in-flight phone-verification record so a signed-out
       // device doesn't auto-route into recovery on next launch.
       await PhoneVerificationRecoveryService.instance.clear();
+
+      // Give any in-flight Firestore mutations a short window to reach the
+      // server while this account's auth is still valid. Bounded — offline,
+      // waitForPendingWrites would never resolve.
+      try {
+        await _firestore
+            .waitForPendingWrites()
+            .timeout(const Duration(seconds: 5));
+      } on TimeoutException {
+        debugPrint('signOut: pending writes did not flush in time');
+      } catch (e) {
+        debugPrint('signOut: waitForPendingWrites failed: $e');
+      }
+
       await _auth.signOut();
+
+      // Shared-device hygiene: drop the local Firestore cache, INCLUDING any
+      // still-pending mutations. Without this, Teacher A's unflushed writes
+      // survived sign-out and replayed under the NEXT account's auth — where
+      // the ownership rules reject them and Firestore silently drops them
+      // (the shared-iPad data-loss case) — and the next user could also read
+      // the previous account's cached data. terminate() is required before
+      // clearPersistence(); the SDK starts a fresh client on next use (same
+      // pattern as the impersonation teardown).
+      try {
+        await _firestore.terminate();
+        await _firestore.clearPersistence();
+      } catch (e) {
+        // Non-fatal: sign-out itself succeeded; worst case the cache
+        // survives, which is no worse than before.
+        debugPrint('signOut: persistence clear failed: $e');
+      }
     } catch (e) {
       debugPrint('Error signing out: $e');
       rethrow;

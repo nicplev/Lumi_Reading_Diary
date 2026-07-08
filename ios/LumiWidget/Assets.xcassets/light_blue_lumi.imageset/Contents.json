@@ -1,0 +1,13 @@
+{
+  "images" : [
+    {
+      "filename" : "light_blue_lumi.png",
+      "idiom" : "universal",
+      "scale" : "1x"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

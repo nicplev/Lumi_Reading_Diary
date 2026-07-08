@@ -6,6 +6,8 @@ import { Badge } from '@/components/lumi/badge';
 import { StatusEditorBadge } from '@/components/lumi/status-editor-badge';
 import { FilterChip } from '@/components/lumi/filter-chip';
 import { SearchInput } from '@/components/lumi/search-input';
+import { Select } from '@/components/lumi/select';
+import { ConfirmDialog } from '@/components/lumi/confirm-dialog';
 import { DataTable, type DataTableColumn } from '@/components/lumi/data-table';
 import { EmptyState } from '@/components/lumi/empty-state';
 import { Icon } from '@/components/lumi/icon';
@@ -13,7 +15,12 @@ import { InfoTooltip } from '@/components/lumi/tooltip';
 import { useToast } from '@/components/lumi/toast';
 import { useStudents, useUpdateEnrollmentStatus, useBulkUpdateEnrollmentStatus } from '@/lib/hooks/use-students';
 import { useClasses } from '@/lib/hooks/use-classes';
-import { useOnboardingEmails, type OnboardingEmailRecord } from '@/lib/hooks/use-onboarding-emails';
+import {
+  useOnboardingEmails,
+  useDeleteOnboardingEmail,
+  useCullOnboardingEmails,
+  type OnboardingEmailRecord,
+} from '@/lib/hooks/use-onboarding-emails';
 import { SendOnboardingEmailModal } from './send-onboarding-email-modal';
 import { EmailPreviewModal } from './email-preview-modal';
 import { OnboardingTour } from './onboarding-tour';
@@ -68,6 +75,43 @@ export function ParentOnboardingTab() {
   const { data: emailHistory, isLoading: emailsLoading } = useOnboardingEmails();
   const updateEnrollment = useUpdateEnrollmentStatus();
   const bulkUpdateEnrollment = useBulkUpdateEnrollmentStatus();
+  const deleteEmail = useDeleteOnboardingEmail();
+  const cullEmails = useCullOnboardingEmails();
+
+  // Email-history list management (how many shown + culling old receipts).
+  const [visibleEmails, setVisibleEmails] = useState(10);
+  const [cullDays, setCullDays] = useState('30');
+  const [cullOpen, setCullOpen] = useState(false);
+  const [deleteEmailId, setDeleteEmailId] = useState<string | null>(null);
+
+  const cullableCount = useMemo(() => {
+    if (!emailHistory) return 0;
+    const cutoff = Date.now() - Number(cullDays) * 24 * 60 * 60 * 1000;
+    return emailHistory.filter(
+      (r) => new Date(r.createdAt).getTime() < cutoff
+    ).length;
+  }, [emailHistory, cullDays]);
+
+  const handleCull = async () => {
+    try {
+      const { deleted } = await cullEmails.mutateAsync(Number(cullDays));
+      toast(`Cleared ${deleted} old receipt${deleted === 1 ? '' : 's'}`, 'success');
+      setCullOpen(false);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Failed to clear receipts', 'error');
+    }
+  };
+
+  const handleDeleteEmail = async () => {
+    if (!deleteEmailId) return;
+    try {
+      await deleteEmail.mutateAsync(deleteEmailId);
+      toast('Receipt deleted', 'success');
+      setDeleteEmailId(null);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Failed to delete receipt', 'error');
+    }
+  };
 
   const classMap = useMemo(() => {
     if (!classes) return new Map<string, string>();
@@ -514,7 +558,37 @@ export function ParentOnboardingTab() {
 
       {/* Email History Section */}
       <div className="mt-8">
-        <h3 className="text-lg font-bold text-ink mb-4">Email History</h3>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-lg font-bold text-ink">
+            Email History
+            {emailHistory && emailHistory.length > 0 && (
+              <span className="ml-2 text-sm font-normal text-muted">
+                ({emailHistory.length})
+              </span>
+            )}
+          </h3>
+          {emailHistory && emailHistory.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Select
+                value={cullDays}
+                onChange={setCullDays}
+                options={[
+                  { value: '7', label: 'Older than 7 days' },
+                  { value: '30', label: 'Older than 30 days' },
+                  { value: '90', label: 'Older than 90 days' },
+                ]}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCullOpen(true)}
+                disabled={cullableCount === 0}
+              >
+                Clear old{cullableCount > 0 ? ` (${cullableCount})` : ''}
+              </Button>
+            </div>
+          )}
+        </div>
         {emailsLoading ? (
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -527,45 +601,68 @@ export function ParentOnboardingTab() {
         ) : !emailHistory || emailHistory.length === 0 ? (
           <p className="text-sm text-muted">No emails sent yet</p>
         ) : (
-          <div className="space-y-3">
-            {emailHistory.map((record: OnboardingEmailRecord) => (
-              <div
-                key={record.id}
-                className="bg-paper shadow-card rounded-[var(--radius-lg)] p-4 flex items-center justify-between"
-              >
-                <div className="flex items-center gap-4">
-                  <div>
-                    <p className="text-sm font-semibold text-ink">
-                      {new Date(record.createdAt).toLocaleDateString(undefined, {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
-                    {record.emailSubject && (
-                      <p className="text-xs text-muted mt-0.5">{record.emailSubject}</p>
-                    )}
+          <>
+            <div className="space-y-3">
+              {emailHistory.slice(0, visibleEmails).map((record: OnboardingEmailRecord) => (
+                <div
+                  key={record.id}
+                  className="bg-paper shadow-card rounded-[var(--radius-lg)] p-4 flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-ink">
+                        {new Date(record.createdAt).toLocaleDateString(undefined, {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
+                      {record.emailSubject && (
+                        <p className="text-xs text-muted mt-0.5">{record.emailSubject}</p>
+                      )}
+                    </div>
+                    <Badge variant={emailStatusVariants[record.status] ?? 'default'}>
+                      {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
+                    </Badge>
                   </div>
-                  <Badge variant={emailStatusVariants[record.status] ?? 'default'}>
-                    {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
-                  </Badge>
+                  <div className="flex items-center gap-3">
+                    <div className="text-sm text-muted">
+                      {record.deliveryCounts ? (
+                        <span>
+                          {record.deliveryCounts.sent} sent
+                          {record.deliveryCounts.skipped > 0 && `, ${record.deliveryCounts.skipped} skipped`}
+                          {record.deliveryCounts.failed > 0 && `, ${record.deliveryCounts.failed} failed`}
+                        </span>
+                      ) : record.recipientCount != null ? (
+                        <span>{record.recipientCount} recipients</span>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteEmailId(record.id)}
+                      className="text-muted transition-colors hover:text-error"
+                      aria-label="Delete receipt"
+                    >
+                      <Icon name="delete" size={18} />
+                    </button>
+                  </div>
                 </div>
-                <div className="text-sm text-muted">
-                  {record.deliveryCounts ? (
-                    <span>
-                      {record.deliveryCounts.sent} sent
-                      {record.deliveryCounts.skipped > 0 && `, ${record.deliveryCounts.skipped} skipped`}
-                      {record.deliveryCounts.failed > 0 && `, ${record.deliveryCounts.failed} failed`}
-                    </span>
-                  ) : record.recipientCount != null ? (
-                    <span>{record.recipientCount} recipients</span>
-                  ) : null}
-                </div>
+              ))}
+            </div>
+            {emailHistory.length > visibleEmails && (
+              <div className="mt-4 text-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setVisibleEmails((n) => n + 10)}
+                >
+                  Show more ({emailHistory.length - visibleEmails} more)
+                </Button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
 
@@ -583,6 +680,28 @@ export function ParentOnboardingTab() {
       <EmailPreviewModal
         open={showPreviewModal}
         onClose={() => setShowPreviewModal(false)}
+      />
+
+      <ConfirmDialog
+        open={cullOpen}
+        onClose={() => setCullOpen(false)}
+        onConfirm={handleCull}
+        title="Clear old email receipts"
+        description={`Permanently delete ${cullableCount} receipt${cullableCount === 1 ? '' : 's'} older than ${cullDays} days? This only removes the history records — no emails are re-sent or recalled.`}
+        confirmLabel="Clear"
+        variant="danger"
+        loading={cullEmails.isPending}
+      />
+
+      <ConfirmDialog
+        open={deleteEmailId !== null}
+        onClose={() => setDeleteEmailId(null)}
+        onConfirm={handleDeleteEmail}
+        title="Delete receipt"
+        description="Permanently delete this email history record? The email itself is unaffected."
+        confirmLabel="Delete"
+        variant="danger"
+        loading={deleteEmail.isPending}
       />
     </div>
   );

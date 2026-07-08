@@ -13,6 +13,7 @@ import 'core/services/app_check_service.dart';
 import 'core/services/dev_access_service.dart';
 import 'core/services/remote_message_controller.dart';
 import 'core/services/service_status_controller.dart';
+import 'core/widgets/force_update_gate.dart';
 import 'core/widgets/impersonation_overlay.dart';
 import 'core/widgets/remote_message_overlay.dart';
 import 'core/widgets/service_status_overlay.dart';
@@ -32,11 +33,42 @@ void main() async {
   // Run app with error handling zone - all initialization must happen inside
   await CrashReportingService.runAppWithZoneGuard(
     () async {
-      // Ensure Flutter binding is initialized
-      WidgetsFlutterBinding.ensureInitialized();
+      // A failed bootstrap used to die before runApp — a black screen with
+      // no message and no way out (the review's "startup brick"). Now any
+      // throw in the critical chain lands on a retry screen instead.
+      try {
+        await _initializeCore();
+      } catch (error, stack) {
+        debugPrint('FATAL: app bootstrap failed: $error');
+        debugPrint('$stack');
+        runApp(BootstrapErrorApp(error: error));
+        return;
+      }
 
-      // Set preferred orientations (mobile only)
-      if (!kIsWeb) {
+      runApp(
+        const ProviderScope(
+          child: LumiApp(),
+        ),
+      );
+    },
+    onError: (error, stack) {
+      debugPrint('Uncaught error: $error');
+      debugPrint('Stack trace: $stack');
+    },
+  );
+}
+
+/// The critical init chain. Idempotent so the [BootstrapErrorApp] retry can
+/// re-run it after a partial failure: Firebase.initializeApp is guarded on
+/// Firebase.apps, FirebaseService/NotificationService/Analytics guard
+/// themselves, Hive.initFlutter and SystemChrome are safe to repeat, and the
+/// best-effort services are individually try-wrapped.
+Future<void> _initializeCore() async {
+  // Ensure Flutter binding is initialized
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Set preferred orientations (mobile only)
+  if (!kIsWeb) {
         await SystemChrome.setPreferredOrientations([
           DeviceOrientation.portraitUp,
           DeviceOrientation.portraitDown,
@@ -54,10 +86,13 @@ void main() async {
         debugPrint('Warning: Teacher device book cache init failed: $e');
       }
 
-      // Initialize Firebase with platform-specific options
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
+  // Initialize Firebase with platform-specific options (guarded so a
+  // bootstrap retry after a later-step failure doesn't double-initialize).
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  }
 
       // OPT-IN: skip phone app-verification so configured Firebase test numbers
       // (e.g. +61400000000 → 123456) sign in directly on the iOS Simulator,
@@ -157,19 +192,109 @@ void main() async {
 
       // Configure Flutter Animate
       Animate.restartOnHotReload = true;
+}
 
-      // Run app
-      runApp(
-        const ProviderScope(
-          child: LumiApp(),
+/// Minimal fallback app shown when the critical bootstrap throws — no
+/// dependencies on anything that may have failed to initialize. Offers a
+/// retry, which re-runs the (idempotent) init chain and swaps in the real
+/// app on success.
+class BootstrapErrorApp extends StatefulWidget {
+  const BootstrapErrorApp({super.key, required this.error});
+
+  final Object error;
+
+  @override
+  State<BootstrapErrorApp> createState() => _BootstrapErrorAppState();
+}
+
+class _BootstrapErrorAppState extends State<BootstrapErrorApp> {
+  late Object _error = widget.error;
+  bool _retrying = false;
+
+  Future<void> _retry() async {
+    setState(() => _retrying = true);
+    try {
+      await _initializeCore();
+      runApp(const ProviderScope(child: LumiApp()));
+    } catch (error, stack) {
+      debugPrint('Bootstrap retry failed: $error');
+      debugPrint('$stack');
+      if (mounted) {
+        setState(() {
+          _error = error;
+          _retrying = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: const Color(0xFFFBF7F0),
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(32),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.cloud_off_rounded,
+                        size: 56, color: Color(0xFF6B6B6B)),
+                    const SizedBox(height: 20),
+                    const Text(
+                      "Lumi couldn't start",
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1A1A1A),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Something went wrong while starting up. Check your '
+                      'connection and try again — if it keeps happening, '
+                      'restart the app.',
+                      style:
+                          TextStyle(fontSize: 15, color: Color(0xFF6B6B6B)),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '$_error',
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xFF9B9B9B)),
+                      textAlign: TextAlign.center,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton.icon(
+                      onPressed: _retrying ? null : _retry,
+                      icon: _retrying
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.refresh_rounded),
+                      label: Text(_retrying ? 'Retrying…' : 'Try again'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
-      );
-    },
-    onError: (error, stack) {
-      debugPrint('Uncaught error: $error');
-      debugPrint('Stack trace: $stack');
-    },
-  );
+      ),
+    );
+  }
 }
 
 class LumiApp extends ConsumerStatefulWidget {
@@ -207,10 +332,15 @@ class _LumiAppState extends ConsumerState<LumiApp> {
       darkTheme: AppTheme.darkTheme(),
       themeMode: ThemeMode.light,
       routerConfig: router,
-      builder: (context, child) => RemoteMessageOverlay(
-        child: ServiceStatusOverlay(
-          child: ImpersonationOverlay(
-            child: child ?? const SizedBox.shrink(),
+      // ForceUpdateGate sits outermost: when the status worker demands a
+      // newer build, it replaces everything (banners included) with the
+      // blocking update screen.
+      builder: (context, child) => ForceUpdateGate(
+        child: RemoteMessageOverlay(
+          child: ServiceStatusOverlay(
+            child: ImpersonationOverlay(
+              child: child ?? const SizedBox.shrink(),
+            ),
           ),
         ),
       ),

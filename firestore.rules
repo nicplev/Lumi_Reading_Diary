@@ -424,6 +424,17 @@ service cloud.firestore {
       }
 
       match /readingLogs/{logId} {
+        // Minutes must be a sane integer. Every legit client sends 5-120;
+        // validateReadingLog flags 1-240 violations after the fact, but the
+        // aggregators shouldn't have to rely on that for obviously forged
+        // writes. Checked on create AND content updates (a log could
+        // otherwise be created valid and edited to 99999 later).
+        function minutesInBounds() {
+          return request.resource.data.minutesRead is int &&
+              request.resource.data.minutesRead >= 1 &&
+              request.resource.data.minutesRead <= 240;
+        }
+
         allow get, list: if isSchoolAdmin(schoolId) ||
             isTeacher(schoolId) ||
             isDevImpersonatingSchool(schoolId);
@@ -441,6 +452,7 @@ service cloud.firestore {
         // `access` to render the "access lapsed — contact your school" screen.
         allow create: if isSignedIn() &&
             writeAllowedForDev() &&
+            minutesInBounds() &&
             getUserData(schoolId).linkedChildren != null &&
             request.resource.data.studentId in getUserData(schoolId).linkedChildren &&
             request.resource.data.parentId == request.auth.uid &&
@@ -459,12 +471,14 @@ service cloud.firestore {
         // synced by the portal, so relying on it denied every proxy log.
         allow create: if isSignedIn() &&
             writeAllowedForDev() &&
+            minutesInBounds() &&
             isTeacher(schoolId) &&
             request.resource.data.parentId == request.auth.uid &&
             request.resource.data.loggedByRole == 'teacher' &&
             teacherTeachesClass(schoolId, request.resource.data.classId);
 
         allow update: if writeAllowedForDev() &&
+            minutesInBounds() &&
             (
               (isSignedIn() && resource.data.parentId == request.auth.uid) ||
               isSchoolAdmin(schoolId) ||

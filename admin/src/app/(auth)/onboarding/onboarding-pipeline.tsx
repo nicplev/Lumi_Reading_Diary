@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { DataTable } from "@/components/data-table/data-table";
 import type { OnboardingListItem } from "@/lib/firestore/onboarding";
 import { onboardingColumns } from "./onboarding-columns";
+import { NewRequestDialog } from "./new-request-dialog";
 
 const STAGES = [
   { value: "demo", label: "Demo", color: "bg-cyan-100 dark:bg-cyan-900" },
@@ -63,6 +64,10 @@ export function OnboardingPipeline({ requests }: OnboardingPipelineProps) {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-end">
+        <NewRequestDialog />
+      </div>
+
       {/* Kanban Board */}
       <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
         {STAGES.map((stage) => {

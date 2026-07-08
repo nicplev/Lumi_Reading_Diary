@@ -22,6 +22,7 @@ import '../../../data/models/student_model.dart';
 import '../../../data/models/user_model.dart';
 import '../../../services/firebase_service.dart';
 import '../../../services/staff_notification_service.dart';
+import '../../../services/widget_data_service.dart';
 import 'models/student_achievement.dart';
 import 'models/dashboard_widget_config.dart';
 import 'models/dashboard_widget_context.dart';
@@ -71,6 +72,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
   List<StudentAchievement> _recentAchievements = [];
   final ValueNotifier<int> _engagementResetSignal = ValueNotifier<int>(0);
   bool _messagingEnabled = true;
+  int _teacherWidgetRefreshGeneration = 0;
 
   // Widget customisation
   late DashboardWidgetConfig _widgetConfig;
@@ -178,7 +180,6 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
     setState(() {
       _widgetConfig = _widgetConfig.removeWidget(id);
     });
-    if (!_anyWidgetNeedsStudents) _students = [];
     if (!_anyWidgetNeedsWeeklyLogs) _weeklyLogs = [];
     if (!_anyWidgetNeedsReadingGroups) {
       _readingGroupsSubscription?.cancel();
@@ -262,11 +263,9 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
 
   /// Launches all required fetches in parallel based on active widget deps.
   void _fetchAllDependencies() {
-    if (_anyWidgetNeedsStudents) {
-      _fetchStudents();
-    } else {
-      _studentsLoaded = true;
-    }
+    // The iOS teacher home-screen widgets also depend on the roster, even when
+    // the in-app dashboard has no currently visible student-dependent cards.
+    _fetchStudents();
     if (_anyWidgetNeedsWeeklyLogs) {
       _fetchWeeklyLogs();
     } else {
@@ -289,6 +288,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
           _recentAchievements = [];
           _studentsLoaded = true;
         });
+        unawaited(_refreshTeacherHomeWidget());
       }
       return;
     }
@@ -338,9 +338,58 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
         _recentAchievements = achievements;
         _studentsLoaded = true;
       });
+      unawaited(_refreshTeacherHomeWidget());
     } catch (e) {
       debugPrint('Error fetching students for dashboard: $e');
-      if (mounted) setState(() => _studentsLoaded = true);
+      if (mounted) {
+        setState(() => _studentsLoaded = true);
+        unawaited(_refreshTeacherHomeWidget());
+      }
+    }
+  }
+
+  Future<void> _refreshTeacherHomeWidget() async {
+    final schoolId = widget.user.schoolId;
+    if (schoolId == null || schoolId.isEmpty) return;
+    final selectedClass = widget.selectedClass;
+    final generation = ++_teacherWidgetRefreshGeneration;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final cutoff = today.subtract(const Duration(days: 41));
+
+    try {
+      await WidgetDataService.instance.updateFromTeacherDashboard(
+        teacher: widget.user,
+        classModel: selectedClass,
+        students: _students,
+        recentLogs: const [],
+      );
+
+      final snapshot = await FirebaseService.instance.firestore
+          .collection('schools')
+          .doc(schoolId)
+          .collection('readingLogs')
+          .where('classId', isEqualTo: selectedClass.id)
+          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(cutoff))
+          .get();
+
+      if (!mounted ||
+          generation != _teacherWidgetRefreshGeneration ||
+          widget.selectedClass.id != selectedClass.id) {
+        return;
+      }
+
+      final recentLogs = snapshot.docs
+          .map((doc) => ReadingLogModel.fromFirestore(doc))
+          .toList();
+      await WidgetDataService.instance.updateFromTeacherDashboard(
+        teacher: widget.user,
+        classModel: selectedClass,
+        students: _students,
+        recentLogs: recentLogs,
+      );
+    } catch (e) {
+      debugPrint('Error refreshing teacher home-screen widget: $e');
     }
   }
 
@@ -517,84 +566,84 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
     return LumiSectionScope(
       section: LumiSectionTheme.dashboard,
       child: RawGestureDetector(
-      behavior: HitTestBehavior.translucent,
-      gestures: <Type, GestureRecognizerFactory>{
-        TapGestureRecognizer:
-            GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
-          () => TapGestureRecognizer(),
-          (TapGestureRecognizer instance) {
-            instance.onTap = _isEditMode ? null : resetEngagementCard;
-          },
-        ),
-        if (!_isEditMode)
-          LongPressGestureRecognizer:
-              GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
-            () => LongPressGestureRecognizer(
-              duration: const Duration(milliseconds: 900),
-            ),
-            (LongPressGestureRecognizer instance) {
-              instance.onLongPress = _enterEditMode;
+        behavior: HitTestBehavior.translucent,
+        gestures: <Type, GestureRecognizerFactory>{
+          TapGestureRecognizer:
+              GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
+            () => TapGestureRecognizer(),
+            (TapGestureRecognizer instance) {
+              instance.onTap = _isEditMode ? null : resetEngagementCard;
             },
           ),
-      },
-      child: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: SizedBox(height: topPadding + 12)),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _buildHero(),
-            )
-                .animate()
-                .fadeIn(duration: 400.ms, curve: Curves.easeOut)
-                .slideY(begin: -0.02, end: 0, duration: 400.ms),
-          ),
-
-          // ── Edit-mode banner ──
-          if (_isEditMode)
+          if (!_isEditMode)
+            LongPressGestureRecognizer: GestureRecognizerFactoryWithHandlers<
+                LongPressGestureRecognizer>(
+              () => LongPressGestureRecognizer(
+                duration: const Duration(milliseconds: 900),
+              ),
+              (LongPressGestureRecognizer instance) {
+                instance.onLongPress = _enterEditMode;
+              },
+            ),
+        },
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(child: SizedBox(height: topPadding + 12)),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: _buildEditModeBanner(),
-              ),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _buildHero(),
+              )
+                  .animate()
+                  .fadeIn(duration: 400.ms, curve: Curves.easeOut)
+                  .slideY(begin: -0.02, end: 0, duration: 400.ms),
             ),
 
-          // ── Widget cards ──
-          if (_isEditMode)
-            _buildEditableWidgetSliver(activeDefinitions, ctx)
-          else
-            _buildNormalWidgetSliver(activeDefinitions, ctx),
+            // ── Edit-mode banner ──
+            if (_isEditMode)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: _buildEditModeBanner(),
+                ),
+              ),
 
-          // ── Customize link (normal mode only) ──
-          if (!_isEditMode)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-                child: GestureDetector(
-                  onTap: _enterEditMode,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.dashboard_customize_rounded,
-                          size: 16, color: AppColors.textSecondary),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Customize dashboard',
-                        style: TeacherTypography.bodySmall.copyWith(
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.w500,
+            // ── Widget cards ──
+            if (_isEditMode)
+              _buildEditableWidgetSliver(activeDefinitions, ctx)
+            else
+              _buildNormalWidgetSliver(activeDefinitions, ctx),
+
+            // ── Customize link (normal mode only) ──
+            if (!_isEditMode)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+                  child: GestureDetector(
+                    onTap: _enterEditMode,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.dashboard_customize_rounded,
+                            size: 16, color: AppColors.textSecondary),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Customize dashboard',
+                          style: TeacherTypography.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
 
-          // ── Bottom padding (clears floating nav pill) ──
-          const SliverToBoxAdapter(child: SizedBox(height: 200)),
-        ],
-      ),
+            // ── Bottom padding (clears floating nav pill) ──
+            const SliverToBoxAdapter(child: SizedBox(height: 200)),
+          ],
+        ),
       ),
     );
   }
@@ -624,8 +673,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
               !_studentsLoaded) ||
           (def.dataDependencies.contains(WidgetDataDependency.weeklyLogs) &&
               !_weeklyLogsLoaded) ||
-          (def.dataDependencies
-                  .contains(WidgetDataDependency.readingGroups) &&
+          (def.dataDependencies.contains(WidgetDataDependency.readingGroups) &&
               !_readingGroupsLoaded);
       if (isLoading) continue;
       if (def.isVisible != null && !def.isVisible!(ctx)) continue;
@@ -639,10 +687,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
         visible[i]
             .builder(ctx)
             .animate()
-            .fadeIn(
-                delay: (60 * i).ms,
-                duration: 300.ms,
-                curve: Curves.easeOut)
+            .fadeIn(delay: (60 * i).ms, duration: 300.ms, curve: Curves.easeOut)
             .slideY(begin: 0.02, end: 0, duration: 300.ms),
       );
     }
@@ -858,64 +903,64 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
         borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '$greeting, $firstName',
-                          style: LumiType.heading.copyWith(
-                            color: LumiSectionTheme.dashboard.onAccent,
-                            fontSize: 22,
-                          ),
-                        ).animate().fadeIn(duration: 400.ms).slideY(
-                              begin: -0.1,
-                              end: 0,
-                              duration: 400.ms,
-                              curve: Curves.easeOut,
-                            ),
-                        const SizedBox(height: 2),
-                        Text(
-                          DateFormat('EEEE, MMMM d').format(DateTime.now()),
-                          style: LumiType.caption.copyWith(
-                            color: LumiSectionTheme.dashboard.onAccent
-                                .withValues(alpha: 0.85),
-                            fontWeight: FontWeight.w500,
-                          ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$greeting, $firstName',
+                      style: LumiType.heading.copyWith(
+                        color: LumiSectionTheme.dashboard.onAccent,
+                        fontSize: 22,
+                      ),
+                    ).animate().fadeIn(duration: 400.ms).slideY(
+                          begin: -0.1,
+                          end: 0,
+                          duration: 400.ms,
+                          curve: Curves.easeOut,
                         ),
-                        if (_dailyInsight != null) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            _dailyInsight!,
-                            style: LumiType.caption.copyWith(
-                              color: LumiSectionTheme.dashboard.onAccent,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ],
+                    const SizedBox(height: 2),
+                    Text(
+                      DateFormat('EEEE, MMMM d').format(DateTime.now()),
+                      style: LumiType.caption.copyWith(
+                        color: LumiSectionTheme.dashboard.onAccent
+                            .withValues(alpha: 0.85),
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                  _buildBellButton(context),
-                ],
+                    if (_dailyInsight != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _dailyInsight!,
+                        style: LumiType.caption.copyWith(
+                          color: LumiSectionTheme.dashboard.onAccent,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
               ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  _buildClassChip()
-                      .animate()
-                      .fadeIn(delay: 100.ms, duration: 300.ms),
-                ],
-              ),
+              _buildBellButton(context),
             ],
           ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _buildClassChip()
+                  .animate()
+                  .fadeIn(delay: 100.ms, duration: 300.ms),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -1040,7 +1085,8 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
                         const BoxConstraints(minWidth: 18, minHeight: 18),
                     decoration: BoxDecoration(
                       color: LumiTokens.red,
-                      borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+                      borderRadius:
+                          BorderRadius.circular(LumiTokens.radiusPill),
                       border: Border.all(
                         color: LumiSectionTheme.dashboard.accent,
                         width: 2,

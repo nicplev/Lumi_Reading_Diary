@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { type ColumnDef } from "@tanstack/react-table";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -127,9 +128,21 @@ export function SchoolUsersTab({ schoolId, users }: SchoolUsersTabProps) {
           body: JSON.stringify({ action: authAction.action }),
         }
       );
+      const data = await res.json();
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to perform action");
+        throw new Error(data.error || "Failed to perform action");
+      }
+      // The reset-password action returns a one-time set-password link; the API
+      // used to generate it and the UI silently dropped it. Surface it.
+      if (authAction.action === "resetPassword" && data.resetLink) {
+        try {
+          await navigator.clipboard.writeText(data.resetLink);
+          toast.success("Password reset link copied to clipboard");
+        } catch {
+          toast.success("Password reset link generated", {
+            description: data.resetLink,
+          });
+        }
       }
       setAuthAction(null);
       router.refresh();

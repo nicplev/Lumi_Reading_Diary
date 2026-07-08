@@ -9,13 +9,11 @@ import '../../../core/theme/lumi_spacing.dart';
 import '../../../core/theme/lumi_text_styles.dart';
 import '../../../services/widget_data_service.dart';
 
-/// In-app "you can still undo" banner — Layer 2 of the widget undo flow.
+/// Legacy in-app "you can still undo" banner for older widget builds.
 ///
-/// Fires when the iOS widget's "Log reading" was tapped and the post-tap
-/// 10-second undo window already closed (so the commit reached Firestore),
-/// but is still within the broader ~5-minute in-app window. Shown above the
-/// regular parent home content; dismisses itself after undo, dismiss, or
-/// expiry.
+/// Current widget taps deep-link into the normal logging flow and do not create
+/// commits directly. This remains so any recently-created records from a
+/// previous build can still be undone, dismissed, or expired cleanly.
 ///
 /// Renders nothing while no recent widget commit is in window — safe to drop
 /// into the parent layout unconditionally.

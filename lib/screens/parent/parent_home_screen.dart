@@ -48,10 +48,16 @@ const double _kNavBarClearance = 92;
 
 class ParentHomeScreen extends ConsumerStatefulWidget {
   final UserModel user;
+  final String? widgetChildId;
+  final String? widgetAction;
+  final String? widgetTapId;
 
   const ParentHomeScreen({
     super.key,
     required this.user,
+    this.widgetChildId,
+    this.widgetAction,
+    this.widgetTapId,
   });
 
   @override
@@ -61,6 +67,7 @@ class ParentHomeScreen extends ConsumerStatefulWidget {
 class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     with WidgetsBindingObserver {
   int _selectedIndex = 0;
+  bool _handledWidgetDeepLink = false;
 
   void _onCoversUpdated() {
     if (mounted) setState(() {});
@@ -75,6 +82,16 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
   }
 
   @override
+  void didUpdateWidget(covariant ParentHomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.widgetChildId != widget.widgetChildId ||
+        oldWidget.widgetAction != widget.widgetAction ||
+        oldWidget.widgetTapId != widget.widgetTapId) {
+      _handledWidgetDeepLink = false;
+    }
+  }
+
+  @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     BookCoverCacheService.instance.removeListener(_onCoversUpdated);
@@ -83,12 +100,11 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Rec 4: reconcile any reading logged from the iOS widget while the app
-    // was backgrounded. Reminder suppression for already-logged-today is now
-    // handled server-side by the `sendReadingReminders` Cloud Function.
     if (state == AppLifecycleState.resumed) {
       final children = ref.read(parentChildrenProvider).value;
       if (children != null && children.isNotEmpty) {
+        // Clears any legacy AppIntent queue from older widget builds. Current
+        // widget taps deep-link into the app instead of writing from the widget.
         WidgetDataService.instance.drainPendingWidgetLogs(
           children: children,
           parent: widget.user,
@@ -119,9 +135,143 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     await ref.read(activeChildIdProvider.notifier).select(ids.first);
   }
 
+  void _scheduleWidgetDeepLinkHandling(List<StudentModel> children) {
+    if (_handledWidgetDeepLink) return;
+    final action = widget.widgetAction;
+    final hasWidgetRoute = action == 'log' ||
+        action == 'home' ||
+        (widget.widgetChildId?.trim().isNotEmpty ?? false);
+    if (!hasWidgetRoute) return;
+
+    _handledWidgetDeepLink = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_handleWidgetDeepLink(children));
+    });
+  }
+
+  Future<void> _handleWidgetDeepLink(List<StudentModel> children) async {
+    final action = widget.widgetAction == 'log' ? 'log' : 'home';
+    final requestedChildId = widget.widgetChildId?.trim() ?? '';
+    StudentModel? targetChild;
+
+    if (requestedChildId.isNotEmpty) {
+      for (final child in children) {
+        if (child.id == requestedChildId) {
+          targetChild = child;
+          break;
+        }
+      }
+      if (targetChild == null) {
+        debugPrint('[ParentHomeScreen] ignored widget link for unknown child: '
+            '$requestedChildId');
+        return;
+      }
+    } else {
+      targetChild = ref.read(activeChildProvider).value ?? children.first;
+    }
+
+    await ref.read(activeChildIdProvider.notifier).select(targetChild.id);
+    if (!mounted) return;
+    if (_selectedIndex != 0) {
+      setState(() => _selectedIndex = 0);
+    }
+    if (action != 'log') return;
+
+    final alreadyLogged = await _hasReadingLogToday(targetChild);
+    if (!mounted || alreadyLogged) return;
+
+    final allocations = await _loadActiveAllocationsFor(targetChild);
+    if (!mounted) return;
+    NavigationStateService().setTempData({
+      'parent': widget.user,
+      'student': targetChild,
+      'allocations': allocations,
+    });
+    context.push('/parent/log-reading');
+  }
+
+  Future<bool> _hasReadingLogToday(StudentModel student) async {
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    try {
+      final snapshot = await FirebaseService.instance.firestore
+          .collection('schools')
+          .doc(student.schoolId)
+          .collection('readingLogs')
+          .where('studentId', isEqualTo: student.id)
+          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+          .orderBy('date', descending: true)
+          .limit(1)
+          .get();
+      return snapshot.docs.isNotEmpty;
+    } catch (e) {
+      debugPrint('[ParentHomeScreen] widget logged-state check failed: $e');
+      return false;
+    }
+  }
+
+  Future<List<AllocationModel>> _loadActiveAllocationsFor(
+    StudentModel student,
+  ) async {
+    final firestore = FirebaseService.instance.firestore;
+    late final List<QuerySnapshot<Map<String, dynamic>>> snapshots;
+    try {
+      snapshots = await Future.wait([
+        firestore
+            .collection('schools')
+            .doc(student.schoolId)
+            .collection('allocations')
+            .where('studentIds', arrayContains: student.id)
+            .where('isActive', isEqualTo: true)
+            .get(),
+        firestore
+            .collection('schools')
+            .doc(student.schoolId)
+            .collection('allocations')
+            .where('classId', isEqualTo: student.classId)
+            .where('studentIds', isEqualTo: [])
+            .where('isActive', isEqualTo: true)
+            .get(),
+      ]);
+    } catch (e) {
+      debugPrint('[ParentHomeScreen] widget allocation load failed: $e');
+      return const [];
+    }
+    final now = DateTime.now();
+    final seen = <String>{};
+    final allocations = <AllocationModel>[];
+    for (final doc in snapshots.expand((snapshot) => snapshot.docs)) {
+      if (!seen.add(doc.id)) continue;
+      final candidate = AllocationModel.fromFirestore(doc);
+      if (candidate.startDate.isBefore(now) && candidate.endDate.isAfter(now)) {
+        allocations.add(candidate);
+      }
+    }
+    return allocations;
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Keep the iOS/Android home-screen widget in sync with the child list.
+    // Defense-in-depth: this is a parent-only screen. If a non-parent (e.g. a
+    // teacher whose session briefly resolved to /parent/home during the async
+    // auth redirect, or an iOS widget deep link) reaches it, bounce them to
+    // their own home instead of rendering the parent "no children" state —
+    // guarantees a teacher never sees this screen.
+    if (widget.user.role != UserRole.parent) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!context.mounted) return;
+        context.go(widget.user.role == UserRole.teacher
+            ? '/teacher/home'
+            : '/auth/admin-portal');
+      });
+      return const Scaffold(
+        backgroundColor: LumiTokens.cream,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Keep the iOS home-screen widget in sync with the child list.
     ref.listen<AsyncValue<List<StudentModel>>>(
       parentChildrenProvider,
       (_, next) {
@@ -132,12 +282,12 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
             selectedChildId:
                 ref.read(activeChildProvider).value?.id ?? children.first.id,
             todaysLogs: const {},
-            // Caches the parent so the lifecycle-driven drain can run on
-            // resume from any parent screen (not only ParentHome).
+            // Caches the parent so lifecycle handling can clear retired widget
+            // queue keys on resume from any parent screen.
             parent: widget.user,
           );
-          // Rec 4: reconcile any reading logged from the iOS widget while
-          // the app was closed.
+          // Clears any stale queue left by older widget builds that supported
+          // live AppIntent logging.
           WidgetDataService.instance.drainPendingWidgetLogs(
             children: children,
             parent: widget.user,
@@ -184,16 +334,16 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
             }
             final activeChild =
                 ref.watch(activeChildProvider).value ?? children.first;
+            _scheduleWidgetDeepLinkHandling(children);
             return Scaffold(
               backgroundColor: LumiTokens.cream,
               body: Stack(
                 children: [
                   Column(
                     children: [
-                      // In-app undo banner — Layer 2 of the widget undo flow.
-                      // Self-hides when no recent widget commit is in window.
-                      // Sits above the IndexedStack so it's visible on every
-                      // parent tab during the ~5-minute undo window.
+                      // Legacy widget undo banner. New widget taps deep-link
+                      // into the normal logging flow, but this still lets old
+                      // post-commit records expire or be dismissed cleanly.
                       const SafeArea(
                         bottom: false,
                         child: WidgetUndoBanner(),
@@ -262,7 +412,11 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
         label: 'Library',
         color: LumiTokens.yellow
       ),
-      (icon: Icons.settings_outlined, label: 'Settings', color: LumiTokens.green),
+      (
+        icon: Icons.settings_outlined,
+        label: 'Settings',
+        color: LumiTokens.green
+      ),
     ];
 
     return DecoratedBox(
@@ -373,15 +527,14 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
         borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
         child: InkWell(
           borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
-          onTap: () =>
-              AddEmailForRecoveryModal.show(context: context, user: widget.user),
+          onTap: () => AddEmailForRecoveryModal.show(
+              context: context, user: widget.user),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
                 Icon(Icons.shield_outlined,
-                    size: 18,
-                    color: LumiTokens.red.withValues(alpha: 0.9)),
+                    size: 18, color: LumiTokens.red.withValues(alpha: 0.9)),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -422,51 +575,51 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: StreamBuilder<int>(
-                stream: StaffNotificationService.instance
-                    .watchUnreadParentNotificationCount(widget.user),
-                builder: (context, snapshot) {
-                  final unreadCount = snapshot.data ?? 0;
-                  return Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Semantics(
-                        label: unreadCount > 0
-                            ? 'Notifications, $unreadCount unread'
-                            : 'Notifications',
-                        button: true,
-                        child: LumiIconButton(
-                          icon: Icons.notifications_outlined,
-                          onPressed: () {
-                            context.push('/parent/notifications');
-                          },
+                  stream: StaffNotificationService.instance
+                      .watchUnreadParentNotificationCount(widget.user),
+                  builder: (context, snapshot) {
+                    final unreadCount = snapshot.data ?? 0;
+                    return Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Semantics(
+                          label: unreadCount > 0
+                              ? 'Notifications, $unreadCount unread'
+                              : 'Notifications',
+                          button: true,
+                          child: LumiIconButton(
+                            icon: Icons.notifications_outlined,
+                            onPressed: () {
+                              context.push('/parent/notifications');
+                            },
+                          ),
                         ),
-                      ),
-                      if (unreadCount > 0)
-                        Positioned(
-                          right: 2,
-                          top: 2,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: LumiTokens.red,
-                              borderRadius:
-                                  BorderRadius.circular(LumiTokens.radiusPill),
-                            ),
-                            child: Text(
-                              unreadCount > 99 ? '99+' : '$unreadCount',
-                              style: LumiType.caption.copyWith(
-                                color: LumiTokens.paper,
-                                fontWeight: FontWeight.w700,
+                        if (unreadCount > 0)
+                          Positioned(
+                            right: 2,
+                            top: 2,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: LumiTokens.red,
+                                borderRadius: BorderRadius.circular(
+                                    LumiTokens.radiusPill),
+                              ),
+                              child: Text(
+                                unreadCount > 99 ? '99+' : '$unreadCount',
+                                style: LumiType.caption.copyWith(
+                                  color: LumiTokens.paper,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                    ],
-                  );
-                },
+                      ],
+                    );
+                  },
                 ),
               ),
             ],
@@ -480,7 +633,8 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
           // one-time read (userProvider doesn't re-fetch when an email is
           // linked mid-session), so we also watch the live Firebase Auth email
           // via authEmailProvider; either one being present hides the nudge.
-          if (!_accountHasEmail) SliverToBoxAdapter(child: _buildRecoveryBanner()),
+          if (!_accountHasEmail)
+            SliverToBoxAdapter(child: _buildRecoveryBanner()),
 
           // Content
           SliverPadding(
@@ -533,7 +687,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const LumiMascot(
-              variant: LumiVariant.parent,
+              variant: LumiVariant.linking,
               size: 150,
             ),
             LumiGap.m,
@@ -559,7 +713,6 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
       ),
     );
   }
-
 }
 
 class _TodayCard extends StatefulWidget {
@@ -598,9 +751,8 @@ class _TodayCardState extends State<_TodayCard> {
       widget.coverUrlResolver;
   VoidCallback? get onTap => widget.onTap;
 
-  int get _targetMinutes => activeAllocations.isNotEmpty
-      ? activeAllocations.first.targetMinutes
-      : 20;
+  int get _targetMinutes =>
+      activeAllocations.isNotEmpty ? activeAllocations.first.targetMinutes : 20;
 
   /// First assigned book title for this student, sanitized for display.
   String? get _firstAssignedTitle {
@@ -686,9 +838,8 @@ class _TodayCardState extends State<_TodayCard> {
                   decoration: BoxDecoration(
                     // Logged = soft green tint with ink text; not-yet-logged =
                     // the Home red accent with white text. Both clear WCAG AA.
-                    color: hasLoggedToday
-                        ? LumiTokens.tintGreen
-                        : LumiTokens.red,
+                    color:
+                        hasLoggedToday ? LumiTokens.tintGreen : LumiTokens.red,
                     borderRadius: LumiBorders.circular,
                   ),
                   child: Text(
@@ -696,9 +847,7 @@ class _TodayCardState extends State<_TodayCard> {
                     style: LumiType.caption.copyWith(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: hasLoggedToday
-                          ? LumiTokens.ink
-                          : LumiTokens.paper,
+                      color: hasLoggedToday ? LumiTokens.ink : LumiTokens.paper,
                     ),
                   ),
                 ),
@@ -807,7 +956,8 @@ class _TodayCardState extends State<_TodayCard> {
                       ),
                     ...allBooks.map((book) {
                       final displayTitle =
-                          IsbnAssignmentService.sanitizeDisplayTitle(book.title);
+                          IsbnAssignmentService.sanitizeDisplayTitle(
+                              book.title);
                       return Padding(
                         padding: EdgeInsets.only(bottom: LumiSpacing.xs),
                         child: LumiBookCard(
@@ -1064,8 +1214,7 @@ class _MomentumCard extends StatelessWidget {
             int totalNights = 0;
             int currentStreak = 0;
             if (studentSnap.hasData && studentSnap.data!.exists) {
-              final stats =
-                  StudentModel.fromFirestore(studentSnap.data!).stats;
+              final stats = StudentModel.fromFirestore(studentSnap.data!).stats;
               totalNights = stats?.totalReadingDays ?? 0;
               currentStreak = stats?.currentStreak ?? 0;
             }
@@ -1101,8 +1250,8 @@ class _MomentumCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Text(
                         '$currentStreak-day',
-                        style: LumiType.body
-                            .copyWith(fontWeight: FontWeight.w600),
+                        style:
+                            LumiType.body.copyWith(fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(width: 8),
                     ],
@@ -1126,8 +1275,8 @@ class _MomentumCard extends StatelessWidget {
                     final completedDays = <int>{};
                     if (weekSnap.hasData) {
                       for (final doc in weekSnap.data!.docs) {
-                        completedDays
-                            .add(ReadingLogModel.fromFirestore(doc).date.weekday);
+                        completedDays.add(
+                            ReadingLogModel.fromFirestore(doc).date.weekday);
                       }
                     }
                     return WeekProgressBar(
@@ -1391,8 +1540,7 @@ class _TonightRowState extends State<_TonightRow> {
                 (log.parentComment != null && log.parentComment!.isNotEmpty));
 
             return InkWell(
-              onTap:
-                  _isQuickLogging ? null : () => _openDetail(allocations),
+              onTap: _isQuickLogging ? null : () => _openDetail(allocations),
               borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 10),
@@ -1489,8 +1637,8 @@ class _LogCircle extends StatelessWidget {
           color: LumiTokens.green,
           shape: BoxShape.circle,
         ),
-        child: const Icon(Icons.check_rounded,
-            color: LumiTokens.paper, size: 24),
+        child:
+            const Icon(Icons.check_rounded, color: LumiTokens.paper, size: 24),
       );
     } else {
       inner = Container(
@@ -1566,8 +1714,8 @@ class _FullFlowNudgeState extends State<_FullFlowNudge> {
             behavior: HitTestBehavior.opaque,
             child: const Padding(
               padding: EdgeInsets.all(6),
-              child: Icon(Icons.close_rounded,
-                  size: 18, color: LumiTokens.muted),
+              child:
+                  Icon(Icons.close_rounded, size: 18, color: LumiTokens.muted),
             ),
           ),
         ],

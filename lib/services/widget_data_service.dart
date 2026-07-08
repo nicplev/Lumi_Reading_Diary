@@ -9,27 +9,30 @@ import 'package:home_widget/home_widget.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../data/models/class_model.dart';
 import '../data/models/student_model.dart';
 import '../data/models/reading_log_model.dart';
 import '../data/models/user_model.dart';
-import 'reading_log_service.dart';
 
 const _appGroupId = 'group.com.lumi.lumiReadingTracker';
 const _widgetDataKey = 'lumi_widget_data';
-const _widgetName = 'LumiWidget';
-// Rec 4: App Group keys shared with the iOS widget's LogReadingIntent.
+const _allWidgetNames = [
+  'LumiWidget',
+  'LumiTeacherTodayWidget',
+  'LumiTeacherTopReadersWidget',
+  'LumiTeacherCalendarWidget',
+];
+// Legacy App Group keys from the removed iOS live AppIntent logging flow.
+// Current widget taps only deep-link into the app, but these are still cleared
+// so stale pre-change queue state cannot create confusing optimistic UI.
 const _pendingLogsKey = 'lumi_pending_widget_logs';
 const _optimisticKey = 'lumi_optimistic_logged_ids';
-// Layer 1 (widget undo): `studentId -> ISO8601` map of "post-tap undo window
-// expires at" timestamps written by Swift's `WidgetLogQueue.enqueue`. While
-// the timestamp is in the future the widget renders an "Undo" CTA and the
-// drain below skips the entry so no Firestore write happens.
 const _undoUntilKey = 'lumi_widget_undo_until';
-// Layer 2 (in-app undo banner): JSON list of recently-committed widget logs
-// stored in SharedPreferences so a parent who didn't catch the 10-second
-// widget undo can still reverse the log from inside the app for ~5 minutes.
+// Legacy in-app undo banner storage for logs committed by older widget builds.
+// No new records are created now that widget taps only deep-link into the app.
 const _recentCommitsPrefsKey = 'lumi_recent_widget_commits';
 const _recentCommitsWindow = Duration(minutes: 5);
+const _teacherCalendarDays = 42;
 
 /// Manages data written to the iOS home screen widget via App Group shared storage.
 ///
@@ -43,6 +46,7 @@ class WidgetDataService {
   // can be merged without re-fetching all children.
   List<_ChildPayload> _cachedChildren = [];
   String _selectedChildId = '';
+  _TeacherDashboardPayload? _cachedTeacherDashboard;
 
   // Rec 4: cached references for the lifecycle-driven drain. Populated on
   // `updateFromChildren`; needed because the WidgetsBindingObserver runs at
@@ -51,20 +55,17 @@ class WidgetDataService {
   UserModel? _cachedParent;
   _LifecycleDrainObserver? _observer;
 
-  // Coalesces concurrent drain callers onto a single future. On app resume
-  // ParentHomeScreen's lifecycle observer AND its parentChildrenProvider
-  // re-emit listener both fire `drainPendingWidgetLogs` within a few ms,
-  // racing on the pending queue and writing the same tap twice to Firestore.
+  // Coalesces concurrent legacy-queue clear callers onto a single future.
   Future<void>? _inFlightDrain;
 
   /// Call once at app startup (after Firebase init).
   static Future<void> initialize() async {
     if (!_isSupported) return;
     await HomeWidget.setAppGroupId(_appGroupId);
-    // Rec 4: register a lifecycle observer so the pending-widget-log queue
-    // drains on every app resume, not only while ParentHomeScreen is the
-    // active route. The observer no-ops until updateFromChildren has cached
-    // the children + parent on a prior session.
+    await instance._clearLegacyLiveInteractionState();
+    // Register a lifecycle observer so legacy widget queue state is cleared on
+    // every app resume, not only while ParentHomeScreen is the active route. The
+    // observer no-ops until updateFromChildren has cached the children + parent.
     instance._observer ??= _LifecycleDrainObserver(instance);
     WidgetsBinding.instance.addObserver(instance._observer!);
   }
@@ -81,12 +82,13 @@ class WidgetDataService {
   Future<void> clearAll() async {
     _cachedChildren = [];
     _selectedChildId = '';
+    _cachedTeacherDashboard = null;
     _cachedChildModels = const [];
     _cachedParent = null;
     _inFlightDrain = null;
 
-    // In-app undo banner (SharedPreferences, not App Group) — runs on every
-    // platform, so clear it regardless of [_isSupported].
+    // Legacy in-app undo banner (SharedPreferences, not App Group) — runs on
+    // every platform, so clear it regardless of [_isSupported].
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_recentCommitsPrefsKey);
@@ -100,18 +102,17 @@ class WidgetDataService {
     try {
       final emptyPayload = jsonEncode({
         'schemaVersion': 1,
+        'accountRole': 'none',
         'updatedAt': DateTime.now().toUtc().toIso8601String(),
         'selectedChildId': '',
         'children': <Map<String, dynamic>>[],
+        'teacherDashboard': null,
       });
       await HomeWidget.saveWidgetData<String>(_widgetDataKey, emptyPayload);
       await HomeWidget.saveWidgetData<String>(_pendingLogsKey, '[]');
       await HomeWidget.saveWidgetData<String>(_optimisticKey, '');
       await HomeWidget.saveWidgetData<String>(_undoUntilKey, '');
-      await HomeWidget.updateWidget(
-        iOSName: _widgetName,
-        androidName: _widgetName,
-      );
+      await _reloadWidgets();
     } catch (e) {
       debugPrint('[WidgetDataService] clearAll: widget wipe failed: $e');
     }
@@ -125,6 +126,7 @@ class WidgetDataService {
     UserModel? parent,
   }) async {
     if (!_isSupported) return;
+    _cachedTeacherDashboard = null;
     _selectedChildId = selectedChildId;
     _cachedChildren = children.map((student) {
       final log = todaysLogs[student.id];
@@ -152,80 +154,67 @@ class WidgetDataService {
     await _push();
   }
 
-  /// Reconciles one-tap logs queued by the iOS widget's `LogReadingIntent`.
+  /// Replaces the full teacher dashboard payload used by the teacher-only iOS
+  /// widgets. The caller must pass data already scoped to the signed-in
+  /// teacher's selected class; the payload is display-only and contains no
+  /// credentials or write-capable tokens.
+  Future<void> updateFromTeacherDashboard({
+    required UserModel teacher,
+    required ClassModel classModel,
+    required List<StudentModel> students,
+    required List<ReadingLogModel> recentLogs,
+  }) async {
+    if (!_isSupported || teacher.role != UserRole.teacher) return;
+    _cachedChildren = [];
+    _selectedChildId = '';
+    _cachedChildModels = const [];
+    _cachedParent = null;
+    _cachedTeacherDashboard = _TeacherDashboardPayload.fromDashboard(
+      teacher: teacher,
+      classModel: classModel,
+      students: students,
+      recentLogs: recentLogs,
+    );
+    await _pushTeacherDashboard();
+  }
+
+  /// Keeps the teacher widget fresh after a teacher proxy-log is saved, without
+  /// overwriting the teacher payload with the parent one-child widget payload.
+  Future<void> updateAfterTeacherLog({
+    required StudentModel student,
+    required ReadingLogModel log,
+  }) async {
+    if (!_isSupported) return;
+    final cached = _cachedTeacherDashboard;
+    if (cached == null || cached.classId != student.classId) return;
+    _cachedTeacherDashboard = cached.withAddedLog(student: student, log: log);
+    await _pushTeacherDashboard();
+  }
+
+  /// Clears one-tap logs queued by older iOS widget builds.
   ///
-  /// The widget extension can't reach Firestore, so each tap is queued in App
-  /// Group storage; this drains that queue on app launch/resume and performs
-  /// the real writes via [ReadingLogService]. Call when the parent's children
-  /// are loaded (see ParentHomeScreen).
+  /// Current widget taps deep-link into the normal app logging flow instead of
+  /// writing from the widget extension. This compatibility method intentionally
+  /// does not create reading logs; it only removes stale App Group queue keys so
+  /// a pre-change widget tap cannot be committed after an upgrade.
   Future<void> drainPendingWidgetLogs({
     required List<StudentModel> children,
     required UserModel parent,
   }) {
-    return _inFlightDrain ??= _drainPendingWidgetLogsImpl(
-      children: children,
-      parent: parent,
-    ).whenComplete(() => _inFlightDrain = null);
+    return _inFlightDrain ??=
+        _drainPendingWidgetLogsImpl().whenComplete(() => _inFlightDrain = null);
   }
 
-  Future<void> _drainPendingWidgetLogsImpl({
-    required List<StudentModel> children,
-    required UserModel parent,
-  }) async {
-    if (!_isSupported || children.isEmpty) return;
+  Future<void> _drainPendingWidgetLogsImpl() async {
+    if (!_isSupported) return;
     try {
-      final raw = await HomeWidget.getWidgetData<String>(_pendingLogsKey);
-      final validIds = {for (final child in children) child.id};
-      final queuedIds = parsePendingQueue(raw, validIds);
-      if (queuedIds.isEmpty) return;
-
-      // Two-layer undo model:
-      //   • Layer 1 (widget Undo button, 10 s) is for the home-screen flow:
-      //     parent taps Log on the widget then realises mid-tap. The pending
-      //     queue + undoUntil timestamp in App Group keep that recoverable
-      //     until the app is opened.
-      //   • Layer 2 (in-app banner, ~5 min) takes over the moment the app is
-      //     foregrounded. Commit immediately, capture pre-write stats, and
-      //     surface the banner — far less confusing than making the parent
-      //     stare at the home screen waiting for a Timer to fire.
-      // So we no longer skip entries whose widget undo window is still open.
-
-      final byId = {for (final child in children) child.id: child};
-      for (final studentId in queuedIds) {
-        final child = byId[studentId]!;
-        try {
-          final result = await ReadingLogService.instance.logReading(
-            student: child,
-            parent: parent,
-            quickLog: true,
-          );
-          await _recordWidgetCommit(
-            studentId: studentId,
-            firstName: child.firstName,
-            logId: result.log.id,
-            schoolId: child.schoolId,
-            committedAt: DateTime.now(),
-          );
-        } catch (e) {
-          debugPrint('[WidgetDataService] widget log drain failed for '
-              '$studentId: $e');
-        }
-      }
-
-      // Clear all transient widget-side state — the queue is now drained, the
-      // optimistic flags served their purpose, and any open undo window is
-      // moot now that the banner has taken over. Clearing undoUntil also
-      // flips the widget's CTA back from "Undo" to "View today" on the next
-      // refresh that `updateAfterLog` already kicked off inside writeLog.
-      await HomeWidget.saveWidgetData<String>(_pendingLogsKey, '[]');
-      await HomeWidget.saveWidgetData<String>(_optimisticKey, '');
-      await HomeWidget.saveWidgetData<String>(_undoUntilKey, '');
+      await _clearLegacyLiveInteractionState();
     } catch (e) {
       debugPrint('[WidgetDataService] drainPendingWidgetLogs failed: $e');
     }
   }
 
-  // ─── Layer 2: in-app undo banner ────────────────────────────────────
+  // ─── Legacy in-app widget undo banner ───────────────────────────────
 
   /// Fires whenever the recent-commits list changes (new commit recorded,
   /// undone, dismissed, or expired). UI watchers (the parent home banner)
@@ -234,8 +223,8 @@ class WidgetDataService {
       StreamController<void>.broadcast();
   Stream<void> get recentCommitsChanges => _commitsChanges.stream;
 
-  /// Recent widget-originated reading logs still within the in-app undo
-  /// window (~5 minutes). Excludes ones the parent already dismissed.
+  /// Legacy widget-originated reading logs still within the in-app undo window
+  /// (~5 minutes). Excludes ones the parent already dismissed.
   /// Newest first.
   Future<List<WidgetCommitRecord>> recentCommits() async {
     final all = await _loadCommits();
@@ -273,34 +262,13 @@ class WidgetDataService {
     // its non-celebrating state immediately rather than waiting on the
     // next parentChildrenProvider re-emit.
     await _clearOptimisticForStudent(commit.studentId);
-    await HomeWidget.updateWidget(
-      iOSName: _widgetName,
-      androidName: _widgetName,
-    );
+    await _reloadWidgets();
   }
 
   /// Removes the commit from the recent list without touching Firestore.
   /// Use for the "X" / "Got it" action on the banner.
   Future<void> dismissCommit(WidgetCommitRecord commit) async {
     await _removeCommit(commit);
-  }
-
-  Future<void> _recordWidgetCommit({
-    required String studentId,
-    required String firstName,
-    required String logId,
-    required String schoolId,
-    required DateTime committedAt,
-  }) async {
-    final commits = await _loadCommits();
-    commits.add(WidgetCommitRecord(
-      studentId: studentId,
-      firstName: firstName,
-      logId: logId,
-      schoolId: schoolId,
-      committedAt: committedAt,
-    ));
-    await _saveCommits(commits);
   }
 
   Future<void> _removeCommit(WidgetCommitRecord commit) async {
@@ -345,14 +313,14 @@ class WidgetDataService {
     await HomeWidget.saveWidgetData<String>(_optimisticKey, '');
   }
 
-  /// Pure parsing/dedupe of the App Group pending-log queue.
+  /// Pure parsing/dedupe of the legacy App Group pending-log queue.
   ///
   /// Exposed for testing (the surrounding [drainPendingWidgetLogs] is gated
   /// to iOS via `Platform.isIOS` and uses the `home_widget` plugin, so this
   /// is the slice that can be unit-tested on the host).
   ///
-  /// - Returns the ordered list of unique student IDs that should be
-  ///   reconciled to real reading logs.
+  /// - Returns the ordered list of unique student IDs represented in legacy
+  ///   queue data.
   /// - Drops entries that aren't well-formed maps with a non-null
   ///   `studentId`, or that reference a student not in [validStudentIds].
   /// - Dedupes per student (the widget already dedupes per day, but a
@@ -364,19 +332,48 @@ class WidgetDataService {
     String? raw,
     Set<String> validStudentIds,
   ) {
+    final processed = <String>{};
+    final result = <String>[];
+    for (final entry in parsePendingQueueEntries(raw, validStudentIds)) {
+      if (!processed.add(entry.studentId)) continue;
+      result.add(entry.studentId);
+    }
+    return result;
+  }
+
+  /// Parses legacy widget queue entries while preserving the captured date.
+  ///
+  /// The older [parsePendingQueue] intentionally returns only student IDs for
+  /// compatibility with existing tests/callers. The drain uses this date-aware
+  /// variant so a tap queued before midnight is committed to the intended
+  /// reading day when the app next foregrounds.
+  @visibleForTesting
+  static List<WidgetPendingLog> parsePendingQueueEntries(
+    String? raw,
+    Set<String> validStudentIds, {
+    DateTime? fallbackDate,
+  }) {
     if (raw == null || raw.isEmpty || raw == '[]') return const [];
     try {
       final decoded = jsonDecode(raw);
       if (decoded is! List || decoded.isEmpty) return const [];
+      final fallback = _dateOnly(fallbackDate ?? DateTime.now());
       final processed = <String>{};
-      final result = <String>[];
+      final result = <WidgetPendingLog>[];
       for (final entry in decoded) {
         if (entry is! Map) continue;
-        final studentId = entry['studentId'] as String?;
-        if (studentId == null) continue;
+        final studentId = entry['studentId'];
+        if (studentId is! String || studentId.isEmpty) continue;
         if (!validStudentIds.contains(studentId)) continue;
-        if (!processed.add(studentId)) continue;
-        result.add(studentId);
+        final readingDate =
+            _parseQueueDate(entry['date'] as String?) ?? fallback;
+        final dateKey = _formatQueueDate(readingDate);
+        if (!processed.add('$studentId|$dateKey')) continue;
+        result.add(WidgetPendingLog(
+          studentId: studentId,
+          dateKey: dateKey,
+          readingDate: readingDate,
+        ));
       }
       return result;
     } catch (_) {
@@ -384,21 +381,78 @@ class WidgetDataService {
     }
   }
 
+  static DateTime _dateOnly(DateTime date) =>
+      DateTime(date.year, date.month, date.day);
+
+  static DateTime? _parseQueueDate(String? raw) {
+    if (raw == null) return null;
+    final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(raw);
+    if (match == null) return null;
+    final year = int.tryParse(match.group(1)!);
+    final month = int.tryParse(match.group(2)!);
+    final day = int.tryParse(match.group(3)!);
+    if (year == null || month == null || day == null) return null;
+    final parsed = DateTime(year, month, day);
+    if (parsed.year != year || parsed.month != month || parsed.day != day) {
+      return null;
+    }
+    return parsed;
+  }
+
+  static String _formatQueueDate(DateTime date) {
+    return DateFormat('yyyy-MM-dd').format(_dateOnly(date));
+  }
+
+  Future<void> _clearLegacyLiveInteractionState() async {
+    await HomeWidget.saveWidgetData<String>(_pendingLogsKey, '[]');
+    await HomeWidget.saveWidgetData<String>(_optimisticKey, '');
+    await HomeWidget.saveWidgetData<String>(_undoUntilKey, '');
+  }
+
+  Future<void> _reloadWidgets() async {
+    for (final widgetName in _allWidgetNames) {
+      await HomeWidget.updateWidget(
+        iOSName: widgetName,
+        androidName: widgetName,
+      );
+    }
+  }
+
   Future<void> _push() async {
     try {
       final payload = {
         'schemaVersion': 1,
+        'accountRole': 'parent',
         'updatedAt': DateTime.now().toUtc().toIso8601String(),
         'selectedChildId': _selectedChildId,
         'children': _cachedChildren.map((c) => c.toJson()).toList(),
+        'teacherDashboard': null,
       };
-      await HomeWidget.saveWidgetData<String>(_widgetDataKey, jsonEncode(payload));
-      await HomeWidget.updateWidget(
-        iOSName: _widgetName,
-        androidName: _widgetName,
-      );
+      await HomeWidget.saveWidgetData<String>(
+          _widgetDataKey, jsonEncode(payload));
+      await _clearLegacyLiveInteractionState();
+      await _reloadWidgets();
     } catch (e) {
       debugPrint('[WidgetDataService] Failed to push widget data: $e');
+    }
+  }
+
+  Future<void> _pushTeacherDashboard() async {
+    try {
+      final payload = {
+        'schemaVersion': 2,
+        'accountRole': 'teacher',
+        'updatedAt': DateTime.now().toUtc().toIso8601String(),
+        'selectedChildId': '',
+        'children': <Map<String, dynamic>>[],
+        'teacherDashboard': _cachedTeacherDashboard?.toJson(),
+      };
+      await HomeWidget.saveWidgetData<String>(
+          _widgetDataKey, jsonEncode(payload));
+      await _clearLegacyLiveInteractionState();
+      await _reloadWidgets();
+    } catch (e) {
+      debugPrint('[WidgetDataService] Failed to push teacher widget data: $e');
     }
   }
 
@@ -432,6 +486,23 @@ class _LifecycleDrainObserver with WidgetsBindingObserver {
   }
 }
 
+class WidgetPendingLog {
+  const WidgetPendingLog({
+    required this.studentId,
+    required this.dateKey,
+    required this.readingDate,
+  });
+
+  final String studentId;
+  final String dateKey;
+  final DateTime readingDate;
+
+  Map<String, dynamic> toQueueJson() => {
+        'studentId': studentId,
+        'date': dateKey,
+      };
+}
+
 class _ChildPayload {
   final String studentId;
   final String firstName;
@@ -453,7 +524,8 @@ class _ChildPayload {
     required this.loggedToday,
   });
 
-  factory _ChildPayload.fromStudent(StudentModel student, ReadingLogModel? log) {
+  factory _ChildPayload.fromStudent(
+      StudentModel student, ReadingLogModel? log) {
     final now = DateTime.now();
     final todayStr = DateFormat('yyyy-MM-dd').format(now);
 
@@ -474,7 +546,9 @@ class _ChildPayload {
       // Fallback: infer from stats so the widget shows the correct state when
       // the app is opened after a log was already saved in a prior session.
       final last = student.stats!.lastReadingDate!;
-      if (last.year == now.year && last.month == now.month && last.day == now.day) {
+      if (last.year == now.year &&
+          last.month == now.month &&
+          last.day == now.day) {
         loggedToday = true;
         // Exact minutes not available without the log; widget shows ✓ state.
       }
@@ -483,10 +557,9 @@ class _ChildPayload {
     return _ChildPayload(
       studentId: student.id,
       firstName: student.firstName,
-      // NB: keeps the chosen character (not displayCharacterId) — the native
-      // home-screen widget bundles its own character assets and has no
-      // gold/special award art, so an award id would render blank there.
-      characterId: student.characterId ?? 'character_default',
+      // NB: keeps the chosen profile character (not displayCharacterId). If a
+      // child has not chosen one, the native widget falls back to red Lumi.
+      characterId: student.characterId ?? 'lumi_red_default',
       currentStreak: student.stats?.currentStreak ?? 0,
       lastReadingDate: student.stats?.lastReadingDate != null
           ? DateFormat('yyyy-MM-dd').format(student.stats!.lastReadingDate!)
@@ -509,8 +582,273 @@ class _ChildPayload {
       };
 }
 
-/// A reading log committed to Firestore via the widget-tap drain, retained in
-/// SharedPreferences while it's still within the in-app undo window.
+class _TeacherDashboardPayload {
+  final String teacherId;
+  final String schoolId;
+  final String classId;
+  final String className;
+  final int totalStudents;
+  final int readTodayCount;
+  final int sessionsTodayCount;
+  final int teacherLoggedTodayCount;
+  final int onStreakCount;
+  final int totalMinutesToday;
+  final String todayDate;
+  final Set<String> todayStudentIds;
+  final Set<String> teacherLoggedStudentIds;
+  final List<_TeacherCalendarDayPayload> calendarDays;
+  final List<_TeacherTopReaderPayload> topReaders;
+
+  const _TeacherDashboardPayload({
+    required this.teacherId,
+    required this.schoolId,
+    required this.classId,
+    required this.className,
+    required this.totalStudents,
+    required this.readTodayCount,
+    required this.sessionsTodayCount,
+    required this.teacherLoggedTodayCount,
+    required this.onStreakCount,
+    required this.totalMinutesToday,
+    required this.todayDate,
+    required this.todayStudentIds,
+    required this.teacherLoggedStudentIds,
+    required this.calendarDays,
+    required this.topReaders,
+  });
+
+  factory _TeacherDashboardPayload.fromDashboard({
+    required UserModel teacher,
+    required ClassModel classModel,
+    required List<StudentModel> students,
+    required List<ReadingLogModel> recentLogs,
+    DateTime? now,
+  }) {
+    final current = now ?? DateTime.now();
+    final today = WidgetDataService._dateOnly(current);
+    final startOfWeek = WidgetDataService._dateOnly(
+        current.subtract(Duration(days: current.weekday - 1)));
+    final calendarStart =
+        today.subtract(const Duration(days: _teacherCalendarDays - 1));
+
+    final logsForClass =
+        recentLogs.where((log) => log.classId == classModel.id).toList();
+    final todayLogs = logsForClass
+        .where((log) => WidgetDataService._dateOnly(log.date) == today)
+        .toList();
+    final weeklyLogs = logsForClass
+        .where((log) =>
+            !WidgetDataService._dateOnly(log.date).isBefore(startOfWeek))
+        .toList();
+
+    final studentsByDay = <DateTime, Set<String>>{};
+    for (final log in logsForClass) {
+      final day = WidgetDataService._dateOnly(log.date);
+      if (day.isBefore(calendarStart) || day.isAfter(today)) continue;
+      (studentsByDay[day] ??= <String>{}).add(log.studentId);
+    }
+
+    final calendarDays = <_TeacherCalendarDayPayload>[
+      for (var i = 0; i < _teacherCalendarDays; i++)
+        _TeacherCalendarDayPayload(
+          date: WidgetDataService._formatQueueDate(
+            calendarStart.add(Duration(days: i)),
+          ),
+          readCount:
+              studentsByDay[calendarStart.add(Duration(days: i))]?.length ?? 0,
+        ),
+    ];
+
+    final studentById = {for (final student in students) student.id: student};
+    final minutesByStudent = <String, int>{};
+    for (final log in weeklyLogs) {
+      minutesByStudent.update(
+        log.studentId,
+        (minutes) => minutes + log.minutesRead,
+        ifAbsent: () => log.minutesRead,
+      );
+    }
+    final sortedReaders = minutesByStudent.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final topReaders = <_TeacherTopReaderPayload>[];
+    for (final entry in sortedReaders.take(3)) {
+      final student = studentById[entry.key];
+      if (student == null) continue;
+      topReaders.add(_TeacherTopReaderPayload(
+        studentId: student.id,
+        firstName: student.firstName,
+        characterId: student.characterId ?? 'lumi_red_default',
+        minutes: entry.value,
+      ));
+    }
+
+    var onStreakCount = 0;
+    final yesterday = today.subtract(const Duration(days: 1));
+    for (final student in students) {
+      final stats = student.stats;
+      if (stats == null || stats.currentStreak <= 0) continue;
+      final lastRead = stats.lastReadingDate;
+      if (lastRead == null) continue;
+      final lastDay = WidgetDataService._dateOnly(lastRead);
+      if (lastDay == today || lastDay == yesterday) onStreakCount++;
+    }
+
+    final todayStudentIds = todayLogs.map((log) => log.studentId).toSet();
+    final teacherLoggedStudentIds = todayLogs
+        .where((log) => log.isTeacherProxy)
+        .map((log) => log.studentId)
+        .toSet();
+
+    return _TeacherDashboardPayload(
+      teacherId: teacher.id,
+      schoolId: teacher.schoolId ?? classModel.schoolId,
+      classId: classModel.id,
+      className: classModel.name,
+      totalStudents: classModel.studentIds.length,
+      readTodayCount: todayStudentIds.length,
+      sessionsTodayCount: todayLogs.length,
+      teacherLoggedTodayCount: teacherLoggedStudentIds.length,
+      onStreakCount: onStreakCount,
+      totalMinutesToday:
+          todayLogs.fold<int>(0, (total, log) => total + log.minutesRead),
+      todayDate: WidgetDataService._formatQueueDate(today),
+      todayStudentIds: todayStudentIds,
+      teacherLoggedStudentIds: teacherLoggedStudentIds,
+      calendarDays: calendarDays,
+      topReaders: topReaders,
+    );
+  }
+
+  _TeacherDashboardPayload withAddedLog({
+    required StudentModel student,
+    required ReadingLogModel log,
+  }) {
+    final today = WidgetDataService._dateOnly(DateTime.now());
+    if (WidgetDataService._dateOnly(log.date) != today) return this;
+    final alreadyReadToday = todayStudentIds.contains(student.id);
+    final alreadyTeacherLoggedToday =
+        teacherLoggedStudentIds.contains(student.id);
+    final updatedTodayStudentIds = {...todayStudentIds, student.id};
+    final updatedTeacherLoggedStudentIds = log.isTeacherProxy
+        ? {...teacherLoggedStudentIds, student.id}
+        : teacherLoggedStudentIds;
+    final updatedReadTodayCount =
+        alreadyReadToday ? readTodayCount : readTodayCount + 1;
+    final updatedTeacherLoggedTodayCount =
+        log.isTeacherProxy && !alreadyTeacherLoggedToday
+            ? teacherLoggedTodayCount + 1
+            : teacherLoggedTodayCount;
+
+    final updatedDays = [
+      for (final day in calendarDays)
+        if (day.date == WidgetDataService._formatQueueDate(today))
+          day.copyWith(
+            readCount: alreadyReadToday
+                ? day.readCount
+                : (day.readCount + 1 > totalStudents
+                    ? totalStudents
+                    : day.readCount + 1),
+          )
+        else
+          day,
+    ];
+
+    final readersById = {
+      for (final reader in topReaders) reader.studentId: reader,
+    };
+    final existingReader = readersById[student.id];
+    readersById[student.id] = _TeacherTopReaderPayload(
+      studentId: student.id,
+      firstName: student.firstName,
+      characterId: student.characterId ?? 'lumi_red_default',
+      minutes: (existingReader?.minutes ?? 0) + log.minutesRead,
+    );
+    final updatedTopReaders = readersById.values.toList()
+      ..sort((a, b) => b.minutes.compareTo(a.minutes));
+
+    return _TeacherDashboardPayload(
+      teacherId: teacherId,
+      schoolId: schoolId,
+      classId: classId,
+      className: className,
+      totalStudents: totalStudents,
+      readTodayCount: updatedReadTodayCount > totalStudents
+          ? totalStudents
+          : updatedReadTodayCount,
+      sessionsTodayCount: sessionsTodayCount + 1,
+      teacherLoggedTodayCount: updatedTeacherLoggedTodayCount,
+      onStreakCount: onStreakCount,
+      totalMinutesToday: totalMinutesToday + log.minutesRead,
+      todayDate: todayDate,
+      todayStudentIds: updatedTodayStudentIds,
+      teacherLoggedStudentIds: updatedTeacherLoggedStudentIds,
+      calendarDays: updatedDays,
+      topReaders: updatedTopReaders.take(3).toList(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'teacherId': teacherId,
+        'schoolId': schoolId,
+        'classId': classId,
+        'className': className,
+        'totalStudents': totalStudents,
+        'readTodayCount': readTodayCount,
+        'sessionsTodayCount': sessionsTodayCount,
+        'teacherLoggedTodayCount': teacherLoggedTodayCount,
+        'onStreakCount': onStreakCount,
+        'totalMinutesToday': totalMinutesToday,
+        'todayDate': todayDate,
+        'calendarDays': calendarDays.map((day) => day.toJson()).toList(),
+        'topReaders': topReaders.map((reader) => reader.toJson()).toList(),
+      };
+}
+
+class _TeacherCalendarDayPayload {
+  final String date;
+  final int readCount;
+
+  const _TeacherCalendarDayPayload({
+    required this.date,
+    required this.readCount,
+  });
+
+  _TeacherCalendarDayPayload copyWith({int? readCount}) =>
+      _TeacherCalendarDayPayload(
+        date: date,
+        readCount: readCount ?? this.readCount,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'date': date,
+        'readCount': readCount,
+      };
+}
+
+class _TeacherTopReaderPayload {
+  final String studentId;
+  final String firstName;
+  final String characterId;
+  final int minutes;
+
+  const _TeacherTopReaderPayload({
+    required this.studentId,
+    required this.firstName,
+    required this.characterId,
+    required this.minutes,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'studentId': studentId,
+        'firstName': firstName,
+        'characterId': characterId,
+        'minutes': minutes,
+      };
+}
+
+/// Legacy record for a reading log committed by older widget-tap drain builds,
+/// retained in SharedPreferences while it's still within the in-app undo window.
 ///
 /// Stats restore is handled server-side by the `aggregateStudentStats` Cloud
 /// Function on log delete, so the record only needs the identifiers needed to

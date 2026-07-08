@@ -6,6 +6,8 @@ import { Badge } from '@/components/lumi/badge';
 import { Icon } from '@/components/lumi/icon';
 import { sectionForPath } from '@/lib/theme/sections';
 import Link from 'next/link';
+import { AccessActivationCard } from './access-activation-card';
+import { renewalReminder } from '@/lib/access';
 import type { DashboardStats, WeeklyReadingSummary, OperationalSummary } from '@/lib/firestore/dashboard';
 
 interface AdminDashboardProps {
@@ -67,6 +69,9 @@ export function AdminDashboard({ schoolName, stats, weekly, operational }: Admin
   const participation = stats.totalStudents > 0
     ? Math.round((weekly.uniqueReaders / stats.totalStudents) * 100)
     : 0;
+
+  // Renewal season nudge (Dec → the 31 Jan access cliff) so it never sneaks up.
+  const renewal = renewalReminder();
 
   // ── Setup checklist — onboarding guidance that disappears once a school is
   // fully set up (its "data-health" half would just duplicate Attention). ─────
@@ -133,6 +138,48 @@ export function AdminDashboard({ schoolName, stats, weekly, operational }: Admin
           subtitle={attentionCount > 0 ? `item${plural(attentionCount)} to review` : 'all clear'}
         />
       </div>
+
+      {/* Access blocker — the fail-closed Day-1 issue, shown above everything
+          else because parents literally can't log until it's cleared. Renders
+          nothing when every student has live access. */}
+      {operational.studentsWithoutAccess > 0 && (
+        <div className="mb-6">
+          <AccessActivationCard
+            studentsWithoutAccess={operational.studentsWithoutAccess}
+            currentAcademicYear={operational.currentAcademicYear}
+            subActive={operational.subActiveForCurrentYear}
+          />
+        </div>
+      )}
+
+      {/* Renewal-season nudge — the ~31 Jan access cliff sneaks up otherwise. */}
+      {renewal.due && (
+        <Card className="mb-6 border-warning/40 bg-warning/5">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-[var(--radius-md)] bg-warning/15 text-warning flex-shrink-0">
+              <Icon name="event_repeat" size={22} />
+            </span>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-lg font-bold text-ink">
+                {renewal.urgent ? 'Renew now — access expires this month' : 'Renewal season is here'}
+              </h2>
+              <p className="text-sm text-muted mt-1">
+                Students&apos; reading access for the current year expires at the
+                end of January. Renew them into {renewal.targetYear} before then so
+                no one is locked out when school goes back.
+              </p>
+              <div className="mt-4">
+                <Link href="/renewals">
+                  <Button variant={renewal.urgent ? 'primary' : 'outline'}>
+                    <Icon name="event_repeat" size={18} />
+                    <span className="ml-2">Renew students for {renewal.targetYear}</span>
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Row 1 — the operational core (hero) beside the shortcuts rail. */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start mb-6">

@@ -2265,6 +2265,64 @@ test('access: parent CANNOT create a log for a legacy student with no access map
   await assertFails(logFor(db, 'student_legacy'));
 });
 
+// ── Reading-log minutes bounds ───────────────────────────────────────────────
+// Every legit client sends 5-120 minutes; the rules bound 1-240 (matching
+// validateReadingLog) so a forged 600-minute log is rejected at the door
+// instead of merely being flagged after the fact. Applies to create AND
+// content updates (a log could otherwise be created valid, edited to 99999).
+
+function logWithMinutes(db, minutes) {
+  return db.collection('schools').doc('school_1').collection('readingLogs').doc('log_bounds').set({
+    schoolId: 'school_1',
+    studentId: 'student_active',
+    parentId: 'parent_1',
+    minutesRead: minutes,
+    status: 'completed',
+    bookTitles: ['Reading'],
+  });
+}
+
+test('minutes bounds: create with 600 minutes is denied', async () => {
+  await seedSchoolWithAccessStates();
+  await assertFails(logWithMinutes(authDb('parent_1'), 600));
+});
+
+test('minutes bounds: create with 0 minutes is denied', async () => {
+  await seedSchoolWithAccessStates();
+  await assertFails(logWithMinutes(authDb('parent_1'), 0));
+});
+
+test('minutes bounds: create with a string "20" is denied', async () => {
+  await seedSchoolWithAccessStates();
+  await assertFails(logWithMinutes(authDb('parent_1'), '20'));
+});
+
+test('minutes bounds: boundary values 1 and 240 are allowed', async () => {
+  await seedSchoolWithAccessStates();
+  await assertSucceeds(logWithMinutes(authDb('parent_1'), 1));
+  await assertSucceeds(logWithMinutes(authDb('parent_1'), 240));
+});
+
+test('minutes bounds: owner cannot edit an existing log up to 600 minutes', async () => {
+  await seedSchoolWithAccessStates();
+  await seedData(async (db) => {
+    await db.collection('schools').doc('school_1').collection('readingLogs').doc('log_edit').set({
+      schoolId: 'school_1', studentId: 'student_active', parentId: 'parent_1',
+      minutesRead: 20, status: 'completed', bookTitles: ['Reading'],
+    });
+  });
+  const db = authDb('parent_1');
+  await assertFails(
+    db.collection('schools').doc('school_1').collection('readingLogs').doc('log_edit')
+      .update({ minutesRead: 600 }),
+  );
+  // A sane owner edit that keeps minutes in range still works.
+  await assertSucceeds(
+    db.collection('schools').doc('school_1').collection('readingLogs').doc('log_edit')
+      .update({ notes: 'great reading tonight' }),
+  );
+});
+
 test('access: student reads stay open so the app can render the lapsed screen', async () => {
   await seedSchoolWithAccessStates();
   const db = authDb('parent_1');

@@ -1,8 +1,14 @@
 import * as functions from "firebase-functions/v1";
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
-import {localDateString, shiftDays} from "./dateUtils";
+import {
+  buildIsCountingDay,
+  localDateString,
+  parseTermDates,
+  shiftDays,
+} from "./dateUtils";
 import {DEFAULT_TIMEZONE} from "./access";
+import {isInvalidatedLog} from "./stats_aggregation";
 
 /**
  * Weekly "Top Reader" award. Every Monday it looks at the week that just ended
@@ -72,6 +78,26 @@ export function previousWeek(
   };
 }
 
+/**
+ * Whether any day in the inclusive [firstDay, lastDay] range is a counting
+ * (in-term) day. Used to skip crowning a Top Reader for a week that falls
+ * entirely inside the school holidays.
+ * @param {string} firstDay First day of the range, "YYYY-MM-DD".
+ * @param {string} lastDay Last day of the range, "YYYY-MM-DD".
+ * @param {function(string): boolean} isCountingDay The counting-day predicate.
+ * @return {boolean} True if the range contains at least one counting day.
+ */
+export function weekContainsCountingDay(
+  firstDay: string,
+  lastDay: string,
+  isCountingDay: (d: string) => boolean,
+): boolean {
+  for (let d = firstDay; d <= lastDay; d = shiftDays(d, 1)) {
+    if (isCountingDay(d)) return true;
+  }
+  return false;
+}
+
 export const topReaderAward = onSchedule(
   {
     schedule: "0 5 * * 1", // Mondays 05:00 (tz below)
@@ -105,6 +131,17 @@ export const topReaderAward = onSchedule(
       const tz =
         typeof rawTz === "string" && rawTz.length > 0 ? rawTz : DEFAULT_TIMEZONE;
       const {firstDay, lastDay, weekOf} = previousWeek(now, tz);
+
+      // If the school has term dates configured and the whole week fell in
+      // the holidays, skip it entirely: no award is crowned for an empty
+      // holiday week and the current holder keeps gold through the break.
+      const termDates = parseTermDates(school.get("termDates"));
+      if (
+        termDates.length > 0 &&
+        !weekContainsCountingDay(firstDay, lastDay, buildIsCountingDay(termDates))
+      ) {
+        continue;
+      }
 
       // Generous UTC query window (±margin) so no local-week log is missed
       // regardless of tz offset; precise membership is decided in memory by
@@ -162,6 +199,7 @@ export const topReaderAward = onSchedule(
             for (const log of logs.docs) {
               const d = log.data();
               if (!COUNTED_STATUSES.has(d.status)) continue;
+              if (isInvalidatedLog(d)) continue; // flagged logs can't win gold
               const dt = d.date?.toDate?.();
               if (!dt) continue;
               const ds = localDateString(dt, tz);

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -85,6 +86,7 @@ class ReadingLogService {
     required StudentModel student,
     required UserModel parent,
     List<AllocationModel> allocations = const [],
+    DateTime? date,
     int? minutesRead,
     List<String>? bookTitles,
     ReadingFeeling? feeling,
@@ -96,6 +98,7 @@ class ReadingLogService {
     int? comprehensionAudioDurationSec,
   }) {
     final now = DateTime.now();
+    final readingDate = date ?? now;
     final target = allocations.isNotEmpty
         ? allocations.first.targetMinutes
         : _defaultTargetMinutes;
@@ -110,7 +113,7 @@ class ReadingLogService {
       parentId: parent.id,
       schoolId: student.schoolId,
       classId: student.classId,
-      date: now,
+      date: readingDate,
       minutesRead: minutesRead ?? target,
       targetMinutes: target,
       status: LogStatus.completed,
@@ -138,11 +141,13 @@ class ReadingLogService {
     required StudentModel student,
     required UserModel parent,
     List<AllocationModel> allocations = const [],
+    DateTime? date,
   }) {
     return buildLog(
       student: student,
       parent: parent,
       allocations: allocations,
+      date: date,
       quickLog: true,
     );
   }
@@ -153,6 +158,7 @@ class ReadingLogService {
     required StudentModel student,
     required UserModel parent,
     List<AllocationModel> allocations = const [],
+    DateTime? date,
     int? minutesRead,
     List<String>? bookTitles,
     ReadingFeeling? feeling,
@@ -167,6 +173,7 @@ class ReadingLogService {
       student: student,
       parent: parent,
       allocations: allocations,
+      date: date,
       minutesRead: minutesRead,
       bookTitles: bookTitles,
       feeling: feeling,
@@ -190,6 +197,7 @@ class ReadingLogService {
     required String parentId,
     required String schoolId,
     required String classId,
+    DateTime? date,
     int targetMinutes = _defaultTargetMinutes,
     String? bookTitle,
     String? loggedByName,
@@ -205,7 +213,7 @@ class ReadingLogService {
       parentId: parentId,
       schoolId: schoolId,
       classId: classId,
-      date: now,
+      date: date ?? now,
       minutesRead: targetMinutes,
       targetMinutes: targetMinutes,
       status: LogStatus.completed,
@@ -235,10 +243,8 @@ class ReadingLogService {
     int targetMinutes = _defaultTargetMinutes,
   }) {
     final now = DateTime.now();
-    final cleanedTitles = bookTitles
-        .map((t) => t.trim())
-        .where((t) => t.isNotEmpty)
-        .toList();
+    final cleanedTitles =
+        bookTitles.map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
     final titles = cleanedTitles.isNotEmpty ? cleanedTitles : const ['Reading'];
     final trimmedNotes = notes?.trim();
 
@@ -279,6 +285,13 @@ class ReadingLogService {
   /// [student] is optional: when supplied the home-screen widget is refreshed
   /// immediately; id-only callers (notification / widget intent) omit it and
   /// the widget refreshes on the next app foreground instead.
+  /// How long the interactive online write waits for a SERVER ack before
+  /// falling back to the offline queue. With offline persistence enabled, a
+  /// `set()` Future resolves only on server ack — on "healthy-looking but
+  /// dead" school wifi (the status probe refreshes every ~30s, so a stale
+  /// healthy verdict is possible) it used to hang the save spinner forever.
+  static const Duration _onlineWriteAckTimeout = Duration(seconds: 15);
+
   Future<ReadingLogResult> writeLog(
     ReadingLogModel log, {
     StudentModel? student,
@@ -289,33 +302,59 @@ class ReadingLogService {
       // exact submission time).
       logData['createdAt'] = FieldValue.serverTimestamp();
 
-      await _firestore
-          .collection('schools')
-          .doc(log.schoolId)
-          .collection('readingLogs')
-          .doc(log.id)
-          .set(logData);
+      try {
+        await _firestore
+            .collection('schools')
+            .doc(log.schoolId)
+            .collection('readingLogs')
+            .doc(log.id)
+            .set(logData)
+            .timeout(_onlineWriteAckTimeout);
 
-      final statsUpdate = await _previewStatsAfterLog(log);
+        final statsUpdate = await _previewStatsAfterLog(log);
 
-      // Push fresh data to the home-screen widget immediately after the log.
-      if (student != null) {
-        WidgetDataService.instance.updateAfterLog(student: student, log: log);
+        // Push fresh data to the home-screen widget immediately after the log.
+        if (student != null) {
+          if (log.loggedByRole == LoggedByRole.teacher) {
+            WidgetDataService.instance
+                .updateAfterTeacherLog(student: student, log: log);
+          } else {
+            WidgetDataService.instance
+                .updateAfterLog(student: student, log: log);
+          }
+        }
+
+        return ReadingLogResult(
+          log: log,
+          updatedStats: statsUpdate.stats,
+          restDayApplied: statsUpdate.restDayApplied,
+        );
+      } on TimeoutException {
+        // No server ack in time — treat the connection as down and fall
+        // through to the offline queue, so the family sees "saved, will
+        // sync" instead of an endless spinner. Safe double-delivery: the
+        // timed-out mutation may still land later from Firestore's internal
+        // queue, but the offline replay `set()`s the SAME doc id with the
+        // same content, so the overwrite is idempotent and the stats
+        // trigger sees a zero-delta update. Non-timeout errors (e.g.
+        // permission-denied) still rethrow so the caller surfaces them.
+        debugPrint(
+            'writeLog: no server ack in ${_onlineWriteAckTimeout.inSeconds}s '
+            '— queueing offline');
       }
-
-      return ReadingLogResult(
-        log: log,
-        updatedStats: statsUpdate.stats,
-        restDayApplied: statsUpdate.restDayApplied,
-      );
     }
 
-    // Offline: persist locally and queue for sync.
+    // Offline (or the online write never acked): persist locally and queue.
     final offlineLog = log.copyWith(isOfflineCreated: true);
     await OfflineService.instance.saveReadingLogLocally(offlineLog);
     if (student != null) {
-      WidgetDataService.instance
-          .updateAfterLog(student: student, log: offlineLog);
+      if (offlineLog.loggedByRole == LoggedByRole.teacher) {
+        WidgetDataService.instance
+            .updateAfterTeacherLog(student: student, log: offlineLog);
+      } else {
+        WidgetDataService.instance
+            .updateAfterLog(student: student, log: offlineLog);
+      }
     }
     return ReadingLogResult(log: offlineLog, savedOffline: true);
   }
@@ -481,7 +520,8 @@ class ReadingLogService {
       comprehensionAudioUploaded: false,
     );
     try {
-      await uploadComprehensionAudio(log: patched, localFilePath: localFilePath);
+      await uploadComprehensionAudio(
+          log: patched, localFilePath: localFilePath);
     } catch (_) {
       await queue();
     }
@@ -598,11 +638,9 @@ class ReadingLogService {
     StudentModel student,
     List<AllocationModel> allocations,
   ) {
-    final cleaned = explicit
-            ?.map((t) => t.trim())
-            .where((t) => t.isNotEmpty)
-            .toList() ??
-        const <String>[];
+    final cleaned =
+        explicit?.map((t) => t.trim()).where((t) => t.isNotEmpty).toList() ??
+            const <String>[];
     if (cleaned.isNotEmpty) return cleaned;
 
     // No explicit selection (the one-tap quick path): attribute the night to

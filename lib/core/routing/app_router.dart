@@ -91,7 +91,18 @@ class AppRouter {
       // pre-selected; the home_widget plugin's own callback is best-effort.
       if (location == '/home' || location == '/log') {
         final childId = state.uri.queryParameters['childId'] ?? '';
-        return '/parent/home?widgetChildId=$childId';
+        final action = location == '/log' ? 'log' : 'home';
+        return Uri(
+          path: '/parent/home',
+          queryParameters: {
+            if (childId.isNotEmpty) 'widgetChildId': childId,
+            'widgetAction': action,
+            'widgetTap': DateTime.now().millisecondsSinceEpoch.toString(),
+          },
+        ).toString();
+      }
+      if (location == '/teacher') {
+        return '/teacher/home';
       }
 
       final firebaseService = _ref.read(firebaseServiceProvider);
@@ -193,8 +204,7 @@ class AppRouter {
         name: 'login',
         pageBuilder: (context, state) {
           final extra = state.extra;
-          final fromSplash =
-              extra is Map && extra['fromSplash'] == true;
+          final fromSplash = extra is Map && extra['fromSplash'] == true;
           if (!fromSplash) {
             return const MaterialPage<void>(child: LoginScreen());
           }
@@ -202,7 +212,8 @@ class AppRouter {
             child: const LoginScreen(),
             transitionDuration: const Duration(milliseconds: 900),
             reverseTransitionDuration: Duration.zero,
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
               return Stack(
                 children: [
                   child,
@@ -255,8 +266,7 @@ class AppRouter {
       GoRoute(
         path: '/dev/impersonate',
         name: 'dev-impersonate',
-        redirect: (context, state) =>
-            hasDevAccess() ? null : '/auth/login',
+        redirect: (context, state) => hasDevAccess() ? null : '/auth/login',
         builder: (context, state) => const ImpersonationPickerScreen(),
       ),
 
@@ -299,7 +309,12 @@ class AppRouter {
         name: 'parent-home',
         builder: (context, state) => _userScopedRoute(
           extra: state.extra,
-          child: (user) => ParentHomeScreen(user: user),
+          child: (user) => ParentHomeScreen(
+            user: user,
+            widgetChildId: state.uri.queryParameters['widgetChildId'],
+            widgetAction: state.uri.queryParameters['widgetAction'],
+            widgetTapId: state.uri.queryParameters['widgetTap'],
+          ),
         ),
       ),
 
@@ -398,7 +413,6 @@ class AppRouter {
         },
       ),
 
-
       GoRoute(
         path: '/parent/offline-management',
         name: 'offline-management',
@@ -418,8 +432,7 @@ class AppRouter {
       GoRoute(
         path: '/settings/app-icon',
         name: 'app-icon',
-        redirect: (context, state) =>
-            hasDevAccess() ? null : '/auth/login',
+        redirect: (context, state) => hasDevAccess() ? null : '/auth/login',
         builder: (context, state) => const AppIconScreen(),
       ),
 
@@ -512,7 +525,6 @@ class AppRouter {
           );
         },
       ),
-
 
       GoRoute(
         path: '/teacher/reading-groups',
@@ -847,8 +859,7 @@ Widget _userScopedRoute({
     builder: (context, ref, _) {
       final userAsync = ref.watch(userProvider);
       return userAsync.when(
-        data: (user) =>
-            user == null ? const LoginScreen() : child(user),
+        data: (user) => user == null ? const LoginScreen() : child(user),
         loading: () => const _RouteLoadingScaffold(),
         error: (_, __) => const LoginScreen(),
       );
@@ -886,7 +897,8 @@ Widget _studentScopedTeacherRoute({
           if (extraStudent != null) return child(user, extraStudent);
           final schoolId = user.schoolId;
           if (schoolId == null) {
-            return const _ResourceNotFoundScaffold(message: 'Student not found');
+            return const _ResourceNotFoundScaffold(
+                message: 'Student not found');
           }
           final studentAsync = ref.watch(
             studentByIdProvider(
@@ -1000,4 +1012,3 @@ class _BookCoverOverlay extends StatelessWidget {
     );
   }
 }
-

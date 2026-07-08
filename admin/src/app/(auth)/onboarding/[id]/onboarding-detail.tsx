@@ -4,8 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { ProgressStepper } from "@/components/shared/progress-stepper";
 import { formatDate } from "@/lib/utils";
-import type { OnboardingDetail as OnboardingDetailType } from "@/lib/firestore/onboarding";
+import type {
+  OnboardingDetail as OnboardingDetailType,
+  OnboardingReadiness,
+} from "@/lib/firestore/onboarding";
 import { OnboardingActions } from "./onboarding-actions";
+import { ProvisionPanel } from "./provision-panel";
+import { ReadinessPanel } from "./readiness-panel";
+import { FollowUpPanel } from "./follow-up-panel";
 
 const ONBOARDING_STEPS = [
   { key: "schoolInfo", label: "School Info" },
@@ -18,9 +24,13 @@ const ONBOARDING_STEPS = [
 
 interface OnboardingDetailProps {
   onboarding: OnboardingDetailType;
+  readiness: OnboardingReadiness | null;
 }
 
-export function OnboardingDetail({ onboarding }: OnboardingDetailProps) {
+export function OnboardingDetail({
+  onboarding,
+  readiness,
+}: OnboardingDetailProps) {
   return (
     <div className="space-y-6">
       <Card>
@@ -36,6 +46,14 @@ export function OnboardingDetail({ onboarding }: OnboardingDetailProps) {
         </CardContent>
       </Card>
 
+      {onboarding.status === "demo" && (
+        <p className="text-sm text-muted-foreground">
+          Demos run as a live call on the shared Lumi Demo school — reset it
+          before each demo. Book the next step below and update the stage as you
+          go.
+        </p>
+      )}
+
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
@@ -44,9 +62,7 @@ export function OnboardingDetail({ onboarding }: OnboardingDetailProps) {
           <CardContent className="space-y-3">
             <div>
               <p className="text-sm text-muted-foreground">Contact Person</p>
-              <p className="font-medium">
-                {onboarding.contactPerson || "\u2014"}
-              </p>
+              <p className="font-medium">{onboarding.contactPerson || "—"}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Email</p>
@@ -54,14 +70,12 @@ export function OnboardingDetail({ onboarding }: OnboardingDetailProps) {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Phone</p>
-              <p className="font-medium">
-                {onboarding.contactPhone || "\u2014"}
-              </p>
+              <p className="font-medium">{onboarding.contactPhone || "—"}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Referral Source</p>
               <p className="font-medium">
-                {onboarding.referralSource || "\u2014"}
+                {onboarding.referralSource || "—"}
               </p>
             </div>
           </CardContent>
@@ -77,36 +91,46 @@ export function OnboardingDetail({ onboarding }: OnboardingDetailProps) {
               <StatusBadge status={onboarding.status} />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">
-                Estimated Students
-              </p>
-              <p className="font-medium">
-                {onboarding.estimatedStudentCount}
-              </p>
+              <p className="text-sm text-muted-foreground">Estimated Students</p>
+              <p className="font-medium">{onboarding.estimatedStudentCount}</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">
-                Estimated Teachers
-              </p>
-              <p className="font-medium">
-                {onboarding.estimatedTeacherCount}
-              </p>
+              <p className="text-sm text-muted-foreground">Estimated Teachers</p>
+              <p className="font-medium">{onboarding.estimatedTeacherCount}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Created</p>
-              <p className="font-medium">
-                {formatDate(onboarding.createdAt)}
-              </p>
+              <p className="font-medium">{formatDate(onboarding.createdAt)}</p>
             </div>
             {onboarding.schoolId && (
               <div>
                 <p className="text-sm text-muted-foreground">Linked School</p>
-                <p className="font-medium">{onboarding.schoolId}</p>
+                <p className="font-mono text-xs">{onboarding.schoolId}</p>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Provisioning: create the school, or show live setup readiness. */}
+      {!onboarding.schoolId ? (
+        <ProvisionPanel
+          onboardingId={onboarding.id}
+          defaultAdminEmail={onboarding.contactEmail}
+          defaultAdminName={onboarding.contactPerson}
+        />
+      ) : (
+        readiness && (
+          <ReadinessPanel
+            onboardingId={onboarding.id}
+            schoolId={onboarding.schoolId}
+            readiness={readiness}
+            isActive={onboarding.status === "active"}
+          />
+        )
+      )}
+
+      <FollowUpPanel onboarding={onboarding} />
 
       <OnboardingActions onboarding={onboarding} />
     </div>

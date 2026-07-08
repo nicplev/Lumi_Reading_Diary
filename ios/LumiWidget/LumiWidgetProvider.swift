@@ -28,21 +28,39 @@ struct LumiWidgetIntentProvider: AppIntentTimelineProvider {
 // MARK: - Refresh schedule
 
 /// Computes the next timeline refresh point:
-///  • While the post-tap undo window is open → refresh exactly when it closes
-///    so the "Undo" CTA flips back to "View today" without the parent needing
-///    to touch the widget.
 ///  • If not yet 7pm and the child hasn't read → refresh at 7pm to switch to "streakAtRisk".
 ///  • Otherwise → refresh at midnight so the widget resets for the new day.
 private func nextRefreshDate(for entry: LumiWidgetEntry) -> Date {
     let calendar = Calendar.current
     let now = Date()
-    if let undoExpiresAt = entry.undoExpiresAt, undoExpiresAt > now {
-        return undoExpiresAt
-    }
     let sevenPM = calendar.date(bySettingHour: 19, minute: 0, second: 0, of: now) ?? now
     let midnight = calendar.startOfDay(for: calendar.date(byAdding: .day, value: 1, to: now) ?? now)
     if now < sevenPM && !entry.loggedToday {
         return sevenPM
     }
     return midnight
+}
+
+// MARK: - Teacher Widget Provider
+
+struct LumiTeacherWidgetProvider: TimelineProvider {
+    let kind: LumiTeacherWidgetKind
+
+    func placeholder(in context: Context) -> LumiTeacherWidgetEntry {
+        .placeholder(kind: kind)
+    }
+
+    func getSnapshot(in context: Context, completion: @escaping (LumiTeacherWidgetEntry) -> Void) {
+        if context.isPreview {
+            completion(.placeholder(kind: kind))
+        } else {
+            completion(WidgetDataStore.buildTeacherEntry(kind: kind))
+        }
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<LumiTeacherWidgetEntry>) -> Void) {
+        let entry = WidgetDataStore.buildTeacherEntry(kind: kind)
+        let nextRefresh = Date().addingTimeInterval(15 * 60)
+        completion(Timeline(entries: [entry], policy: .after(nextRefresh)))
+    }
 }

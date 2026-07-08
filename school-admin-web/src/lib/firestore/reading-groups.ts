@@ -1,4 +1,10 @@
 import { adminDb } from '@/lib/firebase/admin';
+import {
+  getSchoolTimezone,
+  localDateString,
+  shiftDateStr,
+  zonedDayStart,
+} from '@/lib/school-time';
 import type { ReadingGroup, ReadingGroupStat } from '@/lib/types';
 import { getClass } from './classes';
 import { getStudents } from './students';
@@ -144,9 +150,12 @@ export async function getReadingGroupStats(
   ]);
   const defaultTarget = cls?.defaultMinutesTarget ?? 20;
 
-  const since = new Date();
-  since.setHours(0, 0, 0, 0);
-  since.setDate(since.getDate() - (sinceDays - 1));
+  // School-local day window, not server midnight (see lib/school-time.ts).
+  const tz = await getSchoolTimezone(schoolId);
+  const since = zonedDayStart(
+    shiftDateStr(localDateString(new Date(), tz), -(sinceDays - 1)),
+    tz,
+  );
 
   interface Acc {
     minutes: number;
@@ -172,7 +181,7 @@ export async function getReadingGroupStats(
       a.minutes += mins;
       a.sessions += 1;
       const dt: Date | null = d.date?.toDate?.() ?? null;
-      if (dt) a.days.add(dt.toISOString().slice(0, 10));
+      if (dt) a.days.add(localDateString(dt, tz));
       const target = typeof d.targetMinutes === 'number' && d.targetMinutes > 0 ? d.targetMinutes : defaultTarget;
       if (mins >= target) a.met += 1;
       acc.set(sid, a);
