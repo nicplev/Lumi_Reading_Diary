@@ -261,7 +261,28 @@ export function ParentOnboardingTab() {
   const columns: DataTableColumn<StudentRow>[] = [
     {
       id: 'select',
-      header: '',
+      // Header select-all: ticks every student in the current view (respects the
+      // class filter / search), so staff can grab the whole list and bulk-mark
+      // Subscribed in two clicks. Indeterminate when only some are selected.
+      header: (
+        <input
+          type="checkbox"
+          aria-label="Select all students"
+          checked={filtered.length > 0 && filtered.every((s) => selectedIds.has(s.id))}
+          ref={(el) => {
+            if (el) {
+              const n = filtered.filter((s) => selectedIds.has(s.id)).length;
+              el.indeterminate = n > 0 && n < filtered.length;
+            }
+          }}
+          onChange={(e) => {
+            e.stopPropagation();
+            toggleSelectAll();
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="w-4 h-4 rounded border-rule text-section focus:ring-section/30 cursor-pointer"
+        />
+      ),
       accessorFn: (row) => row.id,
       cell: (_, row) => (
         <input
