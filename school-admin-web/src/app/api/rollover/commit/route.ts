@@ -11,7 +11,12 @@ const moveFields = {
   lastName: z.string().min(1),
   className: z.string().min(1),
   yearLevel: z.string().optional(),
-  parentEmail: z.string().optional(),
+  // Same format guard as create actions — a matched row's email can still be
+  // written (update-if-unlinked), so it must be equally well-formed.
+  parentEmail: z
+    .string()
+    .optional()
+    .refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), 'Invalid parent email'),
 };
 
 const actionSchema = z.discriminatedUnion('action', [
