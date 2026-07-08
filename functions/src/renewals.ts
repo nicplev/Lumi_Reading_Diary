@@ -8,7 +8,7 @@ import {
   buildStudentAccess,
   hardExpiryFor,
   isActiveSubscriptionStatus,
-  nextYearLevel,
+  yearLevelForRenewal,
   DEFAULT_TIMEZONE,
   ROLLOVER_DAY,
 } from "./access";
@@ -133,7 +133,13 @@ export const renewStudents = onCall(
       for (const snap of snaps) {
         if (!snap.exists) continue;
         const additional = (snap.data()?.additionalInfo ?? {}) as Record<string, unknown>;
-        const ladder = nextYearLevel(additional.yearLevel as string | undefined);
+        // Honour the portal rollover import's year-level authority marker —
+        // never bump a level the import already set for this year.
+        const ladder = yearLevelForRenewal(
+          additional.yearLevel as string | undefined,
+          additional.yearLevelSetForYear,
+          academicYear,
+        );
 
         const access = buildStudentAccess({
           academicYear,

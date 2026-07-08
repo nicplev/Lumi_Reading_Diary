@@ -326,6 +326,11 @@ export function RenewalsPage({
                     {s.currentYearLevel && s.nextYearLevel && s.nextYearLevel !== s.currentYearLevel
                       ? ` → ${s.nextYearLevel}`
                       : ''}
+                    {s.yearLevelSetByImport && (
+                      <span className="ml-1.5 text-xs text-muted" title="The rollover import already set this year level — renewing won't change it.">
+                        (set by import)
+                      </span>
+                    )}
                   </td>
                   <td className="p-3">{statusBadge(s)}</td>
                 </tr>
