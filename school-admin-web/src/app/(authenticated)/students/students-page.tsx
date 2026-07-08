@@ -38,6 +38,7 @@ interface StudentsPageProps {
   levelOptions: ReadingLevelOption[];
   levelSchema: ReadingLevelSchema;
   devAccess: boolean;
+  isAdmin: boolean;
 }
 
 type QuickFilter = 'all' | 'has-parent' | 'no-parent';
@@ -52,7 +53,7 @@ const ARCHIVED_REASON_LABELS: Record<string, string> = {
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
-export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: StudentsPageProps) {
+export function StudentsPage({ classes, levelOptions, levelSchema, devAccess, isAdmin }: StudentsPageProps) {
   const router = useRouter();
   const { toast } = useToast();
   // Active vs archived is a server-side filter (isActive), not a client one —
@@ -441,6 +442,11 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
         action={
           <div className="flex gap-2 items-center">
             <ResetCodeDevButton visible={devAccess} />
+            {isAdmin && (
+              <Button variant="outline" onClick={() => router.push('/students/rollover')}>
+                Annual Rollover
+              </Button>
+            )}
             <Button onClick={() => setShowAdd(true)}>Add Students</Button>
           </div>
         }
