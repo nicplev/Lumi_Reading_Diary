@@ -21,6 +21,10 @@ function toStudent(doc: FirebaseFirestore.DocumentSnapshot): Student {
     profileImageUrl: data.profileImageUrl,
     characterId: data.characterId,
     isActive: data.isActive ?? true,
+    status: data.status === 'archived' ? 'archived' : undefined,
+    archivedAt: data.archivedAt?.toDate(),
+    archivedReason: data.archivedReason,
+    archivedBy: data.archivedBy,
     createdAt: data.createdAt?.toDate() ?? new Date(),
     enrolledAt: data.enrolledAt?.toDate(),
     additionalInfo: data.additionalInfo,
@@ -365,6 +369,219 @@ export async function deleteStudents(schoolId: string, studentIds: string[]): Pr
   await metaBatch.commit();
 
   return existing.length;
+}
+
+/**
+ * Soft-archive students: hide them from every roster/report surface while
+ * preserving the doc (reading history, stats, parent links) for restore.
+ *
+ * What it does per student: `isActive: false` + archive marker fields, removes
+ * the id from the class roster mirror (`class.studentIds` — analytics and
+ * `reconcileClassStats` derive from it), revokes any active link codes, and
+ * decrements `school.studentCount` (displayed as current enrolment; archived
+ * students shouldn't count toward per-student pricing).
+ *
+ * Deliberately does NOT touch: `classId` (kept as the restore target and for
+ * history), `parentIds`/parent docs (unlinking cascades into parent-account
+ * deletion — irreversibly destructive for a reversible state; the parent app
+ * simply shows the child in the expired-access state), `access`, or stats.
+ */
+export async function archiveStudents(
+  schoolId: string,
+  studentIds: string[],
+  reason: 'graduated' | 'left' | 'manual',
+  archivedBy: string
+): Promise<number> {
+  if (studentIds.length === 0) return 0;
+
+  const schoolRef = adminDb.collection('schools').doc(schoolId);
+  const studentsRef = schoolRef.collection('students');
+  const classesRef = schoolRef.collection('classes');
+
+  const snapshots = await Promise.all(studentIds.map((id) => studentsRef.doc(id).get()));
+  // Only archive currently-active students — re-archiving is a no-op so the
+  // count (and studentCount decrement) stays honest on retries.
+  const targets = snapshots.filter((s) => s.exists && (s.data()!.isActive ?? true) === true);
+  if (targets.length === 0) return 0;
+
+  const classMembersRemoved = new Map<string, string[]>();
+  for (const snap of targets) {
+    const classId = snap.data()!.classId as string | undefined;
+    if (classId) {
+      const list = classMembersRemoved.get(classId) ?? [];
+      list.push(snap.id);
+      classMembersRemoved.set(classId, list);
+    }
+  }
+
+  // Revoke active link codes so a parent can't redeem a code for a student who
+  // has left. Firestore caps `in` queries at 30 values; chunk to stay under.
+  const targetIds = targets.map((s) => s.id);
+  const activeCodeRefs: FirebaseFirestore.DocumentReference[] = [];
+  const CODE_QUERY_CHUNK = 30;
+  for (let i = 0; i < targetIds.length; i += CODE_QUERY_CHUNK) {
+    const chunk = targetIds.slice(i, i + CODE_QUERY_CHUNK);
+    const snap = await adminDb
+      .collection('studentLinkCodes')
+      .where('studentId', 'in', chunk)
+      .where('status', '==', 'active')
+      .get();
+    for (const doc of snap.docs) activeCodeRefs.push(doc.ref);
+  }
+
+  const now = new Date();
+  const BATCH_SIZE = 400;
+  for (let i = 0; i < targets.length; i += BATCH_SIZE) {
+    const batch = adminDb.batch();
+    for (const snap of targets.slice(i, i + BATCH_SIZE)) {
+      batch.update(snap.ref, {
+        isActive: false,
+        status: 'archived',
+        archivedAt: now,
+        archivedReason: reason,
+        archivedBy,
+      });
+    }
+    await batch.commit();
+  }
+
+  for (let i = 0; i < activeCodeRefs.length; i += BATCH_SIZE) {
+    const batch = adminDb.batch();
+    for (const ref of activeCodeRefs.slice(i, i + BATCH_SIZE)) {
+      batch.update(ref, {
+        status: 'revoked',
+        revokedAt: FieldValue.serverTimestamp(),
+        revokeReason: 'student_archived',
+      });
+    }
+    await batch.commit();
+  }
+
+  const metaBatch = adminDb.batch();
+  for (const [classId, ids] of classMembersRemoved) {
+    metaBatch.update(classesRef.doc(classId), {
+      studentIds: FieldValue.arrayRemove(...ids),
+    });
+  }
+  metaBatch.update(schoolRef, {
+    studentCount: FieldValue.increment(-targets.length),
+  });
+  await metaBatch.commit();
+
+  return targets.length;
+}
+
+export interface RestoreResult {
+  count: number;
+  /** Students that could not be restored, with the reason (shown in the UI). */
+  skipped: { id: string; name: string; reason: string }[];
+}
+
+/**
+ * Reverse of archiveStudents. Restores into the student's previous class when
+ * that class is still active; otherwise restores as unassigned (`classId: ''`)
+ * so the admin re-homes them from the Students page. Blocked per-student when
+ * an ACTIVE student now holds the same external `studentId` — two live students
+ * must never share the upsert key the CSV imports match on.
+ *
+ * Does not resurrect revoked link codes — staff issue a fresh code if the
+ * family needs to re-link (they usually never unlinked, so most restores need
+ * nothing).
+ */
+export async function restoreStudents(schoolId: string, studentIds: string[]): Promise<RestoreResult> {
+  const result: RestoreResult = { count: 0, skipped: [] };
+  if (studentIds.length === 0) return result;
+
+  const schoolRef = adminDb.collection('schools').doc(schoolId);
+  const studentsRef = schoolRef.collection('students');
+  const classesRef = schoolRef.collection('classes');
+
+  const snapshots = await Promise.all(studentIds.map((id) => studentsRef.doc(id).get()));
+  const archived = snapshots.filter((s) => s.exists && (s.data()!.isActive ?? true) === false);
+  if (archived.length === 0) return result;
+
+  // External-ID conflict check: an active student holding the same studentId
+  // would break CSV upsert matching (and createStudent's uniqueness guarantee).
+  const externalIds = archived
+    .map((s) => (s.data()!.studentId as string | undefined)?.trim())
+    .filter((sid): sid is string => !!sid);
+  const activeIdHolders = new Set<string>();
+  const ID_QUERY_CHUNK = 30;
+  for (let i = 0; i < externalIds.length; i += ID_QUERY_CHUNK) {
+    const chunk = externalIds.slice(i, i + ID_QUERY_CHUNK);
+    const snap = await studentsRef
+      .where('studentId', 'in', chunk)
+      .where('isActive', '==', true)
+      .get();
+    for (const doc of snap.docs) {
+      const sid = (doc.data().studentId as string | undefined)?.trim();
+      if (sid) activeIdHolders.add(sid);
+    }
+  }
+
+  // Restore into the old class only if it still exists and is active.
+  const classIds = Array.from(
+    new Set(
+      archived
+        .map((s) => s.data()!.classId as string | undefined)
+        .filter((cid): cid is string => !!cid)
+    )
+  );
+  const classSnaps = await Promise.all(classIds.map((cid) => classesRef.doc(cid).get()));
+  const activeClassIds = new Set(
+    classSnaps.filter((c) => c.exists && (c.data()!.isActive ?? true) === true).map((c) => c.id)
+  );
+
+  const classMembersAdded = new Map<string, string[]>();
+  const BATCH_SIZE = 400;
+  for (let i = 0; i < archived.length; i += BATCH_SIZE) {
+    const batch = adminDb.batch();
+    for (const snap of archived.slice(i, i + BATCH_SIZE)) {
+      const data = snap.data()!;
+      const sid = (data.studentId as string | undefined)?.trim();
+      if (sid && activeIdHolders.has(sid)) {
+        result.skipped.push({
+          id: snap.id,
+          name: `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim(),
+          reason: `An active student already has Student ID "${sid}"`,
+        });
+        continue;
+      }
+
+      const classId = data.classId as string | undefined;
+      const classStillActive = !!classId && activeClassIds.has(classId);
+      batch.update(snap.ref, {
+        isActive: true,
+        status: FieldValue.delete(),
+        archivedAt: FieldValue.delete(),
+        archivedReason: FieldValue.delete(),
+        archivedBy: FieldValue.delete(),
+        ...(classStillActive ? {} : { classId: '' }),
+      });
+      if (classStillActive) {
+        const list = classMembersAdded.get(classId) ?? [];
+        list.push(snap.id);
+        classMembersAdded.set(classId, list);
+      }
+      result.count++;
+    }
+    await batch.commit();
+  }
+
+  if (result.count > 0) {
+    const metaBatch = adminDb.batch();
+    for (const [classId, ids] of classMembersAdded) {
+      metaBatch.update(classesRef.doc(classId), {
+        studentIds: FieldValue.arrayUnion(...ids),
+      });
+    }
+    metaBatch.update(schoolRef, {
+      studentCount: FieldValue.increment(result.count),
+    });
+    await metaBatch.commit();
+  }
+
+  return result;
 }
 
 export async function moveStudentToClass(

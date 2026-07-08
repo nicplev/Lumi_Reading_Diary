@@ -13,7 +13,7 @@ import { EmptyState } from '@/components/lumi/empty-state';
 import { Icon } from '@/components/lumi/icon';
 import { useToast } from '@/components/lumi/toast';
 import { ReadingLevelPicker } from '@/components/features/reading-level-picker';
-import { useStudent, useUpdateStudentLevel, useReadingLevelHistory } from '@/lib/hooks/use-students';
+import { useStudent, useUpdateStudentLevel, useReadingLevelHistory, useRestoreStudents } from '@/lib/hooks/use-students';
 import { useStudentAllocations } from '@/lib/hooks/use-allocations';
 import { BookCard } from '@/components/lumi/book-card';
 import { ReadingHistorySection } from './reading-history-section';
@@ -45,6 +45,7 @@ export function StudentDetail({ studentId, classId, levelOptions, levelsEnabled 
   }, [student, studentId, setOverride]);
   const { data: levelHistory } = useReadingLevelHistory(studentId);
   const updateLevel = useUpdateStudentLevel(studentId);
+  const restoreStudents = useRestoreStudents();
 
   const { data: studentAllocations } = useStudentAllocations(studentId, classId);
   const [showLevelPicker, setShowLevelPicker] = useState(false);
@@ -103,8 +104,40 @@ export function StudentDetail({ studentId, classId, levelOptions, levelsEnabled 
   // server-side. May be empty for students linked before the feature shipped.
   const guardians = Object.entries(student.guardianProfiles ?? {});
 
+  const handleRestore = async () => {
+    try {
+      const result = await restoreStudents.mutateAsync({ studentIds: [studentId] });
+      if (result.skipped.length > 0) {
+        toast(result.skipped[0].reason, 'error');
+      } else {
+        toast(`${student.firstName} restored`, 'success');
+      }
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to restore student', 'error');
+    }
+  };
+
   return (
     <div>
+      {/* Archived banner — direct doc fetch still returns archived students,
+          every list surface hides them. */}
+      {student.isActive === false && (
+        <div className="flex flex-wrap items-center gap-3 mb-6 p-4 bg-lumi-orange/10 border border-lumi-orange/30 rounded-[var(--radius-lg)]">
+          <Icon name="inventory_2" size={22} />
+          <div className="flex-1 min-w-48">
+            <p className="text-sm font-bold text-ink">This student is archived</p>
+            <p className="text-sm text-muted">
+              {(student.archivedReason === 'graduated' ? 'Graduated' : student.archivedReason === 'left' ? 'Left school' : 'Archived')}
+              {student.archivedAt ? ` on ${new Date(student.archivedAt).toLocaleDateString('en-AU')}` : ''} — hidden
+              from classes, reports and the app. Reading history is kept.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleRestore} disabled={restoreStudents.isPending}>
+            {restoreStudents.isPending ? 'Restoring…' : 'Restore'}
+          </Button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-start gap-4 mb-6">
         <Avatar name={fullName} size="lg" />

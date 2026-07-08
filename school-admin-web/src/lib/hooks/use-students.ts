@@ -4,20 +4,22 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Student, ReadingLevelEvent, EnrollmentStatus } from '@/lib/types';
 import type { ImportResult } from '@/lib/firestore/students';
 
-type SerializedStudent = Omit<Student, 'createdAt' | 'dateOfBirth' | 'enrolledAt' | 'readingLevelUpdatedAt' | 'levelHistory' | 'stats'> & {
+type SerializedStudent = Omit<Student, 'createdAt' | 'dateOfBirth' | 'enrolledAt' | 'readingLevelUpdatedAt' | 'archivedAt' | 'levelHistory' | 'stats'> & {
   createdAt: string;
   dateOfBirth: string | null;
   enrolledAt: string | null;
   readingLevelUpdatedAt: string | null;
+  archivedAt: string | null;
   levelHistory: Array<Omit<Student['levelHistory'][0], 'changedAt'> & { changedAt: string }>;
   stats: (Omit<NonNullable<Student['stats']>, 'lastReadingDate'> & { lastReadingDate: string | null }) | null;
 };
 
 type SerializedEvent = Omit<ReadingLevelEvent, 'createdAt'> & { createdAt: string };
 
-export function useStudents(filters?: { classId?: string }) {
+export function useStudents(filters?: { classId?: string; status?: 'active' | 'archived' }) {
   const params = new URLSearchParams();
   if (filters?.classId) params.set('classId', filters.classId);
+  if (filters?.status === 'archived') params.set('status', 'archived');
 
   return useQuery<SerializedStudent[]>({
     queryKey: ['students', filters],
@@ -118,6 +120,50 @@ export function useBulkDeleteStudents() {
         throw new Error(err.error || 'Failed to bulk delete students');
       }
       return res.json() as Promise<{ count: number }>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
+    },
+  });
+}
+
+export function useArchiveStudents() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ studentIds, reason }: { studentIds: string[]; reason?: 'graduated' | 'left' | 'manual' }) => {
+      const res = await fetch('/api/students/bulk-archive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentIds, reason: reason ?? 'manual' }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to archive students');
+      }
+      return res.json() as Promise<{ count: number }>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
+    },
+  });
+}
+
+export function useRestoreStudents() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ studentIds }: { studentIds: string[] }) => {
+      const res = await fetch('/api/students/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentIds }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to restore students');
+      }
+      return res.json() as Promise<{ count: number; skipped: { id: string; name: string; reason: string }[] }>;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['students'] });

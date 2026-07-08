@@ -26,6 +26,8 @@ import {
   useBulkDeleteStudents,
   useBulkUpdateEnrollmentStatus,
   useUpdateEnrollmentStatus,
+  useArchiveStudents,
+  useRestoreStudents,
 } from '@/lib/hooks/use-students';
 import type { SchoolClass, ReadingLevelOption, ReadingLevelSchema, EnrollmentStatus } from '@/lib/types';
 
@@ -40,19 +42,33 @@ interface StudentsPageProps {
 
 type QuickFilter = 'all' | 'has-parent' | 'no-parent';
 type EnrollmentFilter = 'all' | 'subscribed' | 'not-subscribed';
+type StatusView = 'active' | 'archived';
+
+const ARCHIVED_REASON_LABELS: Record<string, string> = {
+  graduated: 'Graduated',
+  left: 'Left school',
+  manual: 'Archived',
+};
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: StudentsPageProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const { data: students, isLoading } = useStudents();
+  // Active vs archived is a server-side filter (isActive), not a client one —
+  // the default students feed never includes archived docs.
+  const [statusView, setStatusView] = useState<StatusView>('active');
+  const { data: students, isLoading } = useStudents(
+    statusView === 'archived' ? { status: 'archived' } : undefined
+  );
   const createStudent = useCreateStudent();
   const updateStudent = useUpdateStudent();
   const deleteStudent = useDeleteStudent();
   const bulkDeleteStudents = useBulkDeleteStudents();
   const bulkUpdateEnrollment = useBulkUpdateEnrollmentStatus();
   const updateEnrollment = useUpdateEnrollmentStatus();
+  const archiveStudents = useArchiveStudents();
+  const restoreStudents = useRestoreStudents();
 
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState<string[]>([]);
@@ -73,6 +89,8 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
   const [editingStudent, setEditingStudent] = useState<StudentRow | null>(null);
   const [deletingStudent, setDeletingStudent] = useState<StudentRow | null>(null);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [archivingStudent, setArchivingStudent] = useState<StudentRow | null>(null);
+  const [showBulkArchiveConfirm, setShowBulkArchiveConfirm] = useState(false);
 
   const classMap = new Map(classes.map((c) => [c.id, c.name]));
 
@@ -186,6 +204,46 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
     }
   };
 
+  const handleArchive = async () => {
+    if (!archivingStudent) return;
+    try {
+      await archiveStudents.mutateAsync({ studentIds: [archivingStudent.id], reason: 'manual' });
+      setArchivingStudent(null);
+      toast(`${archivingStudent.firstName} archived`, 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to archive student', 'error');
+    }
+  };
+
+  const handleBulkArchive = async () => {
+    try {
+      const ids = Array.from(selectedIds);
+      const result = await archiveStudents.mutateAsync({ studentIds: ids, reason: 'manual' });
+      setSelectedIds(new Set());
+      setShowBulkArchiveConfirm(false);
+      toast(`Archived ${result.count} students`, 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to archive', 'error');
+    }
+  };
+
+  const handleRestore = async (studentIds: string[]) => {
+    try {
+      const result = await restoreStudents.mutateAsync({ studentIds });
+      setSelectedIds(new Set());
+      if (result.skipped.length > 0) {
+        toast(
+          `Restored ${result.count}. Skipped: ${result.skipped.map((s) => `${s.name} (${s.reason})`).join('; ')}`,
+          'error'
+        );
+      } else {
+        toast(`Restored ${result.count} student${result.count !== 1 ? 's' : ''}`, 'success');
+      }
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to restore', 'error');
+    }
+  };
+
   const handleEdit = async (data: { studentId?: string; firstName: string; lastName: string; classId: string; dateOfBirth?: string; currentReadingLevel?: string; parentEmail?: string }) => {
     if (!editingStudent) return;
     try {
@@ -280,35 +338,61 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
     ? allColumns.filter((col) => col.id !== 'level')
     : allColumns;
 
-  const columns: DataTableColumn<StudentRow>[] = [
+  // Archived view swaps the mid-table columns for the archive metadata and the
+  // row actions for Restore / Delete forever.
+  const archivedBaseColumns: DataTableColumn<StudentRow>[] = [
+    ...allColumns.filter((col) => col.id === 'name' || col.id === 'studentId' || col.id === 'class'),
     {
-      id: 'select',
-      header: (
-        <input
-          type="checkbox"
-          aria-label="Select all students"
-          checked={allFilteredSelected}
-          ref={(el) => {
-            if (el) el.indeterminate = someFilteredSelected;
-          }}
-          onChange={toggleSelectAll}
-          onClick={(e) => e.stopPropagation()}
-          className="accent-section cursor-pointer"
-        />
-      ),
-      accessorFn: () => null,
-      cell: (_val, row) => (
-        <input
-          type="checkbox"
-          checked={selectedIds.has(row.id)}
-          onChange={(e) => { e.stopPropagation(); toggleSelected(row.id); }}
-          onClick={(e) => e.stopPropagation()}
-          className="accent-section"
-        />
-      ),
-      className: 'w-10',
+      id: 'archivedReason',
+      header: 'Reason',
+      accessorFn: (row) => row.archivedReason ?? '',
+      cell: (val) => <Badge>{ARCHIVED_REASON_LABELS[val as string] ?? 'Archived'}</Badge>,
+      sortable: true,
     },
-    ...baseColumns,
+    {
+      id: 'archivedAt',
+      header: 'Archived',
+      accessorFn: (row) => row.archivedAt ?? '',
+      cell: (val) => (
+        <span className="text-sm text-muted">
+          {val ? new Date(val as string).toLocaleDateString('en-AU') : '-'}
+        </span>
+      ),
+      sortable: true,
+    },
+  ];
+
+  const selectColumn: DataTableColumn<StudentRow> = {
+    id: 'select',
+    header: (
+      <input
+        type="checkbox"
+        aria-label="Select all students"
+        checked={allFilteredSelected}
+        ref={(el) => {
+          if (el) el.indeterminate = someFilteredSelected;
+        }}
+        onChange={toggleSelectAll}
+        onClick={(e) => e.stopPropagation()}
+        className="accent-section cursor-pointer"
+      />
+    ),
+    accessorFn: () => null,
+    cell: (_val, row) => (
+      <input
+        type="checkbox"
+        checked={selectedIds.has(row.id)}
+        onChange={(e) => { e.stopPropagation(); toggleSelected(row.id); }}
+        onClick={(e) => e.stopPropagation()}
+        className="accent-section"
+      />
+    ),
+    className: 'w-10',
+  };
+
+  const columns: DataTableColumn<StudentRow>[] = [
+    selectColumn,
+    ...(statusView === 'archived' ? archivedBaseColumns : baseColumns),
     {
       id: 'actions',
       header: '',
@@ -316,13 +400,21 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
       cell: (_val, row) => (
         <div className="flex justify-end">
           <KebabMenu
-            items={[
-              { label: 'Mark Subscribed', onClick: () => handleSingleEnrollment(row, 'book_pack') },
-              { label: 'Mark Subscribed (Direct)', onClick: () => handleSingleEnrollment(row, 'direct_purchase') },
-              { label: 'Mark Not Subscribed', onClick: () => handleSingleEnrollment(row, 'not_enrolled') },
-              { label: 'Edit', onClick: () => setEditingStudent(row) },
-              { label: 'Delete', onClick: () => setDeletingStudent(row), variant: 'danger' },
-            ]}
+            items={
+              statusView === 'archived'
+                ? [
+                    { label: 'Restore', onClick: () => handleRestore([row.id]) },
+                    { label: 'Delete forever', onClick: () => setDeletingStudent(row), variant: 'danger' },
+                  ]
+                : [
+                    { label: 'Mark Subscribed', onClick: () => handleSingleEnrollment(row, 'book_pack') },
+                    { label: 'Mark Subscribed (Direct)', onClick: () => handleSingleEnrollment(row, 'direct_purchase') },
+                    { label: 'Mark Not Subscribed', onClick: () => handleSingleEnrollment(row, 'not_enrolled') },
+                    { label: 'Edit', onClick: () => setEditingStudent(row) },
+                    { label: 'Archive', onClick: () => setArchivingStudent(row) },
+                    { label: 'Delete', onClick: () => setDeletingStudent(row), variant: 'danger' },
+                  ]
+            }
           />
         </div>
       ),
@@ -372,15 +464,30 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
             onChange={(v) => setClassFilter(v === 'all' ? [] : [v])}
           />
         </div>
+        {statusView === 'active' && (
+          <div className="sm:w-44 shrink-0">
+            <Select
+              options={[
+                { value: 'all', label: 'All statuses' },
+                { value: 'subscribed', label: 'Subscribed' },
+                { value: 'not-subscribed', label: 'Not Subscribed' },
+              ]}
+              value={enrollmentFilter}
+              onChange={(v) => setEnrollmentFilter(v as EnrollmentFilter)}
+            />
+          </div>
+        )}
         <div className="sm:w-44 shrink-0">
           <Select
             options={[
-              { value: 'all', label: 'All statuses' },
-              { value: 'subscribed', label: 'Subscribed' },
-              { value: 'not-subscribed', label: 'Not Subscribed' },
+              { value: 'active', label: 'Active students' },
+              { value: 'archived', label: 'Archived students' },
             ]}
-            value={enrollmentFilter}
-            onChange={(v) => setEnrollmentFilter(v as EnrollmentFilter)}
+            value={statusView}
+            onChange={(v) => {
+              setStatusView(v as StatusView);
+              setSelectedIds(new Set());
+            }}
           />
         </div>
       </div>
@@ -396,15 +503,26 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
           />
           <span className="text-sm font-semibold text-ink">{selectedIds.size} selected</span>
           <div className="flex flex-wrap gap-2 ml-auto">
-            <Button variant="outline" size="sm" onClick={() => handleBulkEnrollment('book_pack')}>
-              Mark Subscribed
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => handleBulkEnrollment('direct_purchase')}>
-              Mark Subscribed (Direct)
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => handleBulkEnrollment('not_enrolled')}>
-              Mark Not Subscribed
-            </Button>
+            {statusView === 'archived' ? (
+              <Button variant="outline" size="sm" onClick={() => handleRestore(Array.from(selectedIds))}>
+                Restore
+              </Button>
+            ) : (
+              <>
+                <Button variant="outline" size="sm" onClick={() => handleBulkEnrollment('book_pack')}>
+                  Mark Subscribed
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleBulkEnrollment('direct_purchase')}>
+                  Mark Subscribed (Direct)
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleBulkEnrollment('not_enrolled')}>
+                  Mark Not Subscribed
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setShowBulkArchiveConfirm(true)}>
+                  Archive
+                </Button>
+              </>
+            )}
             <Button variant="danger" size="sm" onClick={() => setShowBulkDeleteConfirm(true)}>
               Delete
             </Button>
@@ -434,12 +552,20 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
         onPageSizeChange={setPageSize}
         onRowClick={(row) => router.push(`/students/${row.id}`)}
         emptyState={
-          <EmptyState
-            icon={<Icon name="person" size={40} />}
-            title="No students found"
-            description={search || classFilter.length > 0 ? 'Try adjusting your filters.' : 'Add your first student to get started.'}
-            action={!search && classFilter.length === 0 ? <Button onClick={() => setShowAdd(true)}>Add Students</Button> : undefined}
-          />
+          statusView === 'archived' ? (
+            <EmptyState
+              icon={<Icon name="inventory_2" size={40} />}
+              title="No archived students"
+              description="Students archived from the roster (graduates, leavers) appear here and can be restored."
+            />
+          ) : (
+            <EmptyState
+              icon={<Icon name="person" size={40} />}
+              title="No students found"
+              description={search || classFilter.length > 0 ? 'Try adjusting your filters.' : 'Add your first student to get started.'}
+              action={!search && classFilter.length === 0 ? <Button onClick={() => setShowAdd(true)}>Add Students</Button> : undefined}
+            />
+          )
         }
       />
 
@@ -490,6 +616,26 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess }: 
         confirmLabel="Delete"
         variant="danger"
         loading={bulkDeleteStudents.isPending}
+      />
+
+      <ConfirmDialog
+        open={!!archivingStudent}
+        onClose={() => setArchivingStudent(null)}
+        onConfirm={handleArchive}
+        title="Archive Student"
+        description={archivingStudent ? `Archive ${archivingStudent.firstName} ${archivingStudent.lastName}? They'll be hidden from classes, reports and the app, but their reading history is kept and they can be restored at any time.` : ''}
+        confirmLabel="Archive"
+        loading={archiveStudents.isPending}
+      />
+
+      <ConfirmDialog
+        open={showBulkArchiveConfirm}
+        onClose={() => setShowBulkArchiveConfirm(false)}
+        onConfirm={handleBulkArchive}
+        title={`Archive ${selectedIds.size} students`}
+        description={`Archive ${selectedIds.size} selected students? They'll be hidden from classes, reports and the app, but their reading history is kept and they can be restored at any time.`}
+        confirmLabel="Archive"
+        loading={archiveStudents.isPending}
       />
 
     </div>
