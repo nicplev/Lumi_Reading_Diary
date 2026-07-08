@@ -309,9 +309,16 @@ class ReadingLogService {
         final statsUpdate = await _previewStatsAfterLog(log);
 
         // Push fresh data to the home-screen widget immediately after the log.
+        // A teacher's proxy-log refreshes the teacher widget; a parent's, the
+        // parent widget.
         if (student != null) {
-          WidgetDataService.instance
-              .updateAfterLog(student: student, log: log);
+          if (log.loggedByRole == LoggedByRole.teacher) {
+            WidgetDataService.instance
+                .updateAfterTeacherLog(student: student, log: log);
+          } else {
+            WidgetDataService.instance
+                .updateAfterLog(student: student, log: log);
+          }
         }
 
         return ReadingLogResult(
@@ -338,8 +345,13 @@ class ReadingLogService {
     final offlineLog = log.copyWith(isOfflineCreated: true);
     await OfflineService.instance.saveReadingLogLocally(offlineLog);
     if (student != null) {
-      WidgetDataService.instance
-          .updateAfterLog(student: student, log: offlineLog);
+      if (offlineLog.loggedByRole == LoggedByRole.teacher) {
+        WidgetDataService.instance
+            .updateAfterTeacherLog(student: student, log: offlineLog);
+      } else {
+        WidgetDataService.instance
+            .updateAfterLog(student: student, log: offlineLog);
+      }
     }
     return ReadingLogResult(log: offlineLog, savedOffline: true);
   }
