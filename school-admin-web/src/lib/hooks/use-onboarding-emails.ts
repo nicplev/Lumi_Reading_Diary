@@ -66,6 +66,45 @@ export function useSendOnboardingEmails() {
   });
 }
 
+export function useDeleteOnboardingEmail() {
+  const queryClient = useQueryClient();
+  return useMutation<{ success: boolean }, Error, string>({
+    mutationFn: async (id) => {
+      const res = await fetch(`/api/onboarding-emails/${id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to delete receipt');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['onboarding-emails'] });
+    },
+  });
+}
+
+export function useCullOnboardingEmails() {
+  const queryClient = useQueryClient();
+  return useMutation<{ deleted: number }, Error, number>({
+    mutationFn: async (olderThanDays) => {
+      const res = await fetch(
+        `/api/onboarding-emails?olderThanDays=${olderThanDays}`,
+        { method: 'DELETE' }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to clear old receipts');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['onboarding-emails'] });
+    },
+  });
+}
+
 export function usePreviewOnboardingEmail() {
   return useMutation<
     { schoolName: string; html: string },
