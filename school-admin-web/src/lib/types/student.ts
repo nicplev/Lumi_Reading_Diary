@@ -17,6 +17,9 @@ export interface ReadingLevelHistory {
 
 export type EnrollmentStatus = 'book_pack' | 'direct_purchase' | 'not_enrolled';
 
+/** Why a student was soft-archived (rollover import or manual portal action). */
+export type ArchivedReason = 'graduated' | 'left' | 'manual';
+
 export type StudentAccessStatus = 'active' | 'expired' | 'suspended';
 
 export type StudentAccessSource =
@@ -71,6 +74,16 @@ export interface Student {
   /** Chosen Lumi character id (Firestore field + PNG stem); see lib/characters.ts. */
   characterId?: string;
   isActive: boolean;
+  /**
+   * Soft-archive marker. `isActive: false` is the universal hiding mechanism
+   * (every roster/report surface already filters on it); `status: 'archived'`
+   * distinguishes an archived student (restorable, history kept) from any other
+   * inactive state. Set by the archive flow, cleared on restore.
+   */
+  status?: 'archived';
+  archivedAt?: Date;
+  archivedReason?: ArchivedReason;
+  archivedBy?: string;
   createdAt: Date;
   enrolledAt?: Date;
   additionalInfo?: Record<string, unknown>;
