@@ -35,36 +35,38 @@ void main() {
 
     test('single valid entry → one studentId', () {
       const raw = '[{"studentId":"s1","date":"2026-05-24"}]';
-      expect(WidgetDataService.parsePendingQueue(raw, validIds), ['s1']);
+      expect(
+        WidgetDataService.parsePendingQueue(raw, validIds),
+        ['s1'],
+      );
     });
 
     test('multiple distinct valid entries preserve order', () {
-      const raw =
-          '['
+      const raw = '['
           '{"studentId":"s2","date":"2026-05-24"},'
           '{"studentId":"s1","date":"2026-05-24"},'
           '{"studentId":"s3","date":"2026-05-24"}'
           ']';
-      expect(WidgetDataService.parsePendingQueue(raw, validIds), [
-        's2',
-        's1',
-        's3',
-      ]);
+      expect(
+        WidgetDataService.parsePendingQueue(raw, validIds),
+        ['s2', 's1', 's3'],
+      );
     });
 
     test('duplicate entries for same student dedupe to first occurrence', () {
-      const raw =
-          '['
+      const raw = '['
           '{"studentId":"s1","date":"2026-05-23"},'
           '{"studentId":"s1","date":"2026-05-24"},'
           '{"studentId":"s2","date":"2026-05-24"}'
           ']';
-      expect(WidgetDataService.parsePendingQueue(raw, validIds), ['s1', 's2']);
+      expect(
+        WidgetDataService.parsePendingQueue(raw, validIds),
+        ['s1', 's2'],
+      );
     });
 
     test('entries for unknown students are dropped', () {
-      const raw =
-          '['
+      const raw = '['
           '{"studentId":"unknown","date":"2026-05-24"},'
           '{"studentId":"s1","date":"2026-05-24"}'
           ']';
@@ -76,19 +78,24 @@ void main() {
     });
 
     test('entries missing studentId or wrong type are dropped', () {
-      const raw =
-          '['
+      const raw = '['
           '{"date":"2026-05-24"},'
           '"plain-string-not-a-map",'
           '{"studentId":null,"date":"2026-05-24"},'
           '{"studentId":"s2"}'
           ']';
-      expect(WidgetDataService.parsePendingQueue(raw, validIds), ['s2']);
+      expect(
+        WidgetDataService.parsePendingQueue(raw, validIds),
+        ['s2'],
+      );
     });
 
     test('no valid students at all → empty queue', () {
       const raw = '[{"studentId":"ghost1"},{"studentId":"ghost2"}]';
-      expect(WidgetDataService.parsePendingQueue(raw, validIds), isEmpty);
+      expect(
+        WidgetDataService.parsePendingQueue(raw, validIds),
+        isEmpty,
+      );
     });
   });
 
@@ -96,8 +103,7 @@ void main() {
     const validIds = {'s1', 's2', 's3'};
 
     test('preserves distinct dates for the same student', () {
-      const raw =
-          '['
+      const raw = '['
           '{"studentId":"s1","date":"2026-05-23"},'
           '{"studentId":"s1","date":"2026-05-24"}'
           ']';
@@ -114,8 +120,7 @@ void main() {
     });
 
     test('dedupes duplicate entries for the same student and date', () {
-      const raw =
-          '['
+      const raw = '['
           '{"studentId":"s1","date":"2026-05-24"},'
           '{"studentId":"s1","date":"2026-05-24"},'
           '{"studentId":"s2","date":"2026-05-24"}'
@@ -130,8 +135,7 @@ void main() {
     });
 
     test('uses fallback date for missing or invalid date values', () {
-      const raw =
-          '['
+      const raw = '['
           '{"studentId":"s1"},'
           '{"studentId":"s2","date":"2026-02-30"}'
           ']';

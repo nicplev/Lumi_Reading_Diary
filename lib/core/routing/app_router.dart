@@ -119,8 +119,7 @@ class AppRouter {
       }
 
       // Public routes: accessible without authentication
-      final isPublicRoute =
-          location == '/splash' ||
+      final isPublicRoute = location == '/splash' ||
           location.startsWith('/auth') ||
           location == '/landing' ||
           location.startsWith('/onboarding');
@@ -215,15 +214,15 @@ class AppRouter {
             reverseTransitionDuration: Duration.zero,
             transitionsBuilder:
                 (context, animation, secondaryAnimation, child) {
-                  return Stack(
-                    children: [
-                      child,
-                      Positioned.fill(
-                        child: _BookCoverOverlay(animation: animation),
-                      ),
-                    ],
-                  );
-                },
+              return Stack(
+                children: [
+                  child,
+                  Positioned.fill(
+                    child: _BookCoverOverlay(animation: animation),
+                  ),
+                ],
+              );
+            },
           );
         },
         routes: [
@@ -369,9 +368,8 @@ class AppRouter {
           if (student == null) return const LoginScreen();
           return ReadingHistoryScreen(
             studentId: student.id,
-            parentId: student.parentIds.isNotEmpty
-                ? student.parentIds.first
-                : '',
+            parentId:
+                student.parentIds.isNotEmpty ? student.parentIds.first : '',
             schoolId: student.schoolId,
           );
         },
@@ -384,7 +382,9 @@ class AppRouter {
           final params = state.extra as Map<String, dynamic>?;
           final student = params?['student'] as StudentModel?;
           if (student == null) return const LoginScreen();
-          return StudentGoalsScreen(student: student);
+          return StudentGoalsScreen(
+            student: student,
+          );
         },
       ),
 
@@ -443,7 +443,9 @@ class AppRouter {
           final params = state.extra as Map<String, dynamic>?;
           final student = params?['student'] as StudentModel?;
           if (student == null) return const LoginScreen();
-          return StudentReportScreen(student: student);
+          return StudentReportScreen(
+            student: student,
+          );
         },
       ),
 
@@ -463,7 +465,9 @@ class AppRouter {
           final params = state.extra as Map<String, dynamic>?;
           final student = params?['student'] as StudentModel?;
           if (student == null) return const LoginScreen();
-          return BookBrowserScreen(student: student);
+          return BookBrowserScreen(
+            student: student,
+          );
         },
       ),
 
@@ -731,8 +735,10 @@ class AppRouter {
           }
           return _userScopedRoute(
             extra: state.extra,
-            child: (teacher) =>
-                ClassroomKioskScreen(teacher: teacher, classModel: classModel),
+            child: (teacher) => ClassroomKioskScreen(
+              teacher: teacher,
+              classModel: classModel,
+            ),
           );
         },
       ),
@@ -892,19 +898,18 @@ Widget _studentScopedTeacherRoute({
           final schoolId = user.schoolId;
           if (schoolId == null) {
             return const _ResourceNotFoundScaffold(
-              message: 'Student not found',
-            );
+                message: 'Student not found');
           }
           final studentAsync = ref.watch(
-            studentByIdProvider((
-              schoolId: schoolId,
-              studentId: studentIdFromPath,
-            )),
+            studentByIdProvider(
+              (schoolId: schoolId, studentId: studentIdFromPath),
+            ),
           );
           return studentAsync.when(
             loading: () => const _RouteLoadingScaffold(),
-            error: (_, __) =>
-                const _ResourceNotFoundScaffold(message: 'Student not found'),
+            error: (_, __) => const _ResourceNotFoundScaffold(
+              message: 'Student not found',
+            ),
             data: (student) => student == null
                 ? const _ResourceNotFoundScaffold(message: 'Student not found')
                 : child(user, student),
@@ -920,7 +925,9 @@ class _RouteLoadingScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
+    );
   }
 }
 

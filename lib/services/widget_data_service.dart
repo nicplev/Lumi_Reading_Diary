@@ -201,9 +201,8 @@ class WidgetDataService {
     required List<StudentModel> children,
     required UserModel parent,
   }) {
-    return _inFlightDrain ??= _drainPendingWidgetLogsImpl().whenComplete(
-      () => _inFlightDrain = null,
-    );
+    return _inFlightDrain ??=
+        _drainPendingWidgetLogsImpl().whenComplete(() => _inFlightDrain = null);
   }
 
   Future<void> _drainPendingWidgetLogsImpl() async {
@@ -370,13 +369,11 @@ class WidgetDataService {
             _parseQueueDate(entry['date'] as String?) ?? fallback;
         final dateKey = _formatQueueDate(readingDate);
         if (!processed.add('$studentId|$dateKey')) continue;
-        result.add(
-          WidgetPendingLog(
-            studentId: studentId,
-            dateKey: dateKey,
-            readingDate: readingDate,
-          ),
-        );
+        result.add(WidgetPendingLog(
+          studentId: studentId,
+          dateKey: dateKey,
+          readingDate: readingDate,
+        ));
       }
       return result;
     } catch (_) {
@@ -432,9 +429,7 @@ class WidgetDataService {
         'teacherDashboard': null,
       };
       await HomeWidget.saveWidgetData<String>(
-        _widgetDataKey,
-        jsonEncode(payload),
-      );
+          _widgetDataKey, jsonEncode(payload));
       await _clearLegacyLiveInteractionState();
       await _reloadWidgets();
     } catch (e) {
@@ -453,9 +448,7 @@ class WidgetDataService {
         'teacherDashboard': _cachedTeacherDashboard?.toJson(),
       };
       await HomeWidget.saveWidgetData<String>(
-        _widgetDataKey,
-        jsonEncode(payload),
-      );
+          _widgetDataKey, jsonEncode(payload));
       await _clearLegacyLiveInteractionState();
       await _reloadWidgets();
     } catch (e) {
@@ -470,7 +463,10 @@ class WidgetDataService {
   Future<void> drainWithCachedContext() async {
     final parent = _cachedParent;
     if (parent == null || _cachedChildModels.isEmpty) return;
-    await drainPendingWidgetLogs(children: _cachedChildModels, parent: parent);
+    await drainPendingWidgetLogs(
+      children: _cachedChildModels,
+      parent: parent,
+    );
   }
 
   static bool get _isSupported => !kIsWeb && Platform.isIOS;
@@ -502,9 +498,9 @@ class WidgetPendingLog {
   final DateTime readingDate;
 
   Map<String, dynamic> toQueueJson() => {
-    'studentId': studentId,
-    'date': dateKey,
-  };
+        'studentId': studentId,
+        'date': dateKey,
+      };
 }
 
 class _ChildPayload {
@@ -529,9 +525,7 @@ class _ChildPayload {
   });
 
   factory _ChildPayload.fromStudent(
-    StudentModel student,
-    ReadingLogModel? log,
-  ) {
+      StudentModel student, ReadingLogModel? log) {
     final now = DateTime.now();
     final todayStr = DateFormat('yyyy-MM-dd').format(now);
 
@@ -577,15 +571,15 @@ class _ChildPayload {
   }
 
   Map<String, dynamic> toJson() => {
-    'studentId': studentId,
-    'firstName': firstName,
-    'characterId': characterId,
-    'currentStreak': currentStreak,
-    'lastReadingDate': lastReadingDate,
-    'minutesReadToday': minutesReadToday,
-    'targetMinutes': targetMinutes,
-    'loggedToday': loggedToday,
-  };
+        'studentId': studentId,
+        'firstName': firstName,
+        'characterId': characterId,
+        'currentStreak': currentStreak,
+        'lastReadingDate': lastReadingDate,
+        'minutesReadToday': minutesReadToday,
+        'targetMinutes': targetMinutes,
+        'loggedToday': loggedToday,
+      };
 }
 
 class _TeacherDashboardPayload {
@@ -633,22 +627,18 @@ class _TeacherDashboardPayload {
     final current = now ?? DateTime.now();
     final today = WidgetDataService._dateOnly(current);
     final startOfWeek = WidgetDataService._dateOnly(
-      current.subtract(Duration(days: current.weekday - 1)),
-    );
-    final calendarStart = today.subtract(
-      const Duration(days: _teacherCalendarDays - 1),
-    );
+        current.subtract(Duration(days: current.weekday - 1)));
+    final calendarStart =
+        today.subtract(const Duration(days: _teacherCalendarDays - 1));
 
-    final logsForClass = recentLogs
-        .where((log) => log.classId == classModel.id)
-        .toList();
+    final logsForClass =
+        recentLogs.where((log) => log.classId == classModel.id).toList();
     final todayLogs = logsForClass
         .where((log) => WidgetDataService._dateOnly(log.date) == today)
         .toList();
     final weeklyLogs = logsForClass
-        .where(
-          (log) => !WidgetDataService._dateOnly(log.date).isBefore(startOfWeek),
-        )
+        .where((log) =>
+            !WidgetDataService._dateOnly(log.date).isBefore(startOfWeek))
         .toList();
 
     final studentsByDay = <DateTime, Set<String>>{};
@@ -685,14 +675,12 @@ class _TeacherDashboardPayload {
     for (final entry in sortedReaders.take(3)) {
       final student = studentById[entry.key];
       if (student == null) continue;
-      topReaders.add(
-        _TeacherTopReaderPayload(
-          studentId: student.id,
-          firstName: student.firstName,
-          characterId: student.characterId ?? 'lumi_red_default',
-          minutes: entry.value,
-        ),
-      );
+      topReaders.add(_TeacherTopReaderPayload(
+        studentId: student.id,
+        firstName: student.firstName,
+        characterId: student.characterId ?? 'lumi_red_default',
+        minutes: entry.value,
+      ));
     }
 
     var onStreakCount = 0;
@@ -722,10 +710,8 @@ class _TeacherDashboardPayload {
       sessionsTodayCount: todayLogs.length,
       teacherLoggedTodayCount: teacherLoggedStudentIds.length,
       onStreakCount: onStreakCount,
-      totalMinutesToday: todayLogs.fold<int>(
-        0,
-        (total, log) => total + log.minutesRead,
-      ),
+      totalMinutesToday:
+          todayLogs.fold<int>(0, (total, log) => total + log.minutesRead),
       todayDate: WidgetDataService._formatQueueDate(today),
       todayStudentIds: todayStudentIds,
       teacherLoggedStudentIds: teacherLoggedStudentIds,
@@ -741,20 +727,18 @@ class _TeacherDashboardPayload {
     final today = WidgetDataService._dateOnly(DateTime.now());
     if (WidgetDataService._dateOnly(log.date) != today) return this;
     final alreadyReadToday = todayStudentIds.contains(student.id);
-    final alreadyTeacherLoggedToday = teacherLoggedStudentIds.contains(
-      student.id,
-    );
+    final alreadyTeacherLoggedToday =
+        teacherLoggedStudentIds.contains(student.id);
     final updatedTodayStudentIds = {...todayStudentIds, student.id};
     final updatedTeacherLoggedStudentIds = log.isTeacherProxy
         ? {...teacherLoggedStudentIds, student.id}
         : teacherLoggedStudentIds;
-    final updatedReadTodayCount = alreadyReadToday
-        ? readTodayCount
-        : readTodayCount + 1;
+    final updatedReadTodayCount =
+        alreadyReadToday ? readTodayCount : readTodayCount + 1;
     final updatedTeacherLoggedTodayCount =
         log.isTeacherProxy && !alreadyTeacherLoggedToday
-        ? teacherLoggedTodayCount + 1
-        : teacherLoggedTodayCount;
+            ? teacherLoggedTodayCount + 1
+            : teacherLoggedTodayCount;
 
     final updatedDays = [
       for (final day in calendarDays)
@@ -763,8 +747,8 @@ class _TeacherDashboardPayload {
             readCount: alreadyReadToday
                 ? day.readCount
                 : (day.readCount + 1 > totalStudents
-                      ? totalStudents
-                      : day.readCount + 1),
+                    ? totalStudents
+                    : day.readCount + 1),
           )
         else
           day,
@@ -805,20 +789,20 @@ class _TeacherDashboardPayload {
   }
 
   Map<String, dynamic> toJson() => {
-    'teacherId': teacherId,
-    'schoolId': schoolId,
-    'classId': classId,
-    'className': className,
-    'totalStudents': totalStudents,
-    'readTodayCount': readTodayCount,
-    'sessionsTodayCount': sessionsTodayCount,
-    'teacherLoggedTodayCount': teacherLoggedTodayCount,
-    'onStreakCount': onStreakCount,
-    'totalMinutesToday': totalMinutesToday,
-    'todayDate': todayDate,
-    'calendarDays': calendarDays.map((day) => day.toJson()).toList(),
-    'topReaders': topReaders.map((reader) => reader.toJson()).toList(),
-  };
+        'teacherId': teacherId,
+        'schoolId': schoolId,
+        'classId': classId,
+        'className': className,
+        'totalStudents': totalStudents,
+        'readTodayCount': readTodayCount,
+        'sessionsTodayCount': sessionsTodayCount,
+        'teacherLoggedTodayCount': teacherLoggedTodayCount,
+        'onStreakCount': onStreakCount,
+        'totalMinutesToday': totalMinutesToday,
+        'todayDate': todayDate,
+        'calendarDays': calendarDays.map((day) => day.toJson()).toList(),
+        'topReaders': topReaders.map((reader) => reader.toJson()).toList(),
+      };
 }
 
 class _TeacherCalendarDayPayload {
@@ -836,7 +820,10 @@ class _TeacherCalendarDayPayload {
         readCount: readCount ?? this.readCount,
       );
 
-  Map<String, dynamic> toJson() => {'date': date, 'readCount': readCount};
+  Map<String, dynamic> toJson() => {
+        'date': date,
+        'readCount': readCount,
+      };
 }
 
 class _TeacherTopReaderPayload {
@@ -853,11 +840,11 @@ class _TeacherTopReaderPayload {
   });
 
   Map<String, dynamic> toJson() => {
-    'studentId': studentId,
-    'firstName': firstName,
-    'characterId': characterId,
-    'minutes': minutes,
-  };
+        'studentId': studentId,
+        'firstName': firstName,
+        'characterId': characterId,
+        'minutes': minutes,
+      };
 }
 
 /// Legacy record for a reading log committed by older widget-tap drain builds,
@@ -882,12 +869,12 @@ class WidgetCommitRecord {
   });
 
   Map<String, dynamic> toJson() => {
-    'studentId': studentId,
-    'firstName': firstName,
-    'logId': logId,
-    'schoolId': schoolId,
-    'committedAt': committedAt.toIso8601String(),
-  };
+        'studentId': studentId,
+        'firstName': firstName,
+        'logId': logId,
+        'schoolId': schoolId,
+        'committedAt': committedAt.toIso8601String(),
+      };
 
   factory WidgetCommitRecord.fromJson(Map<String, dynamic> json) =>
       WidgetCommitRecord(
@@ -895,8 +882,7 @@ class WidgetCommitRecord {
         firstName: json['firstName'] as String? ?? '',
         logId: json['logId'] as String? ?? '',
         schoolId: json['schoolId'] as String? ?? '',
-        committedAt:
-            DateTime.tryParse(json['committedAt'] as String? ?? '') ??
+        committedAt: DateTime.tryParse(json['committedAt'] as String? ?? '') ??
             DateTime.now(),
       );
 }

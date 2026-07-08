@@ -38,10 +38,8 @@ class _WidgetUndoBannerState extends ConsumerState<WidgetUndoBanner> {
     });
     // Re-check expiry periodically so the banner self-dismisses when the
     // 5-minute window closes without any user input.
-    _expiryTicker = Timer.periodic(
-      const Duration(seconds: 15),
-      (_) => _refresh(),
-    );
+    _expiryTicker =
+        Timer.periodic(const Duration(seconds: 15), (_) => _refresh());
   }
 
   @override
@@ -103,7 +101,9 @@ class _WidgetUndoBannerState extends ConsumerState<WidgetUndoBanner> {
         decoration: BoxDecoration(
           color: AppColors.offWhite,
           borderRadius: BorderRadius.circular(LumiBorders.radiusMedium),
-          border: Border.all(color: AppColors.charcoal.withValues(alpha: 0.08)),
+          border: Border.all(
+            color: AppColors.charcoal.withValues(alpha: 0.08),
+          ),
           boxShadow: [
             BoxShadow(
               color: AppColors.charcoal.withValues(alpha: 0.05),
@@ -162,7 +162,10 @@ class _WidgetUndoBannerState extends ConsumerState<WidgetUndoBanner> {
                 color: AppColors.charcoal.withValues(alpha: 0.45),
               ),
               padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              constraints: const BoxConstraints(
+                minWidth: 32,
+                minHeight: 32,
+              ),
               tooltip: "Dismiss",
             ),
           ],
