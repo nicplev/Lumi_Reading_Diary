@@ -4,6 +4,10 @@ Internal documentation for the Lumi reading tracker. Source code lives at the re
 
 ## Index
 
+- **[go-to-market.md](go-to-market.md)** — Landing page, pricing, and onboarding strategy. Covers the retail (public, self-serve) vs wholesale (KAKA-connected, sales-assisted) channels, school + family (B2C) segments, per-student/year pricing, what to advertise publicly, a section-by-section landing-page content spec, the three onboarding flows, and a phased implementation roadmap. Strategy/content only — no code.
+
+- **[demo-playbook.md](demo-playbook.md)** — Sales demo playbook: the 18-minute golden-path demo (parent → teacher → leader → close), video-call and in-person rig checklists, live-moment choreography with fallbacks, objection handling, guardrails, and the scale path for training future demo runners. Built around the demo tenant created by [`scripts/seed_demo_school.js`](../scripts/seed_demo_school.js).
+
 - **[parent-ux-research.md](parent-ux-research.md)** — Research synthesis, baseline review of the parent-logging flow, and the phased implementation roadmap (Recs 1–10). Most of Phases 0–3 are now built on the mobile app; see the roadmap for what each recommendation covers and the cross-cutting risks.
 
 - **[impersonation-runbook.md](impersonation-runbook.md)** — Operations runbook for the super-admin read-only impersonation flow (mobile + web portal). Covers MFA gates, audit trail, and incident response.
