@@ -213,7 +213,7 @@ export function CSVImportDialog({ open, onClose, embedded }: CSVImportDialogProp
         <div className="text-center py-8">
           <div className="flex justify-center mb-4 text-muted/50"><Icon name="upload_file" size={48} /></div>
           <p className="text-sm text-muted mb-3">
-            Upload a CSV file with columns: Student ID, First Name, Last Name, Class Name, DOB, Parent Email, Reading Level.
+            Upload a CSV file with columns: Student ID, First Name, Last Name, Class Name, Parent Email, Reading Level.
           </p>
           <div className="bg-lumi-blue/10 border border-lumi-blue/20 rounded-[var(--radius-md)] px-4 py-3 mb-4 text-sm text-ink">
             <p className="mb-1"><strong>Required columns:</strong> First Name, Last Name, Class Name</p>
@@ -232,10 +232,10 @@ export function CSVImportDialog({ open, onClose, embedded }: CSVImportDialogProp
               type="button"
               onClick={() => {
                 const csv = [
-                  'Student ID,First Name,Last Name,Class Name,Date of Birth,Parent Email,Reading Level',
-                  'S10001,Jane,Smith,3A,2017-03-15,jane.parent@email.com,Level 12',
-                  'S10002,Tom,Brown,3A,2017-06-22,tom.parent@email.com,',
-                  'S10003,Mia,Johnson,3B,2017-01-10,mia.parent@email.com,Gold',
+                  'Student ID,First Name,Last Name,Class Name,Parent Email,Reading Level',
+                  'S10001,Jane,Smith,3A,jane.parent@email.com,Level 12',
+                  'S10002,Tom,Brown,3A,tom.parent@email.com,',
+                  'S10003,Mia,Johnson,3B,mia.parent@email.com,Gold',
                 ].join('\n');
                 const blob = new Blob([csv], { type: 'text/csv' });
                 const url = URL.createObjectURL(blob);
