@@ -93,9 +93,12 @@ export function ProvisionPanel({
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
           <p className="text-muted-foreground">
-            The school is created with access switched on for the year. Send the
-            admin their password-setup link, then continue to the setup
-            checklist.
+            The school is created with access switched on for the year.{" "}
+            <span className="font-medium text-foreground">
+              No email is sent — copy the link below and send it to the admin
+              now.
+            </span>{" "}
+            If you lose it, re-generate it any time from the setup checklist.
           </p>
           {result.inviteLink && (
             <div className="space-y-1">

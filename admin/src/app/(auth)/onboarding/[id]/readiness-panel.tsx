@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Check, AlertTriangle, X, Minus, Rocket } from "lucide-react";
+import { Check, AlertTriangle, X, Minus, Rocket, Copy } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -39,10 +39,34 @@ export function ReadinessPanel({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [adminLinkLoading, setAdminLinkLoading] = useState(false);
 
   const warnings = readiness.items.filter(
     (i) => !i.blocking && i.status === "warn"
   );
+
+  const copyAdminLink = async () => {
+    setAdminLinkLoading(true);
+    try {
+      const res = await fetch(`/api/onboarding/${onboardingId}/admin-link`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate link");
+      try {
+        await navigator.clipboard.writeText(data.link);
+        toast.success(`Setup link copied — send it to ${data.email}`);
+      } catch {
+        toast.success(`Setup link for ${data.email}`, {
+          description: data.link,
+        });
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to generate link");
+    } finally {
+      setAdminLinkLoading(false);
+    }
+  };
 
   const runGoLive = async () => {
     setLoading(true);
@@ -86,6 +110,25 @@ export function ReadinessPanel({
         </Link>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/40 p-3">
+          <div className="text-sm">
+            <p className="font-medium">Admin access</p>
+            <p className="text-xs text-muted-foreground">
+              No email is sent automatically — copy this link and send it to the
+              admin so they can set their password.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={copyAdminLink}
+            disabled={adminLinkLoading}
+          >
+            <Copy className="mr-2 h-4 w-4" />
+            {adminLinkLoading ? "Generating…" : "Copy admin setup link"}
+          </Button>
+        </div>
+
         <ul className="space-y-2">
           {readiness.items.map((item) => (
             <li key={item.key} className="flex items-start gap-2 text-sm">

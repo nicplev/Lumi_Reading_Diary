@@ -79,7 +79,7 @@ export async function provisionSchoolFromOnboarding(
   });
 
   // 3. School-admin account (find-or-create Auth user by email).
-  await createSchoolUser(auth, db, actor, {
+  const { id: adminUserId } = await createSchoolUser(auth, db, actor, {
     schoolId,
     email: params.adminEmail,
     fullName: params.adminFullName,
@@ -109,9 +109,11 @@ export async function provisionSchoolFromOnboarding(
     }
   }
 
-  // 6. Link + advance the onboarding record.
+  // 6. Link + advance the onboarding record (store the admin for later resend).
   await obRef.update({
     schoolId,
+    adminUserId,
+    adminEmail: params.adminEmail,
     status: "setupInProgress",
     currentStep: "importData",
     completedSteps: FieldValue.arrayUnion("schoolInfo", "adminAccount"),
@@ -136,4 +138,63 @@ export async function provisionSchoolFromOnboarding(
   });
 
   return { schoolId, inviteLink, joinCode };
+}
+
+// Re-generate the school-admin's password-setup link on demand — the link is
+// one-shot at provision time and no email is sent, so this is how an operator
+// recovers it. Prefers the adminEmail stored on the request; falls back to the
+// linked school's first schoolAdmin (covers requests provisioned before the
+// field was stored).
+export async function regenerateAdminSetupLink(
+  actor: { uid: string; email?: string },
+  onboardingId: string
+): Promise<{ email: string; link: string }> {
+  const db = getAdminDb();
+  const auth = getAdminAuth();
+
+  const obSnap = await db
+    .collection("schoolOnboarding")
+    .doc(onboardingId)
+    .get();
+  if (!obSnap.exists) {
+    throw new OnboardingProvisionError("Onboarding request not found");
+  }
+  const ob = obSnap.data()!;
+  const schoolId = ob.schoolId as string | undefined;
+  if (!schoolId) {
+    throw new OnboardingProvisionError("This request has no provisioned school yet");
+  }
+
+  let email =
+    typeof ob.adminEmail === "string" && ob.adminEmail ? ob.adminEmail : "";
+  if (!email) {
+    const adminSnap = await db
+      .collection("schools").doc(schoolId)
+      .collection("users")
+      .where("role", "==", "schoolAdmin")
+      .limit(1)
+      .get();
+    email = (adminSnap.docs[0]?.data()?.email as string) || "";
+  }
+  if (!email) {
+    throw new OnboardingProvisionError(
+      "No school-admin account found for this school"
+    );
+  }
+
+  const link = await auth.generatePasswordResetLink(email);
+
+  await logAuditEvent({
+    action: "onboarding.adminLink",
+    performedBy: actor.uid,
+    performedByEmail: actor.email,
+    targetType: "onboarding",
+    targetId: onboardingId,
+    schoolId,
+    after: { email },
+  }).catch((e) => {
+    console.error("[onboarding] audit log failed for onboarding.adminLink", e);
+  });
+
+  return { email, link };
 }
