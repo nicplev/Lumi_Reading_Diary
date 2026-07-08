@@ -253,9 +253,13 @@ export async function deleteStudent(schoolId: string, studentId: string): Promis
     }
   }
 
-  batch.update(schoolRef, {
-    studentCount: FieldValue.increment(-1),
-  });
+  // Archived students already left the count when they were archived —
+  // decrementing again on delete-forever would double-count.
+  if ((data.isActive ?? true) === true) {
+    batch.update(schoolRef, {
+      studentCount: FieldValue.increment(-1),
+    });
+  }
 
   await batch.commit();
 }
@@ -363,9 +367,14 @@ export async function deleteStudents(schoolId: string, studentIds: string[]): Pr
       metaBatch.update(ref, { linkedChildren: FieldValue.arrayRemove(...ids) });
     }
   }
-  metaBatch.update(schoolRef, {
-    studentCount: FieldValue.increment(-existing.length),
-  });
+  // Only active students still count toward studentCount — archived ones left
+  // the count at archive time (double-decrement guard).
+  const activeDeleted = existing.filter((s) => (s.data()!.isActive ?? true) === true).length;
+  if (activeDeleted > 0) {
+    metaBatch.update(schoolRef, {
+      studentCount: FieldValue.increment(-activeDeleted),
+    });
+  }
   await metaBatch.commit();
 
   return existing.length;
