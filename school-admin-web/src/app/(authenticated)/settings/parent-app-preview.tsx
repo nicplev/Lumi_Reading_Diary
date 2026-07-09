@@ -9,18 +9,29 @@ interface ParentAppPreviewProps {
   presets: CommentPresetCategory[];
 }
 
-const CHARCOAL = '#121211';
-const ROSE = '#FF8698';
-const MINT = '#D2EBBF';
-const MINT_BORDER = '#A5D6A7';
-const CHIP_BG = '#F5F5F7';
-const CHIP_BORDER = '#E5E7EB';
+// Exact Lumi app tokens (lib/theme/lumi_tokens.dart + AppColors) so the preview
+// renders pixel-faithfully against the real Flutter screen.
+const NUNITO = 'var(--font-family-nunito), "Nunito", sans-serif'; // app display face
+const INK = '#1A1A1A';         // LumiTokens.ink — labels, chip text
+const CHARCOAL = '#121211';    // AppColors.charcoal — h2 heading
+const MUTED = '#6B6B6B';       // LumiTokens.muted
+const RULE = '#E5E2DC';        // LumiTokens.rule — borders
+const CREAM = '#FBFAF6';       // LumiTokens.cream — body background
+const PAPER = '#FFFFFF';       // LumiTokens.paper — app bar + unselected chip
+const RED = '#EC4544';         // LumiTokens.red — progress + primary button
+const GREEN = '#51BA65';       // LumiTokens.green — selected chip border
+const TINT_GREEN = '#B5DAB8';  // LumiTokens.tintGreen — selected chip fill
+
+// Max chips a parent may select (kMaxParentCommentChips in comment_chips.dart).
+const MAX_CHIPS = 3;
 
 /**
- * Live "iPhone 17 Pro" mockup of the parent app's comment step in the
- * reading-log flow. Mirrors the Flutter UI in
- * lib/screens/parent/log_reading_screen.dart + lib/core/widgets/lumi/comment_chips.dart
- * so admins see exactly what their custom comment presets look like in the real app.
+ * Live "iPhone 17 Pro" mockup of the parent app's reading-log comment step.
+ * Rebuilt to match the real Flutter screen exactly —
+ * lib/screens/parent/log_reading_screen.dart (_buildStepDetail + chrome) and
+ * lib/core/widgets/lumi/comment_chips.dart — Nunito type, white/green chips,
+ * the ✕-close + child-name app bar, 3-segment red progress with a step count,
+ * the cream notes field, and the red primary button.
  *
  * Colors / dimensions are inline-styled (not Tailwind arbitrary values) so the
  * device renders pixel-faithfully regardless of the utility-class pipeline.
@@ -73,8 +84,9 @@ export function ParentAppPreview({ enabled, freeTextEnabled, presets }: ParentAp
               height: SCREEN_H,
               borderRadius: 50,
               overflow: 'hidden',
-              background: '#fff',
-              color: CHARCOAL,
+              background: PAPER,
+              color: INK,
+              fontFamily: NUNITO,
             }}
           >
             {/* Dynamic Island */}
@@ -104,54 +116,72 @@ export function ParentAppPreview({ enabled, freeTextEnabled, presets }: ParentAp
 
             {enabled ? (
               <div className="flex flex-col" style={{ height: SCREEN_H - 34 }}>
-                {/* App header */}
-                <div style={{ padding: '6px 20px 12px' }}>
-                  <div className="flex items-center" style={{ gap: 12 }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke={CHARCOAL} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    <span style={{ fontSize: 15, fontWeight: 700 }}>Log Reading</span>
+                {/* App bar (white) — ✕ close + child name, then the progress row */}
+                <div style={{ background: PAPER, padding: '4px 16px 0' }}>
+                  <div className="flex items-center" style={{ gap: 6, height: 38 }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke={INK} strokeWidth="2" strokeLinecap="round"/></svg>
+                    <span style={{ fontSize: 16, fontWeight: 600, color: INK }}>Sam</span>
                   </div>
-                  {/* Progress: step 3 of 4 */}
-                  <div className="flex" style={{ gap: 6, marginTop: 12 }}>
-                    {[0, 1, 2, 3].map((i) => (
-                      <div key={i} style={{ height: 6, flex: 1, borderRadius: 999, background: i <= 2 ? ROSE : '#EDEDF0' }} />
-                    ))}
+                  {/* Progress — 3 segments (done / active / upcoming) + step count */}
+                  <div className="flex items-center" style={{ gap: 12, padding: '0 0 12px' }}>
+                    <div className="flex" style={{ flex: 1, gap: 6 }}>
+                      {[0, 1, 2].map((i) => (
+                        <div
+                          key={i}
+                          style={{
+                            height: 4,
+                            flex: 1,
+                            borderRadius: 2,
+                            background: i < 1 ? RED : i === 1 ? 'rgba(236,69,68,0.6)' : 'rgba(26,26,26,0.1)',
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <span style={{ fontSize: 12, color: MUTED, whiteSpace: 'nowrap' }}>Step 2 of 3</span>
                   </div>
                 </div>
 
-                {/* Scrollable comment step */}
-                <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 8px' }}>
-                  <h2 style={{ fontSize: 22, fontWeight: 600, lineHeight: 1.15 }}>How did it go?</h2>
-                  <p style={{ fontSize: 13, marginTop: 8, color: 'rgba(18,18,17,0.6)' }}>Select any that apply (optional)</p>
+                {/* Scrollable comment step (cream body) */}
+                <div style={{ flex: 1, overflowY: 'auto', background: CREAM, padding: '16px 16px 8px' }}>
+                  <h2 style={{ fontSize: 24, fontWeight: 600, lineHeight: 1.3, color: CHARCOAL, margin: 0 }}>How did it go?</h2>
+                  <p style={{ fontSize: 14, lineHeight: 1.5, marginTop: 8, color: 'rgba(26,26,26,0.6)' }}>
+                    Select up to {MAX_CHIPS} that apply (optional)
+                  </p>
 
                   <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
                     {categories.map((cat) => (
                       <div key={cat.id}>
-                        <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'rgba(18,18,17,0.7)' }}>{cat.name}</p>
+                        <p style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.4, marginBottom: 8, color: 'rgba(26,26,26,0.7)' }}>{cat.name}</p>
                         <div className="flex flex-wrap" style={{ gap: 8 }}>
                           {cat.chips.map((chip) => {
                             const key = `${cat.id}::${chip}`;
                             const isSelected = selected.has(key);
+                            const chipEnabled = isSelected || selected.size < MAX_CHIPS;
                             return (
                               <button
                                 key={key}
                                 type="button"
-                                onClick={() => toggle(key)}
+                                disabled={!chipEnabled}
+                                onClick={() => chipEnabled && toggle(key)}
                                 className="inline-flex items-center"
                                 style={{
                                   gap: 4,
                                   borderRadius: 20,
                                   padding: '8px 16px',
-                                  fontSize: 13,
+                                  fontSize: 14,
+                                  lineHeight: 1.5,
+                                  fontFamily: NUNITO,
                                   transition: 'all 200ms',
-                                  border: `1px solid ${isSelected ? MINT_BORDER : CHIP_BORDER}`,
-                                  background: isSelected ? MINT : CHIP_BG,
+                                  border: `1px solid ${isSelected ? GREEN : RULE}`,
+                                  background: isSelected ? TINT_GREEN : PAPER,
                                   fontWeight: isSelected ? 600 : 400,
-                                  color: CHARCOAL,
-                                  cursor: 'pointer',
+                                  color: INK,
+                                  opacity: chipEnabled ? 1 : 0.4,
+                                  cursor: chipEnabled ? 'pointer' : 'default',
                                 }}
                               >
                                 {isSelected && (
-                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="rgba(18,18,17,0.8)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="rgba(26,26,26,0.8)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                                 )}
                                 {chip}
                               </button>
@@ -162,7 +192,7 @@ export function ParentAppPreview({ enabled, freeTextEnabled, presets }: ParentAp
                     ))}
 
                     {categories.length === 0 && (
-                      <p style={{ fontSize: 13, fontStyle: 'italic', color: 'rgba(18,18,17,0.4)' }}>
+                      <p style={{ fontSize: 14, fontStyle: 'italic', color: 'rgba(26,26,26,0.4)' }}>
                         No comment options configured yet.
                       </p>
                     )}
@@ -170,29 +200,29 @@ export function ParentAppPreview({ enabled, freeTextEnabled, presets }: ParentAp
 
                   {freeTextEnabled && (
                     <div style={{ marginTop: 24 }}>
-                      <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Additional notes</p>
-                      <div style={{ borderRadius: 12, border: `1px solid ${CHIP_BORDER}`, background: '#fff', padding: '10px 12px', fontSize: 13, color: 'rgba(18,18,17,0.35)', minHeight: 56 }}>
+                      <p style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.4, marginBottom: 8, color: INK }}>Additional notes</p>
+                      <div style={{ borderRadius: 14, border: `1px solid ${RULE}`, background: CREAM, padding: 14, fontSize: 14, color: 'rgba(26,26,26,0.4)', minHeight: 58 }}>
                         Anything else to add? (optional)
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Footer button */}
-                <div style={{ padding: '8px 16px 20px' }}>
-                  <div style={{ width: '100%', borderRadius: 16, background: ROSE, padding: '14px 0', textAlign: 'center', fontSize: 15, fontWeight: 700, color: '#fff' }}>
+                {/* Footer — red primary button (LumiPrimaryButton, LumiTokens.red) */}
+                <div style={{ background: CREAM, padding: 16 }}>
+                  <div style={{ width: '100%', borderRadius: 16, background: RED, padding: '15px 0', textAlign: 'center', fontSize: 16, fontWeight: 600, letterSpacing: 0.5, color: PAPER }}>
                     Next
                   </div>
                 </div>
               </div>
             ) : (
               // Comment step disabled — mirrors the app skipping the step.
-              <div className="flex flex-col items-center justify-center text-center" style={{ height: SCREEN_H - 34, padding: '0 32px' }}>
-                <div className="flex items-center justify-center" style={{ width: 56, height: 56, borderRadius: 999, background: CHIP_BG }}>
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M3 3l18 18M9.5 4.2A9 9 0 0121 12c0 1.1-.2 2.1-.6 3M5 7a9 9 0 00-2 5c0 5 4 9 9 9a9 9 0 005-1.5" stroke="rgba(18,18,17,0.4)" strokeWidth="1.8" strokeLinecap="round"/></svg>
+              <div className="flex flex-col items-center justify-center text-center" style={{ height: SCREEN_H - 34, background: CREAM, padding: '0 32px' }}>
+                <div className="flex items-center justify-center" style={{ width: 56, height: 56, borderRadius: 999, background: 'rgba(26,26,26,0.05)' }}>
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M3 3l18 18M9.5 4.2A9 9 0 0121 12c0 1.1-.2 2.1-.6 3M5 7a9 9 0 00-2 5c0 5 4 9 9 9a9 9 0 005-1.5" stroke="rgba(26,26,26,0.4)" strokeWidth="1.8" strokeLinecap="round"/></svg>
                 </div>
-                <p style={{ fontSize: 15, fontWeight: 600, marginTop: 16 }}>Comments are turned off</p>
-                <p style={{ fontSize: 13, marginTop: 6, color: 'rgba(18,18,17,0.55)' }}>
+                <p style={{ fontSize: 15, fontWeight: 600, marginTop: 16, color: INK }}>Comments are turned off</p>
+                <p style={{ fontSize: 13, marginTop: 6, color: 'rgba(26,26,26,0.55)' }}>
                   Parents skip the comment step and go straight to reviewing their session.
                 </p>
               </div>
