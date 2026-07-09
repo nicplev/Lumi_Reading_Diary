@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/lumi/empty-state';
 import { useSchool } from '@/lib/hooks/use-school';
 import { useClassReport } from '@/lib/hooks/use-reports';
 import { useToast } from '@/components/lumi/toast';
+import type { ClassReport } from '@/lib/firestore/reports';
 
 function isoLocal(d: Date): string {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -49,13 +50,58 @@ function formatDate(iso: string): string {
 }
 
 // A preset without `to` runs through today.
-const PRESETS: { key: string; label: string; from: () => string; to?: () => string }[] = [
-  { key: 'this-week', label: 'This week', from: () => isoMonday(0) },
-  { key: 'last-week', label: 'Last week', from: () => isoMonday(-1), to: () => isoSunday(-1) },
-  { key: '30', label: 'Last 30 days', from: () => isoDaysAgo(30) },
-  { key: '90', label: 'Last term (90 days)', from: () => isoDaysAgo(90) },
-  { key: 'year', label: 'This year', from: () => `${new Date().getFullYear()}-01-01` },
-];
+type Preset = { key: string; label: string; from: () => string; to?: () => string };
+
+/** School term dates are stored as `term{1-4}Start` / `term{1-4}End` ISO strings
+ *  (same shape the analytics page reads). Returns the term containing today. */
+function currentTermRange(termDates?: Record<string, string>): { start: string; end: string } | null {
+  if (!termDates) return null;
+  const today = isoToday();
+  for (let i = 1; i <= 4; i++) {
+    const s = termDates[`term${i}Start`];
+    const e = termDates[`term${i}End`];
+    if (s && e) {
+      const start = s.slice(0, 10);
+      const end = e.slice(0, 10);
+      if (today >= start && today <= end) return { start, end };
+    }
+  }
+  return null;
+}
+
+/** Academic year = earliest configured term start → latest term end. */
+function academicYearStart(termDates?: Record<string, string>): string | null {
+  if (!termDates) return null;
+  const starts = [1, 2, 3, 4]
+    .map((i) => termDates[`term${i}Start`])
+    .filter((s): s is string => Boolean(s))
+    .map((s) => s.slice(0, 10))
+    .sort();
+  return starts[0] ?? null;
+}
+
+/** Term-aware presets — honest labels driven by the school's real term dates,
+ *  falling back to rolling/calendar windows when term dates aren't configured. */
+function buildPresets(termDates?: Record<string, string>): Preset[] {
+  const presets: Preset[] = [
+    { key: 'this-week', label: 'This week', from: () => isoMonday(0) },
+    { key: 'last-week', label: 'Last week', from: () => isoMonday(-1), to: () => isoSunday(-1) },
+    { key: '30', label: 'Last 30 days', from: () => isoDaysAgo(30) },
+  ];
+  const term = currentTermRange(termDates);
+  presets.push(
+    term
+      ? { key: 'term', label: 'This term', from: () => term.start }
+      : { key: '90', label: 'Last 90 days', from: () => isoDaysAgo(90) }
+  );
+  const yearStart = academicYearStart(termDates);
+  presets.push(
+    yearStart
+      ? { key: 'year', label: 'This year', from: () => yearStart }
+      : { key: 'year', label: 'This year', from: () => `${new Date().getFullYear()}-01-01` }
+  );
+  return presets;
+}
 
 interface ClassReportTabProps {
   classId: string;
@@ -66,20 +112,96 @@ interface ClassReportTabProps {
   levelsEnabled?: boolean;
 }
 
-function Metric({ label, value }: { label: string; value: string | number }) {
+// Bento tile / section-header colourways — soft brand tints with a matching
+// dark accent for the icon. Keeps the report on the Lumi palette while giving
+// each metric its own colour so the page reads as a lively dashboard, not a
+// grey spreadsheet.
+const TILE_STYLES = {
+  blue: { tile: 'bg-tint-blue', icon: 'text-lumi-blue-dark' },
+  green: { tile: 'bg-tint-green', icon: 'text-lumi-green-dark' },
+  red: { tile: 'bg-tint-red', icon: 'text-lumi-red-dark' },
+  yellow: { tile: 'bg-tint-yellow', icon: 'text-lumi-yellow-dark' },
+  orange: { tile: 'bg-tint-orange', icon: 'text-lumi-orange' },
+} as const;
+type TileColor = keyof typeof TILE_STYLES;
+
+function BentoMetric({
+  label,
+  value,
+  icon,
+  color,
+  sub,
+  hint,
+}: {
+  label: string;
+  value: string | number;
+  icon: string;
+  color: TileColor;
+  /** Small secondary line under the label (e.g. a rate or percentage). */
+  sub?: string;
+  /** Plain-English explanation shown on hover (native tooltip). */
+  hint?: string;
+}) {
+  const s = TILE_STYLES[color];
   return (
-    <div className="rounded-[var(--radius-md)] border border-rule p-4">
-      <p className="text-xs font-semibold text-muted uppercase tracking-wide">{label}</p>
-      <p className="text-2xl font-bold text-ink mt-1">{value}</p>
+    <div className={`rounded-[var(--radius-md)] p-4 ${s.tile}`} title={hint}>
+      <span
+        className={`inline-flex items-center justify-center w-9 h-9 rounded-[var(--radius-sm)] bg-paper/70 ${s.icon} mb-2`}
+      >
+        <Icon name={icon} size={20} />
+      </span>
+      <p className="text-2xl font-extrabold text-ink leading-none">{value}</p>
+      <p className="text-[11px] font-semibold text-ink/70 uppercase tracking-wide mt-1">{label}</p>
+      {sub ? <p className="text-[11px] font-semibold text-ink/55 mt-0.5">{sub}</p> : null}
     </div>
   );
 }
+
+/** One plain-language sentence teachers can read at a glance (or paste into a
+ *  report) instead of decoding eight tiles. Composed from already-computed
+ *  fields — no new data. */
+function buildSummary(report: ClassReport): string {
+  const parts: string[] = [
+    `${report.activeReaders} of ${report.totalStudents} student${report.totalStudents === 1 ? '' : 's'} read this period`,
+  ];
+  parts.push(
+    report.needsSupport.length > 0
+      ? `${report.needsSupport.length} need${report.needsSupport.length === 1 ? 's' : ''} support`
+      : 'everyone is engaged'
+  );
+  parts.push(`averaging ${report.avgMinutesPerStudent} min and ${report.avgReadingDaysPerStudent} days each`);
+  if (report.topReaders.length > 0) parts.push(`top reader: ${report.topReaders[0].name}`);
+  return `${parts.join(' · ')}.`;
+}
+
+function SectionHeader({ icon, title, color }: { icon: string; title: string; color: TileColor }) {
+  const s = TILE_STYLES[color];
+  return (
+    <div className="flex items-center gap-2.5 mb-4">
+      <span className={`inline-flex items-center justify-center w-8 h-8 rounded-[var(--radius-sm)] ${s.tile} ${s.icon}`}>
+        <Icon name={icon} size={18} />
+      </span>
+      <h2 className="text-lg font-extrabold text-ink">{title}</h2>
+    </div>
+  );
+}
+
+// Gold / silver / bronze for the top-3 readers; plain muted number after that.
+const RANK_BADGE = ['bg-lumi-yellow text-ink', 'bg-rule text-ink', 'bg-lumi-orange text-white'];
 
 export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = true }: ClassReportTabProps) {
   const { data: school } = useSchool();
   const [from, setFrom] = useState(isoDaysAgo(30));
   const [to, setTo] = useState(isoToday());
   const [presetKey, setPresetKey] = useState('30');
+
+  // Term-aware presets, recomputed when the school's term dates load.
+  const presets = useMemo(() => buildPresets(school?.termDates), [school?.termDates]);
+  // Range length in days (inclusive), used to express minutes as a weekly rate.
+  const rangeDays = useMemo(() => {
+    const ms = new Date(`${to}T00:00:00`).getTime() - new Date(`${from}T00:00:00`).getTime();
+    return Math.max(1, Math.round(ms / 86400000) + 1);
+  }, [from, to]);
 
   const { data: report, isLoading, isError, refetch } = useClassReport(classId, from, to);
   const { toast } = useToast();
@@ -117,7 +239,7 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
     try {
       // Dynamic import keeps @react-pdf out of the main bundle until it's needed.
       const { downloadClassReportPdf } = await import('./class-report-pdf');
-      await downloadClassReportPdf(report, school?.displayName || school?.name, levelsEnabled);
+      await downloadClassReportPdf(report, school?.displayName || school?.name, levelsEnabled, school?.logoUrl);
     } catch {
       toast('Could not generate the PDF', 'error');
     } finally {
@@ -126,7 +248,7 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
   };
 
   const applyPreset = (key: string) => {
-    const preset = PRESETS.find((p) => p.key === key);
+    const preset = presets.find((p) => p.key === key);
     if (!preset) return;
     setPresetKey(key);
     setFrom(preset.from());
@@ -144,6 +266,7 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
       ...report.students.map((r) => [
         r.name, r.minutes, r.sessions, r.readingDays, r.metPct, r.lastRead ?? '', r.currentReadingLevel ?? '',
       ]),
+      ['Class total', report.totalMinutes, report.totalSessions, report.totalReadingDays, report.targetMetRate, '', ''],
     ];
     const csv = rows.map((row) => row.map(esc).join(',')).join('\r\n');
     const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' });
@@ -164,7 +287,7 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
       <div className="flex flex-col gap-3 mb-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
-            {PRESETS.map((p) => (
+            {presets.map((p) => (
               <FilterChip
                 key={p.key}
                 label={p.label}
@@ -226,97 +349,228 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
         <p className="text-sm text-muted py-10 text-center">Building report…</p>
       ) : (
         <div id="class-report" className="space-y-6">
-          {/* Report header */}
-          <div className="border-b border-rule pb-4">
-            {school?.displayName || school?.name ? (
-              <p className="text-sm text-muted">{school.displayName || school.name}</p>
-            ) : null}
-            <h1 className="text-2xl font-bold text-ink">Class Reading Report</h1>
-            <p className="text-sm text-muted mt-0.5">
-              {[className, yearLevel].filter(Boolean).join(' · ')} · {formatDate(from)} – {formatDate(to)}
+          {/* Branded report header — school logo on a section-accent band. */}
+          <div className="rounded-[var(--radius-lg)] overflow-hidden border border-rule shadow-card">
+            <div className="bg-section px-6 py-5 flex items-center gap-4">
+              {school?.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={school.logoUrl}
+                  alt=""
+                  className="w-14 h-14 rounded-[var(--radius-md)] bg-paper object-contain p-1 shrink-0"
+                />
+              ) : (
+                <span className="inline-flex items-center justify-center w-14 h-14 rounded-[var(--radius-md)] bg-paper/20 text-on-section shrink-0">
+                  <Icon name="local_fire_department" size={30} />
+                </span>
+              )}
+              <div className="min-w-0">
+                {school?.displayName || school?.name ? (
+                  <p className="text-on-section/85 text-sm font-semibold truncate">
+                    {school.displayName || school.name}
+                  </p>
+                ) : null}
+                <h1 className="text-on-section text-2xl font-extrabold leading-tight">Class Reading Report</h1>
+              </div>
+              <span className="ml-auto hidden sm:inline-flex items-center gap-1.5 text-on-section/90 shrink-0">
+                <Icon name="local_fire_department" size={18} />
+                <span className="font-display font-extrabold tracking-tight">Lumi</span>
+              </span>
+            </div>
+            <div className="bg-paper px-6 py-3 border-t border-rule">
+              <p className="text-sm text-muted">
+                {[className, yearLevel].filter(Boolean).join(' · ')} · {formatDate(from)} – {formatDate(to)}
+              </p>
+            </div>
+          </div>
+
+          {/* Plain-language summary — the takeaway in one sentence */}
+          <div className="rounded-[var(--radius-lg)] border border-rule bg-paper shadow-card p-5 flex items-start gap-3">
+            <span className="inline-flex items-center justify-center w-8 h-8 rounded-[var(--radius-sm)] bg-section-tint text-section shrink-0">
+              <Icon name="lightbulb" size={18} />
+            </span>
+            <p className="text-sm text-ink leading-relaxed">
+              <span className="font-bold">Summary. </span>
+              {buildSummary(report)}
             </p>
           </div>
 
-          {/* Headline metrics */}
+          {/* Headline metrics — colourful bento tiles */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Metric label="Students" value={report.totalStudents} />
-            <Metric label="Active readers" value={report.activeReaders} />
-            <Metric label="Engagement" value={`${report.engagementRate}%`} />
-            <Metric label="Met target" value={`${report.targetMetRate}%`} />
-            <Metric label="Total minutes" value={report.totalMinutes} />
-            <Metric label="Avg min / student" value={report.avgMinutesPerStudent} />
-            <Metric label="Reading days" value={report.totalReadingDays} />
-            <Metric label="Sessions" value={report.totalSessions} />
+            <BentoMetric
+              label="Students"
+              value={report.totalStudents}
+              icon="groups"
+              color="blue"
+              hint="Active students in this class."
+            />
+            <BentoMetric
+              label="Active readers"
+              value={`${report.activeReaders}/${report.totalStudents}`}
+              sub={`${report.engagementRate}% engaged`}
+              icon="auto_stories"
+              color="green"
+              hint="Students who logged any reading in this period."
+            />
+            <BentoMetric
+              label="Met target"
+              value={`${report.targetMetRate}%`}
+              icon="flag"
+              color="yellow"
+              hint="Share of the class meeting their reading goal on at least 70% of their logged sessions (non-readers count against it)."
+            />
+            <BentoMetric
+              label="Total minutes"
+              value={report.totalMinutes}
+              icon="schedule"
+              color="blue"
+              hint="Total minutes read across the class in this period."
+            />
+            <BentoMetric
+              label="Avg min / student"
+              value={report.avgMinutesPerStudent}
+              sub={rangeDays >= 7 ? `${Math.round(report.avgMinutesPerStudent / (rangeDays / 7))} min/week` : undefined}
+              icon="timelapse"
+              color="green"
+              hint="Average minutes per student, across all students including non-readers."
+            />
+            <BentoMetric
+              label="Avg days / student"
+              value={report.avgReadingDaysPerStudent}
+              icon="calendar_month"
+              color="orange"
+              hint="Average number of distinct days each student read in this period."
+            />
+            <BentoMetric
+              label="Sessions"
+              value={report.totalSessions}
+              icon="menu_book"
+              color="red"
+              hint="Total number of reading logs submitted."
+            />
+            <BentoMetric
+              label="Books read"
+              value={report.totalBooks}
+              icon="library_books"
+              color="red"
+              hint="Distinct book titles read across the class — a book logged over several nights counts once."
+            />
           </div>
 
           {/* Top readers */}
           <Card>
-            <h2 className="text-lg font-bold text-ink mb-3">Top readers</h2>
+            <SectionHeader icon="emoji_events" title="Top readers" color="yellow" />
             {report.topReaders.length === 0 ? (
               <p className="text-sm text-muted">No reading recorded in this period.</p>
             ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-muted border-b border-rule">
-                    <th className="py-2 font-semibold w-8">#</th>
-                    <th className="py-2 font-semibold">Student</th>
-                    <th className="py-2 font-semibold text-right">Minutes</th>
-                    <th className="py-2 font-semibold text-right">Days</th>
-                    <th className="py-2 font-semibold text-right">Books</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.topReaders.map((r, i) => (
-                    <tr key={r.id} className="border-b border-rule/60">
-                      <td className="py-2 text-muted">{i + 1}</td>
-                      <td className="py-2 text-ink font-medium">{r.name}</td>
-                      <td className="py-2 text-right">{r.minutes}</td>
-                      <td className="py-2 text-right">{r.readingDays}</td>
-                      <td className="py-2 text-right">{r.books}</td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-muted border-b border-rule">
+                      <th className="py-2 font-semibold w-10">#</th>
+                      <th className="py-2 font-semibold">Student</th>
+                      <th className="py-2 font-semibold text-right">Minutes</th>
+                      <th className="py-2 font-semibold text-right">Days</th>
+                      <th className="py-2 font-semibold text-right">Books</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {report.topReaders.map((r, i) => (
+                      <tr key={r.id} className="border-b border-rule/60">
+                        <td className="py-2">
+                          <span
+                            className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                              i < 3 ? RANK_BADGE[i] : 'text-muted'
+                            }`}
+                          >
+                            {i + 1}
+                          </span>
+                        </td>
+                        <td className="py-2 text-ink font-medium">{r.name}</td>
+                        <td className="py-2 text-right">{r.minutes}</td>
+                        <td className="py-2 text-right">{r.readingDays}</td>
+                        <td className="py-2 text-right">{r.books}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </Card>
 
+          {/* Keep an eye on — the "silent middle" (reading regularly but only
+              meeting target 50–69% of the time), otherwise invisible in the
+              celebrate/support lists. Hidden when empty. */}
+          {report.watchList.length > 0 && (
+            <Card>
+              <SectionHeader icon="visibility" title="Keep an eye on" color="orange" />
+              <p className="text-sm text-muted -mt-2 mb-4">
+                Reading regularly, but meeting their goal on only 50–69% of sessions.
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-muted border-b border-rule">
+                      <th className="py-2 font-semibold">Student</th>
+                      <th className="py-2 font-semibold text-right">Minutes</th>
+                      <th className="py-2 font-semibold text-right">Days</th>
+                      <th className="py-2 font-semibold text-right">Met target</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.watchList.map((r) => (
+                      <tr key={r.id} className="border-b border-rule/60">
+                        <td className="py-2 text-ink font-medium">{r.name}</td>
+                        <td className="py-2 text-right">{r.minutes}</td>
+                        <td className="py-2 text-right">{r.readingDays}</td>
+                        <td className="py-2 text-right">{r.metPct}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+
           {/* Needs support */}
           <Card>
-            <h2 className="text-lg font-bold text-ink mb-3">Students needing support</h2>
+            <SectionHeader icon="volunteer_activism" title="Students needing support" color="red" />
             {report.needsSupport.length === 0 ? (
               <div className="flex items-center gap-2 text-sm text-lumi-green-dark">
                 <Icon name="check_circle" size={18} />
                 All students are actively engaged in reading.
               </div>
             ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-muted border-b border-rule">
-                    <th className="py-2 font-semibold">Student</th>
-                    <th className="py-2 font-semibold text-right">Minutes</th>
-                    <th className="py-2 font-semibold text-right">Days</th>
-                    <th className="py-2 font-semibold text-right">Issue</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.needsSupport.map((r) => (
-                    <tr key={r.id} className="border-b border-rule/60">
-                      <td className="py-2 text-ink font-medium">{r.name}</td>
-                      <td className="py-2 text-right">{r.minutes}</td>
-                      <td className="py-2 text-right">{r.readingDays}</td>
-                      <td className="py-2 text-right">
-                        <Badge variant="warning">{r.issue}</Badge>
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-muted border-b border-rule">
+                      <th className="py-2 font-semibold">Student</th>
+                      <th className="py-2 font-semibold text-right">Minutes</th>
+                      <th className="py-2 font-semibold text-right">Days</th>
+                      <th className="py-2 font-semibold text-right">Issue</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {report.needsSupport.map((r) => (
+                      <tr key={r.id} className="border-b border-rule/60">
+                        <td className="py-2 text-ink font-medium">{r.name}</td>
+                        <td className="py-2 text-right">{r.minutes}</td>
+                        <td className="py-2 text-right">{r.readingDays}</td>
+                        <td className="py-2 text-right">
+                          <Badge variant="warning">{r.issue}</Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </Card>
 
           {/* All students — the full roster, so no one is invisible in the report */}
           <Card>
-            <h2 className="text-lg font-bold text-ink mb-3">All students</h2>
+            <SectionHeader icon="groups" title="All students" color="blue" />
             {report.students.length === 0 ? (
               <p className="text-sm text-muted">No students in this class.</p>
             ) : (
@@ -347,7 +601,7 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
                   </thead>
                   <tbody>
                     {sortedStudents.map((r) => (
-                      <tr key={r.id} className="border-b border-rule/60">
+                      <tr key={r.id} className="border-b border-rule/60 even:bg-cream/60">
                         <td className="py-2 text-ink font-medium">{r.name}</td>
                         <td className="py-2 text-right">{r.minutes}</td>
                         <td className="py-2 text-right">{r.sessions}</td>
@@ -360,6 +614,17 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
                       </tr>
                     ))}
                   </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-rule font-bold text-ink">
+                      <td className="py-2">Class total</td>
+                      <td className="py-2 text-right">{report.totalMinutes}</td>
+                      <td className="py-2 text-right">{report.totalSessions}</td>
+                      <td className="py-2 text-right">{report.totalReadingDays}</td>
+                      <td className="py-2 text-right">{report.targetMetRate}%</td>
+                      <td className="py-2 text-right">—</td>
+                      {levelsEnabled && <td className="py-2 text-right">—</td>}
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             )}
@@ -368,7 +633,8 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
           {/* Reading level distribution — only when the school has reading levels enabled */}
           {levelsEnabled && (
           <Card>
-            <h2 className="text-lg font-bold text-ink mb-3">Reading levels</h2>
+            <SectionHeader icon="stacked_bar_chart" title="Current reading levels" color="green" />
+            <p className="text-sm text-muted -mt-2 mb-4">A snapshot of levels as of today — not limited to the selected period.</p>
             {report.levelDistribution.length === 0 ? (
               <p className="text-sm text-muted">No students in this class.</p>
             ) : (
@@ -390,7 +656,7 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
             {report.popularLevel && (
               <p className="text-xs text-muted mt-3">
                 Most common level: <span className="font-semibold text-ink">{report.popularLevel}</span>
-                {report.longestStreak > 0 && <> · Longest streak: {report.longestStreak} days</>}
+                {report.longestStreak > 0 && <> · Longest streak (all-time): {report.longestStreak} days</>}
               </p>
             )}
           </Card>
@@ -406,11 +672,12 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
         </div>
       )}
 
-      {/* Print only the report region. */}
+      {/* Print only the report region. `print-color-adjust: exact` forces the
+          browser to keep the branded backgrounds/logo instead of stripping them. */}
       <style
         dangerouslySetInnerHTML={{
           __html:
-            '@media print { body * { visibility: hidden !important; } #class-report, #class-report * { visibility: visible !important; } #class-report { position: absolute; left: 0; top: 0; width: 100%; padding: 24px; } }',
+            '@media print { body * { visibility: hidden !important; } #class-report, #class-report * { visibility: visible !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } #class-report { position: absolute; left: 0; top: 0; width: 100%; padding: 24px; } #class-report > * { break-inside: avoid; } }',
         }}
       />
     </div>
