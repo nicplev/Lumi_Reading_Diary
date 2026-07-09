@@ -31,8 +31,13 @@ const double _kNavClearance = 92;
 
 class ParentProfileScreen extends ConsumerStatefulWidget {
   final UserModel user;
+  final VoidCallback? onReplayTour;
 
-  const ParentProfileScreen({super.key, required this.user});
+  const ParentProfileScreen({
+    super.key,
+    required this.user,
+    this.onReplayTour,
+  });
 
   @override
   ConsumerState<ParentProfileScreen> createState() =>
@@ -738,6 +743,13 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
             subtitle: 'Diagnostics for Lumi service & sync',
             onTap: () => context.push('/settings/service-status'),
           ),
+          if (widget.onReplayTour != null)
+            _SettingsRow(
+              icon: Icons.route_outlined,
+              title: 'Replay app tour',
+              subtitle: 'Walk through the main screens again',
+              onTap: () => widget.onReplayTour?.call(),
+            ),
           _SettingsRow(
             icon: Icons.info_outline,
             title: 'About Lumi',

@@ -6,6 +6,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../../theme/section_theme.dart';
+import '../../core/tour/lumi_app_tour.dart';
 import '../../core/widgets/lumi/lumi_skeleton.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
 import '../../core/widgets/lumi_mascot.dart';
@@ -141,8 +142,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
       // Platform kill switch fetched alongside; never throws (fails open).
       final platformEnabledFuture =
           PlatformConfigService().isComprehensionRecordingEnabled();
-      final doc =
-          await _firestore.collection('schools').doc(schoolId).get();
+      final doc = await _firestore.collection('schools').doc(schoolId).get();
       final platformEnabled = await platformEnabledFuture;
       if (!mounted || !doc.exists) return;
       final school = SchoolModel.fromFirestore(doc);
@@ -460,123 +460,124 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     return LumiSectionScope(
       section: LumiSectionTheme.classScreen,
       child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: _studentsStream(selectedClass),
-      builder: (context, snapshot) {
-        final allStudents = snapshot.hasData
-            ? snapshot.data!.docs
-                .map(StudentModel.fromFirestore)
-                .where((student) => student.isActive)
-                .toList()
-            : const <StudentModel>[];
+        stream: _studentsStream(selectedClass),
+        builder: (context, snapshot) {
+          final allStudents = snapshot.hasData
+              ? snapshot.data!.docs
+                  .map(StudentModel.fromFirestore)
+                  .where((student) => student.isActive)
+                  .toList()
+              : const <StudentModel>[];
 
-        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: _allocationsStream(selectedClass),
-          builder: (context, allocationSnapshot) {
-            final assignmentStatus = _assignmentStatusForClass(
-              snapshot: allocationSnapshot,
-              candidateStudentIds: allStudents.map((student) => student.id),
-            );
-            final groupScopedStudents = snapshot.hasData
-                ? _filterByGroup(allStudents)
-                : const <StudentModel>[];
-            final searchFilteredStudents = snapshot.hasData
-                ? _filterStudents(groupScopedStudents)
-                : const <StudentModel>[];
-            final visibleStudents = snapshot.hasData
-                ? _sortStudents(
-                    searchFilteredStudents,
-                    assignedStudentIds: assignmentStatus.assignedStudentIds,
-                  )
-                : const <StudentModel>[];
+          return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: _allocationsStream(selectedClass),
+            builder: (context, allocationSnapshot) {
+              final assignmentStatus = _assignmentStatusForClass(
+                snapshot: allocationSnapshot,
+                candidateStudentIds: allStudents.map((student) => student.id),
+              );
+              final groupScopedStudents = snapshot.hasData
+                  ? _filterByGroup(allStudents)
+                  : const <StudentModel>[];
+              final searchFilteredStudents = snapshot.hasData
+                  ? _filterStudents(groupScopedStudents)
+                  : const <StudentModel>[];
+              final visibleStudents = snapshot.hasData
+                  ? _sortStudents(
+                      searchFilteredStudents,
+                      assignedStudentIds: assignmentStatus.assignedStudentIds,
+                    )
+                  : const <StudentModel>[];
 
-            return Stack(
-              children: [
-                CustomScrollView(
-                  slivers: [
-                    SliverToBoxAdapter(
-                      child: _buildClassOverviewCard(
-                        selectedClass,
-                        students: allStudents,
-                        isLoading: !snapshot.hasData,
-                      ),
-                    ),
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                        child: _buildSearchBar(),
-                      ),
-                    ),
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 0, 0),
-                        child: _buildToolbelt(
-                          selectedClass,
-                          students: groupScopedStudents,
-                        ),
-                      ),
-                    ),
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
-                        child: _buildStudentsHeader(),
-                      ),
-                    ),
-                    if (snapshot.hasData)
+              return Stack(
+                children: [
+                  CustomScrollView(
+                    slivers: [
                       SliverToBoxAdapter(
-                        child: _buildAttentionRow(allStudents),
-                      ),
-                    _buildStudentList(
-                      classModel: selectedClass,
-                      snapshot: snapshot,
-                      allStudents: allStudents,
-                      visibleStudents: visibleStudents,
-                      assignmentStatus: assignmentStatus,
-                    ),
-                    const SliverToBoxAdapter(child: SizedBox(height: 200)),
-                  ],
-                ),
-                Positioned(
-                  right: 16,
-                  bottom: MediaQuery.viewPaddingOf(context).bottom + 84,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Classroom kiosk: students self-scan on a shared iPad.
-                      // An additional path to the same weekly allocations — the
-                      // teacher Scan flow below is unchanged. White FAB needs an
-                      // explicit green label colour (LumiType.button is white).
-                      FloatingActionButton.extended(
-                        heroTag: 'kioskFab',
-                        onPressed: () => _openKiosk(selectedClass),
-                        backgroundColor: LumiTokens.paper,
-                        foregroundColor: LumiTokens.green,
-                        elevation: 2,
-                        icon: const Icon(Icons.tablet_mac_rounded),
-                        label: Text(
-                          'Class scan-in',
-                          style: LumiType.button.copyWith(color: LumiTokens.green),
+                        child: _buildClassOverviewCard(
+                          selectedClass,
+                          students: allStudents,
+                          isLoading: !snapshot.hasData,
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      FloatingActionButton.extended(
-                        heroTag: 'scanFab',
-                        onPressed: () =>
-                            _showStudentScannerPicker(selectedClass),
-                        backgroundColor: LumiTokens.green,
-                        foregroundColor: LumiTokens.paper,
-                        elevation: 4,
-                        icon: const Icon(Icons.qr_code_scanner_rounded),
-                        label: Text('Scan', style: LumiType.button),
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                          child: _buildSearchBar(),
+                        ),
                       ),
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 0, 0),
+                          child: _buildToolbelt(
+                            selectedClass,
+                            students: groupScopedStudents,
+                          ),
+                        ),
+                      ),
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+                          child: _buildStudentsHeader(),
+                        ),
+                      ),
+                      if (snapshot.hasData)
+                        SliverToBoxAdapter(
+                          child: _buildAttentionRow(allStudents),
+                        ),
+                      _buildStudentList(
+                        classModel: selectedClass,
+                        snapshot: snapshot,
+                        allStudents: allStudents,
+                        visibleStudents: visibleStudents,
+                        assignmentStatus: assignmentStatus,
+                      ),
+                      const SliverToBoxAdapter(child: SizedBox(height: 200)),
                     ],
                   ),
-                ),
-              ],
-            );
-          },
-        );
-      },
+                  Positioned(
+                    right: 16,
+                    bottom: MediaQuery.viewPaddingOf(context).bottom + 84,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Classroom kiosk: students self-scan on a shared iPad.
+                        // An additional path to the same weekly allocations — the
+                        // teacher Scan flow below is unchanged. White FAB needs an
+                        // explicit green label colour (LumiType.button is white).
+                        FloatingActionButton.extended(
+                          heroTag: 'kioskFab',
+                          onPressed: () => _openKiosk(selectedClass),
+                          backgroundColor: LumiTokens.paper,
+                          foregroundColor: LumiTokens.green,
+                          elevation: 2,
+                          icon: const Icon(Icons.tablet_mac_rounded),
+                          label: Text(
+                            'Class scan-in',
+                            style: LumiType.button
+                                .copyWith(color: LumiTokens.green),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        FloatingActionButton.extended(
+                          heroTag: 'scanFab',
+                          onPressed: () =>
+                              _showStudentScannerPicker(selectedClass),
+                          backgroundColor: LumiTokens.green,
+                          foregroundColor: LumiTokens.paper,
+                          elevation: 4,
+                          icon: const Icon(Icons.qr_code_scanner_rounded),
+                          label: Text('Scan', style: LumiType.button),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          );
+        },
       ),
     );
   }
@@ -631,25 +632,28 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                 ),
               ),
             const SizedBox(width: 12),
-            GestureDetector(
-              onTap: _openAllocationScreen,
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.auto_awesome_rounded,
-                        size: 14, color: LumiTokens.green),
-                    const SizedBox(width: 5),
-                    Text(
-                      'Assign books',
-                      style: LumiType.caption.copyWith(
-                        color: LumiTokens.green,
-                        fontWeight: FontWeight.w700,
+            LumiTourTarget(
+              id: 'teacher.class.assignBooks',
+              child: GestureDetector(
+                onTap: _openAllocationScreen,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.auto_awesome_rounded,
+                          size: 14, color: LumiTokens.green),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Assign books',
+                        style: LumiType.caption.copyWith(
+                          color: LumiTokens.green,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -956,8 +960,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: LumiTokens.paper,
-                    borderRadius:
-                        BorderRadius.circular(LumiTokens.radiusLarge),
+                    borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
                     border: Border.all(color: LumiTokens.rule),
                   ),
                   child: Row(
@@ -1193,8 +1196,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                   Flexible(
                                     child: Text(
                                       fullName,
-                                      style:
-                                          LumiType.body.copyWith(
+                                      style: LumiType.body.copyWith(
                                         fontWeight: FontWeight.w600,
                                       ),
                                       overflow: TextOverflow.ellipsis,
@@ -1232,8 +1234,8 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                   ),
                                   if (showGroup) ...[
                                     Text('  ·  ',
-                                        style: LumiType.caption.copyWith(
-                                            color: LumiTokens.muted)),
+                                        style: LumiType.caption
+                                            .copyWith(color: LumiTokens.muted)),
                                     Container(
                                       width: 6,
                                       height: 6,
@@ -1276,8 +1278,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                             Icon(
                               Icons.chevron_right_rounded,
                               size: 20,
-                              color: LumiTokens.muted
-                                  .withValues(alpha: 0.4),
+                              color: LumiTokens.muted.withValues(alpha: 0.4),
                             ),
                           ],
                         ),
@@ -1543,8 +1544,8 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                           children: [
                             // Scan All button
                             Material(
-                              color: LumiTokens.tintGreen
-                                  .withValues(alpha: 0.2),
+                              color:
+                                  LumiTokens.tintGreen.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(
                                   LumiTokens.radiusMedium),
                               child: InkWell(
@@ -1565,22 +1566,19 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                   child: Row(
                                     children: [
                                       Icon(Icons.people,
-                                          color: LumiTokens.green,
-                                          size: 20),
+                                          color: LumiTokens.green, size: 20),
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: Text(
                                           'Scan All Students (Batch Mode)',
-                                          style: LumiType.body
-                                              .copyWith(
+                                          style: LumiType.body.copyWith(
                                             color: LumiTokens.green,
                                             fontWeight: FontWeight.w700,
                                           ),
                                         ),
                                       ),
                                       Icon(Icons.arrow_forward_ios,
-                                          color: LumiTokens.green,
-                                          size: 14),
+                                          color: LumiTokens.green, size: 14),
                                     ],
                                   ),
                                 ),
@@ -1608,8 +1606,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                     leading: StudentAvatar.fromStudent(student,
                                         size: 40),
                                     title: Text(student.fullName,
-                                        style: LumiType.body
-                                            .copyWith(
+                                        style: LumiType.body.copyWith(
                                           fontWeight: FontWeight.w600,
                                         )),
                                     subtitle: Row(
@@ -1629,8 +1626,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                             ),
                                             child: Text(
                                               _readingLevelLabel(student),
-                                              style: LumiType.caption
-                                                  .copyWith(
+                                              style: LumiType.caption.copyWith(
                                                 color: LumiTokens.green,
                                                 fontWeight: FontWeight.w600,
                                               ),
@@ -1641,8 +1637,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                         if (isAssigned)
                                           Text(
                                             'Has books',
-                                            style: LumiType.caption
-                                                .copyWith(
+                                            style: LumiType.caption.copyWith(
                                               color: Colors.green,
                                               fontWeight: FontWeight.w600,
                                             ),
@@ -1650,8 +1645,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                                         else if (assignedStudentIds != null)
                                           Text(
                                             'Needs books',
-                                            style: LumiType.caption
-                                                .copyWith(
+                                            style: LumiType.caption.copyWith(
                                               color: LumiTokens.yellow,
                                               fontWeight: FontWeight.w600,
                                             ),
@@ -1762,8 +1756,7 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                     style: LumiType.caption,
                   ),
                   trailing: widget.selectedClass?.id == c.id
-                      ? const Icon(Icons.check_circle,
-                          color: LumiTokens.green)
+                      ? const Icon(Icons.check_circle, color: LumiTokens.green)
                       : null,
                   onTap: () {
                     if (widget.onClassChanged != null) {
@@ -1830,9 +1823,8 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
       ),
-      tileColor: isSelected
-          ? LumiTokens.tintGreen.withValues(alpha: 0.3)
-          : null,
+      tileColor:
+          isSelected ? LumiTokens.tintGreen.withValues(alpha: 0.3) : null,
       leading: Icon(
         icon,
         color: isSelected ? LumiTokens.green : LumiTokens.muted,
@@ -1919,8 +1911,7 @@ class _ClassroomToolChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final foregroundColor = selected ? LumiTokens.paper : LumiTokens.ink;
-    final backgroundColor =
-        selected ? LumiTokens.green : LumiTokens.paper;
+    final backgroundColor = selected ? LumiTokens.green : LumiTokens.paper;
 
     return Material(
       color: backgroundColor,
@@ -1933,8 +1924,7 @@ class _ClassroomToolChip extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
             border: Border.all(
-              color:
-                  selected ? LumiTokens.green : LumiTokens.rule,
+              color: selected ? LumiTokens.green : LumiTokens.rule,
             ),
           ),
           child: Row(

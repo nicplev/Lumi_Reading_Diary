@@ -26,10 +26,12 @@ import '../settings/mfa_settings_sheet.dart';
 /// and cache/sync management.
 class TeacherSettingsScreen extends StatefulWidget {
   final UserModel user;
+  final VoidCallback? onReplayTour;
 
   const TeacherSettingsScreen({
     super.key,
     required this.user,
+    this.onReplayTour,
   });
 
   @override
@@ -574,6 +576,13 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
                     label: 'About',
                     onTap: _showAboutDialog,
                   ),
+                  if (widget.onReplayTour != null)
+                    TeacherSettingsItem(
+                      icon: Icons.route_outlined,
+                      iconBgColor: LumiTokens.muted,
+                      label: 'Replay app tour',
+                      onTap: widget.onReplayTour,
+                    ),
                   // The app-icon pack is still in testing — visible only to
                   // dev-access accounts until it ships publicly. iOS-only.
                   if (hasDevAccess() && AppIconService.isSupportedPlatform)

@@ -20,6 +20,7 @@ import '../../core/widgets/lumi/week_progress_bar.dart';
 import '../../core/widgets/lumi/lumi_book_card.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
 import '../../core/widgets/lumi_mascot.dart';
+import '../../core/tour/lumi_app_tour.dart';
 import '../../core/services/navigation_state_service.dart';
 import '../../data/models/achievement_model.dart';
 import '../../data/models/user_model.dart';
@@ -72,6 +73,9 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
   int _selectedIndex = 0;
   bool _handledWidgetDeepLink = false;
   bool _characterPromptScheduled = false;
+  bool _firstLoginCharacterPromptCompleted = false;
+  bool _parentTourScheduled = false;
+  final LumiTourController _tourController = LumiTourController();
 
   void _onCoversUpdated() {
     if (mounted) setState(() {});
@@ -99,6 +103,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     BookCoverCacheService.instance.removeListener(_onCoversUpdated);
+    _tourController.dispose();
     super.dispose();
   }
 
@@ -206,7 +211,15 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
         break;
       }
     }
-    if (targetChild == null) return;
+    if (targetChild == null) {
+      _characterPromptScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() => _firstLoginCharacterPromptCompleted = true);
+        _clearFirstLoginPromptFlag();
+      });
+      return;
+    }
 
     final promptChild = targetChild;
     _characterPromptScheduled = true;
@@ -217,9 +230,47 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
           context,
           student: promptChild,
           onChanged: (_) => ref.invalidate(parentChildrenProvider),
-        ).whenComplete(_clearFirstLoginPromptFlag),
+        ).whenComplete(_handleFirstLoginCharacterPromptComplete),
       );
     });
+  }
+
+  void _handleFirstLoginCharacterPromptComplete() {
+    if (!mounted) return;
+    setState(() => _firstLoginCharacterPromptCompleted = true);
+    _clearFirstLoginPromptFlag();
+  }
+
+  void _scheduleParentTourIfReady() {
+    if (_parentTourScheduled) return;
+    if (widget.promptForCharacterOnEntry &&
+        !_firstLoginCharacterPromptCompleted) {
+      return;
+    }
+    _parentTourScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _startParentTour();
+    });
+  }
+
+  void _startParentTour({bool force = false}) {
+    unawaited(
+      _tourController.start(
+        definition: LumiTourDefinitions.parent,
+        userId: widget.user.id,
+        force: force,
+        onStepChanged: _handleParentTourStep,
+      ),
+    );
+  }
+
+  Future<void> _handleParentTourStep(LumiTourStep step) async {
+    final tabIndex = step.tabIndex;
+    if (tabIndex != null && mounted && _selectedIndex != tabIndex) {
+      setState(() => _selectedIndex = tabIndex);
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 80));
   }
 
   void _clearFirstLoginPromptFlag() {
@@ -379,69 +430,78 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
               );
             }
             _scheduleFirstLoginCharacterPrompt(children);
+            _scheduleParentTourIfReady();
             final activeChild =
                 ref.watch(activeChildProvider).value ?? children.first;
             _scheduleWidgetDeepLinkHandling(children);
-            return Scaffold(
-              backgroundColor: LumiTokens.cream,
-              body: Stack(
-                children: [
-                  Column(
-                    children: [
-                      // Legacy widget undo banner. New widget taps deep-link
-                      // into the normal logging flow, but this still lets old
-                      // post-commit records expire or be dismissed cleanly.
-                      const SafeArea(
-                        bottom: false,
-                        child: WidgetUndoBanner(),
-                      ),
-                      Expanded(
-                        child: IndexedStack(
-                          index: _selectedIndex,
-                          children: [
-                            // Home section (red). Its scroll content adds its
-                            // own bottom clearance so it scrolls behind the
-                            // floating glass nav.
-                            LumiSectionScope(
-                              section: LumiSectionTheme.home,
-                              child: _buildHomeView(activeChild, children),
-                            ),
-                            // Library section (yellow). Its scroll views add
-                            // their own bottom clearance so it scrolls behind
-                            // the floating glass nav, just like Home.
-                            LumiSectionScope(
-                              section: LumiSectionTheme.library,
-                              child: ReadingHistoryScreen(
-                                // Re-key on the active child so a switch rebuilds
-                                // the Bookshelf with fresh state, not stale data.
-                                key: ValueKey(activeChild.id),
-                                studentId: activeChild.id,
-                                parentId: widget.user.id,
-                                schoolId: widget.user.schoolId!,
-                              ),
-                            ),
-                            // Settings section (green). Owns its bottom
-                            // clearance so it scrolls behind the glass nav.
-                            LumiSectionScope(
-                              section: LumiSectionTheme.settings,
-                              child: ParentProfileScreen(user: widget.user),
-                            ),
-                          ],
+            return LumiTourScope(
+              controller: _tourController,
+              child: Scaffold(
+                backgroundColor: LumiTokens.cream,
+                body: Stack(
+                  children: [
+                    Column(
+                      children: [
+                        // Legacy widget undo banner. New widget taps deep-link
+                        // into the normal logging flow, but this still lets old
+                        // post-commit records expire or be dismissed cleanly.
+                        const SafeArea(
+                          bottom: false,
+                          child: WidgetUndoBanner(),
                         ),
-                      ),
-                    ],
-                  ),
-                  Positioned(
-                    left: 16,
-                    right: 16,
-                    bottom: 0,
-                    child: SafeArea(
-                      top: false,
-                      minimum: const EdgeInsets.only(bottom: 8),
-                      child: _buildBottomNav(),
+                        Expanded(
+                          child: IndexedStack(
+                            index: _selectedIndex,
+                            children: [
+                              // Home section (red). Its scroll content adds its
+                              // own bottom clearance so it scrolls behind the
+                              // floating glass nav.
+                              LumiSectionScope(
+                                section: LumiSectionTheme.home,
+                                child: _buildHomeView(activeChild, children),
+                              ),
+                              // Library section (yellow). Its scroll views add
+                              // their own bottom clearance so it scrolls behind
+                              // the floating glass nav, just like Home.
+                              LumiSectionScope(
+                                section: LumiSectionTheme.library,
+                                child: ReadingHistoryScreen(
+                                  // Re-key on the active child so a switch rebuilds
+                                  // the Bookshelf with fresh state, not stale data.
+                                  key: ValueKey(activeChild.id),
+                                  studentId: activeChild.id,
+                                  parentId: widget.user.id,
+                                  schoolId: widget.user.schoolId!,
+                                ),
+                              ),
+                              // Settings section (green). Owns its bottom
+                              // clearance so it scrolls behind the glass nav.
+                              LumiSectionScope(
+                                section: LumiSectionTheme.settings,
+                                child: ParentProfileScreen(
+                                  user: widget.user,
+                                  onReplayTour: () =>
+                                      _startParentTour(force: true),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: 0,
+                      child: SafeArea(
+                        top: false,
+                        minimum: const EdgeInsets.only(bottom: 8),
+                        child: _buildBottomNav(),
+                      ),
+                    ),
+                    LumiTourOverlay(controller: _tourController),
+                  ],
+                ),
               ),
             );
           },
@@ -464,6 +524,11 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
         label: 'Settings',
         color: LumiTokens.green
       ),
+    ];
+    const targetIds = [
+      'parent.nav.home',
+      'parent.nav.library',
+      'parent.nav.settings',
     ];
 
     return DecoratedBox(
@@ -502,13 +567,16 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
               children: [
                 for (int i = 0; i < navItems.length; i++)
                   Expanded(
-                    child: _ParentNavItem(
-                      icon: navItems[i].icon,
-                      label: navItems[i].label,
-                      isSelected: _selectedIndex == i,
-                      onTap: () => setState(() => _selectedIndex = i),
-                      selectedColor: navItems[i].color,
-                      unselectedColor: LumiTokens.muted,
+                    child: LumiTourTarget(
+                      id: targetIds[i],
+                      child: _ParentNavItem(
+                        icon: navItems[i].icon,
+                        label: navItems[i].label,
+                        isSelected: _selectedIndex == i,
+                        onTap: () => setState(() => _selectedIndex = i),
+                        selectedColor: navItems[i].color,
+                        unselectedColor: LumiTokens.muted,
+                      ),
                     ),
                   ),
               ],
@@ -697,23 +765,32 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                 // tap-to-log row per child, so every child can be logged
                 // without switching context.
                 if (children.length == 1)
-                  _ChildTodayCard(
-                    student: children.first,
-                    parent: widget.user,
-                  ).animate().fadeIn().scale()
+                  LumiTourTarget(
+                    id: 'parent.readingCard',
+                    child: _ChildTodayCard(
+                      student: children.first,
+                      parent: widget.user,
+                    ).animate().fadeIn().scale(),
+                  )
                 else
-                  _TonightMultiCard(
-                    children: children,
-                    parent: widget.user,
-                  ).animate().fadeIn(),
+                  LumiTourTarget(
+                    id: 'parent.readingCard',
+                    child: _TonightMultiCard(
+                      children: children,
+                      parent: widget.user,
+                    ).animate().fadeIn(),
+                  ),
 
                 LumiGap.m,
 
                 // One calm momentum card for the active child. Taps through to
                 // the full Progress screen (stats, rhythm, achievements).
-                _MomentumCard(
-                  student: selectedChild,
-                ).animate().fadeIn(delay: 100.ms),
+                LumiTourTarget(
+                  id: 'parent.progressCard',
+                  child: _MomentumCard(
+                    student: selectedChild,
+                  ).animate().fadeIn(delay: 100.ms),
+                ),
               ]),
             ),
           ),

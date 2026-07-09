@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:rive/rive.dart' hide Animation;
 
 import '../../core/auth/sign_out_flow.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/tour/lumi_app_tour.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/lumi_skeleton.dart';
@@ -37,6 +39,8 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
   ClassModel? _selectedClass;
   bool _isLoading = true;
   bool _isProgrammaticPageChange = false;
+  bool _teacherTourScheduled = false;
+  final LumiTourController _tourController = LumiTourController();
 
   late final PageController _pageController;
 
@@ -59,6 +63,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
   @override
   void dispose() {
     _pageController.dispose();
+    _tourController.dispose();
     super.dispose();
   }
 
@@ -71,13 +76,51 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
     _isProgrammaticPageChange = true;
     _pageController
         .animateToPage(
-          index,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        )
+      index,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    )
         .whenComplete(() {
       if (mounted) _isProgrammaticPageChange = false;
     });
+  }
+
+  void _scheduleTeacherTourIfReady() {
+    if (_teacherTourScheduled || _classes.isEmpty) return;
+    _teacherTourScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _classes.isEmpty) return;
+      _startTeacherTour();
+    });
+  }
+
+  void _startTeacherTour({bool force = false}) {
+    unawaited(
+      _tourController.start(
+        definition: LumiTourDefinitions.teacher,
+        userId: widget.user.id,
+        force: force,
+        onStepChanged: _handleTeacherTourStep,
+      ),
+    );
+  }
+
+  Future<void> _handleTeacherTourStep(LumiTourStep step) async {
+    final tabIndex = step.tabIndex;
+    if (tabIndex != null && mounted && tabIndex != _selectedIndex) {
+      setState(() {
+        _selectedIndex = tabIndex;
+        _dashboardResetTrigger++;
+      });
+      _isProgrammaticPageChange = true;
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(tabIndex);
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _isProgrammaticPageChange = false;
+      });
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 100));
   }
 
   Future<void> _loadClasses() async {
@@ -180,44 +223,57 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
       );
     }
 
-    return Scaffold(
-      backgroundColor: LumiTokens.cream,
-      body: Stack(
-        children: [
-          PageView(
-            controller: _pageController,
-            onPageChanged: (index) {
-              if (_isProgrammaticPageChange) return;
-              setState(() {
-                _selectedIndex = index;
-                _dashboardResetTrigger++;
-              });
-            },
-            children: [
-              _KeepAlivePage(child: _buildDashboardView()),
-              _KeepAlivePage(
-                child: TeacherClassroomScreen(
-                  teacher: widget.user,
-                  selectedClass: _selectedClass,
-                  classes: _classes,
-                  onClassChanged: (c) => setState(() => _selectedClass = c),
+    _scheduleTeacherTourIfReady();
+
+    return LumiTourScope(
+      controller: _tourController,
+      child: Scaffold(
+        backgroundColor: LumiTokens.cream,
+        body: Stack(
+          children: [
+            PageView(
+              controller: _pageController,
+              onPageChanged: (index) {
+                if (_isProgrammaticPageChange) return;
+                setState(() {
+                  _selectedIndex = index;
+                  _dashboardResetTrigger++;
+                });
+              },
+              children: [
+                _KeepAlivePage(child: _buildDashboardView()),
+                _KeepAlivePage(
+                  child: TeacherClassroomScreen(
+                    teacher: widget.user,
+                    selectedClass: _selectedClass,
+                    classes: _classes,
+                    onClassChanged: (c) => setState(() => _selectedClass = c),
+                  ),
                 ),
-              ),
-              _KeepAlivePage(child: TeacherLibraryScreen(teacher: widget.user)),
-              _KeepAlivePage(child: TeacherSettingsScreen(user: widget.user)),
-            ],
-          ),
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 0,
-            child: SafeArea(
-              top: false,
-              minimum: const EdgeInsets.only(bottom: 8),
-              child: _buildBottomNavigationBar(),
+                _KeepAlivePage(
+                  child: TeacherLibraryScreen(teacher: widget.user),
+                ),
+                _KeepAlivePage(
+                  child: TeacherSettingsScreen(
+                    user: widget.user,
+                    onReplayTour: () => _startTeacherTour(force: true),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 0,
+              child: SafeArea(
+                top: false,
+                minimum: const EdgeInsets.only(bottom: 8),
+                child: _buildBottomNavigationBar(),
+              ),
+            ),
+            LumiTourOverlay(controller: _tourController),
+          ],
+        ),
       ),
     );
   }
@@ -231,20 +287,23 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
       return const Center(child: Text('No class selected'));
     }
 
-    return TeacherDashboardView(
-      user: widget.user,
-      selectedClass: _selectedClass!,
-      classes: _classes,
-      onClassChanged: (c) => setState(() => _selectedClass = c),
-      onTabChanged: (index) {
-        setState(() => _selectedIndex = index);
-        _pageController.animateToPage(
-          index,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      },
-      resetTrigger: _dashboardResetTrigger,
+    return LumiTourTarget(
+      id: 'teacher.dashboard',
+      child: TeacherDashboardView(
+        user: widget.user,
+        selectedClass: _selectedClass!,
+        classes: _classes,
+        onClassChanged: (c) => setState(() => _selectedClass = c),
+        onTabChanged: (index) {
+          setState(() => _selectedIndex = index);
+          _pageController.animateToPage(
+            index,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        },
+        resetTrigger: _dashboardResetTrigger,
+      ),
     );
   }
 
@@ -293,8 +352,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
               ),
               child: Row(
                 children: [
-                  const LumiSkeleton(
-                      width: 100, height: 100, borderRadius: 50),
+                  const LumiSkeleton(width: 100, height: 100, borderRadius: 50),
                   const SizedBox(width: 20),
                   Expanded(
                     child: Column(
@@ -351,6 +409,12 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
       LumiTokens.yellow,
       LumiTokens.red,
     ];
+    const targetIds = [
+      'teacher.nav.dashboard',
+      'teacher.nav.class',
+      'teacher.nav.library',
+      'teacher.nav.settings',
+    ];
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -385,32 +449,36 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
             ),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             child: Row(
-            children: [
-              for (int i = 0; i < navItems.length; i++)
-                Expanded(
-                  child: switch (navItems[i]) {
-                    _RiveNavSpec(:final assetPath, :final label) => _RiveNavItem(
-                        assetPath: assetPath,
-                        label: label,
-                        isSelected: _selectedIndex == i,
-                        onTap: () => _onTabTapped(i),
-                        selectedColor: sectionColors[i],
-                        unselectedColor: LumiTokens.muted,
-                      ),
-                    _IconNavSpec(:final icon, :final label, :final size) =>
-                      _IconNavItem(
-                        icon: icon,
-                        label: label,
-                        size: size,
-                        isSelected: _selectedIndex == i,
-                        onTap: () => _onTabTapped(i),
-                        selectedColor: sectionColors[i],
-                        unselectedColor: LumiTokens.muted,
-                      ),
-                  },
-                ),
-            ],
-          ),
+              children: [
+                for (int i = 0; i < navItems.length; i++)
+                  Expanded(
+                    child: LumiTourTarget(
+                      id: targetIds[i],
+                      child: switch (navItems[i]) {
+                        _RiveNavSpec(:final assetPath, :final label) =>
+                          _RiveNavItem(
+                            assetPath: assetPath,
+                            label: label,
+                            isSelected: _selectedIndex == i,
+                            onTap: () => _onTabTapped(i),
+                            selectedColor: sectionColors[i],
+                            unselectedColor: LumiTokens.muted,
+                          ),
+                        _IconNavSpec(:final icon, :final label, :final size) =>
+                          _IconNavItem(
+                            icon: icon,
+                            label: label,
+                            size: size,
+                            isSelected: _selectedIndex == i,
+                            onTap: () => _onTabTapped(i),
+                            selectedColor: sectionColors[i],
+                            unselectedColor: LumiTokens.muted,
+                          ),
+                      },
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -504,8 +572,8 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                           icon: const Icon(Icons.refresh_rounded, size: 20),
                           label: Text(
                             'Refresh Classes',
-                            style: LumiType.button
-                                .copyWith(color: Colors.white),
+                            style:
+                                LumiType.button.copyWith(color: Colors.white),
                           ),
                         ),
                       ),

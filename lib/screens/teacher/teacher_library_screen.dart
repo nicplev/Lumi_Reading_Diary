@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
+import '../../core/tour/lumi_app_tour.dart';
 import 'cover_crop_screen.dart';
 import '../../core/widgets/lumi/lumi_skeleton.dart';
 import '../../core/widgets/lumi/persistent_cached_image.dart';
@@ -387,16 +388,19 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
                     Positioned(
                       right: 16,
                       bottom: MediaQuery.viewPaddingOf(context).bottom + 84,
-                      child: FloatingActionButton.extended(
-                        heroTag: 'library_add_book_fab',
-                        onPressed: _openAddBook,
-                        backgroundColor: LumiTokens.yellow,
-                        foregroundColor: LumiTokens.ink,
-                        icon: const Icon(Icons.document_scanner_rounded),
-                        label: Text(
-                          'Add book',
-                          style:
-                              LumiType.button.copyWith(color: LumiTokens.ink),
+                      child: LumiTourTarget(
+                        id: 'teacher.library.addBook',
+                        child: FloatingActionButton.extended(
+                          heroTag: 'library_add_book_fab',
+                          onPressed: _openAddBook,
+                          backgroundColor: LumiTokens.yellow,
+                          foregroundColor: LumiTokens.ink,
+                          icon: const Icon(Icons.document_scanner_rounded),
+                          label: Text(
+                            'Add book',
+                            style:
+                                LumiType.button.copyWith(color: LumiTokens.ink),
+                          ),
                         ),
                       ),
                     ),
