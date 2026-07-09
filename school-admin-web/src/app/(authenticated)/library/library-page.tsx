@@ -16,7 +16,6 @@ import { useBooks, useIncompleteBooks, useDeleteBook } from '@/lib/hooks/use-boo
 import { useLibraryAssignments } from '@/lib/hooks/use-library-assignments';
 import { assignedStudentIdsForBook } from '@/lib/library/assignment-matching';
 import { BookFormModal } from './book-form-modal';
-import { ContributeBookModal } from './contribute-book-modal';
 import { ConfirmDialog } from '@/components/lumi/confirm-dialog';
 import type { ReadingLevelOption } from '@/lib/types';
 
@@ -36,7 +35,6 @@ export function LibraryPage({ levelOptions }: LibraryPageProps) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showContribute, setShowContribute] = useState(false);
   const [editBookId, setEditBookId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
@@ -115,14 +113,9 @@ export function LibraryPage({ levelOptions }: LibraryPageProps) {
         title="Library"
         description="School book library"
         action={
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowContribute(true)}>
-              Contribute Book
-            </Button>
-            <Button variant="primary" onClick={() => setShowAddModal(true)}>
-              Add Book
-            </Button>
-          </div>
+          <Button variant="primary" onClick={() => setShowAddModal(true)}>
+            Add Book
+          </Button>
         }
       />
 
@@ -278,7 +271,6 @@ export function LibraryPage({ levelOptions }: LibraryPageProps) {
         levelOptions={levelOptions}
       />
 
-      <ContributeBookModal open={showContribute} onClose={() => setShowContribute(false)} />
 
       <ConfirmDialog
         open={!!deleteConfirm}

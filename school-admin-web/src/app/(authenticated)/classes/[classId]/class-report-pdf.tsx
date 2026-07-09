@@ -49,7 +49,9 @@ const styles = StyleSheet.create({
   },
   headerSchool: { fontSize: 9, color: C.white, opacity: 0.9, marginBottom: 2 },
   headerTitle: { fontSize: 18, color: C.white, fontFamily: 'Helvetica-Bold' },
-  headerBrand: { fontSize: 12, color: C.white, fontFamily: 'Helvetica-Bold', opacity: 0.95 },
+  headerBrandWrap: { flexDirection: 'row', alignItems: 'center' },
+  headerChar: { width: 34, height: 34, objectFit: 'contain', marginRight: 5 },
+  headerBrand: { fontSize: 19, color: C.white, fontFamily: 'Helvetica-Bold' },
   subBar: { marginTop: 8, marginBottom: 10 },
   subBarText: { fontSize: 9.5, color: C.muted },
 
@@ -156,18 +158,24 @@ function ClassReportDocument({
   schoolName,
   levelsEnabled,
   logo,
+  character,
+  goal,
 }: {
   report: ClassReport;
   schoolName?: string;
   levelsEnabled?: boolean;
   logo?: string | null;
+  /** Data-URL of the Lumi brand character shown in the header. */
+  character?: string | null;
+  /** The class's daily reading goal (minutes) — clarifies "Met daily goal". */
+  goal: number;
 }) {
   const generatedOn = new Date().toLocaleDateString();
 
   const tiles: Tile[] = [
     { label: 'Students', value: report.totalStudents, bg: C.tintBlue },
     { label: 'Active readers', value: `${report.activeReaders}/${report.totalStudents}`, sub: `${report.engagementRate}% engaged`, bg: C.tintGreen },
-    { label: 'Met target', value: `${report.targetMetRate}%`, bg: C.tintYellow },
+    { label: 'Met daily goal', value: `${report.targetMetRate}%`, sub: `of the ${goal} min/day goal`, bg: C.tintYellow },
     { label: 'Total minutes', value: report.totalMinutes, bg: C.tintBlue },
     { label: 'Avg min/student', value: report.avgMinutesPerStudent, bg: C.tintGreen },
     { label: 'Avg days/student', value: report.avgReadingDaysPerStudent, bg: C.tintOrange },
@@ -190,11 +198,14 @@ function ClassReportDocument({
             {schoolName ? <Text style={styles.headerSchool}>{schoolName}</Text> : null}
             <Text style={styles.headerTitle}>Class Reading Report</Text>
           </View>
-          <Text style={styles.headerBrand}>Lumi</Text>
+          <View style={styles.headerBrandWrap}>
+            {character ? <Image src={character} style={styles.headerChar} /> : null}
+            <Text style={styles.headerBrand}>LUMI</Text>
+          </View>
         </View>
         <View style={styles.subBar}>
           <Text style={styles.subBarText}>
-            {[report.className, report.yearLevel].filter(Boolean).join(' · ')} · {fmtDate(report.from)} – {fmtDate(report.to)}
+            {[report.className, report.yearLevel].filter(Boolean).join(' · ')} · {fmtDate(report.from)} – {fmtDate(report.to)} · Daily goal: {goal} min
           </Text>
         </View>
 
@@ -219,7 +230,7 @@ function ClassReportDocument({
           ))}
         </View>
         <Text style={styles.legend}>
-          Met target = students meeting their reading goal on at least 70% of sessions. Reading levels are current (as of today).
+          Met daily goal = students who read at least the {goal}-minute daily goal on 70%+ of the days they logged. Reading levels are current (as of today).
         </Text>
 
         {/* Top readers */}
@@ -387,11 +398,11 @@ function ClassReportDocument({
   );
 }
 
-// Fetch the school logo and inline it as a data URL. @react-pdf's <Image> can
-// choke on a cross-origin URL (CORS) and cannot render SVG, so we fetch the
-// bytes ourselves and skip anything that isn't a raster image. Any failure
-// degrades gracefully to a logo-less (but still branded) header.
-async function logoToDataUrl(url: string): Promise<string | null> {
+// Fetch an image and inline it as a data URL. @react-pdf's <Image> can choke on
+// a cross-origin URL (CORS) and cannot render SVG, so we fetch the bytes
+// ourselves and skip anything that isn't a raster image. Any failure degrades
+// gracefully (logo-less / character-less but still branded) header.
+async function imageToDataUrl(url: string): Promise<string | null> {
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
@@ -412,11 +423,17 @@ export async function downloadClassReportPdf(
   report: ClassReport,
   schoolName?: string,
   levelsEnabled = true,
-  logoUrl?: string
+  logoUrl?: string,
+  goal = 20
 ): Promise<void> {
-  const logo = logoUrl ? await logoToDataUrl(logoUrl) : null;
+  // The Lumi brand character is a same-origin public asset — fetched to a data
+  // URL so @react-pdf embeds it reliably.
+  const [logo, character] = await Promise.all([
+    logoUrl ? imageToDataUrl(logoUrl) : Promise.resolve(null),
+    imageToDataUrl('/brand/blue-lumi-book.png'),
+  ]);
   const blob = await pdf(
-    <ClassReportDocument report={report} schoolName={schoolName} levelsEnabled={levelsEnabled} logo={logo} />
+    <ClassReportDocument report={report} schoolName={schoolName} levelsEnabled={levelsEnabled} logo={logo} character={character} goal={goal} />
   ).toBlob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

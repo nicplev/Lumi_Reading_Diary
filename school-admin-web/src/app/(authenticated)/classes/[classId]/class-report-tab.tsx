@@ -10,7 +10,9 @@ import { FilterChip } from '@/components/lumi/filter-chip';
 import { EmptyState } from '@/components/lumi/empty-state';
 import { useSchool } from '@/lib/hooks/use-school';
 import { useClassReport } from '@/lib/hooks/use-reports';
+import { useUpdateClass } from '@/lib/hooks/use-classes';
 import { useToast } from '@/components/lumi/toast';
+import { useQueryClient } from '@tanstack/react-query';
 import type { ClassReport } from '@/lib/firestore/reports';
 
 function isoLocal(d: Date): string {
@@ -107,6 +109,9 @@ interface ClassReportTabProps {
   classId: string;
   className: string;
   yearLevel?: string;
+  /** The class's current daily reading goal (minutes). Drives the "Met target"
+   *  clarity copy and the editable goal control. */
+  defaultMinutesTarget?: number;
   /** False when the school has reading levels turned off — hides the
    *  reading-level distribution card (mirrors the roster's level UI gating). */
   levelsEnabled?: boolean;
@@ -189,11 +194,34 @@ function SectionHeader({ icon, title, color }: { icon: string; title: string; co
 // Gold / silver / bronze for the top-3 readers; plain muted number after that.
 const RANK_BADGE = ['bg-lumi-yellow text-ink', 'bg-rule text-ink', 'bg-lumi-orange text-white'];
 
-export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = true }: ClassReportTabProps) {
+export function ClassReportTab({ classId, className, yearLevel, defaultMinutesTarget, levelsEnabled = true }: ClassReportTabProps) {
   const { data: school } = useSchool();
   const [from, setFrom] = useState(isoDaysAgo(30));
   const [to, setTo] = useState(isoToday());
   const [presetKey, setPresetKey] = useState('30');
+
+  // The class's daily reading goal (minutes). Editable in place by the teacher;
+  // held in local state so the display updates immediately on save. Falls back
+  // to 20 to match the report's server-side default.
+  const updateClass = useUpdateClass();
+  const queryClient = useQueryClient();
+  const [goal, setGoal] = useState(defaultMinutesTarget ?? 20);
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalInput, setGoalInput] = useState(defaultMinutesTarget ?? 20);
+  const saveGoal = async () => {
+    const v = Math.max(1, Math.min(600, Math.round(goalInput)));
+    try {
+      await updateClass.mutateAsync({ classId, defaultMinutesTarget: v });
+      setGoal(v);
+      setEditingGoal(false);
+      // Re-run the report so "Met target" reflects the new goal (for logs that
+      // didn't store their own target).
+      queryClient.invalidateQueries({ queryKey: ['class-report', classId] });
+      toast(`Daily reading goal set to ${v} min`, 'success');
+    } catch {
+      toast('Could not update the reading goal', 'error');
+    }
+  };
 
   // Term-aware presets, recomputed when the school's term dates load.
   const presets = useMemo(() => buildPresets(school?.termDates), [school?.termDates]);
@@ -239,7 +267,7 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
     try {
       // Dynamic import keeps @react-pdf out of the main bundle until it's needed.
       const { downloadClassReportPdf } = await import('./class-report-pdf');
-      await downloadClassReportPdf(report, school?.displayName || school?.name, levelsEnabled, school?.logoUrl);
+      await downloadClassReportPdf(report, school?.displayName || school?.name, levelsEnabled, school?.logoUrl, goal);
     } catch {
       toast('Could not generate the PDF', 'error');
     } finally {
@@ -336,6 +364,37 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
               className="px-3 py-2 rounded-[var(--radius-md)] border border-rule bg-paper text-ink text-sm focus:outline-none focus:ring-2 focus:ring-section/30"
             />
           </label>
+
+          {/* Editable per-class daily reading goal — drives "Met target". */}
+          <div className="text-sm">
+            <span className="block text-xs font-semibold text-muted mb-1">Daily reading goal</span>
+            {editingGoal ? (
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  min={1}
+                  max={600}
+                  value={goalInput}
+                  onChange={(e) => setGoalInput(Number(e.target.value))}
+                  className="w-20 px-3 py-2 rounded-[var(--radius-md)] border border-rule bg-paper text-ink text-sm focus:outline-none focus:ring-2 focus:ring-section/30"
+                />
+                <span className="text-xs text-muted">min</span>
+                <Button size="sm" onClick={saveGoal} loading={updateClass.isPending}>Save</Button>
+                <Button variant="outline" size="sm" onClick={() => setEditingGoal(false)} disabled={updateClass.isPending}>Cancel</Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 h-[38px]">
+                <span className="font-bold text-ink">{goal} min/day</span>
+                <button
+                  type="button"
+                  onClick={() => { setGoalInput(goal); setEditingGoal(true); }}
+                  className="inline-flex items-center gap-1 text-section text-xs font-semibold hover:underline"
+                >
+                  <Icon name="edit" size={14} /> Edit
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -372,14 +431,15 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
                 ) : null}
                 <h1 className="text-on-section text-2xl font-extrabold leading-tight">Class Reading Report</h1>
               </div>
-              <span className="ml-auto hidden sm:inline-flex items-center gap-1.5 text-on-section/90 shrink-0">
-                <Icon name="local_fire_department" size={18} />
-                <span className="font-display font-extrabold tracking-tight">Lumi</span>
+              <span className="ml-auto hidden sm:flex items-center gap-2 shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/brand/blue-lumi-book.png" alt="" className="w-11 h-11 object-contain" />
+                <span className="font-display font-extrabold tracking-tight text-on-section text-3xl leading-none">LUMI</span>
               </span>
             </div>
             <div className="bg-paper px-6 py-3 border-t border-rule">
               <p className="text-sm text-muted">
-                {[className, yearLevel].filter(Boolean).join(' · ')} · {formatDate(from)} – {formatDate(to)}
+                {[className, yearLevel].filter(Boolean).join(' · ')} · {formatDate(from)} – {formatDate(to)} · Daily goal: {goal} min
               </p>
             </div>
           </div>
@@ -413,11 +473,12 @@ export function ClassReportTab({ classId, className, yearLevel, levelsEnabled = 
               hint="Students who logged any reading in this period."
             />
             <BentoMetric
-              label="Met target"
+              label="Met daily goal"
               value={`${report.targetMetRate}%`}
+              sub={`of the ${goal} min/day goal`}
               icon="flag"
               color="yellow"
-              hint="Share of the class meeting their reading goal on at least 70% of their logged sessions (non-readers count against it)."
+              hint={`"Met" = read at least the daily goal of ${goal} minutes. This tile is the share of the class who hit that goal on at least 70% of the days they logged. Non-readers count against it. Change the goal above.`}
             />
             <BentoMetric
               label="Total minutes"
