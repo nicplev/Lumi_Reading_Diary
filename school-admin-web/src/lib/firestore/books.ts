@@ -1,6 +1,9 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import type { Book } from '@/lib/types';
+// ISBN-13 normalizer (community_books is keyed by validated ISBN-13; the local
+// normalizeIsbn below only strips separators).
+import { normalizeIsbn as toIsbn13 } from './isbn-assignment';
 
 // External book APIs (Google Books US, Open Library US) routinely take 3–6s
 // from AU before the first byte; 12s matches the Flutter client's budget so the
@@ -177,6 +180,41 @@ export async function lookupBookByIsbn(
     const book = toBook(snap.docs[0]);
     if (book.title && book.metadata?.placeholder !== true) {
       return book;
+    }
+  }
+
+  // 1.5 Shared community catalog (cross-school). The payoff of every school's
+  //     Add Book: a cover another school contributed prefills here for free,
+  //     without hitting an external API. Only short-circuits when the entry has
+  //     a usable cover; otherwise fall through to the richer APIs below.
+  const isbn13 = toIsbn13(isbn);
+  if (isbn13) {
+    const cDoc = await adminDb.collection('community_books').doc(isbn13).get();
+    if (cDoc.exists) {
+      const c = cDoc.data()!;
+      if (c.title && c.coverImageUrl) {
+        return {
+          id: '',
+          title: c.title,
+          author: c.author ?? undefined,
+          isbn: normalized,
+          coverImageUrl: c.coverImageUrl,
+          description: c.description ?? undefined,
+          genres: Array.isArray(c.genres) ? c.genres : [],
+          readingLevel: c.readingLevel ?? undefined,
+          pageCount: c.pageCount ?? undefined,
+          publisher: c.publisher ?? undefined,
+          publishedDate: undefined,
+          tags: [],
+          ratingCount: 0,
+          isPopular: false,
+          timesRead: 0,
+          createdAt: new Date(),
+          scannedByTeacherIds: [],
+          timesAssignedSchoolWide: 0,
+          metadata: { source: 'community_catalog' },
+        };
+      }
     }
   }
 

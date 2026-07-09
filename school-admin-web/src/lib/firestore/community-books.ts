@@ -26,7 +26,11 @@ export interface ContributeCommunityBookArgs {
   description?: string;
   pageCount?: number;
   publisher?: string;
+  /** Raw image bytes to upload (client-resized JPEG from the Contribute flow). */
   coverBuffer?: Buffer;
+  /** An already-hosted cover URL to store directly (from Add Book — the ISBN
+   *  lookup's cover or a portal-uploaded image), avoiding a re-upload. */
+  coverImageUrl?: string;
   contributedBy: string;
   contributedBySchoolId: string;
   contributedByName?: string;
@@ -55,15 +59,21 @@ export async function upsertCommunityBook(
   const title = args.title.trim();
   if (!title) throw new Error('Title is required.');
 
-  // Only upload (and thus overwrite the deterministic storage object) when we
-  // will actually use the cover: a brand-new book, or one with no cover yet.
-  const willSetCover = !!args.coverBuffer && (!existing || !existing.coverImageUrl);
+  // Only set the cover when we actually have one AND the catalog entry doesn't
+  // already have one — a web add never clobbers an existing (e.g. camera-scanned)
+  // cover. Prefer uploading raw bytes; otherwise store an already-hosted URL.
+  const hasCover = !!args.coverBuffer || !!args.coverImageUrl;
+  const willSetCover = hasCover && (!existing || !existing.coverImageUrl);
   let coverImageUrl: string | undefined;
   let coverStoragePath: string | undefined;
-  if (willSetCover && args.coverBuffer) {
-    const up = await uploadCover(isbn, args.coverBuffer);
-    coverImageUrl = up.url;
-    coverStoragePath = up.path;
+  if (willSetCover) {
+    if (args.coverBuffer) {
+      const up = await uploadCover(isbn, args.coverBuffer);
+      coverImageUrl = up.url;
+      coverStoragePath = up.path;
+    } else if (args.coverImageUrl) {
+      coverImageUrl = args.coverImageUrl;
+    }
   }
 
   if (!existing) {
@@ -87,7 +97,7 @@ export async function upsertCommunityBook(
       createdAt: now,
       updatedAt: now,
       metadata: {
-        coverSource: coverImageUrl ? 'web_upload' : null,
+        coverSource: coverImageUrl ? (args.coverBuffer ? 'web_upload' : 'web_link') : null,
         hasCameraScannedCover: false,
       },
     });
