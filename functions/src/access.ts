@@ -244,6 +244,37 @@ export function nextYearLevel(current: string | null | undefined): {
 }
 
 /**
+ * Ladder decision for renewals, honouring the portal rollover import's
+ * authority marker: when the import wrote a student's year level it stamps
+ * `additionalInfo.yearLevelSetForYear` with the target academic year, and a
+ * renewal into that year (or earlier) must NOT bump the level again — the
+ * double-bump would silently skip the student a grade. `>=` keeps a late or
+ * repeated renewal safe too. Mirrors yearLevelForRenewal in
+ * school-admin-web/src/lib/access.ts — keep the two in sync.
+ * @param {string|null|undefined} currentYearLevel The student's current level.
+ * @param {unknown} yearLevelSetForYear `additionalInfo.yearLevelSetForYear`.
+ * @param {number} targetAcademicYear The year being renewed into.
+ * @return {!Object} Object carrying `next`, `graduated`, and `changed`.
+ */
+export function yearLevelForRenewal(
+  currentYearLevel: string | null | undefined,
+  yearLevelSetForYear: unknown,
+  targetAcademicYear: number,
+): {next: string | null; graduated: boolean; changed: boolean} {
+  if (
+    typeof yearLevelSetForYear === "number" &&
+    yearLevelSetForYear >= targetAcademicYear
+  ) {
+    return {
+      next: currentYearLevel ?? null,
+      graduated: nextYearLevel(currentYearLevel).graduated,
+      changed: false,
+    };
+  }
+  return nextYearLevel(currentYearLevel);
+}
+
+/**
  * Build a fully-formed `student.access` map for the given academic year. Status
  * defaults to active; expiry is derived from the year unless overridden.
  * @param {object} params Grant parameters.

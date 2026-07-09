@@ -1,6 +1,6 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { hardExpiryFor, nextYearLevel } from '@/lib/access';
+import { hardExpiryFor, yearLevelForRenewal } from '@/lib/access';
 
 export interface RenewalRosterEntry {
   studentId: string;
@@ -11,6 +11,11 @@ export interface RenewalRosterEntry {
   /** Suggested year level after the bump (pre-filled in the UI). */
   nextYearLevel: string | null;
   graduated: boolean;
+  /**
+   * The rollover import already set this student's year level for the target
+   * year — renewal won't bump it (shown as "set by import" in the roster).
+   */
+  yearLevelSetByImport: boolean;
   /** academicYear the student's current access is for, if any. */
   accessYear: number | null;
   /** Current materialised access status, if any (for the Status column). */
@@ -56,7 +61,11 @@ export async function getRenewalRoster(
     const classId = (d.classId as string | undefined) ?? '';
     const currentYearLevel =
       individualYearLevel ?? (classId ? classYearLevel.get(classId) ?? null : null);
-    const ladder = nextYearLevel(currentYearLevel);
+    const ladder = yearLevelForRenewal(
+      currentYearLevel,
+      additional.yearLevelSetForYear,
+      targetAcademicYear
+    );
     const accessYear = (d.access?.academicYear as number | undefined) ?? null;
     const accessStatus =
       (d.access?.status as 'active' | 'expired' | 'suspended' | undefined) ?? null;
@@ -68,6 +77,7 @@ export async function getRenewalRoster(
       currentYearLevel,
       nextYearLevel: ladder.next,
       graduated: ladder.graduated,
+      yearLevelSetByImport: ladder.setByImport,
       accessYear,
       accessStatus,
       alreadyRenewed: accessYear === targetAcademicYear,
@@ -140,7 +150,13 @@ export async function renewStudents(
       const additional = (data.additionalInfo ?? {}) as Record<string, unknown>;
       const prevYearLevel = (additional.yearLevel as string | undefined) ?? null;
       const prevGraduated = additional.graduated === true;
-      const ladder = nextYearLevel(prevYearLevel);
+      // Skip the bump when the rollover import already set the level for this
+      // (or a later) year — bumping again would skip the student a grade.
+      const ladder = yearLevelForRenewal(
+        prevYearLevel,
+        additional.yearLevelSetForYear,
+        academicYear
+      );
 
       const update: Record<string, unknown> = {
         access: {

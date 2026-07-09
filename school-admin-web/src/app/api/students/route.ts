@@ -9,6 +9,7 @@ function serializeStudent(s: Record<string, unknown>) {
     createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
     dateOfBirth: s.dateOfBirth instanceof Date ? s.dateOfBirth.toISOString() : s.dateOfBirth ?? null,
     enrolledAt: s.enrolledAt instanceof Date ? s.enrolledAt.toISOString() : s.enrolledAt ?? null,
+    archivedAt: s.archivedAt instanceof Date ? s.archivedAt.toISOString() : s.archivedAt ?? null,
     readingLevelUpdatedAt: s.readingLevelUpdatedAt instanceof Date ? s.readingLevelUpdatedAt.toISOString() : s.readingLevelUpdatedAt ?? null,
     levelHistory: Array.isArray(s.levelHistory)
       ? (s.levelHistory as Array<Record<string, unknown>>).map((lh) => ({
@@ -34,9 +35,15 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const classId = searchParams.get('classId') ?? undefined;
+  // ?status=archived flips the existing isActive filter to the archived side
+  // (getStudents defaults to active-only).
+  const status = searchParams.get('status');
 
   try {
-    const students = await getStudents(session.schoolId, { classId });
+    const students = await getStudents(session.schoolId, {
+      classId,
+      ...(status === 'archived' ? { isActive: false } : {}),
+    });
     return NextResponse.json(students.map((s) => serializeStudent(s as unknown as Record<string, unknown>)));
   } catch {
     return NextResponse.json({ error: 'Failed to fetch students' }, { status: 500 });

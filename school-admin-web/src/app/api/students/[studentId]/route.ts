@@ -17,6 +17,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     dateOfBirth: student.dateOfBirth?.toISOString() ?? null,
     enrolledAt: student.enrolledAt?.toISOString() ?? null,
     readingLevelUpdatedAt: student.readingLevelUpdatedAt?.toISOString() ?? null,
+    archivedAt: student.archivedAt?.toISOString() ?? null,
     levelHistory: student.levelHistory.map((lh) => ({
       ...lh,
       changedAt: lh.changedAt.toISOString(),

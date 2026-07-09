@@ -6,10 +6,13 @@ import { isActiveSubscriptionStatus } from '@/lib/types';
 // this lets the renewals API grant access server-side without a round-trip to
 // the callable. Keep the two in sync.
 
+// Pure ladder logic lives in year-ladder.ts (the rollover classifier unit
+// tests import it without firebase-admin); re-exported here so existing
+// consumers keep their import path.
+export { YEAR_LADDER, normalizeYearLevel, isLadderYearLevel, nextYearLevel, yearLevelForRenewal } from '@/lib/year-ladder';
+
 export const DEFAULT_TIMEZONE = 'Australia/Sydney';
 export const ROLLOVER_DAY = 25;
-const YEAR_LADDER = ['Prep', '1', '2', '3', '4', '5', '6'];
-const PREP_SYNONYMS = ['prep', 'foundation', 'kindergarten', 'kinder', 'k', 'f'];
 
 function localPart(d: Date, opt: Intl.DateTimeFormatOptions): number {
   return Number(
@@ -49,26 +52,6 @@ function timezoneOffsetMs(d: Date): number {
     map.hour === 24 ? 0 : map.hour, map.minute, map.second
   );
   return asUtc - d.getTime();
-}
-
-/** Advance a recognised year level; flag graduates past the top. */
-export function nextYearLevel(current: string | null | undefined): {
-  next: string | null;
-  graduated: boolean;
-  changed: boolean;
-} {
-  if (current == null || current === '') {
-    return { next: current ?? null, graduated: false, changed: false };
-  }
-  const normalised = PREP_SYNONYMS.includes(current.trim().toLowerCase())
-    ? 'Prep'
-    : current.trim();
-  const idx = YEAR_LADDER.indexOf(normalised);
-  if (idx === -1) return { next: current, graduated: false, changed: false };
-  if (idx === YEAR_LADDER.length - 1) {
-    return { next: normalised, graduated: true, changed: false };
-  }
-  return { next: YEAR_LADDER[idx + 1], graduated: false, changed: true };
 }
 
 /** Current academic year from config/academicYear, else derived from today. */

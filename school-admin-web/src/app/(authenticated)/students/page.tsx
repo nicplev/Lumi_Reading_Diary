@@ -35,6 +35,7 @@ export default async function StudentsRoute() {
       levelOptions={levelOptions}
       levelSchema={school?.levelSchema ?? 'none'}
       devAccess={devAccess}
+      isAdmin={session.role === 'schoolAdmin'}
     />
   );
 }

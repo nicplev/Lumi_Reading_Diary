@@ -7,6 +7,7 @@ import { Badge } from '@/components/lumi/badge';
 import { Icon } from '@/components/lumi/icon';
 import { useImportStudents } from '@/lib/hooks/use-students';
 import { useToast } from '@/components/lumi/toast';
+import { parseCSV, matchHeader } from '@/lib/csv';
 
 interface CSVImportDialogProps {
   open: boolean;
@@ -27,81 +28,6 @@ interface ParsedRow {
 }
 
 type Step = 'upload' | 'preview' | 'importing' | 'done';
-
-const HEADER_ALIASES: Record<string, string[]> = {
-  studentId: ['student id', 'studentid', 'student_id', 'id', 'student number'],
-  firstName: ['first name', 'firstname', 'first_name', 'given name', 'first'],
-  lastName: ['last name', 'lastname', 'last_name', 'surname', 'family name', 'last'],
-  className: ['class', 'class name', 'classname', 'class_name', 'room', 'group'],
-  dateOfBirth: ['dob', 'date of birth', 'dateofbirth', 'date_of_birth', 'birthday', 'birth date'],
-  parentEmail: ['parent email', 'parent_email', 'parentemail', 'email', 'parent'],
-  readingLevel: ['reading level', 'readinglevel', 'reading_level', 'level'],
-};
-
-function matchHeader(header: string): string | null {
-  const normalized = header.toLowerCase().trim();
-  for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
-    if (aliases.includes(normalized)) return field;
-  }
-  return null;
-}
-
-// A proper CSV/TSV tokenizer (RFC-4180-ish). The old `line.split(delimiter)`
-// shifted every column whenever a field was quoted and contained the delimiter
-// (e.g. a class "Room 1, Building A" or a name "Smith, Jr."), silently
-// corrupting the import. This handles quoted fields, escaped quotes (""), and
-// newlines inside quotes.
-function parseCSV(text: string): { headers: string[]; rows: string[][] } {
-  // Strip a UTF-8 BOM if present (Excel adds one).
-  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
-
-  const firstLine = text.split(/\r?\n/, 1)[0] ?? '';
-  const delimiter = firstLine.includes('\t') && !firstLine.includes(',') ? '\t' : ',';
-
-  const records: string[][] = [];
-  let field = '';
-  let record: string[] = [];
-  let inQuotes = false;
-
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (text[i + 1] === '"') { field += '"'; i++; } // escaped quote
-        else inQuotes = false;
-      } else {
-        field += ch;
-      }
-    } else if (ch === '"') {
-      inQuotes = true;
-    } else if (ch === delimiter) {
-      record.push(field);
-      field = '';
-    } else if (ch === '\r') {
-      // ignore — handled by the \n branch
-    } else if (ch === '\n') {
-      record.push(field);
-      records.push(record);
-      field = '';
-      record = [];
-    } else {
-      field += ch;
-    }
-  }
-  // Flush a trailing field/record when the file doesn't end in a newline.
-  if (field !== '' || record.length > 0) {
-    record.push(field);
-    records.push(record);
-  }
-
-  // Drop blank lines.
-  const nonEmpty = records.filter((r) => r.some((c) => c.trim() !== ''));
-  if (nonEmpty.length === 0) return { headers: [], rows: [] };
-
-  const headers = nonEmpty[0].map((h) => h.trim());
-  const rows = nonEmpty.slice(1).map((r) => r.map((c) => c.trim()));
-  return { headers, rows };
-}
 
 export function CSVImportDialog({ open, onClose, embedded }: CSVImportDialogProps) {
   const { toast } = useToast();
@@ -213,7 +139,7 @@ export function CSVImportDialog({ open, onClose, embedded }: CSVImportDialogProp
         <div className="text-center py-8">
           <div className="flex justify-center mb-4 text-muted/50"><Icon name="upload_file" size={48} /></div>
           <p className="text-sm text-muted mb-3">
-            Upload a CSV file with columns: Student ID, First Name, Last Name, Class Name, DOB, Parent Email, Reading Level.
+            Upload a CSV file with columns: Student ID, First Name, Last Name, Class Name, Parent Email, Reading Level.
           </p>
           <div className="bg-lumi-blue/10 border border-lumi-blue/20 rounded-[var(--radius-md)] px-4 py-3 mb-4 text-sm text-ink">
             <p className="mb-1"><strong>Required columns:</strong> First Name, Last Name, Class Name</p>
@@ -232,10 +158,10 @@ export function CSVImportDialog({ open, onClose, embedded }: CSVImportDialogProp
               type="button"
               onClick={() => {
                 const csv = [
-                  'Student ID,First Name,Last Name,Class Name,Date of Birth,Parent Email,Reading Level',
-                  'S10001,Jane,Smith,3A,2017-03-15,jane.parent@email.com,Level 12',
-                  'S10002,Tom,Brown,3A,2017-06-22,tom.parent@email.com,',
-                  'S10003,Mia,Johnson,3B,2017-01-10,mia.parent@email.com,Gold',
+                  'Student ID,First Name,Last Name,Class Name,Parent Email,Reading Level',
+                  'S10001,Jane,Smith,3A,jane.parent@email.com,Level 12',
+                  'S10002,Tom,Brown,3A,tom.parent@email.com,',
+                  'S10003,Mia,Johnson,3B,mia.parent@email.com,Gold',
                 ].join('\n');
                 const blob = new Blob([csv], { type: 'text/csv' });
                 const url = URL.createObjectURL(blob);

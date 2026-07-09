@@ -39,6 +39,9 @@ export interface ClassReport {
   totalSessions: number;
   /** Sum of every student's distinct reading days in range. */
   totalReadingDays: number;
+  /** Average distinct reading days per student in range (1 dp) — the human-
+   *  readable version of totalReadingDays ("~3 days each" vs a class sum). */
+  avgReadingDaysPerStudent: number;
   studentsMetTarget: number;
   targetMetRate: number;
   longestStreak: number;
@@ -46,6 +49,9 @@ export interface ClassReport {
   /** Every student in the class (name-sorted) — the full-roster table/CSV. */
   students: ClassReportStudentRow[];
   topReaders: ClassReportStudentRow[];
+  /** The "silent middle" — reading regularly but meeting target only 50–69% of
+   *  sessions, so they fall in neither topReaders nor needsSupport. */
+  watchList: ClassReportStudentRow[];
   needsSupport: ClassReportSupportRow[];
   levelDistribution: { level: string; count: number }[];
 }
@@ -172,6 +178,16 @@ export async function getClassReport(
       issue: r.sessions === 0 ? 'No reading logged' : r.readingDays < 3 ? 'Low engagement' : 'Not meeting targets',
     }));
 
+  // The "silent middle": reading regularly (≥3 days) but meeting target on only
+  // 50–69% of sessions — above the needs-support bar (<50%) yet below the
+  // met-target bar (≥70%), so otherwise invisible in both callout lists.
+  // Closest-to-slipping first.
+  const watchList = rows
+    .filter((r) => r.sessions > 0 && r.readingDays >= 3 && r.metPct >= 50 && r.metPct < 70)
+    .sort((a, b) => a.metPct - b.metPct);
+
+  const totalReadingDays = rows.reduce((sum, r) => sum + r.readingDays, 0);
+
   return {
     classId,
     className: cls?.name ?? '',
@@ -185,13 +201,15 @@ export async function getClassReport(
     avgMinutesPerStudent: totalStudents > 0 ? Math.round(totalMinutes / totalStudents) : 0,
     totalBooks: classBooks.size,
     totalSessions,
-    totalReadingDays: rows.reduce((sum, r) => sum + r.readingDays, 0),
+    totalReadingDays,
+    avgReadingDaysPerStudent: totalStudents > 0 ? Math.round((totalReadingDays / totalStudents) * 10) / 10 : 0,
     studentsMetTarget,
     targetMetRate: totalStudents > 0 ? Math.round((studentsMetTarget / totalStudents) * 100) : 0,
     longestStreak,
     popularLevel,
     students: rows,
     topReaders,
+    watchList,
     needsSupport,
     levelDistribution,
   };
