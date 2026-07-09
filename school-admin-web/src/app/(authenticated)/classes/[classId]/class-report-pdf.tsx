@@ -28,7 +28,7 @@ const C = {
 };
 
 const styles = StyleSheet.create({
-  page: { padding: 28, fontSize: 10, color: C.ink, fontFamily: 'Helvetica' },
+  page: { padding: 28, paddingBottom: 44, fontSize: 10, color: C.ink, fontFamily: 'Helvetica' },
 
   // Branded header band + sub-strip
   header: {
@@ -50,21 +50,30 @@ const styles = StyleSheet.create({
   headerSchool: { fontSize: 9, color: C.white, opacity: 0.9, marginBottom: 2 },
   headerTitle: { fontSize: 18, color: C.white, fontFamily: 'Helvetica-Bold' },
   headerBrand: { fontSize: 12, color: C.white, fontFamily: 'Helvetica-Bold', opacity: 0.95 },
-  subBar: { marginTop: 8, marginBottom: 16 },
-  subBarText: { fontSize: 9, color: C.muted },
+  subBar: { marginTop: 8, marginBottom: 10 },
+  subBarText: { fontSize: 9.5, color: C.muted },
+
+  // Plain-language summary
+  summaryBox: { backgroundColor: C.cream, borderRadius: 8, padding: 9, marginBottom: 12 },
+  summaryText: { fontSize: 9.5, color: C.ink, lineHeight: 1.35 },
 
   // Bento metric tiles
-  metricsRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 },
+  metricsRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 6 },
   metricOuter: { width: '25%', padding: 3 },
-  metricBox: { borderRadius: 8, padding: 9, minHeight: 46 },
+  metricBox: { borderRadius: 8, padding: 9, minHeight: 50 },
   metricValue: { fontSize: 15, fontFamily: 'Helvetica-Bold', color: C.ink },
-  metricLabel: { fontSize: 6.5, color: C.ink, opacity: 0.7, textTransform: 'uppercase', marginTop: 3, fontFamily: 'Helvetica-Bold' },
+  metricLabel: { fontSize: 7.5, color: C.ink, opacity: 0.75, textTransform: 'uppercase', marginTop: 3, fontFamily: 'Helvetica-Bold' },
+  metricSub: { fontSize: 7.5, color: C.ink, opacity: 0.6, marginTop: 1, fontFamily: 'Helvetica-Bold' },
+
+  // Legend under the metrics
+  legend: { fontSize: 8, color: C.muted, marginBottom: 12 },
 
   // Sections
   section: { marginBottom: 14 },
   sectionHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   sectionDot: { width: 11, height: 11, borderRadius: 3, marginRight: 6 },
-  sectionTitle: { fontSize: 12, fontFamily: 'Helvetica-Bold', color: C.ink },
+  sectionTitle: { fontSize: 12.5, fontFamily: 'Helvetica-Bold', color: C.ink },
+  sectionNote: { fontSize: 8, color: C.muted, marginBottom: 6 },
 
   // Tables
   headRow: {
@@ -75,9 +84,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   row: { flexDirection: 'row', borderBottom: `1 solid ${C.rule}`, paddingVertical: 3, paddingHorizontal: 4 },
-  th: { fontSize: 8, color: C.muted, fontFamily: 'Helvetica-Bold' },
-  cell: { fontSize: 9 },
-  cellBold: { fontSize: 9, fontFamily: 'Helvetica-Bold' },
+  th: { fontSize: 8.5, color: C.muted, fontFamily: 'Helvetica-Bold' },
+  cell: { fontSize: 9.5 },
+  cellBold: { fontSize: 9.5, fontFamily: 'Helvetica-Bold' },
+  totalsRow: { flexDirection: 'row', borderTop: `1.5 solid ${C.rule}`, paddingVertical: 4, paddingHorizontal: 4 },
+  totalsCell: { fontSize: 9.5, fontFamily: 'Helvetica-Bold' },
 
   // Rank badges (gold / silver / bronze)
   rankBadge: { width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
@@ -85,10 +96,10 @@ const styles = StyleSheet.create({
 
   // Level distribution bars
   levelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 5 },
-  levelName: { fontSize: 9, width: 90 },
+  levelName: { fontSize: 9.5, width: 90 },
   levelTrack: { flex: 1, height: 7, borderRadius: 4, backgroundColor: C.cream, marginHorizontal: 6 },
   levelFill: { height: 7, borderRadius: 4, backgroundColor: C.green },
-  levelCount: { fontSize: 8, color: C.muted, width: 24, textAlign: 'right' },
+  levelCount: { fontSize: 8.5, color: C.muted, width: 24, textAlign: 'right' },
 
   footer: {
     position: 'absolute',
@@ -105,7 +116,7 @@ const styles = StyleSheet.create({
 
 // Metric tiles: soft brand tint per metric so the PDF reads like the on-screen
 // bento grid rather than a monochrome sheet.
-type Tile = { label: string; value: string | number; bg: string };
+type Tile = { label: string; value: string | number; bg: string; sub?: string };
 
 function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
@@ -116,6 +127,19 @@ function rankColors(i: number): { bg: string; fg: string } {
   if (i === 1) return { bg: C.rule, fg: C.ink };
   if (i === 2) return { bg: C.orange, fg: C.white };
   return { bg: 'transparent', fg: C.muted };
+}
+
+// One plain-language sentence — mirrors buildSummary() in class-report-tab.tsx.
+function summarySentence(report: ClassReport): string {
+  const parts: string[] = [
+    `${report.activeReaders} of ${report.totalStudents} student${report.totalStudents === 1 ? '' : 's'} read this period`,
+    report.needsSupport.length > 0
+      ? `${report.needsSupport.length} need${report.needsSupport.length === 1 ? 's' : ''} support`
+      : 'everyone is engaged',
+    `averaging ${report.avgMinutesPerStudent} min and ${report.avgReadingDaysPerStudent} days each`,
+  ];
+  if (report.topReaders.length > 0) parts.push(`top reader: ${report.topReaders[0].name}`);
+  return `${parts.join(' · ')}.`;
 }
 
 function SectionHead({ color, title }: { color: string; title: string }) {
@@ -138,16 +162,23 @@ function ClassReportDocument({
   levelsEnabled?: boolean;
   logo?: string | null;
 }) {
+  const generatedOn = new Date().toLocaleDateString();
+
   const tiles: Tile[] = [
     { label: 'Students', value: report.totalStudents, bg: C.tintBlue },
-    { label: 'Active readers', value: report.activeReaders, bg: C.tintGreen },
-    { label: 'Engagement', value: `${report.engagementRate}%`, bg: C.tintRed },
+    { label: 'Active readers', value: `${report.activeReaders}/${report.totalStudents}`, sub: `${report.engagementRate}% engaged`, bg: C.tintGreen },
     { label: 'Met target', value: `${report.targetMetRate}%`, bg: C.tintYellow },
     { label: 'Total minutes', value: report.totalMinutes, bg: C.tintBlue },
     { label: 'Avg min/student', value: report.avgMinutesPerStudent, bg: C.tintGreen },
-    { label: 'Reading days', value: report.totalReadingDays, bg: C.tintOrange },
+    { label: 'Avg days/student', value: report.avgReadingDaysPerStudent, bg: C.tintOrange },
     { label: 'Sessions', value: report.totalSessions, bg: C.tintRed },
+    { label: 'Books read', value: report.totalBooks, bg: C.tintRed },
   ];
+
+  // Roster column widths — with an extra Level column when levels are enabled.
+  const col = levelsEnabled
+    ? { name: '30%', min: '12%', sess: '12%', days: '9%', met: '13%', last: '14%', level: '10%' }
+    : { name: '34%', min: '13%', sess: '13%', days: '10%', met: '14%', last: '16%', level: '0%' };
 
   return (
     <Document title={`Class Reading Report — ${report.className}`}>
@@ -167,6 +198,14 @@ function ClassReportDocument({
           </Text>
         </View>
 
+        {/* Plain-language summary */}
+        <View style={styles.summaryBox}>
+          <Text style={styles.summaryText}>
+            <Text style={{ fontFamily: 'Helvetica-Bold' }}>Summary. </Text>
+            {summarySentence(report)}
+          </Text>
+        </View>
+
         {/* Bento metrics */}
         <View style={styles.metricsRow}>
           {tiles.map((t) => (
@@ -174,10 +213,14 @@ function ClassReportDocument({
               <View style={[styles.metricBox, { backgroundColor: t.bg }]}>
                 <Text style={styles.metricValue}>{String(t.value)}</Text>
                 <Text style={styles.metricLabel}>{t.label}</Text>
+                {t.sub ? <Text style={styles.metricSub}>{t.sub}</Text> : null}
               </View>
             </View>
           ))}
         </View>
+        <Text style={styles.legend}>
+          Met target = students meeting their reading goal on at least 70% of sessions. Reading levels are current (as of today).
+        </Text>
 
         {/* Top readers */}
         <View style={styles.section}>
@@ -213,9 +256,33 @@ function ClassReportDocument({
           )}
         </View>
 
+        {/* Keep an eye on — the "silent middle" (50–69% met target). */}
+        {report.watchList.length > 0 && (
+          <View style={styles.section}>
+            <SectionHead color={C.orange} title="Keep an eye on" />
+            <Text style={styles.sectionNote}>Reading regularly, but meeting their goal on only 50–69% of sessions.</Text>
+            <View>
+              <View style={styles.headRow}>
+                <Text style={[styles.th, { width: '52%' }]}>Student</Text>
+                <Text style={[styles.th, { width: '16%', textAlign: 'right' }]}>Minutes</Text>
+                <Text style={[styles.th, { width: '14%', textAlign: 'right' }]}>Days</Text>
+                <Text style={[styles.th, { width: '18%', textAlign: 'right' }]}>Met target</Text>
+              </View>
+              {report.watchList.map((r) => (
+                <View style={styles.row} key={r.id}>
+                  <Text style={[styles.cellBold, { width: '52%' }]}>{r.name}</Text>
+                  <Text style={[styles.cell, { width: '16%', textAlign: 'right' }]}>{r.minutes}</Text>
+                  <Text style={[styles.cell, { width: '14%', textAlign: 'right' }]}>{r.readingDays}</Text>
+                  <Text style={[styles.cell, { width: '18%', textAlign: 'right' }]}>{r.metPct}%</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* Needs support */}
         <View style={styles.section}>
-          <SectionHead color={C.orange} title="Students needing support" />
+          <SectionHead color={C.red} title="Students needing support" />
           {report.needsSupport.length === 0 ? (
             <Text style={styles.cell}>All students are actively engaged in reading.</Text>
           ) : (
@@ -238,39 +305,53 @@ function ClassReportDocument({
           )}
         </View>
 
-        {/* All students */}
+        {/* All students — header repeats across page breaks; totals row at the end. */}
         <View style={styles.section}>
           <SectionHead color={C.blue} title="All students" />
           {report.students.length === 0 ? (
             <Text style={styles.cell}>No students in this class.</Text>
           ) : (
             <View>
-              <View style={styles.headRow}>
-                <Text style={[styles.th, { width: '34%' }]}>Student</Text>
-                <Text style={[styles.th, { width: '13%', textAlign: 'right' }]}>Minutes</Text>
-                <Text style={[styles.th, { width: '13%', textAlign: 'right' }]}>Sessions</Text>
-                <Text style={[styles.th, { width: '10%', textAlign: 'right' }]}>Days</Text>
-                <Text style={[styles.th, { width: '14%', textAlign: 'right' }]}>Met target</Text>
-                <Text style={[styles.th, { width: '16%', textAlign: 'right' }]}>Last read</Text>
+              <View style={styles.headRow} fixed>
+                <Text style={[styles.th, { width: col.name }]}>Student</Text>
+                <Text style={[styles.th, { width: col.min, textAlign: 'right' }]}>Minutes</Text>
+                <Text style={[styles.th, { width: col.sess, textAlign: 'right' }]}>Sessions</Text>
+                <Text style={[styles.th, { width: col.days, textAlign: 'right' }]}>Days</Text>
+                <Text style={[styles.th, { width: col.met, textAlign: 'right' }]}>Met target</Text>
+                <Text style={[styles.th, { width: col.last, textAlign: 'right' }]}>Last read</Text>
+                {levelsEnabled && <Text style={[styles.th, { width: col.level, textAlign: 'right' }]}>Level</Text>}
               </View>
               {report.students.map((r, i) => (
                 <View style={[styles.row, i % 2 === 1 ? { backgroundColor: C.cream } : {}]} key={r.id} wrap={false}>
-                  <Text style={[styles.cellBold, { width: '34%' }]}>{r.name}</Text>
-                  <Text style={[styles.cell, { width: '13%', textAlign: 'right' }]}>{r.minutes}</Text>
-                  <Text style={[styles.cell, { width: '13%', textAlign: 'right' }]}>{r.sessions}</Text>
-                  <Text style={[styles.cell, { width: '10%', textAlign: 'right' }]}>{r.readingDays}</Text>
-                  <Text style={[styles.cell, { width: '14%', textAlign: 'right' }]}>{r.sessions > 0 ? `${r.metPct}%` : '—'}</Text>
-                  <Text style={[styles.cell, { width: '16%', textAlign: 'right' }]}>{r.lastRead ? fmtDate(r.lastRead) : '—'}</Text>
+                  <Text style={[styles.cellBold, { width: col.name }]}>{r.name}</Text>
+                  <Text style={[styles.cell, { width: col.min, textAlign: 'right' }]}>{r.minutes}</Text>
+                  <Text style={[styles.cell, { width: col.sess, textAlign: 'right' }]}>{r.sessions}</Text>
+                  <Text style={[styles.cell, { width: col.days, textAlign: 'right' }]}>{r.readingDays}</Text>
+                  <Text style={[styles.cell, { width: col.met, textAlign: 'right' }]}>{r.sessions > 0 ? `${r.metPct}%` : '—'}</Text>
+                  <Text style={[styles.cell, { width: col.last, textAlign: 'right' }]}>{r.lastRead ? fmtDate(r.lastRead) : '—'}</Text>
+                  {levelsEnabled && (
+                    <Text style={[styles.cell, { width: col.level, textAlign: 'right' }]}>{r.currentReadingLevel ?? '—'}</Text>
+                  )}
                 </View>
               ))}
+              <View style={styles.totalsRow}>
+                <Text style={[styles.totalsCell, { width: col.name }]}>Class total</Text>
+                <Text style={[styles.totalsCell, { width: col.min, textAlign: 'right' }]}>{report.totalMinutes}</Text>
+                <Text style={[styles.totalsCell, { width: col.sess, textAlign: 'right' }]}>{report.totalSessions}</Text>
+                <Text style={[styles.totalsCell, { width: col.days, textAlign: 'right' }]}>{report.totalReadingDays}</Text>
+                <Text style={[styles.totalsCell, { width: col.met, textAlign: 'right' }]}>{report.targetMetRate}%</Text>
+                <Text style={[styles.totalsCell, { width: col.last, textAlign: 'right' }]}>—</Text>
+                {levelsEnabled && <Text style={[styles.totalsCell, { width: col.level, textAlign: 'right' }]}>—</Text>}
+              </View>
             </View>
           )}
         </View>
 
-        {/* Reading levels */}
+        {/* Current reading levels (snapshot as of today) */}
         {levelsEnabled && (
           <View style={styles.section}>
-            <SectionHead color={C.green} title="Reading levels" />
+            <SectionHead color={C.green} title="Current reading levels" />
+            <Text style={styles.sectionNote}>A snapshot as of today — not limited to the selected period.</Text>
             {report.levelDistribution.length === 0 ? (
               <Text style={styles.cell}>No students in this class.</Text>
             ) : (
@@ -287,12 +368,20 @@ function ClassReportDocument({
                 );
               })
             )}
+            {report.popularLevel && (
+              <Text style={[styles.sectionNote, { marginTop: 4, marginBottom: 0 }]}>
+                Most common level: {report.popularLevel}
+                {report.longestStreak > 0 ? ` · Longest streak (all-time): ${report.longestStreak} days` : ''}
+              </Text>
+            )}
           </View>
         )}
 
-        <Text style={styles.footer} fixed>
-          Generated by Lumi · {new Date().toLocaleDateString()}
-        </Text>
+        <Text
+          style={styles.footer}
+          fixed
+          render={({ pageNumber, totalPages }) => `Generated by Lumi · ${generatedOn} · Page ${pageNumber} of ${totalPages}`}
+        />
       </Page>
     </Document>
   );
