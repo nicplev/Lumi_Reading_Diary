@@ -99,9 +99,99 @@ interface FinalizeContext {
   schoolId: string;
   fullName: string;
   email: string | null;
-  phoneE164: string;
+  phoneE164: string | null;
+  mfaEnabled: boolean;
   relationshipLabel: string | null;
   linkCode: string | null;
+}
+
+type ProfileRole = "parent" | "teacher";
+
+function userTypeForRole(role: ProfileRole): "parent" | "user" {
+  return role === "parent" ? "parent" : "user";
+}
+
+function collectionForRole(role: ProfileRole): "parents" | "users" {
+  return role === "parent" ? "parents" : "users";
+}
+
+async function updateMfaProfileState(
+  uid: string,
+  role: ProfileRole,
+  schoolId: string,
+  enabled: boolean,
+  phoneE164: string | null,
+): Promise<void> {
+  const db = admin.firestore();
+  const authUser = await admin.auth().getUser(uid);
+  const enrolledPhones = (authUser.multiFactor?.enrolledFactors ?? [])
+    .filter((f) => f.factorId === "phone")
+    .map((f) => (f as admin.auth.PhoneMultiFactorInfo).phoneNumber)
+    .filter((p): p is string => typeof p === "string" && p.length > 0);
+  const hasPhonePrimary = authUser.providerData.some(
+    (p) => p.providerId === "phone",
+  );
+
+  if (enabled) {
+    if (!phoneE164 || !enrolledPhones.includes(phoneE164)) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Phone MFA is not enrolled on this account.",
+      );
+    }
+  } else if (enrolledPhones.length > 0) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Remove the phone second factor before updating the profile.",
+    );
+  }
+
+  const ref = db
+    .collection("schools").doc(schoolId)
+    .collection(collectionForRole(role)).doc(uid);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    throw new HttpsError("not-found", "User profile was not found.");
+  }
+  if (snap.data()?.role !== role) {
+    throw new HttpsError(
+      "permission-denied",
+      "User profile role does not match this account.",
+    );
+  }
+
+  const previousPhone = optStr(snap.data()?.phoneNumber);
+  const update: FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData> = {
+    mfaEnabled: enabled,
+    phoneVerified: enabled || hasPhonePrimary,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  if (enabled && phoneE164) {
+    update.phoneNumber = phoneE164;
+  } else if (!hasPhonePrimary) {
+    update.phoneNumber = admin.firestore.FieldValue.delete();
+  }
+  await ref.update(update);
+
+  if (enabled && phoneE164) {
+    await upsertIndex(phoneE164, {
+      phoneNumber: phoneE164,
+      schoolId,
+      userType: userTypeForRole(role),
+      userId: uid,
+    });
+  } else if (!hasPhonePrimary && previousPhone) {
+    const indexRef = db.collection("userSchoolIndex").doc(sha256Hex(previousPhone));
+    const indexSnap = await indexRef.get();
+    if (
+      indexSnap.exists &&
+      indexSnap.data()?.userId === uid &&
+      indexSnap.data()?.schoolId === schoolId
+    ) {
+      await indexRef.delete();
+    }
+  }
 }
 
 /**
@@ -123,7 +213,7 @@ async function finalizeParent(
 
   const snap = await parentRef.get();
   if (!snap.exists) {
-    await parentRef.set({
+    const parentData: Record<string, unknown> = {
       email: ctx.email,
       fullName: ctx.fullName,
       role: "parent",
@@ -132,10 +222,14 @@ async function finalizeParent(
       classIds: [],
       isActive: true,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      phoneNumber: ctx.phoneE164,
-      phoneVerified: true,
+      phoneVerified: ctx.phoneE164 !== null,
       relationshipLabel: ctx.relationshipLabel,
-    });
+      mfaEnabled: ctx.mfaEnabled,
+    };
+    if (ctx.phoneE164) {
+      parentData.phoneNumber = ctx.phoneE164;
+    }
+    await parentRef.set(parentData);
     try {
       await db.collection("schools").doc(ctx.schoolId).update({
         parentCount: admin.firestore.FieldValue.increment(1),
@@ -155,12 +249,14 @@ async function finalizeParent(
       userId: uid,
     });
   }
-  await upsertIndex(ctx.phoneE164, {
-    phoneNumber: ctx.phoneE164,
-    schoolId: ctx.schoolId,
-    userType: "parent",
-    userId: uid,
-  });
+  if (ctx.phoneE164) {
+    await upsertIndex(ctx.phoneE164, {
+      phoneNumber: ctx.phoneE164,
+      schoolId: ctx.schoolId,
+      userType: "parent",
+      userId: uid,
+    });
+  }
 
   if (ctx.linkCode) {
     try {
@@ -197,8 +293,9 @@ async function finalizeTeacher(
       isActive: true,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
-      phoneNumber: ctx.phoneE164,
-      phoneVerified: true,
+      ...(ctx.phoneE164 ? {phoneNumber: ctx.phoneE164} : {}),
+      phoneVerified: ctx.phoneE164 !== null,
+      mfaEnabled: ctx.mfaEnabled,
       permissions: {
         notifications: {
           assignedClasses: true,
@@ -309,6 +406,7 @@ export const enrollLinkedPhoneAsMfa = onCall(
       fullName: optStr(data?.fullName) ?? "",
       email: tokenEmail ?? optStr(data?.email),
       phoneE164: rawPhone,
+      mfaEnabled: true,
       relationshipLabel: optStr(data?.relationshipLabel),
       linkCode,
     } : null;
@@ -430,6 +528,25 @@ export const enrollLinkedPhoneAsMfa = onCall(
       } else {
         await finalizeTeacher(uid, ctx);
       }
+    } else if (data?.syncProfile === true) {
+      const profileRole = data?.profileRole === "parent" ||
+          data?.profileRole === "teacher" ?
+        data.profileRole :
+        null;
+      const profileSchoolId = optStr(data?.profileSchoolId);
+      if (!profileRole || !profileSchoolId) {
+        throw new HttpsError(
+          "invalid-argument",
+          "profileRole and profileSchoolId are required to sync MFA.",
+        );
+      }
+      await updateMfaProfileState(
+        uid,
+        profileRole,
+        profileSchoolId,
+        true,
+        rawPhone,
+      );
     }
 
     // Mint a custom token so the client can re-establish a session (the enroll
@@ -446,6 +563,154 @@ export const enrollLinkedPhoneAsMfa = onCall(
     }
 
     return {enrolled: true, finalised: ctx !== null, customToken};
+  });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Callable: finalizeEmailSignup  (email/password signup — MFA default OFF)
+// ─────────────────────────────────────────────────────────────────────────────
+interface FinalizeEmailSignupInput {
+  role?: unknown;
+  schoolCode?: unknown;
+  linkCode?: unknown;
+  schoolId?: unknown; // transitional fallback only.
+  fullName?: unknown;
+  relationshipLabel?: unknown;
+}
+
+export const finalizeEmailSignup = onCall(
+  {
+    timeoutSeconds: 60,
+    memory: "256MiB",
+    enforceAppCheck: MFA_ENROLLMENT_APP_CHECK_ENFORCED,
+    consumeAppCheckToken: MFA_ENROLLMENT_APP_CHECK_ENFORCED,
+  },
+  async (request) => {
+    const data: FinalizeEmailSignupInput = request.data;
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError(
+        "unauthenticated",
+        "You must be signed in to finalise signup.",
+      );
+    }
+
+    const role = data?.role === "parent" || data?.role === "teacher" ?
+      data.role :
+      null;
+    if (!role) {
+      throw new HttpsError("invalid-argument", "role is required.");
+    }
+
+    const authUser = await admin.auth().getUser(uid);
+    const tokenEmail = optStr(
+      (request.auth?.token as {email?: unknown} | undefined)?.email,
+    );
+    const email = tokenEmail ?? optStr(authUser.email);
+    if (!email) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Email/password signup requires an email on the account.",
+      );
+    }
+
+    const linkCode = optStr(data?.linkCode);
+    let derivedSchoolId: string | null = null;
+    if (role === "teacher") {
+      const schoolCode = optStr(data?.schoolCode);
+      if (!schoolCode) {
+        throw new HttpsError(
+          "invalid-argument",
+          "schoolCode is required for teacher signup.",
+        );
+      }
+      derivedSchoolId = (await resolveSchoolCode(schoolCode)).schoolId;
+    } else if (role === "parent" && linkCode) {
+      derivedSchoolId =
+        (await resolveLinkCodeSchool(linkCode.toUpperCase())).schoolId;
+    } else {
+      throw new HttpsError(
+        "invalid-argument",
+        "linkCode is required for parent signup.",
+      );
+    }
+
+    const ctx: FinalizeContext = {
+      schoolId: derivedSchoolId,
+      fullName: optStr(data?.fullName) ?? authUser.displayName ?? "",
+      email,
+      phoneE164: null,
+      mfaEnabled: false,
+      relationshipLabel: optStr(data?.relationshipLabel),
+      linkCode,
+    };
+    if (!ctx.schoolId) {
+      throw new HttpsError(
+        "invalid-argument",
+        "schoolId is required to finalise signup.",
+      );
+    }
+
+    if (role === "parent") {
+      await finalizeParent(uid, ctx);
+    } else {
+      await finalizeTeacher(uid, ctx);
+    }
+    return {finalised: true, schoolId: ctx.schoolId};
+  });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Callable: syncUserMfaProfileState
+// ─────────────────────────────────────────────────────────────────────────────
+interface SyncUserMfaProfileStateInput {
+  role?: unknown;
+  schoolId?: unknown;
+  enabled?: unknown;
+  phoneE164?: unknown;
+}
+
+export const syncUserMfaProfileState = onCall(
+  {
+    timeoutSeconds: 30,
+    memory: "256MiB",
+    enforceAppCheck: MFA_ENROLLMENT_APP_CHECK_ENFORCED,
+    consumeAppCheckToken: MFA_ENROLLMENT_APP_CHECK_ENFORCED,
+  },
+  async (request) => {
+    const data: SyncUserMfaProfileStateInput = request.data;
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError(
+        "unauthenticated",
+        "You must be signed in to update MFA settings.",
+      );
+    }
+    const role = data?.role === "parent" || data?.role === "teacher" ?
+      data.role :
+      null;
+    const schoolId = optStr(data?.schoolId);
+    const enabled = data?.enabled === true;
+    const phoneE164 = optStr(data?.phoneE164);
+    if (!role || !schoolId) {
+      throw new HttpsError(
+        "invalid-argument",
+        "role and schoolId are required.",
+      );
+    }
+    if (enabled && (!phoneE164 || !E164_REGEX.test(phoneE164))) {
+      throw new HttpsError(
+        "invalid-argument",
+        "phoneE164 must be provided when enabling MFA.",
+      );
+    }
+
+    await updateMfaProfileState(
+      uid,
+      role,
+      schoolId,
+      enabled,
+      enabled ? phoneE164 : null,
+    );
+    return {updated: true};
   });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -537,6 +802,7 @@ export const finalizeParentSignup = onCall(
       fullName: optStr(data?.fullName) ?? "",
       email: tokenEmail ?? optStr(data?.email),
       phoneE164: rawPhone,
+      mfaEnabled: false,
       relationshipLabel: optStr(data?.relationshipLabel),
       linkCode,
     };

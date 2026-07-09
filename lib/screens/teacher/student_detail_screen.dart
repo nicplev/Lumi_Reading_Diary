@@ -6,6 +6,7 @@ import '../../core/widgets/inline_stream_error.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/achievements/achievement_presentation.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
 import '../../core/widgets/comments/teacher_comments_sheet.dart';
@@ -43,6 +44,13 @@ import 'teacher_log_reading_sheet.dart';
 ///
 /// Shows student profile, stats, assigned books, and latest parent comment.
 /// Per spec: avatar header, 2-col stats, assigned books list, parent comment.
+@visibleForTesting
+bool shouldHydrateStudentDetailIsbnCover(String? cachedCoverUrl) {
+  final trimmed = cachedCoverUrl?.trim();
+  if (trimmed == null || trimmed.isEmpty) return true;
+  return BookCoverCacheService.isFallbackCoverUrl(trimmed);
+}
+
 class StudentDetailScreen extends StatefulWidget {
   final UserModel teacher;
   final StudentModel student;
@@ -78,7 +86,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   StudentModel? _studentOverride;
   bool _readingLevelExpanded = false;
   Future<List<ReadingGroupModel>>? _studentGroupsFuture;
-  Future<List<AchievementModel>>? _achievementsFuture;
+  Future<List<EarnedAchievementDisplay>>? _achievementsFuture;
 
   StudentModel get _currentStudent => _studentOverride ?? widget.student;
 
@@ -103,7 +111,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     _ensureMetadataResolver();
     _loadReadingLevelOptions();
     _studentGroupsFuture = _loadStudentGroups();
-    _achievementsFuture = _loadStudentAchievements();
+    _achievementsFuture = _loadStudentAchievementDisplays();
   }
 
   Future<List<ReadingGroupModel>> _loadStudentGroups() async {
@@ -124,7 +132,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     }
   }
 
-  Future<List<AchievementModel>> _loadStudentAchievements() async {
+  Future<List<EarnedAchievementDisplay>>
+      _loadStudentAchievementDisplays() async {
     try {
       final doc = await _firebaseService.firestore
           .collection('schools')
@@ -135,11 +144,10 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       final data = doc.data();
       if (data == null) return [];
       final raw = data['achievements'] as List<dynamic>? ?? [];
-      final achievements = raw
-          .map((a) => AchievementModel.fromMap(Map<String, dynamic>.from(a)))
-          .toList();
-      achievements.sort((a, b) => b.earnedAt.compareTo(a.earnedAt));
-      return achievements;
+      final earnedById = earnedAchievementMap(
+        raw.map((a) => AchievementModel.fromMap(Map<String, dynamic>.from(a))),
+      );
+      return earnedAchievementDisplays(earnedById: earnedById);
     } catch (e) {
       debugPrint('Error loading student achievements: $e');
       return [];
@@ -156,6 +164,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
     if (studentChanged) {
       _studentOverride = null;
+      _studentGroupsFuture = _loadStudentGroups();
+      _achievementsFuture = _loadStudentAchievementDisplays();
     }
 
     if (oldWidget.student.schoolId != widget.student.schoolId) {
@@ -671,8 +681,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                 height: 36,
                 decoration: BoxDecoration(
                   color: LumiTokens.tintGreen,
-                  borderRadius:
-                      BorderRadius.circular(LumiTokens.radiusSmall),
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusSmall),
                 ),
                 child: Icon(icon, size: 18, color: LumiTokens.green),
               ),
@@ -683,8 +692,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                   children: [
                     Text(
                       label,
-                      style: LumiType.body
-                          .copyWith(fontWeight: FontWeight.w600),
+                      style:
+                          LumiType.body.copyWith(fontWeight: FontWeight.w600),
                     ),
                     Text(subtitle, style: LumiType.caption),
                   ],
@@ -850,7 +859,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     return showModalBottomSheet<_AssignmentEditScope>(
       context: context,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(LumiTokens.radiusLarge)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(LumiTokens.radiusLarge)),
       ),
       builder: (context) =>
           _buildActionScopeSheetBody(actionLabel: actionLabel),
@@ -1113,7 +1123,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(LumiTokens.radiusLarge)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(LumiTokens.radiusLarge)),
       ),
       builder: (context) => _RenewBooksSheet(items: currentItems),
     );
@@ -1472,12 +1483,16 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
     for (final allocation in allocations) {
       for (final isbn in _scannedIsbnsForAllocation(allocation)) {
-        if (BookCoverCacheService.instance.resolveCoverUrlByIsbn(isbn) !=
-            null) {
+        final singletonCover =
+            BookCoverCacheService.instance.resolveCoverUrlByIsbn(isbn);
+        if (!shouldHydrateStudentDetailIsbnCover(singletonCover)) {
           _isbnCoverLoadsCompleted.add(isbn);
           continue;
         }
-        if (_bookCoverByIsbn.containsKey(isbn) ||
+        final localCover = _bookCoverByIsbn[isbn]?.coverImageUrl;
+        final hasResolvedLocalCover =
+            !shouldHydrateStudentDetailIsbnCover(localCover);
+        if (hasResolvedLocalCover ||
             _isbnCoverLoadsInFlight.contains(isbn) ||
             _isbnCoverLoadsCompleted.contains(isbn)) {
           continue;
@@ -1736,7 +1751,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     return '';
   }
 
-
   String _formatCommentDate(DateTime date) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -1886,8 +1900,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         content: Text(
           didUpdate ? 'Reading level updated' : 'No reading level change saved',
         ),
-        backgroundColor:
-            didUpdate ? AppColors.success : LumiTokens.muted,
+        backgroundColor: didUpdate ? AppColors.success : LumiTokens.muted,
       ),
     );
   }
@@ -2050,16 +2063,14 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             runSpacing: 6,
             children: groups.map((group) {
               final groupColor = group.color != null
-                  ? Color(
-                      int.parse(group.color!.replaceFirst('#', '0xFF')))
+                  ? Color(int.parse(group.color!.replaceFirst('#', '0xFF')))
                   : LumiTokens.green;
               return Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: groupColor.withValues(alpha: 0.1),
-                  borderRadius:
-                      BorderRadius.circular(LumiTokens.radiusPill),
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
                   border: Border.all(
                     color: groupColor.withValues(alpha: 0.3),
                     width: 1,
@@ -2118,7 +2129,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         label = 'Last read $diff days ago';
         color = AppColors.warmOrange;
       } else {
-        label = 'Last read ${(diff / 7).floor()} week${diff >= 14 ? 's' : ''} ago';
+        label =
+            'Last read ${(diff / 7).floor()} week${diff >= 14 ? 's' : ''} ago';
         color = AppColors.error;
       }
     }
@@ -2223,8 +2235,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 20),
                 decoration: BoxDecoration(
                   color: LumiTokens.paper,
-                  borderRadius:
-                      BorderRadius.circular(LumiTokens.radiusLarge),
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
                   border: Border.all(color: LumiTokens.rule),
                 ),
                 child: Center(
@@ -2239,8 +2250,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             return Container(
               decoration: BoxDecoration(
                 color: LumiTokens.paper,
-                borderRadius:
-                    BorderRadius.circular(LumiTokens.radiusLarge),
+                borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
                 border: Border.all(color: LumiTokens.rule),
               ),
               child: Builder(builder: (context) {
@@ -2299,11 +2309,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   Widget _buildReadingGroupRow(List<_ReadingLogSnapshot> group) {
     final rep = group.first; // most recent in the group
     final dateStr = _formatCommentDate(rep.date);
-    final books = rep.bookTitles.isNotEmpty
-        ? rep.bookTitles.join(', ')
-        : 'Free reading';
-    final totalMinutes =
-        group.fold<int>(0, (acc, l) => acc + l.minutesRead);
+    final books =
+        rep.bookTitles.isNotEmpty ? rep.bookTitles.join(', ') : 'Free reading';
+    final totalMinutes = group.fold<int>(0, (acc, l) => acc + l.minutesRead);
     final sessions = group.length;
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
@@ -2489,7 +2497,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                         ),
                         decoration: BoxDecoration(
                           color: AppColors.error.withValues(alpha: 0.07),
-                          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+                          borderRadius:
+                              BorderRadius.circular(LumiTokens.radiusMedium),
                           border: Border.all(
                             color: AppColors.error.withValues(alpha: 0.18),
                           ),
@@ -2560,7 +2569,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                               fontWeight: FontWeight.w600,
                             ),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+                              borderRadius: BorderRadius.circular(
+                                  LumiTokens.radiusMedium),
                             ),
                           ),
                           child: const Text('Change Level'),
@@ -2587,9 +2597,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       icon: Icon(icon, size: 14),
       label: Text(label),
       style: OutlinedButton.styleFrom(
-        foregroundColor: onPressed != null
-            ? LumiTokens.green
-            : LumiTokens.muted,
+        foregroundColor:
+            onPressed != null ? LumiTokens.green : LumiTokens.muted,
         side: BorderSide(
           color: onPressed != null
               ? LumiTokens.green.withValues(alpha: 0.35)
@@ -2647,7 +2656,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             children: [
               // Total nights (cumulative) is the hero metric — shown first.
               _buildCompactStat(
-                '$totalNights', 'Total nights',
+                '$totalNights',
+                'Total nights',
                 icon: Icons.nights_stay_outlined,
                 iconColor: LumiTokens.blue,
                 circleColor: LumiTokens.tintBlue,
@@ -2655,7 +2665,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               _compactDivider(),
               // Streak is a gentle, secondary signal.
               _buildCompactStat(
-                '$streak', 'Day streak',
+                '$streak',
+                'Day streak',
                 icon: Icons.local_fire_department_outlined,
                 iconSize: 20,
                 iconColor: LumiTokens.orange,
@@ -2663,7 +2674,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               ),
               _compactDivider(),
               _buildCompactStat(
-                '$totalBooks', 'Total books',
+                '$totalBooks',
+                'Total books',
                 icon: Icons.menu_book_outlined,
                 iconSize: 16,
                 iconColor: LumiTokens.green,
@@ -2801,24 +2813,24 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                     _buildAssignedActionsRow(),
                     const SizedBox(height: 12),
                     ...books.map((book) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: TeacherBookAssignmentCard(
-                        title: book.title,
-                        subtitle: book.subtitle,
-                        coverGradient: book.coverGradient,
-                        coverImageUrl: book.coverImageUrl,
-                        bookType: book.bookType,
-                        status: book.status,
-                        onActionSelected: _canMutateAssignment(book)
-                            ? (action) => _handleBookAction(book, action)
-                            : null,
-                        onTap: _canMutateAssignment(book)
-                            ? () => _showBookActionsSheet(book)
-                            : null,
-                      ),
-                    );
-                  }),
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: TeacherBookAssignmentCard(
+                          title: book.title,
+                          subtitle: book.subtitle,
+                          coverGradient: book.coverGradient,
+                          coverImageUrl: book.coverImageUrl,
+                          bookType: book.bookType,
+                          status: book.status,
+                          onActionSelected: _canMutateAssignment(book)
+                              ? (action) => _handleBookAction(book, action)
+                              : null,
+                          onTap: _canMutateAssignment(book)
+                              ? () => _showBookActionsSheet(book)
+                              : null,
+                        ),
+                      );
+                    }),
                   ],
                 );
               },
@@ -2829,12 +2841,24 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     );
   }
 
+  void _openAchievements() {
+    final student = _currentStudent;
+    context.push(
+      '/teacher/student-achievements/${student.id}',
+      extra: {
+        'teacher': widget.teacher,
+        'student': student,
+      },
+    );
+  }
+
   Widget _buildAchievementsSection() {
-    return FutureBuilder<List<AchievementModel>>(
+    return FutureBuilder<List<EarnedAchievementDisplay>>(
       future: _achievementsFuture,
       builder: (context, snapshot) {
         final achievements = snapshot.data ?? [];
-        if (snapshot.connectionState == ConnectionState.waiting && achievements.isEmpty) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            achievements.isEmpty) {
           return const SizedBox.shrink();
         }
 
@@ -2847,10 +2871,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                 Text('Achievements', style: LumiType.subhead),
                 if (achievements.isNotEmpty)
                   GestureDetector(
-                    onTap: () => context.push(
-                      '/parent/achievements',
-                      extra: {'student': _currentStudent},
-                    ),
+                    onTap: _openAchievements,
                     child: Text(
                       'View all',
                       style: LumiType.caption.copyWith(
@@ -2885,24 +2906,25 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                   itemCount: achievements.length > 8 ? 8 : achievements.length,
                   separatorBuilder: (_, __) => const SizedBox(width: 8),
                   itemBuilder: (context, index) {
-                    final a = achievements[index];
+                    final display = achievements[index];
+                    final template = display.template;
                     return GestureDetector(
-                      onTap: () => context.push(
-                        '/parent/achievements',
-                        extra: {'student': _currentStudent},
-                      ),
+                      onTap: _openAchievements,
                       child: Container(
                         width: 72,
                         decoration: BoxDecoration(
                           color: LumiTokens.paper,
-                          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+                          borderRadius:
+                              BorderRadius.circular(LumiTokens.radiusMedium),
                           border: Border.all(
-                            color: Color(a.effectiveColor).withValues(alpha: 0.5),
+                            color: Color(template.effectiveColor)
+                                .withValues(alpha: 0.5),
                             width: 1.5,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Color(a.effectiveColor).withValues(alpha: 0.1),
+                              color: Color(template.effectiveColor)
+                                  .withValues(alpha: 0.1),
                               blurRadius: 4,
                               offset: const Offset(0, 2),
                             ),
@@ -2911,12 +2933,19 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(a.icon, style: const TextStyle(fontSize: 28)),
+                            Icon(
+                              achievementIconFor(template),
+                              size: 28,
+                              color: achievementCategoryColor(
+                                template.category,
+                              ),
+                            ),
                             const SizedBox(height: 4),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 4),
                               child: Text(
-                                a.name,
+                                template.name,
                                 style: LumiType.caption.copyWith(fontSize: 9),
                                 textAlign: TextAlign.center,
                                 maxLines: 2,
@@ -2970,14 +2999,12 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             final latest = _latestParentComment(logs);
             if (latest == null) {
               return ClipRRect(
-                borderRadius:
-                    BorderRadius.circular(LumiTokens.radiusLarge),
+                borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
                 child: Container(
                   width: double.infinity,
                   decoration: BoxDecoration(
                     color: LumiTokens.paper,
-                    borderRadius:
-                        BorderRadius.circular(LumiTokens.radiusLarge),
+                    borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
                     border: Border.all(color: LumiTokens.rule),
                   ),
                   child: Row(
@@ -3011,150 +3038,151 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                   borderRadius:
                       BorderRadius.circular(TeacherDimensions.radiusL),
                   child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                  decoration: BoxDecoration(
-                    color: LumiTokens.paper,
-                    borderRadius:
-                        BorderRadius.circular(LumiTokens.radiusLarge),
-                    border: Border.all(color: LumiTokens.rule),
-                    // Left accent via a gradient trick won't work with
-                    // Border.all, so we overlay it below.
-                  ),
-                  child: IntrinsicHeight(
-                    child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Comment icon — green only when unread for the teacher
-                      // (green = needs attention), neutral once read.
-                      Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: unread
-                              ? LumiTokens.tintGreen
-                              : LumiTokens.muted.withValues(alpha: 0.08),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.chat_bubble_outline_rounded,
-                          size: 14,
-                          color: unread ? LumiTokens.green : LumiTokens.muted,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      // Content
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Child's feeling — its own line, distinct from
-                            // the parent's topic chips below.
-                            if (latest.feeling != null) ...[
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Image.asset(
-                                    'assets/blobs/blob-${latest.feeling}.png',
-                                    width: 22,
-                                    height: 22,
-                                  ),
-                                  const SizedBox(width: 5),
-                                  Text(
-                                    latest.feeling![0].toUpperCase() +
-                                        latest.feeling!.substring(1),
-                                    style: LumiType.caption.copyWith(
-                                      color: LumiTokens.ink,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              if (latest.selections.isNotEmpty ||
-                                  latest.commentText.isNotEmpty)
-                                const SizedBox(height: 8),
-                            ],
-                            // Parent's topic selections — up to 3, wrap cleanly.
-                            if (latest.selections.isNotEmpty) ...[
-                              Wrap(
-                                spacing: 6,
-                                runSpacing: 6,
-                                children: latest.selections.map((chip) {
-                                  return Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 3,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: LumiTokens.muted
-                                          .withValues(alpha: 0.08),
-                                      borderRadius: BorderRadius.circular(
-                                          LumiTokens.radiusSmall),
-                                    ),
-                                    child: Text(
-                                      chip,
-                                      style: LumiType.caption.copyWith(
-                                        color: LumiTokens.ink,
-                                      ),
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                              if (latest.commentText.isNotEmpty)
-                                const SizedBox(height: 8),
-                            ],
-                            // Free-text comment — wraps, but capped to a short
-                            // preview (the row taps through to the full thread).
-                            if (latest.commentText.isNotEmpty) ...[
-                              Text(
-                                latest.commentText,
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                                style: LumiType.body.copyWith(
-                                  fontStyle: FontStyle.italic,
-                                  color: LumiTokens.muted,
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: 6),
-                            Row(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                    decoration: BoxDecoration(
+                      color: LumiTokens.paper,
+                      borderRadius:
+                          BorderRadius.circular(LumiTokens.radiusLarge),
+                      border: Border.all(color: LumiTokens.rule),
+                      // Left accent via a gradient trick won't work with
+                      // Border.all, so we overlay it below.
+                    ),
+                    child: IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Comment icon — green only when unread for the teacher
+                          // (green = needs attention), neutral once read.
+                          Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: unread
+                                  ? LumiTokens.tintGreen
+                                  : LumiTokens.muted.withValues(alpha: 0.08),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.chat_bubble_outline_rounded,
+                              size: 14,
+                              color:
+                                  unread ? LumiTokens.green : LumiTokens.muted,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          // Content
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Flexible(
-                                  child: Text(
-                                    '— $parentName · ${_formatCommentDate(latest.date)}',
-                                    style: LumiType.caption,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                if (unread) ...[
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 7, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: LumiTokens.tintGreen,
-                                      borderRadius: BorderRadius.circular(
-                                          LumiTokens.radiusPill),
-                                    ),
-                                    child: Text(
-                                      'New',
-                                      style: LumiType.caption.copyWith(
-                                        color: LumiTokens.green,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 11,
+                                // Child's feeling — its own line, distinct from
+                                // the parent's topic chips below.
+                                if (latest.feeling != null) ...[
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Image.asset(
+                                        'assets/blobs/blob-${latest.feeling}.png',
+                                        width: 22,
+                                        height: 22,
                                       ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        latest.feeling![0].toUpperCase() +
+                                            latest.feeling!.substring(1),
+                                        style: LumiType.caption.copyWith(
+                                          color: LumiTokens.ink,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (latest.selections.isNotEmpty ||
+                                      latest.commentText.isNotEmpty)
+                                    const SizedBox(height: 8),
+                                ],
+                                // Parent's topic selections — up to 3, wrap cleanly.
+                                if (latest.selections.isNotEmpty) ...[
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 6,
+                                    children: latest.selections.map((chip) {
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 3,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: LumiTokens.muted
+                                              .withValues(alpha: 0.08),
+                                          borderRadius: BorderRadius.circular(
+                                              LumiTokens.radiusSmall),
+                                        ),
+                                        child: Text(
+                                          chip,
+                                          style: LumiType.caption.copyWith(
+                                            color: LumiTokens.ink,
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                  if (latest.commentText.isNotEmpty)
+                                    const SizedBox(height: 8),
+                                ],
+                                // Free-text comment — wraps, but capped to a short
+                                // preview (the row taps through to the full thread).
+                                if (latest.commentText.isNotEmpty) ...[
+                                  Text(
+                                    latest.commentText,
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: LumiType.body.copyWith(
+                                      fontStyle: FontStyle.italic,
+                                      color: LumiTokens.muted,
                                     ),
                                   ),
                                 ],
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        '— $parentName · ${_formatCommentDate(latest.date)}',
+                                        style: LumiType.caption,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (unread) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 7, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: LumiTokens.tintGreen,
+                                          borderRadius: BorderRadius.circular(
+                                              LumiTokens.radiusPill),
+                                        ),
+                                        child: Text(
+                                          'New',
+                                          style: LumiType.caption.copyWith(
+                                            color: LumiTokens.green,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
                               ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  ),
+                    ),
                   ),
                 );
               },
@@ -3476,9 +3504,8 @@ class _RenewBooksSheetState extends State<_RenewBooksSheet> {
               child: ElevatedButton(
                 onPressed: selectedCount > 0
                     ? () {
-                        final result = _selected
-                            .map((i) => widget.items[i])
-                            .toList();
+                        final result =
+                            _selected.map((i) => widget.items[i]).toList();
                         Navigator.of(context).pop(result);
                       }
                     : null,
@@ -3487,7 +3514,8 @@ class _RenewBooksSheetState extends State<_RenewBooksSheet> {
                   foregroundColor: LumiTokens.paper,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+                    borderRadius:
+                        BorderRadius.circular(LumiTokens.radiusMedium),
                   ),
                 ),
                 child: Text(
@@ -3610,12 +3638,11 @@ class _BookPickerSheetState extends State<_BookPickerSheet> {
                       filled: true,
                       fillColor: LumiTokens.cream,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(
-                            LumiTokens.radiusMedium),
+                        borderRadius:
+                            BorderRadius.circular(LumiTokens.radiusMedium),
                         borderSide: BorderSide.none,
                       ),
-                      contentPadding:
-                          const EdgeInsets.symmetric(vertical: 10),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -3716,84 +3743,77 @@ class _BookPickerSheetState extends State<_BookPickerSheet> {
                           );
                         }
                         final book = books[index];
-                      final hasCover = book.coverImageUrl != null &&
-                          book.coverImageUrl!.isNotEmpty &&
-                          book.coverImageUrl!.startsWith('http');
-                      return InkWell(
-                        onTap: () => Navigator.pop(context, book),
-                        child: Padding(
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 10),
-                          child: Row(
-                            children: [
-                              ClipRRect(
-                                borderRadius:
-                                    BorderRadius.circular(4),
-                                child: SizedBox(
-                                  width: 36,
-                                  height: 50,
-                                  child: hasCover
-                                      ? PersistentCachedImage(
-                                          imageUrl:
-                                              book.coverImageUrl!,
-                                          fit: BoxFit.cover,
-                                          fallback: Container(
-                                            color: AppColors
-                                                .teacherPrimaryLight,
-                                            child: const Icon(
-                                                Icons.menu_book,
+                        final hasCover = book.coverImageUrl != null &&
+                            book.coverImageUrl!.isNotEmpty &&
+                            book.coverImageUrl!.startsWith('http');
+                        return InkWell(
+                          onTap: () => Navigator.pop(context, book),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            child: Row(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: SizedBox(
+                                    width: 36,
+                                    height: 50,
+                                    child: hasCover
+                                        ? PersistentCachedImage(
+                                            imageUrl: book.coverImageUrl!,
+                                            fit: BoxFit.cover,
+                                            fallback: Container(
+                                              color:
+                                                  AppColors.teacherPrimaryLight,
+                                              child: const Icon(Icons.menu_book,
+                                                  size: 16,
+                                                  color:
+                                                      AppColors.teacherPrimary),
+                                            ),
+                                          )
+                                        : Container(
+                                            color:
+                                                AppColors.teacherPrimaryLight,
+                                            child: const Icon(Icons.menu_book,
                                                 size: 16,
-                                                color: AppColors
-                                                    .teacherPrimary),
+                                                color:
+                                                    AppColors.teacherPrimary),
                                           ),
-                                        )
-                                      : Container(
-                                          color: AppColors
-                                              .teacherPrimaryLight,
-                                          child: const Icon(
-                                              Icons.menu_book,
-                                              size: 16,
-                                              color: AppColors
-                                                  .teacherPrimary),
-                                        ),
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      book.title,
-                                      style: LumiType.body.copyWith(
-                                          fontWeight: FontWeight.w600),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    if (book.author != null)
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
                                       Text(
-                                        book.author!,
-                                        style:
-                                            LumiType.caption,
+                                        book.title,
+                                        style: LumiType.body.copyWith(
+                                            fontWeight: FontWeight.w600),
                                         maxLines: 1,
-                                        overflow:
-                                            TextOverflow.ellipsis,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                  ],
+                                      if (book.author != null)
+                                        Text(
+                                          book.author!,
+                                          style: LumiType.caption,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              Icon(
-                                Icons.chevron_right_rounded,
-                                size: 18,
-                                color: LumiTokens.muted
-                                    .withValues(alpha: 0.4),
-                              ),
-                            ],
+                                Icon(
+                                  Icons.chevron_right_rounded,
+                                  size: 18,
+                                  color:
+                                      LumiTokens.muted.withValues(alpha: 0.4),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
                     ),
                   );
                 },
@@ -3907,12 +3927,10 @@ class _SwapScannerScreenState extends State<_SwapScannerScreen> {
         elevation: 0,
         title: const Text(
           'Scan Replacement Book',
-          style:
-              TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.w700),
+          style: TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.w700),
         ),
       ),
-      body:
-          _resolvedBook != null ? _buildConfirmView() : _buildScannerView(),
+      body: _resolvedBook != null ? _buildConfirmView() : _buildScannerView(),
     );
   }
 
@@ -3997,8 +4015,7 @@ class _SwapScannerScreenState extends State<_SwapScannerScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           ClipRRect(
-            borderRadius:
-                BorderRadius.circular(LumiTokens.radiusMedium),
+            borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
             child: SizedBox(
               width: 120,
               height: 170,
@@ -4047,8 +4064,7 @@ class _SwapScannerScreenState extends State<_SwapScannerScreen> {
                 backgroundColor: LumiTokens.green,
                 foregroundColor: LumiTokens.paper,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(
-                      LumiTokens.radiusMedium),
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
                 ),
               ),
               child: const Text(

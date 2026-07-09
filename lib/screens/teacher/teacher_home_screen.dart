@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:rive/rive.dart' hide Animation;
 
-
+import '../../core/auth/sign_out_flow.dart';
 import '../../core/theme/app_theme.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
@@ -149,8 +149,11 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
     );
 
     if (confirm == true) {
-      await _firebaseService.signOut();
-      if (mounted) context.go('/auth/login');
+      if (!mounted) return;
+      await signOutAndNavigateToLogin(
+        context,
+        firebaseService: _firebaseService,
+      );
     }
   }
 

@@ -52,6 +52,7 @@ void main() {
   group('OfflineService', () {
     late OfflineService offlineService;
     late Directory testDirectory;
+    late Directory audioQueueDirectory;
 
     setUpAll(() async {
       // Create a temporary directory for Hive
@@ -65,6 +66,11 @@ void main() {
       await offlineService.initialize();
       // No live FirebaseAuth in unit tests — stub the pre-drain token refresh.
       offlineService.tokenRefreshForTest = () async {};
+      audioQueueDirectory = Directory(
+        '${testDirectory.path}/pending_audio_${DateTime.now().microsecondsSinceEpoch}',
+      );
+      offlineService.pendingComprehensionAudioDirectoryForTest =
+          audioQueueDirectory;
     });
 
     group('saveReadingLogLocally', () {
@@ -486,6 +492,104 @@ void main() {
       });
     });
 
+    group('comprehension audio queue', () {
+      test('copies audio into queue-owned storage before enqueue', () async {
+        final source = File('${testDirectory.path}/recording-source.m4a');
+        await source.writeAsBytes([1, 2, 3, 4, 5]);
+
+        await offlineService.enqueueComprehensionAudioUpload(
+          logId: 'log-audio-copy',
+          schoolId: 'school-1',
+          studentId: 'student-1',
+          storagePath:
+              'schools/school-1/comprehension_audio/log-audio-copy.m4a',
+          localFilePath: source.path,
+          durationSec: 12,
+        );
+
+        final item = offlineService.pendingSyncs.single;
+        final queuedPath = item.data['localFilePath'] as String;
+        expect(item.type, SyncType.comprehensionAudioUpload);
+        expect(item.data['originalLocalFilePath'], source.path);
+        expect(item.data['audioFileManagedByQueue'], isTrue);
+        expect(queuedPath, isNot(source.path));
+        expect(queuedPath, startsWith(audioQueueDirectory.path));
+
+        await source.delete();
+
+        final queuedFile = File(queuedPath);
+        expect(await queuedFile.exists(), isTrue);
+        expect(await queuedFile.readAsBytes(), [1, 2, 3, 4, 5]);
+      });
+
+      test('dismissPending removes a queue-owned audio copy', () async {
+        final source = File('${testDirectory.path}/recording-dismiss.m4a');
+        await source.writeAsBytes([9, 8, 7]);
+
+        await offlineService.enqueueComprehensionAudioUpload(
+          logId: 'log-audio-dismiss',
+          schoolId: 'school-1',
+          studentId: 'student-1',
+          storagePath:
+              'schools/school-1/comprehension_audio/log-audio-dismiss.m4a',
+          localFilePath: source.path,
+          durationSec: 8,
+        );
+        final queuedPath =
+            offlineService.pendingSyncs.single.data['localFilePath'] as String;
+        expect(await File(queuedPath).exists(), isTrue);
+
+        await offlineService.dismissPending('audio_log-audio-dismiss');
+
+        expect(offlineService.pendingSyncs, isEmpty);
+        expect(await File(queuedPath).exists(), isFalse);
+      });
+
+      test('parks the queue item if the source audio is already missing',
+          () async {
+        await offlineService.enqueueComprehensionAudioUpload(
+          logId: 'log-audio-missing',
+          schoolId: 'school-1',
+          studentId: 'student-1',
+          storagePath:
+              'schools/school-1/comprehension_audio/log-audio-missing.m4a',
+          localFilePath: '${testDirectory.path}/does-not-exist.m4a',
+          durationSec: 5,
+        );
+
+        final item = offlineService.pendingSyncs.single;
+        expect(item.needsAttention, isTrue);
+        expect(
+            item.lastError, contains('recording file is no longer available'));
+        expect(item.data['audioFileManagedByQueue'], isFalse);
+      });
+
+      test('successful drain removes the queue-owned audio copy', () async {
+        ServiceStatusController.instance
+            .debugSetCurrent(ServiceStatusSnapshot.healthy());
+        offlineService.syncOneOverrideForTest = (_) async {};
+        final source = File('${testDirectory.path}/recording-synced.m4a');
+        await source.writeAsBytes([6, 5, 4]);
+
+        await offlineService.enqueueComprehensionAudioUpload(
+          logId: 'log-audio-synced',
+          schoolId: 'school-1',
+          studentId: 'student-1',
+          storagePath:
+              'schools/school-1/comprehension_audio/log-audio-synced.m4a',
+          localFilePath: source.path,
+          durationSec: 9,
+        );
+        final queuedPath =
+            offlineService.pendingSyncs.single.data['localFilePath'] as String;
+
+        await offlineService.triggerSync();
+
+        expect(offlineService.pendingSyncs, isEmpty);
+        expect(await File(queuedPath).exists(), isFalse);
+      });
+    });
+
     group('drain hardening', () {
       void goHealthy() => ServiceStatusController.instance
           .debugSetCurrent(ServiceStatusSnapshot.healthy());
@@ -791,6 +895,7 @@ void main() {
           .debugSetCurrent(ServiceStatusSnapshot.unknown());
       // Clean up test data
       await offlineService.clearLocalData();
+      offlineService.pendingComprehensionAudioDirectoryForTest = null;
     });
 
     tearDownAll(() async {

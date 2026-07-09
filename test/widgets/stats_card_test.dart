@@ -94,7 +94,8 @@ void main() {
       expect(find.byType(VerticalDivider), findsNWidgets(2));
     });
 
-    testWidgets('shows the rest-day reassurance footer when one rest day is left',
+    testWidgets(
+        'shows the rest-day reassurance footer when one rest day is left',
         (tester) async {
       await tester.pumpWidget(wrapWidget(
         const StatsCard(
@@ -106,7 +107,24 @@ void main() {
       ));
 
       expect(
-        find.text('🌙 1 rest day left — your streak is safe'),
+        find.text('1 rest day left - your streak is safe'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('explains when streak extends beyond the 30-night view',
+        (tester) async {
+      await tester.pumpWidget(wrapWidget(
+        const StatsCard(
+          totalNights: 9,
+          currentStreak: 9,
+          totalMinutes: 260,
+          last30Nights: 7,
+        ),
+      ));
+
+      expect(
+        find.text('Streak includes nights before this 30-night view'),
         findsOneWidget,
       );
     });

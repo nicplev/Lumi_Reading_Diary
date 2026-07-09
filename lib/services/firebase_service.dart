@@ -164,8 +164,13 @@ class FirebaseService {
     return _auth.currentUser?.emailVerified ?? false;
   }
 
-  // Sign out and clear local caches
-  Future<void> signOut() async {
+  // Sign out and clear local caches.
+  //
+  // UI callers can provide [afterAuthSignOut] to leave authenticated routes
+  // before Firestore persistence is terminated. Keeping a screen with live
+  // snapshots mounted while terminate()/clearPersistence() runs can surface
+  // framework errors during logout.
+  Future<void> signOut({Future<void> Function()? afterAuthSignOut}) async {
     try {
       // Cancel OS-scheduled reminders, wipe parent-scoped SharedPreferences,
       // drop the FCM token from Firestore, and wipe the iOS widget payload
@@ -192,6 +197,14 @@ class FirebaseService {
       }
 
       await _auth.signOut();
+
+      if (afterAuthSignOut != null) {
+        try {
+          await afterAuthSignOut();
+        } catch (e) {
+          debugPrint('signOut: post-auth navigation hook failed: $e');
+        }
+      }
 
       // Shared-device hygiene: drop the local Firestore cache, INCLUDING any
       // still-pending mutations. Without this, Teacher A's unflushed writes
@@ -236,4 +249,3 @@ class FirebaseService {
 final firebaseServiceProvider = Provider<FirebaseService>((ref) {
   return FirebaseService.instance;
 });
-

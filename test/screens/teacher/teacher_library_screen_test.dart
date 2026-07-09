@@ -89,8 +89,8 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.text('Book Library'), findsOneWidget);
-      expect(find.text('2 books in your school library'), findsOneWidget);
+      expect(find.text('Library'), findsOneWidget);
+      expect(find.text("Browse your school's books"), findsOneWidget);
       expect(find.text('All 2'), findsOneWidget);
       expect(find.text('Decodable 1'), findsOneWidget);
       expect(find.text('Library 1'), findsOneWidget);
@@ -257,7 +257,7 @@ BookModel _book({
     isbn: isbn,
     readingLevel: readingLevel,
     createdAt: DateTime(2026, 1, 1),
-    metadata: isDecodable ? {'source': 'llll_local_db'} : null,
+    metadata: isDecodable ? {'isDecodable': true} : null,
   );
 }
 
@@ -268,8 +268,24 @@ class _FakeSchoolLibraryService extends SchoolLibraryService {
   final List<BookModel> _books;
 
   @override
-  Stream<List<BookModel>> booksStream(String schoolId) {
-    return Stream.value(_books);
+  Future<BookPage> fetchBooksPage(
+    String schoolId, {
+    int limit = SchoolLibraryService.pageSize,
+    String? startAfterDocId,
+  }) async {
+    return BookPage(
+      books: _books,
+      lastDocId: _books.isEmpty ? null : _books.last.id,
+      hasMore: false,
+    );
+  }
+
+  @override
+  Future<LibraryCounts> fetchCounts(String schoolId) async {
+    return LibraryCounts(
+      total: _books.length,
+      decodable: _books.where(SchoolLibraryService.isDecodable).length,
+    );
   }
 }
 

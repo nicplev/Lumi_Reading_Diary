@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:lumi_reading_tracker/core/achievements/achievement_presentation.dart';
 import 'package:lumi_reading_tracker/data/models/achievement_model.dart';
 import 'package:lumi_reading_tracker/data/models/student_model.dart';
 import 'package:lumi_reading_tracker/theme/lumi_tokens.dart';
 import 'package:lumi_reading_tracker/theme/lumi_typography.dart';
 import 'package:lumi_reading_tracker/theme/section_theme.dart';
 import 'package:lumi_reading_tracker/core/widgets/glass/glass_achievement_card.dart';
+
+const _goldAccent = Color(0xFFE0A93B);
+const _amberAccent = Color(0xFFF59E0B);
 
 /// Achievements screen — a calm, grouped view of every badge a child can earn.
 ///
@@ -29,93 +33,14 @@ class AchievementsScreen extends StatefulWidget {
   State<AchievementsScreen> createState() => _AchievementsScreenState();
 }
 
-/// Display order + labels + icons for the badge groups (no emoji — unified
-/// Material icons, coloured by category). Streak is deliberately omitted.
-const _groups = <({AchievementCategory category, String label, IconData icon})>[
-  (category: AchievementCategory.readingDays, label: 'Reading Nights', icon: Icons.nightlight_round),
-  (category: AchievementCategory.books, label: 'Books', icon: Icons.menu_book_rounded),
-  (category: AchievementCategory.minutes, label: 'Reading Time', icon: Icons.schedule_rounded),
-  (category: AchievementCategory.special, label: 'Special', icon: Icons.star_rounded),
-];
-
-// Warm accents not in the core token palette (gold/amber read as "reward/time").
-const _goldAccent = Color(0xFFE0A93B);
-const _amberAccent = Color(0xFFF59E0B);
-
-/// Relevant, good-contrast colour per category — used for both the section
-/// header icon and its badge icons (the rarity colour stays on the earned
-/// card's border + check).
-Color _categoryColor(AchievementCategory category) {
-  switch (category) {
-    case AchievementCategory.readingDays:
-      return LumiTokens.blue;
-    case AchievementCategory.books:
-      return LumiTokens.green;
-    case AchievementCategory.minutes:
-      return _amberAccent;
-    case AchievementCategory.special:
-      return LumiTokens.red;
-    default:
-      return LumiTokens.muted;
-  }
-}
-
-/// A unified Material icon per badge (by stable id, with a category fallback
-/// for any custom/unknown achievement).
-IconData _achievementIcon(AchievementModel t) {
-  switch (t.id) {
-    case 'days_t1':
-      return Icons.bedtime_rounded;
-    case 'days_t2':
-      return Icons.nightlight_round;
-    case 'days_t3':
-      return Icons.dark_mode_rounded;
-    case 'days_t4':
-      return Icons.calendar_month_rounded;
-    case 'books_t1':
-      return Icons.menu_book_rounded;
-    case 'books_t2':
-      return Icons.auto_stories_rounded;
-    case 'books_t3':
-      return Icons.local_library_rounded;
-    case 'books_t4':
-      return Icons.library_books_rounded;
-    case 'books_t5':
-      return Icons.workspace_premium_rounded;
-    case 'minutes_t1':
-      return Icons.schedule_rounded;
-    case 'minutes_t2':
-      return Icons.update_rounded;
-    case 'minutes_t3':
-      return Icons.directions_run_rounded;
-    case 'minutes_t4':
-      return Icons.hourglass_bottom_rounded;
-    case 'minutes_t5':
-      return Icons.all_inclusive_rounded;
-    case 'first_log':
-      return Icons.flag_rounded;
-  }
-  switch (t.category) {
-    case AchievementCategory.readingDays:
-      return Icons.nightlight_round;
-    case AchievementCategory.books:
-      return Icons.menu_book_rounded;
-    case AchievementCategory.minutes:
-      return Icons.schedule_rounded;
-    case AchievementCategory.special:
-      return Icons.star_rounded;
-    default:
-      return Icons.emoji_events_rounded;
-  }
-}
-
 class _AchievementsScreenState extends State<AchievementsScreen> {
   // Per-school achievement customisation is disabled for first release — the
   // page always uses the platform default thresholds + names/colours, ignoring
   // any settings.achievementThresholds / achievementCustomization left on the
   // school doc. (To re-enable, load them in initState again.)
   final AchievementThresholds _thresholds = AchievementThresholds.defaults;
-  final AchievementCustomization _customization = AchievementCustomization.empty;
+  final AchievementCustomization _customization =
+      AchievementCustomization.empty;
 
   @override
   Widget build(BuildContext context) {
@@ -150,26 +75,25 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
             final student = StudentModel.fromFirestore(snapshot.data!);
             final stats = student.stats;
 
-            final raw = (snapshot.data!.data() as Map<String, dynamic>?)?['achievements']
+            final raw = (snapshot.data!.data()
+                        as Map<String, dynamic>?)?['achievements']
                     as List<dynamic>? ??
                 const [];
-            final earnedById = <String, AchievementModel>{
-              for (final a in raw)
-                (a['id'] as String? ?? ''):
-                    AchievementModel.fromMap(Map<String, dynamic>.from(a)),
-            };
+            final earnedById = earnedAchievementMap(
+              raw.map((a) => AchievementModel.fromMap(
+                    Map<String, dynamic>.from(a),
+                  )),
+            );
 
             // Build displayable templates (streak excluded — never awarded).
             // Books tiers are retired too (books-read isn't honestly
             // trackable, so the server stopped awarding them): show a books
             // badge only if it was already earned — never as a locked goal.
-            final templates = AchievementTemplates
-                .generateTemplates(_thresholds, customization: _customization)
-                .where((t) => t.category != AchievementCategory.streak)
-                .where((t) =>
-                    t.category != AchievementCategory.books ||
-                    earnedById.containsKey(t.id))
-                .toList();
+            final templates = displayableAchievementTemplates(
+              earnedById: earnedById,
+              thresholds: _thresholds,
+              customization: _customization,
+            );
 
             final earnedCount =
                 templates.where((t) => earnedById.containsKey(t.id)).length;
@@ -201,7 +125,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
                   ),
                   const SizedBox(height: 20),
                 ],
-                for (final group in _groups) ...[
+                for (final group in achievementDisplayGroups) ...[
                   ..._buildGroup(group, templates, earnedById, stats),
                 ],
               ],
@@ -221,14 +145,16 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
     final items = templates.where((t) => t.category == group.category).toList();
     if (items.isEmpty) return const [];
 
-    final earnedInGroup = items.where((t) => earnedById.containsKey(t.id)).length;
+    final earnedInGroup =
+        items.where((t) => earnedById.containsKey(t.id)).length;
 
     return [
       Padding(
         padding: const EdgeInsets.only(bottom: 12, top: 4),
         child: Row(
           children: [
-            Icon(group.icon, size: 20, color: _categoryColor(group.category)),
+            Icon(group.icon,
+                size: 20, color: achievementCategoryColor(group.category)),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -274,8 +200,8 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
     return (current: current, required: t.requiredValue);
   }
 
-  void _onTapBadge(
-      AchievementModel template, AchievementModel? earned, StudentStats? stats) {
+  void _onTapBadge(AchievementModel template, AchievementModel? earned,
+      StudentStats? stats) {
     if (earned != null) {
       // Enrich with the live template name/colour, then celebrate.
       showDialog(
@@ -285,7 +211,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
             name: template.name,
             customColor: template.customColor,
           ),
-          icon: _achievementIcon(template),
+          icon: achievementIconFor(template),
           iconColor: Colors.white,
         ),
       );
@@ -328,14 +254,15 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
                 Opacity(
                   opacity: 0.55,
                   child: Icon(
-                    _achievementIcon(t),
+                    achievementIconFor(t),
                     size: 40,
-                    color: _categoryColor(t.category),
+                    color: achievementCategoryColor(t.category),
                   ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
-                  child: Text(t.name, style: LumiType.heading.copyWith(fontSize: 22)),
+                  child: Text(t.name,
+                      style: LumiType.heading.copyWith(fontSize: 22)),
                 ),
               ],
             ),
@@ -422,7 +349,8 @@ class _HeroCard extends StatelessWidget {
                       TextSpan(text: '$earned', style: LumiType.heading),
                       TextSpan(
                         text: ' of $total unlocked',
-                        style: LumiType.body.copyWith(fontWeight: FontWeight.w600),
+                        style:
+                            LumiType.body.copyWith(fontWeight: FontWeight.w600),
                       ),
                     ],
                   ),
@@ -500,9 +428,9 @@ class _BadgeTile extends StatelessWidget {
                 Opacity(
                   opacity: isEarned ? 1.0 : 0.4,
                   child: Icon(
-                    _achievementIcon(template),
+                    achievementIconFor(template),
                     size: 34,
-                    color: _categoryColor(template.category),
+                    color: achievementCategoryColor(template.category),
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -613,20 +541,19 @@ class _AlmostThereSection extends StatelessWidget {
           child: Column(
             children: [
               for (var i = 0; i < items.length; i++) ...[
-                if (i > 0)
-                  const Divider(height: 20, color: LumiTokens.rule),
+                if (i > 0) const Divider(height: 20, color: LumiTokens.rule),
                 InkWell(
                   onTap: () => onTap(items[i].template),
-                  borderRadius:
-                      BorderRadius.circular(LumiTokens.radiusMedium),
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Row(
                       children: [
                         Icon(
-                          _achievementIcon(items[i].template),
+                          achievementIconFor(items[i].template),
                           size: 26,
-                          color: _categoryColor(items[i].template.category),
+                          color: achievementCategoryColor(
+                              items[i].template.category),
                         ),
                         const SizedBox(width: 12),
                         Expanded(

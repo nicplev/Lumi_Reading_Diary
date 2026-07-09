@@ -321,7 +321,12 @@ class _PhoneVerifyRecoveryScreenState extends State<PhoneVerifyRecoveryScreen> {
 
     await PhoneVerificationRecoveryService.instance.clear();
     if (!mounted) return;
-    context.go(AppRouter.getHomeRouteForRole(UserRole.parent));
+    context.go(
+      Uri(
+        path: AppRouter.getHomeRouteForRole(UserRole.parent),
+        queryParameters: const {'firstParentLogin': '1'},
+      ).toString(),
+    );
   }
 
   /// Phone OTP sign-in implicitly CREATES an Auth user when the number is
@@ -392,7 +397,17 @@ class _PhoneVerifyRecoveryScreenState extends State<PhoneVerifyRecoveryScreen> {
 
     await PhoneVerificationRecoveryService.instance.clear();
     if (!mounted) return;
-    context.go(AppRouter.getHomeRouteForRole(user.role));
+    final route = AppRouter.getHomeRouteForRole(user.role);
+    final firstParentLogin =
+        user.role == UserRole.parent && user.lastLoginAt == null;
+    context.go(
+      firstParentLogin
+          ? Uri(
+              path: route,
+              queryParameters: const {'firstParentLogin': '1'},
+            ).toString()
+          : route,
+    );
   }
 
   /// Teacher email+MFA recovery tail. The email/password account already
@@ -484,7 +499,12 @@ class _PhoneVerifyRecoveryScreenState extends State<PhoneVerifyRecoveryScreen> {
       context.go('/auth/login');
       return;
     }
-    context.go(AppRouter.getHomeRouteForRole(UserRole.parent));
+    context.go(
+      Uri(
+        path: AppRouter.getHomeRouteForRole(UserRole.parent),
+        queryParameters: const {'firstParentLogin': '1'},
+      ).toString(),
+    );
   }
 
   Future<void> _cancel() async {

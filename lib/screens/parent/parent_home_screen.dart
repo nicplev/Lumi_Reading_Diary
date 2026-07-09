@@ -39,6 +39,7 @@ import '../../services/logging_engagement_service.dart';
 import 'reading_history_screen.dart';
 import 'parent_profile_screen.dart';
 import 'widgets/add_email_for_recovery_modal.dart';
+import 'widgets/character_picker_sheet.dart';
 import 'widgets/parent_child_switcher.dart';
 import 'widgets/widget_undo_banner.dart';
 
@@ -51,6 +52,7 @@ class ParentHomeScreen extends ConsumerStatefulWidget {
   final String? widgetChildId;
   final String? widgetAction;
   final String? widgetTapId;
+  final bool promptForCharacterOnEntry;
 
   const ParentHomeScreen({
     super.key,
@@ -58,6 +60,7 @@ class ParentHomeScreen extends ConsumerStatefulWidget {
     this.widgetChildId,
     this.widgetAction,
     this.widgetTapId,
+    this.promptForCharacterOnEntry = false,
   });
 
   @override
@@ -68,6 +71,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     with WidgetsBindingObserver {
   int _selectedIndex = 0;
   bool _handledWidgetDeepLink = false;
+  bool _characterPromptScheduled = false;
 
   void _onCoversUpdated() {
     if (mounted) setState(() {});
@@ -189,6 +193,48 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
       'allocations': allocations,
     });
     context.push('/parent/log-reading');
+  }
+
+  void _scheduleFirstLoginCharacterPrompt(List<StudentModel> children) {
+    if (_characterPromptScheduled || !widget.promptForCharacterOnEntry) return;
+
+    StudentModel? targetChild;
+    for (final child in children) {
+      final characterId = child.characterId?.trim();
+      if (characterId == null || characterId.isEmpty) {
+        targetChild = child;
+        break;
+      }
+    }
+    if (targetChild == null) return;
+
+    final promptChild = targetChild;
+    _characterPromptScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(
+        showCharacterPicker(
+          context,
+          student: promptChild,
+          onChanged: (_) => ref.invalidate(parentChildrenProvider),
+        ).whenComplete(_clearFirstLoginPromptFlag),
+      );
+    });
+  }
+
+  void _clearFirstLoginPromptFlag() {
+    if (!mounted || !widget.promptForCharacterOnEntry) return;
+
+    final uri = GoRouterState.of(context).uri;
+    final queryParameters = Map<String, String>.from(uri.queryParameters);
+    if (queryParameters.remove('firstParentLogin') == null) return;
+
+    final nextUri = Uri(
+      path: uri.path,
+      queryParameters: queryParameters.isEmpty ? null : queryParameters,
+      fragment: uri.fragment.isEmpty ? null : uri.fragment,
+    );
+    context.replace(nextUri.toString());
   }
 
   Future<bool> _hasReadingLogToday(StudentModel student) async {
@@ -332,6 +378,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                 body: _buildNoChildrenView(),
               );
             }
+            _scheduleFirstLoginCharacterPrompt(children);
             final activeChild =
                 ref.watch(activeChildProvider).value ?? children.first;
             _scheduleWidgetDeepLinkHandling(children);
@@ -1218,6 +1265,7 @@ class _MomentumCard extends StatelessWidget {
               totalNights = stats?.totalReadingDays ?? 0;
               currentStreak = stats?.currentStreak ?? 0;
             }
+            final displayedStreak = currentStreak.clamp(0, totalNights);
             final nextGoal = _nextNightsGoal(totalNights);
             final remaining = (nextGoal - totalNights).clamp(0, nextGoal);
             final progress =
@@ -1241,7 +1289,7 @@ class _MomentumCard extends StatelessWidget {
                     const Spacer(),
                     // Streak is gentle and secondary — and only shows when it's
                     // something to celebrate (never a sad "0").
-                    if (currentStreak > 0) ...[
+                    if (displayedStreak > 0) ...[
                       Icon(
                         Icons.local_fire_department,
                         color: LumiTokens.orange.withValues(alpha: 0.85),
@@ -1249,7 +1297,7 @@ class _MomentumCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '$currentStreak-day',
+                        '$displayedStreak-night streak',
                         style:
                             LumiType.body.copyWith(fontWeight: FontWeight.w600),
                       ),

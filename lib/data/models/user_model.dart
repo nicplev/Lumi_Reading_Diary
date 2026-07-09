@@ -26,6 +26,7 @@ class UserModel {
   final String? fcmToken; // For notifications
   final String? phoneNumber; // E.164 format; populated when SMS MFA is enrolled
   final bool phoneVerified;
+  final bool mfaEnabled;
   // For parents: relationship to the child (e.g. Mum, Dad, Grandparent,
   // Guardian, or a free-text value). Used for reading-log attribution and
   // co-parent visibility. Null for legacy parents and non-parent users.
@@ -48,6 +49,7 @@ class UserModel {
     this.fcmToken,
     this.phoneNumber,
     this.phoneVerified = false,
+    this.mfaEnabled = false,
     this.relationshipLabel,
   });
 
@@ -77,6 +79,7 @@ class UserModel {
       fcmToken: data['fcmToken'],
       phoneNumber: data['phoneNumber'],
       phoneVerified: data['phoneVerified'] ?? false,
+      mfaEnabled: data['mfaEnabled'] ?? false,
       relationshipLabel: data['relationshipLabel'],
     );
   }
@@ -99,6 +102,7 @@ class UserModel {
       'fcmToken': fcmToken,
       'phoneNumber': phoneNumber,
       'phoneVerified': phoneVerified,
+      'mfaEnabled': mfaEnabled,
       'relationshipLabel': relationshipLabel,
     };
   }
@@ -120,6 +124,7 @@ class UserModel {
     String? fcmToken,
     String? phoneNumber,
     bool? phoneVerified,
+    bool? mfaEnabled,
     String? relationshipLabel,
   }) {
     return UserModel(
@@ -139,6 +144,7 @@ class UserModel {
       fcmToken: fcmToken ?? this.fcmToken,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       phoneVerified: phoneVerified ?? this.phoneVerified,
+      mfaEnabled: mfaEnabled ?? this.mfaEnabled,
       relationshipLabel: relationshipLabel ?? this.relationshipLabel,
     );
   }

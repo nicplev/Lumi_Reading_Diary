@@ -71,7 +71,11 @@ export {requestSmsVerification} from "./sms_rate_limit";
 // client-side MFA enrollment on unverified emails; the client links the
 // SMS-verified phone and this enrolls it via the Admin SDK. See
 // functions/src/mfa_enrollment.ts.
-export {enrollLinkedPhoneAsMfa} from "./mfa_enrollment";
+export {
+  enrollLinkedPhoneAsMfa,
+  finalizeEmailSignup,
+  syncUserMfaProfileState,
+} from "./mfa_enrollment";
 
 // Phone-primary parent signup finalisation (no MFA enroll). Writes the parent
 // doc + indexes + child link server-side so the client self-create can be

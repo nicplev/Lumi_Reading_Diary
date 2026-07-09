@@ -439,6 +439,82 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
     _focusStageField(prev);
   }
 
+  Future<void> _finishEmailSignup() async {
+    final schoolId = _verifiedSchoolId;
+    if (schoolId == null) return;
+
+    setState(() {
+      _busy = true;
+      _errorMessage = null;
+    });
+
+    final email = _emailController.text.trim().toLowerCase();
+    final password = _passwordController.text;
+    final fullName =
+        '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'
+            .trim();
+
+    try {
+      final cred = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      final user = cred.user!;
+      await user.updateDisplayName(fullName);
+      await user.sendEmailVerification();
+
+      await _smsService.finalizeEmailSignup(
+        role: 'teacher',
+        schoolId: schoolId,
+        schoolCode: _verifiedSchoolCode,
+        fullName: fullName,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _createdTeacher = UserModel(
+          id: user.uid,
+          email: email,
+          fullName: fullName,
+          role: UserRole.teacher,
+          schoolId: schoolId,
+          createdAt: DateTime.now(),
+          lastLoginAt: DateTime.now(),
+        );
+        _stage = _Stage.success;
+      });
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      if (e.code == 'email-already-in-use' ||
+          e.code == 'invalid-email' ||
+          e.code == 'weak-password') {
+        final target =
+            e.code == 'weak-password' ? _Stage.password : _Stage.email;
+        setState(() {
+          _errorMessage = _authErrorMessage(e.code);
+          _stage = target;
+        });
+        _focusStageField(target);
+      } else {
+        setState(() => _errorMessage = SmsVerificationService.friendlyError(e));
+      }
+    } catch (e, st) {
+      if (!mounted) return;
+      var detail = e.toString();
+      if (detail.contains('permission-denied')) {
+        detail =
+            'Firestore permission denied. The security rules may need updating.';
+      } else if (detail.contains('unavailable')) {
+        detail = 'Firebase is temporarily unavailable. Check your connection.';
+      }
+      setState(() => _errorMessage = 'Registration error: $detail');
+      CrashReportingService.instance
+          .recordError(e, st, reason: 'Teacher email registration failed');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   /// Creates the Firebase Auth user (first press) and dispatches an SMS
   /// enrollment code. Re-pressing resends without recreating the account —
   /// resends consult [_pendingUserId] to avoid `email-already-in-use` loops.
@@ -856,6 +932,7 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
   String get _busyLabel => switch (_stage) {
         _Stage.code => 'Verifying school code…',
         _Stage.phone => 'Sending code…',
+        _Stage.confirm => 'Creating account…',
         _Stage.sms => 'Verifying…',
         _ => 'Please wait…',
       };
@@ -967,13 +1044,13 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
         label: 'Password set',
       ));
     }
-    if (_stage.index >= _Stage.phone.index) {
+    if (_stage.index >= _Stage.confirm.index) {
       chips.add(const _CompletedChip(
         key: ValueKey('chip_password_confirmed'),
         label: 'Password confirmed',
       ));
     }
-    if (_stage.index >= _Stage.sms.index) {
+    if (_stage.index >= _Stage.sms.index && _phoneDigits.isNotEmpty) {
       chips.add(_CompletedChip(
         key: const ValueKey('chip_phone'),
         label: 'Phone: $_phoneDigits',
@@ -1317,9 +1394,9 @@ class _TeacherRegistrationCardState extends State<_TeacherRegistrationCard> {
           () => _advance(_Stage.confirm),
         ),
       _Stage.confirm => (
-          'Next',
+          'Create account',
           _confirmValid && !_busy,
-          () => _advance(_Stage.phone),
+          _finishEmailSignup,
         ),
       _Stage.phone => (
           _pendingUserId == null

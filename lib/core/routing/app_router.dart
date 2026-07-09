@@ -255,6 +255,12 @@ class AppRouter {
       ),
 
       GoRoute(
+        path: '/auth/signing-out',
+        name: 'signing-out',
+        builder: (context, state) => const _SigningOutScreen(),
+      ),
+
+      GoRoute(
         path: '/auth/forgot-password',
         name: 'forgot-password',
         builder: (context, state) => const ForgotPasswordScreen(),
@@ -314,6 +320,8 @@ class AppRouter {
             widgetChildId: state.uri.queryParameters['widgetChildId'],
             widgetAction: state.uri.queryParameters['widgetAction'],
             widgetTapId: state.uri.queryParameters['widgetTap'],
+            promptForCharacterOnEntry:
+                state.uri.queryParameters['firstParentLogin'] == '1',
           ),
         ),
       ),
@@ -652,6 +660,19 @@ class AppRouter {
       ),
 
       GoRoute(
+        path: '/teacher/student-achievements/:studentId',
+        name: 'teacher-student-achievements',
+        builder: (context, state) => _studentScopedTeacherRoute(
+          extra: state.extra,
+          studentIdFromPath: state.pathParameters['studentId']!,
+          child: (_, student) => AchievementsScreen(
+            studentId: student.id,
+            schoolId: student.schoolId,
+          ),
+        ),
+      ),
+
+      GoRoute(
         path: '/teacher/student-reading-history/:studentId',
         name: 'teacher-student-reading-history',
         builder: (context, state) => _studentScopedTeacherRoute(
@@ -927,6 +948,32 @@ class _RouteLoadingScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Scaffold(
       body: Center(child: CircularProgressIndicator()),
+    );
+  }
+}
+
+class _SigningOutScreen extends StatelessWidget {
+  const _SigningOutScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(strokeWidth: 3),
+              ),
+              SizedBox(height: 16),
+              Text('Signing out...'),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

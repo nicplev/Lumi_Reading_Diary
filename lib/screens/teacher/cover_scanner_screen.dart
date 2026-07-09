@@ -3,7 +3,8 @@ import 'dart:io';
 
 import 'package:crop_your_image/crop_your_image.dart';
 import 'package:cunning_document_scanner/cunning_document_scanner.dart';
-import 'package:flutter/foundation.dart' show compute, defaultTargetPlatform;
+import 'package:flutter/foundation.dart'
+    show compute, defaultTargetPlatform, visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
@@ -16,6 +17,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../core/models/decodable_grading.dart';
 import '../../core/theme/app_theme.dart';
+import '../../data/models/book_model.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../../data/models/user_model.dart';
@@ -54,6 +56,9 @@ const CoverCaptureFailure _coverSelectionCancelledFailure = CoverCaptureFailure(
 bool useDirectIosDocumentScanner(TargetPlatform platform) {
   return platform == TargetPlatform.iOS;
 }
+
+@visibleForTesting
+Rect fullImageCoverCropRect(Rect viewportRect, Rect imageRect) => imageRect;
 
 @visibleForTesting
 CoverCaptureFailure coverCaptureFailureFor({
@@ -113,8 +118,8 @@ CoverCaptureFailure coverCaptureFailureFor({
 ///
 /// Entry mode for the community book contribution flow.
 enum CommunityBookContributionMode {
-  /// Standalone: cover first → ISBN scan → metadata → save → success screen.
-  coverFirstStandalone,
+  /// Standalone: ISBN scan → found-book prompt or cover → metadata → save.
+  isbnFirstStandalone,
 
   /// Inline from assignment scanner: ISBN already known → cover → metadata → save → pop with result.
   isbnFirstInline,
@@ -142,18 +147,18 @@ class CommunityBookContributionResult {
 }
 
 /// Flow:
-/// 1. Scan book cover using device camera with auto-edge detection
-/// 2. Scan ISBN barcode
+/// 1. Scan ISBN barcode
+/// 2. Reuse existing metadata when available, or scan a cover for new books
 /// 3. Review/edit auto-filled metadata
 /// 4. Upload cover + save to community database
 class CoverScannerScreen extends StatefulWidget {
   const CoverScannerScreen({
     super.key,
     required this.teacher,
-    this.mode = CommunityBookContributionMode.coverFirstStandalone,
+    this.mode = CommunityBookContributionMode.isbnFirstStandalone,
     this.preScannedIsbn,
   }) : assert(
-          mode == CommunityBookContributionMode.coverFirstStandalone ||
+          mode == CommunityBookContributionMode.isbnFirstStandalone ||
               preScannedIsbn != null,
           'preScannedIsbn is required for isbnFirstInline mode',
         );
@@ -167,6 +172,18 @@ class CoverScannerScreen extends StatefulWidget {
 }
 
 enum _ScanStep { coverCapture, coverReview, isbnScan, metadataReview, saving }
+
+enum _StandaloneLookupAction { finish, scanCover }
+
+class _BookMetadataLookupOutcome {
+  const _BookMetadataLookupOutcome({
+    required this.book,
+    required this.existsInCommunity,
+  });
+
+  final BookModel? book;
+  final bool existsInCommunity;
+}
 
 class _CoverScannerScreenState extends State<CoverScannerScreen> {
   final CommunityBookService _communityService = CommunityBookService();
@@ -183,6 +200,9 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
   Uint8List? _coverImageBytes;
   bool _isCropProcessing = false;
   bool _coverWasManuallyCropped = false;
+  bool _coverCropWasAdjusted = false;
+  CropStatus? _coverCropStatus;
+  int _coverEditorRevision = 0;
   int _rotationQuarterTurns = 0;
   final _cropController = CropController();
 
@@ -196,6 +216,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
   final _readingLevelController = TextEditingController();
   bool _isLoadingMetadata = false;
   bool _bookAlreadyExists = false;
+  BookModel? _resolvedLookupBook;
   bool _isDecodableBook = false;
   bool _applyGrade = false;
   GradingSchemaDefinition? _selectedSchemaDef;
@@ -214,17 +235,26 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
   bool get _isInlineMode =>
       widget.mode == CommunityBookContributionMode.isbnFirstInline;
 
+  bool get _canPopImmediately =>
+      _currentStep == _ScanStep.coverCapture ||
+      (_currentStep == _ScanStep.isbnScan &&
+          !_isInlineMode &&
+          _coverImage == null);
+
   @override
   void initState() {
     super.initState();
-    // In inline mode, pre-fill the ISBN so the ISBN scan step is skipped
     if (_isInlineMode && widget.preScannedIsbn != null) {
+      // In inline mode, pre-fill the ISBN so the ISBN scan step is skipped.
       _scannedIsbn = widget.preScannedIsbn;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _startCoverCapture();
+      });
+    } else {
+      _currentStep = _ScanStep.isbnScan;
+      _scannerController = MobileScannerController();
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _startCoverCapture();
-    });
   }
 
   @override
@@ -310,8 +340,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
   }
 
   Future<List<String>?> _captureCoverWithNativeIosDocumentScanner() async {
-    debugPrint(
-        '[CoverScanner] invoking native scanSinglePage via channel '
+    debugPrint('[CoverScanner] invoking native scanSinglePage via channel '
         '${_singlePageScannerChannel.name}');
     final List<dynamic>? pictures;
     try {
@@ -322,19 +351,16 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
         },
       );
     } on MissingPluginException catch (e) {
-      debugPrint(
-          '[CoverScanner] native handler not registered on iOS '
+      debugPrint('[CoverScanner] native handler not registered on iOS '
           '(MissingPluginException): ${e.message}');
       rethrow;
     } on PlatformException catch (e) {
-      debugPrint(
-          '[CoverScanner] native invokeMethod failed: code=${e.code} '
+      debugPrint('[CoverScanner] native invokeMethod failed: code=${e.code} '
           'message=${e.message} details=${e.details}');
       rethrow;
     }
 
-    debugPrint(
-        '[CoverScanner] native scanSinglePage returned '
+    debugPrint('[CoverScanner] native scanSinglePage returned '
         '${pictures == null ? "null" : "${pictures.length} picture(s)"}');
     return pictures?.map((picture) => picture as String).toList();
   }
@@ -363,6 +389,9 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       _coverImageBytes = bytes;
       _rotationQuarterTurns = 0;
       _coverWasManuallyCropped = false;
+      _coverCropWasAdjusted = false;
+      _coverCropStatus = null;
+      _coverEditorRevision++;
       _currentStep = _ScanStep.coverReview;
     });
   }
@@ -469,6 +498,9 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
     setState(() {
       _coverImageBytes = rotated;
       _rotationQuarterTurns = (_rotationQuarterTurns + 1) % 4;
+      _coverCropWasAdjusted = false;
+      _coverCropStatus = null;
+      _coverEditorRevision++;
       _isCropProcessing = false;
     });
   }
@@ -501,10 +533,10 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
 
       setState(() {
         _coverImage = tempFile;
-        _coverWasManuallyCropped = true;
+        _coverWasManuallyCropped = _coverCropWasAdjusted;
         _isCropProcessing = false;
-        if (_isInlineMode) {
-          // ISBN already known — skip barcode scan, go straight to metadata
+        if (_scannedIsbn != null) {
+          // ISBN already known — skip barcode scan, go straight to metadata.
           _currentStep = _ScanStep.metadataReview;
         } else {
           _currentStep = _ScanStep.isbnScan;
@@ -529,6 +561,9 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       _coverImage = null;
       _rotationQuarterTurns = 0;
       _coverWasManuallyCropped = false;
+      _coverCropWasAdjusted = false;
+      _coverCropStatus = null;
+      _coverEditorRevision++;
       _currentStep = _ScanStep.coverCapture;
     });
     _startCoverCapture();
@@ -552,7 +587,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       });
 
       _scannerController?.stop();
-      _loadMetadata(normalized);
+      _loadMetadataAfterStandaloneIsbn(normalized);
       return;
     }
   }
@@ -581,8 +616,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
-              borderSide:
-                  const BorderSide(color: LumiTokens.yellow, width: 2),
+              borderSide: const BorderSide(color: LumiTokens.yellow, width: 2),
             ),
           ),
           autofocus: true,
@@ -611,7 +645,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                 _scannedIsbn = isbn;
               });
               _scannerController?.stop();
-              _loadMetadata(isbn);
+              _loadMetadataAfterStandaloneIsbn(isbn);
             },
             child: const Text('Submit'),
           ),
@@ -622,23 +656,70 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
 
   // ── Step 3: Load & Review Metadata ─────────────────────────────────
 
-  Future<void> _loadMetadata(String isbn) async {
+  Future<void> _loadMetadataAfterStandaloneIsbn(String isbn) async {
+    final outcome = await _loadMetadata(isbn);
+    if (!mounted || _isInlineMode) return;
+
+    final book = outcome.book;
+    if (book == null) {
+      _continueToCoverCapture();
+      return;
+    }
+
+    final action = await _showResolvedBookDialog(
+      book: book,
+      existsInCommunity: outcome.existsInCommunity,
+    );
+    if (!mounted) return;
+
+    switch (action) {
+      case _StandaloneLookupAction.scanCover:
+        _continueToCoverCapture();
+      case _StandaloneLookupAction.finish:
+        Navigator.of(context).pop(true);
+      case null:
+        Navigator.of(context).pop(true);
+    }
+  }
+
+  Future<_BookMetadataLookupOutcome> _loadMetadata(String isbn) async {
     setState(() {
       _isLoadingMetadata = true;
       _currentStep = _ScanStep.metadataReview;
+      _bookAlreadyExists = false;
+      _resolvedLookupBook = null;
+      _titleController.clear();
+      _authorController.clear();
+      _readingLevelController.clear();
     });
 
     // Check if already in community database.
     final existing = await _communityService.lookupByIsbn(isbn);
     if (existing != null) {
+      await _materializeBookToSchoolLibrary(
+        isbn: isbn,
+        book: existing,
+        source: 'community_books',
+      );
+      if (!mounted) {
+        return _BookMetadataLookupOutcome(
+          book: existing,
+          existsInCommunity: true,
+        );
+      }
       setState(() {
         _bookAlreadyExists = true;
+        _resolvedLookupBook = existing;
         _titleController.text = existing.title;
         _authorController.text = existing.author ?? '';
         _readingLevelController.text = existing.readingLevel ?? '';
         _isLoadingMetadata = false;
+        _isProcessingBarcode = false;
       });
-      return;
+      return _BookMetadataLookupOutcome(
+        book: existing,
+        existsInCommunity: true,
+      );
     }
 
     // Try the full lookup chain for auto-fill.
@@ -648,16 +729,126 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       actorId: widget.teacher.id,
     );
 
-    if (!mounted) return;
+    if (!mounted) {
+      return _BookMetadataLookupOutcome(
+        book: result,
+        existsInCommunity: false,
+      );
+    }
 
     setState(() {
       if (result != null) {
+        _resolvedLookupBook = result;
         _titleController.text = result.title;
         _authorController.text = result.author ?? '';
         _readingLevelController.text = result.readingLevel ?? '';
       }
       _isLoadingMetadata = false;
+      _isProcessingBarcode = false;
     });
+    return _BookMetadataLookupOutcome(
+      book: result,
+      existsInCommunity: false,
+    );
+  }
+
+  void _continueToCoverCapture() {
+    _scannerController?.dispose();
+    _scannerController = null;
+    setState(() {
+      _currentStep = _ScanStep.coverCapture;
+      _isOpeningCoverCapture = false;
+      _coverCaptureFailure = null;
+    });
+    _startCoverCapture();
+  }
+
+  Future<_StandaloneLookupAction?> _showResolvedBookDialog({
+    required BookModel book,
+    required bool existsInCommunity,
+  }) {
+    final title =
+        book.title.trim().isNotEmpty ? book.title.trim() : 'This book';
+    final author = book.author?.trim();
+    final message = existsInCommunity
+        ? 'This ISBN is already in the Lumi community database and has been added to your school library.'
+        : 'Lumi found this ISBN and added it to your school library.';
+
+    return showDialog<_StandaloneLookupAction>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+        ),
+        title: Text(
+          existsInCommunity ? 'Book already in Lumi' : 'Book found',
+          style: LumiType.subhead,
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(message, style: LumiType.body),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: LumiType.bodyL.copyWith(fontWeight: FontWeight.w700),
+            ),
+            if (author != null && author.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(author, style: LumiType.caption),
+            ],
+            const SizedBox(height: 8),
+            Text('ISBN ${_scannedIsbn ?? ''}', style: LumiType.caption),
+          ],
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: () =>
+                Navigator.of(ctx).pop(_StandaloneLookupAction.scanCover),
+            icon: const Icon(Icons.add_a_photo_outlined),
+            label: Text(existsInCommunity ? 'Update cover' : 'Scan cover'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: LumiTokens.yellow,
+              foregroundColor: LumiTokens.ink,
+            ),
+            onPressed: () =>
+                Navigator.of(ctx).pop(_StandaloneLookupAction.finish),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _materializeBookToSchoolLibrary({
+    required String isbn,
+    required BookModel book,
+    required String source,
+  }) async {
+    final schoolId = widget.teacher.schoolId?.trim() ?? '';
+    if (schoolId.isEmpty) return;
+
+    await _lookupService.materializeToSchoolLibrary(
+      isbn: isbn,
+      book: book,
+      source: source,
+      schoolId: schoolId,
+      actorId: widget.teacher.id,
+    );
+  }
+
+  void _handleCoverCropStatusChanged(CropStatus status) {
+    _coverCropStatus = status;
+  }
+
+  void _handleCoverCropMoved(Rect _) {
+    if (_coverCropStatus == CropStatus.ready) {
+      _coverCropWasAdjusted = true;
+    }
   }
 
   // ── Step 4: Save ──────────────────────────────────────────────────
@@ -725,6 +916,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       }
 
       // Save book to community database.
+      final effectiveCoverUrl = coverUrl ?? _resolvedLookupBook?.coverImageUrl;
       await _communityService.addBook(
         isbn: _scannedIsbn!,
         title: title,
@@ -753,6 +945,39 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
         },
       );
 
+      if (!_isInlineMode) {
+        await _materializeBookToSchoolLibrary(
+          isbn: _scannedIsbn!,
+          source: 'community_books',
+          book: BookModel(
+            id: 'isbn_${_scannedIsbn!}',
+            title: title,
+            author: _authorController.text.trim().isNotEmpty
+                ? _authorController.text.trim()
+                : null,
+            isbn: _scannedIsbn!,
+            coverImageUrl: effectiveCoverUrl,
+            description: _resolvedLookupBook?.description,
+            genres: _resolvedLookupBook?.genres ?? const [],
+            pageCount: _resolvedLookupBook?.pageCount,
+            publisher: _resolvedLookupBook?.publisher,
+            publishedDate: _resolvedLookupBook?.publishedDate,
+            readingLevel: resolvedReadingLevel,
+            levelSchema: resolvedLevelSchema,
+            createdAt: DateTime.now(),
+            metadata: {
+              ...?_resolvedLookupBook?.metadata,
+              if (_isDecodableBook) 'isDecodable': true,
+              if (_isDecodableBook &&
+                  _applyGrade &&
+                  _selectedSchemaDef != null &&
+                  _selectedSchemaDef!.schema != GradingSchema.custom)
+                'gradingSchema': _selectedSchemaDef!.metadataKey,
+            },
+          ),
+        );
+      }
+
       if (!mounted) return;
 
       if (_isInlineMode) {
@@ -763,7 +988,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
           author: _authorController.text.trim().isNotEmpty
               ? _authorController.text.trim()
               : null,
-          coverImageUrl: coverUrl,
+          coverImageUrl: effectiveCoverUrl,
           coverStoragePath: coverPath,
           bookId: 'isbn_${_scannedIsbn!}',
           readingLevel: resolvedReadingLevel,
@@ -816,6 +1041,9 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       _coverImageBytes = null;
       _rotationQuarterTurns = 0;
       _coverWasManuallyCropped = false;
+      _coverCropWasAdjusted = false;
+      _coverCropStatus = null;
+      _coverEditorRevision++;
       _isCropProcessing = false;
       _scannedIsbn = null;
       _isOpeningCoverCapture = false;
@@ -826,6 +1054,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       _readingLevelController.clear();
       _isLoadingMetadata = false;
       _bookAlreadyExists = false;
+      _resolvedLookupBook = null;
       _isDecodableBook = false;
       _applyGrade = false;
       _selectedSchemaDef = null;
@@ -834,9 +1063,15 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       _isSaving = false;
       _saveError = null;
       _saveSuccess = false;
-      _currentStep = _ScanStep.coverCapture;
+      _currentStep =
+          _isInlineMode ? _ScanStep.coverCapture : _ScanStep.isbnScan;
     });
-    _startCoverCapture();
+    if (_isInlineMode) {
+      _startCoverCapture();
+    } else {
+      _scannerController = MobileScannerController();
+      setState(() {});
+    }
   }
 
   // ── Build ─────────────────────────────────────────────────────────
@@ -844,19 +1079,24 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: _currentStep == _ScanStep.coverCapture,
+      canPop: _canPopImmediately,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
         switch (_currentStep) {
           case _ScanStep.coverReview:
             _retakeCover();
           case _ScanStep.isbnScan:
-            _scannerController?.dispose();
-            _scannerController = null;
-            setState(() => _currentStep = _ScanStep.coverReview);
+            if (!_isInlineMode && _coverImage == null) {
+              _scannerController?.dispose();
+              _scannerController = null;
+              Navigator.of(context).pop();
+            } else {
+              _scannerController?.dispose();
+              _scannerController = null;
+              setState(() => _currentStep = _ScanStep.coverReview);
+            }
           case _ScanStep.metadataReview:
-            if (_isInlineMode) {
-              // In inline mode, back goes to cover review (ISBN is fixed)
+            if (_coverImage != null) {
               setState(() => _currentStep = _ScanStep.coverReview);
             } else {
               setState(() {
@@ -864,6 +1104,11 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                 _isProcessingBarcode = false;
                 _currentStep = _ScanStep.isbnScan;
                 _scannerController = MobileScannerController();
+                _bookAlreadyExists = false;
+                _resolvedLookupBook = null;
+                _titleController.clear();
+                _authorController.clear();
+                _readingLevelController.clear();
               });
             }
           case _ScanStep.saving:
@@ -903,12 +1148,10 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
               : LumiTokens.ink,
         ),
       ),
-      backgroundColor: _currentStep == _ScanStep.isbnScan
-          ? Colors.black
-          : LumiTokens.cream,
-      foregroundColor: _currentStep == _ScanStep.isbnScan
-          ? Colors.white
-          : LumiTokens.ink,
+      backgroundColor:
+          _currentStep == _ScanStep.isbnScan ? Colors.black : LumiTokens.cream,
+      foregroundColor:
+          _currentStep == _ScanStep.isbnScan ? Colors.white : LumiTokens.ink,
       elevation: 0,
     );
   }
@@ -1024,7 +1267,8 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                         borderRadius:
                             BorderRadius.circular(LumiTokens.radiusPill),
                       ),
-                      textStyle: LumiType.button.copyWith(color: LumiTokens.ink),
+                      textStyle:
+                          LumiType.button.copyWith(color: LumiTokens.ink),
                     ),
                     icon: const Icon(Icons.camera_alt_outlined,
                         color: LumiTokens.yellow),
@@ -1042,7 +1286,8 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                     style: TextButton.styleFrom(
                       foregroundColor: LumiTokens.ink,
                       minimumSize: const Size.fromHeight(44),
-                      textStyle: LumiType.button.copyWith(color: LumiTokens.ink),
+                      textStyle:
+                          LumiType.button.copyWith(color: LumiTokens.ink),
                     ),
                     icon: const Icon(Icons.photo_library_outlined,
                         color: LumiTokens.yellow),
@@ -1075,12 +1320,16 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Crop(
+                  key: ValueKey(_coverEditorRevision),
                   image: _coverImageBytes!,
                   controller: _cropController,
                   withCircleUi: false,
-                  initialSize: 0.9,
+                  initialRectBuilder: fullImageCoverCropRect,
                   baseColor: LumiTokens.cream,
                   maskColor: Colors.black54,
+                  clipBehavior: Clip.none,
+                  onMoved: _handleCoverCropMoved,
+                  onStatusChanged: _handleCoverCropStatusChanged,
                   onCropped: _onCoverCropped,
                 ),
               ),
@@ -1150,8 +1399,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
             child: Container(
               color: Colors.black26,
               child: const Center(
-                child:
-                    CircularProgressIndicator(color: LumiTokens.yellow),
+                child: CircularProgressIndicator(color: LumiTokens.yellow),
               ),
             ),
           ),
@@ -1314,8 +1562,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline,
-                      color: LumiTokens.blue, size: 20),
+                  Icon(Icons.info_outline, color: LumiTokens.blue, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -1340,8 +1587,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                   children: [
                     const CircularProgressIndicator(color: LumiTokens.yellow),
                     const SizedBox(height: 12),
-                    Text('Looking up book details...',
-                        style: LumiType.body),
+                    Text('Looking up book details...', style: LumiType.body),
                   ],
                 ),
               ),
@@ -1379,7 +1625,8 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                 decoration: BoxDecoration(
                   color: LumiTokens.red.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: LumiTokens.red.withValues(alpha: 0.3)),
+                  border:
+                      Border.all(color: LumiTokens.red.withValues(alpha: 0.3)),
                 ),
                 child: Text(
                   _saveError!,
@@ -1484,17 +1731,14 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
             // Description banner for selected schema
             Container(
               width: double.infinity,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: LumiTokens.yellow.withValues(alpha: 0.14),
-                borderRadius:
-                    BorderRadius.circular(LumiTokens.radiusSmall),
+                borderRadius: BorderRadius.circular(LumiTokens.radiusSmall),
               ),
               child: Text(
                 _selectedSchemaDef!.description,
-                style: LumiType.caption
-                    .copyWith(color: LumiTokens.ink),
+                style: LumiType.caption.copyWith(color: LumiTokens.ink),
               ),
             ),
             const SizedBox(height: 12),
@@ -1563,8 +1807,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: gradingSchemas.map((def) {
-              final isSelected =
-                  _selectedSchemaDef?.schema == def.schema;
+              final isSelected = _selectedSchemaDef?.schema == def.schema;
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: _SchemaChip(
@@ -1646,8 +1889,8 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       decoration: InputDecoration(
         labelText: 'Grade label',
         hintText: 'e.g. Set 3, Unit 12, Phase 5',
-        prefixIcon: Icon(Icons.edit_outlined,
-            color: LumiTokens.muted, size: 20),
+        prefixIcon:
+            Icon(Icons.edit_outlined, color: LumiTokens.muted, size: 20),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
           borderSide: BorderSide(color: LumiTokens.rule),
@@ -1658,8 +1901,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
-          borderSide:
-              const BorderSide(color: LumiTokens.yellow, width: 2),
+          borderSide: const BorderSide(color: LumiTokens.yellow, width: 2),
         ),
         filled: true,
         fillColor: LumiTokens.paper,
@@ -1690,8 +1932,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
-          borderSide:
-              const BorderSide(color: LumiTokens.yellow, width: 2),
+          borderSide: const BorderSide(color: LumiTokens.yellow, width: 2),
         ),
         filled: true,
         fillColor: LumiTokens.paper,
@@ -1788,7 +2029,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
               width: double.infinity,
               height: 52,
               child: OutlinedButton(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () => Navigator.of(context).pop(true),
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: LumiTokens.ink),
                   shape: RoundedRectangleBorder(
@@ -1837,8 +2078,7 @@ class _SchemaChip extends StatelessWidget {
           color: selected ? LumiTokens.yellow : LumiTokens.paper,
           borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
           border: Border.all(
-            color:
-                selected ? LumiTokens.yellow : LumiTokens.rule,
+            color: selected ? LumiTokens.yellow : LumiTokens.rule,
             width: selected ? 2 : 1,
           ),
         ),
@@ -1846,8 +2086,7 @@ class _SchemaChip extends StatelessWidget {
           schemaDef.displayName,
           style: TextStyle(
             fontSize: 13,
-            fontWeight:
-                selected ? FontWeight.w600 : FontWeight.w500,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
             color: selected ? LumiTokens.ink : LumiTokens.muted,
           ),
         ),
@@ -1884,8 +2123,7 @@ class _LevelChip extends StatelessWidget {
           color: selected ? LumiTokens.yellow : LumiTokens.paper,
           borderRadius: BorderRadius.circular(LumiTokens.radiusSmall),
           border: Border.all(
-            color:
-                selected ? LumiTokens.yellow : LumiTokens.rule,
+            color: selected ? LumiTokens.yellow : LumiTokens.rule,
             width: selected ? 2 : 1,
           ),
         ),
@@ -1910,8 +2148,7 @@ class _LevelChip extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w400,
-                  color:
-                      selected ? LumiTokens.charcoal : LumiTokens.muted,
+                  color: selected ? LumiTokens.charcoal : LumiTokens.muted,
                 ),
               ),
             ],
@@ -1965,8 +2202,7 @@ class _BookTypeChip extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 14,
-                fontWeight:
-                    selected ? FontWeight.w600 : FontWeight.w400,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                 color: selected ? LumiTokens.ink : LumiTokens.muted,
               ),
             ),

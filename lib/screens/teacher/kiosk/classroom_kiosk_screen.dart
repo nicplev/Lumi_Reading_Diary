@@ -2,14 +2,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 
+import '../../../core/auth/sign_out_flow.dart';
 import '../../../core/widgets/lumi/lumi_buttons.dart';
 import '../../../core/widgets/lumi/student_avatar.dart';
 import '../../../data/models/class_model.dart';
 import '../../../data/models/student_model.dart';
 import '../../../data/models/user_model.dart';
-import '../../../services/firebase_service.dart';
 import '../../../services/isbn_assignment_service.dart';
 import '../../../services/kiosk_pin_service.dart';
 import '../../../theme/lumi_tokens.dart';
@@ -232,8 +231,8 @@ class _ClassroomKioskScreenState extends State<ClassroomKioskScreen> {
     if (confirm != true || !mounted) return;
 
     await KioskPinService.instance.clearPin(_teacherId);
-    await FirebaseService.instance.signOut();
-    if (mounted) context.go('/auth/login');
+    if (!mounted) return;
+    await signOutAndNavigateToLogin(context);
   }
 
   Future<void> _confirmExit() async {

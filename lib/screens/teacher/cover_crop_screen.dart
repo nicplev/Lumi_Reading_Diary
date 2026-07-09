@@ -21,10 +21,13 @@ class CoverCropScreen extends StatefulWidget {
   State<CoverCropScreen> createState() => _CoverCropScreenState();
 }
 
+Rect _fullImageCropRect(Rect viewportRect, Rect imageRect) => imageRect;
+
 class _CoverCropScreenState extends State<CoverCropScreen> {
   late Uint8List _bytes;
   final _cropController = CropController();
   bool _isProcessing = false;
+  int _cropRevision = 0;
 
   @override
   void initState() {
@@ -39,6 +42,7 @@ class _CoverCropScreenState extends State<CoverCropScreen> {
     if (!mounted) return;
     setState(() {
       _bytes = rotated;
+      _cropRevision++;
       _isProcessing = false;
     });
   }
@@ -62,7 +66,8 @@ class _CoverCropScreenState extends State<CoverCropScreen> {
       if (!mounted) return;
       setState(() => _isProcessing = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to process image. Please try again.')),
+        const SnackBar(
+            content: Text('Failed to process image. Please try again.')),
       );
     }
   }
@@ -82,11 +87,13 @@ class _CoverCropScreenState extends State<CoverCropScreen> {
         backgroundColor: AppColors.white,
         elevation: 0,
         leading: TextButton(
-          onPressed: _isProcessing ? null : () => Navigator.of(context).pop(null),
+          onPressed:
+              _isProcessing ? null : () => Navigator.of(context).pop(null),
           child: Text(
             'Cancel',
             style: TeacherTypography.bodyMedium.copyWith(
-              color: _isProcessing ? AppColors.textSecondary : AppColors.charcoal,
+              color:
+                  _isProcessing ? AppColors.textSecondary : AppColors.charcoal,
             ),
           ),
         ),
@@ -102,12 +109,14 @@ class _CoverCropScreenState extends State<CoverCropScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Crop(
+                    key: ValueKey(_cropRevision),
                     image: _bytes,
                     controller: _cropController,
                     withCircleUi: false,
-                    initialSize: 0.9,
+                    initialRectBuilder: _fullImageCropRect,
                     baseColor: AppColors.teacherBackground,
                     maskColor: Colors.black54,
+                    clipBehavior: Clip.none,
                     onCropped: _onCropped,
                   ),
                 ),
@@ -156,7 +165,8 @@ class _CoverCropScreenState extends State<CoverCropScreen> {
             const ColoredBox(
               color: Colors.black26,
               child: Center(
-                child: CircularProgressIndicator(color: AppColors.teacherPrimary),
+                child:
+                    CircularProgressIndicator(color: AppColors.teacherPrimary),
               ),
             ),
         ],

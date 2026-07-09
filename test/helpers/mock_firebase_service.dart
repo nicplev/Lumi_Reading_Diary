@@ -21,5 +21,16 @@ class MockFirebaseService extends Mock implements FirebaseService {
 
   @override
   FirebaseAuth get auth => _mockAuth;
-}
 
+  @override
+  Future<void> signOut({Future<void> Function()? afterAuthSignOut}) =>
+      super.noSuchMethod(
+        Invocation.method(
+          #signOut,
+          const [],
+          {#afterAuthSignOut: afterAuthSignOut},
+        ),
+        returnValue: Future<void>.value(),
+        returnValueForMissingStub: Future<void>.value(),
+      ) as Future<void>;
+}

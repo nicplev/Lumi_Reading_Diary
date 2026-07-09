@@ -10,6 +10,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/widgets.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../core/models/service_status.dart';
 import '../core/services/service_status_controller.dart';
@@ -109,6 +110,14 @@ class OfflineService with WidgetsBindingObserver {
   /// FirebaseAuth. When set, it replaces the real forced ID-token refresh.
   @visibleForTesting
   Future<void> Function()? tokenRefreshForTest;
+
+  Directory? _pendingAudioDirectoryOverride;
+
+  /// Override the queue-owned audio directory so specs can exercise file
+  /// preservation without relying on the platform path_provider channel.
+  @visibleForTesting
+  set pendingComprehensionAudioDirectoryForTest(Directory? directory) =>
+      _pendingAudioDirectoryOverride = directory;
 
   /// Replays an allocation assignment that was queued offline. Registered at
   /// startup by IsbnAssignmentService (inverting the dependency so this
@@ -244,6 +253,8 @@ class OfflineService with WidgetsBindingObserver {
       await _pendingSyncBox.clear();
       await _settingsBox.clear();
       await _logDraftsBox.clear();
+      await _deleteAllQueuedComprehensionAudioFiles();
+      await _clearPendingComprehensionAudioDirectory();
       _syncQueue.clear();
       _retryTimer?.cancel();
       await _clearHistory();
@@ -358,6 +369,10 @@ class OfflineService with WidgetsBindingObserver {
   /// Manually drop a parked item the user has acknowledged. The only path by
   /// which a queued write ever leaves the queue without syncing.
   Future<void> dismissPending(String id) async {
+    final removed = _syncQueue.where((it) => it.id == id).toList();
+    for (final item in removed) {
+      await _deleteQueuedComprehensionAudioFile(item);
+    }
     _syncQueue.removeWhere((it) => it.id == id);
     if (_initialized) await _pendingSyncBox.delete(id);
     _broadcastQueue();
@@ -504,21 +519,129 @@ class OfflineService with WidgetsBindingObserver {
     required String localFilePath,
     required int durationSec,
   }) async {
+    final createdAt = DateTime.now();
+    final data = <String, dynamic>{
+      'logId': logId,
+      'schoolId': schoolId,
+      'studentId': studentId,
+      'storagePath': storagePath,
+      'localFilePath': localFilePath,
+      'originalLocalFilePath': localFilePath,
+      'durationSec': durationSec,
+      'audioFileManagedByQueue': false,
+    };
+
+    var needsAttention = false;
+    String? lastError;
+    try {
+      data['localFilePath'] = await _copyComprehensionAudioIntoQueue(
+        logId: logId,
+        localFilePath: localFilePath,
+      );
+      data['audioFileManagedByQueue'] = true;
+    } on ComprehensionAudioMissingException catch (e) {
+      // There is nothing recoverable to upload, but preserve a parked queue
+      // item so the parent sees that the recording did not sync.
+      needsAttention = true;
+      lastError = _describeError(e);
+    }
+
     final sync = PendingSync(
       id: 'audio_$logId',
       type: SyncType.comprehensionAudioUpload,
       action: SyncAction.create,
-      data: {
-        'logId': logId,
-        'schoolId': schoolId,
-        'studentId': studentId,
-        'storagePath': storagePath,
-        'localFilePath': localFilePath,
-        'durationSec': durationSec,
-      },
-      createdAt: DateTime.now(),
+      data: data,
+      createdAt: createdAt,
+      lastAttemptAt: needsAttention ? createdAt : null,
+      lastError: lastError,
+      needsAttention: needsAttention,
     );
+    await _replaceComprehensionAudioSync(sync);
+  }
+
+  Future<Directory> _pendingComprehensionAudioDirectory() async {
+    final override = _pendingAudioDirectoryOverride;
+    if (override != null) {
+      if (!await override.exists()) await override.create(recursive: true);
+      return override;
+    }
+    final supportDir = await getApplicationSupportDirectory();
+    final dir = Directory(
+      '${supportDir.path}${Platform.pathSeparator}pending_comprehension_audio',
+    );
+    if (!await dir.exists()) await dir.create(recursive: true);
+    return dir;
+  }
+
+  Future<String> _copyComprehensionAudioIntoQueue({
+    required String logId,
+    required String localFilePath,
+  }) async {
+    final source = File(localFilePath);
+    if (!await source.exists()) {
+      throw const ComprehensionAudioMissingException();
+    }
+
+    final dir = await _pendingComprehensionAudioDirectory();
+    final safeLogId = _safeFilePart(logId);
+    final filename =
+        'audio_${safeLogId}_${DateTime.now().microsecondsSinceEpoch}.m4a';
+    final destination = File('${dir.path}${Platform.pathSeparator}$filename');
+    await source.copy(destination.path);
+    return destination.path;
+  }
+
+  @visibleForTesting
+  Future<String> copyComprehensionAudioIntoQueueForTest({
+    required String logId,
+    required String localFilePath,
+  }) =>
+      _copyComprehensionAudioIntoQueue(
+        logId: logId,
+        localFilePath: localFilePath,
+      );
+
+  Future<void> _replaceComprehensionAudioSync(PendingSync sync) async {
+    final existing = _syncQueue.where((it) => it.id == sync.id).toList();
+    for (final item in existing) {
+      await _deleteQueuedComprehensionAudioFile(item);
+    }
+    _syncQueue.removeWhere((it) => it.id == sync.id);
+    if (_initialized) await _pendingSyncBox.delete(sync.id);
     await _enqueueAndPersist(sync);
+  }
+
+  Future<void> _deleteQueuedComprehensionAudioFile(PendingSync item) async {
+    if (item.type != SyncType.comprehensionAudioUpload) return;
+    if (item.data['audioFileManagedByQueue'] != true) return;
+    final path = item.data['localFilePath'] as String?;
+    if (path == null || path.isEmpty) return;
+    try {
+      final file = File(path);
+      if (await file.exists()) await file.delete();
+    } catch (e) {
+      debugPrint('[CompAudioSync] failed to delete queued audio copy: $e');
+    }
+  }
+
+  Future<void> _deleteAllQueuedComprehensionAudioFiles() async {
+    for (final item in List<PendingSync>.from(_syncQueue)) {
+      await _deleteQueuedComprehensionAudioFile(item);
+    }
+  }
+
+  Future<void> _clearPendingComprehensionAudioDirectory() async {
+    try {
+      final dir = await _pendingComprehensionAudioDirectory();
+      if (await dir.exists()) await dir.delete(recursive: true);
+    } catch (e) {
+      debugPrint('[CompAudioSync] failed to clear pending audio directory: $e');
+    }
+  }
+
+  String _safeFilePart(String value) {
+    final safe = value.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+    return safe.isEmpty ? 'log' : safe;
   }
 
   /// Queue a comment-thread reply composed offline. Keyed by `commentId` so
@@ -771,6 +894,10 @@ class OfflineService with WidgetsBindingObserver {
 
       // Remove only confirmed items from queue and storage.
       for (final id in syncedItems) {
+        final removed = _syncQueue.where((it) => it.id == id).toList();
+        for (final item in removed) {
+          await _deleteQueuedComprehensionAudioFile(item);
+        }
         _syncQueue.removeWhere((it) => it.id == id);
         await _pendingSyncBox.delete(id);
       }
@@ -985,11 +1112,27 @@ class OfflineService with WidgetsBindingObserver {
       throw Exception('Missing fields for comprehension audio upload sync');
     }
 
-    final file = File(localFilePath);
+    var file = File(localFilePath);
     if (!file.existsSync()) {
-      // Local source vanished — surface to user via needsAttention rather
-      // than retry forever.
-      throw const ComprehensionAudioMissingException();
+      final originalPath = data['originalLocalFilePath'] as String?;
+      final originalFile = originalPath != null && originalPath != localFilePath
+          ? File(originalPath)
+          : null;
+      if (originalFile != null && originalFile.existsSync()) {
+        final queuedPath = await _copyComprehensionAudioIntoQueue(
+          logId: logId,
+          localFilePath: originalFile.path,
+        );
+        data['localFilePath'] = queuedPath;
+        data['audioFileManagedByQueue'] = true;
+        pendingSync.contentHash = PendingSync.computeContentHash(data);
+        await _persistItem(pendingSync);
+        file = File(queuedPath);
+      } else {
+        // Local source vanished — surface to user via needsAttention rather
+        // than retry forever.
+        throw const ComprehensionAudioMissingException();
+      }
     }
 
     try {
@@ -1357,6 +1500,9 @@ class OfflineService with WidgetsBindingObserver {
       final msg = error.message;
       return msg == null || msg.isEmpty ? error.code : '${error.code}: $msg';
     }
+    if (error is ComprehensionAudioMissingException) {
+      return 'The recording file is no longer available on this device.';
+    }
     if (error is TimeoutException) return 'Timed out';
     return error.toString();
   }
@@ -1416,6 +1562,8 @@ class OfflineService with WidgetsBindingObserver {
     await _allocationsBox.clear();
     await _pendingSyncBox.clear();
     await _logDraftsBox.clear();
+    await _deleteAllQueuedComprehensionAudioFiles();
+    await _clearPendingComprehensionAudioDirectory();
     _syncQueue.clear();
     _retryTimer?.cancel();
     await _clearHistory();

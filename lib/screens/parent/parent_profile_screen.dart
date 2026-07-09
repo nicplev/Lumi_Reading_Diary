@@ -3,22 +3,25 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/auth/sign_out_flow.dart';
 import '../../core/config/dev_access.dart';
 import '../../core/services/app_icon_service.dart';
 import '../../core/services/dev_access_service.dart';
+import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
 import '../../core/widgets/lumi/feedback_widget.dart';
 import '../../core/widgets/lumi/legal_links_row.dart';
-import '../../core/widgets/lumi_mascot.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/providers/active_child_provider.dart';
 import '../../core/services/service_status_controller.dart';
 import '../../services/firebase_service.dart';
+import '../../services/mfa_settings_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/offline_service.dart';
+import '../settings/mfa_settings_sheet.dart';
 import 'widgets/add_email_for_recovery_modal.dart';
 import 'settings/child_manage_sheet.dart';
 
@@ -38,6 +41,7 @@ class ParentProfileScreen extends ConsumerStatefulWidget {
 
 class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
   final FirebaseService _firebaseService = FirebaseService.instance;
+  final MfaSettingsService _mfaSettingsService = MfaSettingsService();
 
   /// Dev-access flag — gates surfaces still in development (see the teacher
   /// settings screen for the same pattern). Source of truth is the
@@ -52,6 +56,8 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
   // migrates that to all 7 so it round-trips under this explicit-list model.)
   List<int> _reminderDays = [1, 2, 3, 4];
   List<StudentModel> _linkedChildren = [];
+  MfaStatus? _mfaStatus;
+  bool _mfaStatusLoading = true;
   // Local copy of the parent's relationship label so edits reflect immediately
   // without needing the upstream UserModel to refresh.
   String? _relationshipLabel;
@@ -66,6 +72,7 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
     _linkedChildren =
         ref.read(parentChildrenProvider).value ?? const <StudentModel>[];
     _loadPreferences();
+    _loadMfaStatus();
     // Rebuild if dev-access flips (e.g. the Firestore lookup resolves after a
     // session resume, or a super-admin grants/revokes access).
     _devAccess.addListener(_onDevAccessChanged);
@@ -79,6 +86,36 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
 
   void _onDevAccessChanged() {
     if (mounted) setState(() {});
+  }
+
+  Future<void> _loadMfaStatus() async {
+    setState(() => _mfaStatusLoading = true);
+    try {
+      final status = await _mfaSettingsService.loadStatus();
+      if (mounted) setState(() => _mfaStatus = status);
+    } catch (_) {
+      if (mounted) setState(() => _mfaStatus = null);
+    } finally {
+      if (mounted) setState(() => _mfaStatusLoading = false);
+    }
+  }
+
+  String get _mfaStatusLabel {
+    if (_mfaStatusLoading) return 'Checking';
+    final status = _mfaStatus;
+    if (status == null) return 'Set';
+    if (status.enabled) return 'On';
+    if (status.hasPhonePrimary && !status.hasEmailPrimary) return 'SMS sign-in';
+    return 'Off';
+  }
+
+  Future<void> _openMfaSettings() async {
+    final changed = await showMfaSettingsSheet(
+      context: context,
+      user: widget.user,
+      accentColor: LumiTokens.green,
+    );
+    if (changed == true) await _loadMfaStatus();
   }
 
   void _loadPreferences() {
@@ -148,6 +185,18 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
     }
   }
 
+  Future<void> _pickReminderTime() async {
+    final picked = await showModalBottomSheet<TimeOfDay>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _LumiReminderTimePicker(initialTime: _reminderTime),
+    );
+    if (picked == null || picked == _reminderTime || !mounted) return;
+    setState(() => _reminderTime = picked);
+    await _updatePreferences();
+  }
+
   Future<void> _handleSignOut() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -157,8 +206,8 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
           borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
         ),
         title: Text('Sign out', style: LumiType.subhead),
-        content: Text('Are you sure you want to sign out?',
-            style: LumiType.body),
+        content:
+            Text('Are you sure you want to sign out?', style: LumiType.body),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -168,16 +217,19 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: Text('Sign out',
-                style: LumiType.body
-                    .copyWith(color: LumiTokens.red, fontWeight: FontWeight.w700)),
+                style: LumiType.body.copyWith(
+                    color: LumiTokens.red, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
     );
 
     if (confirm == true) {
-      await _firebaseService.signOut();
-      if (mounted) context.go('/auth/login');
+      if (!mounted) return;
+      await signOutAndNavigateToLogin(
+        context,
+        firebaseService: _firebaseService,
+      );
     }
   }
 
@@ -295,6 +347,13 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
             title: 'Relationship',
             value: label == null || label.isEmpty ? 'Set' : label,
             onTap: _editRelationship,
+          ),
+          _SettingsRow(
+            icon: Icons.shield_outlined,
+            title: 'SMS verification',
+            subtitle: 'Optional extra sign-in check',
+            value: _mfaStatusLabel,
+            onTap: _openMfaSettings,
           ),
           if ((widget.user.email ?? '').isEmpty)
             _SettingsRow(
@@ -445,8 +504,7 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
                 Expanded(
                   child: Text(
                     'Reading reminders',
-                    style:
-                        LumiType.body.copyWith(fontWeight: FontWeight.w600),
+                    style: LumiType.body.copyWith(fontWeight: FontWeight.w600),
                   ),
                 ),
                 Switch.adaptive(
@@ -493,16 +551,7 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
                 Text('Remind me at', style: LumiType.body),
                 const SizedBox(width: LumiTokens.space3),
                 GestureDetector(
-                  onTap: () async {
-                    final picked = await showTimePicker(
-                      context: context,
-                      initialTime: _reminderTime,
-                    );
-                    if (picked != null && picked != _reminderTime) {
-                      setState(() => _reminderTime = picked);
-                      _updatePreferences();
-                    }
-                  },
+                  onTap: _pickReminderTime,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: LumiTokens.space3,
@@ -510,7 +559,8 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
                     ),
                     decoration: BoxDecoration(
                       color: LumiTokens.green,
-                      borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+                      borderRadius:
+                          BorderRadius.circular(LumiTokens.radiusPill),
                     ),
                     child: Text(
                       _reminderTime.format(context),
@@ -556,7 +606,8 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
                     height: 38,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: isSelected ? LumiTokens.green : LumiTokens.tintGreen,
+                      color:
+                          isSelected ? LumiTokens.green : LumiTokens.tintGreen,
                       shape: BoxShape.circle,
                     ),
                     child: Text(
@@ -628,7 +679,8 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
     } else if (names.length == 2) {
       who = '${names[0]} and ${names[1]}';
     } else {
-      who = '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
+      who =
+          '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
     }
     return "Don't forget to log $who's reading today!";
   }
@@ -726,7 +778,8 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
   Future<void> _editRelationship() async {
     final saved = await showDialog<String>(
       context: context,
-      builder: (context) => _RelationshipPicker(initialLabel: _relationshipLabel),
+      builder: (context) =>
+          _RelationshipPicker(initialLabel: _relationshipLabel),
     );
     if (saved == null || saved == _relationshipLabel) return;
     setState(() => _relationshipLabel = saved);
@@ -764,7 +817,11 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const LumiMascot(variant: LumiVariant.parent, size: 96),
+              Image.asset(
+                'assets/staff_characters/la_green.png',
+                height: 112,
+                fit: BoxFit.contain,
+              ),
               const SizedBox(height: LumiTokens.space4),
               Text('Lumi Reading Diary', style: LumiType.subhead),
               const SizedBox(height: LumiTokens.space1),
@@ -972,6 +1029,400 @@ class _HeaderChip extends StatelessWidget {
   }
 }
 
+class _LumiReminderTimePicker extends StatefulWidget {
+  final TimeOfDay initialTime;
+
+  const _LumiReminderTimePicker({required this.initialTime});
+
+  @override
+  State<_LumiReminderTimePicker> createState() =>
+      _LumiReminderTimePickerState();
+}
+
+class _LumiReminderTimePickerState extends State<_LumiReminderTimePicker> {
+  late int _hour = widget.initialTime.hour;
+  late int _minute = widget.initialTime.minute;
+
+  bool get _isPm => _hour >= 12;
+
+  int get _displayHour {
+    final hour = _hour % 12;
+    return hour == 0 ? 12 : hour;
+  }
+
+  String get _minuteLabel => _minute.toString().padLeft(2, '0');
+  TimeOfDay get _selected => TimeOfDay(hour: _hour, minute: _minute);
+
+  void _setDisplayHour(int hour) {
+    final wrapped = ((hour - 1) % 12) + 1;
+    setState(() {
+      if (_isPm) {
+        _hour = wrapped == 12 ? 12 : wrapped + 12;
+      } else {
+        _hour = wrapped == 12 ? 0 : wrapped;
+      }
+    });
+  }
+
+  void _adjustHour(int delta) => _setDisplayHour(_displayHour + delta);
+
+  void _adjustMinute(int delta) {
+    setState(() => _minute = (_minute + delta) % 60);
+    if (_minute < 0) setState(() => _minute += 60);
+  }
+
+  void _setMinute(int minute) {
+    setState(() => _minute = minute.clamp(0, 59));
+  }
+
+  void _setPeriod(bool pm) {
+    final display = _displayHour;
+    setState(() {
+      if (pm) {
+        _hour = display == 12 ? 12 : display + 12;
+      } else {
+        _hour = display == 12 ? 0 : display;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
+    return SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        child: Container(
+          decoration: const BoxDecoration(
+            color: LumiTokens.paper,
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(LumiTokens.radiusXL),
+            ),
+          ),
+          padding: EdgeInsets.fromLTRB(
+            LumiTokens.space5,
+            LumiTokens.space2,
+            LumiTokens.space5,
+            bottomPadding + LumiTokens.space5,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: LumiTokens.rule,
+                    borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+                  ),
+                ),
+              ),
+              const SizedBox(height: LumiTokens.space4),
+              Text(
+                'Reminder time',
+                textAlign: TextAlign.center,
+                style: LumiType.subhead,
+              ),
+              const SizedBox(height: LumiTokens.space4),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: LumiTokens.space4,
+                  vertical: LumiTokens.space3,
+                ),
+                decoration: BoxDecoration(
+                  color: LumiTokens.tintGreen,
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+                ),
+                child: Text(
+                  _selected.format(context),
+                  textAlign: TextAlign.center,
+                  style: LumiType.heading.copyWith(
+                    color: LumiTokens.ink,
+                    fontSize: 34,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(height: LumiTokens.space4),
+              _PeriodSegmentedControl(
+                isPm: _isPm,
+                onChanged: _setPeriod,
+              ),
+              const SizedBox(height: LumiTokens.space4),
+              Row(
+                children: [
+                  Expanded(
+                    child: _TimeStepper(
+                      label: 'Hour',
+                      value: _displayHour.toString(),
+                      onDecrease: () => _adjustHour(-1),
+                      onIncrease: () => _adjustHour(1),
+                    ),
+                  ),
+                  const SizedBox(width: LumiTokens.space3),
+                  Expanded(
+                    child: _TimeStepper(
+                      label: 'Minutes',
+                      value: _minuteLabel,
+                      onDecrease: () => _adjustMinute(-1),
+                      onIncrease: () => _adjustMinute(1),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: LumiTokens.space3),
+              Wrap(
+                spacing: LumiTokens.space2,
+                runSpacing: LumiTokens.space2,
+                alignment: WrapAlignment.center,
+                children: [
+                  for (final minute in const [0, 15, 30, 45])
+                    _MinuteChip(
+                      minute: minute,
+                      selected: _minute == minute,
+                      onTap: () => _setMinute(minute),
+                    ),
+                ],
+              ),
+              const SizedBox(height: LumiTokens.space5),
+              Row(
+                children: [
+                  Expanded(
+                    child: LumiTextButton(
+                      onPressed: () => Navigator.pop(context),
+                      text: 'Cancel',
+                      color: LumiTokens.muted,
+                    ),
+                  ),
+                  const SizedBox(width: LumiTokens.space3),
+                  Expanded(
+                    child: LumiPrimaryButton(
+                      onPressed: () => Navigator.pop(context, _selected),
+                      text: 'Save',
+                      color: LumiTokens.green,
+                      isFullWidth: true,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PeriodSegmentedControl extends StatelessWidget {
+  final bool isPm;
+  final ValueChanged<bool> onChanged;
+
+  const _PeriodSegmentedControl({
+    required this.isPm,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: LumiTokens.cream,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+        border: Border.all(color: LumiTokens.rule),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _PeriodOption(
+              label: 'AM',
+              selected: !isPm,
+              onTap: () => onChanged(false),
+            ),
+          ),
+          Expanded(
+            child: _PeriodOption(
+              label: 'PM',
+              selected: isPm,
+              onTap: () => onChanged(true),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PeriodOption extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _PeriodOption({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? LumiTokens.green : Colors.transparent,
+      borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: LumiType.body.copyWith(
+              color: selected ? LumiTokens.paper : LumiTokens.ink,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TimeStepper extends StatelessWidget {
+  final String label;
+  final String value;
+  final VoidCallback onDecrease;
+  final VoidCallback onIncrease;
+
+  const _TimeStepper({
+    required this.label,
+    required this.value,
+    required this.onDecrease,
+    required this.onIncrease,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(LumiTokens.space3),
+      decoration: BoxDecoration(
+        color: LumiTokens.cream,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+        border: Border.all(color: LumiTokens.rule),
+      ),
+      child: Column(
+        children: [
+          Text(label, style: LumiType.caption),
+          const SizedBox(height: LumiTokens.space2),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _StepperButton(
+                icon: Icons.remove_rounded,
+                tooltip: 'Decrease $label',
+                onTap: onDecrease,
+              ),
+              Expanded(
+                child: Text(
+                  value,
+                  textAlign: TextAlign.center,
+                  style: LumiType.subhead.copyWith(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              _StepperButton(
+                icon: Icons.add_rounded,
+                tooltip: 'Increase $label',
+                onTap: onIncrease,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepperButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _StepperButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: LumiTokens.paper,
+        shape: const CircleBorder(),
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          child: SizedBox(
+            width: 36,
+            height: 36,
+            child: Icon(icon, size: 20, color: LumiTokens.green),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MinuteChip extends StatelessWidget {
+  final int minute;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _MinuteChip({
+    required this.minute,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final label = ':${minute.toString().padLeft(2, '0')}';
+    return Material(
+      color: selected ? LumiTokens.green : LumiTokens.paper,
+      borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+        child: Container(
+          width: 58,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+            border: Border.all(
+              color: selected ? LumiTokens.green : LumiTokens.rule,
+            ),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: LumiType.caption.copyWith(
+              color: selected ? LumiTokens.paper : LumiTokens.ink,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Relationship picker dialog. Owns its own [TextEditingController] so it is
 /// disposed when the dialog leaves the tree (after the exit animation).
 class _RelationshipPicker extends StatefulWidget {
@@ -1016,7 +1467,10 @@ class _RelationshipPickerState extends State<_RelationshipPicker> {
 
   @override
   Widget build(BuildContext context) {
-    final options = [...GuardianRelationship.presets, GuardianRelationship.other];
+    final options = [
+      ...GuardianRelationship.presets,
+      GuardianRelationship.other
+    ];
     return AlertDialog(
       backgroundColor: LumiTokens.paper,
       shape: RoundedRectangleBorder(
@@ -1061,7 +1515,8 @@ class _RelationshipPickerState extends State<_RelationshipPicker> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
-                  borderSide: const BorderSide(color: LumiTokens.green, width: 2),
+                  borderSide:
+                      const BorderSide(color: LumiTokens.green, width: 2),
                 ),
               ),
               onChanged: (_) => setState(() {}),

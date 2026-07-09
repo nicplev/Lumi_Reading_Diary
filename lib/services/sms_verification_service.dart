@@ -301,6 +301,127 @@ class SmsVerificationService {
     }
   }
 
+  /// Enrols phone MFA for an already-created account from Settings. Uses the
+  /// same server-side enrol path as signup so unverified-email accounts can opt
+  /// in after first login, and so trusted profile fields stay Admin-owned.
+  Future<MfaSignupOutcome> completeOptionalMfaEnrollment({
+    required User user,
+    required String verificationId,
+    required String smsCode,
+    required String phoneNumber,
+    required String role,
+    required String schoolId,
+  }) async {
+    try {
+      await user.reload();
+      await user.getIdToken(true);
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-token-expired' ||
+          e.code == 'user-not-found' ||
+          e.code == 'user-disabled') {
+        await _auth.signOut();
+        throw FirebaseAuthException(
+          code: 'session-stale',
+          message: 'Your sign-in session expired. Please log in again.',
+        );
+      }
+      rethrow;
+    }
+
+    final credential = PhoneAuthProvider.credential(
+      verificationId: verificationId,
+      smsCode: smsCode,
+    );
+
+    try {
+      await user.linkWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      switch (e.code) {
+        case 'provider-already-linked':
+          break;
+        case 'credential-already-in-use':
+          throw FirebaseAuthException(
+            code: 'phone-already-registered',
+            message: 'This phone number is already registered to another '
+                'account. Use a different number.',
+          );
+        case 'user-token-expired':
+        case 'user-mismatch':
+        case 'requires-recent-login':
+          throw FirebaseAuthException(
+            code: 'session-stale',
+            message: 'Your sign-in session expired. Please log in again.',
+          );
+        default:
+          rethrow;
+      }
+    }
+
+    final Map<String, dynamic> result;
+    try {
+      final resp = await _functions
+          .httpsCallable('enrollLinkedPhoneAsMfa')
+          .call<Map<String, dynamic>>({
+        'phoneE164': phoneNumber,
+        'displayName': phoneNumber,
+        'syncProfile': true,
+        'profileRole': role,
+        'profileSchoolId': schoolId,
+      });
+      result = Map<String, dynamic>.from(resp.data as Map? ?? const {});
+    } on FirebaseFunctionsException catch (e) {
+      throw FirebaseAuthException(
+        code: e.code == 'already-exists'
+            ? 'second-factor-already-in-use'
+            : 'mfa-enroll-failed',
+        message: e.message ??
+            'Could not turn on SMS verification. Please try again.',
+      );
+    }
+
+    final customToken = result['customToken'] as String?;
+    if (customToken == null || customToken.isEmpty) {
+      return MfaSignupOutcome.needsLogin;
+    }
+    try {
+      await _auth.signInWithCustomToken(customToken);
+      return MfaSignupOutcome.sessionReady;
+    } on FirebaseAuthException {
+      return MfaSignupOutcome.needsLogin;
+    }
+  }
+
+  /// Finalises an email/password parent or teacher signup without enrolling
+  /// MFA. The server derives school membership from the presented join
+  /// credential and writes the protected profile/index fields.
+  Future<void> finalizeEmailSignup({
+    required String role,
+    required String schoolId,
+    required String fullName,
+    String? schoolCode,
+    String? linkCode,
+    String? relationshipLabel,
+  }) async {
+    try {
+      await _functions
+          .httpsCallable('finalizeEmailSignup')
+          .call<Map<String, dynamic>>({
+        'role': role,
+        'schoolId': schoolId,
+        'fullName': fullName,
+        if (schoolCode != null && schoolCode.isNotEmpty)
+          'schoolCode': schoolCode,
+        if (linkCode != null && linkCode.isNotEmpty) 'linkCode': linkCode,
+        if (relationshipLabel != null) 'relationshipLabel': relationshipLabel,
+      });
+    } on FirebaseFunctionsException catch (e) {
+      throw FirebaseAuthException(
+        code: 'email-signup-finalize-failed',
+        message: e.message ?? 'Could not complete signup. Please try again.',
+      );
+    }
+  }
+
   /// Finalises a phone-PRIMARY parent signup server-side.
   ///
   /// The phone-primary path signs in WITH the phone number (no MFA enroll), so
@@ -363,7 +484,8 @@ class SmsVerificationService {
     // some platforms / privacy modes return a masked value. The gate
     // handles both cases — invalid E.164 falls through without enforcement.
     if (kDebugMode) {
-      debugPrint('[phone-auth] sendLoginCode → hint phone="${hint.phoneNumber}" '
+      debugPrint(
+          '[phone-auth] sendLoginCode → hint phone="${hint.phoneNumber}" '
           'factorId=${hint.factorId} enrollmentId=${hint.uid} '
           'isValidE164=${isValidE164(hint.phoneNumber)}');
     }
@@ -531,12 +653,14 @@ class SmsVerificationService {
         'That phone number doesn\'t look right. Use Australian format (e.g. 0400 000 000).',
       'invalid-verification-code' =>
         'The code doesn\'t match. Please try again.',
-      'invalid-verification-id' || 'session-expired' =>
+      'invalid-credential' =>
+        'That code could not be verified. Tap resend to get a fresh code, then enter the newest code.',
+      'invalid-verification-id' ||
+      'session-expired' =>
         'That code expired. Tap resend and try again.',
       'too-many-requests' =>
         'Too many attempts. Please wait a few minutes before trying again.',
-      'quota-exceeded' =>
-        'SMS quota reached for now. Please try again later.',
+      'quota-exceeded' => 'SMS quota reached for now. Please try again later.',
       'missing-phone-number' => 'Please enter your phone number.',
       'second-factor-already-in-use' =>
         'This phone number is already set up as a second factor on another account.',
@@ -548,7 +672,8 @@ class SmsVerificationService {
       // "SMS based MFA not enabled" provider message.
       'operation-not-allowed' =>
         'Phone verification isn\'t available right now. Please try again shortly, or contact support if it keeps happening.',
-      'invalid-user-token' || 'user-token-expired' =>
+      'invalid-user-token' ||
+      'user-token-expired' =>
         'Your sign-in session expired. Please close this and start signup again.',
       _ => e.message ?? 'Something went wrong. Please try again.',
     };

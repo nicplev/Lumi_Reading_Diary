@@ -56,4 +56,13 @@ void main() {
       expect(failure.message, contains('too long'));
     });
   });
+
+  group('fullImageCoverCropRect', () {
+    test('uses the full scanned image as the initial crop rectangle', () {
+      const viewport = Rect.fromLTWH(0, 0, 390, 640);
+      const image = Rect.fromLTWH(24, 0, 342, 640);
+
+      expect(fullImageCoverCropRect(viewport, image), image);
+    });
+  });
 }

@@ -17,12 +17,18 @@ class StatsCard extends StatelessWidget {
   /// used, a small footer reassures the parent the streak is still protected.
   final int? restDaysRemaining;
 
+  /// Distinct nights read in the trailing 30-calendar-night rhythm view. When
+  /// the live streak is higher than this, the streak likely spans before the
+  /// visible calendar window or across protected school-break/rest days.
+  final int? last30Nights;
+
   const StatsCard({
     super.key,
     required this.currentStreak,
     required this.totalNights,
     required this.totalMinutes,
     this.restDaysRemaining,
+    this.last30Nights,
   });
 
   static String _formatTime(int minutes) {
@@ -34,6 +40,9 @@ class StatsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final restDays = restDaysRemaining ?? 2;
+    final showWindowContext = currentStreak > 0 &&
+        last30Nights != null &&
+        currentStreak > last30Nights!;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
@@ -81,20 +90,62 @@ class StatsCard extends StatelessWidget {
           ),
           if (currentStreak > 0 && restDays == 1) ...[
             const SizedBox(height: 14),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-              decoration: BoxDecoration(
-                color: LumiTokens.tintGreen,
-                borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
-              ),
-              child: Text(
-                '🌙 1 rest day left — your streak is safe',
-                style: LumiType.caption.copyWith(color: LumiTokens.ink),
-                textAlign: TextAlign.center,
-              ),
+            _StatsNote(
+              text: '1 rest day left - your streak is safe',
+              icon: Icons.nightlight_round,
+              tint: LumiTokens.tintGreen,
+              iconColor: LumiTokens.green,
             ),
           ],
+          if (showWindowContext) ...[
+            const SizedBox(height: 10),
+            _StatsNote(
+              text: 'Streak includes nights before this 30-night view',
+              icon: Icons.info_outline_rounded,
+              tint: LumiTokens.tintOrange,
+              iconColor: LumiTokens.orange,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _StatsNote extends StatelessWidget {
+  final String text;
+  final IconData icon;
+  final Color tint;
+  final Color iconColor;
+
+  const _StatsNote({
+    required this.text,
+    required this.icon,
+    required this.tint,
+    required this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      decoration: BoxDecoration(
+        color: tint,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 15, color: iconColor),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              text,
+              style: LumiType.caption.copyWith(color: LumiTokens.ink),
+              textAlign: TextAlign.center,
+            ),
+          ),
         ],
       ),
     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/auth/sign_out_flow.dart';
 import '../../core/config/dev_access.dart';
 import '../../core/services/app_icon_service.dart';
 import '../../core/services/dev_access_service.dart';
@@ -14,8 +15,10 @@ import '../../core/widgets/lumi/legal_links_row.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/user_model.dart';
 import '../../services/firebase_service.dart';
+import '../../services/mfa_settings_service.dart';
 import '../../services/offline_service.dart';
 import '../../services/reading_level_service.dart';
+import '../settings/mfa_settings_sheet.dart';
 
 /// Teacher Settings Screen (Tab 4)
 ///
@@ -35,6 +38,7 @@ class TeacherSettingsScreen extends StatefulWidget {
 
 class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
   final ReadingLevelService _readingLevelService = ReadingLevelService();
+  final MfaSettingsService _mfaSettingsService = MfaSettingsService();
 
   /// Dev-access flag — gates surfaces still in development. Source of truth is
   /// the `devAccessEmails` allowlist managed in the super-admin portal
@@ -45,12 +49,15 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
   List<ClassModel> _classes = [];
   bool _loadingClasses = true;
   bool _levelsEnabled = false;
+  MfaStatus? _mfaStatus;
+  bool _mfaStatusLoading = true;
 
   @override
   void initState() {
     super.initState();
     _loadClasses();
     _loadReadingLevelOptions();
+    _loadMfaStatus();
     // Rebuild if dev-access flips (e.g. the Firestore lookup resolves after a
     // session resume, or a super-admin grants/revokes access).
     _devAccess.addListener(_onDevAccessChanged);
@@ -64,6 +71,27 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
 
   void _onDevAccessChanged() {
     if (mounted) setState(() {});
+  }
+
+  Future<void> _loadMfaStatus() async {
+    setState(() => _mfaStatusLoading = true);
+    try {
+      final status = await _mfaSettingsService.loadStatus();
+      if (mounted) setState(() => _mfaStatus = status);
+    } catch (_) {
+      if (mounted) setState(() => _mfaStatus = null);
+    } finally {
+      if (mounted) setState(() => _mfaStatusLoading = false);
+    }
+  }
+
+  Future<void> _openMfaSettings() async {
+    final changed = await showMfaSettingsSheet(
+      context: context,
+      user: widget.user,
+      accentColor: LumiTokens.red,
+    );
+    if (changed == true) await _loadMfaStatus();
   }
 
   Future<void> _loadReadingLevelOptions() async {
@@ -150,10 +178,9 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 20, vertical: 8),
-                  child: Text('Select a Class',
-                      style: LumiType.subhead),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: Text('Select a Class', style: LumiType.subhead),
                 ),
                 const SizedBox(height: 8),
                 ..._classes.map(
@@ -162,8 +189,7 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color:
-                            LumiTokens.muted.withValues(alpha: 0.14),
+                        color: LumiTokens.muted.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(Icons.class_,
@@ -173,8 +199,7 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
                         style: LumiType.body
                             .copyWith(fontWeight: FontWeight.w600)),
                     subtitle: cls.room != null
-                        ? Text('Room ${cls.room}',
-                            style: LumiType.caption)
+                        ? Text('Room ${cls.room}', style: LumiType.caption)
                         : null,
                     onTap: () => Navigator.pop(context, cls),
                   ),
@@ -188,7 +213,6 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
     );
   }
 
-
   void _showAboutDialog() {
     showDialog(
       context: context,
@@ -199,14 +223,13 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
         title: Row(
           children: [
             Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: LumiTokens.red.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(12),
+              width: 48,
+              height: 48,
+              alignment: Alignment.center,
+              child: Image.asset(
+                'assets/staff_characters/la_green.png',
+                fit: BoxFit.contain,
               ),
-              child: const Icon(Icons.auto_stories,
-                  color: LumiTokens.red, size: 22),
             ),
             const SizedBox(width: 12),
             Text('Lumi', style: LumiType.subhead),
@@ -217,8 +240,7 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Version 1.0.0',
-                style: LumiType.body
-                    .copyWith(color: LumiTokens.muted)),
+                style: LumiType.body.copyWith(color: LumiTokens.muted)),
             const SizedBox(height: 8),
             Text('Reading Tracker for Schools', style: LumiType.body),
             const SizedBox(height: LumiTokens.space4),
@@ -229,8 +251,7 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text('Close',
-                style: LumiType.button
-                    .copyWith(color: LumiTokens.red)),
+                style: LumiType.button.copyWith(color: LumiTokens.red)),
           ),
         ],
       ),
@@ -253,24 +274,20 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text('Cancel',
-                style: LumiType.button
-                    .copyWith(color: LumiTokens.muted)),
+                style: LumiType.button.copyWith(color: LumiTokens.muted)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: Text('Sign Out',
-                style: LumiType.button
-                    .copyWith(color: LumiTokens.red)),
+                style: LumiType.button.copyWith(color: LumiTokens.red)),
           ),
         ],
       ),
     );
 
     if (confirm == true) {
-      await FirebaseService.instance.signOut();
-      if (mounted) {
-        context.go('/auth/login');
-      }
+      if (!mounted) return;
+      await signOutAndNavigateToLogin(context);
     }
   }
 
@@ -297,6 +314,38 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
         label = 'Offline';
         color = LumiTokens.muted;
         break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: 'Nunito',
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMfaStatusTrailing() {
+    String label;
+    Color color;
+    if (_mfaStatusLoading) {
+      label = 'Checking';
+      color = LumiTokens.muted;
+    } else if (_mfaStatus?.enabled == true) {
+      label = 'On';
+      color = LumiTokens.green;
+    } else {
+      label = 'Off';
+      color = LumiTokens.muted;
     }
 
     return Container(
@@ -387,152 +436,171 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
     return ColoredBox(
       color: LumiTokens.cream,
       child: SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 200),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Settings', style: LumiType.heading)
-                .animate()
-                .fadeIn(duration: 400.ms)
-                .slideY(begin: -0.05, end: 0, curve: Curves.easeOutCubic),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 200),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Settings', style: LumiType.heading)
+                  .animate()
+                  .fadeIn(duration: 400.ms)
+                  .slideY(begin: -0.05, end: 0, curve: Curves.easeOutCubic),
 
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            // CLASSROOM section
-            TeacherSettingsSection(
-              title: 'Classroom',
-              items: [
-                if (_levelsEnabled)
+              // CLASSROOM section
+              TeacherSettingsSection(
+                title: 'Classroom',
+                items: [
+                  if (_levelsEnabled)
+                    TeacherSettingsItem(
+                      icon: Icons.auto_stories,
+                      iconBgColor: LumiTokens.muted,
+                      label: 'Reading Levels',
+                      onTap: () =>
+                          _navigateWithClass('/teacher/level-management'),
+                    ),
                   TeacherSettingsItem(
-                    icon: Icons.auto_stories,
+                    icon: Icons.groups,
                     iconBgColor: LumiTokens.muted,
-                    label: 'Reading Levels',
-                    onTap: () =>
-                        _navigateWithClass('/teacher/level-management'),
+                    label: 'Reading Groups',
+                    onTap: () => _navigateWithClass('/teacher/reading-groups'),
                   ),
-                TeacherSettingsItem(
-                  icon: Icons.groups,
-                  iconBgColor: LumiTokens.muted,
-                  label: 'Reading Groups',
-                  onTap: () => _navigateWithClass('/teacher/reading-groups'),
-                ),
-                TeacherSettingsItem(
-                  icon: Icons.emoji_events,
-                  iconBgColor: LumiTokens.muted,
-                  label: 'Awards',
-                  onTap: () => _navigateWithClass('/teacher/awards'),
-                ),
-                // Class Reports is still in development — visible only to
-                // dev-access accounts until it ships in a later update.
-                if (hasDevAccess())
                   TeacherSettingsItem(
-                    icon: Icons.assessment,
+                    icon: Icons.emoji_events,
                     iconBgColor: LumiTokens.muted,
-                    label: 'Class Reports',
-                    onTap: () => _navigateWithClass('/teacher/class-report'),
+                    label: 'Awards',
+                    onTap: () => _navigateWithClass('/teacher/awards'),
                   ),
-              ],
-            )
-                .animate()
-                .fadeIn(duration: 300.ms, delay: 60.ms)
-                .slideY(begin: 0.03, end: 0, curve: Curves.easeOut),
+                  // Class Reports is still in development — visible only to
+                  // dev-access accounts until it ships in a later update.
+                  if (hasDevAccess())
+                    TeacherSettingsItem(
+                      icon: Icons.assessment,
+                      iconBgColor: LumiTokens.muted,
+                      label: 'Class Reports',
+                      onTap: () => _navigateWithClass('/teacher/class-report'),
+                    ),
+                ],
+              )
+                  .animate()
+                  .fadeIn(duration: 300.ms, delay: 60.ms)
+                  .slideY(begin: 0.03, end: 0, curve: Curves.easeOut),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // NOTIFICATIONS section
-            TeacherSettingsSection(
-              title: 'Notifications',
-              items: [
-                TeacherSettingsItem(
-                  icon: Icons.campaign,
-                  iconBgColor: LumiTokens.muted,
-                  label: 'Parent/Guardian Notifications',
-                  onTap: () {
-                    context.push('/teacher/notifications');
-                  },
-                ),
-              ],
-            )
-                .animate()
-                .fadeIn(duration: 300.ms, delay: 120.ms)
-                .slideY(begin: 0.03, end: 0, curve: Curves.easeOut),
-
-            const SizedBox(height: 16),
-
-            // DATA & STORAGE section
-            TeacherSettingsSection(
-              title: 'Data & Storage',
-              items: [
-                TeacherSettingsItem(
-                  icon: Icons.sync,
-                  iconBgColor: LumiTokens.muted,
-                  label: 'Sync Status',
-                  trailing: _buildSyncStatusTrailing(),
-                ),
-                TeacherSettingsItem(
-                  icon: Icons.network_check,
-                  iconBgColor: LumiTokens.muted,
-                  label: 'Connection status',
-                  onTap: () => context.push('/settings/service-status'),
-                ),
-              ],
-            )
-                .animate()
-                .fadeIn(duration: 300.ms, delay: 180.ms)
-                .slideY(begin: 0.03, end: 0, curve: Curves.easeOut),
-
-            const SizedBox(height: 16),
-
-            // SUPPORT section
-            TeacherSettingsSection(
-              title: 'Support',
-              items: [
-                TeacherSettingsItem(
-                  icon: Icons.feedback_outlined,
-                  iconBgColor: LumiTokens.muted,
-                  label: 'Send Feedback',
-                  onTap: () {
-                    showFeedbackSheet(
-                      context,
-                      userId: widget.user.id,
-                      userRole: 'teacher',
-                    );
-                  },
-                ),
-                TeacherSettingsItem(
-                  icon: Icons.info_outline,
-                  iconBgColor: LumiTokens.muted,
-                  label: 'About',
-                  onTap: _showAboutDialog,
-                ),
-                // The app-icon pack is still in testing — visible only to
-                // dev-access accounts until it ships publicly. iOS-only.
-                if (hasDevAccess() && AppIconService.isSupportedPlatform)
+              // NOTIFICATIONS section
+              TeacherSettingsSection(
+                title: 'Notifications',
+                items: [
                   TeacherSettingsItem(
-                    icon: Icons.apps,
+                    icon: Icons.campaign,
                     iconBgColor: LumiTokens.muted,
-                    label: 'App Icon',
-                    onTap: () => context.push('/settings/app-icon'),
+                    label: 'Parent/Guardian Notifications',
+                    onTap: () {
+                      context.push('/teacher/notifications');
+                    },
                   ),
-              ],
-            )
-                .animate()
-                .fadeIn(duration: 300.ms, delay: 240.ms)
-                .slideY(begin: 0.03, end: 0, curve: Curves.easeOut),
+                ],
+              )
+                  .animate()
+                  .fadeIn(duration: 300.ms, delay: 120.ms)
+                  .slideY(begin: 0.03, end: 0, curve: Curves.easeOut),
 
-            const SizedBox(height: 24),
+              const SizedBox(height: 16),
 
-            // Log Out card
-            _buildLogOutCard()
-                .animate()
-                .fadeIn(duration: 300.ms, delay: 300.ms),
+              // SECURITY section
+              TeacherSettingsSection(
+                title: 'Security',
+                items: [
+                  TeacherSettingsItem(
+                    icon: Icons.shield_outlined,
+                    iconBgColor: LumiTokens.muted,
+                    label: 'SMS verification',
+                    trailing: _buildMfaStatusTrailing(),
+                    onTap: _openMfaSettings,
+                  ),
+                ],
+              )
+                  .animate()
+                  .fadeIn(duration: 300.ms, delay: 150.ms)
+                  .slideY(begin: 0.03, end: 0, curve: Curves.easeOut),
 
-            // Version footer
-            _buildVersionFooter(),
-          ],
+              const SizedBox(height: 16),
+
+              // DATA & STORAGE section
+              TeacherSettingsSection(
+                title: 'Data & Storage',
+                items: [
+                  TeacherSettingsItem(
+                    icon: Icons.sync,
+                    iconBgColor: LumiTokens.muted,
+                    label: 'Sync Status',
+                    trailing: _buildSyncStatusTrailing(),
+                  ),
+                  TeacherSettingsItem(
+                    icon: Icons.network_check,
+                    iconBgColor: LumiTokens.muted,
+                    label: 'Connection status',
+                    onTap: () => context.push('/settings/service-status'),
+                  ),
+                ],
+              )
+                  .animate()
+                  .fadeIn(duration: 300.ms, delay: 180.ms)
+                  .slideY(begin: 0.03, end: 0, curve: Curves.easeOut),
+
+              const SizedBox(height: 16),
+
+              // SUPPORT section
+              TeacherSettingsSection(
+                title: 'Support',
+                items: [
+                  TeacherSettingsItem(
+                    icon: Icons.feedback_outlined,
+                    iconBgColor: LumiTokens.muted,
+                    label: 'Send Feedback',
+                    onTap: () {
+                      showFeedbackSheet(
+                        context,
+                        userId: widget.user.id,
+                        userRole: 'teacher',
+                      );
+                    },
+                  ),
+                  TeacherSettingsItem(
+                    icon: Icons.info_outline,
+                    iconBgColor: LumiTokens.muted,
+                    label: 'About',
+                    onTap: _showAboutDialog,
+                  ),
+                  // The app-icon pack is still in testing — visible only to
+                  // dev-access accounts until it ships publicly. iOS-only.
+                  if (hasDevAccess() && AppIconService.isSupportedPlatform)
+                    TeacherSettingsItem(
+                      icon: Icons.apps,
+                      iconBgColor: LumiTokens.muted,
+                      label: 'App Icon',
+                      onTap: () => context.push('/settings/app-icon'),
+                    ),
+                ],
+              )
+                  .animate()
+                  .fadeIn(duration: 300.ms, delay: 240.ms)
+                  .slideY(begin: 0.03, end: 0, curve: Curves.easeOut),
+
+              const SizedBox(height: 24),
+
+              // Log Out card
+              _buildLogOutCard()
+                  .animate()
+                  .fadeIn(duration: 300.ms, delay: 300.ms),
+
+              // Version footer
+              _buildVersionFooter(),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }

@@ -26,8 +26,8 @@ class ProgressScreen extends StatelessWidget {
     final now = DateTime.now();
     final startOfWeek = DateTime(now.year, now.month, now.day)
         .subtract(Duration(days: now.weekday - 1));
-    final windowStart =
-        DateTime(now.year, now.month, now.day).subtract(const Duration(days: 29));
+    final windowStart = DateTime(now.year, now.month, now.day)
+        .subtract(const Duration(days: 29));
 
     return LumiSectionScope(
       section: LumiSectionTheme.home,
@@ -38,7 +38,8 @@ class ProgressScreen extends StatelessWidget {
           surfaceTintColor: Colors.transparent,
           elevation: 0,
           iconTheme: const IconThemeData(color: LumiTokens.ink),
-          title: Text("${student.firstName}'s progress", style: LumiType.subhead),
+          title:
+              Text("${student.firstName}'s progress", style: LumiType.subhead),
         ),
         body: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
@@ -61,6 +62,7 @@ class ProgressScreen extends StatelessWidget {
                   currentStreak: stats?.currentStreak ?? 0,
                   totalMinutes: stats?.totalMinutesRead ?? 0,
                   restDaysRemaining: stats?.restDaysRemaining,
+                  last30Nights: stats?.last30DaysCount,
                 );
               },
             ),
@@ -82,7 +84,8 @@ class ProgressScreen extends StatelessWidget {
                 if (snap.hasData) {
                   for (final doc in snap.data!.docs) {
                     final log = ReadingLogModel.fromFirestore(doc);
-                    final day = DateTime(log.date.year, log.date.month, log.date.day);
+                    final day =
+                        DateTime(log.date.year, log.date.month, log.date.day);
                     readDays.add(day);
                     if (!day.isBefore(startOfWeek)) {
                       completedDays.add(log.date.weekday);
@@ -115,7 +118,8 @@ class ProgressScreen extends StatelessWidget {
                     if (readDays.isNotEmpty) ...[
                       const SizedBox(height: 16),
                       LumiCard(
-                        child: RhythmCalendar(readDays: readDays, windowDays: 30),
+                        child:
+                            RhythmCalendar(readDays: readDays, windowDays: 30),
                       ),
                     ],
                   ],
@@ -137,7 +141,8 @@ class ProgressScreen extends StatelessWidget {
                   Expanded(
                     child: Text(
                       'Achievements',
-                      style: LumiType.body.copyWith(fontWeight: FontWeight.w600),
+                      style:
+                          LumiType.body.copyWith(fontWeight: FontWeight.w600),
                     ),
                   ),
                   const Icon(Icons.chevron_right_rounded,

@@ -195,8 +195,7 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _errorMessage = SmsVerificationService.friendlyError(e));
     } catch (_) {
       if (!mounted) return;
-      setState(() =>
-          _errorMessage = 'Verification failed. Please try again.');
+      setState(() => _errorMessage = 'Verification failed. Please try again.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -473,20 +472,18 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       handle = await _smsService.sendLoginCode(resolver: resolver);
     } on FirebaseAuthException catch (e) {
-      setState(() =>
-          _errorMessage = SmsVerificationService.friendlyError(e));
+      setState(() => _errorMessage = SmsVerificationService.friendlyError(e));
       return null;
     } catch (e) {
-      setState(() =>
-          _errorMessage = 'Could not send verification code. Please try again.');
+      setState(() => _errorMessage =
+          'Could not send verification code. Please try again.');
       return null;
     }
 
     if (!mounted) return null;
 
     final hint = resolver.hints.first;
-    final phoneHint =
-        hint is PhoneMultiFactorInfo ? hint.phoneNumber : null;
+    final phoneHint = hint is PhoneMultiFactorInfo ? hint.phoneNumber : null;
 
     final smsCode = await _promptForSmsCode(
       phoneHint: phoneHint,
@@ -505,6 +502,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             );
           }
+          rethrow;
         }
       },
     );
@@ -521,12 +519,11 @@ class _LoginScreenState extends State<LoginScreen> {
         smsCode: smsCode,
       );
     } on FirebaseAuthException catch (e) {
-      setState(() =>
-          _errorMessage = SmsVerificationService.friendlyError(e));
+      setState(() => _errorMessage = SmsVerificationService.friendlyError(e));
       return null;
     } catch (_) {
-      setState(() =>
-          _errorMessage = 'Could not verify the code. Please try again.');
+      setState(
+          () => _errorMessage = 'Could not verify the code. Please try again.');
       return null;
     }
   }
@@ -555,7 +552,16 @@ class _LoginScreenState extends State<LoginScreen> {
     // (no codec → iOS state restoration crashes); the route reads from
     // userProvider instead.
     final homeRoute = AppRouter.getHomeRouteForRole(user.role);
-    context.go(homeRoute);
+    final firstParentLogin =
+        user.role == UserRole.parent && user.lastLoginAt == null;
+    context.go(
+      firstParentLogin
+          ? Uri(
+              path: homeRoute,
+              queryParameters: const {'firstParentLogin': '1'},
+            ).toString()
+          : homeRoute,
+    );
   }
 
   void _showCreateAdminDialog() {
@@ -812,8 +818,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     keyboardType: TextInputType.phone,
                     textInputAction: TextInputAction.done,
                     autofillHints: const [AutofillHints.telephoneNumber],
-                    prefixIcon: const Icon(Icons.phone_outlined,
-                        color: LumiTokens.ink),
+                    prefixIcon:
+                        const Icon(Icons.phone_outlined, color: LumiTokens.ink),
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'[\d\s]')),
                     ],
@@ -830,8 +836,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       keyboardType: TextInputType.number,
                       textInputAction: TextInputAction.done,
                       autofillHints: const [AutofillHints.oneTimeCode],
-                      prefixIcon: const Icon(Icons.sms_outlined,
-                          color: LumiTokens.ink),
+                      prefixIcon:
+                          const Icon(Icons.sms_outlined, color: LumiTokens.ink),
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
                         LengthLimitingTextInputFormatter(6),
@@ -1011,8 +1017,7 @@ class _RoleTile extends StatelessWidget {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: accent.withValues(alpha: 0.12),
-                  borderRadius:
-                      BorderRadius.circular(LumiTokens.radiusMedium),
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
                 ),
                 child: Icon(icon, color: accent, size: 22),
               ),
@@ -1116,7 +1121,8 @@ class _MfaCodeDialogState extends State<_MfaCodeDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(subtitle, style: LumiType.body.copyWith(color: LumiTokens.muted)),
+          Text(subtitle,
+              style: LumiType.body.copyWith(color: LumiTokens.muted)),
           const SizedBox(height: 16),
           LumiInput(
             controller: _codeController,
@@ -1140,6 +1146,16 @@ class _MfaCodeDialogState extends State<_MfaCodeDialog> {
                       setState(() => _resending = true);
                       try {
                         await widget.onResend();
+                        if (!context.mounted) return;
+                        _codeController.clear();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content:
+                                Text('New code sent. Use the newest SMS code.'),
+                          ),
+                        );
+                      } catch (_) {
+                        // The parent callback already surfaced the error.
                       } finally {
                         if (mounted) setState(() => _resending = false);
                       }

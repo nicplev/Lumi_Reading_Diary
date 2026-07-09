@@ -188,11 +188,13 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
     super.dispose();
   }
 
-  void _openAddBook() {
-    context.push(
+  Future<void> _openAddBook() async {
+    final changed = await context.push<bool>(
       '/teacher/community-scanner',
       extra: widget.teacher,
     );
+    if (!mounted || changed != true) return;
+    await _refresh();
   }
 
   @override
@@ -251,10 +253,10 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
           // server-maintained libraryMeta/counts doc so they stay accurate
           // even when only a slice of the books collection is paginated in.
           // Subtract hidden count under the assumption it's a small set.
-          final decodableCount =
-              (_counts.decodable - _hiddenBookIds.length).clamp(0, _counts.decodable);
-          final libraryCount =
-              (_counts.library - _hiddenBookIds.length).clamp(0, _counts.library);
+          final decodableCount = (_counts.decodable - _hiddenBookIds.length)
+              .clamp(0, _counts.decodable);
+          final libraryCount = (_counts.library - _hiddenBookIds.length)
+              .clamp(0, _counts.library);
           final visibleCount =
               (_counts.total - hiddenCount).clamp(0, _counts.total);
 
@@ -267,130 +269,139 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
               return ColoredBox(
                 color: LumiTokens.cream,
                 child: Stack(
-                children: [
-                RefreshIndicator(
-                  onRefresh: _refresh,
-                  child: NotificationListener<ScrollNotification>(
-                    onNotification: (n) {
-                      if (_hasMore && !_isLoading && n.metrics.extentAfter < 600) {
-                        _loadNextPage();
-                      }
-                      return false;
-                    },
-                    child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: [
-                  // ── Header ────────────────────────────────────────────────
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                      child: _LibraryHeader(
-                        isLoading: isLoading,
-                        visibleCount: visibleCount,
-                        decodableCount: decodableCount,
-                        hiddenCount: hiddenCount,
-                      ),
-                    ),
-                  ),
-
-                  // ── Search ────────────────────────────────────────────────
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                      child: _LibrarySearchBar(
-                        controller: _searchController,
-                        query: _searchQuery,
-                        onChanged: (v) {
-                          setState(() => _searchQuery = v);
-                          // Searching must cover the whole library, not just
-                          // the pages scrolled-in so far.
-                          if (v.trim().isNotEmpty && _hasMore) {
-                            _loadAllRemaining();
+                  children: [
+                    RefreshIndicator(
+                      onRefresh: _refresh,
+                      child: NotificationListener<ScrollNotification>(
+                        onNotification: (n) {
+                          if (_hasMore &&
+                              !_isLoading &&
+                              n.metrics.extentAfter < 600) {
+                            _loadNextPage();
                           }
+                          return false;
                         },
-                        onClear: () {
-                          _searchController.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                      ),
-                    ),
-                  ),
-
-                  // ── Filter chips ──────────────────────────────────────────
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 0, 18),
-                      child: SizedBox(
-                        height: 40,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _filters.length,
-                          separatorBuilder: (_, __) => const SizedBox(width: 8),
-                          padding: const EdgeInsets.only(right: 16),
-                          itemBuilder: (context, i) {
-                            final f = _filters[i];
-                            return TeacherFilterChip(
-                              label: _filterLabel(
-                                f,
-                                visibleCount: visibleCount,
-                                decodableCount: decodableCount,
-                                libraryCount: libraryCount,
-                                hiddenCount: hiddenCount,
+                        child: CustomScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          slivers: [
+                            // ── Header ────────────────────────────────────────────────
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                                child: _LibraryHeader(
+                                  isLoading: isLoading,
+                                  visibleCount: visibleCount,
+                                  decodableCount: decodableCount,
+                                  hiddenCount: hiddenCount,
+                                ),
                               ),
-                              isActive: _activeFilter == f,
-                              onTap: () => setState(() => _activeFilter = f),
-                              icon: _filterIcon(f),
-                              activeColor: _filterColor(f),
-                              activeForegroundColor: LumiTokens.ink,
-                            );
-                          },
+                            ),
+
+                            // ── Search ────────────────────────────────────────────────
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                                child: _LibrarySearchBar(
+                                  controller: _searchController,
+                                  query: _searchQuery,
+                                  onChanged: (v) {
+                                    setState(() => _searchQuery = v);
+                                    // Searching must cover the whole library, not just
+                                    // the pages scrolled-in so far.
+                                    if (v.trim().isNotEmpty && _hasMore) {
+                                      _loadAllRemaining();
+                                    }
+                                  },
+                                  onClear: () {
+                                    _searchController.clear();
+                                    setState(() => _searchQuery = '');
+                                  },
+                                ),
+                              ),
+                            ),
+
+                            // ── Filter chips ──────────────────────────────────────────
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 14, 0, 18),
+                                child: SizedBox(
+                                  height: 40,
+                                  child: ListView.separated(
+                                    scrollDirection: Axis.horizontal,
+                                    itemCount: _filters.length,
+                                    separatorBuilder: (_, __) =>
+                                        const SizedBox(width: 8),
+                                    padding: const EdgeInsets.only(right: 16),
+                                    itemBuilder: (context, i) {
+                                      final f = _filters[i];
+                                      return TeacherFilterChip(
+                                        label: _filterLabel(
+                                          f,
+                                          visibleCount: visibleCount,
+                                          decodableCount: decodableCount,
+                                          libraryCount: libraryCount,
+                                          hiddenCount: hiddenCount,
+                                        ),
+                                        isActive: _activeFilter == f,
+                                        onTap: () =>
+                                            setState(() => _activeFilter = f),
+                                        icon: _filterIcon(f),
+                                        activeColor: _filterColor(f),
+                                        activeForegroundColor: LumiTokens.ink,
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            // ── Body ──────────────────────────────────────────────────
+                            if (isLoading)
+                              _buildSkeletonSliver()
+                            else if (allBooks.isEmpty)
+                              _buildEmptySliver()
+                            else if (filtered.isEmpty)
+                              _buildNoResultsSliver()
+                            else if (_activeFilter == 'All' ||
+                                _activeFilter == 'Decodable')
+                              ..._buildTierSections(
+                                filtered,
+                                assignmentSummary: assignmentSummary,
+                              )
+                            else
+                              _buildFlatGrid(
+                                filtered,
+                                assignmentSummary: assignmentSummary,
+                              ),
+
+                            const SliverToBoxAdapter(
+                                child: SizedBox(height: 200)),
+                          ],
                         ),
                       ),
                     ),
-                  ),
-
-                  // ── Body ──────────────────────────────────────────────────
-                  if (isLoading)
-                    _buildSkeletonSliver()
-                  else if (allBooks.isEmpty)
-                    _buildEmptySliver()
-                  else if (filtered.isEmpty)
-                    _buildNoResultsSliver()
-                  else if (_activeFilter == 'All' ||
-                      _activeFilter == 'Decodable')
-                    ..._buildTierSections(
-                      filtered,
-                      assignmentSummary: assignmentSummary,
-                    )
-                  else
-                    _buildFlatGrid(
-                      filtered,
-                      assignmentSummary: assignmentSummary,
+                    // ── Scan FAB ───────────────────────────────────────────
+                    Positioned(
+                      right: 16,
+                      bottom: MediaQuery.viewPaddingOf(context).bottom + 84,
+                      child: FloatingActionButton.extended(
+                        heroTag: 'library_add_book_fab',
+                        onPressed: _openAddBook,
+                        backgroundColor: LumiTokens.yellow,
+                        foregroundColor: LumiTokens.ink,
+                        icon: const Icon(Icons.document_scanner_rounded),
+                        label: Text(
+                          'Add book',
+                          style:
+                              LumiType.button.copyWith(color: LumiTokens.ink),
+                        ),
+                      ),
                     ),
-
-                  const SliverToBoxAdapter(child: SizedBox(height: 200)),
-                ],
-              ),
-                  ),
+                  ],
                 ),
-                // ── Scan FAB ───────────────────────────────────────────
-                Positioned(
-                  right: 16,
-                  bottom: MediaQuery.viewPaddingOf(context).bottom + 84,
-                  child: FloatingActionButton.extended(
-                    heroTag: 'library_add_book_fab',
-                    onPressed: _openAddBook,
-                    backgroundColor: LumiTokens.yellow,
-                    foregroundColor: LumiTokens.ink,
-                    icon: const Icon(Icons.document_scanner_rounded),
-                    label: Text(
-                      'Add book',
-                      style: LumiType.button.copyWith(color: LumiTokens.ink),
-                    ),
-                  ),
-                ),
-              ],
-              ),
               );
             },
           );
@@ -455,8 +466,7 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
     for (final entry in stageGroups.entries) {
       // Colored divider between sections (skip first)
       if (sectionIndex > 0) {
-        final dividerColor =
-            Color(SchoolLibraryService.stageColor(entry.key));
+        final dividerColor = Color(SchoolLibraryService.stageColor(entry.key));
         slivers.add(SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(24, 10, 24, 10),
@@ -466,11 +476,9 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
       }
       final headerWidget = Padding(
         padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
-        child: _StageSectionHeader(
-            stage: entry.key, count: entry.value.length),
+        child: _StageSectionHeader(stage: entry.key, count: entry.value.length),
       );
-      final animateHeaders =
-          !MediaQuery.of(context).disableAnimations;
+      final animateHeaders = !MediaQuery.of(context).disableAnimations;
       slivers.add(SliverPersistentHeader(
         pinned: true,
         delegate: _StickySectionHeaderDelegate(
@@ -511,8 +519,7 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
           child: _LibrarySectionHeader(count: libBooks.length),
         );
-        final animateLib =
-            !MediaQuery.of(context).disableAnimations;
+        final animateLib = !MediaQuery.of(context).disableAnimations;
         slivers.add(SliverPersistentHeader(
           pinned: true,
           delegate: _StickySectionHeaderDelegate(
@@ -1124,8 +1131,7 @@ class _LibraryStateCard extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                 shape: RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(LumiTokens.radiusLarge),
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
                 ),
               ),
               icon: Icon(
@@ -1383,88 +1389,88 @@ class _LibraryBookCardState extends State<_LibraryBookCard>
         child: child,
       ),
       child: Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: LumiTokens.shadowCard,
-      ),
-      child: Material(
-        color: LumiTokens.paper,
-        shape: RoundedRectangleBorder(
+        decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: LumiTokens.rule),
+          boxShadow: LumiTokens.shadowCard,
         ),
-        clipBehavior: Clip.antiAlias,
-        child: GestureDetector(
-          onTapDown: _onTapDown,
-          onTapUp: _onTapUp,
-          onTapCancel: _onTapCancel,
-          onLongPress: widget.onLongPress,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: _BookCoverWidget(
-                  book: book,
-                  stageColor: stageColor,
-                  currentAssignedCount: widget.currentAssignedCount,
-                ),
-              ),
-              // Title + a compact category/level line. The small coloured dot
-              // replaces the old decorative underline and now carries meaning
-              // (decodable stage colour, or yellow for a library book).
-              SizedBox(
-                height: 66,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(9, 7, 9, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          book.title,
-                          style: LumiType.caption.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: LumiTokens.ink,
-                            height: 1.18,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: BoxDecoration(
-                              color: stageColor,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: Text(
-                              metaLabel,
-                              style: LumiType.caption.copyWith(
-                                color: LumiTokens.muted,
-                                fontSize: 11,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+        child: Material(
+          color: LumiTokens.paper,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: LumiTokens.rule),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: GestureDetector(
+            onTapDown: _onTapDown,
+            onTapUp: _onTapUp,
+            onTapCancel: _onTapCancel,
+            onLongPress: widget.onLongPress,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _BookCoverWidget(
+                    book: book,
+                    stageColor: stageColor,
+                    currentAssignedCount: widget.currentAssignedCount,
                   ),
                 ),
-              ),
-            ],
+                // Title + a compact category/level line. The small coloured dot
+                // replaces the old decorative underline and now carries meaning
+                // (decodable stage colour, or yellow for a library book).
+                SizedBox(
+                  height: 66,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(9, 7, 9, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            book.title,
+                            style: LumiType.caption.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: LumiTokens.ink,
+                              height: 1.18,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: stageColor,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            Expanded(
+                              child: Text(
+                                metaLabel,
+                                style: LumiType.caption.copyWith(
+                                  color: LumiTokens.muted,
+                                  fontSize: 11,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -1834,8 +1840,8 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
                         return Center(
                           child: Text(
                             'No active assignments found',
-                            style: LumiType.body
-                                .copyWith(color: LumiTokens.muted),
+                            style:
+                                LumiType.body.copyWith(color: LumiTokens.muted),
                           ),
                         );
                       }
@@ -1843,8 +1849,7 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
                         controller: controller,
                         padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
                         itemCount: groups.length,
-                        separatorBuilder: (_, __) =>
-                            const SizedBox(height: 14),
+                        separatorBuilder: (_, __) => const SizedBox(height: 14),
                         itemBuilder: (context, i) =>
                             _buildAssigneeClass(groups[i]),
                       );
@@ -1898,8 +1903,8 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
             children: group.students
                 .map(
                   (s) => Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: LumiTokens.paper,
                       borderRadius:
@@ -2047,18 +2052,15 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
                   color: LumiTokens.yellow),
               title: Text('Take Photo', style: LumiType.body),
               shape: RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(LumiTokens.radiusMedium)),
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusMedium)),
               onTap: () => Navigator.pop(ctx, ImageSource.camera),
             ),
             ListTile(
               leading: const Icon(Icons.photo_library_outlined,
                   color: LumiTokens.yellow),
-              title: Text('Choose from Gallery',
-                  style: LumiType.body),
+              title: Text('Choose from Gallery', style: LumiType.body),
               shape: RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(LumiTokens.radiusMedium)),
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusMedium)),
               onTap: () => Navigator.pop(ctx, ImageSource.gallery),
             ),
           ],
@@ -2208,300 +2210,303 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
                 ],
               ),
               child: ListView(
-            controller: scrollController,
-            padding: EdgeInsets.zero,
-            children: [
-              // Drag handle
-              Center(
-                child: Container(
-                  margin: const EdgeInsets.only(top: 12, bottom: 14),
-                  width: 44,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: LumiTokens.rule,
-                    borderRadius: BorderRadius.circular(999),
+                controller: scrollController,
+                padding: EdgeInsets.zero,
+                children: [
+                  // Drag handle
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 14),
+                      width: 44,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: LumiTokens.rule,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
                   ),
-                ),
-              ),
 
-              // Cover + basic info
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: LumiTokens.cream,
-                    borderRadius:
-                        BorderRadius.circular(LumiTokens.radiusXL),
-                    border: Border.all(color: LumiTokens.rule),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: LumiTokens.ink.withValues(alpha: 0.10),
-                              blurRadius: 14,
-                              offset: const Offset(0, 6),
+                  // Cover + basic info
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: LumiTokens.cream,
+                        borderRadius:
+                            BorderRadius.circular(LumiTokens.radiusXL),
+                        border: Border.all(color: LumiTokens.rule),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: LumiTokens.ink.withValues(alpha: 0.10),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: SizedBox(
-                            width: 82,
-                            height: 116,
-                            child: _BookCoverWidget(
-                              book: book,
-                              stageColor: stageColor,
-                              currentAssignedCount: currentAssignedCount,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: SizedBox(
+                                width: 82,
+                                height: 116,
+                                child: _BookCoverWidget(
+                                  book: book,
+                                  stageColor: stageColor,
+                                  currentAssignedCount: currentAssignedCount,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  book.title,
+                                  style: LumiType.subhead,
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (book.author?.isNotEmpty == true) ...[
+                                  const SizedBox(height: 5),
+                                  Text(
+                                    book.author!,
+                                    style: LumiType.body.copyWith(
+                                      color: LumiTokens.muted,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                                const SizedBox(height: 10),
+                                _BookLevelBadgeRow(
+                                  book: book,
+                                  isDecodable: isDecodable,
+                                  stageColor: stageColor,
+                                  currentAssignedCount: currentAssignedCount,
+                                  schoolLevelSchemaKey: _schoolLevelSchemaKey,
+                                  onTapAssigned: currentAssignedCount > 0
+                                      ? _showAssignedToSheet
+                                      : null,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
+                    ),
+                  ),
+
+                  // Add / Change Cover Photo button
+                  // "Add" shown for any teacher when no cover exists
+                  // "Change" shown only to the teacher who uploaded the current cover
+                  if (book.isbn?.isNotEmpty == true &&
+                      (!_hasCover || (_hasCover && _isCoverOwner)))
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                      child: _isUploadingCover
+                          ? const Center(
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(vertical: 8),
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: LumiTokens.yellow,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : OutlinedButton.icon(
+                              onPressed: _showAddCoverOptions,
+                              icon: Icon(
+                                _hasCover
+                                    ? Icons.edit_outlined
+                                    : Icons.add_a_photo_outlined,
+                                size: 18,
+                                color: LumiTokens.yellow,
+                              ),
+                              label: Text(
+                                _hasCover
+                                    ? 'Change Cover Photo'
+                                    : 'Add Cover Photo',
+                                style: LumiType.caption.copyWith(
+                                  color: LumiTokens.ink,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side:
+                                    const BorderSide(color: LumiTokens.yellow),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                      LumiTokens.radiusMedium),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 10),
+                              ),
+                            ),
+                    ),
+
+                  if (book.isbn?.isNotEmpty == true)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                      child: _InfoRow(label: 'ISBN', value: book.isbn!),
+                    ),
+
+                  if (book.publisher?.isNotEmpty == true)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                      child:
+                          _InfoRow(label: 'Publisher', value: book.publisher!),
+                    ),
+
+                  if (book.description?.isNotEmpty == true) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: LumiTokens.cream,
+                          borderRadius:
+                              BorderRadius.circular(LumiTokens.radiusLarge),
+                          border: Border.all(color: LumiTokens.rule),
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              book.title,
-                              style: LumiType.subhead,
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            if (book.author?.isNotEmpty == true) ...[
-                              const SizedBox(height: 5),
-                              Text(
-                                book.author!,
-                                style: LumiType.body.copyWith(
-                                  color: LumiTokens.muted,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
+                              'About',
+                              style: LumiType.body.copyWith(
+                                fontWeight: FontWeight.w800,
                               ),
-                            ],
-                            const SizedBox(height: 10),
-                            _BookLevelBadgeRow(
-                              book: book,
-                              isDecodable: isDecodable,
-                              stageColor: stageColor,
-                              currentAssignedCount: currentAssignedCount,
-                              schoolLevelSchemaKey: _schoolLevelSchemaKey,
-                              onTapAssigned: currentAssignedCount > 0
-                                  ? _showAssignedToSheet
-                                  : null,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              book.description!,
+                              style: LumiType.caption.copyWith(
+                                color: LumiTokens.muted,
+                                height: 1.5,
+                              ),
+                              maxLines: 6,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
+                    ),
+                  ],
 
-              // Add / Change Cover Photo button
-              // "Add" shown for any teacher when no cover exists
-              // "Change" shown only to the teacher who uploaded the current cover
-              if (book.isbn?.isNotEmpty == true &&
-                  (!_hasCover || (_hasCover && _isCoverOwner)))
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                  child: _isUploadingCover
-                      ? const Center(
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8),
-                            child: SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: LumiTokens.yellow,
+                  // Library actions
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: LumiTokens.paper,
+                        borderRadius:
+                            BorderRadius.circular(LumiTokens.radiusLarge),
+                        border: Border.all(color: LumiTokens.rule),
+                      ),
+                      child: Column(
+                        children: [
+                          // Set school level — always visible so schools without a
+                          // schema can still enter a free-form level.
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: _isSettingLevel
+                                ? const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 10),
+                                    child: SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2.2,
+                                          color: LumiTokens.yellow),
+                                    ),
+                                  )
+                                : TextButton.icon(
+                                    onPressed: _showSetLevelSheet,
+                                    icon: const Icon(
+                                      Icons.tune_rounded,
+                                      size: 16,
+                                      color: LumiTokens.yellow,
+                                    ),
+                                    label: Text(
+                                      widget.book.schoolReadingLevel
+                                                  ?.isNotEmpty ==
+                                              true
+                                          ? 'Change school level'
+                                          : 'Set level for your school',
+                                      style: LumiType.caption.copyWith(
+                                        color: LumiTokens.ink,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              onPressed: widget.onToggleHide,
+                              icon: Icon(
+                                widget.isHidden
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                                size: 16,
+                                color: LumiTokens.muted,
+                              ),
+                              label: Text(
+                                widget.isHidden
+                                    ? 'Unhide from Library'
+                                    : 'Hide from Library',
+                                style: LumiType.caption.copyWith(
+                                  color: LumiTokens.muted,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ),
-                        )
-                      : OutlinedButton.icon(
-                          onPressed: _showAddCoverOptions,
-                          icon: Icon(
-                            _hasCover
-                                ? Icons.edit_outlined
-                                : Icons.add_a_photo_outlined,
-                            size: 18,
-                            color: LumiTokens.yellow,
-                          ),
-                          label: Text(
-                            _hasCover
-                                ? 'Change Cover Photo'
-                                : 'Add Cover Photo',
-                            style: LumiType.caption.copyWith(
-                              color: LumiTokens.ink,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(
-                                color: LumiTokens.yellow),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                  LumiTokens.radiusMedium),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 10),
-                          ),
-                        ),
-                ),
-
-              if (book.isbn?.isNotEmpty == true)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                  child: _InfoRow(label: 'ISBN', value: book.isbn!),
-                ),
-
-              if (book.publisher?.isNotEmpty == true)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                  child: _InfoRow(label: 'Publisher', value: book.publisher!),
-                ),
-
-              if (book.description?.isNotEmpty == true) ...[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: LumiTokens.cream,
-                      borderRadius:
-                          BorderRadius.circular(LumiTokens.radiusLarge),
-                      border: Border.all(color: LumiTokens.rule),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'About',
-                          style: LumiType.body.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          book.description!,
-                          style: LumiType.caption.copyWith(
-                            color: LumiTokens.muted,
-                            height: 1.5,
-                          ),
-                          maxLines: 6,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-
-              // Library actions
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: LumiTokens.paper,
-                    borderRadius:
-                        BorderRadius.circular(LumiTokens.radiusLarge),
-                    border: Border.all(color: LumiTokens.rule),
-                  ),
-                  child: Column(
-                    children: [
-                      // Set school level — always visible so schools without a
-                      // schema can still enter a free-form level.
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: _isSettingLevel
-                            ? const Padding(
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 10),
-                                child: SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2.2,
-                                      color: LumiTokens.yellow),
-                                ),
-                              )
-                            : TextButton.icon(
-                                onPressed: _showSetLevelSheet,
-                                icon: const Icon(
-                                  Icons.tune_rounded,
+                          if (_isCommunityBook && book.isbn?.isNotEmpty == true)
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                onPressed: _showDeletionRequestDialog,
+                                icon: Icon(
+                                  Icons.flag_outlined,
                                   size: 16,
-                                  color: LumiTokens.yellow,
+                                  color: Colors.red.shade400,
                                 ),
                                 label: Text(
-                                  widget.book.schoolReadingLevel?.isNotEmpty == true
-                                      ? 'Change school level'
-                                      : 'Set level for your school',
+                                  'Request Deletion',
                                   style: LumiType.caption.copyWith(
-                                    color: LumiTokens.ink,
+                                    color: Colors.red.shade400,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ),
+                            ),
+                        ],
                       ),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                          onPressed: widget.onToggleHide,
-                          icon: Icon(
-                            widget.isHidden
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                            size: 16,
-                            color: LumiTokens.muted,
-                          ),
-                          label: Text(
-                            widget.isHidden
-                                ? 'Unhide from Library'
-                                : 'Hide from Library',
-                            style: LumiType.caption.copyWith(
-                              color: LumiTokens.muted,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (_isCommunityBook && book.isbn?.isNotEmpty == true)
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: TextButton.icon(
-                            onPressed: _showDeletionRequestDialog,
-                            icon: Icon(
-                              Icons.flag_outlined,
-                              size: 16,
-                              color: Colors.red.shade400,
-                            ),
-                            label: Text(
-                              'Request Deletion',
-                              style: LumiType.caption.copyWith(
-                                color: Colors.red.shade400,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
 
-              const SizedBox(height: 40),
-            ],
-          ),
+                  const SizedBox(height: 40),
+                ],
+              ),
             ),
           );
         },
@@ -2566,15 +2571,14 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
                     // Description
                     Text(
                       'This will send a request to Lumi to remove this book from the community library.',
-                      style: LumiType.caption
-                          .copyWith(color: LumiTokens.muted),
+                      style: LumiType.caption.copyWith(color: LumiTokens.muted),
                     ),
                     const SizedBox(height: 20),
 
                     // Reason dropdown
                     Text('Reason',
-                        style: LumiType.caption
-                            .copyWith(color: LumiTokens.ink)),
+                        style:
+                            LumiType.caption.copyWith(color: LumiTokens.ink)),
                     const SizedBox(height: 6),
                     Container(
                       decoration: BoxDecoration(
@@ -2594,8 +2598,7 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
                           contentPadding: EdgeInsets.symmetric(
                               horizontal: 14, vertical: 12),
                         ),
-                        style: LumiType.body
-                            .copyWith(color: LumiTokens.ink),
+                        style: LumiType.body.copyWith(color: LumiTokens.ink),
                         dropdownColor: LumiTokens.paper,
                         borderRadius:
                             BorderRadius.circular(LumiTokens.radiusMedium),
@@ -2614,8 +2617,8 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
 
                     // Notes field
                     Text('Additional Details',
-                        style: LumiType.caption
-                            .copyWith(color: LumiTokens.ink)),
+                        style:
+                            LumiType.caption.copyWith(color: LumiTokens.ink)),
                     const SizedBox(height: 6),
                     Container(
                       decoration: BoxDecoration(
@@ -2656,8 +2659,7 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
                                 borderRadius: BorderRadius.circular(
                                     LumiTokens.radiusMedium),
                               ),
-                              side: const BorderSide(
-                                  color: LumiTokens.rule),
+                              side: const BorderSide(color: LumiTokens.rule),
                             ),
                             child: Text(
                               'Cancel',
@@ -2703,9 +2705,8 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
                                         SnackBar(
                                           content: Text(
                                             'Deletion request submitted. The Lumi team will review it.',
-                                            style: LumiType.caption
-                                                .copyWith(
-                                                    color: LumiTokens.paper),
+                                            style: LumiType.caption.copyWith(
+                                                color: LumiTokens.paper),
                                           ),
                                           behavior: SnackBarBehavior.floating,
                                           backgroundColor: LumiTokens.ink,
@@ -2723,9 +2724,8 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
                                         SnackBar(
                                           content: Text(
                                             'Failed to submit request: $e',
-                                            style: LumiType.caption
-                                                .copyWith(
-                                                    color: LumiTokens.paper),
+                                            style: LumiType.caption.copyWith(
+                                                color: LumiTokens.paper),
                                           ),
                                           behavior: SnackBarBehavior.floating,
                                           backgroundColor: Colors.red,
@@ -2756,8 +2756,7 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
                                   )
                                 : Text(
                                     'Submit Request',
-                                    style:
-                                        LumiType.body.copyWith(
+                                    style: LumiType.body.copyWith(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -2805,8 +2804,7 @@ class _BookLevelBadgeRow extends StatelessWidget {
       schoolLevelSchemaKey,
     );
 
-    final isMismatch =
-        resolved.mode == LevelDisplayMode.communityMismatch;
+    final isMismatch = resolved.mode == LevelDisplayMode.communityMismatch;
 
     // For decodable books: show the resolved level (or 'Decodable' fallback).
     // For library books: show 'Library' type + a level badge if one exists.
@@ -2846,7 +2844,8 @@ class _BookLevelBadgeRow extends StatelessWidget {
             decoration: BoxDecoration(
               color: const Color(0xFFFEF3C7),
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.40)),
+              border: Border.all(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.40)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -2936,8 +2935,7 @@ class _SetSchoolLevelSheetState extends State<_SetSchoolLevelSheet> {
             const SizedBox(height: 4),
             Text(
               'This only affects your school\'s library — the community record is unchanged.',
-              style: LumiType.caption
-                  .copyWith(color: LumiTokens.muted),
+              style: LumiType.caption.copyWith(color: LumiTokens.muted),
             ),
             const SizedBox(height: 16),
             if (widget.levels.isEmpty) ...[
@@ -2963,8 +2961,8 @@ class _SetSchoolLevelSheetState extends State<_SetSchoolLevelSheet> {
                   focusedBorder: OutlineInputBorder(
                     borderRadius:
                         BorderRadius.circular(LumiTokens.radiusMedium),
-                    borderSide: const BorderSide(
-                        color: LumiTokens.yellow, width: 2),
+                    borderSide:
+                        const BorderSide(color: LumiTokens.yellow, width: 2),
                   ),
                   filled: true,
                   fillColor: LumiTokens.paper,

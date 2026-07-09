@@ -113,13 +113,30 @@ class BookCoverCacheService extends ChangeNotifier {
     if (effectiveUrl != null &&
         effectiveUrl.isNotEmpty &&
         effectiveUrl.startsWith('http')) {
-      if (_isbnCoverCache[normalizedIsbn] != effectiveUrl) {
+      final existingUrl = _isbnCoverCache[normalizedIsbn];
+      final canReplaceExisting = existingUrl == null ||
+          !isFallbackCoverUrl(effectiveUrl) ||
+          isFallbackCoverUrl(existingUrl);
+      if (existingUrl != effectiveUrl && canReplaceExisting) {
         _isbnCoverCache[normalizedIsbn] = effectiveUrl;
         changed = true;
       }
     }
 
     if (changed) notifyListeners();
+  }
+
+  /// Returns true for the optimistic Open Library ISBN endpoint fallback that
+  /// may still render no cover. Teacher/admin-uploaded covers should be allowed
+  /// to replace this URL whenever they become available.
+  static bool isFallbackCoverUrl(String? rawUrl) {
+    final trimmed = rawUrl?.trim();
+    if (trimmed == null || trimmed.isEmpty) return false;
+    final normalized = trimmed.startsWith('http://')
+        ? trimmed.replaceFirst('http://', 'https://')
+        : trimmed;
+    return normalized.startsWith('https://covers.openlibrary.org/b/isbn/') &&
+        normalized.contains('default=false');
   }
 
   /// Returns the best available cover URL for [title], or `null` if not yet
@@ -214,10 +231,15 @@ class BookCoverCacheService extends ChangeNotifier {
         }
         if (effectiveUrl != null &&
             effectiveUrl.isNotEmpty &&
-            effectiveUrl.startsWith('http') &&
-            _isbnCoverCache[isbn] != effectiveUrl) {
-          _isbnCoverCache[isbn] = effectiveUrl;
-          changed = true;
+            effectiveUrl.startsWith('http')) {
+          final existingUrl = _isbnCoverCache[isbn];
+          final canReplaceExisting = existingUrl == null ||
+              !isFallbackCoverUrl(effectiveUrl) ||
+              isFallbackCoverUrl(existingUrl);
+          if (existingUrl != effectiveUrl && canReplaceExisting) {
+            _isbnCoverCache[isbn] = effectiveUrl;
+            changed = true;
+          }
         }
       }
 
