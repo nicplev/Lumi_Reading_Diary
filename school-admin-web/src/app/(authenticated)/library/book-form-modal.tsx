@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Modal } from '@/components/lumi/modal';
 import { Input } from '@/components/lumi/input';
 import { Select } from '@/components/lumi/select';
 import { Button } from '@/components/lumi/button';
 import { Badge } from '@/components/lumi/badge';
+import { Icon } from '@/components/lumi/icon';
 import { ReadingLevelPill } from '@/components/lumi/reading-level-pill';
 import { useToast } from '@/components/lumi/toast';
 import { useCreateBook, useUpdateBook, useLookupIsbn } from '@/lib/hooks/use-books';
@@ -32,6 +33,37 @@ export function BookFormModal({ open, onClose, book, levelOptions }: BookFormMod
   const [isbn, setIsbn] = useState('');
   const [readingLevel, setReadingLevel] = useState('');
   const [coverImageUrl, setCoverImageUrl] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [dragging, setDragging] = useState(false);
+
+  const uploadCover = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast('Please choose an image file', 'error');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast('Image must be 5 MB or smaller', 'error');
+      return;
+    }
+    setUploadingCover(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/books/cover-upload', { method: 'POST', body: fd });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Upload failed');
+      }
+      const { url } = await res.json();
+      setCoverImageUrl(url);
+      toast('Cover uploaded', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Upload failed', 'error');
+    } finally {
+      setUploadingCover(false);
+    }
+  };
 
   useEffect(() => {
     if (open) {
@@ -213,25 +245,66 @@ export function BookFormModal({ open, onClose, book, levelOptions }: BookFormMod
           />
         )}
 
-        <Input
-          label="Cover Image URL"
-          value={coverImageUrl}
-          onChange={(e) => setCoverImageUrl(e.target.value)}
-          placeholder="https://..."
-        />
-
-        {coverImageUrl && (
-          <div className="flex justify-center">
-            <div className="w-24 h-32 rounded bg-cream overflow-hidden">
-              <img
-                src={coverImageUrl}
-                alt="Cover preview"
-                className="w-full h-full object-cover"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-              />
-            </div>
+        <div>
+          <label className="block text-sm font-semibold text-ink mb-1.5">Cover Image</label>
+          <div
+            onClick={() => { if (!uploadingCover) fileInputRef.current?.click(); }}
+            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragging(false);
+              const file = e.dataTransfer.files?.[0];
+              if (file) uploadCover(file);
+            }}
+            className={`flex flex-col items-center justify-center gap-2 rounded-[var(--radius-md)] border-2 border-dashed p-4 text-center transition ${
+              uploadingCover ? 'opacity-60 cursor-wait' : 'cursor-pointer'
+            } ${dragging ? 'border-section bg-section-tint/40' : 'border-rule bg-cream hover:bg-cream/60'}`}
+          >
+            {coverImageUrl ? (
+              <div className="w-24 h-32 rounded-[var(--radius-sm)] overflow-hidden bg-paper shadow-card">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={coverImageUrl}
+                  alt="Cover preview"
+                  className="w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              </div>
+            ) : (
+              <span className="inline-flex items-center justify-center w-11 h-11 rounded-full bg-paper text-section">
+                <Icon name="add_photo_alternate" size={24} />
+              </span>
+            )}
+            <p className="text-xs text-muted">
+              {uploadingCover
+                ? 'Uploading…'
+                : coverImageUrl
+                ? 'Click or drop an image to replace'
+                : 'Drag & drop an image, or click to choose a file'}
+            </p>
           </div>
-        )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) uploadCover(file);
+              e.target.value = '';
+            }}
+          />
+          {coverImageUrl && !uploadingCover && (
+            <button
+              type="button"
+              onClick={() => setCoverImageUrl('')}
+              className="mt-2 text-xs font-semibold text-muted hover:text-error"
+            >
+              Remove cover
+            </button>
+          )}
+        </div>
       </div>
     </Modal>
   );
