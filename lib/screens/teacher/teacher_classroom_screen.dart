@@ -546,29 +546,35 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
                         // An additional path to the same weekly allocations — the
                         // teacher Scan flow below is unchanged. White FAB needs an
                         // explicit green label colour (LumiType.button is white).
-                        FloatingActionButton.extended(
-                          heroTag: 'kioskFab',
-                          onPressed: () => _openKiosk(selectedClass),
-                          backgroundColor: LumiTokens.paper,
-                          foregroundColor: LumiTokens.green,
-                          elevation: 2,
-                          icon: const Icon(Icons.tablet_mac_rounded),
-                          label: Text(
-                            'Class scan-in',
-                            style: LumiType.button
-                                .copyWith(color: LumiTokens.green),
+                        LumiTourTarget(
+                          id: 'teacher.class.kioskScanIn',
+                          child: FloatingActionButton.extended(
+                            heroTag: 'kioskFab',
+                            onPressed: () => _openKiosk(selectedClass),
+                            backgroundColor: LumiTokens.paper,
+                            foregroundColor: LumiTokens.green,
+                            elevation: 2,
+                            icon: const Icon(Icons.tablet_mac_rounded),
+                            label: Text(
+                              'Class scan-in',
+                              style: LumiType.button
+                                  .copyWith(color: LumiTokens.green),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 12),
-                        FloatingActionButton.extended(
-                          heroTag: 'scanFab',
-                          onPressed: () =>
-                              _showStudentScannerPicker(selectedClass),
-                          backgroundColor: LumiTokens.green,
-                          foregroundColor: LumiTokens.paper,
-                          elevation: 4,
-                          icon: const Icon(Icons.qr_code_scanner_rounded),
-                          label: Text('Scan', style: LumiType.button),
+                        LumiTourTarget(
+                          id: 'teacher.class.scanBooks',
+                          child: FloatingActionButton.extended(
+                            heroTag: 'scanFab',
+                            onPressed: () =>
+                                _showStudentScannerPicker(selectedClass),
+                            backgroundColor: LumiTokens.green,
+                            foregroundColor: LumiTokens.paper,
+                            elevation: 4,
+                            icon: const Icon(Icons.qr_code_scanner_rounded),
+                            label: Text('Scan', style: LumiType.button),
+                          ),
                         ),
                       ],
                     ),

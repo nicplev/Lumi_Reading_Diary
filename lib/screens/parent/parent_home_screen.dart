@@ -847,7 +847,7 @@ class _TodayCard extends StatefulWidget {
   final bool hasLoggedToday;
   final List<ReadingLogModel> todayLogs;
 
-  /// Opens the full detail wizard ("Add detail" / "Log another session").
+  /// Opens the full detail wizard.
   final VoidCallback? onTap;
 
   const _TodayCard({
@@ -900,6 +900,12 @@ class _TodayCardState extends State<_TodayCard> {
         : '$_targetMinutes min of reading';
   }
 
+  String get _quickLogLabel => 'Quick log $_targetMinutes min';
+
+  void _openReadingHistory() {
+    context.push('/parent/reading-history', extra: {'student': student});
+  }
+
   /// Records a default reading log for today in a single tap (Rec 1).
   Future<void> _handleQuickLog() async {
     if (_isQuickLogging) return;
@@ -947,7 +953,7 @@ class _TodayCardState extends State<_TodayCard> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: hasLoggedToday ? _openReadingHistory : onTap,
       child: LumiCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1109,43 +1115,55 @@ class _TodayCardState extends State<_TodayCard> {
               ),
             ],
             LumiGap.m,
-            if (hasLoggedToday)
+            if (hasLoggedToday) ...[
               SizedBox(
                 width: double.infinity,
                 child: LumiPrimaryButton(
+                  onPressed: _openReadingHistory,
+                  text: 'View reading history',
+                  icon: Icons.history_rounded,
+                  color: LumiTokens.red,
+                ),
+              ),
+              LumiGap.xxs,
+              Center(
+                child: LumiTextButton(
                   onPressed: onTap,
-                  text: 'Log Another Session',
+                  text: 'Add another session',
                   icon: Icons.add_circle_outline,
                   color: LumiTokens.red,
                 ),
-              )
-            else ...[
-              // Rec 1: one-tap log is the default action. The caption tells
-              // the parent exactly what a single tap will record.
-              Text(
-                'One tap logs $_quickLogSummary',
-                style: LumiType.caption.copyWith(
-                  color: LumiTokens.ink.withValues(alpha: 0.6),
-                ),
               ),
-              LumiGap.xs,
+            ] else ...[
               LumiPrimaryButton(
-                onPressed: _isQuickLogging ? null : _handleQuickLog,
-                isLoading: _isQuickLogging,
+                onPressed: _isQuickLogging ? null : onTap,
                 isFullWidth: true,
-                text: 'Did ${student.firstName} read today?',
-                icon: Icons.check_circle_outline,
+                text: 'Log reading',
+                icon: Icons.edit_note_rounded,
                 color: LumiTokens.red,
               ),
               LumiGap.xxs,
               Center(
                 child: LumiTextButton(
-                  onPressed: _isQuickLogging ? null : onTap,
-                  text: 'Add detail',
-                  icon: Icons.tune,
+                  onPressed: _isQuickLogging ? null : _handleQuickLog,
+                  isLoading: _isQuickLogging,
+                  text: _quickLogLabel,
+                  icon: Icons.check_circle_outline,
                   color: LumiTokens.red,
                 ),
               ),
+              if (_firstAssignedTitle != null) ...[
+                LumiGap.xxs,
+                Center(
+                  child: Text(
+                    'Quick log records $_quickLogSummary',
+                    style: LumiType.caption.copyWith(
+                      color: LumiTokens.ink.withValues(alpha: 0.55),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
             ],
           ],
         ),

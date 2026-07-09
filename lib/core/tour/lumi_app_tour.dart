@@ -60,10 +60,11 @@ class LumiTourDefinitions {
         id: 'logging',
         targetId: 'parent.readingCard',
         tabIndex: 0,
-        title: 'Logging',
+        title: 'Log Reading',
         body:
-            'Tap the reading card to add books, minutes, comments, and how reading felt. The circle is there when you only need a quick log.',
-        tip: 'A little context helps the teacher spot patterns faster.',
+            'For one-child accounts, this card is your daily reading hub. Tap Log reading to add books, minutes, comments, and how reading felt.',
+        tip:
+            'Quick log is the smaller shortcut for days when you only need to record the target minutes. Once logged, the card opens reading history.',
         icon: Icons.edit_note_rounded,
         accent: LumiTokens.red,
       ),
@@ -106,7 +107,7 @@ class LumiTourDefinitions {
   static const teacher = LumiTourDefinition(
     id: 'teacher_core',
     role: LumiTourRole.teacher,
-    version: 1,
+    version: 2,
     steps: [
       LumiTourStep(
         id: 'dashboard',
@@ -116,6 +117,18 @@ class LumiTourDefinitions {
         body:
             'Start here for the class snapshot: reading activity, patterns, and which students may need attention.',
         icon: Icons.dashboard_outlined,
+        accent: LumiTokens.blue,
+      ),
+      LumiTourStep(
+        id: 'dashboard_customize',
+        targetId: 'teacher.dashboard',
+        tabIndex: 0,
+        title: 'Customise Dashboard',
+        body:
+            'Choose the widgets you want at a glance, remove what you do not need, and drag cards into the order that matches your day.',
+        tip:
+            'Tap Customize dashboard at the bottom of the dashboard, or long-press the dashboard to start editing.',
+        icon: Icons.dashboard_customize_rounded,
         accent: LumiTokens.blue,
       ),
       LumiTourStep(
@@ -132,12 +145,33 @@ class LumiTourDefinitions {
         id: 'assign_books',
         targetId: 'teacher.class.assignBooks',
         tabIndex: 1,
-        title: 'Assign Books',
+        title: 'Manual Assign',
         body:
-            'Use Assign books to set the week’s reading for the whole class or the right students.',
-        tip:
-            'Assignments make parent logging faster because books can be inferred.',
+            'Use Assign books when you want to choose titles for the whole class, groups, or specific students by hand.',
+        tip: 'Manual assigning is best for planned weekly take-home books.',
         icon: Icons.auto_awesome_rounded,
+        accent: LumiTokens.green,
+      ),
+      LumiTourStep(
+        id: 'teacher_scan',
+        targetId: 'teacher.class.scanBooks',
+        tabIndex: 1,
+        title: 'Teacher Scan',
+        body:
+            'Tap Scan when you want to scan ISBNs yourself and assign books to students as you go.',
+        tip: 'This is the fastest teacher-led workflow during book changeover.',
+        icon: Icons.qr_code_scanner_rounded,
+        accent: LumiTokens.green,
+      ),
+      LumiTourStep(
+        id: 'class_scan_in',
+        targetId: 'teacher.class.kioskScanIn',
+        tabIndex: 1,
+        title: 'Class Scan-In',
+        body:
+            'Class scan-in opens a student-friendly kiosk so children can scan their own books on a shared device.',
+        tip: 'Use Guided Access or app pinning before handing over the device.',
+        icon: Icons.tablet_mac_rounded,
         accent: LumiTokens.green,
       ),
       LumiTourStep(
@@ -167,7 +201,9 @@ class LumiTourDefinitions {
         tabIndex: 3,
         title: 'Settings',
         body:
-            'Settings has notifications, SMS verification, sync status, support, and the option to replay this tour.',
+            'Use Settings for Reading Groups, Awards, and Parent/Guardian Notifications. Build groups, adjust award tools, then choose which families receive each update.',
+        tip:
+            'Notifications can be customised by audience and message before sending.',
         icon: Icons.settings_outlined,
         accent: LumiTokens.red,
       ),
@@ -653,6 +689,12 @@ class _TourCard extends StatelessWidget {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: LumiTokens.ink,
                       side: const BorderSide(color: LumiTokens.rule),
+                      minimumSize: const Size(0, 48),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 12,
+                      ),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       shape: RoundedRectangleBorder(
                         borderRadius:
                             BorderRadius.circular(LumiTokens.radiusMedium),
@@ -672,10 +714,12 @@ class _TourCard extends StatelessWidget {
                     foregroundColor: step.accent == LumiTokens.yellow
                         ? LumiTokens.ink
                         : LumiTokens.paper,
+                    minimumSize: const Size(0, 48),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 18,
                       vertical: 12,
                     ),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     shape: RoundedRectangleBorder(
                       borderRadius:
                           BorderRadius.circular(LumiTokens.radiusMedium),
