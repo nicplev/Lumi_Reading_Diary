@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -92,6 +94,26 @@ Future<void> _initializeCore() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+  }
+
+  // If a previous sign-out flagged the Firestore cache for clearing, do it now
+  // — after Firebase init but BEFORE any Firestore client starts or any
+  // listener attaches. This is the only place clearPersistence() is provably
+  // safe: doing it inline on sign-out raced live document `.snapshots()`
+  // streams and crashed natively, and left a terminated instance that broke the
+  // first post-logout login. Here the client hasn't started, so no terminate()
+  // is needed and the fresh instance serves the next user cleanly.
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(FirebaseService.firestoreClearPendingKey) ?? false) {
+      await FirebaseFirestore.instance.clearPersistence();
+      await prefs.remove(FirebaseService.firestoreClearPendingKey);
+      debugPrint('bootstrap: cleared Firestore persistence from prior sign-out');
+    }
+  } catch (e) {
+    // Non-fatal — worst case the cache survives to the next launch, which is
+    // no worse than before and never blocks startup.
+    debugPrint('bootstrap: deferred Firestore clear skipped: $e');
   }
 
       // OPT-IN: skip phone app-verification so configured Firebase test numbers

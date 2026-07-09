@@ -32,6 +32,12 @@ enum PhoneVerificationMode {
   /// parent doc + indexes + links the student. `contextJson` carries
   /// schoolId / linkCode / email / fullName / relationshipLabel.
   parentMfaEnrollment,
+
+  /// An already-onboarded parent/teacher enabling SMS 2FA from Settings. The
+  /// account + profile already exist and the session is live, so recovery just
+  /// enrols the phone factor (no doc writes). `contextJson` carries role +
+  /// schoolId. Defends the Settings sheet against the same reCAPTCHA modal pop.
+  optionalMfaEnrollment,
 }
 
 /// Snapshot of an in-flight Firebase phone verification that needs to

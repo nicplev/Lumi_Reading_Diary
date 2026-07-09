@@ -44,7 +44,8 @@ class ParentProfileScreen extends ConsumerStatefulWidget {
       _ParentProfileScreenState();
 }
 
-class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
+class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen>
+    with WidgetsBindingObserver {
   final FirebaseService _firebaseService = FirebaseService.instance;
   final MfaSettingsService _mfaSettingsService = MfaSettingsService();
 
@@ -73,6 +74,7 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _relationshipLabel = widget.user.relationshipLabel;
     _linkedChildren =
         ref.read(parentChildrenProvider).value ?? const <StudentModel>[];
@@ -85,8 +87,17 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _devAccess.removeListener(_onDevAccessChanged);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Refresh the MFA row when the app returns to the foreground — the
+    // enrol/disable flow bounces through Safari (reCAPTCHA), so the On/Off
+    // badge can otherwise lag behind the real state until a cold start.
+    if (state == AppLifecycleState.resumed) _loadMfaStatus();
   }
 
   void _onDevAccessChanged() {
@@ -115,12 +126,15 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen> {
   }
 
   Future<void> _openMfaSettings() async {
-    final changed = await showMfaSettingsSheet(
+    await showMfaSettingsSheet(
       context: context,
       user: widget.user,
       accentColor: LumiTokens.green,
     );
-    if (changed == true) await _loadMfaStatus();
+    // Always re-read on close: enrolment can complete out-of-band (via the
+    // reCAPTCHA recovery screen) without the sheet reporting a change, so the
+    // sheet's return value isn't a reliable signal to refresh the row.
+    await _loadMfaStatus();
   }
 
   void _loadPreferences() {

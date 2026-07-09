@@ -66,10 +66,12 @@ class MfaSettingsService {
   Future<SmsCodeHandle> sendEnableCode({
     required String phoneE164,
     int? forceResendingToken,
+    void Function(SmsCodeHandle handle)? onCodeSentPersist,
   }) {
     return _smsService.sendPrimaryPhoneCode(
       phoneNumberE164: phoneE164,
       forceResendingToken: forceResendingToken,
+      onCodeSentPersist: onCodeSentPersist,
     );
   }
 
@@ -112,12 +114,44 @@ class MfaSettingsService {
     final factorUid = status.factorUid;
     if (factorUid == null || factorUid.isEmpty) return;
 
-    await user.multiFactor.unenroll(factorUid: factorUid);
+    try {
+      await user.multiFactor.unenroll(factorUid: factorUid);
+    } on FirebaseAuthException catch (_) {
+      // iOS can throw "no second factor matching the identifier" even when the
+      // unenroll actually removed the factor. Right after the call the local
+      // session still lists the factor, so a single reload() isn't enough —
+      // force a server round-trip and re-check a few times before deciding it
+      // genuinely failed. Only surface the error if it's really still enrolled.
+      if (await _isFactorStillEnrolled(user, factorUid)) rethrow;
+    }
     await user.reload();
     await _functions.httpsCallable('syncUserMfaProfileState').call({
       'enabled': false,
       'role': role.name,
       'schoolId': schoolId,
     });
+  }
+
+  /// Whether [factorUid] is still enrolled, forcing a fresh server round-trip
+  /// before reading. iOS's firebase_auth keeps the just-removed factor in the
+  /// local session even after a plain `reload()`, so we refresh the ID token
+  /// and re-check up to three times; the moment it's gone we return false.
+  Future<bool> _isFactorStillEnrolled(User user, String factorUid) async {
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        await user.getIdToken(true);
+      } catch (_) {
+        // A failed refresh shouldn't mask a successful unenroll — fall through
+        // to reload() and let the factor check decide.
+      }
+      await user.reload();
+      final refreshed = _auth.currentUser ?? user;
+      final factors = await refreshed.multiFactor.getEnrolledFactors();
+      if (!factors.any((f) => f.uid == factorUid)) return false;
+      if (attempt < 2) {
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+      }
+    }
+    return true;
   }
 }
