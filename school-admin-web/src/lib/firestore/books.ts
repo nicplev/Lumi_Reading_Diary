@@ -78,6 +78,21 @@ export async function getBook(schoolId: string, bookId: string): Promise<Book | 
   return toBook(doc);
 }
 
+/** The id of an existing book in this school with the same ISBN, or null.
+ *  Used to dedup Add Book against the copy the ISBN lookup already cached. */
+export async function findBookIdByIsbn(schoolId: string, isbn: string): Promise<string | null> {
+  const normalized = normalizeIsbn(isbn);
+  if (!normalized) return null;
+  const snap = await adminDb
+    .collection('schools')
+    .doc(schoolId)
+    .collection('books')
+    .where('isbnNormalized', '==', normalized)
+    .limit(1)
+    .get();
+  return snap.empty ? null : snap.docs[0].id;
+}
+
 export async function createBook(
   schoolId: string,
   data: {
