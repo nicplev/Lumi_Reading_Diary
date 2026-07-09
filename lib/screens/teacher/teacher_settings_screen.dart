@@ -38,7 +38,8 @@ class TeacherSettingsScreen extends StatefulWidget {
   State<TeacherSettingsScreen> createState() => _TeacherSettingsScreenState();
 }
 
-class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
+class _TeacherSettingsScreenState extends State<TeacherSettingsScreen>
+    with WidgetsBindingObserver {
   final ReadingLevelService _readingLevelService = ReadingLevelService();
   final MfaSettingsService _mfaSettingsService = MfaSettingsService();
 
@@ -57,6 +58,7 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadClasses();
     _loadReadingLevelOptions();
     _loadMfaStatus();
@@ -67,8 +69,17 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _devAccess.removeListener(_onDevAccessChanged);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Refresh the MFA row when the app comes back to the foreground — the
+    // enrol/disable flow bounces through Safari (reCAPTCHA), so the on-screen
+    // On/Off badge can otherwise lag behind the real state until a cold start.
+    if (state == AppLifecycleState.resumed) _loadMfaStatus();
   }
 
   void _onDevAccessChanged() {
@@ -88,12 +99,15 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen> {
   }
 
   Future<void> _openMfaSettings() async {
-    final changed = await showMfaSettingsSheet(
+    await showMfaSettingsSheet(
       context: context,
       user: widget.user,
       accentColor: LumiTokens.red,
     );
-    if (changed == true) await _loadMfaStatus();
+    // Always re-read on close: enrolment can complete out-of-band (via the
+    // reCAPTCHA recovery screen) without the sheet reporting a change, so the
+    // sheet's return value isn't a reliable signal to refresh the row.
+    await _loadMfaStatus();
   }
 
   Future<void> _loadReadingLevelOptions() async {

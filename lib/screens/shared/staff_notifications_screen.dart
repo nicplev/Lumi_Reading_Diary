@@ -1361,35 +1361,19 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: LumiTokens.cream,
+      // Clean paper app bar — matches Reading Groups and the rest of the app
+      // (no heavy grey back-square).
+      appBar: AppBar(
+        backgroundColor: LumiTokens.paper,
+        foregroundColor: LumiTokens.ink,
+        surfaceTintColor: LumiTokens.paper,
+        elevation: 0,
+        title: Text('Notifications', style: LumiType.subhead),
+      ),
       body: SafeArea(
+        top: false,
         child: Column(
           children: [
-            // Custom header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: LumiTokens.muted
-                            .withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(
-                            LumiTokens.radiusMedium),
-                      ),
-                      child: const Icon(Icons.arrow_back_rounded,
-                          color: LumiTokens.ink, size: 20),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text('Notifications', style: LumiType.subhead),
-                ],
-              ),
-            ),
-
             // Pill tab bar
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
@@ -1502,7 +1486,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
 
   // ─── Compose Tab ────────────────────────────────────────────────
 
-  /// In-card bento header — a soft green icon chip + normal-case title.
+  /// In-card bento header — a soft blue icon chip + normal-case title.
   Widget _cardHeader(IconData icon, String title) {
     return Row(
       children: [
@@ -1510,10 +1494,10 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
           width: 30,
           height: 30,
           decoration: BoxDecoration(
-            color: LumiTokens.muted.withValues(alpha: 0.12),
+            color: LumiTokens.blue.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(LumiTokens.radiusSmall),
           ),
-          child: Icon(icon, size: 17, color: LumiTokens.ink),
+          child: Icon(icon, size: 17, color: LumiTokens.blue),
         ),
         const SizedBox(width: 10),
         Text(title, style: LumiType.subhead.copyWith(fontSize: 16)),
@@ -1607,7 +1591,7 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
             ],
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 20),
 
         // ── Content ──
         Container(

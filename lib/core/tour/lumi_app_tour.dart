@@ -551,18 +551,10 @@ class _TourCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
+                SizedBox(
                   width: 62,
                   height: 62,
-                  decoration: BoxDecoration(
-                    color: step.accent.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(7),
-                    child:
-                        Image.asset(character.assetPath, fit: BoxFit.contain),
-                  ),
+                  child: Image.asset(character.assetPath, fit: BoxFit.contain),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -666,7 +658,10 @@ class _TourCard extends StatelessWidget {
                             BorderRadius.circular(LumiTokens.radiusMedium),
                       ),
                     ),
-                    child: Text('Back', style: LumiType.button),
+                    child: Text(
+                      'Back',
+                      style: LumiType.button.copyWith(color: LumiTokens.ink),
+                    ),
                   ),
                   const SizedBox(width: 8),
                 ],

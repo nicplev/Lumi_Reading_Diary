@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +8,7 @@ import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_input.dart';
 import '../../data/models/user_model.dart';
 import '../../services/mfa_settings_service.dart';
+import '../../services/phone_verification_recovery_service.dart';
 import '../../services/sms_verification_service.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
@@ -65,7 +68,18 @@ class _MfaSettingsSheetState extends State<_MfaSettingsSheet> {
   @override
   void initState() {
     super.initState();
+    _prefillPhone();
     _loadStatus();
+  }
+
+  /// Pre-fill the phone field with the number already on the account (stored in
+  /// E.164, e.g. +61412345678) converted to the local 04… form the input uses,
+  /// so the parent doesn't have to retype it. No-op if none is on file.
+  void _prefillPhone() {
+    final e164 = widget.user.phoneNumber?.trim() ?? '';
+    if (e164.startsWith('+61') && e164.length == 12) {
+      _phoneController.text = '0${e164.substring(3)}';
+    }
   }
 
   @override
@@ -105,6 +119,27 @@ class _MfaSettingsSheetState extends State<_MfaSettingsSheet> {
       final handle = await _service.sendEnableCode(
         phoneE164: _phoneE164,
         forceResendingToken: _resendToken,
+        // Persist the in-flight verification so the SMS step survives an iOS
+        // reCAPTCHA modal pop: if the sheet was already torn down, jump to the
+        // code-entry recovery screen; otherwise it stays here in the sheet.
+        onCodeSentPersist: (h) {
+          final record = PendingPhoneVerification(
+            verificationId: h.verificationId,
+            resendToken: h.resendToken,
+            phoneE164: _phoneE164,
+            mode: PhoneVerificationMode.optionalMfaEnrollment,
+            contextJson: {
+              'role': widget.user.role.name,
+              'schoolId': widget.user.schoolId ?? '',
+            },
+            savedAt: DateTime.now(),
+          );
+          unawaited(PhoneVerificationRecoveryService.instance.save(record));
+          if (!mounted) {
+            PhoneVerificationRecoveryService.instance.onRecoveryNeeded
+                ?.call(record);
+          }
+        },
       );
       if (!mounted) return;
       setState(() {
@@ -147,6 +182,9 @@ class _MfaSettingsSheetState extends State<_MfaSettingsSheet> {
       );
       if (!mounted) return;
       _changed = true;
+      // Completed in-sheet — drop the recovery record so it can't fire a
+      // spurious recovery screen on the next launch.
+      unawaited(PhoneVerificationRecoveryService.instance.clear());
       if (outcome == MfaSignupOutcome.needsLogin) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

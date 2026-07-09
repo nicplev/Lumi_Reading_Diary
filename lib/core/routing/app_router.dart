@@ -105,6 +105,16 @@ class AppRouter {
         return '/teacher/home';
       }
 
+      // Firebase Auth's phone-verification / reCAPTCHA callback
+      // (`<reversed-client-id>://firebaseauth/link…`) surfaces in the router as
+      // `/link` on iOS after the Safari handoff pops the calling modal. Route
+      // it to the phone-verify recovery screen, which reads the persisted
+      // verification and shows the SMS-code entry — instead of 404-ing to login
+      // or bouncing to the dashboard.
+      if (location == '/link') {
+        return '/auth/login/phone-verify';
+      }
+
       final firebaseService = _ref.read(firebaseServiceProvider);
       final isLoggedIn = firebaseService.auth.currentUser != null;
 

@@ -171,6 +171,12 @@ class _PhoneVerifyRecoveryScreenState extends State<PhoneVerifyRecoveryScreen> {
         case PhoneVerificationMode.parentMfaEnrollment:
           await _finishParentMfa(record: record);
           break;
+        // Enabling SMS 2FA from Settings on an already-onboarded account: the
+        // profile already exists and the session is live, so just enrol the
+        // phone factor and go home (no doc writes).
+        case PhoneVerificationMode.optionalMfaEnrollment:
+          await _finishSettingsMfa(record: record);
+          break;
         // Phone is the PRIMARY credential here — the SMS code signs in.
         case PhoneVerificationMode.phonePrimaryRegistration:
         case PhoneVerificationMode.phoneLogin:
@@ -453,6 +459,43 @@ class _PhoneVerifyRecoveryScreenState extends State<PhoneVerifyRecoveryScreen> {
       return;
     }
     context.go(AppRouter.getHomeRouteForRole(UserRole.teacher));
+  }
+
+  /// Settings SMS-2FA enrolment tail. The account + profile already exist and
+  /// the session is live, so we only enrol the phone factor (no doc writes),
+  /// clear the recovery record, and return to the user's home.
+  Future<void> _finishSettingsMfa({
+    required PendingPhoneVerification record,
+  }) async {
+    final user = _firebaseService.auth.currentUser;
+    if (user == null) {
+      await PhoneVerificationRecoveryService.instance.clear();
+      if (!mounted) return;
+      setState(() => _errorMessage =
+          'Your session expired. Please sign in again to enable SMS verification.');
+      return;
+    }
+    final ctx = record.contextJson;
+    final roleName = (ctx['role'] as String?) ?? '';
+    final schoolId = (ctx['schoolId'] as String?) ?? '';
+
+    final outcome = await _smsService.completeOptionalMfaEnrollment(
+      user: user,
+      verificationId: record.verificationId,
+      smsCode: _codeController.text.trim(),
+      phoneNumber: record.phoneE164,
+      role: roleName,
+      schoolId: schoolId,
+    );
+
+    await PhoneVerificationRecoveryService.instance.clear();
+    if (!mounted) return;
+    if (outcome == MfaSignupOutcome.needsLogin) {
+      context.go('/auth/login');
+      return;
+    }
+    final role = roleName == 'teacher' ? UserRole.teacher : UserRole.parent;
+    context.go(AppRouter.getHomeRouteForRole(role));
   }
 
   /// Parent email+MFA recovery tail. Links + enrols the phone on the

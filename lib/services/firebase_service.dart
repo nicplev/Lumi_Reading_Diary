@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 
@@ -19,6 +20,10 @@ class FirebaseService {
 
   // Firebase instances
   late final FirebaseAuth _auth;
+  /// SharedPreferences flag set on sign-out and honoured at the next app
+  /// bootstrap (main.dart) to clear the Firestore cache safely — see signOut().
+  static const firestoreClearPendingKey = 'firestore_clear_pending';
+
   late final FirebaseFirestore _firestore;
   late final FirebaseStorage _storage;
 
@@ -206,21 +211,23 @@ class FirebaseService {
         }
       }
 
-      // Shared-device hygiene: drop the local Firestore cache, INCLUDING any
-      // still-pending mutations. Without this, Teacher A's unflushed writes
-      // survived sign-out and replayed under the NEXT account's auth — where
-      // the ownership rules reject them and Firestore silently drops them
-      // (the shared-iPad data-loss case) — and the next user could also read
-      // the previous account's cached data. terminate() is required before
-      // clearPersistence(); the SDK starts a fresh client on next use (same
-      // pattern as the impersonation teardown).
+      // Shared-device hygiene: the local Firestore cache (incl. still-pending
+      // mutations) is dropped so the next account can't read the previous
+      // user's cached data and unflushed writes don't replay under the wrong
+      // auth. We deliberately do NOT terminate()/clearPersistence() here:
+      // running it while the widget tree was still settling raced with live
+      // document `.snapshots()` listeners and crashed natively ("client already
+      // terminated"), and reusing the terminated late-final instance made the
+      // first post-logout login fail. Instead we flag it and clear at the next
+      // app bootstrap (main.dart), before any Firestore client starts — the
+      // only place clearPersistence() is provably safe. Pending writes were
+      // already flushed above when online; any offline ones are dropped by the
+      // deferred clear (and rejected by security rules if they replay first).
       try {
-        await _firestore.terminate();
-        await _firestore.clearPersistence();
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(firestoreClearPendingKey, true);
       } catch (e) {
-        // Non-fatal: sign-out itself succeeded; worst case the cache
-        // survives, which is no worse than before.
-        debugPrint('signOut: persistence clear failed: $e');
+        debugPrint('signOut: could not flag deferred persistence clear: $e');
       }
     } catch (e) {
       debugPrint('Error signing out: $e');
