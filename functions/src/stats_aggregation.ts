@@ -185,11 +185,14 @@ export function isStatsNoopUpdate(
  * cleanly retired once the flag has been fully on for a release.
  * @param {string} schoolId The school document ID.
  * @param {string} studentId The student document ID within the school.
+ * @param {FirebaseFirestore.DocumentData} prefetchedSchoolData Optional
+ *   already-read school doc data (tz + termDates) to avoid a re-read.
  * @return {Promise<void>} Resolves when the student doc is updated.
  */
 export async function reconcileStudentStats(
   schoolId: string,
   studentId: string,
+  prefetchedSchoolData?: FirebaseFirestore.DocumentData,
 ): Promise<void> {
   const db = admin.firestore();
   const studentRef = db.doc(`schools/${schoolId}/students/${studentId}`);
@@ -200,8 +203,11 @@ export async function reconcileStudentStats(
     .where("status", "in", COUNTED_STATUSES)
     .get();
 
-  const schoolSnap = await db.collection("schools").doc(schoolId).get();
-  const schoolData = schoolSnap.data() ?? {};
+  // Callers that already hold the school doc (the weekly reconciler pages
+  // through schools; the delta path's self-heal just read it) pass it in so
+  // a pass over N students doesn't re-read the same school doc N times.
+  const schoolData = prefetchedSchoolData ??
+    ((await db.collection("schools").doc(schoolId).get()).data() ?? {});
   const tz = String(schoolData.timezone ?? DEFAULT_TIMEZONE);
   const isCountingDay = buildIsCountingDay(parseTermDates(schoolData.termDates));
 
@@ -299,9 +305,10 @@ export async function applyStudentStatsDelta(
   const stats = studentSnap.data()?.stats ?? {};
 
   // Self-heal: first-ever trigger for this student in incremental mode.
-  // Run the full recompute once to seed the readingDates array.
+  // Run the full recompute once to seed the readingDates array. Pass the
+  // school data we already read so the fallback doesn't re-read it.
   if (!Array.isArray(stats.readingDates)) {
-    await reconcileStudentStats(schoolId, studentId);
+    await reconcileStudentStats(schoolId, studentId, schoolData);
     return;
   }
 
@@ -559,11 +566,127 @@ export async function applyClassStatsDelta(
 // Reconciler — used by the weekly scheduled function
 // ──────────────────────────────────────────────────────────────────────
 
+/** Resume position for a paged reconcile: the last doc processed. */
+interface ReconcileCursorPos {
+  schoolId: string;
+  docId: string;
+}
+
+/** Docs fetched per page while reconciling (IDs only via select()). */
+const RECONCILE_PAGE = 300;
+
+const reconcileCursorDoc = () =>
+  admin.firestore().doc("platformConfig/statsReconcileCursor");
+
 /**
- * Iterate every student + class across every school and run the full
- * recompute path. Safety net for any drift in the incremental path.
- * Caller passes the page size + total cap so callers can use the same
- * helper from a one-off Cloud Run job or the weekly cron.
+ * Parses one cursor position out of the cursor doc, tolerating a missing
+ * doc / field / malformed shape (all mean "start from the beginning").
+ * @param {FirebaseFirestore.DocumentData | undefined} data Cursor doc data.
+ * @param {string} key Which cursor to read ("student" | "class").
+ * @return {ReconcileCursorPos | null} Position, or null for a fresh start.
+ */
+function readCursorPos(
+  data: FirebaseFirestore.DocumentData | undefined,
+  key: "student" | "class",
+): ReconcileCursorPos | null {
+  const raw = data?.[key];
+  if (
+    !raw ||
+    typeof raw.schoolId !== "string" ||
+    typeof raw.docId !== "string"
+  ) {
+    return null;
+  }
+  return {schoolId: raw.schoolId, docId: raw.docId};
+}
+
+/**
+ * Pages through `schools/{sid}/{sub}` doc IDs across all schools, resuming
+ * after `cursor`, invoking `fn` per doc until `budget` docs are processed.
+ * Pages fetch IDs only (select()) and never read past the budget — the old
+ * implementation read ENTIRE student/class collections regardless of budget
+ * and always restarted from the first school, so once the population
+ * outgrew the budget the tail schools were never reconciled.
+ * @param {FirebaseFirestore.QueryDocumentSnapshot[]} schools Schools in
+ *   documentId order (the order the cursor is defined against).
+ * @param {string} sub Subcollection to page ("students" | "classes").
+ * @param {ReconcileCursorPos | null} cursor Resume position, if any.
+ * @param {number} budget Max docs to process this run.
+ * @param {Function} fn Reconcile callback for one doc.
+ * @return {Promise<object>} Processed count + resume cursor (null = the
+ *   whole population was covered; next run wraps to the start).
+ */
+async function pageAndReconcile(
+  schools: FirebaseFirestore.QueryDocumentSnapshot[],
+  sub: "students" | "classes",
+  cursor: ReconcileCursorPos | null,
+  budget: number,
+  fn: (
+    schoolDoc: FirebaseFirestore.QueryDocumentSnapshot,
+    docId: string,
+  ) => Promise<void>,
+): Promise<{processed: number; next: ReconcileCursorPos | null}> {
+  let processed = 0;
+  let pendingCursor = cursor;
+
+  for (const schoolDoc of schools) {
+    let lastId: string | null = null;
+    if (pendingCursor) {
+      // Skip schools wholly before the cursor. If the cursor's school was
+      // deleted, resume at the first school after it (lexicographic).
+      if (schoolDoc.id < pendingCursor.schoolId) continue;
+      if (schoolDoc.id === pendingCursor.schoolId) {
+        lastId = pendingCursor.docId || null;
+      }
+      pendingCursor = null;
+    }
+
+    for (;;) {
+      const remaining = budget - processed;
+      if (remaining <= 0) {
+        // Budget exhausted mid-population: resume here next run. (If the
+        // school happened to be exactly finished, next run's startAfter
+        // returns an empty page and moves on — one cheap wasted query.)
+        return {
+          processed,
+          next: {schoolId: schoolDoc.id, docId: lastId ?? ""},
+        };
+      }
+      const pageSize = Math.min(remaining, RECONCILE_PAGE);
+      let query = schoolDoc.ref
+        .collection(sub)
+        .orderBy(admin.firestore.FieldPath.documentId())
+        .limit(pageSize);
+      if (lastId) query = query.startAfter(lastId);
+      const page = await query.select().get();
+      if (page.empty) break;
+
+      for (const doc of page.docs) {
+        try {
+          await fn(schoolDoc, doc.id);
+        } catch (err) {
+          functions.logger.error(`reconcile ${sub} doc failed`, {
+            schoolId: schoolDoc.id, docId: doc.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        processed++;
+        lastId = doc.id;
+      }
+      if (page.size < pageSize) break; // school exhausted
+    }
+  }
+
+  return {processed, next: null};
+}
+
+/**
+ * Reconcile up to the budgeted number of students + classes, resuming from
+ * where the previous run stopped (cursor persisted in
+ * platformConfig/statsReconcileCursor). Safety net for any drift in the
+ * incremental path: successive weekly runs now cover the WHOLE population
+ * in budget-sized slices instead of re-reconciling the same first N docs
+ * while starving the tail.
  * @param {object} opts Optional caps to keep the pass within the 540s function timeout.
  * @return {Promise<object>} Counts of docs reconciled before the budget was reached.
  */
@@ -577,49 +700,38 @@ export async function runReconcilePass(opts: {
   const studentBudget = opts.studentBudget ?? 5000;
   const classBudget = opts.classBudget ?? 1000;
 
-  let studentsProcessed = 0;
-  let classesProcessed = 0;
+  const cursorSnap = await reconcileCursorDoc().get();
+  const cursorData = cursorSnap.data();
 
-  const schoolsSnap = await db.collection("schools").get();
-  for (const schoolDoc of schoolsSnap.docs) {
-    const schoolId = schoolDoc.id;
+  // Schools ordered by documentId so the cursor's notion of before/after
+  // is stable across runs.
+  const schoolsSnap = await db
+    .collection("schools")
+    .orderBy(admin.firestore.FieldPath.documentId())
+    .get();
+  const schools = schoolsSnap.docs;
 
-    if (studentsProcessed < studentBudget) {
-      const studentsSnap = await db
-        .collection(`schools/${schoolId}/students`)
-        .get();
-      for (const studentDoc of studentsSnap.docs) {
-        if (studentsProcessed >= studentBudget) break;
-        try {
-          await reconcileStudentStats(schoolId, studentDoc.id);
-          studentsProcessed++;
-        } catch (err) {
-          functions.logger.error("reconcileStudentStats failed", {
-            schoolId, studentId: studentDoc.id,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      }
-    }
+  // schoolDoc.data() is already in hand from the schools query — pass it
+  // through so reconcileStudentStats doesn't re-read the school doc for
+  // every student in the school.
+  const students = await pageAndReconcile(
+    schools, "students", readCursorPos(cursorData, "student"), studentBudget,
+    (schoolDoc, docId) =>
+      reconcileStudentStats(schoolDoc.id, docId, schoolDoc.data()),
+  );
+  const classes = await pageAndReconcile(
+    schools, "classes", readCursorPos(cursorData, "class"), classBudget,
+    (schoolDoc, docId) => reconcileClassStats(schoolDoc.id, docId),
+  );
 
-    if (classesProcessed < classBudget) {
-      const classesSnap = await db
-        .collection(`schools/${schoolId}/classes`)
-        .get();
-      for (const classDoc of classesSnap.docs) {
-        if (classesProcessed >= classBudget) break;
-        try {
-          await reconcileClassStats(schoolId, classDoc.id);
-          classesProcessed++;
-        } catch (err) {
-          functions.logger.error("reconcileClassStats failed", {
-            schoolId, classId: classDoc.id,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      }
-    }
-  }
+  await reconcileCursorDoc().set({
+    student: students.next, // null = wrapped; next run starts fresh
+    class: classes.next,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
 
-  return {studentsProcessed, classesProcessed};
+  return {
+    studentsProcessed: students.processed,
+    classesProcessed: classes.processed,
+  };
 }

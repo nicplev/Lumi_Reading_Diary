@@ -228,3 +228,26 @@ export function isWithinQuietHours(
 
   return localMinutes >= startMinutes || localMinutes < endMinutes;
 }
+
+/**
+ * The school-local hour (0-23) at which a parent wants their reading
+ * reminder. Single source of truth shared by sendReadingReminders'
+ * eligibility check, the syncParentReminderHour mirror trigger, and
+ * scripts/backfill_reminder_hour.js — the denormalized `reminderHour`
+ * field on parent docs MUST always equal this function applied to
+ * `preferences.reminderTime`, or the scheduler's equality query will
+ * miss/mis-hit parents.
+ *
+ * Mirrors the scheduler's historical inline parse exactly, INCLUDING its
+ * quirk: a "00:xx" (midnight) preference falls back to 19 because
+ * parseInt yields a falsy 0. Kept bug-for-bug so denormalizing cannot
+ * change who gets reminded at which hour.
+ * @param {unknown} reminderTime The raw `preferences.reminderTime` value.
+ * @return {number} Hour of day the parent should be reminded (default 19).
+ */
+export function parseReminderHour(reminderTime: unknown): number {
+  if (typeof reminderTime !== "string" || reminderTime.length === 0) {
+    return 19;
+  }
+  return parseInt(reminderTime.split(":")[0], 10) || 19;
+}
