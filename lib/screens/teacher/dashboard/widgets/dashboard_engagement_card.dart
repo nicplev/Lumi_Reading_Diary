@@ -146,7 +146,8 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
       stream: _logsStream,
       builder: (context, logsSnapshot) {
         if (logsSnapshot.hasError) {
-          return const InlineStreamError(message: "Couldn't load today's reading.");
+          return const InlineStreamError(
+              message: "Couldn't load today's reading.");
         }
         final logs = logsSnapshot.data?.docs
                 .map((doc) => ReadingLogModel.fromFirestore(doc))
@@ -186,9 +187,8 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
         }
 
         final notReadCount = totalStudents - readCount;
-        final engagementPercent = totalStudents > 0
-            ? (readCount / totalStudents * 100).round()
-            : 0;
+        final engagementPercent =
+            totalStudents > 0 ? (readCount / totalStudents * 100).round() : 0;
         final isAllRead = totalStudents > 0 && readCount >= totalStudents;
 
         final pendingStudents = widget.students
@@ -276,9 +276,13 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
             ),
             Icon(Icons.schedule_rounded, size: 16, color: LumiTokens.yellow),
             const SizedBox(width: 6),
-            Text(
-              '${pendingStudents.length} haven\'t read yet',
-              style: LumiType.subhead.copyWith(fontSize: 15),
+            Expanded(
+              child: Text(
+                '${pendingStudents.length} haven\'t read yet',
+                style: LumiType.subhead.copyWith(fontSize: 15),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),
@@ -446,4 +450,3 @@ class _DashboardEngagementCardState extends State<DashboardEngagementCard>
     );
   }
 }
-

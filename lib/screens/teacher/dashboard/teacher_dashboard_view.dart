@@ -981,9 +981,11 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
           const SizedBox(height: 10),
           Row(
             children: [
-              _buildClassChip()
-                  .animate()
-                  .fadeIn(delay: 100.ms, duration: 300.ms),
+              Flexible(
+                child: _buildClassChip()
+                    .animate()
+                    .fadeIn(delay: 100.ms, duration: 300.ms),
+              ),
             ],
           ),
         ],
@@ -1000,12 +1002,16 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
         Icon(Icons.class_outlined,
             size: 18, color: LumiSectionTheme.dashboard.onAccent),
         const SizedBox(width: 8),
-        Text(
-          label,
-          style: LumiType.subhead.copyWith(
-            color: LumiSectionTheme.dashboard.onAccent,
-            fontWeight: FontWeight.w700,
-            fontSize: 16,
+        Flexible(
+          child: Text(
+            label,
+            style: LumiType.subhead.copyWith(
+              color: LumiSectionTheme.dashboard.onAccent,
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
         if (_momentumDiff != null) ...[

@@ -65,7 +65,12 @@ class AllocationScheduleCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              Expanded(child: _buildMinutesField()),
+              Expanded(
+                child: _MinutesField(
+                  label: _minutesLabel,
+                  controller: minutesController,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -108,13 +113,52 @@ class AllocationScheduleCard extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget _buildMinutesField() {
+class _MinutesField extends StatefulWidget {
+  const _MinutesField({
+    required this.label,
+    required this.controller,
+  });
+
+  final String label;
+  final TextEditingController controller;
+
+  @override
+  State<_MinutesField> createState() => _MinutesFieldState();
+}
+
+class _MinutesFieldState extends State<_MinutesField> {
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode()..addListener(_handleFocusChange);
+  }
+
+  @override
+  void dispose() {
+    _focusNode
+      ..removeListener(_handleFocusChange)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _handleFocusChange() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasFocus = _focusNode.hasFocus;
+    final focusColor = LumiTokens.green;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          _minutesLabel,
+          widget.label,
           style: LumiType.caption.copyWith(
             color: LumiTokens.ink,
             fontWeight: FontWeight.w600,
@@ -125,21 +169,35 @@ class AllocationScheduleCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14),
           height: 52,
           decoration: BoxDecoration(
-            color: LumiTokens.cream,
+            color: hasFocus
+                ? LumiTokens.tintGreen.withValues(alpha: 0.18)
+                : LumiTokens.cream,
             borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
-            border: Border.all(color: LumiTokens.rule, width: 1.2),
+            border: Border.all(
+              color: hasFocus ? focusColor : LumiTokens.rule,
+              width: hasFocus ? 2 : 1.2,
+            ),
           ),
           child: Row(
             children: [
               Expanded(
                 child: TextField(
-                  controller: minutesController,
+                  controller: widget.controller,
+                  focusNode: _focusNode,
                   keyboardType: TextInputType.number,
-                  cursorColor: LumiTokens.green,
+                  cursorColor: focusColor,
                   style: LumiType.body.copyWith(color: LumiTokens.ink),
                   decoration: const InputDecoration(
                     isCollapsed: true,
+                    contentPadding: EdgeInsets.zero,
                     border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    focusColor: Colors.transparent,
+                    hoverColor: Colors.transparent,
                   ),
                 ),
               ),

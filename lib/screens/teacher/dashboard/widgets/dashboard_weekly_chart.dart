@@ -100,8 +100,7 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
         .doc(widget.schoolId)
         .collection('readingLogs')
         .where('classId', isEqualTo: widget.classModel.id)
-        .where('date',
-            isGreaterThanOrEqualTo: Timestamp.fromDate(_startOfWeek))
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(_startOfWeek))
         .where('date', isLessThan: Timestamp.fromDate(endOfWeek))
         .snapshots();
   }
@@ -197,7 +196,8 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
             stream: _weeklyStream,
             builder: (context, snapshot) {
               if (snapshot.hasError) {
-                return const InlineStreamError(message: "Couldn't load this week's reading.");
+                return const InlineStreamError(
+                    message: "Couldn't load this week's reading.");
               }
               // While the (re-created) stream is still loading — e.g. right
               // after toggling This week / Last week — hold a stable
@@ -220,9 +220,9 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
               for (final log in logs) {
                 final date = log.date;
                 final dayIndex = _startOfWeek
-                        .difference(DateTime(date.year, date.month, date.day))
-                        .inDays
-                        .abs();
+                    .difference(DateTime(date.year, date.month, date.day))
+                    .inDays
+                    .abs();
                 if (dayIndex >= 0 && dayIndex < 7) {
                   studentsByDay[dayIndex]!.add(log.studentId);
                 }
@@ -265,11 +265,12 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
                     height: 170,
                     child: BarChart(
                       BarChartData(
-                        barGroups:
-                            _buildBarGroups(completionByDay, todayIndex, totalStudents),
+                        barGroups: _buildBarGroups(
+                            completionByDay, todayIndex, totalStudents),
                         maxY: max(totalStudents.toDouble(), 1),
                         alignment: BarChartAlignment.spaceAround,
-                        titlesData: _buildTitlesData(completionByDay, todayIndex),
+                        titlesData:
+                            _buildTitlesData(completionByDay, todayIndex),
                         borderData: FlBorderData(show: false),
                         gridData: FlGridData(
                           show: true,
@@ -308,8 +309,7 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
                                 BorderRadius.circular(LumiTokens.radiusMedium),
                             tooltipPadding: const EdgeInsets.symmetric(
                                 horizontal: 14, vertical: 10),
-                            getTooltipItem:
-                                (group, groupIndex, rod, rodIndex) {
+                            getTooltipItem: (group, groupIndex, rod, rodIndex) {
                               const days = [
                                 'Monday',
                                 'Tuesday',
@@ -331,8 +331,7 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
                                 ),
                                 children: [
                                   TextSpan(
-                                    text:
-                                        '$count/$totalStudents read · $pct%',
+                                    text: '$count/$totalStudents read · $pct%',
                                     style: LumiType.caption.copyWith(
                                       color: LumiTokens.paper
                                           .withValues(alpha: 0.8),
@@ -389,8 +388,7 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
     });
   }
 
-  FlTitlesData _buildTitlesData(
-      Map<int, int> completionByDay, int todayIndex) {
+  FlTitlesData _buildTitlesData(Map<int, int> completionByDay, int todayIndex) {
     return FlTitlesData(
       bottomTitles: AxisTitles(
         sideTitles: SideTitles(
@@ -479,7 +477,9 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
     // Compared against the week before the one on screen.
     final vsLabel =
         _weekOffset == 0 ? 'than last week' : 'than the week before';
-    if (_prevWeekLoaded && _prevWeekTotal != null && _prevWeekDayCount != null) {
+    if (_prevWeekLoaded &&
+        _prevWeekTotal != null &&
+        _prevWeekDayCount != null) {
       final lastAvg = _prevWeekDayCount! > 0
           ? (_prevWeekTotal! / _prevWeekDayCount!).round()
           : 0;
@@ -503,8 +503,11 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
         color: LumiTokens.cream,
         borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 12,
+        runSpacing: 4,
         children: [
           Text(
             'Avg $avgPerDay of $totalStudents per night',

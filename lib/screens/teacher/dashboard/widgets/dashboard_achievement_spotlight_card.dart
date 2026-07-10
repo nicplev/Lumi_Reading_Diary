@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/achievements/achievement_presentation.dart';
+import '../../../../data/models/achievement_model.dart';
 import '../../../../theme/lumi_tokens.dart';
 import '../../../../theme/lumi_typography.dart';
-import '../../../../data/models/achievement_model.dart';
 import '../models/student_achievement.dart';
 
 /// Highlights the most recent achievements earned across the class.
@@ -38,8 +39,7 @@ class DashboardAchievementSpotlightCard extends StatelessWidget {
           // Header
           Row(
             children: [
-              Text('Achievement Spotlight',
-                  style: LumiType.subhead),
+              Text('Achievement Spotlight', style: LumiType.subhead),
               const Spacer(),
               if (thisWeekCount > 0)
                 Container(
@@ -80,18 +80,20 @@ class DashboardAchievementSpotlightCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
-          // Emoji icon in coloured circle
+          // Material placeholder icon in a coloured circle.
           Container(
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: rarityColor.withValues(alpha: 0.12),
+              color:
+                  achievementCategoryColor(a.category).withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: Center(
-              child: Text(
-                a.icon,
-                style: const TextStyle(fontSize: 16),
+              child: Icon(
+                achievementIconFor(a),
+                size: 20,
+                color: achievementCategoryColor(a.category),
               ),
             ),
           ),
@@ -161,8 +163,7 @@ class DashboardAchievementSpotlightCard extends StatelessWidget {
         child: Column(
           children: [
             Icon(Icons.military_tech_rounded,
-                size: 32,
-                color: LumiTokens.muted.withValues(alpha: 0.3)),
+                size: 32, color: LumiTokens.muted.withValues(alpha: 0.3)),
             const SizedBox(height: 8),
             Text(
               "No achievements earned yet — they'll appear here!",

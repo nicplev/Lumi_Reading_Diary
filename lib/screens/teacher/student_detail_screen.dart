@@ -895,18 +895,26 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     required String label,
     required VoidCallback onPressed,
     bool primary = false,
+    bool outlinedAccent = false,
   }) {
     // The single primary action ("Assign") carries the green accent; the rest
     // are calm neutral ghost buttons so the toolbar doesn't shout.
-    final fg = primary ? LumiTokens.green : LumiTokens.ink;
+    final isAccent = primary || outlinedAccent;
+    final fg = isAccent ? LumiTokens.green : LumiTokens.ink;
     return GestureDetector(
       onTap: onPressed,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 9),
         decoration: BoxDecoration(
-          color: primary ? LumiTokens.tintGreen : LumiTokens.paper,
+          color: primary && !outlinedAccent
+              ? LumiTokens.tintGreen
+              : LumiTokens.paper,
           borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
-          border: primary ? null : Border.all(color: LumiTokens.rule),
+          border: outlinedAccent
+              ? Border.all(color: LumiTokens.green, width: 1.3)
+              : primary
+                  ? null
+                  : Border.all(color: LumiTokens.rule),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -940,7 +948,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             icon: Icons.edit_note_rounded,
             label: 'Log',
             onPressed: _openTeacherLogSheet,
-            primary: true,
+            outlinedAccent: true,
           ),
         ),
         const SizedBox(width: 8),
