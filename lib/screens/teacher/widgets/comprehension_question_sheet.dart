@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
 import '../../../core/widgets/lumi/lumi_buttons.dart';
+import '../../../core/widgets/lumi/lumi_toast.dart';
 import '../../../data/models/class_model.dart';
 import '../../../services/firebase_service.dart';
 
@@ -67,7 +68,6 @@ class _ComprehensionQuestionSheetState
 
   Future<void> _save() async {
     final trimmed = _controller.text.trim();
-    final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
     setState(() => _saving = true);
     try {
@@ -84,18 +84,18 @@ class _ComprehensionQuestionSheetState
         'settings.comprehensionQuestion':
             isDefault ? FieldValue.delete() : trimmed,
       });
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(isDefault
-              ? 'Reset to the default question.'
-              : 'Question updated.'),
-          duration: const Duration(seconds: 2),
-        ),
+      showLumiToast(
+        message: isDefault
+            ? 'Reset to the default question.'
+            : 'Question updated.',
+        type: LumiToastType.success,
+        duration: const Duration(seconds: 2),
       );
       navigator.pop();
     } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('Could not save: $e')),
+      showLumiToast(
+        message: 'Could not save: $e',
+        type: LumiToastType.error,
       );
       if (mounted) setState(() => _saving = false);
     }

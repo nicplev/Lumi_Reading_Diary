@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import 'lumi/lumi_toast.dart';
 
 /// Common reusable UI components for consistent design across the app
 class CommonWidgets {
@@ -313,37 +314,16 @@ class CommonWidgets {
   }
 
   /// Success snackbar
-  static void showSuccessSnackbar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
+  static void showSuccessSnackbar(BuildContext context, String message) =>
+      showLumiToast(message: message, type: LumiToastType.success);
 
   /// Error snackbar
-  static void showErrorSnackbar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.error,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
+  static void showErrorSnackbar(BuildContext context, String message) =>
+      showLumiToast(message: message, type: LumiToastType.error);
 
   /// Info snackbar
-  static void showInfoSnackbar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.info,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
+  static void showInfoSnackbar(BuildContext context, String message) =>
+      showLumiToast(message: message, type: LumiToastType.info);
 
   /// Avatar with initials
   static Widget buildAvatar({

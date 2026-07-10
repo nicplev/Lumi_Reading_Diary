@@ -9,6 +9,7 @@ import '../../services/reading_level_service.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 
 /// Neutral Lumi card surface shared by this screen's sections + dialogs.
 /// Flat, bordered "bento" compartment — no drop shadow, defined by its rule.
@@ -591,11 +592,9 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
       setState(() => _isLoading = false);
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error loading data: $e'),
-          backgroundColor: LumiTokens.red,
-        ),
+      showLumiToast(
+        message: 'Error loading data: $e',
+        type: LumiToastType.error,
       );
     }
   }
@@ -624,22 +623,18 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
 
         if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Group created successfully!'),
-            backgroundColor: LumiTokens.green,
-          ),
+        showLumiToast(
+          message: 'Group created successfully!',
+          type: LumiToastType.success,
         );
 
         _loadData();
       } catch (e) {
         if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error creating group: $e'),
-            backgroundColor: LumiTokens.red,
-          ),
+        showLumiToast(
+          message: 'Error creating group: $e',
+          type: LumiToastType.error,
         );
       }
     }
@@ -671,22 +666,18 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
 
         if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Group updated successfully!'),
-            backgroundColor: LumiTokens.green,
-          ),
+        showLumiToast(
+          message: 'Group updated successfully!',
+          type: LumiToastType.success,
         );
 
         _loadData();
       } catch (e) {
         if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating group: $e'),
-            backgroundColor: LumiTokens.red,
-          ),
+        showLumiToast(
+          message: 'Error updating group: $e',
+          type: LumiToastType.error,
         );
       }
     }
@@ -739,22 +730,18 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
 
         if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Group deleted successfully!'),
-            backgroundColor: LumiTokens.green,
-          ),
+        showLumiToast(
+          message: 'Group deleted successfully!',
+          type: LumiToastType.success,
         );
 
         _loadData();
       } catch (e) {
         if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error deleting group: $e'),
-            backgroundColor: LumiTokens.red,
-          ),
+        showLumiToast(
+          message: 'Error deleting group: $e',
+          type: LumiToastType.error,
         );
       }
     }
@@ -1012,22 +999,18 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
 
         if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Students updated successfully!'),
-            backgroundColor: LumiTokens.green,
-          ),
+        showLumiToast(
+          message: 'Students updated successfully!',
+          type: LumiToastType.success,
         );
 
         _loadData();
       } catch (e) {
         if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating students: $e'),
-            backgroundColor: LumiTokens.red,
-          ),
+        showLumiToast(
+          message: 'Error updating students: $e',
+          type: LumiToastType.error,
         );
       }
     }
@@ -1035,10 +1018,9 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
 
   Future<void> _assignStudentToGroup(StudentModel student) async {
     if (_groups.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please create a group first'),
-        ),
+      showLumiToast(
+        message: 'Please create a group first',
+        type: LumiToastType.warning,
       );
       return;
     }
@@ -1138,22 +1120,18 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
 
         if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${student.fullName} added to ${selectedGroup.name}'),
-            backgroundColor: LumiTokens.green,
-          ),
+        showLumiToast(
+          message: '${student.fullName} added to ${selectedGroup.name}',
+          type: LumiToastType.success,
         );
 
         _loadData();
       } catch (e) {
         if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error assigning student: $e'),
-            backgroundColor: LumiTokens.red,
-          ),
+        showLumiToast(
+          message: 'Error assigning student: $e',
+          type: LumiToastType.error,
         );
       }
     }
@@ -1163,8 +1141,9 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
   /// group in one go.
   void _showBatchAssign() {
     if (_groups.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please create a group first')),
+      showLumiToast(
+        message: 'Please create a group first',
+        type: LumiToastType.warning,
       );
       return;
     }
@@ -1431,21 +1410,17 @@ class _ReadingGroupsScreenState extends State<ReadingGroupsScreen> {
         'updatedAt': FieldValue.serverTimestamp(),
       });
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              '${studentIds.length} student${studentIds.length == 1 ? '' : 's'} added to ${group.name}'),
-          backgroundColor: LumiTokens.green,
-        ),
+      showLumiToast(
+        message:
+            '${studentIds.length} student${studentIds.length == 1 ? '' : 's'} added to ${group.name}',
+        type: LumiToastType.success,
       );
       _loadData();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error assigning students: $e'),
-          backgroundColor: LumiTokens.red,
-        ),
+      showLumiToast(
+        message: 'Error assigning students: $e',
+        type: LumiToastType.error,
       );
     }
   }

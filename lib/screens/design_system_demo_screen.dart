@@ -6,6 +6,7 @@ import '../core/theme/lumi_borders.dart';
 import '../core/widgets/lumi/lumi_buttons.dart';
 import '../core/widgets/lumi/lumi_card.dart';
 import '../core/widgets/lumi/lumi_input.dart';
+import '../core/widgets/lumi/lumi_toast.dart';
 
 /// Lumi Design System Demo Screen
 ///
@@ -489,13 +490,10 @@ class _DesignSystemDemoScreenState extends State<DesignSystemDemoScreen> {
   }
 
   void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.charcoal,
-      ),
+    showLumiToast(
+      message: message,
+      type: LumiToastType.info,
+      duration: const Duration(seconds: 2),
     );
   }
 }

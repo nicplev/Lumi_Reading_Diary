@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../../core/auth/sign_out_flow.dart';
 import '../../../core/widgets/lumi/lumi_buttons.dart';
+import '../../../core/widgets/lumi/lumi_toast.dart';
 import '../../../core/widgets/lumi/student_avatar.dart';
 import '../../../data/models/class_model.dart';
 import '../../../data/models/student_model.dart';
@@ -115,11 +116,10 @@ class _ClassroomKioskScreenState extends State<ClassroomKioskScreen> {
     final pin = await showKioskPinSetupDialog(context);
     if (pin != null) {
       await pins.setPin(_teacherId, pin);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Exit PIN set for this device')),
-        );
-      }
+      showLumiToast(
+        message: 'Exit PIN set for this device',
+        type: LumiToastType.success,
+      );
     }
   }
 
@@ -136,11 +136,10 @@ class _ClassroomKioskScreenState extends State<ClassroomKioskScreen> {
       final pin = await showKioskPinSetupDialog(context);
       if (pin != null) {
         await pins.setPin(_teacherId, pin);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Exit PIN set for this device')),
-          );
-        }
+        showLumiToast(
+          message: 'Exit PIN set for this device',
+          type: LumiToastType.success,
+        );
       }
       return;
     }
@@ -190,11 +189,10 @@ class _ClassroomKioskScreenState extends State<ClassroomKioskScreen> {
       if (pin != null) await pins.setPin(_teacherId, pin);
     } else if (action == 'remove') {
       await pins.clearPin(_teacherId);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Exit PIN removed')),
-        );
-      }
+      showLumiToast(
+        message: 'Exit PIN removed',
+        type: LumiToastType.success,
+      );
     }
   }
 

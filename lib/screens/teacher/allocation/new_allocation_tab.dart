@@ -7,6 +7,7 @@ import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
 import '../../../core/widgets/lumi/lumi_buttons.dart';
 import '../../../core/widgets/lumi/lumi_card.dart';
+import '../../../core/widgets/lumi/lumi_toast.dart';
 import '../../../data/models/user_model.dart';
 import '../../../data/models/class_model.dart';
 import '../../../data/models/student_model.dart';
@@ -258,8 +259,9 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
     });
 
     if (widget.selectedClass == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a class')),
+      showLumiToast(
+        message: 'Please select a class',
+        type: LumiToastType.warning,
       );
       return false;
     }
@@ -443,13 +445,11 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(widget.editingAllocation != null
-                ? 'Allocation updated'
-                : 'Allocation created'),
-            backgroundColor: LumiTokens.green,
-          ),
+        showLumiToast(
+          message: widget.editingAllocation != null
+              ? 'Allocation updated'
+              : 'Allocation created',
+          type: LumiToastType.success,
         );
         _resetForm();
         widget.onSaved();
@@ -458,11 +458,10 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
       debugPrint('Error saving allocation: $e');
       debugPrint('Stack trace: $stackTrace');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to save: ${e.toString()}'),
-            duration: const Duration(seconds: 5),
-          ),
+        showLumiToast(
+          message: 'Failed to save: ${e.toString()}',
+          type: LumiToastType.error,
+          duration: const Duration(seconds: 5),
         );
       }
     } finally {
@@ -524,8 +523,9 @@ class _NewAllocationTabState extends State<NewAllocationTab> {
     if (text.isEmpty) return;
 
     if (_bookTitles.any((t) => t.toLowerCase() == text.toLowerCase())) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This book is already in the list')),
+      showLumiToast(
+        message: 'This book is already in the list',
+        type: LumiToastType.info,
       );
       return;
     }

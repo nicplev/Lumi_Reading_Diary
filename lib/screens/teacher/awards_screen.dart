@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../core/characters/lumi_character.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/student_model.dart';
 import '../../services/firebase_service.dart';
@@ -56,9 +57,11 @@ class _AwardsScreenState extends State<AwardsScreen> {
         ..sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase())));
 
   void _snack(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg), duration: const Duration(seconds: 2)));
+    showLumiToast(
+      message: msg,
+      type: LumiToastType.info,
+      duration: const Duration(seconds: 2),
+    );
   }
 
   Future<void> _run(Future<void> Function() action, {String? failMsg}) async {

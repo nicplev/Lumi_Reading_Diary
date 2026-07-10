@@ -7,6 +7,7 @@ import 'package:just_audio/just_audio.dart';
 import '../../../services/comprehension_audio_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/lumi_text_styles.dart';
+import '../lumi/lumi_toast.dart';
 
 /// A cached signed URL and the moment it stops being valid.
 class _CachedUrl {
@@ -162,7 +163,6 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
   bool get _canDelete => !_deleting;
 
   Future<void> _confirmAndDelete() async {
-    final messenger = ScaffoldMessenger.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -199,14 +199,16 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
     } on FirebaseFunctionsException catch (e) {
       if (!mounted) return;
       setState(() => _deleting = false);
-      messenger.showSnackBar(
-        SnackBar(content: Text(e.message ?? 'Failed to delete recording')),
+      showLumiToast(
+        message: e.message ?? 'Failed to delete recording',
+        type: LumiToastType.error,
       );
     } catch (_) {
       if (!mounted) return;
       setState(() => _deleting = false);
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Failed to delete recording')),
+      showLumiToast(
+        message: 'Failed to delete recording',
+        type: LumiToastType.error,
       );
     }
   }

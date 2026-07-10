@@ -11,6 +11,7 @@ import '../../services/firebase_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../core/widgets/lumi/lumi_skeleton.dart';
 import '../../core/widgets/lumi/teacher_alert_banner.dart';
 import '../../core/widgets/lumi/teacher_filter_chip.dart';
@@ -529,12 +530,10 @@ class _ClassReportScreenState extends State<ClassReportScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Class report generated successfully!'),
-          backgroundColor: AppColors.success,
-          duration: Duration(seconds: 2),
-        ),
+      showLumiToast(
+        message: 'Class report generated successfully!',
+        type: LumiToastType.success,
+        duration: const Duration(seconds: 2),
       );
     } catch (e) {
       setState(() {
@@ -544,12 +543,10 @@ class _ClassReportScreenState extends State<ClassReportScreen> {
       debugPrint('Class report generation failed: $e');
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text("Couldn't generate the report. Please try again."),
-          backgroundColor: AppColors.error,
-          duration: const Duration(seconds: 3),
-        ),
+      showLumiToast(
+        message: "Couldn't generate the report. Please try again.",
+        type: LumiToastType.error,
+        duration: const Duration(seconds: 3),
       );
     }
   }
@@ -562,11 +559,9 @@ class _ClassReportScreenState extends State<ClassReportScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error sharing report: $e'),
-          backgroundColor: AppColors.error,
-        ),
+      showLumiToast(
+        message: 'Error sharing report: $e',
+        type: LumiToastType.error,
       );
     }
   }
@@ -579,11 +574,9 @@ class _ClassReportScreenState extends State<ClassReportScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error printing report: $e'),
-          backgroundColor: AppColors.error,
-        ),
+      showLumiToast(
+        message: 'Error printing report: $e',
+        type: LumiToastType.error,
       );
     }
   }

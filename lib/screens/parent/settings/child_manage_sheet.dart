@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/widgets/lumi/student_avatar.dart';
+import '../../../core/widgets/lumi/lumi_toast.dart';
 import '../../../data/models/student_link_code_model.dart';
 import '../../../data/models/student_model.dart';
 import '../../../data/models/user_model.dart';
@@ -76,8 +77,9 @@ class _ChildManageSheetState extends State<_ChildManageSheet> {
     if (!mounted) return;
 
     if (code == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not create invite: $error')),
+      showLumiToast(
+        message: 'Could not create invite: $error',
+        type: LumiToastType.error,
       );
       return;
     }
@@ -123,8 +125,9 @@ class _ChildManageSheetState extends State<_ChildManageSheet> {
           TextButton(
             onPressed: () {
               Clipboard.setData(ClipboardData(text: inviteCode));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Code copied')),
+              showLumiToast(
+                message: 'Code copied',
+                type: LumiToastType.success,
               );
             },
             child: Text('Copy code',

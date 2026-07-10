@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
 import '../../../core/widgets/lumi/lumi_card.dart';
+import '../../../core/widgets/lumi/lumi_toast.dart';
 import '../../../data/models/user_model.dart';
 import '../../../data/models/class_model.dart';
 import '../../../data/models/allocation_model.dart';
@@ -105,19 +106,15 @@ class _ActiveAllocationsTabState extends State<ActiveAllocationsTab> {
           actorId: widget.teacher.id,
           isActive: false,
         );
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Allocation removed.')),
-          );
-        }
+        showLumiToast(
+          message: 'Allocation removed.',
+          type: LumiToastType.success,
+        );
       } catch (_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Couldn't remove the allocation. Please try again."),
-            ),
-          );
-        }
+        showLumiToast(
+          message: "Couldn't remove the allocation. Please try again.",
+          type: LumiToastType.error,
+        );
       }
     }
   }

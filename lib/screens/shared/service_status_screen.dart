@@ -6,6 +6,7 @@ import '../../core/config/dev_access.dart';
 import '../../core/models/remote_message.dart';
 import '../../core/models/service_status.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../data/providers/remote_message_provider.dart';
 import '../../data/providers/service_status_provider.dart';
@@ -282,10 +283,9 @@ class ServiceStatusScreen extends ConsumerWidget {
     await OfflineService.instance.clearCachedData();
     await OfflineService.instance.triggerSync();
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Cached data cleared — re-downloading from the cloud.'),
-      ),
+    showLumiToast(
+      message: 'Cached data cleared — re-downloading from the cloud.',
+      type: LumiToastType.info,
     );
   }
 }

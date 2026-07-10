@@ -12,6 +12,7 @@ import '../../core/widgets/lumi/feedback_widget.dart';
 import '../../core/widgets/lumi/teacher_settings_section.dart';
 import '../../core/widgets/lumi/teacher_settings_item.dart';
 import '../../core/widgets/lumi/legal_links_row.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/user_model.dart';
 import '../../services/firebase_service.dart';
@@ -154,8 +155,9 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen>
     if (_loadingClasses) return;
 
     if (_classes.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No classes assigned to your account.')),
+      showLumiToast(
+        message: 'No classes assigned to your account.',
+        type: LumiToastType.info,
       );
       return;
     }

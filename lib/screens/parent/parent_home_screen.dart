@@ -19,6 +19,7 @@ import '../../core/widgets/lumi/lumi_card.dart';
 import '../../core/widgets/lumi/week_progress_bar.dart';
 import '../../core/widgets/lumi/lumi_book_card.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../core/tour/lumi_app_tour.dart';
 import '../../core/services/navigation_state_service.dart';
@@ -942,10 +943,9 @@ class _TodayCardState extends State<_TodayCard> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _isQuickLogging = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Couldn't log reading. Please try again."),
-        ),
+      showLumiToast(
+        message: "Couldn't log reading. Please try again.",
+        type: LumiToastType.error,
       );
     }
   }
@@ -1637,10 +1637,9 @@ class _TonightRowState extends State<_TonightRow> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _isQuickLogging = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Couldn't log reading. Please try again."),
-        ),
+      showLumiToast(
+        message: "Couldn't log reading. Please try again.",
+        type: LumiToastType.error,
       );
     }
   }

@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/lumi_text_styles.dart';
 import '../../../core/theme/lumi_spacing.dart';
 import '../../../core/widgets/lumi/lumi_buttons.dart';
+import '../../../core/widgets/lumi/lumi_toast.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../data/models/student_model.dart';
 import '../../../services/firebase_service.dart';
@@ -87,8 +88,9 @@ class _CharacterPickerSheetState extends State<CharacterPickerSheet> {
     } catch (_) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to save. Please try again.')),
+        showLumiToast(
+          message: 'Failed to save. Please try again.',
+          type: LumiToastType.error,
         );
       }
     }

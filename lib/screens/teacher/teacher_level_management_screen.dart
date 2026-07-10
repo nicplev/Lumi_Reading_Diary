@@ -6,6 +6,7 @@ import '../../core/theme/teacher_constants.dart';
 import '../../core/widgets/lumi/reading_level_picker_sheet.dart';
 import '../../core/widgets/lumi/teacher_reading_level_pill.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/reading_level_option.dart';
 import '../../data/models/student_model.dart';
@@ -256,24 +257,17 @@ class _TeacherLevelManagementScreenState
         setState(() => _selectedStudentIds.clear());
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            updatedCount > 0
-                ? 'Updated reading levels for $updatedCount student${updatedCount == 1 ? '' : 's'}'
-                : 'No reading level changes were needed',
-          ),
-          backgroundColor:
-              updatedCount > 0 ? AppColors.success : AppColors.textSecondary,
-        ),
+      showLumiToast(
+        message: updatedCount > 0
+            ? 'Updated reading levels for $updatedCount student${updatedCount == 1 ? '' : 's'}'
+            : 'No reading level changes were needed',
+        type: updatedCount > 0 ? LumiToastType.success : LumiToastType.info,
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not update reading levels: $error'),
-          backgroundColor: AppColors.error,
-        ),
+      showLumiToast(
+        message: 'Could not update reading levels: $error',
+        type: LumiToastType.error,
       );
     } finally {
       if (mounted) {
@@ -290,11 +284,10 @@ class _TeacherLevelManagementScreenState
     final sharedLevel = _sharedSelectedLevelValue(selectedStudents);
     if (sharedLevel == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-              'Select students with the same current level to move together'),
-        ),
+      showLumiToast(
+        message:
+            'Select students with the same current level to move together',
+        type: LumiToastType.warning,
       );
       return;
     }
@@ -305,14 +298,11 @@ class _TeacherLevelManagementScreenState
 
     if (targetOption == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            increase
-                ? 'Those students are already at the top of the level scale'
-                : 'Those students are already at the lowest level',
-          ),
-        ),
+      showLumiToast(
+        message: increase
+            ? 'Those students are already at the top of the level scale'
+            : 'Those students are already at the lowest level',
+        type: LumiToastType.info,
       );
       return;
     }

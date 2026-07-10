@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_input.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../data/models/user_model.dart';
 import '../../services/mfa_settings_service.dart';
 import '../../services/phone_verification_recovery_service.dart';
@@ -186,18 +187,18 @@ class _MfaSettingsSheetState extends State<_MfaSettingsSheet> {
       // spurious recovery screen on the next launch.
       unawaited(PhoneVerificationRecoveryService.instance.clear());
       if (outcome == MfaSignupOutcome.needsLogin) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('MFA is on. Please sign in again to continue.'),
-          ),
+        showLumiToast(
+          message: 'MFA is on. Please sign in again to continue.',
+          type: LumiToastType.info,
         );
         Navigator.pop(context, true);
         return;
       }
       await _loadStatus();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('SMS verification turned on')),
+      showLumiToast(
+        message: 'SMS verification turned on',
+        type: LumiToastType.success,
       );
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
@@ -268,8 +269,9 @@ class _MfaSettingsSheetState extends State<_MfaSettingsSheet> {
       _changed = true;
       await _loadStatus();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('SMS verification turned off')),
+      showLumiToast(
+        message: 'SMS verification turned off',
+        type: LumiToastType.info,
       );
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
