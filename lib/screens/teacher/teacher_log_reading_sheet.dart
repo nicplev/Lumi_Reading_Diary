@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../data/models/allocation_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/user_model.dart';
@@ -187,14 +188,16 @@ class _TeacherLogReadingSheetState extends State<TeacherLogReadingSheet> {
 
       if (!mounted) return;
       Navigator.of(context).pop(true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Reading logged for ${widget.student.firstName}')),
+      showLumiToast(
+        message: 'Reading logged for ${widget.student.firstName}',
+        type: LumiToastType.success,
       );
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSaving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Couldn\'t log reading: $e')),
+      showLumiToast(
+        message: 'Couldn\'t log reading: $e',
+        type: LumiToastType.error,
       );
     }
   }

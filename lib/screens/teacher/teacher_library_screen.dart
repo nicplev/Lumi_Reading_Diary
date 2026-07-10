@@ -13,6 +13,7 @@ import '../../theme/lumi_typography.dart';
 import '../../core/tour/lumi_app_tour.dart';
 import 'cover_crop_screen.dart';
 import '../../core/widgets/lumi/lumi_skeleton.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../core/widgets/lumi/persistent_cached_image.dart';
 import '../../core/widgets/lumi/teacher_filter_chip.dart';
 import '../../data/models/book_model.dart';
@@ -805,14 +806,11 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
         break;
       case 'isbn':
         await Clipboard.setData(ClipboardData(text: book.isbn!));
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('ISBN copied: ${book.isbn}'),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
+        showLumiToast(
+          message: 'ISBN copied: ${book.isbn}',
+          type: LumiToastType.success,
+          duration: const Duration(seconds: 2),
+        );
         break;
     }
   }
@@ -2109,8 +2107,9 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
 
       if (url == null) {
         setState(() => _isUploadingCover = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to upload cover image')),
+        showLumiToast(
+          message: 'Failed to upload cover image',
+          type: LumiToastType.error,
         );
         return;
       }
@@ -2165,16 +2164,16 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
         _isCoverOwner = true;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Cover photo added! It will appear for all teachers.'),
-        ),
+      showLumiToast(
+        message: 'Cover photo added! It will appear for all teachers.',
+        type: LumiToastType.success,
       );
     } catch (e) {
       if (!mounted) return;
       setState(() => _isUploadingCover = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error adding cover: $e')),
+      showLumiToast(
+        message: 'Error adding cover: $e',
+        type: LumiToastType.error,
       );
     }
   }
@@ -2704,40 +2703,16 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
                                       Navigator.pop(sheetContext); // close form
                                       Navigator.pop(context); // close detail
 
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                          content: Text(
+                                      showLumiToast(
+                                        message:
                                             'Deletion request submitted. The Lumi team will review it.',
-                                            style: LumiType.caption.copyWith(
-                                                color: LumiTokens.paper),
-                                          ),
-                                          behavior: SnackBarBehavior.floating,
-                                          backgroundColor: LumiTokens.ink,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                                LumiTokens.radiusMedium),
-                                          ),
-                                        ),
+                                        type: LumiToastType.success,
                                       );
                                     } catch (e) {
                                       setSheetState(() => isSubmitting = false);
-                                      if (!context.mounted) return;
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            'Failed to submit request: $e',
-                                            style: LumiType.caption.copyWith(
-                                                color: LumiTokens.paper),
-                                          ),
-                                          behavior: SnackBarBehavior.floating,
-                                          backgroundColor: Colors.red,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                                LumiTokens.radiusMedium),
-                                          ),
-                                        ),
+                                      showLumiToast(
+                                        message: 'Failed to submit request: $e',
+                                        type: LumiToastType.error,
                                       );
                                     }
                                   },

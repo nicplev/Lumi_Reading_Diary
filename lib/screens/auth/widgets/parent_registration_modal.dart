@@ -16,6 +16,7 @@ import '../../../theme/lumi_typography.dart';
 import '../../../core/theme/lumi_text_styles.dart';
 import '../../../core/widgets/lumi/lumi_buttons.dart';
 import '../../../core/widgets/lumi/lumi_input.dart';
+import '../../../core/widgets/lumi/lumi_toast.dart';
 import '../../../data/models/student_link_code_model.dart';
 import '../../../data/models/user_model.dart';
 import '../../../services/analytics_service.dart';
@@ -1156,13 +1157,13 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
   /// re-auth was MFA-challenged: the account is fully set up, so close the modal
   /// and send the user to log in (phone or email + SMS) to continue.
   void _goToLoginAfterSignup() {
-    final messenger = ScaffoldMessenger.of(context);
     final router = GoRouter.of(context);
     Navigator.of(context).pop();
     router.go('/auth/login');
-    messenger.showSnackBar(const SnackBar(
-      content: Text('Account created! Please log in to continue.'),
-    ));
+    showLumiToast(
+      message: 'Account created! Please log in to continue.',
+      type: LumiToastType.success,
+    );
   }
 
   // ---------------------------------------------------------------------------

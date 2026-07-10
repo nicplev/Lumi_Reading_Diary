@@ -6,6 +6,7 @@ import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/teacher_filter_chip.dart';
 import '../../core/widgets/lumi/teacher_settings_item.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/notification_campaign_model.dart';
 import '../../data/models/student_model.dart';
@@ -107,8 +108,9 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
     } catch (error) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load notification audience: $error')),
+      showLumiToast(
+        message: 'Failed to load notification audience: $error',
+        type: LumiToastType.error,
       );
     }
   }
@@ -768,9 +770,9 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
 
   Future<void> _pickStudents() async {
     if (_students.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('No students available for this audience.')),
+      showLumiToast(
+        message: 'No students available for this audience.',
+        type: LumiToastType.error,
       );
       return;
     }
@@ -1010,41 +1012,41 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
     final wasScheduled = _scheduledFor != null;
 
     if (title.isEmpty || body.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Add a title and message before sending.')),
+      showLumiToast(
+        message: 'Add a title and message before sending.',
+        type: LumiToastType.error,
       );
       return;
     }
 
     if (title.length > _maxTitleLength) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content:
-                Text('Title must be $_maxTitleLength characters or fewer.')),
+      showLumiToast(
+        message: 'Title must be $_maxTitleLength characters or fewer.',
+        type: LumiToastType.error,
       );
       return;
     }
 
     if (body.length > _maxBodyLength) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content:
-                Text('Message must be $_maxBodyLength characters or fewer.')),
+      showLumiToast(
+        message: 'Message must be $_maxBodyLength characters or fewer.',
+        type: LumiToastType.error,
       );
       return;
     }
 
     if (_audienceType == 'classes' && _selectedClassIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select at least one class.')),
+      showLumiToast(
+        message: 'Select at least one class.',
+        type: LumiToastType.error,
       );
       return;
     }
 
     if (_audienceType == 'students' && _selectedStudentIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select at least one student.')),
+      showLumiToast(
+        message: 'Select at least one student.',
+        type: LumiToastType.error,
       );
       return;
     }
@@ -1129,25 +1131,23 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
       await _refreshStudents();
       if (!mounted) return;
       _tabController.animateTo(1);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            wasScheduled
-                ? 'Notification scheduled successfully.'
-                : 'Notification queued for delivery.',
-          ),
-        ),
+      showLumiToast(
+        message: wasScheduled
+            ? 'Notification scheduled successfully.'
+            : 'Notification queued for delivery.',
+        type: LumiToastType.success,
       );
     } on StaffNotificationException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.message)),
+      showLumiToast(
+        message: error.message,
+        type: LumiToastType.error,
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Something went wrong. Please try again.')),
+      showLumiToast(
+        message: 'Something went wrong. Please try again.',
+        type: LumiToastType.error,
       );
     } finally {
       if (mounted) {

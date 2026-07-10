@@ -9,6 +9,7 @@ import '../../../data/providers/user_provider.dart';
 import '../../../services/reading_log_service.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../theme/lumi_spacing.dart';
+import '../lumi/lumi_toast.dart';
 
 /// A threaded comment conversation attached to a reading log, shared by the
 /// parent and teacher reading-history surfaces.
@@ -98,19 +99,17 @@ class _CommentThreadState extends ConsumerState<CommentThread> {
       );
       _controller.clear();
       if (mounted && savedOffline) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Saved — it'll send when you're back online."),
-          ),
+        showLumiToast(
+          message: "Saved — it'll send when you're back online.",
+          type: LumiToastType.info,
         );
       }
     } catch (_) {
       // Keep the typed text so the user can retry rather than losing it.
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Couldn't send your comment. Please try again."),
-          ),
+        showLumiToast(
+          message: "Couldn't send your comment. Please try again.",
+          type: LumiToastType.error,
         );
       }
     } finally {

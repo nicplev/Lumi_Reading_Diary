@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/lumi_spacing.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 
@@ -25,12 +26,10 @@ class AdminUseWebPortalScreen extends StatelessWidget {
   Future<void> _copyToClipboard(BuildContext context) async {
     await Clipboard.setData(const ClipboardData(text: _portalUrl));
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Portal link copied to clipboard!'),
-          behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: 2),
-        ),
+      showLumiToast(
+        message: 'Portal link copied to clipboard!',
+        type: LumiToastType.success,
+        duration: const Duration(seconds: 2),
       );
     }
   }

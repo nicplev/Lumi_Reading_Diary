@@ -17,6 +17,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../core/models/decodable_grading.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../data/models/book_model.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
@@ -634,8 +635,9 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
             onPressed: () {
               final isbn = IsbnAssignmentService.normalizeIsbn(controller.text);
               if (isbn == null) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(content: Text('Invalid ISBN')),
+                showLumiToast(
+                  message: 'Invalid ISBN',
+                  type: LumiToastType.error,
                 );
                 return;
               }
@@ -879,11 +881,9 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
         if (coverUrl != null) {
           coverPath = _communityService.coverStoragePath(_scannedIsbn!);
         } else if (_bookAlreadyExists && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content:
-                  Text('Cover image could not be updated. Metadata was saved.'),
-            ),
+          showLumiToast(
+            message: 'Cover image could not be updated. Metadata was saved.',
+            type: LumiToastType.warning,
           );
         }
       }
@@ -1026,10 +1026,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
   }
 
   void _showError(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    showLumiToast(message: message, type: LumiToastType.error);
   }
 
   void _scanAnother() {

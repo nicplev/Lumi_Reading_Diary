@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/services/app_icon_service.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 
@@ -52,11 +53,9 @@ class _AppIconScreenState extends State<AppIconScreen> {
       if (mounted) setState(() => _current = icon);
     } on PlatformException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content:
-                Text('Could not change the app icon: ${e.message ?? e.code}'),
-          ),
+        showLumiToast(
+          message: 'Could not change the app icon: ${e.message ?? e.code}',
+          type: LumiToastType.error,
         );
       }
     } finally {

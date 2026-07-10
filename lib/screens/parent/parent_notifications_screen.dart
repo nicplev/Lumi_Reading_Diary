@@ -11,6 +11,7 @@ import '../../core/theme/lumi_spacing.dart';
 import '../../data/models/parent_notification_model.dart';
 import '../../data/models/user_model.dart';
 import '../../services/staff_notification_service.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 
 class ParentNotificationsScreen extends StatefulWidget {
   const ParentNotificationsScreen({
@@ -81,10 +82,9 @@ class _ParentNotificationsScreenState
         // The stream re-emits the server state, so the list restores itself —
         // just tell the user why.
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Couldn't clear notifications. Please try again."),
-            ),
+          showLumiToast(
+            message: "Couldn't clear notifications. Please try again.",
+            type: LumiToastType.error,
           );
         }
       }
@@ -99,10 +99,9 @@ class _ParentNotificationsScreenState
       );
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Couldn't dismiss that notification."),
-          ),
+        showLumiToast(
+          message: "Couldn't dismiss that notification.",
+          type: LumiToastType.error,
         );
       }
     }

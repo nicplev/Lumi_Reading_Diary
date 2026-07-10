@@ -12,6 +12,7 @@ import '../../core/theme/lumi_spacing.dart';
 import '../../core/theme/lumi_borders.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_card.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
 
 /// Screen for generating and sharing student progress reports
@@ -425,12 +426,10 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Report generated successfully!'),
-          backgroundColor: AppColors.success,
-          duration: const Duration(seconds: 2),
-        ),
+      showLumiToast(
+        message: 'Report generated successfully!',
+        type: LumiToastType.success,
+        duration: const Duration(seconds: 2),
       );
     } catch (e) {
       setState(() {
@@ -440,12 +439,10 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
       if (!mounted) return;
 
       debugPrint('Report generation failed: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text("Couldn't generate the report. Please try again."),
-          backgroundColor: AppColors.error,
-          duration: const Duration(seconds: 3),
-        ),
+      showLumiToast(
+        message: "Couldn't generate the report. Please try again.",
+        type: LumiToastType.error,
+        duration: const Duration(seconds: 3),
       );
     }
   }
@@ -459,11 +456,9 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
       if (!mounted) return;
 
       debugPrint('Report share failed: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text("Couldn't share the report. Please try again."),
-          backgroundColor: AppColors.error,
-        ),
+      showLumiToast(
+        message: "Couldn't share the report. Please try again.",
+        type: LumiToastType.error,
       );
     }
   }
@@ -477,11 +472,9 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
       if (!mounted) return;
 
       debugPrint('Report print failed: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text("Couldn't print the report. Please try again."),
-          backgroundColor: AppColors.error,
-        ),
+      showLumiToast(
+        message: "Couldn't print the report. Please try again.",
+        type: LumiToastType.error,
       );
     }
   }

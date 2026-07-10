@@ -7,6 +7,7 @@ import '../../theme/lumi_spacing.dart';
 import '../../theme/lumi_borders.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../lumi/lumi_buttons.dart';
+import 'lumi_toast.dart';
 import '../../../services/firebase_service.dart';
 import '../../../services/analytics_service.dart';
 
@@ -74,8 +75,9 @@ class _FeedbackSheetState extends State<_FeedbackSheet> {
   Future<void> _submit() async {
     final description = _descriptionController.text.trim();
     if (description.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a description')),
+      showLumiToast(
+        message: 'Please enter a description',
+        type: LumiToastType.error,
       );
       return;
     }
@@ -96,14 +98,16 @@ class _FeedbackSheetState extends State<_FeedbackSheet> {
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Thank you for your feedback!')),
+        showLumiToast(
+          message: 'Thank you for your feedback!',
+          type: LumiToastType.success,
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to submit feedback')),
+        showLumiToast(
+          message: 'Failed to submit feedback',
+          type: LumiToastType.error,
         );
       }
     } finally {

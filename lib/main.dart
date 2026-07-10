@@ -17,6 +17,7 @@ import 'core/services/remote_message_controller.dart';
 import 'core/services/service_status_controller.dart';
 import 'core/widgets/force_update_gate.dart';
 import 'core/widgets/impersonation_overlay.dart';
+import 'core/widgets/lumi_toast_overlay.dart';
 import 'core/widgets/remote_message_overlay.dart';
 import 'core/widgets/service_status_overlay.dart';
 import 'data/providers/remote_message_provider.dart';
@@ -358,10 +359,15 @@ class _LumiAppState extends ConsumerState<LumiApp> {
       // newer build, it replaces everything (banners included) with the
       // blocking update screen.
       builder: (context, child) => ForceUpdateGate(
-        child: RemoteMessageOverlay(
-          child: ServiceStatusOverlay(
-            child: ImpersonationOverlay(
-              child: child ?? const SizedBox.shrink(),
+        // LumiToastOverlay sits outermost of the overlays so bento toasts always
+        // float above app + banner chrome; it self-offsets below the service
+        // banner when that's showing.
+        child: LumiToastOverlay(
+          child: RemoteMessageOverlay(
+            child: ServiceStatusOverlay(
+              child: ImpersonationOverlay(
+                child: child ?? const SizedBox.shrink(),
+              ),
             ),
           ),
         ),

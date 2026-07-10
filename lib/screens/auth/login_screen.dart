@@ -15,6 +15,7 @@ import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_input.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../core/routing/app_router.dart';
 import '../../data/models/user_model.dart';
 import '../../services/firebase_service.dart';
@@ -283,13 +284,11 @@ class _LoginScreenState extends State<LoginScreen> {
             // Resend verification email
             await _firebaseService.sendEmailVerification();
             if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
+            showLumiToast(
+              message:
                   'Please verify your email address. A verification email has been sent.',
-                ),
-                duration: Duration(seconds: 5),
-              ),
+              type: LumiToastType.info,
+              duration: const Duration(seconds: 5),
             );
           }
 
@@ -496,10 +495,9 @@ class _LoginScreenState extends State<LoginScreen> {
           handle = resent;
         } on FirebaseAuthException catch (e) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(SmsVerificationService.friendlyError(e)),
-              ),
+            showLumiToast(
+              message: SmsVerificationService.friendlyError(e),
+              type: LumiToastType.error,
             );
           }
           rethrow;
@@ -617,18 +615,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   password: password,
                 );
                 if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
+                showLumiToast(
+                  message:
                       'Admin account created for $email. Check your inbox to verify, then log in.',
-                    ),
-                    duration: const Duration(seconds: 8),
-                  ),
+                  type: LumiToastType.success,
+                  duration: const Duration(seconds: 8),
                 );
               } catch (e) {
                 if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error: $e')),
+                showLumiToast(
+                  message: 'Error: $e',
+                  type: LumiToastType.error,
                 );
               } finally {
                 if (mounted) setState(() => _isLoading = false);
@@ -952,12 +949,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         LumiTextButton(
                           onPressed: () {
                             if (_firebaseService.auth.currentUser == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Sign in to your dev account first.',
-                                  ),
-                                ),
+                              showLumiToast(
+                                message: 'Sign in to your dev account first.',
+                                type: LumiToastType.info,
                               );
                               return;
                             }
@@ -1148,11 +1142,9 @@ class _MfaCodeDialogState extends State<_MfaCodeDialog> {
                         await widget.onResend();
                         if (!context.mounted) return;
                         _codeController.clear();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content:
-                                Text('New code sent. Use the newest SMS code.'),
-                          ),
+                        showLumiToast(
+                          message: 'New code sent. Use the newest SMS code.',
+                          type: LumiToastType.success,
                         );
                       } catch (_) {
                         // The parent callback already surfaced the error.

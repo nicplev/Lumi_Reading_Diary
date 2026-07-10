@@ -9,6 +9,7 @@ import '../../core/theme/lumi_spacing.dart';
 import '../../core/theme/lumi_borders.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi_mascot.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 
 class WebNotAvailableScreen extends StatelessWidget {
   const WebNotAvailableScreen({super.key});
@@ -29,13 +30,10 @@ class WebNotAvailableScreen extends StatelessWidget {
   Future<void> _copyToClipboard(BuildContext context, String url) async {
     await Clipboard.setData(ClipboardData(text: url));
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Link copied to clipboard!'),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ),
+      showLumiToast(
+        message: 'Link copied to clipboard!',
+        type: LumiToastType.success,
+        duration: const Duration(seconds: 2),
       );
     }
   }

@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/lumi_borders.dart';
 import '../../../core/theme/lumi_spacing.dart';
 import '../../../core/theme/lumi_text_styles.dart';
+import '../../../core/widgets/lumi/lumi_toast.dart';
 import '../../../services/widget_data_service.dart';
 
 /// Legacy in-app "you can still undo" banner for older widget builds.
@@ -59,19 +60,17 @@ class _WidgetUndoBannerState extends ConsumerState<WidgetUndoBanner> {
     try {
       await WidgetDataService.instance.undoCommit(commit);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Undone — ${commit.firstName}'s log removed."),
-          duration: const Duration(seconds: 3),
-        ),
+      showLumiToast(
+        message: "Undone — ${commit.firstName}'s log removed.",
+        type: LumiToastType.success,
+        duration: const Duration(seconds: 3),
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Couldn't undo — please try again."),
-          duration: Duration(seconds: 3),
-        ),
+      showLumiToast(
+        message: "Couldn't undo — please try again.",
+        type: LumiToastType.error,
+        duration: const Duration(seconds: 3),
       );
     }
   }

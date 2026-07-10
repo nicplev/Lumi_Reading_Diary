@@ -6,6 +6,7 @@ import '../../services/offline_service.dart';
 import '../models/service_status.dart';
 import '../theme/app_colors.dart';
 import '../../theme/lumi_tokens.dart';
+import 'lumi/lumi_toast.dart';
 
 /// Bottom sheet opened when the user taps [ServiceStatusBanner].
 ///
@@ -382,6 +383,6 @@ class _SyncButtonState extends ConsumerState<_SyncButton> {
     } else {
       msg = '$synced synced · $after still waiting';
     }
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    showLumiToast(message: msg, type: LumiToastType.info);
   }
 }

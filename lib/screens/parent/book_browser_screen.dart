@@ -9,6 +9,7 @@ import '../../core/theme/lumi_borders.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_card.dart';
 import '../../core/widgets/lumi/lumi_book_card.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../core/widgets/lumi/persistent_cached_image.dart';
 
 /// Screen for browsing and discovering books
@@ -492,11 +493,9 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error loading books: $e'),
-          backgroundColor: AppColors.error,
-        ),
+      showLumiToast(
+        message: 'Error loading books: $e',
+        type: LumiToastType.error,
       );
     }
   }
@@ -659,22 +658,18 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Started reading "${book.title}"!'),
-          backgroundColor: AppColors.success,
-        ),
+      showLumiToast(
+        message: 'Started reading "${book.title}"!',
+        type: LumiToastType.success,
       );
 
       _loadData();
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error starting book: $e'),
-          backgroundColor: AppColors.error,
-        ),
+      showLumiToast(
+        message: 'Error starting book: $e',
+        type: LumiToastType.error,
       );
     }
   }
@@ -730,11 +725,9 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error loading similar books: $e'),
-          backgroundColor: AppColors.error,
-        ),
+      showLumiToast(
+        message: 'Error loading similar books: $e',
+        type: LumiToastType.error,
       );
     }
   }
@@ -798,11 +791,9 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error loading books: $e'),
-          backgroundColor: AppColors.error,
-        ),
+      showLumiToast(
+        message: 'Error loading books: $e',
+        type: LumiToastType.error,
       );
     }
   }

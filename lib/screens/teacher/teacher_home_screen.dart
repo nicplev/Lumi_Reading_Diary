@@ -11,6 +11,7 @@ import '../../core/tour/lumi_app_tour.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/lumi_skeleton.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/class_model.dart';
 import '../../services/firebase_service.dart';
@@ -155,10 +156,9 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
       // Tell the teacher the load FAILED — otherwise a query error renders the
       // same "no classes" empty state as a genuinely class-less teacher, who
       // then assumes their classes vanished.
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Couldn't load your classes. Please try again."),
-        ),
+      showLumiToast(
+        message: "Couldn't load your classes. Please try again.",
+        type: LumiToastType.error,
       );
     }
   }

@@ -11,6 +11,7 @@ import '../../core/theme/lumi_spacing.dart';
 import '../../core/theme/lumi_borders.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_card.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 
 /// Screen for viewing and managing student reading goals
 /// Allows students and parents to set targets and track progress
@@ -422,11 +423,9 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error loading goals: $e'),
-          backgroundColor: AppColors.error,
-        ),
+      showLumiToast(
+        message: 'Error loading goals: $e',
+        type: LumiToastType.error,
       );
     }
   }
@@ -627,22 +626,18 @@ class _StudentGoalsScreenState extends State<StudentGoalsScreen>
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('🎉 Congratulations! Goal marked as complete!'),
-          backgroundColor: AppColors.mintGreen,
-        ),
+      showLumiToast(
+        message: '🎉 Congratulations! Goal marked as complete!',
+        type: LumiToastType.success,
       );
 
       _loadGoals();
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error completing goal: $e'),
-          backgroundColor: AppColors.error,
-        ),
+      showLumiToast(
+        message: 'Error completing goal: $e',
+        type: LumiToastType.error,
       );
     }
   }
@@ -769,20 +764,16 @@ class _CreateGoalDialogState extends State<_CreateGoalDialog> {
 
       Navigator.of(context).pop(true);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Goal created successfully!'),
-          backgroundColor: AppColors.mintGreen,
-        ),
+      showLumiToast(
+        message: 'Goal created successfully!',
+        type: LumiToastType.success,
       );
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error creating goal: $e'),
-          backgroundColor: AppColors.error,
-        ),
+      showLumiToast(
+        message: 'Error creating goal: $e',
+        type: LumiToastType.error,
       );
     }
   }

@@ -9,6 +9,7 @@ import '../../theme/section_theme.dart';
 import '../../core/tour/lumi_app_tour.dart';
 import '../../core/widgets/lumi/lumi_skeleton.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../core/widgets/lumi_mascot.dart';
 import '../../data/models/allocation_model.dart';
 import '../../data/models/user_model.dart';
@@ -1385,14 +1386,11 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     final scannedCount = (result['scannedCount'] as num?)?.toInt() ?? 0;
     final totalAssigned = (result['totalAssignedBooks'] as num?)?.toInt() ?? 0;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          scannedCount > 0
-              ? 'Scanned $scannedCount book(s). ${student.firstName} now has $totalAssigned assigned this week.'
-              : 'No ISBN scans captured.',
-        ),
-      ),
+    showLumiToast(
+      message: scannedCount > 0
+          ? 'Scanned $scannedCount book(s). ${student.firstName} now has $totalAssigned assigned this week.'
+          : 'No ISBN scans captured.',
+      type: scannedCount > 0 ? LumiToastType.success : LumiToastType.info,
     );
   }
 
@@ -1702,13 +1700,10 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
     final skippedCount = (result['skippedCount'] as num?)?.toInt() ?? 0;
     final totalStudents = (result['totalStudents'] as num?)?.toInt() ?? 0;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Assigned books to $studentsAssigned/$totalStudents students'
+    showLumiToast(
+      message: 'Assigned books to $studentsAssigned/$totalStudents students'
           '${skippedCount > 0 ? ' ($skippedCount skipped)' : ''}.',
-        ),
-      ),
+      type: LumiToastType.success,
     );
   }
 

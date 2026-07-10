@@ -17,6 +17,7 @@ import '../../core/widgets/lumi/reading_level_picker_sheet.dart';
 import '../../core/widgets/lumi/teacher_book_assignment_card.dart';
 import '../../core/widgets/lumi/teacher_reading_level_pill.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../core/widgets/feelings/feelings_tracker_card.dart';
 import '../../data/models/achievement_model.dart';
 import '../../data/models/reading_log_model.dart';
@@ -252,11 +253,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             .get();
         if (!classDoc.exists) {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Class not found for this student'),
-              backgroundColor: AppColors.error,
-            ),
+          showLumiToast(
+            message: 'Class not found for this student',
+            type: LumiToastType.error,
           );
           return;
         }
@@ -274,11 +273,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not open assignment flow'),
-          backgroundColor: AppColors.error,
-        ),
+      showLumiToast(
+        message: 'Could not open assignment flow',
+        type: LumiToastType.error,
       );
     }
   }
@@ -295,11 +292,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             .get();
         if (!classDoc.exists) {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Class not found for this student'),
-              backgroundColor: AppColors.error,
-            ),
+          showLumiToast(
+            message: 'Class not found for this student',
+            type: LumiToastType.error,
           );
           return;
         }
@@ -323,22 +318,17 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       final totalAssigned =
           (result['totalAssignedBooks'] as num?)?.toInt() ?? 0;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            scannedCount > 0
-                ? 'Scanned $scannedCount book(s). $totalAssigned assigned this week.'
-                : 'No ISBN scans captured.',
-          ),
-        ),
+      showLumiToast(
+        message: scannedCount > 0
+            ? 'Scanned $scannedCount book(s). $totalAssigned assigned this week.'
+            : 'No ISBN scans captured.',
+        type: scannedCount > 0 ? LumiToastType.success : LumiToastType.info,
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not open ISBN scanner'),
-          backgroundColor: AppColors.error,
-        ),
+      showLumiToast(
+        message: 'Could not open ISBN scanner',
+        type: LumiToastType.error,
       );
     }
   }
@@ -474,11 +464,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not update assignment: $e'),
-          backgroundColor: AppColors.error,
-        ),
+      showLumiToast(
+        message: 'Could not update assignment: $e',
+        type: LumiToastType.error,
       );
     }
   }
@@ -508,8 +496,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         itemId: itemId,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Removed "$title" for the whole class.')),
+      showLumiToast(
+        message: 'Removed "$title" for the whole class.',
+        type: LumiToastType.success,
       );
       return;
     }
@@ -522,9 +511,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       studentIds: [widget.student.id],
     );
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content: Text('Removed "$title" for ${widget.student.firstName}.')),
+    showLumiToast(
+      message: 'Removed "$title" for ${widget.student.firstName}.',
+      type: LumiToastType.success,
     );
   }
 
@@ -563,8 +552,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         nextMetadata: nextMetadata,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Swapped "$currentTitle" for whole class.')),
+      showLumiToast(
+        message: 'Swapped "$currentTitle" for whole class.',
+        type: LumiToastType.success,
       );
       return;
     }
@@ -581,10 +571,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       nextMetadata: nextMetadata,
     );
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content:
-              Text('Swapped "$currentTitle" for ${widget.student.firstName}.')),
+    showLumiToast(
+      message: 'Swapped "$currentTitle" for ${widget.student.firstName}.',
+      type: LumiToastType.success,
     );
   }
 
@@ -736,8 +725,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         title: nextTitle,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Updated "$currentTitle" for whole class.')),
+      showLumiToast(
+        message: 'Updated "$currentTitle" for whole class.',
+        type: LumiToastType.success,
       );
       return;
     }
@@ -752,10 +742,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       nextMetadata: const {'source': 'student_edit'},
     );
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content:
-              Text('Updated "$currentTitle" for ${widget.student.firstName}.')),
+    showLumiToast(
+      message: 'Updated "$currentTitle" for ${widget.student.firstName}.',
+      type: LumiToastType.success,
     );
   }
 
@@ -773,8 +762,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         .get();
     if (!doc.exists) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Allocation not found.')),
+      showLumiToast(
+        message: 'Allocation not found.',
+        type: LumiToastType.error,
       );
       return;
     }
@@ -785,8 +775,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     final item = items.where((i) => i.id == itemId).firstOrNull;
     if (item == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Book item not found in allocation.')),
+      showLumiToast(
+        message: 'Book item not found in allocation.',
+        type: LumiToastType.error,
       );
       return;
     }
@@ -804,12 +795,14 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
     if (!mounted) return;
     if (result.alreadyAssignedCount > 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('"$title" is already assigned next week.')),
+      showLumiToast(
+        message: '"$title" is already assigned next week.',
+        type: LumiToastType.info,
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('"$title" kept for next week.')),
+      showLumiToast(
+        message: '"$title" kept for next week.',
+        type: LumiToastType.success,
       );
     }
   }
@@ -1112,8 +1105,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
     if (currentItems.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No books to renew.')),
+      showLumiToast(
+        message: 'No books to renew.',
+        type: LumiToastType.info,
       );
       return;
     }
@@ -1158,18 +1152,20 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
     if (!mounted) return;
     final String message;
+    final LumiToastType type;
     if (failedCount == 0) {
       message = alreadyCount > 0
           ? '$keptCount book(s) kept for next week ($alreadyCount already assigned).'
           : '$keptCount book(s) kept for next week.';
+      type = LumiToastType.success;
     } else if (keptCount == 0) {
       message = "Couldn't renew books. Please try again.";
+      type = LumiToastType.error;
     } else {
       message = '$keptCount book(s) kept, $failedCount failed — please retry.';
+      type = LumiToastType.warning;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    showLumiToast(message: message, type: type);
   }
 
   Widget _buildActionScopeSheetBody({
@@ -1831,11 +1827,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not open reading level picker: $error'),
-          backgroundColor: AppColors.error,
-        ),
+      showLumiToast(
+        message: 'Could not open reading level picker: $error',
+        type: LumiToastType.error,
       );
     }
   }
@@ -1860,11 +1854,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not update reading level: $error'),
-          backgroundColor: AppColors.error,
-        ),
+      showLumiToast(
+        message: 'Could not update reading level: $error',
+        type: LumiToastType.error,
       );
     }
   }
@@ -1895,13 +1887,10 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       });
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
+    showLumiToast(
+      message:
           didUpdate ? 'Reading level updated' : 'No reading level change saved',
-        ),
-        backgroundColor: didUpdate ? AppColors.success : LumiTokens.muted,
-      ),
+      type: didUpdate ? LumiToastType.success : LumiToastType.info,
     );
   }
 
@@ -1954,11 +1943,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not load reading level history: $error'),
-          backgroundColor: AppColors.error,
-        ),
+      showLumiToast(
+        message: 'Could not load reading level history: $error',
+        type: LumiToastType.error,
       );
     }
   }

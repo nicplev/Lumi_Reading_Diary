@@ -8,6 +8,7 @@ import '../../core/theme/lumi_spacing.dart';
 import '../../core/theme/lumi_text_styles.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_card.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../data/providers/service_status_provider.dart';
 import '../../services/offline_service.dart';
 
@@ -222,9 +223,7 @@ class _PendingCard extends ConsumerWidget {
                         } else {
                           msg = '$synced synced · $after still waiting';
                         }
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(msg)),
-                        );
+                        showLumiToast(message: msg, type: LumiToastType.info);
                       },
                 text: 'Sync now',
                 icon: Icons.sync,
@@ -310,9 +309,7 @@ class _CacheCard extends StatelessWidget {
     // the pending-sync queue + drafts (clearLocalData() would wipe unsynced work).
     await OfflineService.instance.clearCachedData();
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Cache cleared')),
-    );
+    showLumiToast(message: 'Cache cleared', type: LumiToastType.success);
   }
 }
 
@@ -420,8 +417,9 @@ class _PendingDetailRow extends StatelessWidget {
                       onTap: () async {
                         await OfflineService.instance.dismissPending(sync.id);
                         if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Removed from queue')),
+                        showLumiToast(
+                          message: 'Removed from queue',
+                          type: LumiToastType.success,
                         );
                       },
                       child: Padding(

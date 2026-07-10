@@ -13,6 +13,7 @@ import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
 import '../../core/widgets/lumi/feedback_widget.dart';
 import '../../core/widgets/lumi/legal_links_row.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/student_model.dart';
 import '../../data/providers/active_child_provider.dart';
@@ -187,18 +188,18 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen>
       if (mounted) {
         final queued =
             !ServiceStatusController.instance.current.canWriteToFirebase;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(queued
-                ? 'Saved — will sync when reconnected'
-                : 'Preferences updated'),
-          ),
+        showLumiToast(
+          message: queued
+              ? 'Saved — will sync when reconnected'
+              : 'Preferences updated',
+          type: LumiToastType.success,
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update preferences')),
+        showLumiToast(
+          message: 'Failed to update preferences',
+          type: LumiToastType.error,
         );
       }
     }
@@ -657,12 +658,11 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen>
                     studentIds: ids,
                   );
                   if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(sentPush
-                          ? 'Test push sent — it should pop up at the top now'
-                          : 'Showing a local preview (push unavailable)'),
-                    ),
+                  showLumiToast(
+                    message: sentPush
+                        ? 'Test push sent — it should pop up at the top now'
+                        : 'Showing a local preview (push unavailable)',
+                    type: LumiToastType.info,
                   );
                 },
                 icon: const Icon(Icons.send_outlined,
@@ -817,14 +817,16 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen>
           .doc(widget.user.id)
           .update({'relationshipLabel': saved});
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Relationship updated')),
+        showLumiToast(
+          message: 'Relationship updated',
+          type: LumiToastType.success,
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update relationship')),
+        showLumiToast(
+          message: 'Failed to update relationship',
+          type: LumiToastType.error,
         );
       }
     }

@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/teacher_constants.dart';
+import '../../core/widgets/lumi/lumi_toast.dart';
 
 /// Full-screen crop step shown after the user picks or captures a book cover
 /// image. Returns the cropped [File] on acceptance, or null on cancellation.
@@ -65,9 +66,9 @@ class _CoverCropScreenState extends State<CoverCropScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _isProcessing = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Failed to process image. Please try again.')),
+      showLumiToast(
+        message: 'Failed to process image. Please try again.',
+        type: LumiToastType.error,
       );
     }
   }

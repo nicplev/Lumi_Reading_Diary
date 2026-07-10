@@ -11,6 +11,7 @@ import 'package:record/record.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../core/theme/lumi_text_styles.dart';
 import '../../../core/widgets/lumi/lumi_buttons.dart';
+import '../../../core/widgets/lumi/lumi_toast.dart';
 import '../../../core/widgets/lumi_mascot.dart';
 
 /// The result of a confirmed comprehension recording — handed to the parent
@@ -265,10 +266,11 @@ class _ComprehensionRecordingStepState extends State<ComprehensionRecordingStep>
     if (!mounted) return;
     setState(() => _state = _RecordingState.preview);
     if (autoStopped) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text("Got it — 60 seconds is plenty."),
-        duration: Duration(seconds: 2),
-      ));
+      showLumiToast(
+        message: "Got it — 60 seconds is plenty.",
+        type: LumiToastType.info,
+        duration: const Duration(seconds: 2),
+      );
     }
   }
 
