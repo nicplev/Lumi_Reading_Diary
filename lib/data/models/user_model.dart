@@ -31,6 +31,10 @@ class UserModel {
   // Guardian, or a free-text value). Used for reading-log attribution and
   // co-parent visibility. Null for legacy parents and non-parent users.
   final String? relationshipLabel;
+  final bool termsAccepted;
+  final DateTime? termsAcceptedAt;
+  final String? termsAcceptedVersion;
+  final String? termsAcceptedPlatform;
 
   UserModel({
     required this.id,
@@ -51,6 +55,10 @@ class UserModel {
     this.phoneVerified = false,
     this.mfaEnabled = false,
     this.relationshipLabel,
+    this.termsAccepted = false,
+    this.termsAcceptedAt,
+    this.termsAcceptedVersion,
+    this.termsAcceptedPlatform,
   });
 
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
@@ -81,6 +89,12 @@ class UserModel {
       phoneVerified: data['phoneVerified'] ?? false,
       mfaEnabled: data['mfaEnabled'] ?? false,
       relationshipLabel: data['relationshipLabel'],
+      termsAccepted: data['termsAccepted'] ?? false,
+      termsAcceptedAt: data['termsAcceptedAt'] != null
+          ? (data['termsAcceptedAt'] as Timestamp).toDate()
+          : null,
+      termsAcceptedVersion: data['termsAcceptedVersion'],
+      termsAcceptedPlatform: data['termsAcceptedPlatform'],
     );
   }
 
@@ -104,6 +118,11 @@ class UserModel {
       'phoneVerified': phoneVerified,
       'mfaEnabled': mfaEnabled,
       'relationshipLabel': relationshipLabel,
+      'termsAccepted': termsAccepted,
+      'termsAcceptedAt':
+          termsAcceptedAt != null ? Timestamp.fromDate(termsAcceptedAt!) : null,
+      'termsAcceptedVersion': termsAcceptedVersion,
+      'termsAcceptedPlatform': termsAcceptedPlatform,
     };
   }
 
@@ -126,6 +145,10 @@ class UserModel {
     bool? phoneVerified,
     bool? mfaEnabled,
     String? relationshipLabel,
+    bool? termsAccepted,
+    DateTime? termsAcceptedAt,
+    String? termsAcceptedVersion,
+    String? termsAcceptedPlatform,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -146,8 +169,18 @@ class UserModel {
       phoneVerified: phoneVerified ?? this.phoneVerified,
       mfaEnabled: mfaEnabled ?? this.mfaEnabled,
       relationshipLabel: relationshipLabel ?? this.relationshipLabel,
+      termsAccepted: termsAccepted ?? this.termsAccepted,
+      termsAcceptedAt: termsAcceptedAt ?? this.termsAcceptedAt,
+      termsAcceptedVersion: termsAcceptedVersion ?? this.termsAcceptedVersion,
+      termsAcceptedPlatform:
+          termsAcceptedPlatform ?? this.termsAcceptedPlatform,
     );
   }
+
+  bool hasAcceptedTermsVersion(String version) =>
+      termsAccepted &&
+      termsAcceptedAt != null &&
+      termsAcceptedVersion == version;
 
   /// Display-safe identifier — prefers the email, then the phone number, then
   /// a placeholder. Use this in profile / picker / impersonation surfaces so

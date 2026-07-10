@@ -15,6 +15,10 @@ void main() {
           schoolId: 'school-1',
           linkedChildren: ['child-1', 'child-2'],
           createdAt: DateTime(2026, 1, 15),
+          termsAccepted: true,
+          termsAcceptedAt: DateTime(2026, 7, 10, 9, 30),
+          termsAcceptedVersion: '2026-07-10',
+          termsAcceptedPlatform: 'ios',
         );
 
         await firestore
@@ -22,8 +26,7 @@ void main() {
             .doc(original.id)
             .set(original.toFirestore());
 
-        final doc =
-            await firestore.collection('users').doc(original.id).get();
+        final doc = await firestore.collection('users').doc(original.id).get();
         final restored = UserModel.fromFirestore(doc);
 
         expect(restored.id, original.id);
@@ -33,6 +36,11 @@ void main() {
         expect(restored.schoolId, original.schoolId);
         expect(restored.linkedChildren, ['child-1', 'child-2']);
         expect(restored.isActive, true);
+        expect(restored.termsAccepted, true);
+        expect(restored.termsAcceptedAt, DateTime(2026, 7, 10, 9, 30));
+        expect(restored.termsAcceptedVersion, '2026-07-10');
+        expect(restored.termsAcceptedPlatform, 'ios');
+        expect(restored.hasAcceptedTermsVersion('2026-07-10'), true);
       });
 
       test('serializes and deserializes teacher user correctly', () async {
@@ -52,8 +60,7 @@ void main() {
             .doc(original.id)
             .set(original.toFirestore());
 
-        final doc =
-            await firestore.collection('users').doc(original.id).get();
+        final doc = await firestore.collection('users').doc(original.id).get();
         final restored = UserModel.fromFirestore(doc);
 
         expect(restored.role, UserRole.teacher);
@@ -76,8 +83,7 @@ void main() {
             .doc(original.id)
             .set(original.toFirestore());
 
-        final doc =
-            await firestore.collection('users').doc(original.id).get();
+        final doc = await firestore.collection('users').doc(original.id).get();
         final restored = UserModel.fromFirestore(doc);
 
         expect(restored.role, UserRole.schoolAdmin);
@@ -106,12 +112,20 @@ void main() {
         final updated = user.copyWith(
           email: 'new@test.com',
           fullName: 'New Name',
+          termsAccepted: true,
+          termsAcceptedAt: DateTime(2026, 7, 10),
+          termsAcceptedVersion: '2026-07-10',
+          termsAcceptedPlatform: 'android',
         );
 
         expect(updated.email, 'new@test.com');
         expect(updated.fullName, 'New Name');
         expect(updated.id, user.id);
         expect(updated.role, user.role);
+        expect(updated.termsAccepted, true);
+        expect(updated.termsAcceptedAt, DateTime(2026, 7, 10));
+        expect(updated.termsAcceptedVersion, '2026-07-10');
+        expect(updated.termsAcceptedPlatform, 'android');
       });
 
       test('preserves original when no fields specified', () {
@@ -154,6 +168,11 @@ void main() {
         expect(user.preferences, isNull);
         expect(user.fcmToken, isNull);
         expect(user.schoolId, isNull);
+        expect(user.termsAccepted, false);
+        expect(user.termsAcceptedAt, isNull);
+        expect(user.termsAcceptedVersion, isNull);
+        expect(user.termsAcceptedPlatform, isNull);
+        expect(user.hasAcceptedTermsVersion('2026-07-10'), false);
       });
     });
 
@@ -165,8 +184,7 @@ void main() {
           'email': 'test@test.com',
         });
 
-        final doc =
-            await firestore.collection('users').doc('incomplete').get();
+        final doc = await firestore.collection('users').doc('incomplete').get();
         final user = UserModel.fromFirestore(doc);
 
         expect(user.id, 'incomplete');
@@ -174,6 +192,7 @@ void main() {
         expect(user.fullName, '');
         expect(user.role, UserRole.parent);
         expect(user.linkedChildren, isEmpty);
+        expect(user.termsAccepted, false);
       });
     });
   });

@@ -23,6 +23,7 @@ import '../../screens/dev/impersonation_picker_screen.dart';
 import '../config/dev_access.dart';
 import '../../screens/auth/forgot_password_screen.dart';
 import '../../screens/auth/phone_verify_recovery_screen.dart';
+import '../../screens/auth/terms_acceptance_screen.dart';
 import '../../screens/auth/web_not_available_screen.dart';
 import '../../screens/auth/admin_use_web_portal_screen.dart';
 import '../../screens/parent/parent_home_screen.dart';
@@ -58,6 +59,7 @@ import '../../screens/onboarding/school_demo_screen.dart';
 import '../../screens/onboarding/demo_request_screen.dart';
 import '../../screens/marketing/landing_screen.dart';
 import '../../screens/design_system_demo_screen.dart';
+import '../../services/terms_acceptance_service.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final appRouter = AppRouter(ref);
@@ -104,6 +106,7 @@ class AppRouter {
       if (location == '/teacher') {
         return '/teacher/home';
       }
+      final isTermsRoute = location == '/terms-acceptance';
 
       // Firebase Auth's phone-verification / reCAPTCHA callback
       // (`<reversed-client-id>://firebaseauth/link…`) surfaces in the router as
@@ -134,7 +137,8 @@ class AppRouter {
           location == '/landing' ||
           location.startsWith('/onboarding');
 
-      if (isPublicRoute) {
+      final isPhoneRecoveryRoute = location == '/auth/login/phone-verify';
+      if (isPublicRoute && (!isLoggedIn || isPhoneRecoveryRoute)) {
         return null;
       }
 
@@ -165,6 +169,28 @@ class AppRouter {
       }
 
       final userRole = userModel.role;
+      final isImpersonating =
+          _ref.read(impersonationSessionProvider).value != null;
+      final hasAcceptedTerms =
+          TermsAcceptanceService.hasAcceptedCurrentTerms(userModel);
+
+      if (!isImpersonating && !hasAcceptedTerms) {
+        if (isTermsRoute) return null;
+        return Uri(
+          path: '/terms-acceptance',
+          queryParameters: {'returnTo': state.uri.toString()},
+        ).toString();
+      }
+
+      if (isTermsRoute) {
+        final returnTo = state.uri.queryParameters['returnTo'];
+        if (returnTo != null &&
+            returnTo.startsWith('/') &&
+            !returnTo.startsWith('/terms-acceptance')) {
+          return returnTo;
+        }
+        return getHomeRouteForRole(userRole);
+      }
 
       // Web platform check: parent app is mobile-only
       if (kIsWeb &&
@@ -204,6 +230,14 @@ class AppRouter {
         path: '/landing',
         name: 'landing',
         builder: (context, state) => const LandingScreen(),
+      ),
+
+      GoRoute(
+        path: '/terms-acceptance',
+        name: 'terms-acceptance',
+        builder: (context, state) => TermsAcceptanceScreen(
+          returnTo: state.uri.queryParameters['returnTo'],
+        ),
       ),
 
       // ============================================

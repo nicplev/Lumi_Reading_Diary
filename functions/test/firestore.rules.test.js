@@ -7,6 +7,7 @@ const {
   assertSucceeds,
   assertFails,
 } = require('@firebase/rules-unit-testing');
+const { serverTimestamp } = require('firebase/firestore');
 
 const PROJECT_ID = 'lumi-reading-tracker-rules-test';
 const RULES_PATH = path.resolve(__dirname, '../../firestore.rules');
@@ -202,6 +203,11 @@ test('users self-update: whitelisted fields succeed, sensitive fields fail', asy
       schoolId: 'school_1',
       fullName: 'Teacher One',
     });
+    await db.collection('schools').doc('school_1').collection('users').doc('teacher_2').set({
+      role: 'teacher',
+      schoolId: 'school_1',
+      fullName: 'Teacher Two',
+    });
   });
 
   const teacherDb = authDb('teacher_1');
@@ -210,6 +216,12 @@ test('users self-update: whitelisted fields succeed, sensitive fields fail', asy
   await assertSucceeds(userRef.update({ preferences: { theme: 'dark' } }));
   await assertSucceeds(userRef.update({ fcmToken: 'token-abc' }));
   await assertSucceeds(userRef.update({ lastLoginAt: new Date() }));
+  await assertSucceeds(userRef.update({
+    termsAccepted: true,
+    termsAcceptedAt: serverTimestamp(),
+    termsAcceptedVersion: '2026-07-10',
+    termsAcceptedPlatform: 'ios',
+  }));
 
   // Sensitive / server-owned fields must be rejected on self-update.
   await assertFails(userRef.update({ subscriptionTier: 'pro' }));
@@ -220,6 +232,28 @@ test('users self-update: whitelisted fields succeed, sensitive fields fail', asy
   await assertFails(userRef.update({ isActive: false }));
   // Allowed field bundled with a sensitive one — whole write rejected.
   await assertFails(userRef.update({ preferences: { theme: 'dark' }, subscriptionTier: 'pro' }));
+  // Terms acceptance must be its own server-timestamped write.
+  await assertFails(userRef.update({
+    termsAccepted: true,
+    termsAcceptedAt: new Date(),
+    termsAcceptedVersion: '2026-07-10',
+    termsAcceptedPlatform: 'ios',
+  }));
+  await assertFails(userRef.update({
+    termsAccepted: false,
+    termsAcceptedAt: serverTimestamp(),
+    termsAcceptedVersion: '2026-07-10',
+    termsAcceptedPlatform: 'ios',
+  }));
+  const secondTeacherDb = authDb('teacher_2');
+  const secondUserRef = secondTeacherDb.collection('schools').doc('school_1').collection('users').doc('teacher_2');
+  await assertFails(secondUserRef.update({
+    preferences: { theme: 'dark' },
+    termsAccepted: true,
+    termsAcceptedAt: serverTimestamp(),
+    termsAcceptedVersion: '2026-07-10',
+    termsAcceptedPlatform: 'ios',
+  }));
 });
 
 test('parents self-update: whitelisted fields succeed, sensitive fields fail', async () => {
@@ -245,12 +279,24 @@ test('parents self-update: whitelisted fields succeed, sensitive fields fail', a
   await assertSucceeds(parentRef.update({ preferences: { reminderTime: '19:00' } }));
   await assertSucceeds(parentRef.update({ relationshipLabel: 'Mum' }));
   await assertSucceeds(parentRef.update({ fcmToken: 'token-xyz' }));
+  await assertSucceeds(parentRef.update({
+    termsAccepted: true,
+    termsAcceptedAt: serverTimestamp(),
+    termsAcceptedVersion: '2026-07-10',
+    termsAcceptedPlatform: 'android',
+  }));
 
   // Parent must not be able to grant themselves entitlements or alter linking.
   await assertFails(parentRef.update({ subscriptionStatus: 'active' }));
   await assertFails(parentRef.update({ isPremium: true }));
   await assertFails(parentRef.update({ rateLimitOverride: 99999 }));
   await assertFails(parentRef.update({ linkedChildren: ['student_smuggled'] }));
+  await assertFails(parentRef.update({
+    termsAccepted: true,
+    termsAcceptedAt: new Date(),
+    termsAcceptedVersion: '2026-07-10',
+    termsAcceptedPlatform: 'android',
+  }));
 });
 
 test('school counters: only role-aligned increments are allowed', async () => {

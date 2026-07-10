@@ -41,6 +41,31 @@ service cloud.firestore {
       return isSignedIn() && userRole(schoolId) == 'parent';
     }
 
+    function isValidTermsAcceptanceUpdate() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return !changed.hasAny([
+        'termsAccepted',
+        'termsAcceptedAt',
+        'termsAcceptedVersion',
+        'termsAcceptedPlatform'
+      ]) || (
+        changed.hasOnly([
+          'termsAccepted',
+          'termsAcceptedAt',
+          'termsAcceptedVersion',
+          'termsAcceptedPlatform'
+        ]) &&
+        request.resource.data.termsAccepted == true &&
+        request.resource.data.termsAcceptedAt == request.time &&
+        request.resource.data.termsAcceptedVersion is string &&
+        request.resource.data.termsAcceptedVersion.size() > 0 &&
+        request.resource.data.termsAcceptedVersion.size() <= 32 &&
+        request.resource.data.termsAcceptedPlatform is string &&
+        request.resource.data.termsAcceptedPlatform.size() > 0 &&
+        request.resource.data.termsAcceptedPlatform.size() <= 16
+      );
+    }
+
     function belongsToSchool(schoolId) {
       return isSignedIn() &&
           (exists(/databases/$(database)/documents/schools/$(schoolId)/users/$(request.auth.uid)) ||
@@ -271,7 +296,12 @@ service cloud.firestore {
                   // Profile mascot a staff member picks for themselves (app/portal).
                   // Category-vs-role (la_/mt_/ft_) is enforced by the write paths.
                   'characterId',
-                ])
+                  'termsAccepted',
+                  'termsAcceptedAt',
+                  'termsAcceptedVersion',
+                  'termsAcceptedPlatform',
+                ]) &&
+                isValidTermsAcceptanceUpdate()
               )
             );
 
@@ -327,7 +357,12 @@ service cloud.firestore {
                   'fcmTokenUpdatedAt',
                   'lastLoginAt',
                   'relationshipLabel',
-                ])
+                  'termsAccepted',
+                  'termsAcceptedAt',
+                  'termsAcceptedVersion',
+                  'termsAcceptedPlatform',
+                ]) &&
+                isValidTermsAcceptanceUpdate()
               )
             );
 
