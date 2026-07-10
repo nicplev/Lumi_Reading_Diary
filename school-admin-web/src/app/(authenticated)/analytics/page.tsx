@@ -6,6 +6,10 @@ import { AnalyticsPage } from './analytics-page';
 export default async function AnalyticsRoute() {
   const session = await getSession();
   if (!session) redirect('/login');
+  // Admin-only (matches the sidebar's adminOnly flag): the data is
+  // whole-school, and a year-period load scans the school's entire log
+  // history — neither should be reachable by a teacher session.
+  if (session.role !== 'schoolAdmin') redirect('/dashboard');
 
   const school = await getSchool(session.schoolId);
 
