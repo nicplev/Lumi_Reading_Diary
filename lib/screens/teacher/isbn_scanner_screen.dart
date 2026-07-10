@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../core/characters/lumi_character.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/persistent_cached_image.dart';
@@ -64,10 +65,13 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
   final Map<String, List<ScannedIsbnBook>> _booksByStudent =
       <String, List<ScannedIsbnBook>>{};
   final Set<String> _skippedStudentIds = <String>{};
+  double _panelDragOffset = 0;
+  bool _isDraggingPanel = false;
 
   bool get _isBatchMode => _queue.length > 1;
   StudentModel get _currentStudent => _queue[_currentQueueIndex];
   bool get _isLastStudent => _currentQueueIndex >= _queue.length - 1;
+  bool get _canChangeStudent => !_isProcessing && !_isProcessingQueue;
 
   int get _completedStudentCount {
     var count = 0;
@@ -520,6 +524,8 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
 
     setState(() {
       _currentQueueIndex++;
+      _panelDragOffset = 0;
+      _isDraggingPanel = false;
       _sessionBooks.clear();
       _sessionIsbns.clear();
       _pendingIsbns.clear();
@@ -532,6 +538,45 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
   void _skipCurrentStudent() {
     _skippedStudentIds.add(_currentStudent.id);
     _advanceToNextStudent();
+  }
+
+  void _onPanelDragStart(DragStartDetails details) {
+    if (!_canChangeStudent) return;
+    setState(() => _isDraggingPanel = true);
+  }
+
+  void _onPanelDragUpdate(DragUpdateDetails details) {
+    if (!_canChangeStudent) return;
+    final maxDrag = MediaQuery.sizeOf(context).width * 0.55;
+    setState(() {
+      _panelDragOffset =
+          (_panelDragOffset + details.delta.dx).clamp(-maxDrag, 0.0).toDouble();
+    });
+  }
+
+  void _onPanelDragEnd(DragEndDetails details) {
+    if (!_canChangeStudent) {
+      _resetPanelDrag();
+      return;
+    }
+
+    final velocity = details.primaryVelocity ?? 0;
+    final shouldAdvance = _panelDragOffset <= -72 || velocity <= -550;
+    if (shouldAdvance) {
+      HapticFeedback.selectionClick();
+      _advanceToNextStudent();
+      return;
+    }
+
+    _resetPanelDrag();
+  }
+
+  void _resetPanelDrag() {
+    if (!mounted) return;
+    setState(() {
+      _panelDragOffset = 0;
+      _isDraggingPanel = false;
+    });
   }
 
   void _finishScanner() {
@@ -579,18 +624,16 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final studentName = _currentStudent.firstName;
-
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
-        title: Text(
-          _isBatchMode
-              ? 'Scan ISBN • $studentName (${_currentQueueIndex + 1}/${_queue.length})'
-              : 'Scan ISBN • ${_currentStudent.fullName}',
-          style: LumiType.subhead.copyWith(color: Colors.white),
+        centerTitle: true,
+        titleSpacing: 0,
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: _buildWeekSelector(),
         ),
         actions: [
           IconButton(
@@ -603,36 +646,6 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
               });
             },
           ),
-          if (_isBatchMode) ...[
-            TextButton(
-              onPressed: _isProcessing ? null : _skipCurrentStudent,
-              child: Text(
-                'Skip',
-                style: TextStyle(
-                  color: _isProcessing ? Colors.white38 : Colors.white70,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: _isProcessing ? null : _advanceToNextStudent,
-              child: Text(
-                _isLastStudent ? 'Done' : 'Next',
-                style: TextStyle(
-                  color: _isProcessing ? Colors.white38 : Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ] else
-            TextButton(
-              onPressed: _finishScanner,
-              child: const Text(
-                'Done',
-                style:
-                    TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-              ),
-            ),
         ],
       ),
       body: Column(
@@ -646,12 +659,9 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
               minHeight: 3,
             ),
 
-          // Week selector bar
-          _buildWeekSelector(),
-
           // Camera
           Expanded(
-            flex: 6,
+            flex: 13,
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -660,8 +670,24 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
                   onDetect: _onDetect,
                   errorBuilder: (context, error) => _buildCameraError(),
                 ),
-                Center(child: _ReticleOverlay(flashTick: _scanFlashTick)),
-                Center(child: _ScanSuccessTickOverlay(tick: _scanFlashTick)),
+                Positioned(
+                  top: LumiTokens.space4,
+                  left: LumiTokens.space4,
+                  right: LumiTokens.space4,
+                  child: _StudentIdentityOverlay(
+                    student: _currentStudent,
+                    position: _isBatchMode ? _currentQueueIndex + 1 : null,
+                    total: _isBatchMode ? _queue.length : null,
+                  ),
+                ),
+                Align(
+                  alignment: const Alignment(0, -0.12),
+                  child: _ReticleOverlay(flashTick: _scanFlashTick),
+                ),
+                Align(
+                  alignment: const Alignment(0, -0.12),
+                  child: _ScanSuccessTickOverlay(tick: _scanFlashTick),
+                ),
                 Positioned(
                   left: 16,
                   right: 16,
@@ -689,78 +715,27 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
 
           // Bottom panel
           Expanded(
-            flex: 4,
-            child: Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                color: LumiTokens.cream,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-                    child: Row(
-                      children: [
-                        _InfoChip(
-                          icon: Icons.qr_code_rounded,
-                          label: '${_sessionBooks.length} scanned',
-                        ),
-                        const SizedBox(width: 8),
-                        if (_isBatchMode)
-                          _InfoChip(
-                            icon: Icons.people_alt_rounded,
-                            label:
-                                '$_completedStudentCount/${_queue.length} students',
-                          )
-                        else
-                          _InfoChip(
-                            icon: Icons.menu_book_rounded,
-                            label: '$_totalAssignedBooks total this week',
-                          ),
-                        const Spacer(),
-                        if (_isProcessing)
-                          const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                  LumiTokens.green),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  if (_statusMessage != null)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        _statusMessage!,
-                        style: LumiType.caption,
-                      ),
-                    ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: _sessionBooks.isEmpty
-                        ? Center(
-                            child: Text(
-                              'No ISBN scanned yet',
-                              style: LumiType.body
-                                  .copyWith(color: LumiTokens.muted),
-                            ),
-                          )
-                        : ListView.builder(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                            itemCount: _sessionBooks.length,
-                            itemBuilder: (context, index) {
-                              final book = _sessionBooks[index];
-                              return _buildBookCard(book);
-                            },
-                          ),
-                  ),
-                ],
+            flex: 7,
+            child: GestureDetector(
+              key: const Key('isbn_scan_results_panel'),
+              behavior: HitTestBehavior.opaque,
+              onHorizontalDragStart:
+                  _isBatchMode && _canChangeStudent ? _onPanelDragStart : null,
+              onHorizontalDragUpdate:
+                  _isBatchMode && _canChangeStudent ? _onPanelDragUpdate : null,
+              onHorizontalDragEnd:
+                  _isBatchMode && _canChangeStudent ? _onPanelDragEnd : null,
+              onHorizontalDragCancel: _isBatchMode ? _resetPanelDrag : null,
+              child: AnimatedSlide(
+                offset: Offset(
+                  _panelDragOffset / MediaQuery.sizeOf(context).width,
+                  0,
+                ),
+                duration: _isDraggingPanel
+                    ? Duration.zero
+                    : const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                child: _buildBottomPanel(),
               ),
             ),
           ),
@@ -824,30 +799,220 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
   }
 
   Widget _buildWeekSelector() {
-    return Container(
-      color: Colors.white.withValues(alpha: 0.08),
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.chevron_left, color: Colors.white70),
-            iconSize: 20,
-            onPressed: _canGoBack ? () => _shiftWeek(-1) : null,
-            visualDensity: VisualDensity.compact,
-          ),
-          Text(
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          tooltip: 'Previous week',
+          icon: const Icon(Icons.chevron_left),
+          color: Colors.white70,
+          disabledColor: Colors.white24,
+          iconSize: 22,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.tightFor(width: 32, height: 40),
+          onPressed: _canGoBack ? () => _shiftWeek(-1) : null,
+          visualDensity: VisualDensity.compact,
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: LumiTokens.space1),
+          child: Text(
             _weekLabel,
             style: LumiType.caption.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.w600,
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.chevron_right, color: Colors.white70),
-            iconSize: 20,
-            onPressed: _canGoForward ? () => _shiftWeek(1) : null,
-            visualDensity: VisualDensity.compact,
+        ),
+        IconButton(
+          tooltip: 'Next week',
+          icon: const Icon(Icons.chevron_right),
+          color: Colors.white70,
+          disabledColor: Colors.white24,
+          iconSize: 22,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.tightFor(width: 32, height: 40),
+          onPressed: _canGoForward ? () => _shiftWeek(1) : null,
+          visualDensity: VisualDensity.compact,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBottomPanel() {
+    return Container(
+      key: ValueKey(_currentStudent.id),
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        color: LumiTokens.cream,
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(LumiTokens.radiusXL),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_isBatchMode) ...[
+            const SizedBox(height: LumiTokens.space2),
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: LumiTokens.rule,
+                  borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                LumiTokens.space4,
+                LumiTokens.space1,
+                LumiTokens.space2,
+                0,
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.swipe_left_rounded,
+                    size: 18,
+                    color: LumiTokens.muted,
+                  ),
+                  const SizedBox(width: LumiTokens.space2),
+                  Expanded(
+                    child: Text(
+                      _isLastStudent
+                          ? 'Swipe left to finish'
+                          : 'Swipe left for next student',
+                      style: LumiType.caption.copyWith(
+                        color: LumiTokens.muted,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  TextButton.icon(
+                    key: const Key('isbn_batch_skip_button'),
+                    onPressed: _canChangeStudent ? _skipCurrentStudent : null,
+                    icon: const Icon(Icons.skip_next_rounded, size: 18),
+                    label: const Text('Skip'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: LumiTokens.muted,
+                      disabledForegroundColor:
+                          LumiTokens.muted.withValues(alpha: 0.45),
+                      textStyle: LumiType.button,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                LumiTokens.space4,
+                LumiTokens.space3,
+                LumiTokens.space3,
+                0,
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    'Scanned books',
+                    style: LumiType.subhead.copyWith(fontSize: 18),
+                  ),
+                  const Spacer(),
+                  FilledButton.icon(
+                    key: const Key('isbn_single_done_button'),
+                    onPressed: _canChangeStudent ? _finishScanner : null,
+                    icon: const Icon(Icons.check_rounded, size: 18),
+                    label: const Text('Done'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: LumiTokens.green,
+                      foregroundColor: LumiTokens.paper,
+                      disabledBackgroundColor:
+                          LumiTokens.green.withValues(alpha: 0.45),
+                      disabledForegroundColor: LumiTokens.paper,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: LumiTokens.space4,
+                        vertical: LumiTokens.space2,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      textStyle: LumiType.button,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              LumiTokens.space4,
+              _isBatchMode ? 0 : LumiTokens.space2,
+              LumiTokens.space4,
+              LumiTokens.space2,
+            ),
+            child: Row(
+              children: [
+                _InfoChip(
+                  icon: Icons.qr_code_rounded,
+                  label: '${_sessionBooks.length} scanned',
+                ),
+                const SizedBox(width: LumiTokens.space2),
+                if (_isBatchMode)
+                  _InfoChip(
+                    icon: Icons.people_alt_rounded,
+                    label: '$_completedStudentCount/${_queue.length} students',
+                  )
+                else
+                  _InfoChip(
+                    icon: Icons.menu_book_rounded,
+                    label: '$_totalAssignedBooks total this week',
+                  ),
+                const Spacer(),
+                if (_isProcessing)
+                  const SizedBox(
+                    width: LumiTokens.space4,
+                    height: LumiTokens.space4,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(LumiTokens.green),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          if (_statusMessage != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: LumiTokens.space4,
+              ),
+              child: Text(
+                _statusMessage!,
+                style: LumiType.caption,
+              ),
+            ),
+          const SizedBox(height: LumiTokens.space2),
+          Expanded(
+            child: _sessionBooks.isEmpty
+                ? Center(
+                    child: Text(
+                      'No ISBN scanned yet',
+                      style: LumiType.body.copyWith(color: LumiTokens.muted),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(
+                      LumiTokens.space4,
+                      0,
+                      LumiTokens.space4,
+                      LumiTokens.space3,
+                    ),
+                    itemCount: _sessionBooks.length,
+                    itemBuilder: (context, index) {
+                      final book = _sessionBooks[index];
+                      return _buildBookCard(book);
+                    },
+                  ),
           ),
         ],
       ),
@@ -951,6 +1116,113 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _StudentIdentityOverlay extends StatelessWidget {
+  const _StudentIdentityOverlay({
+    required this.student,
+    this.position,
+    this.total,
+  });
+
+  final StudentModel student;
+  final int? position;
+  final int? total;
+
+  @override
+  Widget build(BuildContext context) {
+    final fullName = student.fullName.trim();
+    final character = LumiCharacters.findById(student.displayCharacterId);
+    final profileImageUrl = student.profileImageUrl?.trim() ?? '';
+
+    Widget? visual;
+    if (character != null) {
+      visual = Image.asset(
+        character.assetPath,
+        width: 52,
+        height: 52,
+        fit: BoxFit.contain,
+      );
+    }
+    if (profileImageUrl.startsWith('http')) {
+      visual = ClipOval(
+        child: PersistentCachedImage(
+          imageUrl: profileImageUrl,
+          width: 52,
+          height: 52,
+          fit: BoxFit.cover,
+          fallback: visual ?? const SizedBox.shrink(),
+        ),
+      );
+    }
+
+    final progressLabel = position != null && total != null
+        ? 'Student $position of $total'
+        : null;
+    final semanticsLabel = progressLabel == null
+        ? 'Scanning for $fullName'
+        : 'Scanning for $fullName, $progressLabel';
+
+    return Semantics(
+      container: true,
+      label: semanticsLabel,
+      child: ExcludeSemantics(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (visual != null) ...[
+              visual,
+              const SizedBox(width: LumiTokens.space3),
+            ],
+            Flexible(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: visual == null
+                    ? CrossAxisAlignment.center
+                    : CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    fullName,
+                    softWrap: true,
+                    textAlign:
+                        visual == null ? TextAlign.center : TextAlign.start,
+                    style: LumiType.subhead.copyWith(
+                      color: Colors.white,
+                      fontSize: 22,
+                      shadows: const [
+                        Shadow(
+                          color: Colors.black87,
+                          blurRadius: 10,
+                          offset: Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (progressLabel != null) ...[
+                    const SizedBox(height: LumiTokens.space1),
+                    Text(
+                      progressLabel,
+                      style: LumiType.caption.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        shadows: const [
+                          Shadow(
+                            color: Colors.black87,
+                            blurRadius: 8,
+                            offset: Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
