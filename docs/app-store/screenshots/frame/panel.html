@@ -112,13 +112,18 @@
     headline.style.maxWidth = '1200px';
     const ring = 13, pad = 20, imgW = 1092;
     const imgH = Math.round(imgW * 2868 / 1320);          // 2372
+    // Real display corner radius: Apple's _displayCornerRadius reports 62pt
+    // for the 16/17 Pro family → 186px at the 3x capture scale, scaled to
+    // this panel's image width. Bezel + chassis corners stay concentric
+    // (outer radius = inner radius + gap), matching the device's curvature.
+    const screenR = Math.round(62 * 3 * imgW / 1320);     // 154
     shot.style.width = imgW + 'px';
     shot.style.height = imgH + 'px';
-    shot.style.borderRadius = '52px';
+    shot.style.borderRadius = screenR + 'px';
     bezel.style.padding = pad + 'px';
-    bezel.style.borderRadius = (52 + pad) + 'px';
+    bezel.style.borderRadius = (screenR + pad) + 'px';
     chassis.style.padding = ring + 'px';
-    chassis.style.borderRadius = (52 + pad + ring) + 'px';
+    chassis.style.borderRadius = (screenR + pad + ring) + 'px';
 
     // Left edge: action button + volume up/down. Right edge: power.
     // Positions proportional to the real device.
