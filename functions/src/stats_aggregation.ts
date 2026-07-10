@@ -59,20 +59,35 @@ export interface IncrementalAggregationConfig {
   classStats: boolean;
 }
 
+// Config cache: the two stats triggers call readIncrementalConfig on EVERY
+// reading-log write, so without a cache the config doc alone bills 2+ reads
+// per log (~30k+/day at 15k logs). 60s TTL means a flag flip (including the
+// no-deploy rollback: set both flags false) takes effect within a minute per
+// warm instance — acceptable for a rollout/rollback lever.
+const CONFIG_CACHE_TTL_MS = 60_000;
+let cachedConfig: IncrementalAggregationConfig | null = null;
+let cachedConfigAt = 0;
+
 /**
- * Reads /platformConfig/incrementalAggregation. Defaults BOTH flags to
- * false so deploying this file alone is a no-op — flip the flags from
- * the super-admin portal (or directly in Firestore) to roll incremental
- * mode out per-feature.
+ * Reads /platformConfig/incrementalAggregation (cached ~60s per instance).
+ * Defaults BOTH flags to false so deploying this file alone is a no-op —
+ * flip the flags from the super-admin portal (or directly in Firestore) to
+ * roll incremental mode out per-feature.
  */
 export async function readIncrementalConfig():
   Promise<IncrementalAggregationConfig> {
+  const now = Date.now();
+  if (cachedConfig && now - cachedConfigAt < CONFIG_CACHE_TTL_MS) {
+    return cachedConfig;
+  }
   const snap = await incrementalAggregationDoc().get();
   const data = snap.data() ?? {};
-  return {
+  cachedConfig = {
     studentStats: data.studentStats === true,
     classStats: data.classStats === true,
   };
+  cachedConfigAt = now;
+  return cachedConfig;
 }
 
 interface CountedLogFields {
@@ -105,6 +120,53 @@ function extractCountedFields(
   const minutes = Number(logData.minutesRead) || 0;
   const books = Array.isArray(logData.bookTitles) ? logData.bookTitles.length : 0;
   return {minutes, books, localDate, date};
+}
+
+/**
+ * True when a reading-log UPDATE cannot change any aggregate stat, so both
+ * stats triggers can skip it entirely (no config read, no doc reads, no
+ * write). Creates and deletes always return false.
+ *
+ * A log's entire contribution to student AND class stats is derived from:
+ * counted-ness (status ∈ COUNTED_STATUSES and not invalidated), studentId,
+ * date, minutesRead, and bookTitles.length — see [extractCountedFields].
+ * If none of those changed between the snapshots, recomputing is a no-op.
+ *
+ * This kills the two hottest wasted firings on the log write path:
+ *  - validateReadingLog's post-create stamp (validation metadata only)
+ *  - onCommentCreated's teacher-comment mirror write
+ * while deliberately NOT skipping the updates that must recompute:
+ *  - valid → invalid flips (counted-ness changes)
+ *  - minute / date / status / studentId edits
+ *  - deletes (widget-undo) and creates
+ * @param {functions.Change<admin.firestore.DocumentSnapshot>} change
+ *   Before/after snapshots from the onDocumentWritten event.
+ * @return {boolean} True when the write is stats-irrelevant.
+ */
+export function isStatsNoopUpdate(
+  change: functions.Change<admin.firestore.DocumentSnapshot>,
+): boolean {
+  if (!change.before.exists || !change.after.exists) return false;
+  const b = change.before.data() ?? {};
+  const a = change.after.data() ?? {};
+
+  const bCounted =
+    COUNTED_STATUSES.includes(String(b.status ?? "")) && !isInvalidatedLog(b);
+  const aCounted =
+    COUNTED_STATUSES.includes(String(a.status ?? "")) && !isInvalidatedLog(a);
+  if (bCounted !== aCounted) return false;
+  // Neither snapshot contributes to any stat → nothing can change.
+  if (!bCounted) return true;
+
+  const bDate = b.date as admin.firestore.Timestamp | undefined;
+  const aDate = a.date as admin.firestore.Timestamp | undefined;
+  return (
+    String(b.studentId ?? "") === String(a.studentId ?? "") &&
+    (bDate?.toMillis() ?? null) === (aDate?.toMillis() ?? null) &&
+    (Number(b.minutesRead) || 0) === (Number(a.minutesRead) || 0) &&
+    (Array.isArray(b.bookTitles) ? b.bookTitles.length : 0) ===
+      (Array.isArray(a.bookTitles) ? a.bookTitles.length : 0)
+  );
 }
 
 // ──────────────────────────────────────────────────────────────────────

@@ -179,17 +179,32 @@ export const topReaderAward = onSchedule(
             typeof topReader.name === "string" ? topReader.name.trim() : "";
           const name = rawName.length > 0 ? rawName : DEFAULT_TOP_READER_NAME;
 
-          const roster = await studentsCol
-            .where("classId", "==", cls.id)
-            .where("isActive", "==", true)
-            .get();
-          const rosterIds = new Set(roster.docs.map((d) => d.id));
-          const currentHolders = roster.docs.filter(
-            (d) => d.get("autoAward") != null,
-          );
-
+          let currentHolders: FirebaseFirestore.DocumentSnapshot[];
           let winnerId: string | null = null;
-          if (enabled) {
+
+          if (!enabled) {
+            // Award disabled: the only work left is clearing stale gold from
+            // a previous week — a class that turns the award off must not
+            // leave the last winner gold forever. A narrow holders-only
+            // query returns 0–1 docs instead of the whole roster
+            // (equality-only filters, no composite index needed; autoAward
+            // is written solely by this function, always with
+            // characterId = GOLD_CHARACTER_ID).
+            const holdersSnap = await studentsCol
+              .where("classId", "==", cls.id)
+              .where("autoAward.characterId", "==", GOLD_CHARACTER_ID)
+              .get();
+            currentHolders = holdersSnap.docs;
+          } else {
+            const roster = await studentsCol
+              .where("classId", "==", cls.id)
+              .where("isActive", "==", true)
+              .get();
+            const rosterIds = new Set(roster.docs.map((d) => d.id));
+            currentHolders = roster.docs.filter(
+              (d) => d.get("autoAward") != null,
+            );
+
             const logs = await logsCol
               .where("classId", "==", cls.id)
               .where("date", ">=", queryStart)
