@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/teacher_constants.dart';
+import '../../../core/tour/lumi_app_tour.dart';
 import '../../../theme/lumi_tokens.dart';
 import '../../../theme/lumi_typography.dart';
 import '../../../theme/section_theme.dart';
@@ -43,6 +44,7 @@ class TeacherDashboardView extends StatefulWidget {
   final ValueChanged<ClassModel> onClassChanged;
   final ValueChanged<int> onTabChanged;
   final int resetTrigger;
+  final String? activeTourStepId;
 
   const TeacherDashboardView({
     super.key,
@@ -52,6 +54,7 @@ class TeacherDashboardView extends StatefulWidget {
     required this.onClassChanged,
     required this.onTabChanged,
     this.resetTrigger = 0,
+    this.activeTourStepId,
   });
 
   @override
@@ -59,6 +62,9 @@ class TeacherDashboardView extends StatefulWidget {
 }
 
 class _TeacherDashboardViewState extends State<TeacherDashboardView> {
+  static const _customizeTourStepId = 'dashboard_customize';
+
+  final ScrollController _scrollController = ScrollController();
   int _bellAnimCount = 0;
   String? _dailyInsight;
   int? _momentumDiff; // positive = up, negative = down
@@ -113,6 +119,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
   void dispose() {
     _readingGroupsSubscription?.cancel();
     _engagementResetSignal.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -130,6 +137,22 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
     if (oldWidget.resetTrigger != widget.resetTrigger) {
       resetEngagementCard();
     }
+    if (oldWidget.activeTourStepId != widget.activeTourStepId &&
+        widget.activeTourStepId == _customizeTourStepId) {
+      _scrollToCustomizeButtonForTour();
+    }
+  }
+
+  void _scrollToCustomizeButtonForTour() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients || _isEditMode) return;
+      final position = _scrollController.position;
+      _scrollController.animateTo(
+        position.maxScrollExtent,
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOutCubic,
+      );
+    });
   }
 
   // ------------------------------------------------------------------
@@ -587,6 +610,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
             ),
         },
         child: CustomScrollView(
+          controller: _scrollController,
           slivers: [
             SliverToBoxAdapter(child: SizedBox(height: topPadding + 12)),
             SliverToBoxAdapter(
@@ -619,22 +643,25 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-                  child: GestureDetector(
-                    onTap: _enterEditMode,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.dashboard_customize_rounded,
-                            size: 16, color: AppColors.textSecondary),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Customize dashboard',
-                          style: TeacherTypography.bodySmall.copyWith(
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w500,
+                  child: LumiTourTarget(
+                    id: 'teacher.dashboard.customizeButton',
+                    child: GestureDetector(
+                      onTap: _enterEditMode,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.dashboard_customize_rounded,
+                              size: 16, color: AppColors.textSecondary),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Customize dashboard',
+                            style: TeacherTypography.bodySmall.copyWith(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),

@@ -7,6 +7,7 @@ import '../../core/auth/sign_out_flow.dart';
 import '../../core/config/dev_access.dart';
 import '../../core/services/app_icon_service.dart';
 import '../../core/services/dev_access_service.dart';
+import '../../core/tour/lumi_app_tour.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
@@ -398,12 +399,15 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen>
       child: _SettingsGroup(
         rows: [
           ..._linkedChildren.map(_buildChildRow),
-          _SettingsRow(
-            icon: Icons.qr_code_scanner,
-            title: 'Link a new child',
-            subtitle: 'Enter an invite code',
-            accent: true,
-            onTap: () => context.push('/parent/link-child'),
+          LumiTourTarget(
+            id: 'parent.settings.linkChild',
+            child: _SettingsRow(
+              icon: Icons.qr_code_scanner,
+              title: 'Link a new child',
+              subtitle: 'Enter an invite code',
+              accent: true,
+              onTap: () => context.push('/parent/link-child'),
+            ),
           ),
         ],
       ),

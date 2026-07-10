@@ -2189,11 +2189,14 @@ test('platformConfig: clients cannot create, update, or delete flags', async () 
 const FUTURE = new Date(Date.now() + 365 * 86400000);
 const PAST = new Date(Date.now() - 86400000);
 
-async function seedSchoolWithAccessStates() {
+async function seedSchoolWithAccessStates({ quickLoggingEnabled } = {}) {
   await seedData(async (db) => {
     await db.collection('schools').doc('school_1').set({
       name: 'Lumi School One',
       createdBy: 'admin_1',
+      ...(quickLoggingEnabled === undefined ? {} : {
+        settings: { quickLogging: { enabled: quickLoggingEnabled } },
+      }),
     });
     await db.collection('schools').doc('school_1').collection('parents').doc('parent_1').set({
       role: 'parent',
@@ -2230,14 +2233,15 @@ async function seedSchoolWithAccessStates() {
   });
 }
 
-function logFor(db, studentId) {
-  return db.collection('schools').doc('school_1').collection('readingLogs').doc(`log_${studentId}`).set({
+function logFor(db, studentId, { quickLog = false, logId = `log_${studentId}` } = {}) {
+  return db.collection('schools').doc('school_1').collection('readingLogs').doc(logId).set({
     schoolId: 'school_1',
     studentId,
     parentId: 'parent_1',
     minutesRead: 20,
     status: 'completed',
     bookTitles: ['Reading'],
+    ...(quickLog ? { metadata: { quickLog: true } } : {}),
   });
 }
 
@@ -2263,6 +2267,35 @@ test('access: parent CANNOT create a log for a legacy student with no access map
   await seedSchoolWithAccessStates();
   const db = authDb('parent_1');
   await assertFails(logFor(db, 'student_legacy'));
+});
+
+test('quick logging: parent quick log is allowed when the school setting is absent', async () => {
+  await seedSchoolWithAccessStates();
+  const db = authDb('parent_1');
+  await assertSucceeds(
+    logFor(db, 'student_active', {
+      quickLog: true,
+      logId: 'log_quick_default',
+    }),
+  );
+});
+
+test('quick logging: parent quick log is denied when school disables it', async () => {
+  await seedSchoolWithAccessStates({ quickLoggingEnabled: false });
+  const db = authDb('parent_1');
+
+  await assertFails(
+    logFor(db, 'student_active', {
+      quickLog: true,
+      logId: 'log_quick_disabled',
+    }),
+  );
+
+  await assertSucceeds(
+    logFor(db, 'student_active', {
+      logId: 'log_detail_still_allowed',
+    }),
+  );
 });
 
 // ── Reading-log minutes bounds ───────────────────────────────────────────────

@@ -63,6 +63,9 @@ const updateSchema = z.object({
       chips: z.array(z.string().min(1).max(100)).max(20),
     })).max(10),
   }).optional(),
+  quickLoggingSettings: z.object({
+    enabled: z.boolean(),
+  }).optional(),
   comprehensionRecordingSettings: z.object({
     enabled: z.boolean(),
   }).optional(),

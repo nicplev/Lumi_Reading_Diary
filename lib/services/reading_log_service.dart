@@ -43,6 +43,13 @@ class ReadingLogResult {
   final bool restDayApplied;
 }
 
+class QuickLoggingDisabledException implements Exception {
+  const QuickLoggingDisabledException();
+
+  @override
+  String toString() => 'Quick logging is disabled for this school';
+}
+
 /// Internal result of the stats preview.
 class _StatsUpdate {
   const _StatsUpdate(this.stats, this.restDayApplied);
@@ -236,10 +243,8 @@ class ReadingLogService {
     int targetMinutes = _defaultTargetMinutes,
   }) {
     final now = DateTime.now();
-    final cleanedTitles = bookTitles
-        .map((t) => t.trim())
-        .where((t) => t.isNotEmpty)
-        .toList();
+    final cleanedTitles =
+        bookTitles.map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
     final titles = cleanedTitles.isNotEmpty ? cleanedTitles : const ['Reading'];
     final trimmedNotes = notes?.trim();
 
@@ -291,6 +296,8 @@ class ReadingLogService {
     ReadingLogModel log, {
     StudentModel? student,
   }) async {
+    await _guardQuickLoggingAllowed(log);
+
     if (ServiceStatusController.instance.current.canWriteToFirebase) {
       final logData = log.toFirestore();
       // Server timestamp for an accurate audit trail (teachers can see the
@@ -354,6 +361,30 @@ class ReadingLogService {
       }
     }
     return ReadingLogResult(log: offlineLog, savedOffline: true);
+  }
+
+  Future<void> _guardQuickLoggingAllowed(ReadingLogModel log) async {
+    if (!log.isQuickLog || log.loggedByRole == LoggedByRole.teacher) return;
+    final enabled = await _quickLoggingEnabled(log.schoolId);
+    if (!enabled) throw const QuickLoggingDisabledException();
+  }
+
+  Future<bool> _quickLoggingEnabled(String schoolId) async {
+    if (schoolId.isEmpty) return true;
+    try {
+      final doc = await _firestore.collection('schools').doc(schoolId).get();
+      final data = doc.data();
+      if (data == null) return true;
+      final settings = data['settings'];
+      if (settings is! Map) return true;
+      final quickLogging = settings['quickLogging'];
+      if (quickLogging is! Map) return true;
+      final enabled = quickLogging['enabled'];
+      return enabled is bool ? enabled : true;
+    } catch (e) {
+      debugPrint('quickLoggingEnabled check failed for $schoolId: $e');
+      return true;
+    }
   }
 
   /// Patches a child-feeling onto an already-saved log document.
@@ -517,7 +548,8 @@ class ReadingLogService {
       comprehensionAudioUploaded: false,
     );
     try {
-      await uploadComprehensionAudio(log: patched, localFilePath: localFilePath);
+      await uploadComprehensionAudio(
+          log: patched, localFilePath: localFilePath);
     } catch (_) {
       await queue();
     }
@@ -634,11 +666,9 @@ class ReadingLogService {
     StudentModel student,
     List<AllocationModel> allocations,
   ) {
-    final cleaned = explicit
-            ?.map((t) => t.trim())
-            .where((t) => t.isNotEmpty)
-            .toList() ??
-        const <String>[];
+    final cleaned =
+        explicit?.map((t) => t.trim()).where((t) => t.isNotEmpty).toList() ??
+            const <String>[];
     if (cleaned.isNotEmpty) return cleaned;
 
     // No explicit selection (the one-tap quick path): attribute the night to

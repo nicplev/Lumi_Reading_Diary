@@ -173,6 +173,17 @@ service cloud.firestore {
           .get('enabled', true);
     }
 
+    // Server-side backstop for the parent app's one-tap quick logging shortcut.
+    // Defaults to TRUE for legacy schools. When a school admin disables it, a
+    // stale/tampered parent client cannot create new logs marked
+    // `metadata.quickLog == true`; detailed logs remain allowed.
+    function quickLoggingEnabled(schoolId) {
+      return get(/databases/$(database)/documents/schools/$(schoolId))
+          .data.get('settings', {})
+          .get('quickLogging', {})
+          .get('enabled', true);
+    }
+
     match /schools/{schoolId} {
       allow list: if isSignedIn();
       allow get: if belongsToSchool(schoolId) || isDevImpersonatingSchool(schoolId);
@@ -435,6 +446,11 @@ service cloud.firestore {
               request.resource.data.minutesRead <= 240;
         }
 
+        function isQuickLogCreate() {
+          return request.resource.data.get('metadata', {}) is map &&
+              request.resource.data.get('metadata', {}).get('quickLog', false) == true;
+        }
+
         allow get, list: if isSchoolAdmin(schoolId) ||
             isTeacher(schoolId) ||
             isDevImpersonatingSchool(schoolId);
@@ -453,6 +469,7 @@ service cloud.firestore {
         allow create: if isSignedIn() &&
             writeAllowedForDev() &&
             minutesInBounds() &&
+            (!isQuickLogCreate() || quickLoggingEnabled(schoolId)) &&
             getUserData(schoolId).linkedChildren != null &&
             request.resource.data.studentId in getUserData(schoolId).linkedChildren &&
             request.resource.data.parentId == request.auth.uid &&

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'comprehension_recording_settings.dart';
 import 'messaging_settings.dart';
 import 'parent_comment_settings.dart';
+import 'quick_logging_settings.dart';
 
 enum ReadingLevelSchema {
   none,
@@ -23,7 +24,8 @@ class SchoolModel {
   final String? secondaryColor;
   final ReadingLevelSchema levelSchema;
   final List<String>? customLevels;
-  final Map<String, String>? levelColors; // hex color keyed by level name (for colouredLevels)
+  final Map<String, String>?
+      levelColors; // hex color keyed by level name (for colouredLevels)
   final Map<String, DateTime> termDates; // term1Start, term1End, etc.
   final Map<String, String> quietHours; // start: "19:00", end: "07:00"
   final String timezone;
@@ -115,7 +117,8 @@ class SchoolModel {
           ? (data['subscriptionExpiry'] as Timestamp).toDate()
           : null,
       access: data['access'] != null
-          ? SchoolAccess.fromMap(Map<String, dynamic>.from(data['access'] as Map))
+          ? SchoolAccess.fromMap(
+              Map<String, dynamic>.from(data['access'] as Map))
           : null,
     );
   }
@@ -158,6 +161,12 @@ class SchoolModel {
     );
   }
 
+  QuickLoggingSettings get quickLoggingSettings {
+    return QuickLoggingSettings.fromMap(
+      settings?['quickLogging'] as Map<String, dynamic>?,
+    );
+  }
+
   ComprehensionRecordingSettings get comprehensionRecordingSettings {
     return ComprehensionRecordingSettings.fromMap(
       settings?['comprehensionRecording'] as Map<String, dynamic>?,
@@ -178,17 +187,52 @@ class SchoolModel {
         return [];
       case ReadingLevelSchema.aToZ:
         return [
-          'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
-          'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
-          'U', 'V', 'W', 'X', 'Y', 'Z'
+          'A',
+          'B',
+          'C',
+          'D',
+          'E',
+          'F',
+          'G',
+          'H',
+          'I',
+          'J',
+          'K',
+          'L',
+          'M',
+          'N',
+          'O',
+          'P',
+          'Q',
+          'R',
+          'S',
+          'T',
+          'U',
+          'V',
+          'W',
+          'X',
+          'Y',
+          'Z'
         ];
       case ReadingLevelSchema.pmBenchmark:
         return List.generate(30, (i) => '${i + 1}');
       case ReadingLevelSchema.lexile:
         return [
-          'BR', '100L', '200L', '300L', '400L', '500L',
-          '600L', '700L', '800L', '900L', '1000L', '1100L',
-          '1200L', '1300L', '1400L'
+          'BR',
+          '100L',
+          '200L',
+          '300L',
+          '400L',
+          '500L',
+          '600L',
+          '700L',
+          '800L',
+          '900L',
+          '1000L',
+          '1100L',
+          '1200L',
+          '1300L',
+          '1400L'
         ];
       case ReadingLevelSchema.numbered:
         return List.generate(100, (i) => '${i + 1}');

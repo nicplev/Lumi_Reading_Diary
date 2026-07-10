@@ -15,9 +15,16 @@ import { useToast } from '@/components/lumi/toast';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useSchool, useUpdateSchool } from '@/lib/hooks/use-school';
 import { getReadingLevels } from '@/lib/types';
-import type { ReadingLevelSchema, ParentCommentSettings, ComprehensionRecordingSettings, MessagingSettings } from '@/lib/types';
+import type {
+  ReadingLevelSchema,
+  ParentCommentSettings,
+  QuickLoggingSettings,
+  ComprehensionRecordingSettings,
+  MessagingSettings,
+} from '@/lib/types';
 import { ParentCommentSettingsSection, DEFAULT_PRESETS, type CommentPreviewState } from './parent-comment-settings';
 import { FloatingPhonePreview } from './floating-phone-preview';
+import { QuickLoggingSettingsSection } from './quick-logging-settings';
 import { ComprehensionRecordingSettingsSection } from './comprehension-recording-settings';
 import { ComprehensionAudioCleanupSection } from './comprehension-audio-cleanup';
 import { MessagingSettingsSection } from './messaging-settings';
@@ -115,6 +122,7 @@ export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
   const [savingTerms, setSavingTerms] = useState(false);
   const [savingQuiet, setSavingQuiet] = useState(false);
   const [savingComments, setSavingComments] = useState(false);
+  const [savingQuickLogging, setSavingQuickLogging] = useState(false);
   const [savingComprehension, setSavingComprehension] = useState(false);
   const [savingMessaging, setSavingMessaging] = useState(false);
 
@@ -228,6 +236,20 @@ export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
       toast(error instanceof Error ? error.message : 'Failed to save', 'error');
     } finally {
       setSavingComments(false);
+    }
+  };
+
+  const handleSaveQuickLogging = async (
+    quickLoggingSettings: QuickLoggingSettings,
+  ) => {
+    setSavingQuickLogging(true);
+    try {
+      await updateSchool.mutateAsync({ quickLoggingSettings });
+      toast('Quick logging settings updated', 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to save', 'error');
+    } finally {
+      setSavingQuickLogging(false);
     }
   };
 
@@ -462,8 +484,17 @@ export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
       {/* Parent App Tab */}
       {activeTab === 'parent-app' && (
         <div className="space-y-6">
-          {/* Parent communication channels: notification timing + messaging */}
+          {/* Parent app controls: logging shortcuts, notification timing, messaging */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            <QuickLoggingSettingsSection
+              settings={
+                school?.settings?.quickLogging as QuickLoggingSettings | undefined
+              }
+              isAdmin={isAdmin}
+              onSave={handleSaveQuickLogging}
+              saving={savingQuickLogging}
+            />
+
             {/* Quiet Hours */}
             <Card>
               <h2 className="text-lg font-bold text-ink mb-1">Parent Notification Quiet Hours</h2>

@@ -84,7 +84,8 @@ void main() {
       return doc.data()!;
     }
 
-    test('writes the log doc and returns a streak=1 preview, persisting no stats',
+    test(
+        'writes the log doc and returns a streak=1 preview, persisting no stats',
         () async {
       await seedStudent(null);
 
@@ -180,15 +181,16 @@ void main() {
           reason: 'beyond the 2-day tolerance → fresh start');
     });
 
-    test('never persists computed stats (Cloud Function is the source of truth)',
+    test(
+        'never persists computed stats (Cloud Function is the source of truth)',
         () async {
       final seeded = {
         'currentStreak': 5,
         'longestStreak': 9,
         'totalReadingDays': 5,
         'totalMinutesRead': 100,
-        'lastReadingDate':
-            Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 2))),
+        'lastReadingDate': Timestamp.fromDate(
+            DateTime.now().subtract(const Duration(days: 2))),
       };
       await seedStudent(seeded);
 
@@ -202,6 +204,32 @@ void main() {
       expect(stats['currentStreak'], 5, reason: 'untouched by the client');
       expect(stats['totalReadingDays'], 5, reason: 'untouched by the client');
       expect(stats['totalMinutesRead'], 100, reason: 'untouched by the client');
+    });
+
+    test('quick log throws when the school disables quick logging', () async {
+      await firestore.collection('schools').doc(schoolId).set({
+        'name': 'Lumi School',
+        'settings': {
+          'quickLogging': {'enabled': false},
+        },
+      });
+      await seedStudent(null);
+
+      await expectLater(
+        service.logReading(
+          student: buildStudent(),
+          parent: buildParent(),
+          quickLog: true,
+        ),
+        throwsA(isA<QuickLoggingDisabledException>()),
+      );
+
+      final logs = await firestore
+          .collection('schools')
+          .doc(schoolId)
+          .collection('readingLogs')
+          .get();
+      expect(logs.docs, isEmpty);
     });
   });
 }

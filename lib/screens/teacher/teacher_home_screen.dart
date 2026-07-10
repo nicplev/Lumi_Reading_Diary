@@ -36,6 +36,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
   final FirebaseService _firebaseService = FirebaseService.instance;
   int _selectedIndex = 0;
   int _dashboardResetTrigger = 0;
+  String? _activeTourStepId;
   List<ClassModel> _classes = [];
   ClassModel? _selectedClass;
   bool _isLoading = true;
@@ -112,6 +113,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
       setState(() {
         _selectedIndex = tabIndex;
         _dashboardResetTrigger++;
+        _activeTourStepId = step.id;
       });
       _isProgrammaticPageChange = true;
       if (_pageController.hasClients) {
@@ -120,6 +122,8 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _isProgrammaticPageChange = false;
       });
+    } else if (mounted && _activeTourStepId != step.id) {
+      setState(() => _activeTourStepId = step.id);
     }
     await Future<void>.delayed(const Duration(milliseconds: 100));
   }
@@ -303,6 +307,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
           );
         },
         resetTrigger: _dashboardResetTrigger,
+        activeTourStepId: _activeTourStepId,
       ),
     );
   }

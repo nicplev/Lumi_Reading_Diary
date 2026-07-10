@@ -62,6 +62,12 @@ export interface ParentCommentSettings {
   customPresets: CommentPresetCategory[];
 }
 
+// Stored at `schools/{id}.settings.quickLogging`. Gates the parent app's
+// one-tap/minutes-only shortcut. Absent = enabled for legacy schools.
+export interface QuickLoggingSettings {
+  enabled: boolean;
+}
+
 // Stored at `schools/{id}.settings.comprehensionRecording`. Drives the
 // optional voice-recording step at the end of the parent's reading-log
 // wizard. Per-class prompts live on `classes/{id}.settings.comprehensionQuestion`.

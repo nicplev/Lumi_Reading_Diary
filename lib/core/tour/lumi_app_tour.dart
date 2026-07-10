@@ -22,6 +22,7 @@ class LumiTourStep {
     required this.accent,
     this.tip,
     this.tabIndex,
+    this.spotlightTarget = true,
   });
 
   final String id;
@@ -32,6 +33,7 @@ class LumiTourStep {
   final IconData icon;
   final Color accent;
   final int? tabIndex;
+  final bool spotlightTarget;
 }
 
 class LumiTourDefinition {
@@ -64,7 +66,7 @@ class LumiTourDefinitions {
         body:
             'For one-child accounts, this card is your daily reading hub. Tap Log reading to add books, minutes, comments, and how reading felt.',
         tip:
-            'Quick log is the smaller shortcut for days when you only need to record the target minutes. Once logged, the card opens reading history.',
+            'If your school allows Quick log, you may also see a smaller shortcut for target-minutes-only days. Once logged, this card opens reading history.',
         icon: Icons.edit_note_rounded,
         accent: LumiTokens.red,
       ),
@@ -101,6 +103,18 @@ class LumiTourDefinitions {
         icon: Icons.settings_outlined,
         accent: LumiTokens.green,
       ),
+      LumiTourStep(
+        id: 'link_child',
+        targetId: 'parent.settings.linkChild',
+        tabIndex: 2,
+        title: 'Add Another Child',
+        body:
+            'If you receive invite codes for more than one child, keep using this same parent account. Add each extra code here to link every child in one place.',
+        tip:
+            'You only need one Lumi parent account for your family, even when each child has their own invite email.',
+        icon: Icons.person_add_alt_1_rounded,
+        accent: LumiTokens.green,
+      ),
     ],
   );
 
@@ -118,10 +132,11 @@ class LumiTourDefinitions {
             'Start here for the class snapshot: reading activity, patterns, and which students may need attention.',
         icon: Icons.dashboard_outlined,
         accent: LumiTokens.blue,
+        spotlightTarget: false,
       ),
       LumiTourStep(
         id: 'dashboard_customize',
-        targetId: 'teacher.dashboard',
+        targetId: 'teacher.dashboard.customizeButton',
         tabIndex: 0,
         title: 'Customise Dashboard',
         body:
@@ -352,12 +367,21 @@ class LumiTourController extends ChangeNotifier {
 
   void registerTarget(String id, GlobalKey key) {
     _targets[id] = key;
+    _notifyWhenCurrentTargetChanges(id);
   }
 
   void unregisterTarget(String id, GlobalKey key) {
     if (identical(_targets[id], key)) {
       _targets.remove(id);
+      _notifyWhenCurrentTargetChanges(id);
     }
+  }
+
+  void _notifyWhenCurrentTargetChanges(String id) {
+    if (!_isActive || currentStep?.targetId != id) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_isActive && currentStep?.targetId == id) notifyListeners();
+    });
   }
 
   Future<void> _prepareCurrentStep() async {
@@ -472,9 +496,12 @@ class _LumiTourOverlayContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
     final step = controller.currentStep!;
-    final rawTarget = controller.targetRect(context);
+    final rawTarget =
+        step.spotlightTarget ? controller.targetRect(context) : null;
     final fullRect = Offset.zero & media.size;
-    final target = rawTarget?.inflate(8).intersect(fullRect);
+    final target = _useTargetSpotlight(rawTarget, media.size)
+        ? rawTarget!.inflate(8).intersect(fullRect)
+        : null;
     final placeCardAtTop =
         target != null && target.center.dy > media.size.height * 0.56;
 
@@ -509,6 +536,16 @@ class _LumiTourOverlayContent extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  bool _useTargetSpotlight(Rect? target, Size screenSize) {
+    if (target == null || target.isEmpty || screenSize.isEmpty) return false;
+    final screenArea = screenSize.width * screenSize.height;
+    final targetArea = target.width * target.height;
+    final coversMostWidth = target.width > screenSize.width * 0.86;
+    final coversMostHeight = target.height > screenSize.height * 0.46;
+    return targetArea / screenArea < 0.42 &&
+        !(coversMostWidth && coversMostHeight);
   }
 }
 

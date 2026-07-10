@@ -29,6 +29,7 @@ import '../../data/models/student_model.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../data/models/allocation_model.dart';
 import '../../data/providers/active_child_provider.dart';
+import '../../data/providers/school_settings_provider.dart';
 import '../../data/providers/user_provider.dart';
 import '../../services/book_cover_cache_service.dart';
 import '../../services/firebase_service.dart';
@@ -434,6 +435,12 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
             _scheduleParentTourIfReady();
             final activeChild =
                 ref.watch(activeChildProvider).value ?? children.first;
+            final quickLoggingBySchoolId = {
+              for (final schoolId in {
+                for (final child in children) child.schoolId,
+              })
+                schoolId: ref.watch(quickLoggingEnabledProvider(schoolId)),
+            };
             _scheduleWidgetDeepLinkHandling(children);
             return LumiTourScope(
               controller: _tourController,
@@ -459,7 +466,12 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                               // floating glass nav.
                               LumiSectionScope(
                                 section: LumiSectionTheme.home,
-                                child: _buildHomeView(activeChild, children),
+                                child: _buildHomeView(
+                                  activeChild,
+                                  children,
+                                  quickLoggingBySchoolId:
+                                      quickLoggingBySchoolId,
+                                ),
                               ),
                               // Library section (yellow). Its scroll views add
                               // their own bottom clearance so it scrolls behind
@@ -673,8 +685,9 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
 
   Widget _buildHomeView(
     StudentModel selectedChild,
-    List<StudentModel> children,
-  ) {
+    List<StudentModel> children, {
+    required Map<String, bool> quickLoggingBySchoolId,
+  }) {
     return SafeArea(
       child: CustomScrollView(
         slivers: [
@@ -771,6 +784,9 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                     child: _ChildTodayCard(
                       student: children.first,
                       parent: widget.user,
+                      quickLoggingEnabled:
+                          quickLoggingBySchoolId[children.first.schoolId] ??
+                              true,
                     ).animate().fadeIn().scale(),
                   )
                 else
@@ -779,6 +795,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                     child: _TonightMultiCard(
                       children: children,
                       parent: widget.user,
+                      quickLoggingBySchoolId: quickLoggingBySchoolId,
                     ).animate().fadeIn(),
                   ),
 
@@ -847,6 +864,7 @@ class _TodayCard extends StatefulWidget {
   final String? Function(String title)? coverUrlResolver;
   final bool hasLoggedToday;
   final List<ReadingLogModel> todayLogs;
+  final bool quickLoggingEnabled;
 
   /// Opens the full detail wizard.
   final VoidCallback? onTap;
@@ -858,6 +876,7 @@ class _TodayCard extends StatefulWidget {
     this.coverUrlResolver,
     required this.hasLoggedToday,
     this.todayLogs = const [],
+    required this.quickLoggingEnabled,
     this.onTap,
   });
 
@@ -872,6 +891,7 @@ class _TodayCardState extends State<_TodayCard> {
   List<AllocationModel> get activeAllocations => widget.activeAllocations;
   bool get hasLoggedToday => widget.hasLoggedToday;
   List<ReadingLogModel> get todayLogs => widget.todayLogs;
+  bool get quickLoggingEnabled => widget.quickLoggingEnabled;
   String? Function(String title)? get coverUrlResolver =>
       widget.coverUrlResolver;
   VoidCallback? get onTap => widget.onTap;
@@ -910,6 +930,14 @@ class _TodayCardState extends State<_TodayCard> {
   /// Records a default reading log for today in a single tap (Rec 1).
   Future<void> _handleQuickLog() async {
     if (_isQuickLogging) return;
+    if (!quickLoggingEnabled) {
+      showLumiToast(
+        message:
+            'Quick log is turned off by your school. Use Log reading to add details.',
+        type: LumiToastType.info,
+      );
+      return;
+    }
     // Access gate: the quick-log write bypasses the /parent/log-reading route's
     // hasActiveAccess check, so when a school's licence lapses the parent would
     // otherwise hit an endless "Couldn't log reading" loop. Route to the gate,
@@ -940,6 +968,14 @@ class _TodayCardState extends State<_TodayCard> {
         'savedOffline': result.savedOffline,
         'restDayApplied': result.restDayApplied,
       });
+    } on QuickLoggingDisabledException {
+      if (!mounted) return;
+      setState(() => _isQuickLogging = false);
+      showLumiToast(
+        message:
+            'Quick log is turned off by your school. Use Log reading to add details.',
+        type: LumiToastType.info,
+      );
     } catch (_) {
       if (!mounted) return;
       setState(() => _isQuickLogging = false);
@@ -1143,26 +1179,28 @@ class _TodayCardState extends State<_TodayCard> {
                 color: LumiTokens.red,
               ),
               LumiGap.xxs,
-              Center(
-                child: LumiTextButton(
-                  onPressed: _isQuickLogging ? null : _handleQuickLog,
-                  isLoading: _isQuickLogging,
-                  text: _quickLogLabel,
-                  icon: Icons.check_circle_outline,
-                  color: LumiTokens.red,
-                ),
-              ),
-              if (_firstAssignedTitle != null) ...[
-                LumiGap.xxs,
+              if (quickLoggingEnabled) ...[
                 Center(
-                  child: Text(
-                    'Quick log records $_quickLogSummary',
-                    style: LumiType.caption.copyWith(
-                      color: LumiTokens.ink.withValues(alpha: 0.55),
-                    ),
-                    textAlign: TextAlign.center,
+                  child: LumiTextButton(
+                    onPressed: _isQuickLogging ? null : _handleQuickLog,
+                    isLoading: _isQuickLogging,
+                    text: _quickLogLabel,
+                    icon: Icons.check_circle_outline,
+                    color: LumiTokens.red,
                   ),
                 ),
+                if (_firstAssignedTitle != null) ...[
+                  LumiGap.xxs,
+                  Center(
+                    child: Text(
+                      'Quick log records $_quickLogSummary',
+                      style: LumiType.caption.copyWith(
+                        color: LumiTokens.ink.withValues(alpha: 0.55),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
               ],
             ],
           ],
@@ -1210,10 +1248,12 @@ int _nextNightsGoal(int totalNights) {
 class _ChildTodayCard extends StatefulWidget {
   final StudentModel student;
   final UserModel parent;
+  final bool quickLoggingEnabled;
 
   const _ChildTodayCard({
     required this.student,
     required this.parent,
+    required this.quickLoggingEnabled,
   });
 
   @override
@@ -1308,6 +1348,7 @@ class _ChildTodayCardState extends State<_ChildTodayCard> {
               coverUrlResolver: BookCoverCacheService.instance.resolveCoverUrl,
               hasLoggedToday: hasLoggedToday,
               todayLogs: todayLogs,
+              quickLoggingEnabled: widget.quickLoggingEnabled,
               onTap: () {
                 NavigationStateService().setTempData({
                   'parent': widget.parent,
@@ -1465,8 +1506,13 @@ class _MomentumCard extends StatelessWidget {
 class _TonightMultiCard extends StatefulWidget {
   final List<StudentModel> children;
   final UserModel parent;
+  final Map<String, bool> quickLoggingBySchoolId;
 
-  const _TonightMultiCard({required this.children, required this.parent});
+  const _TonightMultiCard({
+    required this.children,
+    required this.parent,
+    required this.quickLoggingBySchoolId,
+  });
 
   @override
   State<_TonightMultiCard> createState() => _TonightMultiCardState();
@@ -1527,14 +1573,18 @@ class _TonightMultiCardState extends State<_TonightMultiCard> {
           .where('isActive', isEqualTo: true)
           .snapshots()
           .listen((snapshot) {
-        if (!mounted) return;
-        setState(() => _classAllocSnaps[classId] = snapshot);
-      });
+            if (!mounted) return;
+            setState(() => _classAllocSnaps[classId] = snapshot);
+          });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final anyQuickLoggingEnabled = children.any(
+      (child) => widget.quickLoggingBySchoolId[child.schoolId] ?? true,
+    );
+
     return LumiCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1563,6 +1613,8 @@ class _TonightMultiCardState extends State<_TonightMultiCard> {
             _TonightRow(
               student: children[i],
               parent: parent,
+              quickLoggingEnabled:
+                  widget.quickLoggingBySchoolId[children[i].schoolId] ?? true,
               classAllocations: _classAllocSnaps[children[i].classId],
             ),
           ],
@@ -1576,7 +1628,9 @@ class _TonightMultiCardState extends State<_TonightMultiCard> {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  'Tap a name to add how it went · tap the circle to log fast',
+                  anyQuickLoggingEnabled
+                      ? 'Tap a name to add how it went · tap a circle where shown to log fast'
+                      : 'Tap a name to log reading details',
                   style: LumiType.caption.copyWith(
                     color: LumiTokens.muted,
                     fontSize: 12,
@@ -1597,6 +1651,7 @@ class _TonightMultiCardState extends State<_TonightMultiCard> {
 class _TonightRow extends StatefulWidget {
   final StudentModel student;
   final UserModel parent;
+  final bool quickLoggingEnabled;
 
   /// Latest whole-class allocations for this student's class, owned and
   /// deduped by [_TonightMultiCardState] (one listener per distinct class
@@ -1606,6 +1661,7 @@ class _TonightRow extends StatefulWidget {
   const _TonightRow({
     required this.student,
     required this.parent,
+    required this.quickLoggingEnabled,
     this.classAllocations,
   });
 
@@ -1687,6 +1743,14 @@ class _TonightRowState extends State<_TonightRow> {
 
   Future<void> _quickLog(List<AllocationModel> allocations) async {
     if (_isQuickLogging) return;
+    if (!widget.quickLoggingEnabled) {
+      showLumiToast(
+        message:
+            'Quick log is turned off by your school. Tap the name to add details.',
+        type: LumiToastType.info,
+      );
+      return;
+    }
     // Access gate — route to the log-reading gate (→ AccessLockedScreen) rather
     // than attempting a write the licence no longer permits (endless retry).
     if (!widget.student.hasActiveAccess) {
@@ -1710,6 +1774,14 @@ class _TonightRowState extends State<_TonightRow> {
         'savedOffline': result.savedOffline,
         'restDayApplied': result.restDayApplied,
       });
+    } on QuickLoggingDisabledException {
+      if (!mounted) return;
+      setState(() => _isQuickLogging = false);
+      showLumiToast(
+        message:
+            'Quick log is turned off by your school. Tap the name to add details.',
+        type: LumiToastType.info,
+      );
     } catch (_) {
       if (!mounted) return;
       setState(() => _isQuickLogging = false);
@@ -1803,14 +1875,16 @@ class _TonightRowState extends State<_TonightRow> {
                     // the richer path. The circle beside it is the shortcut.
                     const Icon(Icons.chevron_right_rounded,
                         color: LumiTokens.muted, size: 20),
-                    const SizedBox(width: 6),
-                    _LogCircle(
-                      done: hasLoggedToday,
-                      loading: _isQuickLogging,
-                      onTap: hasLoggedToday || _isQuickLogging
-                          ? null
-                          : () => _quickLog(allocations),
-                    ),
+                    if (widget.quickLoggingEnabled) ...[
+                      const SizedBox(width: 6),
+                      _LogCircle(
+                        done: hasLoggedToday,
+                        loading: _isQuickLogging,
+                        onTap: hasLoggedToday || _isQuickLogging
+                            ? null
+                            : () => _quickLog(allocations),
+                      ),
+                    ],
                   ],
                 ),
               ),
