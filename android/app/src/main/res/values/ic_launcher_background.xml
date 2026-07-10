@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Sampled from the icon artwork's corner so the adaptive foreground
+         (which carries the same red square, inset) blends seamlessly. -->
+    <color name="ic_launcher_background">#EB4544</color>
+</resources>
