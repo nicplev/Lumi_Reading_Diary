@@ -1457,11 +1457,81 @@ class _MomentumCard extends StatelessWidget {
 
 /// Tonight, for a multi-child parent: one card, a tap-to-log row per child so
 /// every child can be logged without switching context.
-class _TonightMultiCard extends StatelessWidget {
+///
+/// Stateful so it can own ONE whole-class allocations listener per distinct
+/// classId — siblings in the same class previously each opened an identical
+/// Firestore listener from their own [_TonightRow]. The latest snapshot per
+/// class is passed down to the rows as plain data.
+class _TonightMultiCard extends StatefulWidget {
   final List<StudentModel> children;
   final UserModel parent;
 
   const _TonightMultiCard({required this.children, required this.parent});
+
+  @override
+  State<_TonightMultiCard> createState() => _TonightMultiCardState();
+}
+
+class _TonightMultiCardState extends State<_TonightMultiCard> {
+  final Map<String, StreamSubscription<QuerySnapshot>> _classAllocSubs = {};
+  final Map<String, QuerySnapshot> _classAllocSnaps = {};
+
+  List<StudentModel> get children => widget.children;
+  UserModel get parent => widget.parent;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncClassSubscriptions();
+  }
+
+  @override
+  void didUpdateWidget(covariant _TonightMultiCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncClassSubscriptions();
+  }
+
+  @override
+  void dispose() {
+    for (final sub in _classAllocSubs.values) {
+      sub.cancel();
+    }
+    super.dispose();
+  }
+
+  /// One live whole-class allocations listener per distinct classId among the
+  /// children; cancels listeners for classes no longer represented.
+  void _syncClassSubscriptions() {
+    final firestore = FirebaseService.instance.firestore;
+    final schoolId = widget.parent.schoolId;
+    final wanted = {
+      for (final child in widget.children)
+        if (child.classId.isNotEmpty) child.classId,
+    };
+
+    for (final classId in _classAllocSubs.keys.toList()) {
+      if (!wanted.contains(classId)) {
+        _classAllocSubs.remove(classId)?.cancel();
+        _classAllocSnaps.remove(classId);
+      }
+    }
+
+    for (final classId in wanted) {
+      if (_classAllocSubs.containsKey(classId)) continue;
+      _classAllocSubs[classId] = firestore
+          .collection('schools')
+          .doc(schoolId)
+          .collection('allocations')
+          .where('classId', isEqualTo: classId)
+          .where('studentIds', isEqualTo: [])
+          .where('isActive', isEqualTo: true)
+          .snapshots()
+          .listen((snapshot) {
+        if (!mounted) return;
+        setState(() => _classAllocSnaps[classId] = snapshot);
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1490,7 +1560,11 @@ class _TonightMultiCard extends StatelessWidget {
           LumiGap.s,
           for (int i = 0; i < children.length; i++) ...[
             if (i > 0) const Divider(height: 1, color: LumiTokens.rule),
-            _TonightRow(student: children[i], parent: parent),
+            _TonightRow(
+              student: children[i],
+              parent: parent,
+              classAllocations: _classAllocSnaps[children[i].classId],
+            ),
           ],
           LumiGap.xs,
           // Teach both gestures: the row opens the richer flow, the circle is
@@ -1524,7 +1598,16 @@ class _TonightRow extends StatefulWidget {
   final StudentModel student;
   final UserModel parent;
 
-  const _TonightRow({required this.student, required this.parent});
+  /// Latest whole-class allocations for this student's class, owned and
+  /// deduped by [_TonightMultiCardState] (one listener per distinct class
+  /// instead of one per sibling). Null until that listener's first snapshot.
+  final QuerySnapshot? classAllocations;
+
+  const _TonightRow({
+    required this.student,
+    required this.parent,
+    this.classAllocations,
+  });
 
   @override
   State<_TonightRow> createState() => _TonightRowState();
@@ -1532,7 +1615,7 @@ class _TonightRow extends StatefulWidget {
 
 class _TonightRowState extends State<_TonightRow> {
   late final Stream<QuerySnapshot> _todayLogsStream;
-  late final Stream<List<QuerySnapshot>> _allocationsStream;
+  late final Stream<QuerySnapshot> _allocationsStream;
   bool _isQuickLogging = false;
 
   @override
@@ -1553,39 +1636,32 @@ class _TonightRowState extends State<_TonightRow> {
         .snapshots()
         .asBroadcastStream();
 
-    Stream<QuerySnapshot> studentAllocations() => firestore
+    // Allocations targeting this student specifically. Whole-class
+    // allocations arrive via widget.classAllocations (shared per class by
+    // the parent card). Broadcast so a rebuild's re-subscribe is safe.
+    _allocationsStream = firestore
         .collection('schools')
         .doc(schoolId)
         .collection('allocations')
         .where('studentIds', arrayContains: widget.student.id)
         .where('isActive', isEqualTo: true)
-        .snapshots();
-
-    Stream<QuerySnapshot> classAllocations() => firestore
-        .collection('schools')
-        .doc(schoolId)
-        .collection('allocations')
-        .where('classId', isEqualTo: widget.student.classId)
-        .where('studentIds', isEqualTo: [])
-        .where('isActive', isEqualTo: true)
-        .snapshots();
-
-    _allocationsStream = _combineStreams(studentAllocations, classAllocations);
+        .snapshots()
+        .asBroadcastStream();
   }
 
-  List<AllocationModel> _activeFrom(
-      AsyncSnapshot<List<QuerySnapshot>> snapshot) {
+  List<AllocationModel> _activeFrom(AsyncSnapshot<QuerySnapshot> snapshot) {
     final result = <AllocationModel>[];
-    if (snapshot.hasData) {
-      final now = DateTime.now();
-      final seen = <String>{};
-      for (final doc in snapshot.data!.expand((qs) => qs.docs)) {
-        if (!seen.add(doc.id)) continue;
-        final candidate = AllocationModel.fromFirestore(doc);
-        if (candidate.startDate.isBefore(now) &&
-            candidate.endDate.isAfter(now)) {
-          result.add(candidate);
-        }
+    final now = DateTime.now();
+    final seen = <String>{};
+    final docs = [
+      ...?snapshot.data?.docs,
+      ...?widget.classAllocations?.docs,
+    ];
+    for (final doc in docs) {
+      if (!seen.add(doc.id)) continue;
+      final candidate = AllocationModel.fromFirestore(doc);
+      if (candidate.startDate.isBefore(now) && candidate.endDate.isAfter(now)) {
+        result.add(candidate);
       }
     }
     return result;
@@ -1665,7 +1741,7 @@ class _TonightRowState extends State<_TonightRow> {
             : <ReadingLogModel>[];
         final hasLoggedToday = todayLogs.isNotEmpty;
 
-        return StreamBuilder<List<QuerySnapshot>>(
+        return StreamBuilder<QuerySnapshot>(
           stream: _allocationsStream,
           builder: (context, allocationSnapshot) {
             final allocations = _activeFrom(allocationSnapshot);

@@ -28,7 +28,16 @@ class ServiceStatusController with WidgetsBindingObserver {
     Connectivity? connectivity,
     FirebaseFirestore? firestore,
     http.Client? httpClient,
-    Duration periodicInterval = const Duration(seconds: 30),
+    // 180s: the steady-state heartbeat is deliberately slow — every tick is
+    // a billed server-source Firestore read PER FOREGROUND USER (the old 30s
+    // cadence cost ~120 reads/hr/user across the fleet). Fast detection
+    // comes from the event-driven probes instead: connectivity changes, app
+    // resume, user taps, and OfflineService's enqueue/drain-failure hooks
+    // all forceProbe() immediately, so the timer only catches outages no
+    // event surfaces. The offline queue makes a stale status safe: writes
+    // gated by a stale-healthy status still fail into the queue, and a
+    // stale-degraded status just queues writes that drain minutes later.
+    Duration periodicInterval = const Duration(seconds: 180),
     Duration debounce = const Duration(milliseconds: 500),
     Duration minProbeInterval = const Duration(seconds: 5),
     Duration probeTimeout = const Duration(seconds: 3),
