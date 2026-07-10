@@ -183,7 +183,9 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
           );
       }
     } catch (_) {
-      if (mounted) _showBanner('Something went wrong. Try again.', LumiTokens.red);
+      if (mounted) {
+        _showBanner('Something went wrong. Try again.', LumiTokens.red);
+      }
     } finally {
       if (mounted) setState(() => _isProcessing = false);
       _refocus();
@@ -201,7 +203,10 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
 
     switch (result.classification) {
       case ScanClassification.alreadyThisWeek:
-        _showBanner('"${book.title}" is already on your list.', LumiTokens.blue);
+        _showBanner(
+          '"${book.title}" is already on your list.',
+          LumiTokens.blue,
+        );
         return;
       case ScanClassification.renew:
         final queued = await _persist(book, renewed: true);
@@ -293,80 +298,20 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
   }
 
   Future<void> _scanWithCamera() async {
-    final controller = MobileScannerController();
-    String? captured;
-    await showModalBottomSheet<void>(
+    final capturedCodes = await showModalBottomSheet<List<String>>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          child: SizedBox(
-            height: MediaQuery.of(ctx).size.height * 0.7,
-            child: ColoredBox(
-              color: LumiTokens.ink,
-              child: Stack(
-                children: [
-                  MobileScanner(
-                    controller: controller,
-                    onDetect: (capture) {
-                      for (final barcode in capture.barcodes) {
-                        final code = IsbnAssignmentService.normalizeIsbn(
-                            barcode.rawValue);
-                        if (code != null) {
-                          captured = code;
-                          Navigator.of(ctx).pop();
-                          break;
-                        }
-                      }
-                    },
-                    errorBuilder: (context, error) => _CameraUnavailable(
-                      onClose: () => Navigator.of(ctx).pop(),
-                    ),
-                  ),
-                  Positioned(
-                    top: 16,
-                    right: 16,
-                    child: Material(
-                      color: LumiTokens.paper,
-                      shape: const CircleBorder(),
-                      child: IconButton(
-                        onPressed: () => Navigator.of(ctx).pop(),
-                        icon: const Icon(Icons.close_rounded,
-                            color: LumiTokens.ink),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 32,
-                    child: Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: LumiTokens.ink.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
-                        ),
-                        child: Text(
-                          'Point at a book barcode',
-                          style: LumiType.caption.copyWith(color: LumiTokens.paper),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+      builder: (ctx) => _KioskCameraScannerSheet(
+        ignoredIsbns: _sessionIsbns,
+        onCloseEmpty: () => Navigator.of(ctx).pop(),
+      ),
     );
-    await controller.dispose();
-    if (captured != null) {
-      await _handleCode(captured!);
+    if (capturedCodes != null && capturedCodes.isNotEmpty) {
+      for (final code in capturedCodes) {
+        if (!mounted) return;
+        await _handleCode(code);
+      }
     } else {
       _refocus();
     }
@@ -493,7 +438,8 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
         // A little wiggle + shimmer for personality on each scan.
         .then()
         .shake(hz: 4, rotation: 0.12, duration: 360.ms)
-        .shimmer(duration: 700.ms, color: LumiTokens.paper.withValues(alpha: 0.6));
+        .shimmer(
+            duration: 700.ms, color: LumiTokens.paper.withValues(alpha: 0.6));
   }
 
   /// The central scan call-to-action card (mascot + heading + camera button).
@@ -567,7 +513,9 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
     // never block scanning. Android: default to connected. See PR #126.
     final showConnectHelp =
         _entries.isEmpty && _celebrateAsset == null && !_isProcessing;
-    return showConnectHelp ? _buildConnectScannerPanel() : _buildActiveScanPanel();
+    return showConnectHelp
+        ? _buildConnectScannerPanel()
+        : _buildActiveScanPanel();
   }
 
   /// Empty state shown when no scanner has fired yet — explains pairing a
@@ -626,14 +574,14 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
       _buildMascot(),
       const SizedBox(height: 20),
       Text(
-        _isProcessing ? 'Looking up your book…' : 'Scan a book barcode',
+        _isProcessing ? 'Looking up your book…' : 'Scan book barcodes',
         style: LumiType.heading,
         textAlign: TextAlign.center,
       ),
       const SizedBox(height: 8),
       Text(
-        'Point the barcode scanner at your book — or tap below to use '
-        'the camera.',
+        'Point the barcode scanner at each book — or use the camera to grab '
+        'several barcodes at once.',
         style: LumiType.body.copyWith(color: LumiTokens.muted),
         textAlign: TextAlign.center,
       ),
@@ -690,8 +638,7 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.menu_book_rounded,
-                size: 48, color: LumiTokens.rule),
+            Icon(Icons.menu_book_rounded, size: 48, color: LumiTokens.rule),
             const SizedBox(height: 12),
             Text(
               'Your scanned books\nwill appear here.',
@@ -837,6 +784,270 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
             style: LumiType.button,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _KioskCameraScannerSheet extends StatefulWidget {
+  const _KioskCameraScannerSheet({
+    required this.ignoredIsbns,
+    required this.onCloseEmpty,
+  });
+
+  final Set<String> ignoredIsbns;
+  final VoidCallback onCloseEmpty;
+
+  @override
+  State<_KioskCameraScannerSheet> createState() =>
+      _KioskCameraScannerSheetState();
+}
+
+class _KioskCameraScannerSheetState extends State<_KioskCameraScannerSheet> {
+  final MobileScannerController _controller = MobileScannerController();
+  final Set<String> _capturedIsbns = <String>{};
+
+  bool _sawKnownCode = false;
+  int _flashTick = 0;
+
+  @override
+  void dispose() {
+    unawaited(_controller.dispose());
+    super.dispose();
+  }
+
+  void _onDetect(BarcodeCapture capture) {
+    var addedAny = false;
+    var sawKnown = false;
+
+    for (final barcode in capture.barcodes) {
+      final code = IsbnAssignmentService.normalizeIsbn(barcode.rawValue);
+      if (code == null) continue;
+
+      if (widget.ignoredIsbns.contains(code) || _capturedIsbns.contains(code)) {
+        sawKnown = true;
+        continue;
+      }
+
+      _capturedIsbns.add(code);
+      addedAny = true;
+    }
+
+    if (!mounted) return;
+    if (addedAny) {
+      HapticFeedback.mediumImpact();
+      setState(() {
+        _sawKnownCode = false;
+        _flashTick++;
+      });
+      return;
+    }
+    if (sawKnown && !_sawKnownCode) {
+      setState(() => _sawKnownCode = true);
+    }
+  }
+
+  void _finish() {
+    Navigator.of(context).pop(List<String>.unmodifiable(_capturedIsbns));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final foundCount = _capturedIsbns.length;
+    final statusText = foundCount == 0
+        ? (_sawKnownCode
+            ? 'Already scanned this session'
+            : 'No books found yet')
+        : '$foundCount ${foundCount == 1 ? 'book' : 'books'} found';
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.74,
+        child: ColoredBox(
+          color: LumiTokens.ink,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              MobileScanner(
+                controller: _controller,
+                onDetect: _onDetect,
+                errorBuilder: (context, error) => _CameraUnavailable(
+                  onClose: widget.onCloseEmpty,
+                ),
+              ),
+              Center(child: _KioskCameraReticle(flashTick: _flashTick)),
+              Center(child: _KioskScanSuccessTickOverlay(tick: _flashTick)),
+              Positioned(
+                top: 16,
+                right: 16,
+                child: Material(
+                  color: LumiTokens.paper,
+                  shape: const CircleBorder(),
+                  child: IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: LumiTokens.ink,
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 16,
+                child: SafeArea(
+                  top: false,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: LumiTokens.paper.withValues(alpha: 0.96),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: LumiTokens.tintGreen,
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Icon(
+                                Icons.qr_code_scanner_rounded,
+                                color: LumiTokens.green,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    statusText,
+                                    style: LumiType.subhead,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Point at all the book barcodes, then tap Done.',
+                                    style: LumiType.caption.copyWith(
+                                      color: LumiTokens.muted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        FilledButton.icon(
+                          onPressed: foundCount == 0 ? null : _finish,
+                          icon: const Icon(Icons.check_rounded),
+                          label: Text(
+                            foundCount == 0
+                                ? 'Find book barcodes'
+                                : 'Done with $foundCount',
+                            style: LumiType.button,
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: LumiTokens.green,
+                            foregroundColor: LumiTokens.paper,
+                            disabledBackgroundColor: LumiTokens.rule,
+                            disabledForegroundColor: LumiTokens.muted,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                LumiTokens.radiusPill,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _KioskCameraReticle extends StatelessWidget {
+  const _KioskCameraReticle({required this.flashTick});
+
+  final int flashTick;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      key: ValueKey(flashTick),
+      duration: 160.ms,
+      width: 220,
+      height: 150,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: flashTick == 0
+              ? Colors.white.withValues(alpha: 0.8)
+              : LumiTokens.green,
+          width: flashTick == 0 ? 3 : 5,
+        ),
+      ),
+    );
+  }
+}
+
+class _KioskScanSuccessTickOverlay extends StatelessWidget {
+  const _KioskScanSuccessTickOverlay({required this.tick});
+
+  final int tick;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: TweenAnimationBuilder<double>(
+        key: ValueKey(tick),
+        tween: Tween<double>(begin: tick == 0 ? 0.0 : 1.0, end: 0.0),
+        duration: const Duration(milliseconds: 700),
+        curve: Curves.easeOutCubic,
+        builder: (context, value, _) {
+          if (value == 0) return const SizedBox.shrink();
+          final scale = 0.82 + ((1 - value) * 0.22);
+          return Opacity(
+            opacity: value.clamp(0.0, 1.0),
+            child: Transform.scale(
+              scale: scale,
+              child: Container(
+                width: 82,
+                height: 82,
+                decoration: BoxDecoration(
+                  color: LumiTokens.green.withValues(alpha: 0.94),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: LumiTokens.green.withValues(alpha: 0.35),
+                      blurRadius: 24,
+                      spreadRadius: 4,
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.check_rounded,
+                  color: Colors.white,
+                  size: 54,
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

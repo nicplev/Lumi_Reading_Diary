@@ -54,7 +54,8 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
   int _totalAssignedBooks = 0;
   late String _sessionId;
 
-  // Bumped each time a scan is accepted — drives the reticle flash + haptic.
+  // Bumped each time a scan is accepted — drives the reticle flash, success
+  // check, and haptic feedback.
   int _scanFlashTick = 0;
 
   // --- Batch queue state ---
@@ -641,8 +642,7 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
             LinearProgressIndicator(
               value: (_currentQueueIndex + 1) / _queue.length,
               backgroundColor: Colors.white12,
-              valueColor:
-                  const AlwaysStoppedAnimation<Color>(LumiTokens.green),
+              valueColor: const AlwaysStoppedAnimation<Color>(LumiTokens.green),
               minHeight: 3,
             ),
 
@@ -661,6 +661,7 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
                   errorBuilder: (context, error) => _buildCameraError(),
                 ),
                 Center(child: _ReticleOverlay(flashTick: _scanFlashTick)),
+                Center(child: _ScanSuccessTickOverlay(tick: _scanFlashTick)),
                 Positioned(
                   left: 16,
                   right: 16,
@@ -725,8 +726,8 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
                             height: 16,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(LumiTokens.green),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                  LumiTokens.green),
                             ),
                           ),
                       ],
@@ -1016,6 +1017,54 @@ class _ReticleOverlay extends StatelessWidget {
   }
 }
 
+class _ScanSuccessTickOverlay extends StatelessWidget {
+  const _ScanSuccessTickOverlay({required this.tick});
+
+  final int tick;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: TweenAnimationBuilder<double>(
+        key: ValueKey(tick),
+        tween: Tween<double>(begin: tick == 0 ? 0.0 : 1.0, end: 0.0),
+        duration: const Duration(milliseconds: 700),
+        curve: Curves.easeOutCubic,
+        builder: (context, value, _) {
+          if (value == 0) return const SizedBox.shrink();
+          final scale = 0.82 + ((1 - value) * 0.22);
+          return Opacity(
+            opacity: value.clamp(0.0, 1.0),
+            child: Transform.scale(
+              scale: scale,
+              child: Container(
+                width: 82,
+                height: 82,
+                decoration: BoxDecoration(
+                  color: LumiTokens.green.withValues(alpha: 0.94),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: LumiTokens.green.withValues(alpha: 0.35),
+                      blurRadius: 24,
+                      spreadRadius: 4,
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.check_rounded,
+                  color: Colors.white,
+                  size: 54,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _ReticlePainter extends CustomPainter {
   _ReticlePainter({required this.flash});
 
@@ -1069,8 +1118,7 @@ class _ReticlePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_ReticlePainter oldDelegate) =>
-      oldDelegate.flash != flash;
+  bool shouldRepaint(_ReticlePainter oldDelegate) => oldDelegate.flash != flash;
 }
 
 class _PreviouslyReadWarningSheet extends StatelessWidget {
