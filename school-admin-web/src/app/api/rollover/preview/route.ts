@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
+import { getCurrentAcademicYear } from '@/lib/access';
 import { previewRollover } from '@/lib/firestore/rollover';
 import { z } from 'zod';
 
@@ -33,7 +34,15 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const data = previewSchema.parse(body);
-    const preview = await previewRollover(session.schoolId, data.rows, data.targetAcademicYear);
+    const currentAcademicYear = await getCurrentAcademicYear();
+    const targetAcademicYear = currentAcademicYear + 1;
+    if (data.targetAcademicYear != null && data.targetAcademicYear !== targetAcademicYear) {
+      return NextResponse.json(
+        { error: `The active school-year transition is ${currentAcademicYear} to ${targetAcademicYear}. Refresh the page and try again.` },
+        { status: 409 }
+      );
+    }
+    const preview = await previewRollover(session.schoolId, data.rows, targetAcademicYear);
     return NextResponse.json(preview);
   } catch (error) {
     if (error instanceof z.ZodError) {

@@ -89,6 +89,25 @@ function asOptionalString(value: unknown, field: string): string | null {
   return trimmed.length === 0 ? null : trimmed;
 }
 
+/**
+ * Normalises the optional administrator note saved with an unlink audit event.
+ * Keeping the limit at the callable boundary prevents unbounded client input
+ * from being written into Firestore or rendered in future audit tooling.
+ *
+ * @param {unknown} value Raw callable input.
+ * @return {string|null} A trimmed reason or null when omitted/blank.
+ */
+export function normalizeUnlinkReason(value: unknown): string | null {
+  const reason = asOptionalString(value, "reason");
+  if (reason !== null && reason.length > 250) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "reason must be 250 characters or fewer."
+    );
+  }
+  return reason;
+}
+
 // Atomic rate-limit check + increment for the calling parent. Mirrors
 // `enforceRateLimit` in impersonation.ts so we get the same hour/day window
 // behaviour. Throws HttpsError('resource-exhausted') if either ceiling is hit.
@@ -377,6 +396,7 @@ export async function linkParentToStudentCore(
         isActiveSubscriptionStatus(subSnap.data()?.status as string);
     const grantAccess =
         subActive &&
+        studentSnap.data()?.access?.status !== "revoked" &&
         !studentAccessAlreadyLive(studentSnap.data());
 
     const existingLinked = Array.isArray(parentSnap.data()?.linkedChildren) ?
@@ -672,20 +692,22 @@ interface UnlinkParentInput {
   reason?: unknown;
 }
 
-async function callerCanUnlink(
+type UnlinkActorRole = "parent" | "teacher" | "schoolAdmin";
+
+async function unlinkActorRole(
   uid: string,
   schoolId: string,
   parentUserId: string
-): Promise<boolean> {
-  if (uid === parentUserId) return true;
+): Promise<UnlinkActorRole | null> {
+  if (uid === parentUserId) return "parent";
   // Teacher / school admin in this school can also unlink.
   const userSnap = await db()
     .collection("schools").doc(schoolId)
     .collection("users").doc(uid)
     .get();
-  if (!userSnap.exists) return false;
+  if (!userSnap.exists) return null;
   const role = (userSnap.data()?.role as string | undefined) ?? "";
-  return role === "teacher" || role === "schoolAdmin";
+  return role === "teacher" || role === "schoolAdmin" ? role : null;
 }
 
 export const unlinkParentFromStudent = onCall(
@@ -697,14 +719,16 @@ export const unlinkParentFromStudent = onCall(
     const schoolId = asNonEmptyString(data.schoolId, "schoolId");
     const studentId = asNonEmptyString(data.studentId, "studentId");
     const parentUserId = asNonEmptyString(data.parentUserId, "parentUserId");
-    asOptionalString(data.reason, "reason"); // validate type only
+    const reason = normalizeUnlinkReason(data.reason);
 
-    if (!(await callerCanUnlink(uid, schoolId, parentUserId))) {
+    const actorRole = await unlinkActorRole(uid, schoolId, parentUserId);
+    if (!actorRole) {
       throw permissionDenied(
         "Only the parent themselves or a teacher/admin in the school may unlink."
       );
     }
 
+    const auditRef = db().collection("adminAuditLog").doc();
     return db().runTransaction(async (tx) => {
       const studentRef = db()
         .collection("schools").doc(schoolId)
@@ -740,10 +764,29 @@ export const unlinkParentFromStudent = onCall(
 
       tx.update(studentRef, {
         parentIds: admin.firestore.FieldValue.arrayRemove(parentUserId),
+        parentIdsUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        parentIdsUpdatedBy: uid,
       });
       tx.update(parentRef, {
         linkedChildren: admin.firestore.FieldValue.arrayRemove(studentId),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        linkedChildrenUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        linkedChildrenUpdatedBy: uid,
+      });
+      tx.set(auditRef, {
+        action: "parentStudentConnection.unlink",
+        performedBy: uid,
+        performedByRole: actorRole,
+        targetType: "parentStudentConnection",
+        targetId: `${parentUserId}:${studentId}`,
+        schoolId,
+        metadata: {
+          parentUserId,
+          studentId,
+          reason: reason ?? null,
+          source: actorRole === "parent" ? "parentSelfService" : "schoolStaff",
+        },
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
       return {schoolId, studentId, removedParentUid: parentUserId};

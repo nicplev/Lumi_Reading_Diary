@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { Modal } from './modal';
 import { Button } from './button';
 
@@ -12,6 +13,7 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   variant?: 'danger' | 'warning';
   loading?: boolean;
+  children?: ReactNode;
 }
 
 export function ConfirmDialog({
@@ -23,6 +25,7 @@ export function ConfirmDialog({
   confirmLabel = 'Confirm',
   variant = 'danger',
   loading,
+  children,
 }: ConfirmDialogProps) {
   return (
     <Modal
@@ -46,6 +49,7 @@ export function ConfirmDialog({
       }
     >
       <p className="text-sm text-muted">{description}</p>
+      {children && <div className="mt-4">{children}</div>}
     </Modal>
   );
 }

@@ -132,7 +132,8 @@ service cloud.firestore {
     // Function ever runs. school-wide suspension flows through here too: the
     // subscription trigger flips each student's access.status to 'suspended'.
     function studentAccessLive(studentData) {
-      return studentData.get('access', {}).get('status', '') == 'active' &&
+      return studentData.get('isActive', true) == true &&
+          studentData.get('access', {}).get('status', '') == 'active' &&
           studentData.get('access', {}).get('expiresAt', request.time) > request.time;
     }
 
@@ -527,7 +528,10 @@ service cloud.firestore {
             isTeacher(schoolId) &&
             request.resource.data.parentId == request.auth.uid &&
             request.resource.data.loggedByRole == 'teacher' &&
-            teacherTeachesClass(schoolId, request.resource.data.classId);
+            teacherTeachesClass(schoolId, request.resource.data.classId) &&
+            studentAccessLive(
+              get(/databases/$(database)/documents/schools/$(schoolId)/students/$(request.resource.data.studentId)).data
+            );
 
         allow update: if writeAllowedForDev() &&
             minutesInBounds() &&

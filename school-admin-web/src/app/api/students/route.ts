@@ -11,6 +11,23 @@ function serializeStudent(s: Record<string, unknown>) {
     enrolledAt: s.enrolledAt instanceof Date ? s.enrolledAt.toISOString() : s.enrolledAt ?? null,
     archivedAt: s.archivedAt instanceof Date ? s.archivedAt.toISOString() : s.archivedAt ?? null,
     readingLevelUpdatedAt: s.readingLevelUpdatedAt instanceof Date ? s.readingLevelUpdatedAt.toISOString() : s.readingLevelUpdatedAt ?? null,
+    access: s.access
+      ? {
+          ...(s.access as Record<string, unknown>),
+          expiresAt:
+            (s.access as Record<string, unknown>).expiresAt instanceof Date
+              ? ((s.access as Record<string, unknown>).expiresAt as Date).toISOString()
+              : (s.access as Record<string, unknown>).expiresAt ?? null,
+          grantedAt:
+            (s.access as Record<string, unknown>).grantedAt instanceof Date
+              ? ((s.access as Record<string, unknown>).grantedAt as Date).toISOString()
+              : (s.access as Record<string, unknown>).grantedAt ?? null,
+          revokedAt:
+            (s.access as Record<string, unknown>).revokedAt instanceof Date
+              ? ((s.access as Record<string, unknown>).revokedAt as Date).toISOString()
+              : (s.access as Record<string, unknown>).revokedAt ?? null,
+        }
+      : null,
     levelHistory: Array.isArray(s.levelHistory)
       ? (s.levelHistory as Array<Record<string, unknown>>).map((lh) => ({
           ...lh,

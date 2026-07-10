@@ -1,8 +1,7 @@
 import { redirect } from 'next/navigation';
 
-// Renewals now lives as an admin-only tab inside Settings (it's a once-a-year
-// tool, so it no longer warrants a primary sidebar item). This route forwards
-// there so any old links/bookmarks keep working.
+// Preserve old bookmarks while keeping roster changes and access grants in the
+// single guided School Year Transition workflow.
 export default function RenewalsRoute() {
-  redirect('/settings?tab=renewals');
+  redirect('/students/rollover');
 }

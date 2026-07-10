@@ -231,7 +231,9 @@ export async function getOperationalSummary(
   // and whether the admin can self-activate (subscription active) or must
   // contact Lumi. Two tiny extra reads (year config + one subscription doc).
   const studentsWithoutAccess = (studentsSnap?.docs ?? []).filter(
-    (d) => !isStudentAccessLive(d.data().access, now)
+    (d) =>
+      d.data().access?.status !== 'revoked' &&
+      !isStudentAccessLive(d.data().access, now)
   ).length;
   let currentAcademicYear = new Date().getUTCFullYear();
   let subActiveForCurrentYear = false;

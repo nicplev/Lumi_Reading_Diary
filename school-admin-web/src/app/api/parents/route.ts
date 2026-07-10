@@ -13,6 +13,12 @@ function serializeParent(p: Record<string, unknown>) {
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (session.role !== 'schoolAdmin') {
+    return NextResponse.json(
+      { error: 'Only school admins can view parent connections' },
+      { status: 403 },
+    );
+  }
 
   try {
     const parents = await getParentsWithStudents(session.schoolId);

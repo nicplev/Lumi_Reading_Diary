@@ -30,19 +30,22 @@ function asNonEmptyString(value: unknown, field: string): string {
 }
 
 /**
- * Caller must be a teacher or school admin of the target school.
+ * Caller must be a school admin of the target school.
  * @param {string} uid The caller's UID.
  * @param {string} schoolId The target school ID.
- * @return {Promise<boolean>} True when the caller is staff at the school.
+ * @return {Promise<boolean>} True when the caller is an admin at the school.
  */
-async function callerIsStaff(uid: string, schoolId: string): Promise<boolean> {
+async function callerIsSchoolAdmin(
+  uid: string,
+  schoolId: string,
+): Promise<boolean> {
   const snap = await db()
     .collection("schools").doc(schoolId)
     .collection("users").doc(uid)
     .get();
   if (!snap.exists) return false;
   const role = (snap.data()?.role as string | undefined) ?? "";
-  return role === "teacher" || role === "schoolAdmin";
+  return role === "schoolAdmin";
 }
 
 /**
@@ -99,18 +102,30 @@ export const renewStudents = onCall(
         "academicYear must be an integer.",
       );
     }
-    if (!Array.isArray(data.studentIds) || data.studentIds.length === 0) {
+    if (!Array.isArray(data.studentIds) || data.studentIds.length === 0 ||
+        data.studentIds.length > 500) {
       throw new HttpsError(
         "invalid-argument",
-        "studentIds must be a non-empty array.",
+        "studentIds must contain between 1 and 500 entries.",
       );
     }
-    const studentIds = data.studentIds.map((s) => asNonEmptyString(s, "studentId"));
+    const studentIds = Array.from(new Set(
+      data.studentIds.map((s) => asNonEmptyString(s, "studentId")),
+    ));
 
-    if (!(await callerIsStaff(uid, schoolId))) {
+    if (!(await callerIsSchoolAdmin(uid, schoolId))) {
       throw new HttpsError(
         "permission-denied",
-        "Only school staff may renew students.",
+        "Only school admins may renew students.",
+      );
+    }
+    const cfg = await db().collection("config").doc("academicYear").get();
+    const currentAcademicYear = cfg.data()?.currentAcademicYear;
+    if (typeof currentAcademicYear !== "number" ||
+        academicYear !== currentAcademicYear + 1) {
+      throw new HttpsError(
+        "failed-precondition",
+        "The requested academic year is not the active transition year.",
       );
     }
     if (!(await schoolSubActive(schoolId, academicYear))) {
@@ -123,20 +138,44 @@ export const renewStudents = onCall(
     const studentsCol = db()
       .collection("schools").doc(schoolId)
       .collection("students");
+    const classesSnap = await db()
+      .collection("schools").doc(schoolId)
+      .collection("classes").get();
+    const classYearLevel = new Map<string, string>();
+    for (const doc of classesSnap.docs) {
+      const value = doc.data().yearLevel;
+      if (typeof value === "string" && value.trim()) {
+        classYearLevel.set(doc.id, value.trim());
+      }
+    }
 
     let renewed = 0;
     let graduates = 0;
+    let skipped = 0;
     for (let i = 0; i < studentIds.length; i += STUDENT_BATCH) {
       const chunk = studentIds.slice(i, i + STUDENT_BATCH);
       const snaps = await db().getAll(...chunk.map((id) => studentsCol.doc(id)));
       const batch = db().batch();
       for (const snap of snaps) {
-        if (!snap.exists) continue;
-        const additional = (snap.data()?.additionalInfo ?? {}) as Record<string, unknown>;
+        if (!snap.exists || snap.data()?.isActive !== true) {
+          skipped++;
+          continue;
+        }
+        const student = snap.data() ?? {};
+        if (student.access?.academicYear === academicYear &&
+            student.access?.status === "active") {
+          // Retried calls are no-ops; never advance a year level twice.
+          skipped++;
+          continue;
+        }
+        const additional = (student.additionalInfo ?? {}) as Record<string, unknown>;
+        const individualYearLevel = additional.yearLevel as string | undefined;
+        const classLevel = typeof student.classId === "string" ?
+          classYearLevel.get(student.classId) : undefined;
         // Honour the portal rollover import's year-level authority marker —
         // never bump a level the import already set for this year.
         const ladder = yearLevelForRenewal(
-          additional.yearLevel as string | undefined,
+          individualYearLevel ?? classLevel,
           additional.yearLevelSetForYear,
           academicYear,
         );
@@ -150,6 +189,7 @@ export const renewStudents = onCall(
         const update: admin.firestore.UpdateData<admin.firestore.DocumentData> = {access};
         if (ladder.changed && ladder.next != null) {
           update["additionalInfo.yearLevel"] = ladder.next;
+          update["additionalInfo.yearLevelSetForYear"] = academicYear;
         }
         if (ladder.graduated) {
           update["additionalInfo.graduated"] = true;
@@ -163,9 +203,10 @@ export const renewStudents = onCall(
 
     functions.logger.info(
       `renewStudents: school ${schoolId} year ${academicYear} -> ` +
-      `renewed ${renewed}, ${graduates} graduate(s) flagged.`,
+      `renewed ${renewed}, ${graduates} graduate(s) flagged, ` +
+      `${skipped} skipped.`,
     );
-    return {renewed, graduates, academicYear};
+    return {renewed, graduates, skipped, academicYear};
   });
 
 // ─────────────────────────────────────────────────────────────────────────────

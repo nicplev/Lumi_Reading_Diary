@@ -36,6 +36,16 @@ export interface ParentRecipient {
   classIds: string[];
 }
 
+export interface PushTokenRecipient {
+  parentId: string;
+  token?: string;
+}
+
+export interface UniquePushTarget {
+  token: string;
+  parentIds: string[];
+}
+
 interface QuietHoursShape {
   start?: string | null;
   end?: string | null;
@@ -166,6 +176,34 @@ export function mergeRecipientsByParent(students: RecipientStudent[]): ParentRec
     studentIds: [...bucket.studentIds],
     studentNames: [...bucket.studentNames],
     classIds: [...bucket.classIds],
+  }));
+}
+
+/**
+ * Groups recipients by FCM registration token so one physical app install gets
+ * one push even if account switching left that token on multiple parent docs.
+ * Every owning parent id is retained so each in-app inbox can still receive an
+ * accurate push status.
+ * @param {PushTokenRecipient[]} recipients Parent records eligible for push.
+ * @return {UniquePushTarget[]} One send target per unique device token.
+ */
+export function mergePushTargetsByToken(
+  recipients: PushTokenRecipient[],
+): UniquePushTarget[] {
+  const ownersByToken = new Map<string, Set<string>>();
+
+  for (const recipient of recipients) {
+    const token = recipient.token?.trim();
+    if (!token) continue;
+
+    const owners = ownersByToken.get(token) ?? new Set<string>();
+    owners.add(recipient.parentId);
+    ownersByToken.set(token, owners);
+  }
+
+  return [...ownersByToken.entries()].map(([token, parentIds]) => ({
+    token,
+    parentIds: [...parentIds],
   }));
 }
 

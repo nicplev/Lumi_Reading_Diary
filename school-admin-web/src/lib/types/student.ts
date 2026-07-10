@@ -20,7 +20,7 @@ export type EnrollmentStatus = 'book_pack' | 'direct_purchase' | 'not_enrolled';
 /** Why a student was soft-archived (rollover import or manual portal action). */
 export type ArchivedReason = 'graduated' | 'left' | 'manual';
 
-export type StudentAccessStatus = 'active' | 'expired' | 'suspended';
+export type StudentAccessStatus = 'active' | 'expired' | 'suspended' | 'revoked';
 
 export type StudentAccessSource =
   | 'school_renewal'
@@ -43,6 +43,9 @@ export interface StudentAccess {
   source?: StudentAccessSource;
   grantedAt?: Date;
   grantedBy?: string;
+  revokedAt?: Date;
+  revokedBy?: string;
+  revokeReason?: string;
 }
 
 /**

@@ -1,22 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
+import { assertNotImpersonating } from '@/lib/auth/assert-not-impersonating';
 import { z } from 'zod';
-import { getCurrentAcademicYear, isSchoolSubActive } from '@/lib/access';
-import { getRenewalRoster, renewStudents } from '@/lib/firestore/renewals';
+import { getCurrentAcademicYear, isRenewalWindowOpen, isSchoolSubActive } from '@/lib/access';
+import { getRecentRenewalBatches, getRenewalRoster, renewStudents } from '@/lib/firestore/renewals';
 
 // GET /api/renewals — pre-loaded roster for the next academic year.
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (session.role !== 'schoolAdmin') {
+    return NextResponse.json({ error: 'Only school admins can view renewals' }, { status: 403 });
+  }
 
   try {
     const currentYear = await getCurrentAcademicYear();
     const targetYear = currentYear + 1;
-    const [roster, subActive] = await Promise.all([
+    const [roster, subActive, recentBatches] = await Promise.all([
       getRenewalRoster(session.schoolId, targetYear),
       isSchoolSubActive(session.schoolId, targetYear),
+      getRecentRenewalBatches(session.schoolId),
     ]);
-    return NextResponse.json({ currentYear, targetYear, subActive, roster });
+    return NextResponse.json({
+      currentYear,
+      targetYear,
+      subActive,
+      windowOpen: isRenewalWindowOpen(targetYear),
+      recentBatches,
+      roster,
+    });
   } catch (error) {
     console.error('Renewal roster error:', error);
     return NextResponse.json({ error: 'Failed to load renewal roster' }, { status: 500 });
@@ -25,7 +37,7 @@ export async function GET() {
 
 const renewSchema = z.object({
   academicYear: z.number().int().min(2020).max(2100),
-  studentIds: z.array(z.string().min(1)).min(1),
+  studentIds: z.array(z.string().min(1)).min(1).max(400),
 });
 
 // POST /api/renewals — renew the selected students into the target year.
@@ -35,10 +47,20 @@ export async function POST(request: NextRequest) {
   if (session.role !== 'schoolAdmin') {
     return NextResponse.json({ error: 'Only school admins can renew students' }, { status: 403 });
   }
+  const impersonationBlock = assertNotImpersonating(session);
+  if (impersonationBlock) return impersonationBlock;
 
   try {
     const body = await request.json();
     const { academicYear, studentIds } = renewSchema.parse(body);
+    const currentAcademicYear = await getCurrentAcademicYear();
+    if (academicYear !== currentAcademicYear + 1) {
+      return NextResponse.json(
+        { error: `The active school-year transition is ${currentAcademicYear} to ${currentAcademicYear + 1}. Refresh the page and try again.` },
+        { status: 409 }
+      );
+    }
+    const uniqueStudentIds = Array.from(new Set(studentIds));
 
     // Fail-closed: a school must both pay AND select. The subscription for the
     // target year must be active before any student can be carried forward.
@@ -52,7 +74,7 @@ export async function POST(request: NextRequest) {
     const result = await renewStudents(
       session.schoolId,
       academicYear,
-      studentIds,
+      uniqueStudentIds,
       session.uid,
       session.fullName
     );

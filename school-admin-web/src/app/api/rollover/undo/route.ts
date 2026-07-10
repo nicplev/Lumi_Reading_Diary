@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
+import { assertNotImpersonating } from '@/lib/auth/assert-not-impersonating';
 import { undoRolloverImport, getRecentRolloverImports } from '@/lib/firestore/rollover';
 import { z } from 'zod';
 
@@ -30,6 +31,8 @@ export async function POST(request: NextRequest) {
   if (session.role !== 'schoolAdmin') {
     return NextResponse.json({ error: 'Only school admins can undo a rollover import' }, { status: 403 });
   }
+  const impersonationBlock = assertNotImpersonating(session);
+  if (impersonationBlock) return impersonationBlock;
 
   try {
     const body = await request.json();

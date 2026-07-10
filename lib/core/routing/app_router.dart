@@ -506,7 +506,10 @@ class AppRouter {
         name: 'parent-notifications',
         builder: (context, state) => _userScopedRoute(
           extra: state.extra,
-          child: (user) => ParentNotificationsScreen(user: user),
+          child: (user) => ParentNotificationsScreen(
+            user: user,
+            openedFromPush: state.uri.queryParameters['fromPush'] == 'true',
+          ),
         ),
       ),
 

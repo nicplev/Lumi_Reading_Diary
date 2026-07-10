@@ -169,10 +169,10 @@ export function AdminDashboard({ schoolName, stats, weekly, operational }: Admin
                 no one is locked out when school goes back.
               </p>
               <div className="mt-4">
-                <Link href="/renewals">
+                <Link href="/students/rollover">
                   <Button variant={renewal.urgent ? 'primary' : 'outline'}>
                     <Icon name="event_repeat" size={18} />
-                    <span className="ml-2">Renew students for {renewal.targetYear}</span>
+                    <span className="ml-2">Start {renewal.targetYear} school-year transition</span>
                   </Button>
                 </Link>
               </div>

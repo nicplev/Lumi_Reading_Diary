@@ -15,7 +15,7 @@
 
 export const DEFAULT_TIMEZONE = "Australia/Sydney";
 
-export type StudentAccessStatus = "active" | "expired" | "suspended";
+export type StudentAccessStatus = "active" | "expired" | "suspended" | "revoked";
 export type StudentAccessSource =
   | "school_renewal"
   | "book_pack_assumed"

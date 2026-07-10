@@ -160,8 +160,9 @@ class StudentModel {
           [],
       stats: data['stats'] != null ? StudentStats.fromMap(data['stats']) : null,
       earnedAchievementIds: (data['achievements'] as List<dynamic>?)
-              ?.map((a) =>
-                  (a is Map ? a['id'] : null) is String ? a['id'] as String : null)
+              ?.map((a) => (a is Map ? a['id'] : null) is String
+                  ? a['id'] as String
+                  : null)
               .whereType<String>()
               .toList() ??
           const [],
@@ -371,6 +372,7 @@ class StudentAccess {
   static const String statusActive = 'active';
   static const String statusExpired = 'expired';
   static const String statusSuspended = 'suspended';
+  static const String statusRevoked = 'revoked';
 
   final String status;
 
@@ -386,6 +388,9 @@ class StudentAccess {
   final String? source;
   final DateTime? grantedAt;
   final String? grantedBy;
+  final DateTime? revokedAt;
+  final String? revokedBy;
+  final String? revokeReason;
 
   StudentAccess({
     required this.status,
@@ -394,6 +399,9 @@ class StudentAccess {
     this.source,
     this.grantedAt,
     this.grantedBy,
+    this.revokedAt,
+    this.revokedBy,
+    this.revokeReason,
   });
 
   /// Fail-closed: live only when status is active AND the hard expiry has not
@@ -417,6 +425,11 @@ class StudentAccess {
           ? (map['grantedAt'] as Timestamp).toDate()
           : null,
       grantedBy: map['grantedBy'] as String?,
+      revokedAt: map['revokedAt'] != null
+          ? (map['revokedAt'] as Timestamp).toDate()
+          : null,
+      revokedBy: map['revokedBy'] as String?,
+      revokeReason: map['revokeReason'] as String?,
     );
   }
 
@@ -428,6 +441,9 @@ class StudentAccess {
       if (source != null) 'source': source,
       if (grantedAt != null) 'grantedAt': Timestamp.fromDate(grantedAt!),
       if (grantedBy != null) 'grantedBy': grantedBy,
+      if (revokedAt != null) 'revokedAt': Timestamp.fromDate(revokedAt!),
+      if (revokedBy != null) 'revokedBy': revokedBy,
+      if (revokeReason != null) 'revokeReason': revokeReason,
     };
   }
 }

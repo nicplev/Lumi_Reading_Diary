@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { PageHeader } from '@/components/lumi/page-header';
 import { Icon } from '@/components/lumi/icon';
 import { Card } from '@/components/lumi/card';
@@ -28,7 +29,6 @@ import { QuickLoggingSettingsSection } from './quick-logging-settings';
 import { ComprehensionRecordingSettingsSection } from './comprehension-recording-settings';
 import { ComprehensionAudioCleanupSection } from './comprehension-audio-cleanup';
 import { MessagingSettingsSection } from './messaging-settings';
-import { RenewalsPage } from '../renewals/renewals-page';
 import type { RenewalRosterEntry, RenewalBatchSummary } from '@/lib/firestore/renewals';
 
 const LEVEL_SCHEMAS: { value: ReadingLevelSchema; label: string; description: string }[] = [
@@ -58,7 +58,7 @@ const SETTINGS_TABS = [
 // sidebar) because it's a once-a-year tool. Appended to the tab list only for
 // school admins. The internal id stays `renewals` so /settings?tab=renewals and
 // the /renewals redirect keep working.
-const RENEWALS_TAB = { id: 'renewals', label: 'Rollover', icon: <Icon name="autorenew" size={16} /> };
+const RENEWALS_TAB = { id: 'renewals', label: 'School Year', icon: <Icon name="autorenew" size={16} /> };
 const KNOWN_TAB_IDS = ['school', 'parent-app', 'renewals'];
 
 interface RenewalsData {
@@ -570,15 +570,36 @@ export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
       {/* Renewals Tab (admin-only) */}
       {activeTab === 'renewals' && isAdmin && (
         renewals ? (
-          <RenewalsPage
-            currentYear={renewals.currentYear}
-            targetYear={renewals.targetYear}
-            subActive={renewals.subActive}
-            windowOpen={renewals.windowOpen}
-            initialRoster={renewals.roster}
-            recentBatches={renewals.recentBatches}
-            embedded
-          />
+          <div className="max-w-3xl space-y-4">
+            <Card className="p-6">
+              <div className="flex items-start gap-4">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-section/10 text-section">
+                  <Icon name="autorenew" size={24} />
+                </span>
+                <div className="flex-1">
+                  <h2 className="text-lg font-bold text-ink">{renewals.currentYear} → {renewals.targetYear} School Year Transition</h2>
+                  <p className="mt-1 text-sm text-muted">
+                    One guided workflow updates classes and leavers from your school-system export, then refreshes the resulting roster so you can grant reading access for {renewals.targetYear}.
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Badge variant={renewals.subActive ? 'success' : 'warning'}>
+                      {renewals.subActive ? `${renewals.targetYear} subscription active` : `${renewals.targetYear} subscription pending`}
+                    </Badge>
+                    <Badge>{renewals.roster.filter((student) => student.alreadyRenewed).length} already granted access</Badge>
+                    <Badge>{renewals.roster.length} active students</Badge>
+                  </div>
+                  <p className="mt-4 text-xs text-muted">
+                    Roster changes and access grants remain separately audited and can each be undone. Existing reading history and guardian links are preserved.
+                  </p>
+                  <div className="mt-5">
+                    <Link href="/students/rollover">
+                      <Button>Open School Year Transition</Button>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
         ) : (
           <Card>
             <p className="text-sm text-muted">Renewal data is unavailable right now.</p>

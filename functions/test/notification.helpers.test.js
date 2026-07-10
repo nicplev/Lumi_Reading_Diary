@@ -6,6 +6,7 @@ const {
   normalizeNotificationPermissions,
   validateNotificationAudience,
   mergeRecipientsByParent,
+  mergePushTargetsByToken,
   isDueAt,
   isWithinQuietHours,
 } = require('../lib/notification_helpers.js');
@@ -93,6 +94,22 @@ test('mergeRecipientsByParent deduplicates sibling recipients into one parent bu
   const parent2 = recipients.find((recipient) => recipient.parentId === 'parent_2');
   assert.ok(parent2);
   assert.deepEqual(parent2.studentIds, ['student_2']);
+});
+
+test('mergePushTargetsByToken sends once per device and retains every parent owner', () => {
+  assert.deepEqual(
+    mergePushTargetsByToken([
+      { parentId: 'parent_1', token: 'device_a' },
+      { parentId: 'parent_2', token: 'device_a' },
+      { parentId: 'parent_3', token: 'device_b' },
+      { parentId: 'parent_4' },
+      { parentId: 'parent_5', token: '  ' },
+    ]),
+    [
+      { token: 'device_a', parentIds: ['parent_1', 'parent_2'] },
+      { token: 'device_b', parentIds: ['parent_3'] },
+    ],
+  );
 });
 
 test('isDueAt only returns true once the scheduled time has passed', () => {

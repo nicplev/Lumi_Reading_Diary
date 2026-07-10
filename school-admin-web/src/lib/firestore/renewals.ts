@@ -1,6 +1,7 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { hardExpiryFor, yearLevelForRenewal } from '@/lib/access';
+import { isActiveSubscriptionStatus } from '@/lib/types';
 
 export interface RenewalRosterEntry {
   studentId: string;
@@ -12,14 +13,14 @@ export interface RenewalRosterEntry {
   nextYearLevel: string | null;
   graduated: boolean;
   /**
-   * The rollover import already set this student's year level for the target
-   * year — renewal won't bump it (shown as "set by import" in the roster).
+   * A roster import or prior grant already set this student's year level for
+   * the target year — renewal won't bump it again.
    */
   yearLevelSetByImport: boolean;
   /** academicYear the student's current access is for, if any. */
   accessYear: number | null;
   /** Current materialised access status, if any (for the Status column). */
-  accessStatus: 'active' | 'expired' | 'suspended' | null;
+  accessStatus: 'active' | 'expired' | 'suspended' | 'revoked' | null;
   /** Whether the student is already renewed into the target year. */
   alreadyRenewed: boolean;
 }
@@ -68,7 +69,7 @@ export async function getRenewalRoster(
     );
     const accessYear = (d.access?.academicYear as number | undefined) ?? null;
     const accessStatus =
-      (d.access?.status as 'active' | 'expired' | 'suspended' | undefined) ?? null;
+      (d.access?.status as 'active' | 'expired' | 'suspended' | 'revoked' | undefined) ?? null;
     return {
       studentId: doc.id,
       firstName: d.firstName ?? '',
@@ -80,7 +81,7 @@ export async function getRenewalRoster(
       yearLevelSetByImport: ladder.setByImport,
       accessYear,
       accessStatus,
-      alreadyRenewed: accessYear === targetAcademicYear,
+      alreadyRenewed: accessYear === targetAcademicYear && accessStatus === 'active',
     };
   });
 }
@@ -88,6 +89,7 @@ export async function getRenewalRoster(
 export interface RenewResult {
   renewed: number;
   graduates: number;
+  skipped: number;
   /** Id of the recorded batch (for an immediate undo); null if nothing renewed. */
   batchId: string | null;
 }
@@ -98,9 +100,12 @@ export interface RenewalBatchEntry {
   name: string;
   prevAccess: Record<string, unknown> | null;
   prevYearLevel: string | null;
+  prevYearLevelSetForYear: number | null;
   prevGraduated: boolean;
   /** Whether this renewal bumped the year level (so undo knows to restore it). */
   bumped: boolean;
+  /** Whether this renewal wrote the same-year idempotency marker. */
+  markedYearLevelForYear: boolean;
   /** Whether this renewal flagged the student graduated. */
   graduated: boolean;
 }
@@ -120,8 +125,9 @@ export interface RenewalBatchSummary {
  * Grant access for `academicYear` to the selected students (source:
  * school_renewal), bumping recognised year levels and flagging graduates.
  * Records a `renewalBatches` doc with per-student before-snapshots so the whole
- * action can be undone (mistake recovery + audit trail). Mirrors the
- * renewStudents Cloud Function. Chunked into batches of 400.
+ * action can be undone (mistake recovery + audit trail). Student writes and
+ * the undo record commit in one transaction (up to 400 students), making
+ * retries and concurrent submissions idempotent.
  */
 export async function renewStudents(
   schoolId: string,
@@ -136,24 +142,81 @@ export async function renewStudents(
     .collection('students');
 
   const expiresAt = hardExpiryFor(academicYear);
-  const entries: RenewalBatchEntry[] = [];
-  let renewed = 0;
-  let graduates = 0;
+  const classesSnap = await adminDb
+    .collection('schools')
+    .doc(schoolId)
+    .collection('classes')
+    .get();
+  const classYearLevel = new Map<string, string>();
+  classesSnap.docs.forEach((doc) => {
+    const value = doc.data().yearLevel;
+    if (typeof value === 'string' && value.trim()) classYearLevel.set(doc.id, value.trim());
+  });
 
-  for (let i = 0; i < studentIds.length; i += 400) {
-    const chunk = studentIds.slice(i, i + 400);
-    const snaps = await adminDb.getAll(...chunk.map((id) => studentsCol.doc(id)));
-    const batch = adminDb.batch();
+  if (studentIds.length > 400) {
+    throw new Error('A renewal can include at most 400 students.');
+  }
+
+  const renewalRef = adminDb
+    .collection('schools')
+    .doc(schoolId)
+    .collection('renewalBatches')
+    .doc();
+
+  // Students and the corresponding undo/audit record commit atomically. The
+  // transaction also serialises concurrent retries: once one request grants
+  // target-year access, a racing request retries, sees it, and safely skips it.
+  const transactionResult = await adminDb.runTransaction(async (transaction) => {
+    const subscription = await transaction.get(
+      adminDb.collection('schoolSubscriptions').doc(`${schoolId}_${academicYear}`)
+    );
+    if (
+      !subscription.exists ||
+      !isActiveSubscriptionStatus(subscription.data()?.status as string)
+    ) {
+      throw new Error(`School subscription is not active for ${academicYear}.`);
+    }
+    const snaps = await Promise.all(
+      studentIds.map((studentId) => transaction.get(studentsCol.doc(studentId)))
+    );
+    const entries: RenewalBatchEntry[] = [];
+    let graduates = 0;
+    let skipped = 0;
+
     for (const snap of snaps) {
-      if (!snap.exists) continue;
+      if (!snap.exists) {
+        skipped++;
+        continue;
+      }
       const data = snap.data() ?? {};
+      // Never let a stale or forged selection reactivate an archived student.
+      if (data.isActive !== true) {
+        skipped++;
+        continue;
+      }
+      if (
+        data.access?.academicYear === academicYear &&
+        data.access?.status === 'active'
+      ) {
+        // Idempotency guard: a client retry must not bump the year level twice
+        // or create a second audit batch for the same grant.
+        skipped++;
+        continue;
+      }
       const additional = (data.additionalInfo ?? {}) as Record<string, unknown>;
       const prevYearLevel = (additional.yearLevel as string | undefined) ?? null;
+      const prevYearLevelSetForYear =
+        typeof additional.yearLevelSetForYear === 'number'
+          ? additional.yearLevelSetForYear
+          : null;
       const prevGraduated = additional.graduated === true;
       // Skip the bump when the rollover import already set the level for this
       // (or a later) year — bumping again would skip the student a grade.
+      const currentYearLevel =
+        prevYearLevel ??
+        (typeof data.classId === 'string' ? classYearLevel.get(data.classId) ?? null : null);
       const ladder = yearLevelForRenewal(
-        prevYearLevel,
+        currentYearLevel,
         additional.yearLevelSetForYear,
         academicYear
       );
@@ -170,47 +233,47 @@ export async function renewStudents(
       };
       if (ladder.changed && ladder.next != null) {
         update['additionalInfo.yearLevel'] = ladder.next;
+        update['additionalInfo.yearLevelSetForYear'] = academicYear;
       }
       if (ladder.graduated) {
         update['additionalInfo.graduated'] = true;
         graduates++;
       }
-      batch.update(snap.ref, update);
+      transaction.update(snap.ref, update);
 
       entries.push({
         studentId: snap.id,
         name: `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim(),
         prevAccess: (data.access as Record<string, unknown> | undefined) ?? null,
         prevYearLevel,
+        prevYearLevelSetForYear,
         prevGraduated,
         bumped: ladder.changed && ladder.next != null,
+        markedYearLevelForYear: ladder.changed && ladder.next != null,
         graduated: ladder.graduated,
       });
-      renewed++;
     }
-    await batch.commit();
-  }
 
-  let batchId: string | null = null;
-  if (entries.length > 0) {
-    const ref = adminDb
-      .collection('schools')
-      .doc(schoolId)
-      .collection('renewalBatches')
-      .doc();
-    await ref.set({
-      academicYear,
-      status: 'applied',
-      count: entries.length,
-      performedBy: grantedBy,
-      performedByName: grantedByName ?? null,
-      performedAt: FieldValue.serverTimestamp(),
-      entries,
-    });
-    batchId = ref.id;
-  }
+    if (entries.length > 0) {
+      transaction.create(renewalRef, {
+        academicYear,
+        status: 'applied',
+        count: entries.length,
+        performedBy: grantedBy,
+        performedByName: grantedByName ?? null,
+        performedAt: FieldValue.serverTimestamp(),
+        entries,
+      });
+    }
+    return {
+      renewed: entries.length,
+      graduates,
+      skipped,
+      batchId: entries.length > 0 ? renewalRef.id : null,
+    };
+  });
 
-  return { renewed, graduates, batchId };
+  return transactionResult;
 }
 
 /** Most-recent renewal batches for the undo list. */
@@ -284,6 +347,10 @@ export async function undoRenewalBatch(
       };
       if (e.bumped) {
         update['additionalInfo.yearLevel'] = e.prevYearLevel ?? FieldValue.delete();
+      }
+      if (e.markedYearLevelForYear) {
+        update['additionalInfo.yearLevelSetForYear'] =
+          e.prevYearLevelSetForYear ?? FieldValue.delete();
       }
       if (e.graduated) {
         update['additionalInfo.graduated'] = e.prevGraduated ? true : FieldValue.delete();

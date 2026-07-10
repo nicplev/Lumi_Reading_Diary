@@ -8,6 +8,7 @@ import {
   isSchoolSubActive,
   isStudentAccessLive,
 } from '@/lib/access';
+import { isActiveSubscriptionStatus } from '@/lib/types';
 
 /**
  * Self-serve access activation — the portal equivalent of the ops-only
@@ -28,6 +29,18 @@ export interface AccessActivationResult {
   /** Students already live, left untouched. */
   skipped: number;
   academicYear: number;
+}
+
+export type ManagedEnrollmentStatus =
+  | 'book_pack'
+  | 'direct_purchase'
+  | 'not_enrolled';
+
+export interface EnrollmentAccessUpdateResult {
+  updated: number;
+  skipped: number;
+  academicYear: number;
+  accessStatus: 'active' | 'revoked';
 }
 
 /**
@@ -53,7 +66,9 @@ export async function activateAccessForYear(
   const now = new Date();
   const expiresAt = hardExpiryFor(academicYear);
   const toGrant = studentsSnap.docs.filter(
-    (d) => !isStudentAccessLive(d.data().access, now)
+    (d) =>
+      d.data().access?.status !== 'revoked' &&
+      !isStudentAccessLive(d.data().access, now)
   );
 
   for (let i = 0; i < toGrant.length; i += 400) {
@@ -113,6 +128,7 @@ export async function grantStudentAccessForCurrentYear(
     .collection('students').doc(studentId);
   const snap = await ref.get();
   if (!snap.exists) return { granted: false, academicYear };
+  if (snap.data()?.isActive === false) return { granted: false, academicYear };
   if (isStudentAccessLive(snap.data()?.access)) {
     return { granted: false, academicYear }; // already live — no-op
   }
@@ -127,6 +143,120 @@ export async function grantStudentAccessForCurrentYear(
     },
   });
   return { granted: true, academicYear };
+}
+
+/**
+ * Keep the portal's subscription label and the enforceable reading entitlement
+ * in sync. Subscribed states grant current-year access; not_enrolled creates a
+ * durable per-student `revoked` state that school subscription cascades and
+ * bulk activation deliberately ignore. Student history and guardian links are
+ * never touched.
+ */
+export async function updateStudentEnrollmentAndAccess(
+  schoolId: string,
+  studentIds: string[],
+  enrollmentStatus: ManagedEnrollmentStatus,
+  performedBy: string,
+  reason?: string
+): Promise<EnrollmentAccessUpdateResult> {
+  const ids = Array.from(new Set(studentIds.map((id) => id.trim()).filter(Boolean)));
+  if (ids.length === 0) {
+    return {
+      updated: 0,
+      skipped: 0,
+      academicYear: await getCurrentAcademicYear(),
+      accessStatus: enrollmentStatus === 'not_enrolled' ? 'revoked' : 'active',
+    };
+  }
+
+  const academicYear = await getCurrentAcademicYear();
+  const revoking = enrollmentStatus === 'not_enrolled';
+  if (ids.length > 400) {
+    throw new Error('Access changes are limited to 400 students per audited batch.');
+  }
+
+  const studentsCol = adminDb
+    .collection('schools')
+    .doc(schoolId)
+    .collection('students');
+  const refs = ids.map((id) => studentsCol.doc(id));
+  const source =
+    enrollmentStatus === 'direct_purchase' ? 'parent_direct' : 'book_pack_assumed';
+  const revokeReason = reason?.trim() || 'Marked not subscribed by school admin';
+  const auditRef = adminDb.collection('adminAuditLog').doc();
+
+  // One transaction keeps the enforceable entitlement, subscription label,
+  // and audit record in lock-step. For grants, reading the subscription inside
+  // the transaction also closes the pay-status race with a concurrent lapse.
+  const updated = await adminDb.runTransaction(async (transaction) => {
+    if (!revoking) {
+      const subscription = await transaction.get(
+        adminDb.collection('schoolSubscriptions').doc(`${schoolId}_${academicYear}`)
+      );
+      if (
+        !subscription.exists ||
+        !isActiveSubscriptionStatus(subscription.data()?.status as string)
+      ) {
+        throw new SubscriptionInactiveError(academicYear);
+      }
+    }
+    const snapshots = await Promise.all(refs.map((ref) => transaction.get(ref)));
+    const targets = snapshots.filter(
+      (snapshot) => snapshot.exists && snapshot.data()?.isActive !== false
+    );
+    for (const snapshot of targets) {
+      const previousAccess =
+        snapshot.data()?.access && typeof snapshot.data()?.access === 'object'
+          ? snapshot.data()!.access
+          : {};
+      transaction.update(snapshot.ref, {
+        enrollmentStatus,
+        access: revoking
+          ? {
+              ...previousAccess,
+              status: 'revoked',
+              academicYear: previousAccess.academicYear ?? academicYear,
+              expiresAt: previousAccess.expiresAt ?? hardExpiryFor(academicYear),
+              revokedAt: FieldValue.serverTimestamp(),
+              revokedBy: performedBy,
+              revokeReason,
+            }
+          : {
+              status: 'active',
+              academicYear,
+              expiresAt: hardExpiryFor(academicYear),
+              source,
+              grantedAt: FieldValue.serverTimestamp(),
+              grantedBy: performedBy,
+            },
+      });
+    }
+    if (targets.length > 0) {
+      transaction.create(auditRef, {
+        action: revoking ? 'studentAccess.revoke' : 'studentAccess.grant',
+        performedBy,
+        targetType: targets.length === 1 ? 'student' : 'studentSelection',
+        targetId: targets.length === 1 ? targets[0].id : schoolId,
+        schoolId,
+        metadata: {
+          studentIds: targets.map((snapshot) => snapshot.id),
+          enrollmentStatus,
+          academicYear,
+          reason: revoking ? revokeReason : null,
+          count: targets.length,
+        },
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    }
+    return targets.length;
+  });
+
+  return {
+    updated,
+    skipped: ids.length - updated,
+    academicYear,
+    accessStatus: revoking ? 'revoked' : 'active',
+  };
 }
 
 /** Create `config/academicYear` if it is missing (never overwrites). */

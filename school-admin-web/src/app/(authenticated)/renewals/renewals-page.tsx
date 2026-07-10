@@ -23,9 +23,16 @@ interface Props {
   embedded?: boolean;
   /** Recent rollover batches, for the undo list. */
   recentBatches?: RenewalBatchSummary[];
+  /** Rendered as step 2 inside the unified School Year Transition workflow. */
+  transitionMode?: boolean;
+  /** Called after access is granted, so the parent workflow can show completion. */
+  onRenewed?: (result: { renewed: number; graduates: number; skipped: number; hasMore: boolean }) => void;
+  /** Allows completion when every returning student was already granted access. */
+  onFinish?: () => void;
+  onBack?: () => void;
 }
 
-type StatusKey = 'renewed' | 'graduate' | 'active' | 'expired' | 'suspended' | 'none';
+type StatusKey = 'renewed' | 'graduate' | 'active' | 'expired' | 'suspended' | 'revoked' | 'none';
 
 /** Single status bucket per student — drives the Status column + the filter. */
 function statusKey(s: RenewalRosterEntry): StatusKey {
@@ -39,6 +46,7 @@ const STATUS_FILTERS: { value: string; label: string }[] = [
   { value: 'active', label: 'Active' },
   { value: 'expired', label: 'Expired' },
   { value: 'suspended', label: 'Suspended' },
+  { value: 'revoked', label: 'Revoked' },
   { value: 'none', label: 'No access' },
   { value: 'renewed', label: 'Already rolled over' },
   { value: 'graduate', label: 'Graduate' },
@@ -63,6 +71,10 @@ export function RenewalsPage({
   windowOpen = true,
   embedded = false,
   recentBatches = [],
+  transitionMode = false,
+  onRenewed,
+  onFinish,
+  onBack,
 }: Props) {
   const { toast } = useToast();
   const router = useRouter();
@@ -70,9 +82,16 @@ export function RenewalsPage({
   const [saving, setSaving] = useState(false);
   const [undoing, setUndoing] = useState<string | null>(null);
 
-  // Pre-tick everyone except graduates and the already-rolled-over.
+  // Explicitly revoked students are never silently reactivated by a bulk
+  // default. An admin can still deliberately tick one to grant the new year.
+  const defaultEligible = roster.filter(
+    (student) =>
+      !student.graduated &&
+      !student.alreadyRenewed &&
+      student.accessStatus !== 'revoked'
+  );
   const defaultSelection = () =>
-    new Set(roster.filter((s) => !s.graduated && !s.alreadyRenewed).map((s) => s.studentId));
+    new Set(defaultEligible.slice(0, 400).map((student) => student.studentId));
   const [selected, setSelected] = useState<Set<string>>(defaultSelection);
   useEffect(() => {
     setSelected(defaultSelection());
@@ -102,7 +121,7 @@ export function RenewalsPage({
     });
     const name = (s: RenewalRosterEntry) => `${s.lastName} ${s.firstName}`.trim().toLowerCase();
     const statusOrder: Record<StatusKey, number> = {
-      none: 0, expired: 1, suspended: 2, active: 3, renewed: 4, graduate: 5,
+      none: 0, revoked: 1, expired: 2, suspended: 3, active: 4, renewed: 5, graduate: 6,
     };
     list.sort((a, b) => {
       if (sortBy === 'name-desc') return name(b).localeCompare(name(a));
@@ -125,7 +144,11 @@ export function RenewalsPage({
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
-      else next.add(id);
+      else if (next.size >= 400) {
+        toast('Access grants are limited to 400 students per audited batch.', 'warning');
+      } else {
+        next.add(id);
+      }
       return next;
     });
   }
@@ -136,7 +159,14 @@ export function RenewalsPage({
     setSelected((prev) => {
       const next = new Set(prev);
       filtered.forEach((s) => {
-        if (!s.graduated && !s.alreadyRenewed) next.add(s.studentId);
+        if (
+          next.size < 400 &&
+          !s.graduated &&
+          !s.alreadyRenewed &&
+          s.accessStatus !== 'revoked'
+        ) {
+          next.add(s.studentId);
+        }
       });
       return next;
     });
@@ -163,11 +193,14 @@ export function RenewalsPage({
         body: JSON.stringify({ academicYear: targetYear, studentIds: Array.from(selected) }),
       });
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? 'Rollover failed');
-      toast(`Rolled ${body.renewed} student(s) forward into ${targetYear}. Undo below if needed.`, 'success');
-      router.refresh();
+      if (!res.ok) throw new Error(body.error ?? 'Access grant failed');
+      toast(`Granted ${targetYear} reading access to ${body.renewed} student(s). Undo below if needed.`, 'success');
+      if (onRenewed) {
+        onRenewed({ ...body, hasMore: defaultEligible.length > body.renewed });
+      }
+      else router.refresh();
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Rollover failed', 'error');
+      toast(e instanceof Error ? e.message : 'Access grant failed', 'error');
     } finally {
       setSaving(false);
     }
@@ -204,6 +237,8 @@ export function RenewalsPage({
         return <Badge variant="warning">Expired{s.accessYear ? ` · ${s.accessYear}` : ''}</Badge>;
       case 'suspended':
         return <Badge variant="error">Suspended</Badge>;
+      case 'revoked':
+        return <Badge variant="error">Revoked</Badge>;
       default:
         return <span className="text-muted">No access</span>;
     }
@@ -213,14 +248,14 @@ export function RenewalsPage({
     <div className="space-y-6">
       {!embedded && (
         <PageHeader
-          eyebrow="Rollover"
-          title="Rollover"
-          description={`Carry students forward into the ${targetYear} school year`}
+          eyebrow="Students"
+          title="School Year Transition"
+          description={`Grant reading access for the ${targetYear} school year`}
         />
       )}
       {embedded && (
         <p className="text-sm text-muted">
-          Roll students forward into the {targetYear} school year.
+          {transitionMode ? `Step 2 of 2 — grant reading access for ${targetYear}.` : `Roll students forward into the ${targetYear} school year.`}
         </p>
       )}
 
@@ -232,19 +267,20 @@ export function RenewalsPage({
         </Card>
       )}
 
-      <Card className="p-4 text-sm text-ink">
-        <span className="font-semibold">Rolling into a new year?</span> Start with the{' '}
-        <Link href="/students/rollover" className="text-section font-semibold hover:underline">
-          Annual Rollover Import
-        </Link>{' '}
-        — it moves every student to their new class from your school system&apos;s class
-        lists and handles graduates and leavers. Then come back here to grant {targetYear} access.
-      </Card>
+      {!transitionMode && (
+        <Card className="p-4 text-sm text-ink">
+          <span className="font-semibold">Rolling into a new year?</span> Start with the{' '}
+          <Link href="/students/rollover" className="text-section font-semibold hover:underline">
+            School Year Transition
+          </Link>{' '}
+          to update classes, handle leavers, and grant {targetYear} access in one guided flow.
+        </Card>
+      )}
 
       {!subActive && (
         <Card className="border-error/40 bg-error/5 p-4 text-sm">
           Your school&apos;s Lumi subscription for {targetYear} is not active yet.
-          Rollover is disabled until Lumi marks it paid — please contact Lumi.
+          Access grants are disabled until Lumi marks it paid — please contact Lumi.
         </Card>
       )}
 
@@ -256,10 +292,17 @@ export function RenewalsPage({
           <span>Already rolled over: <strong>{stats.alreadyRenewed}</strong></span>
         </div>
         <p className="mt-2 text-xs text-muted">
-          Everyone is pre-ticked except graduates and students already rolled over.
-          Untick anyone not returning (non-payers / leavers). Year levels are bumped
-          automatically; class assignment stays manual.
+          Everyone is pre-ticked except graduates, students already granted {targetYear}
+          access, and deliberately revoked students. Select a revoked student only if
+          you intentionally want to restore their access. Class assignments are not
+          changed in this step.
         </p>
+        {defaultEligible.length > 400 && (
+          <p className="mt-2 text-xs font-semibold text-warning">
+            This roster needs {Math.ceil(defaultEligible.length / 400)} audited access batches.
+            The first 400 are selected; return to this step after each completed batch for the remainder.
+          </p>
+        )}
       </Card>
 
       {/* Toolbar — search / filter / sort for large rosters */}
@@ -337,8 +380,8 @@ export function RenewalsPage({
                       ? ` → ${s.nextYearLevel}`
                       : ''}
                     {s.yearLevelSetByImport && (
-                      <span className="ml-1.5 text-xs text-muted" title="The rollover import already set this year level — renewing won't change it.">
-                        (set by import)
+                      <span className="ml-1.5 text-xs text-muted" title="This year level is already set for the target year, so the access grant won't change it again.">
+                        (already set)
                       </span>
                     )}
                   </td>
@@ -357,10 +400,18 @@ export function RenewalsPage({
         </div>
       </Card>
 
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-3">
+        {onBack && (
+          <Button variant="outline" onClick={onBack} disabled={saving}>
+            Back
+          </Button>
+        )}
         <Button onClick={confirm} loading={saving} disabled={!subActive || selected.size === 0}>
-          Confirm {selected.size} rollover{selected.size === 1 ? '' : 's'}
+          Grant access to {selected.size} student{selected.size === 1 ? '' : 's'}
         </Button>
+        {onFinish && selected.size === 0 && defaultEligible.length === 0 && (
+          <Button onClick={onFinish}>Finish transition</Button>
+        )}
       </div>
 
       {recentBatches.length > 0 && (

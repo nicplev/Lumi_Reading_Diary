@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../theme/lumi_tokens.dart';
@@ -17,17 +18,18 @@ class ParentNotificationsScreen extends StatefulWidget {
   const ParentNotificationsScreen({
     super.key,
     required this.user,
+    this.openedFromPush = false,
   });
 
   final UserModel user;
+  final bool openedFromPush;
 
   @override
   State<ParentNotificationsScreen> createState() =>
       _ParentNotificationsScreenState();
 }
 
-class _ParentNotificationsScreenState
-    extends State<ParentNotificationsScreen> {
+class _ParentNotificationsScreenState extends State<ParentNotificationsScreen> {
   final _service = StaffNotificationService.instance;
   late final StreamSubscription<List<ParentNotificationModel>> _sub;
   List<ParentNotificationModel> _notifications = const [];
@@ -118,6 +120,22 @@ class _ParentNotificationsScreenState
           surfaceTintColor: Colors.transparent,
           elevation: 0,
           iconTheme: const IconThemeData(color: LumiTokens.ink),
+          leading: IconButton(
+            tooltip: 'Back to home',
+            icon: const Icon(Icons.arrow_back_ios_new_rounded),
+            onPressed: () {
+              // Normal in-app entry pushes this screen and can pop. A push
+              // notification cold-starts directly at this route, so there is
+              // no route beneath it; in that case, explicitly restore Home.
+              if (widget.openedFromPush) {
+                context.go('/parent/home');
+              } else if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/parent/home');
+              }
+            },
+          ),
           title: Text('Notifications', style: LumiType.subhead),
           actions: [
             if (_notifications.isNotEmpty)
@@ -199,8 +217,10 @@ class _NotificationCard extends StatelessWidget {
     final isUnread = !notification.isRead;
     final deliveredLabel = notification.deliveredAt == null
         ? 'Just now'
-        : DateFormat("EEE, d MMM 'at' h:mm a").format(notification.deliveredAt!);
-    final category = notification.messageType.replaceAll('_', ' ').toUpperCase();
+        : DateFormat("EEE, d MMM 'at' h:mm a")
+            .format(notification.deliveredAt!);
+    final category =
+        notification.messageType.replaceAll('_', ' ').toUpperCase();
     final meta = 'From ${notification.senderName}  ·  $deliveredLabel';
 
     return Material(

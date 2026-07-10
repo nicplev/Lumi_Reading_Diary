@@ -14,6 +14,7 @@ const sendgridSenderEmail = defineSecret("SENDGRID_SENDER_EMAIL");
 import {
   isDueAt,
   isWithinQuietHours,
+  mergePushTargetsByToken,
   mergeRecipientsByParent,
   NotificationAudienceType,
   normalizeNotificationPermissions,
@@ -593,11 +594,14 @@ async function buildParentDeliveries(
 
     // Respect parent push notification preference
     const pushEnabled = parentData.preferences?.pushNotificationsEnabled !== false;
+    const storedToken = typeof parentData.fcmToken === "string" ?
+      parentData.fcmToken.trim() :
+      "";
 
     deliveries.push({
       parentId: recipient.parentId,
       parentRef: parentDoc.ref,
-      token: pushEnabled && typeof parentData.fcmToken === "string" ? parentData.fcmToken : undefined,
+      token: pushEnabled && storedToken.length > 0 ? storedToken : undefined,
       studentIds: recipient.studentIds,
       studentNames: recipient.studentNames,
       classIds: recipient.classIds,
@@ -809,7 +813,7 @@ async function dispatchNotificationCampaign(
 
     const statusByParentId = new Map<string, string>();
     const tokenMessages: admin.messaging.TokenMessage[] = [];
-    const tokenOwners: string[] = [];
+    const tokenOwnerGroups: string[][] = [];
     const inboxWritten = deliveries.length;
 
     for (const delivery of deliveries) {
@@ -817,10 +821,25 @@ async function dispatchNotificationCampaign(
         statusByParentId.set(delivery.parentId, "skipped_no_token");
         continue;
       }
+    }
 
-      tokenOwners.push(delivery.parentId);
+    // A device token can remain on more than one parent document after account
+    // switching on a shared device. Send once per unique token, while retaining
+    // every parent owner so all inbox status documents stay correct.
+    const pushTargets = mergePushTargetsByToken(deliveries);
+    const tokenOwnerCount = deliveries.filter((delivery) => delivery.token).length;
+    if (pushTargets.length < tokenOwnerCount) {
+      functions.logger.info("Deduplicated notification campaign device tokens", {
+        schoolId,
+        campaignId: campaignRef.id,
+        tokenOwners: tokenOwnerCount,
+        uniquePushTargets: pushTargets.length,
+      });
+    }
+    for (const target of pushTargets) {
+      tokenOwnerGroups.push(target.parentIds);
       tokenMessages.push({
-        token: delivery.token,
+        token: target.token,
         notification: {
           title: campaign.title,
           body: campaign.body,
@@ -831,8 +850,14 @@ async function dispatchNotificationCampaign(
           schoolId,
           messageType: campaign.messageType,
         },
-        apns: {payload: {aps: {sound: "default"}}},
+        // Collapse-id is defense in depth for provider retries: one campaign
+        // should occupy one notification slot on each Apple device.
+        apns: {
+          headers: {"apns-collapse-id": campaignRef.id},
+          payload: {aps: {sound: "default"}},
+        },
         android: {
+          collapseKey: campaignRef.id,
           priority: "high" as const,
           notification: {sound: "default", clickAction: "FLUTTER_NOTIFICATION_CLICK"},
         },
@@ -845,26 +870,26 @@ async function dispatchNotificationCampaign(
 
     for (let i = 0; i < tokenMessages.length; i += FCM_BATCH_LIMIT) {
       const messageBatch = tokenMessages.slice(i, i + FCM_BATCH_LIMIT);
-      const ownerBatch = tokenOwners.slice(i, i + FCM_BATCH_LIMIT);
+      const ownerBatch = tokenOwnerGroups.slice(i, i + FCM_BATCH_LIMIT);
       const result = await admin.messaging().sendEach(messageBatch);
 
       pushSent += result.successCount;
       pushFailed += result.failureCount;
 
       result.responses.forEach((response, index) => {
-        const parentId = ownerBatch[index];
+        const parentIds = ownerBatch[index] ?? [];
         if (response.success) {
-          statusByParentId.set(parentId, "sent");
+          parentIds.forEach((parentId) => statusByParentId.set(parentId, "sent"));
           return;
         }
 
-        statusByParentId.set(parentId, "failed");
+        parentIds.forEach((parentId) => statusByParentId.set(parentId, "failed"));
         const code = response.error?.code;
         if (
           code === "messaging/registration-token-not-registered" ||
           code === "messaging/invalid-registration-token"
         ) {
-          staleParentIds.add(parentId);
+          parentIds.forEach((parentId) => staleParentIds.add(parentId));
         }
       });
     }
@@ -1259,7 +1284,19 @@ async function processSchool(
     const docs = await db.getAll(...refs);
     docs.forEach((d) => {
       if (d.exists) {
-        studentNames.set(d.id, d.data()?.firstName ?? "your child");
+        const student = d.data() ?? {};
+        const access = student.access ?? {};
+        const rawExpiry = access.expiresAt;
+        const expiresAtMs = rawExpiry instanceof admin.firestore.Timestamp ?
+          rawExpiry.toMillis() :
+          rawExpiry instanceof Date ? rawExpiry.getTime() : 0;
+        if (
+          student.isActive !== false &&
+          access.status === "active" &&
+          expiresAtMs > utcNow.getTime()
+        ) {
+          studentNames.set(d.id, student.firstName ?? "your child");
+        }
       }
     });
   }));

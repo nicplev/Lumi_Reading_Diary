@@ -29,7 +29,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 /// Single owner of all notification/FCM logic (push + local + scheduled)
 class NotificationService {
   static NotificationService? _instance;
-  static NotificationService get instance => _instance ??= NotificationService._();
+  static NotificationService get instance =>
+      _instance ??= NotificationService._();
 
   NotificationService._();
 
@@ -108,7 +109,8 @@ class NotificationService {
 
   /// Initialize local notifications
   Future<void> _initializeLocalNotifications() async {
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -281,7 +283,7 @@ class NotificationService {
     debugPrint('Notification tapped: ${message.data}');
     final type = message.data['type'];
     if (type == 'staff_message') {
-      _navigateTo('/parent/notifications');
+      _navigateTo('/parent/notifications?fromPush=true');
       return;
     }
     if (type == 'reading_reminder') {
@@ -307,9 +309,15 @@ class NotificationService {
     if (payload != null && payload.isNotEmpty) {
       try {
         final data = jsonDecode(payload);
-        if (data is Map<String, dynamic> && data['type'] == 'reading_reminder') {
-          _routeReadingReminderTap(data);
-          return;
+        if (data is Map<String, dynamic>) {
+          if (data['type'] == 'staff_message') {
+            _navigateTo('/parent/notifications?fromPush=true');
+            return;
+          }
+          if (data['type'] == 'reading_reminder') {
+            _routeReadingReminderTap(data);
+            return;
+          }
         }
       } catch (_) {
         // Payload wasn't JSON; fall through to the default home navigation.
@@ -337,7 +345,11 @@ class NotificationService {
   Future<void> _routeReadingReminderTap(Map<String, dynamic> data) async {
     final rawIds = data['studentIds'];
     final ids = rawIds is String
-        ? rawIds.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
+        ? rawIds
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList()
         : <String>[];
     if (ids.isNotEmpty) {
       try {
@@ -365,9 +377,8 @@ class NotificationService {
           : channelId == _achievementChannel
               ? 'Achievements'
               : 'General',
-      importance: channelId == _achievementChannel
-          ? Importance.max
-          : Importance.high,
+      importance:
+          channelId == _achievementChannel ? Importance.max : Importance.high,
       priority: Priority.high,
       playSound: true,
       enableVibration: true,
@@ -535,7 +546,8 @@ class NotificationService {
     } catch (e) {
       // APNS token not available on iOS Simulator - expected
       if (e.toString().contains('apns-token-not-set')) {
-        debugPrint('APNS not available (iOS Simulator) - notifications will work on physical devices');
+        debugPrint(
+            'APNS not available (iOS Simulator) - notifications will work on physical devices');
       } else {
         debugPrint('Error saving FCM token: $e');
       }
@@ -543,7 +555,8 @@ class NotificationService {
   }
 
   /// Persist token to the parent's Firestore document
-  Future<void> _persistToken(String token, String schoolId, String userId) async {
+  Future<void> _persistToken(
+      String token, String schoolId, String userId) async {
     try {
       await FirebaseFirestore.instance
           .collection('schools')

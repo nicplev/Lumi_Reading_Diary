@@ -4,12 +4,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Student, ReadingLevelEvent, EnrollmentStatus } from '@/lib/types';
 import type { ImportResult } from '@/lib/firestore/students';
 
-type SerializedStudent = Omit<Student, 'createdAt' | 'dateOfBirth' | 'enrolledAt' | 'readingLevelUpdatedAt' | 'archivedAt' | 'levelHistory' | 'stats'> & {
+type SerializedStudent = Omit<Student, 'createdAt' | 'dateOfBirth' | 'enrolledAt' | 'readingLevelUpdatedAt' | 'archivedAt' | 'access' | 'levelHistory' | 'stats'> & {
   createdAt: string;
   dateOfBirth: string | null;
   enrolledAt: string | null;
   readingLevelUpdatedAt: string | null;
   archivedAt: string | null;
+  access: (Omit<NonNullable<Student['access']>, 'expiresAt' | 'grantedAt' | 'revokedAt'> & {
+    expiresAt: string | null;
+    grantedAt: string | null;
+    revokedAt: string | null;
+  }) | null;
   levelHistory: Array<Omit<Student['levelHistory'][0], 'changedAt'> & { changedAt: string }>;
   stats: (Omit<NonNullable<Student['stats']>, 'lastReadingDate'> & { lastReadingDate: string | null }) | null;
 };
@@ -253,11 +258,11 @@ export function useReadingLevelHistory(studentId: string) {
 export function useUpdateEnrollmentStatus() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ studentId, enrollmentStatus }: { studentId: string; enrollmentStatus: EnrollmentStatus }) => {
+    mutationFn: async ({ studentId, enrollmentStatus, reason }: { studentId: string; enrollmentStatus: EnrollmentStatus; reason?: string }) => {
       const res = await fetch(`/api/students/${studentId}/enrollment`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enrollmentStatus }),
+        body: JSON.stringify({ enrollmentStatus, ...(reason ? { reason } : {}) }),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -274,11 +279,11 @@ export function useUpdateEnrollmentStatus() {
 export function useBulkUpdateEnrollmentStatus() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ studentIds, enrollmentStatus }: { studentIds: string[]; enrollmentStatus: EnrollmentStatus }) => {
+    mutationFn: async ({ studentIds, enrollmentStatus, reason }: { studentIds: string[]; enrollmentStatus: EnrollmentStatus; reason?: string }) => {
       const res = await fetch('/api/students/bulk-enrollment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentIds, enrollmentStatus }),
+        body: JSON.stringify({ studentIds, enrollmentStatus, ...(reason ? { reason } : {}) }),
       });
       if (!res.ok) {
         const err = await res.json();

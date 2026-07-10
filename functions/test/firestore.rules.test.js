@@ -2228,9 +2228,9 @@ test('platformConfig: clients cannot create, update, or delete flags', async () 
 // ── Access entitlement: reading-log create is gated on student.access ───────
 // The parent logging path is the single enforcement point. A parent linked to
 // the student may create a log ONLY when that student's materialised `access`
-// is live (status == 'active' AND expiresAt in the future). Lapsed (expired),
-// suspended (unpaid/off-boarded school cascade), and legacy (no access map)
-// students are all fail-closed.
+// is live (student is active, access.status == 'active', and expiresAt is in
+// the future). Revoked, archived, lapsed, suspended, and legacy students are
+// all fail-closed.
 
 const FUTURE = new Date(Date.now() + 365 * 86400000);
 const PAST = new Date(Date.now() - 86400000);
@@ -2253,26 +2253,45 @@ async function seedSchoolWithAccessStates({ quickLoggingEnabled } = {}) {
         'student_active',
         'student_expired',
         'student_suspended',
+        'student_revoked',
+        'student_archived',
         'student_legacy',
       ],
     });
     await db.collection('schools').doc('school_1').collection('students').doc('student_active').set({
       schoolId: 'school_1', classId: 'class_1', firstName: 'Ada', lastName: 'A',
+      isActive: true,
       parentIds: ['parent_1'],
       access: { status: 'active', academicYear: 2026, expiresAt: FUTURE, source: 'book_pack_assumed' },
     });
     await db.collection('schools').doc('school_1').collection('students').doc('student_expired').set({
       schoolId: 'school_1', classId: 'class_1', firstName: 'Bea', lastName: 'B',
+      isActive: true,
       parentIds: ['parent_1'],
       access: { status: 'active', academicYear: 2025, expiresAt: PAST, source: 'book_pack_assumed' },
     });
     await db.collection('schools').doc('school_1').collection('students').doc('student_suspended').set({
       schoolId: 'school_1', classId: 'class_1', firstName: 'Cy', lastName: 'C',
+      isActive: true,
       parentIds: ['parent_1'],
       access: { status: 'suspended', academicYear: 2026, expiresAt: FUTURE, source: 'book_pack_assumed' },
     });
+    await db.collection('schools').doc('school_1').collection('students').doc('student_revoked').set({
+      schoolId: 'school_1', classId: 'class_1', firstName: 'Dee', lastName: 'D',
+      isActive: true,
+      parentIds: ['parent_1'],
+      access: { status: 'revoked', academicYear: 2026, expiresAt: FUTURE, source: 'book_pack_assumed' },
+    });
+    await db.collection('schools').doc('school_1').collection('students').doc('student_archived').set({
+      schoolId: 'school_1', classId: 'class_1', firstName: 'Eli', lastName: 'E',
+      isActive: false,
+      parentIds: ['parent_1'],
+      // Even an otherwise-live access map cannot override archive state.
+      access: { status: 'active', academicYear: 2026, expiresAt: FUTURE, source: 'book_pack_assumed' },
+    });
     await db.collection('schools').doc('school_1').collection('students').doc('student_legacy').set({
-      schoolId: 'school_1', classId: 'class_1', firstName: 'Di', lastName: 'D',
+      schoolId: 'school_1', classId: 'class_1', firstName: 'Fay', lastName: 'F',
+      isActive: true,
       parentIds: ['parent_1'],
       // No access map — predates the access model.
     });
@@ -2307,6 +2326,18 @@ test('access: parent CANNOT create a log for a suspended student', async () => {
   await seedSchoolWithAccessStates();
   const db = authDb('parent_1');
   await assertFails(logFor(db, 'student_suspended'));
+});
+
+test('access: parent CANNOT create a log for a manually revoked student', async () => {
+  await seedSchoolWithAccessStates();
+  const db = authDb('parent_1');
+  await assertFails(logFor(db, 'student_revoked'));
+});
+
+test('access: parent CANNOT create a log for an archived student with otherwise-live access', async () => {
+  await seedSchoolWithAccessStates();
+  const db = authDb('parent_1');
+  await assertFails(logFor(db, 'student_archived'));
 });
 
 test('access: parent CANNOT create a log for a legacy student with no access map', async () => {
@@ -2490,6 +2521,11 @@ async function seedSchoolForTeacherProxy() {
       studentIds: ['student_2'],
       isActive: true,
     });
+    await db.collection('schools').doc('school_1').collection('students').doc('student_1').set({
+      schoolId: 'school_1', classId: 'class_1', firstName: 'Proxy', lastName: 'Student',
+      isActive: true,
+      access: { status: 'active', academicYear: 2026, expiresAt: FUTURE },
+    });
   });
 }
 
@@ -2535,6 +2571,14 @@ test('proxy: a teacher cannot write a parent-shaped log (loggedByRole != teacher
   await seedSchoolForTeacherProxy();
   const db = authDb('teacher_array');
   await assertFails(proxyLog(db, { logId: 'p5', parentId: 'teacher_array', classId: 'class_1', loggedByRole: 'parent' }));
+});
+
+test('proxy: a teacher CANNOT log after the student access is revoked', async () => {
+  await seedSchoolForTeacherProxy();
+  await seedData((db) => db.collection('schools').doc('school_1')
+    .collection('students').doc('student_1').update({ 'access.status': 'revoked' }));
+  const db = authDb('teacher_array');
+  await assertFails(proxyLog(db, { logId: 'p6', parentId: 'teacher_array', classId: 'class_1' }));
 });
 
 // ── Parent↔teacher messaging gate (settings.messaging.enabled) ──────────

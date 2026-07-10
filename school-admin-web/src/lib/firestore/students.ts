@@ -1,5 +1,6 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import { getCurrentAcademicYear, hardExpiryFor } from '@/lib/access';
 import type { Student } from '@/lib/types';
 
 function toStudent(doc: FirebaseFirestore.DocumentSnapshot): Student {
@@ -32,6 +33,19 @@ function toStudent(doc: FirebaseFirestore.DocumentSnapshot): Student {
     // we collapsed the two when the four-state model was simplified.
     enrollmentStatus: data.enrollmentStatus === 'pending' ? 'not_enrolled' : data.enrollmentStatus,
     parentEmail: data.parentEmail ?? data.additionalInfo?.pendingParentEmail,
+    access: data.access
+      ? {
+          status: data.access.status ?? 'expired',
+          academicYear: data.access.academicYear ?? 0,
+          expiresAt: data.access.expiresAt?.toDate?.() ?? new Date(0),
+          source: data.access.source,
+          grantedAt: data.access.grantedAt?.toDate?.(),
+          grantedBy: data.access.grantedBy,
+          revokedAt: data.access.revokedAt?.toDate?.(),
+          revokedBy: data.access.revokedBy,
+          revokeReason: data.access.revokeReason,
+        }
+      : undefined,
     levelHistory: (data.levelHistory ?? []).map((lh: Record<string, unknown>) => ({
       level: lh.level as string,
       changedAt: (lh.changedAt as { toDate: () => Date })?.toDate?.() ?? new Date(),
@@ -391,9 +405,9 @@ export async function deleteStudents(schoolId: string, studentIds: string[]): Pr
  * students shouldn't count toward per-student pricing).
  *
  * Deliberately does NOT touch: `classId` (kept as the restore target and for
- * history), `parentIds`/parent docs (unlinking cascades into parent-account
- * deletion — irreversibly destructive for a reversible state; the parent app
- * simply shows the child in the expired-access state), `access`, or stats.
+ * history), `parentIds`/parent docs, reading history, or stats. It snapshots
+ * the current access verdict and replaces it with `revoked`; restore puts the
+ * exact prior verdict back.
  */
 export async function archiveStudents(
   schoolId: string,
@@ -439,16 +453,28 @@ export async function archiveStudents(
   }
 
   const now = new Date();
+  const currentAcademicYear = await getCurrentAcademicYear();
   const BATCH_SIZE = 400;
   for (let i = 0; i < targets.length; i += BATCH_SIZE) {
     const batch = adminDb.batch();
     for (const snap of targets.slice(i, i + BATCH_SIZE)) {
+      const existingAccess = snap.data()!.access ?? null;
       batch.update(snap.ref, {
         isActive: false,
         status: 'archived',
         archivedAt: now,
         archivedReason: reason,
         archivedBy,
+        accessBeforeArchive: existingAccess,
+        access: {
+          ...(existingAccess ?? {}),
+          status: 'revoked',
+          academicYear: existingAccess?.academicYear ?? currentAcademicYear,
+          expiresAt: existingAccess?.expiresAt ?? hardExpiryFor(currentAcademicYear),
+          revokedAt: FieldValue.serverTimestamp(),
+          revokedBy: archivedBy,
+          revokeReason: `student_archived:${reason}`,
+        },
       });
     }
     await batch.commit();
@@ -477,6 +503,21 @@ export async function archiveStudents(
   });
   await metaBatch.commit();
 
+  await adminDb.collection('adminAuditLog').add({
+    action: 'student.archive',
+    performedBy: archivedBy,
+    targetType: targets.length === 1 ? 'student' : 'studentSelection',
+    targetId: targets.length === 1 ? targets[0].id : schoolId,
+    schoolId,
+    metadata: {
+      studentIds: targets.map((student) => student.id),
+      reason,
+      count: targets.length,
+      accessRevoked: true,
+    },
+    createdAt: FieldValue.serverTimestamp(),
+  });
+
   return targets.length;
 }
 
@@ -497,7 +538,11 @@ export interface RestoreResult {
  * family needs to re-link (they usually never unlinked, so most restores need
  * nothing).
  */
-export async function restoreStudents(schoolId: string, studentIds: string[]): Promise<RestoreResult> {
+export async function restoreStudents(
+  schoolId: string,
+  studentIds: string[],
+  restoredBy: string
+): Promise<RestoreResult> {
   const result: RestoreResult = { count: 0, skipped: [] };
   if (studentIds.length === 0) return result;
 
@@ -542,6 +587,7 @@ export async function restoreStudents(schoolId: string, studentIds: string[]): P
   );
 
   const classMembersAdded = new Map<string, string[]>();
+  const restoredIds: string[] = [];
   const BATCH_SIZE = 400;
   for (let i = 0; i < archived.length; i += BATCH_SIZE) {
     const batch = adminDb.batch();
@@ -565,6 +611,8 @@ export async function restoreStudents(schoolId: string, studentIds: string[]): P
         archivedAt: FieldValue.delete(),
         archivedReason: FieldValue.delete(),
         archivedBy: FieldValue.delete(),
+        access: data.accessBeforeArchive ?? FieldValue.delete(),
+        accessBeforeArchive: FieldValue.delete(),
         ...(classStillActive ? {} : { classId: '' }),
       });
       if (classStillActive) {
@@ -573,6 +621,7 @@ export async function restoreStudents(schoolId: string, studentIds: string[]): P
         classMembersAdded.set(classId, list);
       }
       result.count++;
+      restoredIds.push(snap.id);
     }
     await batch.commit();
   }
@@ -588,6 +637,20 @@ export async function restoreStudents(schoolId: string, studentIds: string[]): P
       studentCount: FieldValue.increment(result.count),
     });
     await metaBatch.commit();
+
+    await adminDb.collection('adminAuditLog').add({
+      action: 'student.restore',
+      performedBy: restoredBy,
+      targetType: result.count === 1 ? 'student' : 'studentSelection',
+      targetId: result.count === 1 ? restoredIds[0] : schoolId,
+      schoolId,
+      metadata: {
+        studentIds: restoredIds,
+        count: result.count,
+        accessRestoredFromSnapshot: true,
+      },
+      createdAt: FieldValue.serverTimestamp(),
+    });
   }
 
   return result;

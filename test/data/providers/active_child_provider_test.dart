@@ -37,6 +37,12 @@ void main() {
       'schoolId': schoolId,
       'classId': 'class_1',
       'parentIds': [parentId],
+      'isActive': true,
+      'access': {
+        'status': 'active',
+        'academicYear': 2026,
+        'expiresAt': Timestamp.fromDate(DateTime(2027, 1, 31)),
+      },
       'createdAt': Timestamp.now(),
     });
   }
@@ -121,5 +127,41 @@ void main() {
     // A stale / unknown id falls back to the first child.
     await container.read(activeChildIdProvider.notifier).select('ghost');
     expect(container.read(activeChildProvider).value?.id, 'child_1');
+  });
+
+  test('student access and archive changes propagate without relinking',
+      () async {
+    await seedStudent('child_1', 'Mia');
+    await setLinkedChildren(['child_1']);
+    final container = makeContainer();
+
+    final initial = await readChildrenWhen(
+      container,
+      (children) =>
+          children.length == 1 && children.single.access?.status == 'active',
+    );
+    expect(initial.single.hasActiveAccess, isTrue);
+
+    final studentRef = firestore
+        .collection('schools')
+        .doc(schoolId)
+        .collection('students')
+        .doc('child_1');
+    await studentRef.update({'access.status': StudentAccess.statusRevoked});
+
+    final revoked = await readChildrenWhen(
+      container,
+      (children) =>
+          children.length == 1 &&
+          children.single.access?.status == StudentAccess.statusRevoked,
+    );
+    // Revocation blocks logging but deliberately keeps the guardian link and
+    // child visible, so the app can explain the access state.
+    expect(revoked.single.hasActiveAccess, isFalse);
+
+    await studentRef.update({'isActive': false});
+    final archived =
+        await readChildrenWhen(container, (children) => children.isEmpty);
+    expect(archived, isEmpty);
   });
 }

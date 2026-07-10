@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
+import { assertNotImpersonating } from '@/lib/auth/assert-not-impersonating';
+import { getCurrentAcademicYear } from '@/lib/access';
 import { commitRollover } from '@/lib/firestore/rollover';
 import { z } from 'zod';
 
@@ -58,10 +60,19 @@ export async function POST(request: NextRequest) {
   if (session.role !== 'schoolAdmin') {
     return NextResponse.json({ error: 'Only school admins can run the rollover import' }, { status: 403 });
   }
+  const impersonationBlock = assertNotImpersonating(session);
+  if (impersonationBlock) return impersonationBlock;
 
   try {
     const body = await request.json();
     const { importId, plan } = commitSchema.parse(body);
+    const currentAcademicYear = await getCurrentAcademicYear();
+    if (plan.targetAcademicYear !== currentAcademicYear + 1) {
+      return NextResponse.json(
+        { error: `The active school-year transition is ${currentAcademicYear} to ${currentAcademicYear + 1}. Refresh the page and try again.` },
+        { status: 409 }
+      );
+    }
     const result = await commitRollover(session.schoolId, plan, importId, session.uid, session.fullName);
     return NextResponse.json(result);
   } catch (error) {

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -61,51 +60,97 @@ final parentChildrenProvider = StreamProvider<List<StudentModel>>((ref) {
   final schoolRef =
       ref.watch(firestoreProvider).collection('schools').doc(schoolId);
 
-  // The parent doc emits on EVERY field change — login stamps lastLoginAt
-  // and refreshes fcmToken, preferences saves, etc. Re-fetching all N child
-  // docs on each of those was pure waste: this provider's job is the child
-  // LIST, and per-child live data (stats, awards) comes from the screens'
-  // own student-doc streams. Cache the last fetch and re-read students only
-  // when the linkedChildren id list itself changes.
-  List<String>? cachedIds;
-  List<StudentModel>? cachedStudents;
+  // Keep every linked student live, not just the parent document. Access and
+  // archive mutations are written to the student doc without changing the
+  // parent's linkedChildren array; a get-and-cache implementation therefore
+  // left the parent UI stale until restart. Individual doc streams also work
+  // with the parent-only Firestore `get` rule (a collection query would not).
+  late final StreamController<List<StudentModel>> controller;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+      parentSubscription;
+  final childSubscriptions =
+      <StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>>[];
+  final studentsById = <String, StudentModel>{};
+  final loadedIds = <String>{};
+  var orderedIds = <String>[];
+  var generation = 0;
 
-  return schoolRef.collection('parents').doc(user.id).snapshots().asyncMap(
-    (parentDoc) async {
-      final ids = parentDoc.exists
-          ? List<String>.from(
-              (parentDoc.data()?['linkedChildren'] as List?) ?? const [])
-          : const <String>[];
-      if (ids.isEmpty) {
-        cachedIds = ids;
-        cachedStudents = const <StudentModel>[];
-        return const <StudentModel>[];
-      }
+  void emitIfReady(int token) {
+    if (controller.isClosed || token != generation) return;
+    if (loadedIds.length < orderedIds.length) return;
+    controller.add([
+      for (final id in orderedIds)
+        if (studentsById[id]?.isActive == true) studentsById[id]!,
+    ]);
+  }
 
-      final cachedList = cachedStudents;
-      if (cachedList != null &&
-          cachedIds != null &&
-          listEquals(cachedIds, ids)) {
-        return cachedList;
-      }
+  Future<void> cancelChildren() async {
+    final subscriptions = List.of(childSubscriptions);
+    childSubscriptions.clear();
+    await Future.wait(
+        subscriptions.map((subscription) => subscription.cancel()));
+  }
 
-      final docs = await Future.wait(
-        ids.map((id) => schoolRef.collection('students').doc(id).get()),
+  Future<void> watchChildren(List<String> ids) async {
+    final token = ++generation;
+    await cancelChildren();
+    if (controller.isClosed || token != generation) return;
+
+    orderedIds = List.unmodifiable(ids);
+    studentsById.clear();
+    loadedIds.clear();
+    if (ids.isEmpty) {
+      controller.add(const <StudentModel>[]);
+      return;
+    }
+
+    for (final id in ids) {
+      final subscription =
+          schoolRef.collection('students').doc(id).snapshots().listen(
+        (doc) {
+          if (token != generation) return;
+          loadedIds.add(id);
+          if (doc.exists) {
+            studentsById[id] = StudentModel.fromFirestore(doc);
+          } else {
+            studentsById.remove(id);
+          }
+          emitIfReady(token);
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          if (!controller.isClosed && token == generation) {
+            controller.addError(error, stackTrace);
+          }
+        },
       );
-      final byId = <String, StudentModel>{
-        for (final doc in docs)
-          if (doc.exists) doc.id: StudentModel.fromFirestore(doc),
-      };
-      // Preserve linkedChildren order; drop ids whose student doc is missing.
-      final students = [
-        for (final id in ids)
-          if (byId.containsKey(id)) byId[id]!,
-      ];
-      cachedIds = ids;
-      cachedStudents = students;
-      return students;
+      childSubscriptions.add(subscription);
+    }
+  }
+
+  controller = StreamController<List<StudentModel>>(
+    onListen: () {
+      parentSubscription =
+          schoolRef.collection('parents').doc(user.id).snapshots().listen(
+        (parentDoc) {
+          final ids = parentDoc.exists
+              ? List<String>.from(
+                  (parentDoc.data()?['linkedChildren'] as List?) ?? const [])
+              : const <String>[];
+          unawaited(watchChildren(ids));
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          if (!controller.isClosed) controller.addError(error, stackTrace);
+        },
+      );
+    },
+    onCancel: () async {
+      generation++;
+      await parentSubscription?.cancel();
+      await cancelChildren();
     },
   );
+
+  return controller.stream;
 });
 
 /// Holds the id of the parent's currently-active child.

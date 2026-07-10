@@ -92,6 +92,9 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess, is
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [archivingStudent, setArchivingStudent] = useState<StudentRow | null>(null);
   const [showBulkArchiveConfirm, setShowBulkArchiveConfirm] = useState(false);
+  const [revokingStudent, setRevokingStudent] = useState<StudentRow | null>(null);
+  const [showBulkRevokeConfirm, setShowBulkRevokeConfirm] = useState(false);
+  const [revokeReason, setRevokeReason] = useState('');
 
   const classMap = new Map(classes.map((c) => [c.id, c.name]));
 
@@ -169,16 +172,62 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess, is
   };
 
   const handleBulkEnrollment = async (status: EnrollmentStatus) => {
+    if (selectedIds.size > 400) {
+      toast('Select at most 400 students per audited access batch.', 'warning');
+      return;
+    }
     try {
-      await bulkUpdateEnrollment.mutateAsync({
+      const result = await bulkUpdateEnrollment.mutateAsync({
         studentIds: Array.from(selectedIds),
         enrollmentStatus: status,
       });
-      const count = selectedIds.size;
       setSelectedIds(new Set());
-      toast(`Updated ${count} students`, 'success');
+      toast(
+        `Updated ${result.updated} student${result.updated === 1 ? '' : 's'}${result.skipped ? `; ${result.skipped} skipped because the roster changed` : ''}`,
+        result.skipped ? 'warning' : 'success'
+      );
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Failed to update', 'error');
+    }
+  };
+
+  const handleRevokeAccess = async () => {
+    if (!revokingStudent) return;
+    try {
+      await updateEnrollment.mutateAsync({
+        studentId: revokingStudent.id,
+        enrollmentStatus: 'not_enrolled',
+        reason: revokeReason.trim() || undefined,
+      });
+      toast(`Reading access revoked for ${revokingStudent.firstName}`, 'success');
+      setRevokingStudent(null);
+      setRevokeReason('');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to revoke reading access', 'error');
+    }
+  };
+
+  const handleBulkRevokeAccess = async () => {
+    if (selectedIds.size > 400) {
+      toast('Select at most 400 students per audited access batch.', 'warning');
+      return;
+    }
+    try {
+      const ids = Array.from(selectedIds);
+      const result = await bulkUpdateEnrollment.mutateAsync({
+        studentIds: ids,
+        enrollmentStatus: 'not_enrolled',
+        reason: revokeReason.trim() || undefined,
+      });
+      setSelectedIds(new Set());
+      setShowBulkRevokeConfirm(false);
+      setRevokeReason('');
+      toast(
+        `Revoked reading access for ${result.updated} student${result.updated === 1 ? '' : 's'}${result.skipped ? `; ${result.skipped} skipped because the roster changed` : ''}`,
+        result.skipped ? 'warning' : 'success'
+      );
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to revoke reading access', 'error');
     }
   };
 
@@ -307,13 +356,13 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess, is
     },
     {
       id: 'enrollment',
-      header: 'Status',
+      header: 'Subscription',
       accessorFn: (row) => row.enrollmentStatus ?? 'not_enrolled',
       cell: (_val, row) => {
         // Read-only at a glance. Subscription changes are an exception-only
         // action (mid-year revoke, refund, correction) — they live in the row's
         // ⋮ menu and the bulk bar, not as an always-on inline editor. Onboarding
-        // handles the start-of-year flow; Rollover handles the annual reset.
+        // handles the start-of-year flow; School Year Transition handles the annual reset.
         const subscribed =
           row.enrollmentStatus === 'book_pack' || row.enrollmentStatus === 'direct_purchase';
         return (
@@ -324,6 +373,23 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess, is
             {row.enrollmentStatus === 'direct_purchase' && <Badge variant="info">Direct</Badge>}
           </span>
         );
+      },
+      sortable: true,
+    },
+    {
+      id: 'access',
+      header: 'Reading Access',
+      accessorFn: (row) => row.access?.status ?? 'none',
+      cell: (_val, row) => {
+        const access = row.access;
+        const expired = !!access?.expiresAt && new Date(access.expiresAt).getTime() <= Date.now();
+        if (access?.status === 'active' && !expired) {
+          return <Badge variant="success">Active{access.academicYear ? ` · ${access.academicYear}` : ''}</Badge>;
+        }
+        if (access?.status === 'revoked') return <Badge variant="error">Revoked</Badge>;
+        if (access?.status === 'suspended') return <Badge variant="error">School suspended</Badge>;
+        if (access?.status === 'expired' || expired) return <Badge variant="warning">Expired</Badge>;
+        return <Badge variant="default">No access</Badge>;
       },
       sortable: true,
     },
@@ -410,7 +476,7 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess, is
                 : [
                     { label: 'Mark Subscribed', onClick: () => handleSingleEnrollment(row, 'book_pack') },
                     { label: 'Mark Subscribed (Direct)', onClick: () => handleSingleEnrollment(row, 'direct_purchase') },
-                    { label: 'Mark Not Subscribed', onClick: () => handleSingleEnrollment(row, 'not_enrolled') },
+                    { label: 'Revoke reading access', onClick: () => setRevokingStudent(row), variant: 'danger' },
                     { label: 'Edit', onClick: () => setEditingStudent(row) },
                     { label: 'Archive', onClick: () => setArchivingStudent(row) },
                     { label: 'Delete', onClick: () => setDeletingStudent(row), variant: 'danger' },
@@ -444,7 +510,7 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess, is
             <ResetCodeDevButton visible={devAccess} />
             {isAdmin && (
               <Button variant="outline" onClick={() => router.push('/students/rollover')}>
-                Annual Rollover
+                School Year Transition
               </Button>
             )}
             <Button onClick={() => setShowAdd(true)}>Add Students</Button>
@@ -474,7 +540,7 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess, is
           <div className="sm:w-44 shrink-0">
             <Select
               options={[
-                { value: 'all', label: 'All statuses' },
+                { value: 'all', label: 'All subscriptions' },
                 { value: 'subscribed', label: 'Subscribed' },
                 { value: 'not-subscribed', label: 'Not Subscribed' },
               ]}
@@ -521,8 +587,8 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess, is
                 <Button variant="outline" size="sm" onClick={() => handleBulkEnrollment('direct_purchase')}>
                   Mark Subscribed (Direct)
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => handleBulkEnrollment('not_enrolled')}>
-                  Mark Not Subscribed
+                <Button variant="outline" size="sm" onClick={() => setShowBulkRevokeConfirm(true)}>
+                  Revoke reading access
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setShowBulkArchiveConfirm(true)}>
                   Archive
@@ -629,7 +695,7 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess, is
         onClose={() => setArchivingStudent(null)}
         onConfirm={handleArchive}
         title="Archive Student"
-        description={archivingStudent ? `Archive ${archivingStudent.firstName} ${archivingStudent.lastName}? They'll be hidden from classes, reports and the app, but their reading history is kept and they can be restored at any time.` : ''}
+        description={archivingStudent ? `Archive ${archivingStudent.firstName} ${archivingStudent.lastName}? They'll be hidden from classes, reports and the parent app, and new reading logs will be blocked. Reading history and guardian links are preserved, and restoring the student restores their previous access state.` : ''}
         confirmLabel="Archive"
         loading={archiveStudents.isPending}
       />
@@ -639,10 +705,64 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess, is
         onClose={() => setShowBulkArchiveConfirm(false)}
         onConfirm={handleBulkArchive}
         title={`Archive ${selectedIds.size} students`}
-        description={`Archive ${selectedIds.size} selected students? They'll be hidden from classes, reports and the app, but their reading history is kept and they can be restored at any time.`}
+        description={`Archive ${selectedIds.size} selected students? They'll be hidden from classes, reports and the parent app, and new reading logs will be blocked. Reading history and guardian links are preserved, and each student can be restored later.`}
         confirmLabel="Archive"
         loading={archiveStudents.isPending}
       />
+
+      <ConfirmDialog
+        open={!!revokingStudent}
+        onClose={() => {
+          setRevokingStudent(null);
+          setRevokeReason('');
+        }}
+        onConfirm={handleRevokeAccess}
+        title="Revoke reading access"
+        description={revokingStudent ? `Revoke access for ${revokingStudent.firstName} ${revokingStudent.lastName}? They will remain on the active school roster, but parents will be unable to create new reading logs. Existing reading history and guardian connections are preserved.` : ''}
+        confirmLabel="Revoke access"
+        variant="danger"
+        loading={updateEnrollment.isPending}
+      >
+        <label className="block text-sm font-semibold text-ink" htmlFor="revoke-reason">
+          Reason <span className="font-normal text-muted">(optional)</span>
+        </label>
+        <textarea
+          id="revoke-reason"
+          value={revokeReason}
+          onChange={(event) => setRevokeReason(event.target.value.slice(0, 250))}
+          maxLength={250}
+          rows={3}
+          placeholder="For example: left the program or account correction"
+          className="mt-2 w-full rounded-[var(--radius-md)] border border-border bg-white px-3 py-2 text-sm text-ink outline-none focus:border-section"
+        />
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={showBulkRevokeConfirm}
+        onClose={() => {
+          setShowBulkRevokeConfirm(false);
+          setRevokeReason('');
+        }}
+        onConfirm={handleBulkRevokeAccess}
+        title={`Revoke access for ${selectedIds.size} students`}
+        description="The selected students will remain on the active roster, but parents will be unable to create new reading logs. Existing reading history and guardian connections are preserved."
+        confirmLabel="Revoke access"
+        variant="danger"
+        loading={bulkUpdateEnrollment.isPending}
+      >
+        <label className="block text-sm font-semibold text-ink" htmlFor="bulk-revoke-reason">
+          Reason <span className="font-normal text-muted">(optional)</span>
+        </label>
+        <textarea
+          id="bulk-revoke-reason"
+          value={revokeReason}
+          onChange={(event) => setRevokeReason(event.target.value.slice(0, 250))}
+          maxLength={250}
+          rows={3}
+          placeholder="For example: students left the program"
+          className="mt-2 w-full rounded-[var(--radius-md)] border border-border bg-white px-3 py-2 text-sm text-ink outline-none focus:border-section"
+        />
+      </ConfirmDialog>
 
     </div>
   );

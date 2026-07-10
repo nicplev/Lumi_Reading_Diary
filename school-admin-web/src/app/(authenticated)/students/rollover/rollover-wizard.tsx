@@ -1,18 +1,18 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
 import { PageHeader } from '@/components/lumi/page-header';
 import { Button } from '@/components/lumi/button';
 import { Badge } from '@/components/lumi/badge';
 import { Icon } from '@/components/lumi/icon';
-import { Select } from '@/components/lumi/select';
 import { ConfirmDialog } from '@/components/lumi/confirm-dialog';
 import { useToast } from '@/components/lumi/toast';
 import { parseCSV, matchHeader } from '@/lib/csv';
 import type { RolloverCSVRow } from '@/lib/rollover/classify';
 import type { RolloverAction, RolloverPlan, RolloverCommitResult } from '@/lib/rollover/plan';
 import type { RolloverPreview, RolloverImportSummary } from '@/lib/firestore/rollover';
+import type { RenewalBatchSummary, RenewalRosterEntry } from '@/lib/firestore/renewals';
+import { RenewalsPage } from '../../renewals/renewals-page';
 import { ReviewStep, type MissingDisposition, type RowResolution } from './review-step';
 
 interface ClassOption {
@@ -24,10 +24,22 @@ interface ClassOption {
 interface RolloverWizardProps {
   classes: ClassOption[];
   currentAcademicYear: number;
+  targetAcademicYear: number;
   recentImports: RolloverImportSummary[];
+  initialRenewalRoster: RenewalRosterEntry[];
+  renewalSubActive: boolean;
+  renewalWindowOpen: boolean;
+  recentRenewalBatches: RenewalBatchSummary[];
 }
 
-type WizardStep = 'upload' | 'review' | 'confirm' | 'applying' | 'done';
+type WizardStep = 'upload' | 'review' | 'confirm' | 'applying' | 'done' | 'access' | 'complete';
+
+interface AccessStepData {
+  roster: RenewalRosterEntry[];
+  subActive: boolean;
+  windowOpen: boolean;
+  recentBatches: RenewalBatchSummary[];
+}
 
 const TEMPLATE_CSV = [
   'Student ID,First Name,Last Name,Class Name,Year Level,Parent Email',
@@ -36,14 +48,21 @@ const TEMPLATE_CSV = [
   ',Zoe,Nguyen,Prep B,Prep,zoe.parent@email.com',
 ].join('\n');
 
-export function RolloverWizard({ classes, currentAcademicYear, recentImports }: RolloverWizardProps) {
+export function RolloverWizard({
+  classes,
+  currentAcademicYear,
+  targetAcademicYear,
+  recentImports,
+  initialRenewalRoster,
+  renewalSubActive,
+  renewalWindowOpen,
+  recentRenewalBatches,
+}: RolloverWizardProps) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<WizardStep>('upload');
-  // Oct–Dec: schools prepare next year's classes → default to next year.
-  const defaultTarget = new Date().getMonth() >= 9 ? currentAcademicYear + 1 : currentAcademicYear;
-  const [targetYear, setTargetYear] = useState(defaultTarget);
+  const targetYear = targetAcademicYear;
   const [preview, setPreview] = useState<RolloverPreview | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
 
@@ -57,6 +76,44 @@ export function RolloverWizard({ classes, currentAcademicYear, recentImports }: 
   const [showUndoConfirm, setShowUndoConfirm] = useState(false);
   const [undoTarget, setUndoTarget] = useState<string | null>(null);
   const [undoing, setUndoing] = useState(false);
+  const [loadingAccess, setLoadingAccess] = useState(false);
+  const [accessResult, setAccessResult] = useState<{
+    renewed: number;
+    graduates: number;
+    skipped: number;
+    hasMore: boolean;
+  } | null>(null);
+  const [accessData, setAccessData] = useState<AccessStepData>({
+    roster: initialRenewalRoster,
+    subActive: renewalSubActive,
+    windowOpen: renewalWindowOpen,
+    recentBatches: recentRenewalBatches,
+  });
+
+  const openAccessStep = async () => {
+    setLoadingAccess(true);
+    try {
+      // Always refresh after a roster import: newly created students must be
+      // included, while students just archived must not receive access.
+      const response = await fetch('/api/renewals');
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? 'Could not load the access roster');
+      if (body.targetYear !== targetAcademicYear) {
+        throw new Error('The active school year changed. Refresh this page before continuing.');
+      }
+      setAccessData({
+        roster: body.roster,
+        subActive: body.subActive,
+        windowOpen: body.windowOpen,
+        recentBatches: body.recentBatches,
+      });
+      setStep('access');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Could not load the access roster', 'error');
+    } finally {
+      setLoadingAccess(false);
+    }
+  };
 
   // ── Upload ─────────────────────────────────────────────────────────────────
 
@@ -279,21 +336,31 @@ export function RolloverWizard({ classes, currentAcademicYear, recentImports }: 
     <div>
       <PageHeader
         eyebrow="Students"
-        title="Annual Rollover Import"
-        description="Upload your school system's class lists to move every student to their new class for the year"
+        title="School Year Transition"
+        description={`Move the roster from ${currentAcademicYear} to ${targetAcademicYear}, then grant reading access in one guided workflow`}
         action={
-          step !== 'upload' && step !== 'applying' ? (
-            <Button variant="outline" onClick={() => { setStep('upload'); setPreview(null); }}>
+          step !== 'upload' && step !== 'applying' && step !== 'access' ? (
+            <Button variant="outline" onClick={() => { setStep('upload'); setPreview(null); setResult(null); setAccessResult(null); }}>
               Start over
             </Button>
           ) : undefined
         }
       />
 
+      <div className="flex items-center gap-3 mb-6 text-sm" aria-label="Transition progress">
+        <Badge variant={step === 'upload' || step === 'review' || step === 'confirm' || step === 'applying' || step === 'done' ? 'success' : 'default'}>
+          1 · Update roster
+        </Badge>
+        <Icon name="arrow_forward" size={16} className="text-muted" />
+        <Badge variant={step === 'access' ? 'success' : 'default'}>2 · Grant access</Badge>
+        <Icon name="arrow_forward" size={16} className="text-muted" />
+        <Badge variant={step === 'complete' ? 'success' : 'default'}>Complete</Badge>
+      </div>
+
       {step === 'upload' && (
         <div className="max-w-2xl">
           <div className="bg-paper rounded-[var(--radius-lg)] shadow-card p-6 mb-6">
-            <h3 className="font-bold text-ink mb-2">How it works</h3>
+            <h3 className="font-bold text-ink mb-2">Step 1: update the {targetAcademicYear} roster</h3>
             <ol className="text-sm text-muted space-y-1.5 list-decimal ml-4 mb-4">
               <li>Export class lists from your school system (CASES21, Compass…) with student IDs.</li>
               <li>Paste them into the Lumi template — one row per student, returning and new.</li>
@@ -301,23 +368,8 @@ export function RolloverWizard({ classes, currentAcademicYear, recentImports }: 
               <li>Students not in the file are flagged as graduated or left, for you to confirm.</li>
             </ol>
             <div className="bg-lumi-blue/10 border border-lumi-blue/20 rounded-[var(--radius-md)] px-4 py-3 mb-4 text-sm text-ink">
-              <p className="mb-1"><strong>This does not grant next year&apos;s access</strong> — after importing, confirm the year on the{' '}
-                <Link href="/settings?tab=renewals" className="text-section font-semibold hover:underline">Rollover page</Link>.</p>
-              <p>Run it outside class time if you can — classes re-organise live.</p>
-            </div>
-
-            <div className="flex items-center gap-3 mb-4">
-              <span className="text-sm font-semibold text-ink">School year:</span>
-              <div className="w-32">
-                <Select
-                  options={[
-                    { value: String(currentAcademicYear), label: String(currentAcademicYear) },
-                    { value: String(currentAcademicYear + 1), label: String(currentAcademicYear + 1) },
-                  ]}
-                  value={String(targetYear)}
-                  onChange={(v) => setTargetYear(Number(v))}
-                />
-              </div>
+              <p className="mb-1"><strong>Transition: {currentAcademicYear} → {targetAcademicYear}.</strong> This roster step is reviewed and reversible.</p>
+              <p>After it completes, this same workflow refreshes the active roster and asks you to grant {targetAcademicYear} reading access. Run the roster import outside class time if possible because classes reorganise live.</p>
             </div>
 
             <input ref={fileInputRef} type="file" accept=".csv,.tsv,.txt" onChange={handleFileSelect} className="hidden" />
@@ -328,6 +380,12 @@ export function RolloverWizard({ classes, currentAcademicYear, recentImports }: 
               <button type="button" onClick={downloadTemplate} className="text-sm text-section hover:underline font-semibold">
                 Download CSV Template
               </button>
+            </div>
+            <div className="mt-5 pt-5 border-t border-rule">
+              <p className="text-sm text-muted mb-2">Already updated classes and leavers manually?</p>
+              <Button variant="outline" onClick={openAccessStep} loading={loadingAccess}>
+                Skip roster import and review access
+              </Button>
             </div>
           </div>
 
@@ -410,8 +468,8 @@ export function RolloverWizard({ classes, currentAcademicYear, recentImports }: 
             </ul>
 
             <div className="bg-cream rounded-[var(--radius-md)] p-4 text-sm text-muted space-y-1.5 mb-4">
-              <p>• Year levels come from your CSV — the Rollover (renewals) page won&apos;t bump them again for {preview.targetAcademicYear}.</p>
-              <p>• This does <strong>not</strong> grant {preview.targetAcademicYear} access — confirm that on the Rollover page next.</p>
+              <p>• Year levels come from your CSV — the access step recognises them and won&apos;t bump them a second time for {preview.targetAcademicYear}.</p>
+              <p>• This step does <strong>not</strong> grant {preview.targetAcademicYear} access — step 2 refreshes the resulting roster and asks you to confirm access.</p>
               <p>• Archived students keep their reading history and can be restored; parent accounts stay linked.</p>
               <p>• You can undo this import afterwards.</p>
             </div>
@@ -435,7 +493,7 @@ export function RolloverWizard({ classes, currentAcademicYear, recentImports }: 
           <div className="flex justify-end gap-3">
             <Button variant="outline" onClick={() => setStep('review')}>Back</Button>
             <Button onClick={handleApply} disabled={derived.bigArchive && !archiveGuardChecked}>
-              Apply Rollover
+              Apply roster changes
             </Button>
           </div>
         </div>
@@ -457,7 +515,7 @@ export function RolloverWizard({ classes, currentAcademicYear, recentImports }: 
             <span className="inline-flex items-center justify-center text-success animate-success-pop mb-3">
               <Icon name="task_alt" size={56} />
             </span>
-            <h3 className="text-lg font-bold text-ink mb-3">Rollover complete</h3>
+            <h3 className="text-lg font-bold text-ink mb-3">Roster updated</h3>
             <div className="flex flex-wrap justify-center gap-2 mb-4">
               <Badge variant="success">{result.counts.moved} moved</Badge>
               <Badge variant="success">{result.counts.created} created</Badge>
@@ -478,9 +536,62 @@ export function RolloverWizard({ classes, currentAcademicYear, recentImports }: 
 
             <div className="flex justify-center gap-3">
               <Button variant="outline" onClick={() => setShowUndoConfirm(true)}>Undo this import</Button>
-              <Link href="/settings?tab=renewals">
-                <Button>Next: grant {result ? preview?.targetAcademicYear ?? '' : ''} access →</Button>
-              </Link>
+              <Button onClick={openAccessStep} loading={loadingAccess}>
+                Next: review {preview?.targetAcademicYear ?? targetAcademicYear} access →
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {step === 'access' && (
+        <RenewalsPage
+          currentYear={currentAcademicYear}
+          targetYear={targetAcademicYear}
+          subActive={accessData.subActive}
+          windowOpen={accessData.windowOpen}
+          initialRoster={accessData.roster}
+          recentBatches={accessData.recentBatches}
+          embedded
+          transitionMode
+          onBack={() => setStep(result ? 'done' : 'upload')}
+          onRenewed={(renewed) => {
+            setAccessResult(renewed);
+            setStep('complete');
+          }}
+          onFinish={() => setStep('complete')}
+        />
+      )}
+
+      {step === 'complete' && (
+        <div className="max-w-2xl">
+          <div className="bg-paper rounded-[var(--radius-lg)] shadow-card p-6 text-center">
+            <span className="inline-flex items-center justify-center text-success animate-success-pop mb-3">
+              <Icon name="task_alt" size={56} />
+            </span>
+            <h3 className="text-lg font-bold text-ink mb-2">
+              {accessResult?.hasMore ? 'Access batch complete' : `${targetAcademicYear} transition complete`}
+            </h3>
+            <p className="text-sm text-muted mb-4">
+              {result ? 'The roster was updated and ' : ''}
+              {accessResult
+                ? `${accessResult.renewed} student${accessResult.renewed === 1 ? '' : 's'} received ${targetAcademicYear} reading access.${accessResult.hasMore ? ' More eligible students remain for the next audited batch.' : ''}`
+                : `The ${targetAcademicYear} access roster was reviewed; no additional grants were required.`}
+            </p>
+            {accessResult && accessResult.skipped > 0 && (
+              <p className="text-sm text-warning mb-4">
+                {accessResult.skipped} student{accessResult.skipped === 1 ? ' was' : 's were'} skipped because the roster changed or the student was archived.
+              </p>
+            )}
+            <div className="flex flex-wrap justify-center gap-3">
+              <Button variant="outline" onClick={openAccessStep} loading={loadingAccess}>
+                Review remaining access
+              </Button>
+              {!accessResult?.hasMore && (
+                <Button onClick={() => { setStep('upload'); setPreview(null); setResult(null); setAccessResult(null); }}>
+                  Done
+                </Button>
+              )}
             </div>
           </div>
         </div>

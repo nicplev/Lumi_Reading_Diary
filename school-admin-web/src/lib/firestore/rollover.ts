@@ -1,6 +1,6 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { getCurrentAcademicYear, isRenewalWindowOpen } from '@/lib/access';
+import { getCurrentAcademicYear, hardExpiryFor, isRenewalWindowOpen } from '@/lib/access';
 import {
   classifyRollover,
   classKey,
@@ -72,7 +72,10 @@ export async function previewRollover(
     };
   });
 
-  const year = targetAcademicYear ?? currentYear;
+  // The import is the first half of a transition, never a current-year roster
+  // edit. Defaulting to the next configured year prevents the historical
+  // July-vs-October mismatch between this helper and the access-grant screen.
+  const year = targetAcademicYear ?? currentYear + 1;
   return {
     ...classifyRollover(rows, students, classes),
     targetAcademicYear: year,
@@ -111,6 +114,8 @@ interface RolloverEntry {
   prevArchivedAtMs: number | null;
   prevArchivedReason: string | null;
   prevArchivedBy: string | null;
+  prevAccess: Record<string, unknown> | null;
+  prevAccessBeforeArchive: Record<string, unknown> | null;
   archiveReason?: 'graduated' | 'left';
 }
 
@@ -396,6 +401,9 @@ export async function commitRollover(
       prevArchivedAtMs: d.archivedAt?.toMillis?.() ?? null,
       prevArchivedReason: (d.archivedReason as string | undefined) ?? null,
       prevArchivedBy: (d.archivedBy as string | undefined) ?? null,
+      prevAccess: (d.access as Record<string, unknown> | undefined) ?? null,
+      prevAccessBeforeArchive:
+        (d.accessBeforeArchive as Record<string, unknown> | undefined) ?? null,
     };
 
     if (r.kind === 'archive') {
@@ -516,6 +524,7 @@ export async function commitRollover(
 
       const entry = entries.find((e) => e.index === r.index)!;
       if (r.kind === 'archive') {
+        const existingAccess = r.snap.data()!.access ?? null;
         writes.push({
           ref: studentsRef.doc(r.snap.id),
           type: 'update',
@@ -525,6 +534,17 @@ export async function commitRollover(
             archivedAt: now,
             archivedReason: r.a.reason === 'graduated' ? 'graduated' : 'left',
             archivedBy: performedBy,
+            accessBeforeArchive: existingAccess,
+            access: {
+              ...(existingAccess ?? {}),
+              status: 'revoked',
+              academicYear: existingAccess?.academicYear ?? plan.targetAcademicYear,
+              expiresAt:
+                existingAccess?.expiresAt ?? hardExpiryFor(plan.targetAcademicYear),
+              revokedAt: FieldValue.serverTimestamp(),
+              revokedBy: performedBy,
+              revokeReason: `student_archived:${r.a.reason}`,
+            },
             ...(r.a.reason === 'graduated' ? { 'additionalInfo.graduated': true } : {}),
           },
         });
@@ -555,6 +575,8 @@ export async function commitRollover(
         data.archivedAt = FieldValue.delete();
         data.archivedReason = FieldValue.delete();
         data.archivedBy = FieldValue.delete();
+        data.access = r.snap.data()!.accessBeforeArchive ?? r.snap.data()!.access;
+        data.accessBeforeArchive = FieldValue.delete();
       }
       writes.push({ ref: studentsRef.doc(r.snap.id), type: 'update', data });
     }
@@ -803,6 +825,9 @@ export async function undoRolloverImport(
           archivedAt: FieldValue.delete(),
           archivedReason: FieldValue.delete(),
           archivedBy: FieldValue.delete(),
+          access: e.prevAccess ?? FieldValue.delete(),
+          accessBeforeArchive:
+            e.prevAccessBeforeArchive ?? FieldValue.delete(),
           'additionalInfo.graduated': e.prevGraduated ? true : FieldValue.delete(),
         });
         unarchived++;
@@ -833,6 +858,9 @@ export async function undoRolloverImport(
         data.archivedAt = e.prevArchivedAtMs ? new Date(e.prevArchivedAtMs) : new Date();
         data.archivedReason = e.prevArchivedReason ?? 'manual';
         data.archivedBy = e.prevArchivedBy ?? undoneBy;
+        data.access = e.prevAccess ?? FieldValue.delete();
+        data.accessBeforeArchive =
+          e.prevAccessBeforeArchive ?? FieldValue.delete();
         rearchived++;
       }
       batch.update(ref, data);
