@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Adaptive launcher icon (API 26+): solid Lumi-red background sampled from
-     the artwork (#EB4544) + the face foreground inset to the safe zone, so
-     circle/squircle/rounded-square masks all render cleanly. Legacy
-     ic_launcher.png in each mipmap dir covers older launchers. -->
+<!-- Adaptive launcher icon (API 26+) built from separately designed layers:
+     full-bleed background image + tight-cropped mascot foreground centered
+     in the safe zone. Legacy ic_launcher.png covers pre-8.0 launchers. -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/ic_launcher_background"/>
+    <background android:drawable="@mipmap/ic_launcher_background"/>
     <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
 </adaptive-icon>

@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Sampled from Android_Icon.png's corner so the adaptive foreground
-         (same blue field, inset) blends seamlessly. -->
-    <color name="ic_launcher_background">#56C6E3</color>
-</resources>
