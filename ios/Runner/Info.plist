@@ -14,6 +14,10 @@
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<!-- Standard HTTPS/TLS only — exempt from export-compliance docs. Setting
+	     this skips App Store Connect's encryption question on every upload. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CFBundleName</key>
 	<string>lumi_reading_tracker</string>
 	<key>CFBundlePackageType</key>
