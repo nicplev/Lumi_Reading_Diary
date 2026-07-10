@@ -43,10 +43,23 @@ class WidgetGallerySheet extends StatelessWidget {
           if (availableWidgets.isEmpty)
             _buildEmptyState()
           else
-            ...availableWidgets.map((def) => _GalleryItem(
-                  definition: def,
-                  onAdd: () => onAddWidget(def.id),
-                )),
+            // Flexible + scroll: with every widget available the list can be
+            // taller than the modal sheet (it overflowed by 22px on iPad), so
+            // the handle/title stay pinned and the items scroll to fit
+            // whatever height the sheet is given.
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: availableWidgets
+                      .map((def) => _GalleryItem(
+                            definition: def,
+                            onAdd: () => onAddWidget(def.id),
+                          ))
+                      .toList(),
+                ),
+              ),
+            ),
         ],
       ),
     );
