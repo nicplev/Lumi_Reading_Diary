@@ -6,6 +6,7 @@ Connect. Raw simulator captures live in `raw/`. The compositor is `frame/`
 
 ## Sizes
 - iPhone 6.9″: `framed/iphone69/*.png` — 1320×2868 portrait (7 panels)
+- iPhone 6.5″: `framed/iphone65/*.png` — 1284×2778 portrait (derived from the 6.9″ set: resample to 1284 wide + 12px centre crop)
 - iPad 13″: `framed/ipad13/*.png` — 2752×2064 landscape (6 panels)
 
 ## iPhone panels (parent story, upload in this order)
