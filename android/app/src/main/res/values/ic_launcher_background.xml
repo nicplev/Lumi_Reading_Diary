@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Sampled from the blue_lumi artwork's corner so the adaptive
-         foreground (same blue field, inset) blends seamlessly. -->
-    <color name="ic_launcher_background">#2289CA</color>
+    <!-- Sampled from Android_Icon.png's corner so the adaptive foreground
+         (same blue field, inset) blends seamlessly. -->
+    <color name="ic_launcher_background">#56C6E3</color>
 </resources>
