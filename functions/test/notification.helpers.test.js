@@ -120,3 +120,34 @@ test('isWithinQuietHours parses overnight quiet-hour windows correctly', () => {
     true,
   );
 });
+
+// ── parseReminderHour ────────────────────────────────────────────────
+// The denormalized reminderHour on parent docs must equal this function
+// applied to preferences.reminderTime — these tests pin the contract,
+// including the historical midnight quirk.
+
+test('parseReminderHour: unset/empty/non-string default to 19', () => {
+  const { parseReminderHour } = require('../lib/notification_helpers.js');
+  assert.equal(parseReminderHour(undefined), 19);
+  assert.equal(parseReminderHour(null), 19);
+  assert.equal(parseReminderHour(''), 19);
+  assert.equal(parseReminderHour(1830), 19);
+});
+
+test('parseReminderHour: parses the hour from HH:MM', () => {
+  const { parseReminderHour } = require('../lib/notification_helpers.js');
+  assert.equal(parseReminderHour('19:00'), 19);
+  assert.equal(parseReminderHour('07:30'), 7);
+  assert.equal(parseReminderHour('9:15'), 9);
+  assert.equal(parseReminderHour('23:45'), 23);
+});
+
+test('parseReminderHour: midnight quirk — "00:xx" falls back to 19 (bug-for-bug with the old inline parse)', () => {
+  const { parseReminderHour } = require('../lib/notification_helpers.js');
+  assert.equal(parseReminderHour('00:30'), 19);
+});
+
+test('parseReminderHour: garbage strings fall back to 19', () => {
+  const { parseReminderHour } = require('../lib/notification_helpers.js');
+  assert.equal(parseReminderHour('bedtime'), 19);
+});

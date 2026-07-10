@@ -17,6 +17,7 @@ import {
   mergeRecipientsByParent,
   NotificationAudienceType,
   normalizeNotificationPermissions,
+  parseReminderHour,
   validateNotificationAudience,
 } from "./notification_helpers";
 import {buildOnboardingEmail, buildOnboardingQrAttachments, buildStaffOnboardingEmail} from "./email_templates";
@@ -1152,10 +1153,16 @@ async function processSchool(
     return {sent: 0, failed: 0, stale: 0};
   }
 
-  // ---- Step 1: Fetch parents who have a token ----
+  // ---- Step 1: Fetch parents due THIS hour ----
+  // Equality on the denormalized `reminderHour` (maintained by the
+  // syncParentReminderHour mirror trigger, seeded for existing docs by
+  // scripts/backfill_reminder_hour.js) reads ~1/24th of parents per hourly
+  // tick instead of every tokened parent every hour. Parents missing the
+  // field are invisible to this query — run the backfill right after
+  // deploying this change.
   const parentsSnap = await db
     .collection(`schools/${schoolId}/parents`)
-    .where("fcmToken", "!=", null)
+    .where("reminderHour", "==", localHour)
     .get();
 
   if (parentsSnap.empty) return {sent: 0, failed: 0, stale: 0};
@@ -1176,13 +1183,11 @@ async function processSchool(
     if (!p.fcmToken) continue;
     if (p.preferences?.notificationsEnabled === false) continue;
 
-    // Hour check (default 19 / 7 PM — matches the app's default time)
-    let prefHour = 19;
-    if (p.preferences?.reminderTime) {
-      const parts = (p.preferences.reminderTime as string).split(":");
-      prefHour = parseInt(parts[0], 10) || 19;
-    }
-    if (prefHour !== localHour) continue;
+    // Hour check (default 19 / 7 PM — matches the app's default time).
+    // Defense-in-depth re-derivation from preferences: a stale denormalized
+    // reminderHour (e.g. a direct doc edit while the mirror trigger was
+    // down) must not cause a wrong-hour send.
+    if (parseReminderHour(p.preferences?.reminderTime) !== localHour) continue;
 
     // Day-of-week check. Unset → default Mon–Thu (the app's school-night
     // default). A legacy empty list meant "every day", so honour that; any
@@ -1352,14 +1357,36 @@ async function processSchool(
 }
 
 /**
+ * Mirrors `preferences.reminderTime` into a top-level `reminderHour` field
+ * on parent docs so sendReadingReminders can query only the parents due at
+ * the current hour instead of reading every tokened parent every hour
+ * (~24× fewer parent reads per day).
+ *
+ * Self-terminating: the mirror write re-fires this trigger once, finds the
+ * value already correct, and returns without writing. Zero reads — all data
+ * comes from the event snapshot. scripts/backfill_reminder_hour.js stamps
+ * existing docs; this keeps them in sync from then on (including doc
+ * creation, so new parents never need the backfill).
+ */
+export const syncParentReminderHour = onDocumentWritten(
+  {document: "schools/{schoolId}/parents/{parentId}", concurrency: 10},
+  async (event) => {
+    if (!event.data?.after.exists) return;
+    const data = event.data.after.data() ?? {};
+    const desired = parseReminderHour(data.preferences?.reminderTime);
+    if (data.reminderHour === desired) return;
+    await event.data.after.ref.update({reminderHour: desired});
+  });
+
+/**
  * Send reading reminder notifications to parents.
  *
  * Runs every hour. Uses school timezone to match each parent's preferred
  * reminder hour and day-of-week. One notification per parent (not per child).
  * Processes schools with bounded concurrency and sends FCM in 500-msg chunks.
  *
- * Firestore reads per school ≈ parents(with token) + unlogged_students + log_checks
- * (NOT all students × all logs like the naive approach)
+ * Firestore reads per school ≈ parents(due this hour) + unlogged_students +
+ * log_checks (NOT all students × all logs like the naive approach)
  */
 export const sendReadingReminders = onSchedule(
   {
