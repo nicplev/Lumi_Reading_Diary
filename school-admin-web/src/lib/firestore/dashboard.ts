@@ -43,11 +43,53 @@ export interface RecentActivity {
   bookTitle?: string;
 }
 
-export async function getDashboardStats(schoolId: string): Promise<DashboardStats> {
+/**
+ * One `classes where isActive` snapshot, shared by getDashboardStats and
+ * getOperationalSummary — the admin dashboard render fired both, each with
+ * its own identical query. Fetch once in the page and pass down.
+ */
+export async function fetchActiveClasses(
+  schoolId: string,
+): Promise<FirebaseFirestore.QuerySnapshot> {
+  return adminDb
+    .collection('schools').doc(schoolId).collection('classes')
+    .where('isActive', '==', true)
+    .get();
+}
+
+/**
+ * One whole-school reading-log scan covering the current school-local week
+ * (Monday-anchored, `date >=` only — same window `getTeacherDashboardWidgets`
+ * used), shared by the three teacher-dashboard functions that previously
+ * each ran their own overlapping whole-school scan per render:
+ * today (getTeacherDashboardData) ⊂ week, and getWeeklyEngagement's
+ * weekOffset-0 window is this week bounded above.
+ */
+export interface WeekLogsPrefetch {
+  docs: FirebaseFirestore.QueryDocumentSnapshot[];
+  tz: string;
+}
+
+export async function fetchCurrentWeekLogs(
+  schoolId: string,
+): Promise<WeekLogsPrefetch> {
+  const tz = await getSchoolTimezone(schoolId);
+  const startOfWeek = startOfLocalWeek(new Date(), tz);
+  const snap = await adminDb
+    .collection('schools').doc(schoolId).collection('readingLogs')
+    .where('date', '>=', startOfWeek)
+    .get();
+  return { docs: snap.docs, tz };
+}
+
+export async function getDashboardStats(
+  schoolId: string,
+  prefetchedClasses?: FirebaseFirestore.QuerySnapshot,
+): Promise<DashboardStats> {
   const schoolDoc = await adminDb.collection('schools').doc(schoolId).get();
   const schoolData = schoolDoc.data();
 
-  const classesSnap = await adminDb
+  const classesSnap = prefetchedClasses ?? await adminDb
     .collection('schools').doc(schoolId).collection('classes')
     .where('isActive', '==', true)
     .get();
@@ -148,12 +190,16 @@ export interface OperationalSummary {
   subActiveForCurrentYear: boolean;
 }
 
-export async function getOperationalSummary(schoolId: string): Promise<OperationalSummary> {
+export async function getOperationalSummary(
+  schoolId: string,
+  prefetchedClasses?: FirebaseFirestore.QuerySnapshot,
+): Promise<OperationalSummary> {
   const schoolRef = adminDb.collection('schools').doc(schoolId);
 
   const [studentsSnap, classesSnap, linkSnap, campaignSnap, usersSnap, booksSnap] = await Promise.all([
     schoolRef.collection('students').where('isActive', '==', true).get().catch(() => null),
-    schoolRef.collection('classes').where('isActive', '==', true).get().catch(() => null),
+    prefetchedClasses ??
+      schoolRef.collection('classes').where('isActive', '==', true).get().catch(() => null),
     adminDb
       .collection('studentLinkCodes')
       .where('schoolId', '==', schoolId)
@@ -308,9 +354,10 @@ export async function getWeeklyReadingSummary(schoolId: string): Promise<WeeklyR
 export async function getWeeklyEngagement(
   schoolId: string,
   weekOffset = 0,
+  prefetched?: WeekLogsPrefetch,
 ): Promise<WeeklyEngagement[]> {
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const tz = await getSchoolTimezone(schoolId);
+  const tz = prefetched?.tz ?? await getSchoolTimezone(schoolId);
   const now = new Date();
   const thisMondayStr = shiftDateStr(localDateString(now, tz), -localWeekdayIndex(now, tz));
   const weekStartStr = shiftDateStr(thisMondayStr, 7 * weekOffset);
@@ -318,25 +365,39 @@ export async function getWeeklyEngagement(
   const endOfWeek = zonedDayStart(shiftDateStr(weekStartStr, 7), tz);
 
   try {
-    // Try date field first
-    let logsSnap = await adminDb
-      .collection('schools').doc(schoolId).collection('readingLogs')
-      .where('date', '>=', startOfWeek)
-      .where('date', '<', endOfWeek)
-      .get();
+    // Current week + prefetch available: filter the shared scan in memory
+    // (it's `date >= startOfWeek`, superset of this bounded window).
+    // Otherwise query the date field directly.
+    let logDocs: FirebaseFirestore.QueryDocumentSnapshot[];
+    if (prefetched && weekOffset === 0) {
+      logDocs = prefetched.docs.filter(doc => {
+        const ts = doc.data().date;
+        const ms = ts?.toMillis?.();
+        return typeof ms === 'number' &&
+          ms >= startOfWeek.getTime() && ms < endOfWeek.getTime();
+      });
+    } else {
+      const logsSnap = await adminDb
+        .collection('schools').doc(schoolId).collection('readingLogs')
+        .where('date', '>=', startOfWeek)
+        .where('date', '<', endOfWeek)
+        .get();
+      logDocs = logsSnap.docs;
+    }
 
     // Fallback to createdAt if date field yields no results
-    if (logsSnap.empty) {
-      logsSnap = await adminDb
+    if (logDocs.length === 0) {
+      const fallbackSnap = await adminDb
         .collection('schools').doc(schoolId).collection('readingLogs')
         .where('createdAt', '>=', startOfWeek)
         .where('createdAt', '<', endOfWeek)
         .get();
+      logDocs = fallbackSnap.docs;
     }
 
     const countByDay = new Map<number, number>();
     const minutesByDay = new Map<number, number>();
-    logsSnap.docs.forEach(doc => {
+    logDocs.forEach(doc => {
       const data = doc.data();
       // Handle both Timestamp and string date fields
       let date: Date;
@@ -495,7 +556,11 @@ export interface TeacherDashboardData {
   booksToday: number;
 }
 
-export async function getTeacherDashboardData(schoolId: string, userId: string): Promise<TeacherDashboardData> {
+export async function getTeacherDashboardData(
+  schoolId: string,
+  userId: string,
+  prefetched?: WeekLogsPrefetch,
+): Promise<TeacherDashboardData> {
   // Get classes where this teacher is assigned
   const classesSnap = await adminDb
     .collection('schools').doc(schoolId).collection('classes')
@@ -503,7 +568,7 @@ export async function getTeacherDashboardData(schoolId: string, userId: string):
     .where('isActive', '==', true)
     .get();
 
-  const tz = await getSchoolTimezone(schoolId);
+  const tz = prefetched?.tz ?? await getSchoolTimezone(schoolId);
   const today = startOfLocalDay(new Date(), tz);
 
   // Collect all student IDs and class IDs upfront
@@ -515,15 +580,20 @@ export async function getTeacherDashboardData(schoolId: string, userId: string):
     allStudentIds.push(...studentIds);
   }
 
-  // Batch fetch: today's logs for all teacher's classes in one query
+  // Today's logs for all teacher's classes: today ⊂ current week, so the
+  // shared week prefetch covers it in memory; otherwise one query.
+  // Filter client-side to teacher's classes (avoids needing composite index on classId+date)
   let allTodayLogs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
   try {
-    const logsSnap = await adminDb
+    const weekDocs = prefetched?.docs ?? (await adminDb
       .collection('schools').doc(schoolId).collection('readingLogs')
       .where('date', '>=', today)
-      .get();
-    // Filter client-side to teacher's classes (avoids needing composite index on classId+date)
-    allTodayLogs = logsSnap.docs.filter(d => classIds.includes(d.data().classId));
+      .get()).docs;
+    allTodayLogs = weekDocs.filter(d => {
+      const ms = d.data().date?.toMillis?.();
+      if (typeof ms !== 'number' || ms < today.getTime()) return false;
+      return classIds.includes(d.data().classId);
+    });
   } catch { /* ignore */ }
 
   // Group logs by classId
@@ -662,7 +732,8 @@ export interface TeacherDashboardWidgets {
  */
 export async function getTeacherDashboardWidgets(
   schoolId: string,
-  userId: string
+  userId: string,
+  prefetched?: WeekLogsPrefetch,
 ): Promise<TeacherDashboardWidgets> {
   const classesSnap = await adminDb
     .collection('schools').doc(schoolId).collection('classes')
@@ -720,18 +791,20 @@ export async function getTeacherDashboardWidgets(
     } catch { /* ignore */ }
   }
 
-  const startOfWeek = startOfLocalWeek(new Date(), await getSchoolTimezone(schoolId));
+  const startOfWeek = startOfLocalWeek(
+    new Date(), prefetched?.tz ?? await getSchoolTimezone(schoolId));
 
   const minutesByStudent = new Map<string, number>();
   const parentComments: TeacherParentComment[] = [];
   const feelingCounts = new Map<string, number>();
   const recentReading: TeacherRecentReading[] = [];
   try {
-    const logsSnap = await adminDb
+    // Same `date >= startOfWeek` window the shared prefetch uses.
+    const weekDocs = prefetched?.docs ?? (await adminDb
       .collection('schools').doc(schoolId).collection('readingLogs')
       .where('date', '>=', startOfWeek)
-      .get();
-    for (const doc of logsSnap.docs) {
+      .get()).docs;
+    for (const doc of weekDocs) {
       const d = doc.data();
       if (!classIds.includes(d.classId)) continue;
       const sid: string = d.studentId ?? '';

@@ -21,6 +21,11 @@ type Period = typeof VALID_PERIODS[number];
 export async function GET(request: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // Admin-only (matches the sidebar's adminOnly flag): returns whole-school
+  // data and a year-period load scans the school's entire log history.
+  if (session.role !== 'schoolAdmin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const { searchParams } = request.nextUrl;
   const rawPeriod = searchParams.get('period') ?? 'month';

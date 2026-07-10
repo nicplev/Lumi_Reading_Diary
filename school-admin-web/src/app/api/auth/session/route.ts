@@ -92,9 +92,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Cache schoolId as custom claim for faster future logins
+    // Cache schoolId as custom claim for faster future logins.
+    // NOTE: existing claims must come from adminAuth.getUser() — a decoded
+    // ID token spreads custom claims onto its TOP level (there is no
+    // `decodedToken.customClaims` property), so the old spread here was
+    // always `{}` and this call silently WIPED every other custom claim
+    // the user had whenever the slow path ran.
+    const userRecord = await adminAuth.getUser(uid);
     await adminAuth.setCustomUserClaims(uid, {
-      ...(decodedToken.customClaims || {}),
+      ...(userRecord.customClaims ?? {}),
       schoolId: userData.schoolId,
     });
 
