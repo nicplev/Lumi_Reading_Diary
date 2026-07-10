@@ -44,9 +44,15 @@ class _TermsAcceptanceScreenState extends ConsumerState<TermsAcceptanceScreen> {
 
     try {
       await _termsService.acceptCurrentTerms(user);
-      ref.invalidate(userProvider);
+      final refreshedUser = await ref
+          .refresh(userProvider.future)
+          .timeout(const Duration(seconds: 8));
+      if (refreshedUser == null ||
+          !TermsAcceptanceService.hasAcceptedCurrentTerms(refreshedUser)) {
+        throw StateError('Terms acceptance did not refresh.');
+      }
       if (!mounted) return;
-      context.go(_destinationFor(user));
+      context.go(_destinationFor(refreshedUser));
     } catch (_) {
       if (!mounted) return;
       setState(() {

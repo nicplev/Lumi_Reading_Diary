@@ -44,9 +44,7 @@ class TermsAcceptanceService {
       'termsAcceptedAt': FieldValue.serverTimestamp(),
       'termsAcceptedVersion': currentTermsVersion,
       'termsAcceptedPlatform': _platformLabel,
-    });
-
-    await _firestore.waitForPendingWrites().timeout(const Duration(seconds: 8));
+    }).timeout(const Duration(seconds: 12));
   }
 
   static String get _platformLabel {
