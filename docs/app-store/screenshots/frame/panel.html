@@ -45,13 +45,16 @@
      their own Dynamic Island / rounded content, which sells it. */
   .chassis {
     position: relative;
+    /* Natural titanium: bright enough to read against both the pastel
+       background AND the black bezel, even at thumbnail scale. */
     background: linear-gradient(145deg,
-      #6e6e73 0%, #3a3a3e 18%, #57575c 42%,
-      #2c2c30 60%, #4a4a4f 82%, #626267 100%);
+      #d9d7d3 0%, #a8a5a0 18%, #c9c6c1 40%,
+      #918e89 62%, #bfbcb7 82%, #d3d1cd 100%);
     box-shadow:
       0 50px 110px rgba(26,26,26,0.32),
       0 12px 34px rgba(26,26,26,0.22),
-      inset 0 0 3px rgba(255,255,255,0.55);
+      inset 0 0 4px rgba(255,255,255,0.7),
+      inset 0 0 1px rgba(0,0,0,0.35);
   }
   .bezel {
     background: #0a0a0b;
@@ -63,10 +66,10 @@
   /* Hardware buttons: metallic nubs attached to the frame edge. */
   .btn {
     position: absolute;
-    background: linear-gradient(90deg, #7a7a80, #45454a 50%, #6b6b70);
-    box-shadow: inset 0 1px 1px rgba(255,255,255,0.4);
+    background: linear-gradient(90deg, #cfccc7, #8f8c87 50%, #c2bfba);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.55), 0 0 1px rgba(0,0,0,0.4);
   }
-  .btn.h { background: linear-gradient(180deg, #7a7a80, #45454a 50%, #6b6b70); }
+  .btn.h { background: linear-gradient(180deg, #cfccc7, #8f8c87 50%, #c2bfba); }
 
   /* iPad camera dot on the top bezel edge (landscape). */
   .cam {
@@ -107,7 +110,7 @@
     headline.style.height = '290px';
     headline.style.fontSize = '86px';
     headline.style.maxWidth = '1200px';
-    const ring = 7, pad = 20, imgW = 1092;
+    const ring = 13, pad = 20, imgW = 1092;
     const imgH = Math.round(imgW * 2868 / 1320);          // 2372
     shot.style.width = imgW + 'px';
     shot.style.height = imgH + 'px';
@@ -120,10 +123,10 @@
     // Left edge: action button + volume up/down. Right edge: power.
     // Positions proportional to the real device.
     const H = imgH + 2 * (pad + ring);
-    btn('h', { left: '-4px', top: Math.round(H * 0.155) + 'px', width: '5px', height: '58px',  borderRadius: '3px' });
-    btn('h', { left: '-4px', top: Math.round(H * 0.235) + 'px', width: '5px', height: '118px', borderRadius: '3px' });
-    btn('h', { left: '-4px', top: Math.round(H * 0.295) + 'px', width: '5px', height: '118px', borderRadius: '3px' });
-    btn('h', { right: '-4px', top: Math.round(H * 0.245) + 'px', width: '5px', height: '190px', borderRadius: '3px' });
+    btn('h', { left: '-7px', top: Math.round(H * 0.155) + 'px', width: '8px', height: '58px',  borderRadius: '4px' });
+    btn('h', { left: '-7px', top: Math.round(H * 0.235) + 'px', width: '8px', height: '118px', borderRadius: '4px' });
+    btn('h', { left: '-7px', top: Math.round(H * 0.295) + 'px', width: '8px', height: '118px', borderRadius: '4px' });
+    btn('h', { right: '-7px', top: Math.round(H * 0.245) + 'px', width: '8px', height: '190px', borderRadius: '4px' });
   } else {
     // canvas 2752x2064 landscape — iPad Pro 13": aluminum ring, uniform bezel,
     // camera centered on the top (landscape) bezel.
