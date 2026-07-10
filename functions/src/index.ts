@@ -43,6 +43,7 @@ import {
   applyClassStatsDelta,
   applyStudentStatsDelta,
   isInvalidatedLog,
+  isStatsNoopUpdate,
   readIncrementalConfig,
   runReconcilePass,
 } from "./stats_aggregation";
@@ -151,6 +152,9 @@ export const aggregateStudentStats = onDocumentWritten(
   {document: "schools/{schoolId}/readingLogs/{logId}", concurrency: 1},
   async (event) => {
     if (!event.data) return;
+    // Metadata-only updates (validation stamps, teacher-comment mirrors)
+    // can't change any stat — skip before spending a single read.
+    if (isStatsNoopUpdate(event.data)) return;
     const schoolId = event.params.schoolId;
 
     // When the incremental flag is on, dispatch to the O(1)-reads path.
@@ -655,6 +659,66 @@ async function updateParentInboxStatuses(
   }
 }
 
+// Recipient budgets — a school-wide campaign fans out parent-doc reads,
+// two inbox writes, and a push per parent, so an unbounded audience is a
+// direct bill risk (the only existing limit was 10 campaigns/sender/hour,
+// which still allows 10 × whole-school fan-outs). Both caps are overridable
+// via platformConfig/notificationLimits ({maxRecipientsPerCampaign,
+// maxRecipientsPerSchoolPerDay}); a missing doc/field falls back to these.
+const DEFAULT_MAX_RECIPIENTS_PER_CAMPAIGN = 2500;
+const DEFAULT_MAX_RECIPIENTS_PER_SCHOOL_PER_DAY = 5000;
+
+async function readNotificationLimits(): Promise<{
+  maxRecipientsPerCampaign: number;
+  maxRecipientsPerSchoolPerDay: number;
+}> {
+  const snap = await db.doc("platformConfig/notificationLimits").get();
+  const data = snap.data() ?? {};
+  const num = (value: unknown, fallback: number) =>
+    typeof value === "number" && Number.isFinite(value) && value > 0 ?
+      value :
+      fallback;
+  return {
+    maxRecipientsPerCampaign:
+      num(data.maxRecipientsPerCampaign, DEFAULT_MAX_RECIPIENTS_PER_CAMPAIGN),
+    maxRecipientsPerSchoolPerDay: num(
+      data.maxRecipientsPerSchoolPerDay,
+      DEFAULT_MAX_RECIPIENTS_PER_SCHOOL_PER_DAY,
+    ),
+  };
+}
+
+/**
+ * Atomically reserves `count` recipients from the school's daily budget.
+ * The window is a UTC calendar day — coarse by design: this is a runaway
+ * guard, not an accounting system.
+ * @param {string} schoolId School whose budget to draw from.
+ * @param {number} count Recipients this campaign wants to send to.
+ * @param {number} cap Daily per-school recipient cap.
+ * @return {Promise<boolean>} False when the reservation would exceed the cap.
+ */
+async function reserveDailyRecipientBudget(
+  schoolId: string,
+  count: number,
+  cap: number,
+): Promise<boolean> {
+  const budgetRef =
+    schoolRef(schoolId).collection("meta").doc("notificationBudget");
+  const today = new Date().toISOString().slice(0, 10);
+  return db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(budgetRef);
+    const data = snap.data() ?? {};
+    const used = data.date === today ? Number(data.recipients ?? 0) : 0;
+    if (used + count > cap) return false;
+    transaction.set(budgetRef, {
+      date: today,
+      recipients: used + count,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return true;
+  });
+}
+
 async function dispatchNotificationCampaign(
   schoolId: string,
   campaignRef: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>,
@@ -702,6 +766,40 @@ async function dispatchNotificationCampaign(
           pushSent: 0,
           pushFailed: 0,
         },
+      });
+      return;
+    }
+
+    // Recipient budgets: reject over-cap audiences BEFORE any inbox writes
+    // or pushes go out, using the same clean "failed" shape as the
+    // empty-audience case above.
+    const limits = await readNotificationLimits();
+    const failCounts = {
+      recipientCounts: {parents: deliveries.length, students: students.length},
+      deliveryCounts: {inboxWritten: 0, pushSent: 0, pushFailed: 0},
+    };
+    if (deliveries.length > limits.maxRecipientsPerCampaign) {
+      await campaignRef.update({
+        status: "failed",
+        errorSummary:
+          `Audience of ${deliveries.length} parents exceeds the ` +
+          `per-campaign limit of ${limits.maxRecipientsPerCampaign}. ` +
+          "Narrow the audience (e.g. send per class) and try again.",
+        ...failCounts,
+      });
+      return;
+    }
+    const reserved = await reserveDailyRecipientBudget(
+      schoolId, deliveries.length, limits.maxRecipientsPerSchoolPerDay,
+    );
+    if (!reserved) {
+      await campaignRef.update({
+        status: "failed",
+        errorSummary:
+          "Your school has reached its daily notification limit " +
+          `(${limits.maxRecipientsPerSchoolPerDay} recipients). ` +
+          "Try again tomorrow.",
+        ...failCounts,
       });
       return;
     }
@@ -1440,6 +1538,21 @@ export const detectAchievements = onDocumentUpdated(
     const newData = event.data.after.data();
     const newStats = newData.stats || {};
 
+    // This fires on EVERY student-doc update (character picks, award writes,
+    // its own arrayUnion, stats no-op rewrites). Achievements are driven
+    // solely by totalMinutesRead + totalReadingDays (see
+    // computeAwardableAchievements) — if neither moved, skip before paying
+    // the threshold-config read.
+    const oldStats = event.data.before.data()?.stats || {};
+    if (
+      Number(oldStats.totalMinutesRead ?? 0) ===
+        Number(newStats.totalMinutesRead ?? 0) &&
+      Number(oldStats.totalReadingDays ?? 0) ===
+        Number(newStats.totalReadingDays ?? 0)
+    ) {
+      return;
+    }
+
     const thresholds = await resolveAchievementThresholds(schoolId);
 
     // Build set of already-earned IDs to prevent duplicates.
@@ -1622,7 +1735,11 @@ export const validateReadingLog = onDocumentCreated(
       validationErrors.push("Parent not linked to this student");
     }
 
-    // If validation fails, mark the log as invalid
+    // If validation fails, mark the log as invalid. Valid logs get NO write:
+    // absence of validationStatus means valid everywhere (isInvalidatedLog
+    // keys on === "invalid"; nothing reads "valid"/validatedAt), and the old
+    // valid-stamp update re-fired both stats triggers on every single log —
+    // a wasted write + double aggregation for the ~all-valid majority.
     if (validationErrors.length > 0) {
       await event.data.ref.update({
         validationStatus: "invalid",
@@ -1632,11 +1749,6 @@ export const validateReadingLog = onDocumentCreated(
       functions.logger.warn("Invalid reading log detected", {
         logId: event.params.logId,
         errors: validationErrors,
-      });
-    } else {
-      await event.data.ref.update({
-        validationStatus: "valid",
-        validatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     }
 
@@ -2210,6 +2322,9 @@ export const updateClassStats = onDocumentWritten(
   {document: "schools/{schoolId}/readingLogs/{logId}", concurrency: 1},
   async (event) => {
     if (!event.data) return;
+    // Metadata-only updates (validation stamps, teacher-comment mirrors)
+    // can't change any stat — skip before spending a single read.
+    if (isStatsNoopUpdate(event.data)) return;
     const schoolId = event.params.schoolId;
 
     // Incremental path: read the class doc once, apply per-log delta. Old
