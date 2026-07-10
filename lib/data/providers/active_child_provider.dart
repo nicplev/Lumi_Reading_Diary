@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -60,13 +61,33 @@ final parentChildrenProvider = StreamProvider<List<StudentModel>>((ref) {
   final schoolRef =
       ref.watch(firestoreProvider).collection('schools').doc(schoolId);
 
+  // The parent doc emits on EVERY field change — login stamps lastLoginAt
+  // and refreshes fcmToken, preferences saves, etc. Re-fetching all N child
+  // docs on each of those was pure waste: this provider's job is the child
+  // LIST, and per-child live data (stats, awards) comes from the screens'
+  // own student-doc streams. Cache the last fetch and re-read students only
+  // when the linkedChildren id list itself changes.
+  List<String>? cachedIds;
+  List<StudentModel>? cachedStudents;
+
   return schoolRef.collection('parents').doc(user.id).snapshots().asyncMap(
     (parentDoc) async {
       final ids = parentDoc.exists
           ? List<String>.from(
               (parentDoc.data()?['linkedChildren'] as List?) ?? const [])
           : const <String>[];
-      if (ids.isEmpty) return const <StudentModel>[];
+      if (ids.isEmpty) {
+        cachedIds = ids;
+        cachedStudents = const <StudentModel>[];
+        return const <StudentModel>[];
+      }
+
+      final cachedList = cachedStudents;
+      if (cachedList != null &&
+          cachedIds != null &&
+          listEquals(cachedIds, ids)) {
+        return cachedList;
+      }
 
       final docs = await Future.wait(
         ids.map((id) => schoolRef.collection('students').doc(id).get()),
@@ -76,10 +97,13 @@ final parentChildrenProvider = StreamProvider<List<StudentModel>>((ref) {
           if (doc.exists) doc.id: StudentModel.fromFirestore(doc),
       };
       // Preserve linkedChildren order; drop ids whose student doc is missing.
-      return [
+      final students = [
         for (final id in ids)
           if (byId.containsKey(id)) byId[id]!,
       ];
+      cachedIds = ids;
+      cachedStudents = students;
+      return students;
     },
   );
 });

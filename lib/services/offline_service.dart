@@ -392,6 +392,13 @@ class OfflineService with WidgetsBindingObserver {
     // A fresh item is immediately eligible; nudge a drain in case we're
     // already online and idle.
     _scheduleNextRetry();
+    // Something just got queued — usually because a direct write failed or
+    // the status gate said "not writable". Either way the service status is
+    // the thing that decides when this queue drains, so make sure it's
+    // fresh rather than waiting out the slow periodic heartbeat. Coalesced
+    // by the controller's min-probe interval; fire-and-forget.
+    unawaited(ServiceStatusController.instance.forceProbe().catchError(
+        (Object _) => ServiceStatusController.instance.current));
   }
 
   Future<void> _persistItem(PendingSync item) async {
@@ -852,6 +859,7 @@ class OfflineService with WidgetsBindingObserver {
 
     final syncedItems = <String>[];
     var anySuccess = false;
+    var anyFailure = false;
 
     try {
       // Drain in priority order: reading-log creates first (so dependent
@@ -889,6 +897,7 @@ class OfflineService with WidgetsBindingObserver {
           _recordHistory(item, SyncResult.success, null);
         } catch (e) {
           await _handleItemFailure(item, e);
+          anyFailure = true;
         }
       }
 
@@ -906,6 +915,14 @@ class OfflineService with WidgetsBindingObserver {
         final ts = DateTime.now();
         await _serviceMetaBox.put('lastSuccessfulSyncAt', ts.toIso8601String());
         if (!_lastSyncController.isClosed) _lastSyncController.add(ts);
+      }
+
+      // Drain hit failures: the backend may have just gone unhealthy — make
+      // the status controller re-check now instead of waiting out its slow
+      // periodic heartbeat (coalesced by its min-probe interval).
+      if (anyFailure) {
+        unawaited(ServiceStatusController.instance.forceProbe().catchError(
+            (Object _) => ServiceStatusController.instance.current));
       }
     } finally {
       _isSyncing = false;
