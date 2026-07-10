@@ -182,7 +182,7 @@ class _TermsCard extends StatelessWidget {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(8),
-                  child: Image.asset('assets/lumi/Lumi_Welcome.png'),
+                  child: Image.asset('assets/staff_characters/la_default.png'),
                 ),
               ),
               const SizedBox(width: 16),
