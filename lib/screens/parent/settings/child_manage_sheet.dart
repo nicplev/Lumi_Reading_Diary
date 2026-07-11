@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 
+import '../../../core/widgets/lumi/lumi_buttons.dart';
 import '../../../core/widgets/lumi/student_avatar.dart';
 import '../../../core/widgets/lumi/student_reading_level_label.dart';
 import '../../../core/widgets/lumi/lumi_toast.dart';
@@ -51,6 +53,7 @@ class _ChildManageSheet extends StatefulWidget {
 class _ChildManageSheetState extends State<_ChildManageSheet> {
   final _linkingService = ParentLinkingService();
   late StudentModel _child = widget.child;
+  bool _invitingGuardian = false;
 
   void _changeCharacter() {
     showCharacterPicker(
@@ -64,6 +67,11 @@ class _ChildManageSheetState extends State<_ChildManageSheet> {
   }
 
   Future<void> _inviteGuardian() async {
+    if (_invitingGuardian) return;
+    // Generating the invite requires a Cloud Function round-trip, so show a
+    // spinner on the row instead of leaving it looking unresponsive.
+    setState(() => _invitingGuardian = true);
+
     StudentLinkCodeModel? code;
     Object? error;
     try {
@@ -76,6 +84,7 @@ class _ChildManageSheetState extends State<_ChildManageSheet> {
       error = e;
     }
     if (!mounted) return;
+    setState(() => _invitingGuardian = false);
 
     if (code == null) {
       showLumiToast(
@@ -86,6 +95,7 @@ class _ChildManageSheetState extends State<_ChildManageSheet> {
     }
 
     final inviteCode = code.code;
+    final firstName = _child.firstName;
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
@@ -99,8 +109,9 @@ class _ChildManageSheetState extends State<_ChildManageSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Share this code with another guardian of ${_child.firstName}. '
-              'They enter it when registering for the Lumi app.',
+              'Send this code to $firstName\'s other guardian. They enter it '
+              'when they create their own Lumi account, which links them to '
+              '$firstName.',
               style: LumiType.body,
             ),
             const SizedBox(height: LumiTokens.space4),
@@ -119,6 +130,34 @@ class _ChildManageSheetState extends State<_ChildManageSheet> {
                   letterSpacing: 4,
                 ),
               ),
+            ),
+            const SizedBox(height: LumiTokens.space2),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(top: 1),
+                  child: Icon(Icons.info_outline,
+                      size: 15, color: LumiTokens.muted),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'The code only works once you share it with them — '
+                    'they need it to link to $firstName.',
+                    style: LumiType.caption,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: LumiTokens.space4),
+            LumiPrimaryButton(
+              text: 'Share code',
+              icon: Icons.ios_share,
+              color: _accent,
+              isFullWidth: true,
+              borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+              onPressed: () => _shareInviteCode(inviteCode, firstName),
             ),
           ],
         ),
@@ -142,6 +181,17 @@ class _ChildManageSheetState extends State<_ChildManageSheet> {
                     color: LumiTokens.ink, fontWeight: FontWeight.w700)),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _shareInviteCode(String code, String firstName) async {
+    await SharePlus.instance.share(
+      ShareParams(
+        subject: 'Join me on Lumi for $firstName',
+        text: "You're invited to be a guardian for $firstName on the Lumi "
+            'reading app. Download Lumi, then enter this code when you '
+            'register to link to $firstName:\n\n$code',
       ),
     );
   }
@@ -277,8 +327,11 @@ class _ChildManageSheetState extends State<_ChildManageSheet> {
                   const SizedBox(height: LumiTokens.space3),
                   _ActionRow(
                     icon: Icons.person_add_alt_1,
-                    label: 'Invite another guardian',
+                    label: _invitingGuardian
+                        ? 'Creating invite…'
+                        : 'Invite another guardian',
                     accent: true,
+                    busy: _invitingGuardian,
                     onTap: _inviteGuardian,
                   ),
                 ],
@@ -295,6 +348,7 @@ class _ActionRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool accent;
+  final bool busy;
   final VoidCallback onTap;
 
   const _ActionRow({
@@ -302,13 +356,14 @@ class _ActionRow extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.accent = false,
+    this.busy = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final color = accent ? _accent : LumiTokens.ink;
     return InkWell(
-      onTap: onTap,
+      onTap: busy ? null : onTap,
       borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
       child: Container(
         padding: const EdgeInsets.all(LumiTokens.space4),
@@ -329,8 +384,18 @@ class _ActionRow extends StatelessWidget {
                 ),
               ),
             ),
-            const Icon(Icons.chevron_right_rounded,
-                size: 20, color: LumiTokens.muted),
+            if (busy)
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(color),
+                ),
+              )
+            else
+              const Icon(Icons.chevron_right_rounded,
+                  size: 20, color: LumiTokens.muted),
           ],
         ),
       ),
