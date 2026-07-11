@@ -6,6 +6,7 @@ import { Nav } from "@/components/landing/Nav";
 import { Hero } from "@/components/landing/Hero";
 import { TrustStrip } from "@/components/landing/TrustStrip";
 import { Stats } from "@/components/landing/Stats";
+import { ReadingEvidence } from "@/components/landing/ReadingEvidence";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { ForTeachers } from "@/components/landing/ForTeachers";
 import { ForSchoolLeaders } from "@/components/landing/ForSchoolLeaders";
@@ -26,6 +27,7 @@ export default function LumiLandingPage() {
       <Hero />
       <TrustStrip />
       <Stats />
+      <ReadingEvidence />
       <HowItWorks />
       <ForTeachers />
       <ForSchoolLeaders />
