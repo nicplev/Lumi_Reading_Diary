@@ -153,6 +153,27 @@ const DEMO_EMAIL_DOMAIN = "lumidemo.school";
 
 const SCHOOL_NAME = "Lumi Demo Primary School";
 
+// Accounts shared with prospects on demo day. They live on @lumi-reading.com
+// (plus-aliased into Nic's mailbox, so their Firebase password-reset emails are
+// actually receivable — plus-addressing to this domain is proven working). Their
+// passwords are rolled daily: the portal's "Provision today's demo password"
+// issues the day password and scrambleDemoPasswords scrambles it nightly, so
+// the DEMO_PASSWORD set here is only the initial value. Keep in sync with
+// platformConfig/demoAccess (seedDemoAccessConfig) and functions/src/demo_access.ts.
+const SHARED_ADMIN_EMAIL = "support+demo@lumi-reading.com";
+const SHARED_TEACHER_EMAIL = "support+demo.teacher@lumi-reading.com";
+const SHARED_PARENT_EMAIL = "support+demo.parent@lumi-reading.com";
+
+// Old addresses the teacher/parent shared accounts used before the rename to
+// @lumi-reading.com. Their userSchoolIndex hash entries are deleted every run
+// so a stale entry can't shadow the new address (the Flutter app resolves school
+// membership by emailHash(login email)). The Auth accounts themselves are
+// renamed by uid — not recreated — so classes/logs/links stay intact.
+const RETIRED_INDEX_EMAILS = [
+  `demo.teacher@${DEMO_EMAIL_DOMAIN}`,
+  `demo.parent@${DEMO_EMAIL_DOMAIN}`,
+];
+
 const STAFF = [
   {
     key: "admin",
@@ -165,8 +186,21 @@ const STAFF = [
     hasAuth: true,
   },
   {
+    // Shared with prospects on demo day (the "Email demo details" admin login).
+    // demo.admin above stays as the internal/backup admin, never shared.
+    key: "sharedadmin",
+    email: SHARED_ADMIN_EMAIL,
+    fullName: "Jordan Ellis",
+    firstName: "Jordan",
+    lastName: "Ellis",
+    role: "schoolAdmin",
+    classKeys: [],
+    hasAuth: true,
+  },
+  {
+    // Shared demo TEACHER login. Renamed from demo.teacher@lumidemo.school.
     key: "teacher",
-    email: `demo.teacher@${DEMO_EMAIL_DOMAIN}`,
+    email: SHARED_TEACHER_EMAIL,
     fullName: "Priya Sharma",
     firstName: "Priya",
     lastName: "Sharma",
@@ -190,8 +224,10 @@ const STAFF = [
 
 const PARENTS = [
   {
+    // Shared demo PARENT login (mobile app only). Renamed from
+    // demo.parent@lumidemo.school.
     key: "parent1",
-    email: `demo.parent@${DEMO_EMAIL_DOMAIN}`,
+    email: SHARED_PARENT_EMAIL,
     fullName: "Sarah Nguyen",
     relationshipLabel: "Mum",
     childKeys: ["ava", "leo"], // two children → shows the multi-child UI
@@ -960,14 +996,36 @@ async function ensureAuthUsers(admin, plan) {
       log(`   • exists   ${u.email}`);
     } catch (err) {
       if (err.code !== "auth/user-not-found") throw err;
-      await admin.auth().createUser({
-        uid: u.uid,
-        email: u.email,
-        password: DEMO_PASSWORD,
-        emailVerified: true,
-        displayName: u.fullName,
-      });
-      log(`   • created  ${u.email}`);
+      // The (new) email is free. Either our deterministic uid already exists
+      // under a PREVIOUS email — a rename, e.g. demo.teacher@lumidemo.school →
+      // support+demo.teacher@lumi-reading.com — or the account is genuinely new.
+      // Rename by uid so Firestore docs (keyed by uid), classes, logs and linked
+      // children stay intact; only create when the uid is truly absent.
+      let existingByUid = null;
+      try {
+        existingByUid = await admin.auth().getUser(u.uid);
+      } catch (e) {
+        if (e.code !== "auth/user-not-found") throw e;
+      }
+      if (existingByUid) {
+        const previousEmail = existingByUid.email;
+        await admin.auth().updateUser(u.uid, {
+          email: u.email,
+          password: DEMO_PASSWORD,
+          emailVerified: true,
+          displayName: u.fullName,
+        });
+        log(`   • renamed  ${previousEmail} → ${u.email}`);
+      } else {
+        await admin.auth().createUser({
+          uid: u.uid,
+          email: u.email,
+          password: DEMO_PASSWORD,
+          emailVerified: true,
+          displayName: u.fullName,
+        });
+        log(`   • created  ${u.email}`);
+      }
     }
   }
 }
@@ -1006,6 +1064,50 @@ async function seedFirestore(db, plan) {
   return count;
 }
 
+// Delete userSchoolIndex entries for addresses the shared accounts no longer
+// use (post-rename), so a stale hash can't shadow the new address. Idempotent —
+// a missing doc delete is a no-op.
+async function cleanupRetiredIndexEntries(db) {
+  for (const email of RETIRED_INDEX_EMAILS) {
+    await db.collection("userSchoolIndex").doc(emailHash(email)).delete();
+  }
+  if (RETIRED_INDEX_EMAILS.length > 0) {
+    log(`   • cleaned ${RETIRED_INDEX_EMAILS.length} retired userSchoolIndex entries`);
+  }
+}
+
+// Write platformConfig/demoAccess — the non-secret config the demo-access
+// backend + portal read. Idempotent, and PRESERVES any appStoreUrl/playStoreUrl
+// an operator has filled in (those are set in the portal/console once the store
+// listings are live — a re-seed must never clobber them back to null).
+async function seedDemoAccessConfig(db) {
+  const ref = db.collection("platformConfig").doc("demoAccess");
+  const snap = await ref.get();
+  const existing = snap.exists ? snap.data() : {};
+  await ref.set({
+    schoolId: SCHOOL_ID,
+    adminEmail: SHARED_ADMIN_EMAIL,
+    teacherEmail: SHARED_TEACHER_EMAIL,
+    parentEmail: SHARED_PARENT_EMAIL,
+    // Rotated nightly but never shared with prospects: the internal/backup admin
+    // and the no-login second teacher/parent personas. Keeps every account in
+    // the school off a known password.
+    scrambleOnlyEmails: [
+      `demo.admin@${DEMO_EMAIL_DOMAIN}`,
+      `demo.teacher2@${DEMO_EMAIL_DOMAIN}`,
+      `demo.parent2@${DEMO_EMAIL_DOMAIN}`,
+    ],
+    portalLoginUrl: "https://lumi-school-admin-au.web.app/login",
+    marketingUrl: "https://lumi-reading.com",
+    appStoreUrl: existing.appStoreUrl ?? null,
+    playStoreUrl: existing.playStoreUrl ?? null,
+    updatedAt: new Date(),
+    updatedBy: "seed_demo_school.js",
+  });
+  const preserved = existing.appStoreUrl || existing.playStoreUrl;
+  log(`   • platformConfig/demoAccess written (store URLs ${preserved ? "preserved" : "null"})`);
+}
+
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -1036,13 +1138,18 @@ async function main() {
   await ensureAuthUsers(admin, plan);
   log("Writing Firestore documents…");
   const written = await seedFirestore(db, plan);
+  await cleanupRetiredIndexEntries(db);
+  await seedDemoAccessConfig(db);
 
   log("");
   log(`✓ Demo school seeded (${written} documents).`);
   log("");
-  log("  Demo logins (all share one password):");
+  log("  Demo logins:");
   for (const u of plan.authUsers) log(`    ${u.email}`);
-  log(`    password: ${DEMO_PASSWORD}`);
+  log("");
+  log(`  Passwords are ROLLED DAILY. ${DEMO_PASSWORD} is only the seed value —`);
+  log("  scrambleDemoPasswords scrambles it nightly, and the super-admin portal's");
+  log("  \"Provision today's demo password\" issues the shared day password.");
   log("");
   log("  Live-linking codes (hand these out in demos):");
   for (const c of plan.linkCodes) log(`    ${c.data.code}  →  ${c.data.studentId}`);
