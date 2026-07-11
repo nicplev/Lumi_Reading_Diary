@@ -2,8 +2,8 @@ import Link from "next/link";
 
 export function Footer() {
   return (
-    <footer id="contact" style={{ background: "#1C1812", padding: "60px 32px 40px" }}>
-      <div style={{ maxWidth: 1180, margin: "0 auto", display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1fr", gap: 40 }}>
+    <footer id="contact" className="marketing-footer" style={{ background: "#1C1812", padding: "60px 32px 40px" }}>
+      <div className="marketing-footer-grid" style={{ maxWidth: 1180, margin: "0 auto", display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1fr", gap: 40 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ display: "block", width: 24, height: 28 }}>
@@ -76,7 +76,8 @@ export function Footer() {
           </div>
         </div>
       </div>
-      <div
+        <div
+          className="marketing-footer-bottom"
         style={{
           maxWidth: 1180,
           margin: "40px auto 0",

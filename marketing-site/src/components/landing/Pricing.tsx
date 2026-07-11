@@ -2,9 +2,9 @@ import Link from "next/link";
 
 export function Pricing() {
   return (
-    <section id="pricing" style={{ padding: "78px 32px", background: "#fff", borderTop: "1px solid #ECE7DD", borderBottom: "1px solid #ECE7DD" }}>
+    <section id="pricing" className="marketing-pricing" style={{ padding: "78px 32px", background: "#fff", borderTop: "1px solid #ECE7DD", borderBottom: "1px solid #ECE7DD" }}>
       <div style={{ maxWidth: 1180, margin: "0 auto", position: "relative" }}>
-        <div style={{ position: "absolute", left: 2, top: -26, width: 90, animation: "lumiFloatB 6s ease-in-out infinite" }}>
+        <div className="marketing-section-mascot" style={{ position: "absolute", left: 2, top: -26, width: 90, animation: "lumiFloatB 6s ease-in-out infinite" }}>
           <img
             src="/assets/lumi-tiger.png"
             alt="Lumi tiger"
@@ -23,7 +23,7 @@ export function Pricing() {
             Billed annually in AUD. Invoicing, POs and funding supported.
           </p>
         </div>
-        <div data-anim="stagger" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 20, alignItems: "stretch", maxWidth: 840, margin: "0 auto" }}>
+        <div data-anim="stagger" className="marketing-pricing-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 20, alignItems: "stretch", maxWidth: 840, margin: "0 auto" }}>
           {/* direct */}
           <div style={{ background: "#F7F5F0", border: "1px solid #ECE7DD", borderRadius: 24, padding: 32, display: "flex", flexDirection: "column" }}>
             <div style={{ fontFamily: "'Nunito',sans-serif", fontWeight: 900, fontSize: 20, color: "#1C1812" }}>Direct</div>

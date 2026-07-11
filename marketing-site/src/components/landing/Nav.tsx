@@ -5,6 +5,7 @@ import Link from "next/link";
 
 export function Nav() {
   const [condensed, setCondensed] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     function update() {
@@ -23,6 +24,7 @@ export function Nav() {
   return (
     <div
       data-nav
+      className="marketing-nav"
       data-condensed={condensed ? "" : undefined}
       style={{
         position: "sticky",
@@ -34,6 +36,7 @@ export function Nav() {
       }}
     >
       <div
+        className="marketing-nav-inner"
         style={{
           maxWidth: 1180,
           margin: "0 auto",
@@ -43,7 +46,7 @@ export function Nav() {
           justifyContent: "space-between",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 40 }}>
+        <div className="marketing-nav-primary" style={{ display: "flex", alignItems: "center", gap: 40 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ display: "block", width: 26, height: 34 }}>
               <img
@@ -64,7 +67,7 @@ export function Nav() {
               Lumi
             </span>
           </div>
-          <div style={{ display: "flex", gap: 26, fontWeight: 400, fontSize: 15, color: "#4A453E" }}>
+          <div className="marketing-nav-links" style={{ display: "flex", gap: 26, fontWeight: 400, fontSize: 15, color: "#4A453E" }}>
             <a href="#how" style={{ color: "#4A453E", textDecoration: "none" }}>
               How it works
             </a>
@@ -79,7 +82,7 @@ export function Nav() {
             </a>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+        <div className="marketing-nav-secondary" style={{ display: "flex", alignItems: "center", gap: 18 }}>
           <a
             href="https://lumi-school-admin-au.web.app/login"
             style={{ fontWeight: 400, fontSize: 15, color: "#4A453E", textDecoration: "none" }}
@@ -105,6 +108,25 @@ export function Nav() {
             Book a demo
           </Link>
         </div>
+        <button
+          type="button"
+          className="marketing-nav-toggle"
+          aria-expanded={menuOpen}
+          aria-controls="marketing-mobile-menu"
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <span aria-hidden="true">{menuOpen ? "×" : "☰"}</span>
+          <span className="sr-only">{menuOpen ? "Close navigation" : "Open navigation"}</span>
+        </button>
+      </div>
+      <div id="marketing-mobile-menu" className="marketing-mobile-menu" data-open={menuOpen ? "" : undefined}>
+        <a href="#how" onClick={() => setMenuOpen(false)}>How it works</a>
+        <a href="#teachers" onClick={() => setMenuOpen(false)}>For teachers</a>
+        <a href="#schools" onClick={() => setMenuOpen(false)}>For schools</a>
+        <a href="#pricing" onClick={() => setMenuOpen(false)}>Pricing</a>
+        <a href="https://lumi-school-admin-au.web.app/login">Log in</a>
+        <Link href="/contact-sales" onClick={() => setMenuOpen(false)}>Contact sales</Link>
+        <Link href="/book-a-demo" onClick={() => setMenuOpen(false)}>Book a demo</Link>
       </div>
     </div>
   );

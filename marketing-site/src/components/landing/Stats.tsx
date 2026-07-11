@@ -6,9 +6,10 @@ const STATS = [
 
 export function Stats() {
   return (
-    <section style={{ padding: "64px 32px 10px" }}>
+    <section className="marketing-stats" style={{ padding: "64px 32px 10px" }}>
       <div
         data-anim="stagger"
+        className="marketing-stats-grid"
         style={{
           maxWidth: 1180,
           margin: "0 auto",
@@ -21,6 +22,7 @@ export function Stats() {
         {STATS.map((s) => (
           <div key={s.label} style={{ padding: "18px 10px" }}>
             <div
+              className="marketing-stat-value"
               style={{
                 fontFamily: "'Nunito',sans-serif",
                 fontWeight: 900,

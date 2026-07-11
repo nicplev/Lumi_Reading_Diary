@@ -53,9 +53,9 @@ export function FAQ() {
   const [open, setOpen] = useState(0);
 
   return (
-    <section style={{ padding: "78px 32px" }}>
+    <section className="marketing-faq" style={{ padding: "78px 32px" }}>
       <div style={{ maxWidth: 820, margin: "0 auto", position: "relative" }}>
-        <div style={{ position: "absolute", right: -26, top: -22, width: 86, animation: "lumiFloat 5.5s ease-in-out infinite" }}>
+        <div className="marketing-section-mascot" style={{ position: "absolute", right: -26, top: -22, width: 86, animation: "lumiFloat 5.5s ease-in-out infinite" }}>
           <img
             src="/assets/lumi-penguin.png"
             alt="Lumi penguin"
@@ -77,6 +77,7 @@ export function FAQ() {
             return (
               <div key={f.q} style={{ background: "#fff", border: "1px solid #ECE7DD", borderRadius: 18, overflow: "hidden" }}>
                 <div
+                  className="marketing-faq-question"
                   onClick={() => setOpen((cur) => (cur === i ? -1 : i))}
                   style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "22px 26px", cursor: "pointer" }}
                 >

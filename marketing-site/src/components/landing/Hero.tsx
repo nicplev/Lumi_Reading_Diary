@@ -41,9 +41,10 @@ export function Hero() {
   };
 
   return (
-    <section style={{ position: "relative", padding: "64px 32px 20px", overflow: "hidden" }}>
+    <section className="marketing-hero" style={{ position: "relative", padding: "64px 32px 20px", overflow: "hidden" }}>
       <div style={{ maxWidth: 1180, margin: "0 auto", position: "relative" }}>
         <div
+          className="hero-mascot"
           style={{
             position: "absolute",
             left: -6,
@@ -67,6 +68,7 @@ export function Hero() {
           />
         </div>
         <div
+          className="hero-mascot"
           style={{
             position: "absolute",
             right: -8,
@@ -108,6 +110,7 @@ export function Hero() {
             No paper · No typing · Just seconds
           </span>
           <h1
+            className="marketing-hero-title"
             style={{
               fontFamily: "'Nunito',sans-serif",
               fontWeight: 900,
@@ -122,6 +125,7 @@ export function Hero() {
             Nightly reading, logged in seconds.
           </h1>
           <p
+            className="marketing-hero-copy"
             style={{
               fontWeight: 300,
               fontSize: 20,
@@ -134,7 +138,7 @@ export function Hero() {
             Lumi replaces the paper reading diary with a tap-only nightly log for parents and a live class dashboard
             for teachers, keeping real, physical books at the centre of reading.
           </p>
-          <div style={{ display: "flex", gap: 14, justifyContent: "center", marginTop: 30 }}>
+          <div className="marketing-hero-actions" style={{ display: "flex", gap: 14, justifyContent: "center", marginTop: 30 }}>
             <Link
               href="/book-a-demo"
               style={{
@@ -173,6 +177,7 @@ export function Hero() {
         {/* bento grid */}
         <div
           data-anim="bento"
+          className="marketing-hero-bento"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(3, 1fr)",

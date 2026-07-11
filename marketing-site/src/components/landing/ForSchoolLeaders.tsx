@@ -102,10 +102,10 @@ export function ForSchoolLeaders() {
   };
 
   return (
-    <section id="schools" style={{ padding: "78px 32px" }}>
-      <div style={{ maxWidth: 1180, margin: "0 auto", display: "grid", gridTemplateColumns: "1.05fr 1fr", gap: 56, alignItems: "center" }}>
+    <section id="schools" className="marketing-schools" style={{ padding: "78px 32px" }}>
+      <div className="marketing-schools-layout" style={{ maxWidth: 1180, margin: "0 auto", display: "grid", gridTemplateColumns: "1.05fr 1fr", gap: 56, alignItems: "center" }}>
         {/* admin illustration (left) */}
-        <div data-anim="reveal-left" style={{ order: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+        <div data-anim="reveal-left" className="marketing-school-portal" style={{ order: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
           <span
             style={{
               display: "inline-flex",

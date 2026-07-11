@@ -84,7 +84,7 @@ export function HowItWorks() {
   };
 
   return (
-    <section id="how" style={{ padding: "78px 32px" }}>
+    <section id="how" className="marketing-how" style={{ padding: "78px 32px" }}>
       <div style={{ maxWidth: 1180, margin: "0 auto" }}>
         <div data-anim="reveal" style={{ textAlign: "center", maxWidth: 680, margin: "0 auto" }}>
           <span
@@ -119,6 +119,7 @@ export function HowItWorks() {
 
         <div
           data-anim="stagger"
+          className="marketing-how-steps"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
