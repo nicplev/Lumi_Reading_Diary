@@ -79,8 +79,48 @@ final userProvider = StreamProvider<UserModel?>((ref) {
   }
 
   final uid = ref.watch(authStateChangesProvider).value;
-  if (uid != null) {
-    return userRepository.getUser(uid).asStream();
-  }
-  return Stream.value(null);
+  if (uid == null) return Stream.value(null);
+  return _loadUserResilient(userRepository, uid);
 });
+
+/// Loads the profile for [uid], retrying briefly on a null/failed read while a
+/// Firebase session is still present — staying in the loading state (no
+/// emission) between attempts rather than surfacing a premature null.
+///
+/// Right after account creation the phone-MFA enrol revokes and re-establishes
+/// the session (a custom-token re-auth). During that swap the first profile
+/// read can miss — the ID token / email aren't hydrated yet, or the token is
+/// mid-revocation — even though the user is validly signed in. The old one-shot
+/// `getUser(uid).asStream()` surfaced that transient miss as a *sticky* null,
+/// which the router rendered as a blank login screen that never self-healed.
+/// Retrying (and only emitting null once the session is genuinely gone or the
+/// attempts are exhausted) makes a fresh signup land on home instead of being
+/// bounced back to login.
+Stream<UserModel?> _loadUserResilient(
+  UserRepository repository,
+  String uid,
+) async* {
+  const maxAttempts = 5;
+  const retryGap = Duration(milliseconds: 400);
+  for (var attempt = 0; attempt < maxAttempts; attempt++) {
+    final user = await repository.getUser(uid);
+    if (user != null) {
+      yield user;
+      return;
+    }
+    // Genuinely signed out → surface null so the router shows login.
+    if (FirebaseAuth.instance.currentUser == null) {
+      yield null;
+      return;
+    }
+    if (attempt < maxAttempts - 1) {
+      await Future<void>.delayed(retryGap);
+      try {
+        await FirebaseAuth.instance.currentUser?.reload();
+      } catch (_) {
+        // reload can throw while the token is mid-revocation — keep retrying.
+      }
+    }
+  }
+  yield null; // Exhausted (~2s) → treat as no profile; router shows login.
+}
