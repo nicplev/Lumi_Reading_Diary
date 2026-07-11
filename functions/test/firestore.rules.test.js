@@ -1364,6 +1364,35 @@ test('legacy top-level notifications are blocked for clients', async () => {
   );
 });
 
+test('opsMetrics: denied to all clients, unlike gettable platformConfig', async () => {
+  await seedData(async (db) => {
+    await db.collection('opsMetrics').doc('storageUsage').set({
+      totalBytes: 123,
+      audioPerSchool: { school_1: { bytes: 123, objects: 1 } },
+    });
+    await db.collection('platformConfig').doc('comprehensionRecording').set({
+      enabled: true,
+    });
+  });
+
+  const teacherDb = authDb('teacher_1');
+
+  // platformConfig flags stay client-gettable…
+  await assertSucceeds(
+    teacherDb.collection('platformConfig').doc('comprehensionRecording').get(),
+  );
+
+  // …but opsMetrics telemetry (per-school byte maps) is Admin-SDK only.
+  await assertFails(
+    teacherDb.collection('opsMetrics').doc('storageUsage').get(),
+  );
+  await assertFails(
+    teacherDb.collection('opsMetrics').doc('storageUsage').set({
+      totalBytes: 0,
+    }),
+  );
+});
+
 test('sanity: test environment initialized', async () => {
   assert.ok(testEnv);
 });

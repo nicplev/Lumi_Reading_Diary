@@ -65,6 +65,15 @@ const NOTIFICATION_CAMPAIGN_APP_CHECK_ENFORCED =
 // the full books collection. See functions/src/library_counts.ts.
 export {maintainLibraryCounts} from "./library_counts";
 
+// Live bucket-usage counters (opsMetrics/storageUsage) for the super-admin
+// dashboard: storage triggers keep the totals current, a nightly reconcile
+// heals drift. See functions/src/storage_usage.ts.
+export {
+  trackStorageObjectFinalized,
+  trackStorageObjectDeleted,
+  reconcileStorageUsage,
+} from "./storage_usage";
+
 // Per-phone-number SMS rate-limit gate. Clients call this before
 // invoking verifyPhoneNumber to enforce a daily cap. See
 // functions/src/sms_rate_limit.ts for the policy and rollout notes.
