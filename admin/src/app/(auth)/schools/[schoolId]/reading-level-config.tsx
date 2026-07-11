@@ -24,6 +24,11 @@ import type { SchoolDetail } from "@/lib/firestore/schools";
 
 const LEVEL_SCHEMAS = [
   {
+    value: "none",
+    label: "None",
+    description: "Do not use reading levels",
+  },
+  {
     value: "aToZ",
     label: "A to Z",
     description: "Levels A through Z",

@@ -566,7 +566,8 @@ function buildPlan(now) {
     data: {
       name: SCHOOL_NAME,
       isDemo: true, // reset guard + "never a real tenant" marker
-      levelSchema: "aToZ",
+      // Keep the demo focused on reading habits and progress, not level labels.
+      levelSchema: "none",
       termDates: {
         term1Start: new Date(`${year}-01-28T09:00:00+11:00`),
         term1End: new Date(`${year}-03-28T15:30:00+11:00`),

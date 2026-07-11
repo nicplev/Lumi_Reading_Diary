@@ -1,6 +1,7 @@
 import type { FirestoreTimestamp } from "./common";
 
 export const ReadingLevelSchema = {
+  none: "none",
   aToZ: "aToZ",
   pmBenchmark: "pmBenchmark",
   lexile: "lexile",
