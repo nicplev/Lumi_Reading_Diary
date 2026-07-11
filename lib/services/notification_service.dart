@@ -298,6 +298,12 @@ class NotificationService {
       _navigateTo('/parent/home');
       return;
     }
+    if (type == 'award_earned') {
+      // Land on parent home so the celebration modal (driven by the live
+      // award fields) greets them. The award is also in the inbox.
+      _navigateTo('/parent/home');
+      return;
+    }
   }
 
   /// Handle notification tap (local notifications shown via _showLocalNotification).

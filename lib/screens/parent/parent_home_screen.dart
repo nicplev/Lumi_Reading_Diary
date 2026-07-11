@@ -40,6 +40,7 @@ import '../../services/isbn_assignment_service.dart';
 import '../../services/staff_notification_service.dart';
 import '../../services/logging_engagement_service.dart';
 import 'reading_history_screen.dart';
+import 'widgets/award_celebration_dialog.dart';
 import 'parent_profile_screen.dart';
 import 'widgets/add_email_for_recovery_modal.dart';
 import 'widgets/character_picker_sheet.dart';
@@ -77,6 +78,10 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
   bool _characterPromptScheduled = false;
   bool _firstLoginCharacterPromptCompleted = false;
   bool _parentTourScheduled = false;
+  // Award celebration: guards against re-entrancy while a modal is being
+  // resolved/shown, plus the set of award keys already handled this session.
+  bool _awardCelebrationInFlight = false;
+  final Set<String> _celebratedAwardKeysThisSession = <String>{};
   final LumiTourController _tourController = LumiTourController();
 
   void _onCoversUpdated() {
@@ -275,6 +280,65 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     await Future<void>.delayed(const Duration(milliseconds: 80));
   }
 
+  /// Shows a one-time celebration modal when a child has newly won the weekly
+  /// Top Reader award or been given a teacher's special award. Driven by the
+  /// live award fields on [children]; deduped once per distinct award via
+  /// [AwardCelebrationStore]. Deferred while the first-login character prompt
+  /// or the guided tour is running so celebrations don't stack on onboarding.
+  void _scheduleAwardCelebration(List<StudentModel> children) {
+    if (_awardCelebrationInFlight) return;
+    if (widget.promptForCharacterOnEntry &&
+        !_firstLoginCharacterPromptCompleted) {
+      return;
+    }
+    if (_tourController.isActive) return;
+
+    StudentModel? target;
+    String? awardKey;
+    for (final child in children) {
+      final key = AwardCelebrationStore.keyFor(child);
+      if (key == null || _celebratedAwardKeysThisSession.contains(key)) {
+        continue;
+      }
+      target = child;
+      awardKey = key;
+      break;
+    }
+    if (target == null || awardKey == null) return;
+
+    final child = target;
+    final key = awardKey;
+    _awardCelebrationInFlight = true;
+    // Mark session-seen synchronously so rapid rebuilds can't queue duplicates.
+    _celebratedAwardKeysThisSession.add(key);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) {
+        _awardCelebrationInFlight = false;
+        return;
+      }
+      final alreadyCelebrated = await AwardCelebrationStore.isCelebrated(key);
+      if (!mounted || _tourController.isActive) {
+        _awardCelebrationInFlight = false;
+        return;
+      }
+      if (!alreadyCelebrated) {
+        await AwardCelebrationStore.markCelebrated(key);
+        if (!mounted) {
+          _awardCelebrationInFlight = false;
+          return;
+        }
+        await showAwardCelebrationDialog(context, child: child);
+      }
+      _awardCelebrationInFlight = false;
+      // Another child may also have an uncelebrated award — check again.
+      if (mounted) {
+        final latest = ref.read(parentChildrenProvider).value;
+        if (latest != null) _scheduleAwardCelebration(latest);
+      }
+    });
+  }
+
   void _clearFirstLoginPromptFlag() {
     if (!mounted || !widget.promptForCharacterOnEntry) return;
 
@@ -433,6 +497,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
             }
             _scheduleFirstLoginCharacterPrompt(children);
             _scheduleParentTourIfReady();
+            _scheduleAwardCelebration(children);
             final activeChild =
                 ref.watch(activeChildProvider).value ?? children.first;
             final quickLoggingBySchoolId = {

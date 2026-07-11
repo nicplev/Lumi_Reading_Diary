@@ -1689,6 +1689,157 @@ export const detectAchievements = onDocumentUpdated(
   });
 
 /**
+ * Notifies parents when a student is newly awarded — either the weekly Top
+ * Reader (`autoAward`, written by topReaderAward) or a teacher's special award
+ * (`manualAward`, written client-side by the teacher). Fires on any student-doc
+ * update but only acts when an award's identity actually changes (newly added
+ * or refreshed for a new week), so unrelated writes (stats, achievements,
+ * character picks) don't re-notify. For each linked parent it (1) creates an
+ * inbox item — so the award appears in the notifications list + badge and
+ * survives reinstalls — and (2) sends a push. The app also shows a celebration
+ * modal on next open, driven by the live award fields.
+ *
+ * This trigger never writes the student doc, so it cannot self-trigger.
+ */
+export const notifyAwardChanges = onDocumentUpdated(
+  {document: "schools/{schoolId}/students/{studentId}", concurrency: 1},
+  async (event) => {
+    if (!event.data) return;
+    const schoolId = event.params.schoolId;
+    const studentId = event.params.studentId;
+    const before = event.data.before.data() || {};
+    const after = event.data.after.data();
+    if (!after) return;
+
+    const parentIds: string[] =
+      Array.isArray(after.parentIds) ? after.parentIds : [];
+    if (parentIds.length === 0) return;
+
+    const firstName = (after.firstName as string) || "Your child";
+
+    // One entry per award type that was newly assigned / refreshed.
+    const awardEvents: Array<{
+      type: "auto" | "manual";
+      dedupeId: string;
+      title: string;
+      body: string;
+    }> = [];
+
+    if (awardChanged(before.autoAward, after.autoAward)) {
+      const name = (after.autoAward?.name as string) || "Reader of the Week";
+      awardEvents.push({
+        type: "auto",
+        dedupeId: `auto_${awardDedupe(after.autoAward)}`,
+        title: `${firstName} is ${name}! 🏆`,
+        body:
+          `${firstName} read the most minutes in class last week. ` +
+          "Cheer them on to keep it up!",
+      });
+    }
+
+    if (awardChanged(before.manualAward, after.manualAward)) {
+      const name = (after.manualAward?.name as string) || "a special award";
+      awardEvents.push({
+        type: "manual",
+        dedupeId: `manual_${awardDedupe(after.manualAward)}`,
+        title: `${firstName} earned an award! 🌟`,
+        body:
+          `${firstName}'s teacher gave them the "${name}" award. ` +
+          "Celebrate their reading!",
+      });
+    }
+
+    if (awardEvents.length === 0) return;
+
+    for (const awardEvent of awardEvents) {
+      for (const parentId of parentIds) {
+        try {
+          const parentRef = db.doc(
+            `schools/${schoolId}/parents/${parentId}`,
+          );
+          const parentSnap = await parentRef.get();
+          if (!parentSnap.exists) continue;
+
+          // Deterministic inbox id → a rare re-fire merges instead of dupes.
+          const inboxId = `award_${studentId}_${awardEvent.dedupeId}`;
+          await parentRef.collection("notifications").doc(inboxId).set({
+            campaignId: inboxId,
+            schoolId,
+            title: awardEvent.title,
+            body: awardEvent.body,
+            messageType: "award",
+            studentIds: [studentId],
+            classIds: [],
+            senderName: "Lumi",
+            senderRole: "system",
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            deliveredAt: admin.firestore.FieldValue.serverTimestamp(),
+            pushStatus: "pending",
+            isRead: false,
+            readAt: null,
+          }, {merge: true});
+
+          const fcmToken = parentSnap.data()?.fcmToken;
+          if (!fcmToken) continue;
+          await admin.messaging().send({
+            token: fcmToken,
+            notification: {title: awardEvent.title, body: awardEvent.body},
+            data: {
+              type: "award_earned",
+              studentId,
+              schoolId,
+              awardType: awardEvent.type,
+            },
+          });
+          functions.logger.info("Award notification sent", {
+            parentId, studentId, awardType: awardEvent.type,
+          });
+        } catch (error) {
+          functions.logger.error("Failed to send award notification", {
+            parentId,
+            studentId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    }
+
+    return;
+  });
+
+// True when `after` holds an award whose identity differs from `before` — i.e.
+// a newly assigned award, or the same award refreshed for a new week. Removals
+// (award present in `before`, absent in `after`) and unchanged awards return
+// false, so we only ever celebrate additions.
+function awardChanged(
+  before: Record<string, unknown> | undefined,
+  after: Record<string, unknown> | undefined,
+): boolean {
+  if (!after) return false;
+  const beforeKey = before ? awardIdentity(before) : null;
+  return beforeKey !== awardIdentity(after);
+}
+
+function awardIdentity(award: Record<string, unknown>): string {
+  const characterId = (award.characterId as string) || "";
+  const name = (award.name as string) || "";
+  const weekOf = (award.weekOf as string) || "";
+  return `${characterId}|${name}|${weekOf}|${awardDedupe(award)}`;
+}
+
+// Stable per-award key: week-of for the weekly award, else its awardedAt.
+function awardDedupe(award: Record<string, unknown> | undefined): string {
+  if (!award) return "unknown";
+  const weekOf = award.weekOf as string | undefined;
+  if (weekOf) return weekOf;
+  const awardedAt = award.awardedAt as {toMillis?: () => number} | undefined;
+  if (awardedAt && typeof awardedAt.toMillis === "function") {
+    return String(awardedAt.toMillis());
+  }
+  return (award.name as string) || "award";
+}
+
+/**
  * Backfill achievements (admin-gated, idempotent).
  *
  * Awards every achievement each student currently qualifies for based on their
