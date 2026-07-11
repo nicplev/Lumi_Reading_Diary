@@ -129,6 +129,7 @@ export {verifySchoolCode} from "./code_verification";
 export {onSchoolSubscriptionWrite} from "./subscriptions";
 export {renewStudents, annualRollover} from "./renewals";
 export {topReaderAward} from "./top_reader_award";
+export {submitDemoRequest, submitContactSalesInquiry} from "./marketing_leads";
 
 // Daily cleanup for comprehension audio + per-row teacher/school-admin
 // trash button. The cron is driven by /platformConfig/comprehensionRetention
