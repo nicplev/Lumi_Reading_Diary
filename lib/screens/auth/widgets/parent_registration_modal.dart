@@ -1596,11 +1596,19 @@ class _ParentRegistrationCardState extends State<_ParentRegistrationCard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Text(
+          'Enter your own name — the parent or guardian. '
+          'This is your account, not your child\'s.',
+          style: LumiTextStyles.bodySmall(
+            color: LumiTokens.ink.withValues(alpha: 0.7),
+          ),
+        ),
+        const SizedBox(height: 12),
         LumiInput(
           accentColor: LumiTokens.red,
           controller: _firstNameController,
           focusNode: _firstNameFocusNode,
-          hintText: 'First name',
+          hintText: 'Your first name',
           textInputAction: TextInputAction.next,
           textCapitalization: TextCapitalization.words,
           autofillHints: const [AutofillHints.givenName],
