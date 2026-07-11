@@ -19,7 +19,7 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const session = await getSession();
+  const session = await getSession({ requireMutable: true });
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -96,6 +96,10 @@ export async function POST(request: NextRequest) {
     uid: session.uid,
     email: session.email,
     fullName: session.fullName,
+    // Preserve the real user's server-verified MFA state. If the target role
+    // is admin, getSession() will reject the impersonated cookie unless this
+    // proof is present as well.
+    mfaVerified: session.mfaVerified,
     // EFFECTIVE school/role — every existing API route reads `session.schoolId`
     // and naturally queries the target school from this point on.
     schoolId: targetSchoolId,

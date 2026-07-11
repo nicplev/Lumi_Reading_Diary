@@ -33,6 +33,14 @@ export interface SessionData {
   fullName: string;
   /** Chosen staff Lumi character id; renders in the profile chip. */
   characterId?: string;
+  /**
+   * True only after the server has verified the second-factor requirement for
+   * this session. Admin sessions without this bit are rejected, which also
+   * invalidates admin cookies minted before mandatory MFA was introduced.
+   */
+  mfaVerified?: boolean;
+  /** Server-verified exception for the isolated, synthetic, read-only demo. */
+  mfaExemptReason?: 'isolatedDemoReadOnly';
   /** Present iff a developer impersonation session is active. */
   impersonation?: ImpersonationSessionBlock;
 }
@@ -43,6 +51,9 @@ export interface SessionData {
 // on subsequent requests, so middleware always redirects to /login.
 const SESSION_COOKIE_NAME = '__session';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 5; // 5 days
+const MFA_ENROLLMENT_ISSUER = 'lumi-school-admin';
+const MFA_ENROLLMENT_AUDIENCE = 'admin-totp-enrollment';
+const MFA_ENROLLMENT_MAX_AGE = '10m';
 
 // The shared sales-demo school. Its login accounts use a rolling daily password
 // (scrambled just after Sydney midnight — see functions/src/demo_access.ts), so
@@ -105,20 +116,96 @@ export async function createSessionCookie(sessionData: SessionData) {
   });
 }
 
-export async function getSession(): Promise<SessionData | null> {
+/**
+ * A short-lived proof that this user supplied a valid primary credential and
+ * was identified server-side as a school admin who still needs TOTP. It lets
+ * the first, OTP-confirmed enrollment complete without weakening all future
+ * admin logins, which must contain Firebase's `sign_in_second_factor=totp`
+ * claim.
+ */
+export async function createAdminMfaEnrollmentToken(uid: string) {
+  return new SignJWT({ uid, purpose: MFA_ENROLLMENT_AUDIENCE })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuer(MFA_ENROLLMENT_ISSUER)
+    .setAudience(MFA_ENROLLMENT_AUDIENCE)
+    .setIssuedAt()
+    .setExpirationTime(MFA_ENROLLMENT_MAX_AGE)
+    .sign(getSecret());
+}
+
+export async function verifyAdminMfaEnrollmentToken(
+  token: string | undefined,
+  uid: string,
+): Promise<boolean> {
+  if (!token) return false;
+
+  try {
+    const { payload } = await jwtVerify(token, getSecret(), {
+      algorithms: ['HS256'],
+      issuer: MFA_ENROLLMENT_ISSUER,
+      audience: MFA_ENROLLMENT_AUDIENCE,
+    });
+    return payload.uid === uid && payload.purpose === MFA_ENROLLMENT_AUDIENCE;
+  } catch {
+    return false;
+  }
+}
+
+export async function getSession(
+  options: { requireMutable?: boolean } = {},
+): Promise<SessionData | null> {
   const cookieStore = await cookies();
   const cookie = cookieStore.get(SESSION_COOKIE_NAME);
   if (!cookie?.value) return null;
 
   try {
-    const { payload } = await jwtVerify(cookie.value, getSecret());
+    const { payload } = await jwtVerify(cookie.value, getSecret(), {
+      algorithms: ['HS256'],
+    });
+    const role = payload.role;
+    if (
+      typeof payload.uid !== 'string' ||
+      typeof payload.email !== 'string' ||
+      typeof payload.schoolId !== 'string' ||
+      (role !== 'teacher' && role !== 'schoolAdmin') ||
+      typeof payload.fullName !== 'string'
+    ) {
+      return null;
+    }
+
+    // Mandatory MFA is enforced here as well as at cookie issuance. This
+    // rejects every pre-rollout admin cookie and protects API handlers that
+    // call getSession() even if middleware is bypassed.
+    const hasAdminMfa =
+      payload.mfaVerified === true ||
+      payload.mfaExemptReason === 'isolatedDemoReadOnly';
+    if (role === 'schoolAdmin' && !hasAdminMfa) {
+      return null;
+    }
+
+    // Route handlers that mutate through the Admin SDK must opt into this
+    // check. Admin SDK writes bypass Firestore Rules, and middleware is only a
+    // first-line convenience guard, so both read-only session types must be
+    // rejected again at the handler's authentication boundary.
+    if (
+      options.requireMutable === true &&
+      (payload.mfaExemptReason === 'isolatedDemoReadOnly' || payload.impersonation)
+    ) {
+      return null;
+    }
+
     return {
       uid: payload.uid as string,
       email: payload.email as string,
       schoolId: payload.schoolId as string,
-      role: payload.role as 'teacher' | 'schoolAdmin',
+      role,
       fullName: payload.fullName as string,
       characterId: payload.characterId as string | undefined,
+      mfaVerified: payload.mfaVerified === true,
+      mfaExemptReason:
+        payload.mfaExemptReason === 'isolatedDemoReadOnly'
+          ? 'isolatedDemoReadOnly'
+          : undefined,
       impersonation: payload.impersonation as ImpersonationSessionBlock | undefined,
     };
   } catch {

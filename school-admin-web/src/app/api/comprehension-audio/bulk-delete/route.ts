@@ -17,7 +17,7 @@ const bodySchema = z.object({
 // Writes one summary entry to adminAuditLog. Per-doc entries would explode
 // the audit log on a year-end purge.
 export async function POST(request: NextRequest) {
-  const session = await getSession();
+  const session = await getSession({ requireMutable: true });
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

@@ -29,6 +29,7 @@ export async function POST() {
     fullName: session.fullName,
     schoolId: session.impersonation.realSchoolId,
     role: session.impersonation.realRole,
+    mfaVerified: session.mfaVerified,
   };
 
   await createSessionCookie(restored);

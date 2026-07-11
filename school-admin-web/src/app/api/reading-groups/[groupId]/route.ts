@@ -14,7 +14,7 @@ const updateGroupSchema = z.object({
 });
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ groupId: string }> }) {
-  const session = await getSession();
+  const session = await getSession({ requireMutable: true });
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { groupId } = await params;
@@ -43,7 +43,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 }
 
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ groupId: string }> }) {
-  const session = await getSession();
+  const session = await getSession({ requireMutable: true });
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { groupId } = await params;

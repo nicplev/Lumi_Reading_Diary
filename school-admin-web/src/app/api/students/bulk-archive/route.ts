@@ -10,7 +10,7 @@ const bulkArchiveSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const session = await getSession();
+  const session = await getSession({ requireMutable: true });
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if (session.role !== 'schoolAdmin') {
     return NextResponse.json({ error: 'Only school admins can archive students' }, { status: 403 });

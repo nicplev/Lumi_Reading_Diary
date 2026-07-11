@@ -45,9 +45,9 @@ node scripts/seed_demo_screenshots.js                # screenshot overlay
 (Auth-user creation needs `FIREBASE_ADMIN_SERVICE_ACCOUNT_PATH` — plain
 gcloud ADC can't call the Auth Admin API.)
 
-Logins (password `LumiDemo!2026`): `demo.parent@lumidemo.school` (Sarah:
+Logins (password `LumiDemo!2026`): `support+demo.parent@lumi-reading.com` (Sarah:
 Ava + Leo), `demo.parent2@lumidemo.school` (Marcus: Zoe),
-`demo.teacher@lumidemo.school` (Priya, 3G Goannas).
+`support+demo.teacher@lumi-reading.com` (Priya, 3G Goannas).
 
 Staging notes baked into the overlay: Leo sits one night short of the
 50-night badge so one quick-log reproduces the celebration shot; Zoe has no

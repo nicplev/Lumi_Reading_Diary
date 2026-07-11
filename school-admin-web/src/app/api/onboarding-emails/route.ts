@@ -44,7 +44,7 @@ export async function GET() {
 // history records are removed; nothing is re-sent or recalled. schoolAdmin only.
 export async function DELETE(request: Request) {
   try {
-    const session = await getSession();
+    const session = await getSession({ requireMutable: true });
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (session.role !== 'schoolAdmin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

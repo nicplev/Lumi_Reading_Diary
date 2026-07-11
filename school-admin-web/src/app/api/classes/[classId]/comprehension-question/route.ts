@@ -23,7 +23,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 const schema = z.object({ question: z.string().max(200, 'Keep it under 200 characters') });
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ classId: string }> }) {
-  const session = await getSession();
+  const session = await getSession({ requireMutable: true });
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { classId } = await params;

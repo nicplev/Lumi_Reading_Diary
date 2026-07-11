@@ -27,7 +27,9 @@ function getSecret() {
 
 async function getSessionData(sessionValue: string): Promise<Record<string, unknown> | null> {
   try {
-    const { payload } = await jwtVerify(sessionValue, getSecret());
+    const { payload } = await jwtVerify(sessionValue, getSecret(), {
+      algorithms: ['HS256'],
+    });
     return payload as Record<string, unknown>;
   } catch {
     // Invalid or unsigned cookie — never trust it. (A plain-JSON fallback here
@@ -48,10 +50,32 @@ export async function middleware(request: NextRequest) {
   // mutations are locked regardless of what the handler does) ──────────────
   // Read the session up-front so both API and page requests can consult it.
   const cookie = request.cookies.get('__session');
-  const sessionData = cookie?.value ? await getSessionData(cookie.value) : null;
+  const decodedSession = cookie?.value ? await getSessionData(cookie.value) : null;
+  // Do not let an admin cookie minted before mandatory MFA pass the edge
+  // convenience check. API handlers independently enforce the same invariant
+  // through getSession().
+  const sessionData =
+    decodedSession?.role === 'schoolAdmin' &&
+    decodedSession.mfaVerified !== true &&
+    decodedSession.mfaExemptReason !== 'isolatedDemoReadOnly'
+      ? null
+      : decodedSession;
   const impersonation = sessionData?.impersonation as
     | { expiresAt?: number }
     | undefined;
+
+  // The public demo administrator deliberately skips MFA, so its portal
+  // session is read-only. This prevents the shared demo password from being
+  // used to create accounts, send email, delete records, or change settings.
+  if (
+    sessionData?.mfaExemptReason === 'isolatedDemoReadOnly' &&
+    !['GET', 'HEAD', 'OPTIONS'].includes(request.method.toUpperCase())
+  ) {
+    return NextResponse.json(
+      { error: 'The demo administrator is read-only.' },
+      { status: 403 },
+    );
+  }
 
   if (impersonation) {
     // Expired → force the client out. Middleware cannot call the end-session
