@@ -15,8 +15,8 @@ interface TabsProps {
 
 export function Tabs({ tabs, activeTab, onChange }: TabsProps) {
   return (
-    <div className="border-b border-rule mb-6">
-      <nav className="flex gap-6 -mb-px">
+    <div className="mb-6 overflow-x-auto border-b border-rule">
+      <nav className="-mb-px flex min-w-max gap-6 pr-4">
         {tabs.map((tab) => (
           <button
             key={tab.id}

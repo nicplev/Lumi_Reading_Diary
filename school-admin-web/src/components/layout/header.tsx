@@ -30,26 +30,26 @@ export function Header() {
   const accent = sectionForPath(pathname).accent;
 
   return (
-    <header className="h-14 border-b border-rule bg-paper flex items-center px-6 sticky top-0 z-30">
+    <header className="sticky top-0 z-30 flex h-14 items-center border-b border-rule bg-paper px-4 sm:px-6">
       {/* Section dot — a quiet cue for which colour world you're in */}
       <span
         className="w-2 h-2 rounded-full mr-3 shrink-0"
         style={{ backgroundColor: accent }}
         aria-hidden
       />
-      <nav className="flex items-center gap-1.5 text-sm">
+      <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 overflow-hidden text-sm">
         {segments.map((segment, index) => {
           const href = '/' + segments.slice(0, index + 1).join('/');
           const isLast = index === segments.length - 1;
           const label = overrides[segment] || breadcrumbLabels[segment] || segment;
 
           return (
-            <span key={href} className="flex items-center gap-1.5">
-              {index > 0 && <span className="text-muted/40">/</span>}
+            <span key={href} className={`flex min-w-0 items-center gap-1.5 ${!isLast ? 'hidden sm:flex' : ''}`}>
+              {index > 0 && <span className="shrink-0 text-muted/40">/</span>}
               {isLast ? (
-                <span className="font-semibold text-ink">{label}</span>
+                <span className="truncate font-semibold text-ink">{label}</span>
               ) : (
-                <Link href={href} className="text-muted hover:text-ink transition-colors">
+                <Link href={href} className="truncate text-muted transition-colors hover:text-ink">
                   {label}
                 </Link>
               )}

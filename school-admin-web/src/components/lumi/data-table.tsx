@@ -79,29 +79,31 @@ export function DataTable<T>({
 
   if (loading) {
     return (
-      <div className="bg-paper rounded-[var(--radius-lg)] shadow-card overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-rule">
-              {columns.map((col) => (
-                <th key={col.id} className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">
-                  {col.header}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <tr key={i} className="border-b border-rule/50">
+      <div className="overflow-hidden rounded-[var(--radius-lg)] bg-paper shadow-card">
+        <div className="overflow-x-auto">
+          <table className="min-w-max w-full">
+            <thead>
+              <tr className="border-b border-rule">
                 {columns.map((col) => (
-                  <td key={col.id} className="px-4 py-3">
-                    <Skeleton className="h-4 w-24" />
-                  </td>
+                  <th key={col.id} className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">
+                    {col.header}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i} className="border-b border-rule/50">
+                  {columns.map((col) => (
+                    <td key={col.id} className="px-4 py-3">
+                      <Skeleton className="h-4 w-24" />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   }
@@ -114,7 +116,7 @@ export function DataTable<T>({
     <div>
       <div className="bg-paper rounded-[var(--radius-lg)] shadow-card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="min-w-max w-full">
             <thead>
               <tr className="border-b border-rule">
                 {table.getHeaderGroups().map((headerGroup) =>
@@ -163,11 +165,11 @@ export function DataTable<T>({
       </div>
 
       {(table.getPageCount() > 1 || pageSizeOptions) && (
-        <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted">
             Page {table.getState().pagination.pageIndex + 1} of {Math.max(table.getPageCount(), 1)} ({data.length} total)
           </p>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {pageSizeOptions && pageSizeOptions.length > 0 && (
               <label className="flex items-center gap-2 text-sm text-muted">
                 <span>Rows per page</span>
