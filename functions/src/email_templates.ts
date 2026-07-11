@@ -25,6 +25,16 @@ const CARD_TINT = "#FAF6F0";
 const NOTE_BG = "#FEF6D8";
 const NOTE_LABEL = "#8A6D00";
 
+// Interpolated request fields (contactPerson/schoolName) are attacker-controlled
+// via the public marketing form, so escape everything spliced into the HTML.
+// Mirrors escapeHtml in marketing_leads.ts.
+function escapeHtml(s: string): string {
+  const map: Record<string, string> = {
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;",
+  };
+  return s.replace(/[&<>"']/g, (c) => map[c]);
+}
+
 interface OnboardingEmailEntry {
   studentName: string;
   linkCode: string;
@@ -600,6 +610,212 @@ export function buildStaffOnboardingEmail(params: {
               </p>
               <p style="margin: 0 0 20px 0; font-family: ${FONT_BODY}; font-size: 13px; color: ${MUTED}; line-height: 1.65;">
                 This email was sent by <strong style="color: ${INK};">${schoolName}</strong> via Lumi.<br />If you weren't expecting this, please contact your school.
+              </p>
+              <p style="margin: 0; font-family: ${FONT_DISPLAY}; font-size: 11px; font-weight: 800; color: ${RED_DARK}; letter-spacing: 3px;">
+                LUMI READING DIARY
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+// ─── Demo-day access (rolling credentials for a sales demo) ───────────
+
+/**
+ * A single "Label: value" credential row inside a demo card.
+ * @param {string} label The row label (already plain text).
+ * @param {string} value The already-escaped value to show in mono.
+ * @return {string} The row HTML.
+ */
+function renderDemoCredentialRow(label: string, value: string): string {
+  return `
+                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 8px 0;">
+                  <tr>
+                    <td style="font-family: ${FONT_DISPLAY}; font-size: 11px; font-weight: 700; color: ${RED_DARK}; text-transform: uppercase; letter-spacing: 1.5px; padding-bottom: 2px;">
+                      ${label}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="font-family: ${FONT_MONO}; font-size: 16px; font-weight: 700; color: ${INK}; word-break: break-all;">
+                      ${value}
+                    </td>
+                  </tr>
+                </table>`;
+}
+
+export function buildDemoAccessEmail(params: {
+  contactPerson: string;
+  schoolName: string;
+  /** Human date, e.g. "Friday 11 Jul", for the body copy. */
+  dateLabel: string;
+  password: string;
+  adminEmail: string;
+  teacherEmail: string;
+  parentEmail: string;
+  portalLoginUrl: string;
+  marketingUrl: string;
+  /** null ⇒ the email shows a "search for Lumi Reading" line, not a dead link. */
+  appStoreUrl: string | null;
+  playStoreUrl: string | null;
+}): string {
+  const {
+    contactPerson,
+    schoolName,
+    dateLabel,
+    password,
+    adminEmail,
+    teacherEmail,
+    parentEmail,
+    portalLoginUrl,
+    marketingUrl,
+    appStoreUrl,
+    playStoreUrl,
+  } = params;
+
+  const firstName = contactPerson.trim().split(" ")[0] || "";
+  const greeting = firstName ? `Hi ${escapeHtml(firstName)},` : "Hi there,";
+  const forSchool = schoolName.trim() ?
+    ` for today's session (<strong style="color: ${RED};">${escapeHtml(schoolName.trim())}</strong>)` :
+    " for today's session";
+  const pw = escapeHtml(password);
+
+  // Store row: link buttons only when BOTH URLs exist; otherwise a plain
+  // "search for Lumi Reading" line so we never ship dead `#` links.
+  const bothStoreUrls = !!appStoreUrl && !!playStoreUrl;
+  const storeBlock = bothStoreUrls ?
+    `
+                <table cellpadding="0" cellspacing="0" border="0" style="margin: 6px auto 0;">
+                  <tr>
+                    <td style="padding: 4px;">
+                      <a href="${appStoreUrl}" target="_blank" style="display: inline-block; background-color: ${INK}; text-decoration: none; padding: 10px 20px; border-radius: 12px; font-family: ${FONT_DISPLAY}; font-size: 14px; font-weight: 800; color: ${PAPER};">App Store</a>
+                    </td>
+                    <td style="padding: 4px;">
+                      <a href="${playStoreUrl}" target="_blank" style="display: inline-block; background-color: ${INK}; text-decoration: none; padding: 10px 20px; border-radius: 12px; font-family: ${FONT_DISPLAY}; font-size: 14px; font-weight: 800; color: ${PAPER};">Google Play</a>
+                    </td>
+                  </tr>
+                </table>` :
+    `
+                <p style="margin: 6px 0 0 0; font-family: ${FONT_BODY}; font-size: 14px; color: ${INK_SOFT}; text-align: center; line-height: 1.6;">
+                  Search for <strong>&ldquo;Lumi Reading&rdquo;</strong> in the App Store or Google Play.
+                </p>`;
+
+  return `<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>Your Lumi demo access</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body style="margin: 0; padding: 0; background-color: ${CREAM}; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: ${CREAM};">
+    <tr>
+      <td align="center" style="padding: 32px 16px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; width: 100%; background-color: ${PAPER}; border-radius: 24px; overflow: hidden; box-shadow: 0 8px 24px rgba(26,26,26,0.08);">
+
+          <!-- Hero -->
+          <tr>
+            <td style="background-color: ${RED}; background-image: ${RED_GRADIENT}; padding: 44px 32px 40px; text-align: center;">
+              <img src="cid:${LUMI_MASCOT_CONTENT_ID}" width="103" height="100" alt="Lumi" style="display: block; width: 103px; height: 100px; margin: 0 auto 14px;" />
+              <h1 style="margin: 0 0 8px 0; font-family: ${FONT_DISPLAY}; font-size: 44px; font-weight: 800; color: ${PAPER}; letter-spacing: 1px; line-height: 1;">
+                Lumi
+              </h1>
+              <p style="margin: 0; font-family: ${FONT_DISPLAY}; font-size: 11px; font-weight: 700; color: ${PAPER}; text-transform: uppercase; letter-spacing: 4px; opacity: 0.95;">
+                Demo access
+              </p>
+            </td>
+          </tr>
+
+          <!-- Welcome -->
+          <tr>
+            <td style="padding: 40px 40px 12px 40px; text-align: center;">
+              <h2 style="margin: 0 0 12px 0; font-family: ${FONT_DISPLAY}; font-size: 26px; font-weight: 800; color: ${INK}; line-height: 1.25;">
+                ${greeting}
+              </h2>
+              <p style="margin: 0; font-family: ${FONT_BODY}; font-size: 15px; color: ${INK_SOFT}; line-height: 1.7;">
+                Thanks for booking a Lumi demo — here's everything you need${forSchool} on <strong>${escapeHtml(dateLabel)}</strong>.
+              </p>
+            </td>
+          </tr>
+
+          <tr><td style="height: 20px; line-height: 20px; font-size: 0;">&nbsp;</td></tr>
+
+          <!-- School admin portal card -->
+          <tr>
+            <td style="padding: 0 24px 8px 24px;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: ${CARD_TINT}; background-image: linear-gradient(180deg, ${CARD_TINT} 0%, ${PAPER} 78%); border-radius: 20px; border: 1px solid ${RULE};">
+                <tr>
+                  <td style="padding: 26px 24px;">
+                    <p style="margin: 0 0 6px 0; font-family: ${FONT_DISPLAY}; font-size: 18px; font-weight: 800; color: ${INK};">
+                      School admin portal
+                    </p>
+                    <p style="margin: 0 0 18px 0; font-family: ${FONT_BODY}; font-size: 14px; color: ${MUTED}; line-height: 1.6;">
+                      Works in any browser. Go to <a href="${marketingUrl}" target="_blank" style="color: ${RED}; font-weight: 700; text-decoration: none;">${marketingUrl}</a> and click <strong>Log in</strong> (top right), or go straight to <a href="${portalLoginUrl}" target="_blank" style="color: ${RED}; font-weight: 700; text-decoration: none;">the portal login</a>.
+                    </p>
+                    ${renderDemoCredentialRow("Email", escapeHtml(adminEmail))}
+                    ${renderDemoCredentialRow("Password", pw)}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Lumi app card -->
+          <tr>
+            <td style="padding: 0 24px 8px 24px;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: ${CARD_TINT}; background-image: linear-gradient(180deg, ${CARD_TINT} 0%, ${PAPER} 78%); border-radius: 20px; border: 1px solid ${RULE};">
+                <tr>
+                  <td style="padding: 26px 24px;">
+                    <p style="margin: 0 0 6px 0; font-family: ${FONT_DISPLAY}; font-size: 18px; font-weight: 800; color: ${INK};">
+                      The Lumi app
+                    </p>
+                    <p style="margin: 0 0 18px 0; font-family: ${FONT_BODY}; font-size: 14px; color: ${MUTED}; line-height: 1.6;">
+                      How teachers &amp; parents use Lumi day-to-day. Both logins use the <strong>same password</strong> as above.
+                    </p>
+                    ${renderDemoCredentialRow("Teacher login", escapeHtml(teacherEmail))}
+                    ${renderDemoCredentialRow("Parent login (mobile app only)", escapeHtml(parentEmail))}
+                    ${storeBlock}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Expiry + data-hygiene note -->
+          <tr>
+            <td style="padding: 16px 24px 8px 24px;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: ${NOTE_BG}; border-radius: 14px;">
+                <tr>
+                  <td style="padding: 18px 22px;">
+                    <p style="margin: 0 0 6px 0; font-family: ${FONT_DISPLAY}; font-size: 11px; font-weight: 700; color: ${NOTE_LABEL}; text-transform: uppercase; letter-spacing: 2px;">
+                      Good to know
+                    </p>
+                    <p style="margin: 0; font-family: ${FONT_BODY}; font-size: 14px; color: ${INK}; line-height: 1.65;">
+                      These logins are live <strong>today only</strong> and expire at midnight (AEST/AEDT) — ask us for fresh access any time. This is a shared demo environment with sample students, so please don't enter real student data.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: ${CREAM}; padding: 32px 32px 28px; text-align: center; border-top: 1px solid ${RULE};">
+              <p style="margin: 0 0 8px 0; font-family: ${FONT_DISPLAY}; font-size: 13px; font-weight: 800; color: ${INK};">
+                Questions?
+              </p>
+              <p style="margin: 0 0 20px 0; font-family: ${FONT_BODY}; font-size: 13px; color: ${MUTED}; line-height: 1.65;">
+                Just reply to this email — we're happy to help you get the most out of your demo.
               </p>
               <p style="margin: 0; font-family: ${FONT_DISPLAY}; font-size: 11px; font-weight: 800; color: ${RED_DARK}; letter-spacing: 3px;">
                 LUMI READING DIARY
