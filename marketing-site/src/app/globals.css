@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Lumi design tokens — same palette as the school portal
+   (school-admin-web/src/app/globals.css), minus the per-route
+   --section-accent scoping, which this single-brand marketing site
+   doesn't need.
+   ───────────────────────────────────────────────────────────────────────── */
+
+@theme {
+  --color-lumi-red: #EC4544;
+  --color-lumi-red-dark: #D63A39;
+  --color-lumi-yellow: #FFCB05;
+  --color-lumi-yellow-dark: #E6B600;
+  --color-lumi-green: #51BA65;
+  --color-lumi-green-dark: #429654;
+  --color-lumi-blue: #56C8E6;
+  --color-lumi-blue-dark: #2A9FC4;
+  --color-lumi-orange: #FAA51A;
+  --color-lumi-indigo: #1989CA;
+  --color-lumi-pink: #F5A1C5;
+
+  --color-tint-red: #FFE0DF;
+  --color-tint-yellow: #FFF1C2;
+  --color-tint-green: #DFF0E3;
+  --color-tint-blue: #DCF0F8;
+
+  --color-cream: #F7F5F0;
+  --color-paper: #FFFFFF;
+  --color-ink: #1C1812;
+  --color-ink-soft: #4A453E;
+  --color-ink-faint: #857E73;
+  --color-rule: #ECE7DD;
+
+  --font-heading: "Nunito", sans-serif;
+  --font-body: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-cream);
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes lumiFloat {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-14px) rotate(1deg); }
+}
+@keyframes lumiFloatB {
+  0%, 100% { transform: translateY(0) rotate(2deg); }
+  50% { transform: translateY(-10px) rotate(-2deg); }
+}
+@keyframes chipBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+@keyframes scanSweep {
+  0%, 100% { left: 2px; }
+  50% { left: calc(100% - 4px); }
+}
+@keyframes ringSweep {
+  from { stroke-dashoffset: 159.5; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes confettiFall {
+  from { transform: translateY(-6px) rotate(0deg); opacity: 1; }
+  to { transform: translateY(280px) rotate(340deg); opacity: 0; }
+}
+@keyframes popIn {
+  0% { transform: scale(0.5); opacity: 0; }
+  65% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes lumiRise {
+  from { transform: translateY(26px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-draw="ring"] { animation: ringSweep 1.4s cubic-bezier(.16,.84,.44,1) .4s both; }
+  [data-hover="pop"]:hover { transform: scale(1.24) rotate(-5deg) !important; }
+  [data-hover="peek-l"]:hover { transform: translateY(-12px) rotate(-6deg) !important; }
+  [data-hover="peek-r"]:hover { transform: translateY(-12px) rotate(6deg) !important; }
+  [data-hover="lift"]:hover { transform: translateY(-2px) !important; }
+
+  :is(
+    [data-anim="stagger"],
+    [data-anim="bento"],
+    [data-anim="pop"],
+    [data-anim="bars"]
+  ) > *:not([data-shown]) {
+    opacity: 0;
+  }
+  [data-anim="reveal"]:not([data-shown]) { opacity: 0; transform: translateY(26px); }
+  [data-anim="reveal-left"]:not([data-shown]) { opacity: 0; transform: translateX(-40px); }
+  [data-anim="reveal-right"]:not([data-shown]) { opacity: 0; transform: translateX(40px); }
+  [data-anim="stagger"] > *:not([data-shown]) { transform: translateY(26px); }
+  [data-anim="bento"] > *:not([data-shown]) { transform: translateY(28px) scale(.95); }
+  [data-anim="pop"] > *:not([data-shown]) { transform: scale(.35); }
+  [data-anim="bars"] > *:not([data-shown]) { transform: scaleY(0); }
+
+  [data-anim="reveal"], [data-anim="reveal-left"], [data-anim="reveal-right"],
+  [data-anim="stagger"] > *, [data-anim="bento"] > * {
+    transition: opacity .7s cubic-bezier(.16,.84,.44,1), transform .7s cubic-bezier(.16,.84,.44,1);
+  }
+  [data-anim="pop"] > * { transition: opacity .35s ease, transform .6s cubic-bezier(.34,1.56,.64,1); }
+  [data-anim="bars"] > * { transform-origin: bottom; transition: transform .9s cubic-bezier(.16,.84,.44,1); }
+}
+
+[data-nav] { transition: box-shadow .35s ease, background .35s ease; }
+[data-nav] > div { transition: padding .35s ease; }
+[data-nav][data-condensed] { box-shadow: 0 10px 28px -18px rgba(33,28,22,0.3); background: rgba(247,245,240,0.96); }
+[data-nav][data-condensed] > div { padding-top: 9px !important; padding-bottom: 9px !important; }
