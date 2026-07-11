@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #E7E7E3; -webkit-font-smoothing: antialiased; }
+  @keyframes lumiFloat { 0%,100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-14px) rotate(1deg); } }
+  @keyframes lumiFloatB { 0%,100% { transform: translateY(0) rotate(2deg); } 50% { transform: translateY(-10px) rotate(-2deg); } }
+  @keyframes chipBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+</style>
+</helmet>
+
+<div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #211C16; padding: 48px 40px 80px; max-width: 1640px; margin: 0 auto;">
+
+  <!-- ===== INTRO / REASONING ===== -->
+  <div style="max-width: 980px; margin: 0 auto 8px;">
+    <div style="display:inline-block; font-family:'Nunito',sans-serif; font-weight:800; font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:#51BA65;">Lumi Reading Diary · Landing page</div>
+    <h1 style="font-family:'Nunito',sans-serif; font-weight:900; font-size:40px; line-height:1.08; margin:10px 0 14px; letter-spacing:-0.01em;">Three directions for the homepage hero</h1>
+    <p style="font-weight:300; font-size:17px; line-height:1.65; color:#4A453E; margin:0 0 18px; max-width:760px;">Same system, three compositions and messaging angles for a <strong style="font-weight:600;">school decision-maker</strong> audience. Brand stays playful, the substance stays credible. Mascot is used as a friendly accent (~40%), illustration-led, no device mockups. Pick the hero you like and I'll build the full page — teachers, admin, how-it-works, features, social proof, pricing and FAQ — in that direction.</p>
+
+    <!-- system bar -->
+    <div style="display:flex; flex-wrap:wrap; gap:24px; align-items:center; padding:18px 22px; background:#F7F5F0; border:1px solid #E4E0D7; border-radius:18px;">
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <span style="font-family:'Nunito',sans-serif; font-weight:800; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:#928B7F;">Palette</span>
+        <div style="display:flex; gap:8px;">
+          <span style="width:30px;height:30px;border-radius:8px;background:#EC4544;"></span>
+          <span style="width:30px;height:30px;border-radius:8px;background:#FFCB05;"></span>
+          <span style="width:30px;height:30px;border-radius:8px;background:#51BA65;"></span>
+          <span style="width:30px;height:30px;border-radius:8px;background:#56C8E6;"></span>
+          <span style="width:30px;height:30px;border-radius:8px;background:#F7F5F0;border:1px solid #E4E0D7;"></span>
+        </div>
+      </div>
+      <div style="width:1px; align-self:stretch; background:#E4E0D7;"></div>
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <span style="font-family:'Nunito',sans-serif; font-weight:800; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:#928B7F;">Type</span>
+        <span style="font-family:'Nunito',sans-serif; font-weight:800; font-size:18px;">Nunito ExtraBold — headings</span>
+        <span style="font-weight:300; font-size:14px; color:#6A645B;">Helvetica Neue Light — body</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- DIRECTION A — EDITORIAL SPLIT -->
+  <!-- ============================================================ -->
+  <div style="margin-top:54px;">
+    <div style="display:flex; align-items:baseline; gap:12px; margin:0 auto 14px; max-width:1440px;">
+      <span style="font-family:'Nunito',sans-serif; font-weight:900; font-size:22px;">A</span>
+      <span style="font-family:'Nunito',sans-serif; font-weight:800; font-size:15px; color:#211C16;">Editorial &amp; credible</span>
+      <span style="font-weight:300; font-size:14px; color:#857E73;">Split hero · outcomes-for-schools copy · mascot as a tidy accent</span>
+    </div>
+
+    <div data-screen-label="Direction A" style="width:1440px; margin:0 auto; background:#F7F5F0; border-radius:26px; overflow:hidden; box-shadow:0 22px 60px -28px rgba(33,28,22,0.34); border:1px solid #E8E4DB;">
+      <!-- nav -->
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:24px 46px; border-bottom:1px solid #EDE9E0;">
+        <div style="display:flex; align-items:center; gap:40px;">
+          <span style="font-family:'Nunito',sans-serif; font-weight:900; font-size:29px; color:#211C16; letter-spacing:-0.01em;">Lumi</span>
+          <div style="display:flex; gap:28px; font-weight:400; font-size:15px; color:#4A453E;">
+            <span>For Schools</span><span>For Teachers</span><span>How it works</span><span>Pricing</span>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:18px;">
+          <span style="font-weight:400; font-size:15px; color:#4A453E;">Contact sales</span>
+          <span style="font-family:'Nunito',sans-serif; font-weight:800; font-size:15px; color:#fff; background:#EC4544; padding:12px 22px; border-radius:999px;">Book a demo</span>
+        </div>
+      </div>
+      <!-- hero body -->
+      <div style="display:grid; grid-template-columns:1.05fr 0.95fr; gap:30px; padding:64px 46px 70px; align-items:center;">
+        <div>
+          <span style="display:inline-flex; align-items:center; gap:8px; font-family:'Nunito',sans-serif; font-weight:800; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:#3C9B53; background:#DFF0E3; padding:8px 14px; border-radius:999px;">For Australian primary schools</span>
+          <h2 style="font-family:'Nunito',sans-serif; font-weight:900; font-size:58px; line-height:1.04; letter-spacing:-0.02em; margin:22px 0 0; color:#1C1812;">The home reading diary your whole school will&nbsp;actually use.</h2>
+          <p style="font-weight:300; font-size:20px; line-height:1.6; color:#4A453E; margin:22px 0 0; max-width:520px;">Lumi replaces the paper reading journal with a 30-second nightly log for parents and a live class dashboard for teachers — keeping real, physical books at the centre of reading.</p>
+          <div style="display:flex; gap:14px; margin-top:34px;">
+            <span style="font-family:'Nunito',sans-serif; font-weight:800; font-size:17px; color:#fff; background:#EC4544; padding:16px 30px; border-radius:999px; box-shadow:0 10px 22px -10px rgba(236,69,68,0.7);">Book a demo</span>
+            <span style="font-family:'Nunito',sans-serif; font-weight:800; font-size:17px; color:#1C1812; background:#fff; border:1.5px solid #E0DBD0; padding:16px 30px; border-radius:999px;">Contact sales</span>
+          </div>
+          <div style="margin-top:40px;">
+            <span style="font-weight:300; font-size:13px; letter-spacing:0.04em; text-transform:uppercase; color:#928B7F;">Trusted by primary schools across Australia</span>
+            <div style="display:flex; gap:12px; margin-top:14px;">
+              <span style="width:46px;height:46px;border-radius:12px;background:#EFEBE2;display:flex;align-items:center;justify-content:center;font-family:'Nunito',sans-serif;font-weight:800;color:#A49C8E;font-size:15px;">PS</span>
+              <span style="width:46px;height:46px;border-radius:12px;background:#EFEBE2;display:flex;align-items:center;justify-content:center;font-family:'Nunito',sans-serif;font-weight:800;color:#A49C8E;font-size:15px;">SC</span>
+              <span style="width:46px;height:46px;border-radius:12px;background:#EFEBE2;display:flex;align-items:center;justify-content:center;font-family:'Nunito',sans-serif;font-weight:800;color:#A49C8E;font-size:15px;">CP</span>
+              <span style="width:46px;height:46px;border-radius:12px;background:#EFEBE2;display:flex;align-items:center;justify-content:center;font-family:'Nunito',sans-serif;font-weight:800;color:#A49C8E;font-size:15px;">GV</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- illustration panel -->
+        <div style="position:relative; background:#DCF0F8; border-radius:24px; height:480px; overflow:hidden;">
+          <!-- soft inner ring -->
+          <div style="position:absolute; inset:0; background:radial-gradient(120% 90% at 70% 30%, rgba(255,255,255,0.7), rgba(255,255,255,0) 60%);"></div>
+          <!-- book stack -->
+          <div style="position:absolute; left:54px; bottom:74px;">
+            <div style="width:188px;height:30px;background:#51BA65;border-radius:6px;transform:rotate(-3deg);box-shadow:0 6px 12px -6px rgba(0,0,0,0.25);"></div>
+            <div style="width:188px;height:30px;background:#FFCB05;border-radius:6px;transform:rotate(2deg);margin-top:7px;box-shadow:0 6px 12px -6px rgba(0,0,0,0.25);"></div>
+            <div style="width:188px;height:30px;background:#56C8E6;border-radius:6px;transform:rotate(-2deg);margin-top:7px;box-shadow:0 6px 12px -6px rgba(0,0,0,0.25);"></div>
+            <div style="width:188px;height:30px;background:#EC4544;border-radius:6px;transform:rotate(1deg);margin-top:7px;box-shadow:0 6px 12px -6px rgba(0,0,0,0.25);"></div>
+          </div>
+          <!-- mascot -->
+          <div style="position:absolute; right:40px; bottom:58px; width:170px; animation:lumiFloat 5.5s ease-in-out infinite;">
+            <dc-import name="LumiMascot" color="#EC4544" cheek="#F5A1C5" hint-size="170px,182px" style="display:block;width:170px;height:182px;filter:drop-shadow(0 16px 16px rgba(33,28,22,0.16));"></dc-import>
+          </div>
+          <!-- floating streak chip -->
+          <div style="position:absolute; right:34px; top:34px; background:#fff; border-radius:16px; padding:12px 16px; box-shadow:0 12px 26px -12px rgba(33,28,22,0.34); display:flex; align-items:center; gap:10px; animation:chipBob 4s ease-in-out infinite;">
+            <span style="width:34px;height:34px;border-radius:10px;background:#FFF1C2;display:flex;align-items:center;justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M13 2c.4 4-3 5.5-3 9.5 0 1.2.5 2 1.3 2.4-.2-1.4.4-2.6 1.5-3.2-.3 2 .9 2.7 1.7 3.3 1.1.8 1.7 1.8 1.7 3.1A4.7 4.7 0 0 1 7.5 13c0-4.3 4-4.8 5.5-11z" fill="#FAA51A"/></svg></span>
+            <div style="display:flex;flex-direction:column;line-height:1.1;">
+              <span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:17px;color:#1C1812;">16 days</span>
+              <span style="font-weight:300;font-size:12px;color:#857E73;">reading streak</span>
+            </div>
+          </div>
+          <!-- floating mood chip -->
+          <div style="position:absolute; left:40px; top:46px; background:#fff; border-radius:16px; padding:11px 15px; box-shadow:0 12px 26px -12px rgba(33,28,22,0.34); display:flex; align-items:center; gap:9px; animation:chipBob 4.6s ease-in-out infinite 0.4s;">
+            <span style="width:30px;height:30px;border-radius:50%;background:#51BA65;"></span>
+            <span style="font-weight:300;font-size:14px;color:#1C1812;">Loved it tonight!</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- DIRECTION B — PLAYFUL BENTO -->
+  <!-- ============================================================ -->
+  <div style="margin-top:68px;">
+    <div style="display:flex; align-items:baseline; gap:12px; margin:0 auto 14px; max-width:1440px;">
+      <span style="font-family:'Nunito',sans-serif; font-weight:900; font-size:22px;">B</span>
+      <span style="font-family:'Nunito',sans-serif; font-weight:800; font-size:15px; color:#211C16;">Playful bento</span>
+      <span style="font-weight:300; font-size:14px; color:#857E73;">Colour-blocked tile grid · speed &amp; simplicity copy</span>
+    </div>
+
+    <div data-screen-label="Direction B" style="width:1440px; margin:0 auto; background:#F7F5F0; border-radius:26px; overflow:hidden; box-shadow:0 22px 60px -28px rgba(33,28,22,0.34); border:1px solid #E8E4DB;">
+      <!-- nav -->
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:24px 46px;">
+        <div style="display:flex; align-items:center; gap:40px;">
+          <span style="font-family:'Nunito',sans-serif; font-weight:900; font-size:29px; color:#211C16; letter-spacing:-0.01em;">Lumi</span>
+          <div style="display:flex; gap:28px; font-weight:400; font-size:15px; color:#4A453E;">
+            <span>For Schools</span><span>For Teachers</span><span>How it works</span><span>Pricing</span>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:18px;">
+          <span style="font-weight:400; font-size:15px; color:#4A453E;">Contact sales</span>
+          <span style="font-family:'Nunito',sans-serif; font-weight:800; font-size:15px; color:#fff; background:#EC4544; padding:12px 22px; border-radius:999px;">Book a demo</span>
+        </div>
+      </div>
+
+      <!-- centered headline -->
+      <div style="text-align:center; padding:30px 46px 10px;">
+        <span style="display:inline-block; font-family:'Nunito',sans-serif; font-weight:800; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:#C79400; background:#FFF1C2; padding:8px 14px; border-radius:999px;">No paper · No typing · 30 seconds</span>
+        <h2 style="font-family:'Nunito',sans-serif; font-weight:900; font-size:56px; line-height:1.04; letter-spacing:-0.02em; margin:18px auto 0; max-width:880px; color:#1C1812;">Nightly reading, logged in 30&nbsp;seconds.</h2>
+        <p style="font-weight:300; font-size:19px; line-height:1.6; color:#4A453E; margin:18px auto 0; max-width:600px;">Parents tap a book, their child shows how it felt, and a quick comment chip does the rest. Teachers see it all on a live class dashboard.</p>
+        <div style="display:flex; gap:14px; justify-content:center; margin-top:28px;">
+          <span style="font-family:'Nunito',sans-serif; font-weight:800; font-size:17px; color:#fff; background:#EC4544; padding:16px 30px; border-radius:999px; box-shadow:0 10px 22px -10px rgba(236,69,68,0.7);">Book a demo</span>
+          <span style="font-family:'Nunito',sans-serif; font-weight:800; font-size:17px; color:#1C1812; background:#fff; border:1.5px solid #E0DBD0; padding:16px 30px; border-radius:999px;">Contact sales</span>
+        </div>
+      </div>
+
+      <!-- bento grid -->
+      <div style="display:grid; grid-template-columns:repeat(3, 1fr); grid-auto-rows:172px; gap:18px; padding:34px 46px 50px;">
+        <!-- tap how it felt (yellow, tall) -->
+        <div style="grid-row:span 2; background:#FFCB05; border-radius:22px; padding:26px; display:flex; flex-direction:column; justify-content:space-between; overflow:hidden;">
+          <span style="font-family:'Nunito',sans-serif; font-weight:900; font-size:23px; line-height:1.15; color:#3A2E00;">Tap how the reading felt</span>
+          <div style="display:flex; gap:14px; align-items:flex-end;">
+            <span style="width:54px;height:54px;border-radius:50%;background:#EC4544;"></span>
+            <span style="width:64px;height:64px;border-radius:50%;background:#51BA65;"></span>
+            <span style="width:54px;height:54px;border-radius:50%;background:#56C8E6;"></span>
+          </div>
+        </div>
+        <!-- dashboard (blue, wide) -->
+        <div style="grid-column:span 2; background:#56C8E6; border-radius:22px; padding:26px; display:flex; align-items:center; gap:26px; overflow:hidden;">
+          <div style="flex:1;">
+            <span style="font-family:'Nunito',sans-serif; font-weight:900; font-size:23px; color:#06384A;">A live dashboard for every class</span>
+            <p style="font-weight:300; font-size:15px; color:#0B4A60; margin:8px 0 0; max-width:280px;">Engagement charts and priority nudges for students who haven't read.</p>
+          </div>
+          <div style="display:flex; align-items:flex-end; gap:7px; height:96px; background:rgba(255,255,255,0.55); padding:14px; border-radius:14px;">
+            <span style="width:16px;height:46px;background:#1989CA;border-radius:4px;"></span>
+            <span style="width:16px;height:70px;background:#1989CA;border-radius:4px;"></span>
+            <span style="width:16px;height:34px;background:#1989CA;border-radius:4px;"></span>
+            <span style="width:16px;height:62px;background:#1989CA;border-radius:4px;"></span>
+            <span style="width:16px;height:80px;background:#1989CA;border-radius:4px;"></span>
+          </div>
+        </div>
+        <!-- allocate readers (green) -->
+        <div style="background:#51BA65; border-radius:22px; padding:26px; display:flex; flex-direction:column; justify-content:space-between; overflow:hidden;">
+          <span style="font-family:'Nunito',sans-serif; font-weight:900; font-size:21px; line-height:1.15; color:#0C3A18;">Allocate decodable readers by level</span>
+          <div style="display:flex; gap:7px; flex-wrap:wrap;">
+            <span style="font-weight:300;font-size:13px;background:rgba(255,255,255,0.6);padding:6px 11px;border-radius:999px;color:#0C3A18;">Level 12</span>
+            <span style="font-weight:300;font-size:13px;background:rgba(255,255,255,0.6);padding:6px 11px;border-radius:999px;color:#0C3A18;">Free choice</span>
+          </div>
+        </div>
+        <!-- mascot streak (red) -->
+        <div style="position:relative; background:#EC4544; border-radius:22px; padding:26px; display:flex; flex-direction:column; justify-content:space-between; overflow:hidden;">
+          <span style="font-family:'Nunito',sans-serif; font-weight:900; font-size:21px; line-height:1.15; color:#fff;">Streaks &amp; badges keep kids reading</span>
+          <span style="font-weight:300; font-size:14px; color:#FFE0DF;">16-day streak · rest days built in</span>
+          <div style="position:absolute; right:-6px; bottom:-10px; width:104px; animation:lumiFloatB 5s ease-in-out infinite;">
+            <dc-import name="LumiMascot" color="#FFCB05" cheek="#EC4544" highlight-opacity="0" hint-size="104px,111px" style="display:block;width:104px;height:111px;"></dc-import>
+          </div>
+        </div>
+        <!-- scanner (cream) -->
+        <div style="background:#fff; border:1px solid #ECE7DD; border-radius:22px; padding:26px; display:flex; flex-direction:column; justify-content:space-between; overflow:hidden;">
+          <span style="font-family:'Nunito',sans-serif; font-weight:900; font-size:21px; line-height:1.15; color:#1C1812;">Build your library by scanning ISBNs</span>
+          <div style="display:flex; gap:4px; align-items:flex-end; height:38px;">
+            <span style="width:4px;height:38px;background:#211C16;"></span><span style="width:3px;height:38px;background:#211C16;"></span><span style="width:6px;height:38px;background:#211C16;"></span><span style="width:3px;height:38px;background:#211C16;"></span><span style="width:5px;height:38px;background:#211C16;"></span><span style="width:3px;height:38px;background:#211C16;"></span><span style="width:7px;height:38px;background:#211C16;"></span><span style="width:3px;height:38px;background:#211C16;"></span><span style="width:4px;height:38px;background:#211C16;"></span><span style="width:6px;height:38px;background:#211C16;"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- DIRECTION C — SOFT SPOTLIGHT -->
+  <!-- ============================================================ -->
+  <div style="margin-top:68px;">
+    <div style="display:flex; align-items:baseline; gap:12px; margin:0 auto 14px; max-width:1440px;">
+      <span style="font-family:'Nunito',sans-serif; font-weight:900; font-size:22px;">C</span>
+      <span style="font-family:'Nunito',sans-serif; font-weight:800; font-size:15px; color:#211C16;">Soft spotlight</span>
+      <span style="font-weight:300; font-size:14px; color:#857E73;">Centred mascot moment · emotional copy · floating UI chips</span>
+    </div>
+
+    <div data-screen-label="Direction C" style="width:1440px; margin:0 auto; background:linear-gradient(180deg, #F7F5F0 0%, #E9F6FB 100%); border-radius:26px; overflow:hidden; box-shadow:0 22px 60px -28px rgba(33,28,22,0.34); border:1px solid #E8E4DB;">
+      <!-- nav -->
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:24px 46px;">
+        <div style="display:flex; align-items:center; gap:40px;">
+          <span style="font-family:'Nunito',sans-serif; font-weight:900; font-size:29px; color:#211C16; letter-spacing:-0.01em;">Lumi</span>
+          <div style="display:flex; gap:28px; font-weight:400; font-size:15px; color:#4A453E;">
+            <span>For Schools</span><span>For Teachers</span><span>How it works</span><span>Pricing</span>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:18px;">
+          <span style="font-weight:400; font-size:15px; color:#4A453E;">Contact sales</span>
+          <span style="font-family:'Nunito',sans-serif; font-weight:800; font-size:15px; color:#fff; background:#EC4544; padding:12px 22px; border-radius:999px;">Book a demo</span>
+        </div>
+      </div>
+
+      <div style="position:relative; text-align:center; padding:48px 46px 70px;">
+        <span style="display:inline-flex; align-items:center; gap:7px; font-family:'Nunito',sans-serif; font-weight:800; font-size:12px; letter-spacing:0.07em; text-transform:uppercase; color:#3C9B53; background:#DFF0E3; padding:8px 14px; border-radius:999px;">Made in Australia for primary schools</span>
+        <h2 style="font-family:'Nunito',sans-serif; font-weight:900; font-size:64px; line-height:1.02; letter-spacing:-0.025em; margin:22px auto 0; max-width:840px; color:#1C1812;">Where kids fall in love with reading.</h2>
+        <p style="font-weight:300; font-size:20px; line-height:1.6; color:#45556B; margin:20px auto 0; max-width:560px;">Lumi digitises the tracking, communication and motivation around real books — so every night of reading counts, and no journal goes missing in a school bag.</p>
+        <div style="display:flex; gap:14px; justify-content:center; margin-top:30px;">
+          <span style="font-family:'Nunito',sans-serif; font-weight:800; font-size:17px; color:#fff; background:#EC4544; padding:16px 30px; border-radius:999px; box-shadow:0 10px 22px -10px rgba(236,69,68,0.7);">Book a demo</span>
+          <span style="font-family:'Nunito',sans-serif; font-weight:800; font-size:17px; color:#1C1812; background:#fff; border:1.5px solid #D7E6EC; padding:16px 30px; border-radius:999px;">Contact sales</span>
+        </div>
+
+        <!-- mascot stage -->
+        <div style="position:relative; height:344px; margin-top:30px;">
+          <!-- glow -->
+          <div style="position:absolute; left:50%; top:54%; transform:translate(-50%,-50%); width:380px; height:380px; border-radius:50%; background:radial-gradient(circle, rgba(86,200,230,0.35), rgba(86,200,230,0) 68%);"></div>
+          <!-- mascot -->
+          <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:215px; animation:lumiFloat 5.5s ease-in-out infinite;">
+            <dc-import name="LumiMascot" color="#EC4544" cheek="#F5A1C5" hint-size="215px,230px" style="display:block;width:215px;height:230px;filter:drop-shadow(0 22px 22px rgba(33,28,22,0.16));"></dc-import>
+          </div>
+          <!-- floating chips -->
+          <div style="position:absolute; left:200px; top:24px; background:#fff; border-radius:16px; padding:11px 15px; box-shadow:0 14px 28px -14px rgba(33,28,22,0.36); display:flex; align-items:center; gap:9px; animation:chipBob 4.4s ease-in-out infinite;">
+            <span style="width:28px;height:28px;border-radius:50%;background:#51BA65;"></span>
+            <span style="font-weight:300;font-size:14px;color:#1C1812;">Loved it!</span>
+          </div>
+          <div style="position:absolute; right:206px; top:14px; background:#fff; border-radius:16px; padding:11px 15px; box-shadow:0 14px 28px -14px rgba(33,28,22,0.36); display:flex; align-items:center; gap:10px; animation:chipBob 5s ease-in-out infinite 0.5s;">
+            <span style="width:30px;height:30px;border-radius:9px;background:#FFF1C2;display:flex;align-items:center;justify-content:center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2.5l2.7 6 6.6.6-5 4.3 1.5 6.4L12 16.9 6.2 19.8l1.5-6.4-5-4.3 6.6-.6z" fill="#FFCB05" stroke="#E0A800" stroke-width="0.6"/></svg></span>
+            <div style="display:flex;flex-direction:column;line-height:1.05;text-align:left;">
+              <span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:14px;color:#1C1812;">Rare badge</span>
+              <span style="font-weight:300;font-size:11px;color:#857E73;">earned tonight</span>
+            </div>
+          </div>
+          <div style="position:absolute; left:250px; bottom:18px; background:#fff; border-radius:16px; padding:11px 15px; box-shadow:0 14px 28px -14px rgba(33,28,22,0.36); display:flex; align-items:center; gap:10px; animation:chipBob 4.8s ease-in-out infinite 0.3s;">
+            <span style="width:30px;height:30px;border-radius:9px;background:#FFE6B0;display:flex;align-items:center;justify-content:center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M13 2c.4 4-3 5.5-3 9.5 0 1.2.5 2 1.3 2.4-.2-1.4.4-2.6 1.5-3.2-.3 2 .9 2.7 1.7 3.3 1.1.8 1.7 1.8 1.7 3.1A4.7 4.7 0 0 1 7.5 13c0-4.3 4-4.8 5.5-11z" fill="#FAA51A"/></svg></span>
+            <span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:15px;color:#1C1812;">16-day streak</span>
+          </div>
+          <div style="position:absolute; right:226px; bottom:40px; transform:rotate(-8deg); animation:chipBob 5.2s ease-in-out infinite 0.7s;">
+            <div style="position:relative; width:64px; height:86px; background:#51BA65; border-radius:5px 9px 9px 5px; box-shadow:0 14px 28px -14px rgba(33,28,22,0.4);">
+              <div style="position:absolute; left:6px; top:0; bottom:0; width:4px; background:#3C9B53; border-radius:3px;"></div>
+              <div style="position:absolute; right:-3px; top:6px; bottom:6px; width:5px; background:#fff; border-radius:2px;"></div>
+              <div style="position:absolute; left:17px; right:11px; top:20px; height:7px; background:rgba(255,255,255,0.6); border-radius:3px;"></div>
+              <div style="position:absolute; left:17px; right:19px; top:33px; height:5px; background:rgba(255,255,255,0.42); border-radius:3px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- stats strip -->
+        <div style="display:flex; justify-content:center; gap:46px; margin-top:20px;">
+          <div style="display:flex;flex-direction:column;align-items:center;"><span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:30px;color:#1C1812;">30 sec</span><span style="font-weight:300;font-size:14px;color:#6A7588;">to log a night</span></div>
+          <div style="width:1px;background:#CFE2EA;"></div>
+          <div style="display:flex;flex-direction:column;align-items:center;"><span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:30px;color:#1C1812;">0 words</span><span style="font-weight:300;font-size:14px;color:#6A7588;">typed by parents</span></div>
+          <div style="width:1px;background:#CFE2EA;"></div>
+          <div style="display:flex;flex-direction:column;align-items:center;"><span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:30px;color:#1C1812;">100%</span><span style="font-weight:300;font-size:14px;color:#6A7588;">real, physical books</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<svg viewBox="0 0 140 150" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block; overflow:visible;">
+  <path d="M86 20 C88 33 95 41 104 52 C114 64 115 84 110 100 C104 122 88 134 68 134 C46 134 30 122 28 100 C25 83 31 67 45 53 C58 40 80 36 86 20 Z" fill="{{ color }}"></path>
+  <ellipse cx="52" cy="60" rx="12" ry="16" fill="#ffffff" opacity="{{ highlightOpacity }}"></ellipse>
+  <ellipse cx="50" cy="103" rx="8.5" ry="5.5" fill="{{ cheek }}" opacity="0.78"></ellipse>
+  <ellipse cx="90" cy="103" rx="8.5" ry="5.5" fill="{{ cheek }}" opacity="0.78"></ellipse>
+  <ellipse cx="58" cy="89" rx="8.5" ry="11.5" fill="#ffffff"></ellipse>
+  <ellipse cx="82" cy="89" rx="8.5" ry="11.5" fill="#ffffff"></ellipse>
+  <circle cx="59" cy="91" r="4.3" fill="#211C16"></circle>
+  <circle cx="81" cy="91" r="4.3" fill="#211C16"></circle>
+  <path d="M63 107 Q70 115 78 107" stroke="#211C16" stroke-width="3.4" stroke-linecap="round" fill="none"></path>
+</svg>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:180,&quot;height&quot;:192},&quot;color&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#EC4544&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;cheek&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#F5A1C5&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;highlightOpacity&quot;:{&quot;editor&quot;:&quot;float&quot;,&quot;default&quot;:0.16,&quot;min&quot;:0,&quot;max&quot;:1,&quot;step&quot;:0.02,&quot;tsType&quot;:&quot;number&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      color: this.props.color ?? '#EC4544',
+      cheek: this.props.cheek ?? '#F5A1C5',
+      highlightOpacity: this.props.highlightOpacity ?? 0.16,
+    };
+  }
+}
+</script>
+</body>
+</html>
