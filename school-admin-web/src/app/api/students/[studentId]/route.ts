@@ -41,7 +41,7 @@ const updateStudentSchema = z.object({
 });
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ studentId: string }> }) {
-  const session = await getSession();
+  const session = await getSession({ requireMutable: true });
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if (session.role !== 'schoolAdmin') {
     return NextResponse.json({ error: 'Only school admins can modify students' }, { status: 403 });
@@ -62,7 +62,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 }
 
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ studentId: string }> }) {
-  const session = await getSession();
+  const session = await getSession({ requireMutable: true });
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if (session.role !== 'schoolAdmin') {
     return NextResponse.json({ error: 'Only school admins can delete students' }, { status: 403 });

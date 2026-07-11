@@ -20,7 +20,7 @@ function hashEmail(email: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getSession();
+  const session = await getSession({ requireMutable: true });
   // Gated on the Firestore-backed dev allowlist rather than NODE_ENV so the
   // dev can still use this in production. Returns 404 (not 403/401) so the
   // endpoint is indistinguishable from a missing route to unauthorised callers.

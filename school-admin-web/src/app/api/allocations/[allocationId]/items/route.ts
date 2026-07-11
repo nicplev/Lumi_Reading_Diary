@@ -10,7 +10,7 @@ const addItemSchema = z.object({
 });
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ allocationId: string }> }) {
-  const session = await getSession();
+  const session = await getSession({ requireMutable: true });
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { allocationId } = await params;
@@ -33,7 +33,7 @@ const removeItemSchema = z.object({
 });
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ allocationId: string }> }) {
-  const session = await getSession();
+  const session = await getSession({ requireMutable: true });
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { allocationId } = await params;

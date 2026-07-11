@@ -5,15 +5,21 @@ import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
   getMultiFactorResolver,
+  multiFactor,
   PhoneAuthProvider,
   PhoneMultiFactorGenerator,
   RecaptchaVerifier,
+  sendEmailVerification,
+  signOut,
+  TotpMultiFactorGenerator,
   type MultiFactorResolver,
   type MultiFactorError,
   type MultiFactorInfo,
   type PhoneMultiFactorInfo,
+  type TotpSecret,
   type User,
 } from 'firebase/auth';
+import QRCode from 'qrcode';
 import { auth } from '@/lib/firebase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
@@ -30,13 +36,20 @@ function LoginForm() {
   const [forgotMode, setForgotMode] = useState(false);
   const [resetMessage, setResetMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [resetLoading, setResetLoading] = useState(false);
-  // SMS second-factor challenge state (staff who enrolled MFA in the app).
+  // Second-factor challenge state (SMS for existing staff accounts, or TOTP).
   const [mfaResolver, setMfaResolver] = useState<MultiFactorResolver | null>(null);
-  const [mfaPhoneHint, setMfaPhoneHint] = useState<MultiFactorInfo | null>(null);
+  const [mfaHint, setMfaHint] = useState<MultiFactorInfo | null>(null);
   const [mfaVerificationId, setMfaVerificationId] = useState('');
   const [mfaCode, setMfaCode] = useState('');
   const [mfaSending, setMfaSending] = useState(false);
   const [mfaLoading, setMfaLoading] = useState(false);
+  // Mandatory first-login TOTP enrollment state for school administrators.
+  const [totpEnrollmentToken, setTotpEnrollmentToken] = useState('');
+  const [totpSecret, setTotpSecret] = useState<TotpSecret | null>(null);
+  const [totpQrCode, setTotpQrCode] = useState('');
+  const [totpEnrollmentCode, setTotpEnrollmentCode] = useState('');
+  const [totpEnrollmentLoading, setTotpEnrollmentLoading] = useState(false);
+  const [emailVerificationRequired, setEmailVerificationRequired] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setSessionData } = useAuth();
@@ -49,18 +62,26 @@ function LoginForm() {
     setCharacter(randomCharacterId());
   }, []);
 
-  // Mint the server session cookie and enter the portal (shared by the
-  // password path and the MFA path).
-  const finishLogin = async (user: User) => {
-    const idToken = await user.getIdToken();
+  // Mint the server session cookie and enter the portal (shared by password,
+  // MFA challenge, and first-time authenticator enrollment paths).
+  const finishLogin = async (user: User, enrollmentProof?: string) => {
+    const idToken = await user.getIdToken(Boolean(enrollmentProof));
 
     const res = await fetch('/api/auth/session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken }),
+      body: JSON.stringify({ idToken, enrollmentToken: enrollmentProof }),
     });
 
     const sessionData = await res.json();
+    if (
+      res.status === 403 &&
+      sessionData.code === 'admin-totp-enrollment-required' &&
+      typeof sessionData.enrollmentToken === 'string'
+    ) {
+      await beginTotpEnrollment(user, sessionData.enrollmentToken);
+      return;
+    }
     if (!res.ok) {
       throw new Error(sessionData.error || 'Login failed');
     }
@@ -68,9 +89,114 @@ function LoginForm() {
     // Inject session data directly into AuthContext to avoid race condition
     setSessionData(sessionData);
 
-    const from = searchParams.get('from') || '/dashboard';
+    const requestedFrom = searchParams.get('from');
+    // Never pass an untrusted absolute or javascript: URL to router.push().
+    const from =
+      requestedFrom?.startsWith('/') && !requestedFrom.startsWith('//')
+        ? requestedFrom
+        : '/dashboard';
     router.push(from);
     router.refresh();
+  };
+
+  async function beginTotpEnrollment(user: User, enrollmentProof: string) {
+    setTotpEnrollmentToken(enrollmentProof);
+    setTotpSecret(null);
+    setTotpQrCode('');
+    setTotpEnrollmentCode('');
+    setError('');
+
+    // Firebase requires a verified email before any second factor can be
+    // enrolled. Existing Admin-SDK-created staff accounts may not have one yet.
+    await user.reload();
+    if (!user.emailVerified) {
+      setEmailVerificationRequired(true);
+      try {
+        await sendEmailVerification(user, {
+          url: `${window.location.origin}/login`,
+        });
+      } catch (err) {
+        const code = (err as { code?: string })?.code ?? '';
+        if (code !== 'auth/too-many-requests') throw err;
+      }
+      return;
+    }
+
+    setEmailVerificationRequired(false);
+    // Refresh the token so Identity Platform sees the newly verified-email
+    // claim when it authorizes generation of the TOTP enrollment secret.
+    await user.getIdToken(true);
+    const mfaUser = multiFactor(user);
+    const session = await mfaUser.getSession();
+    const secret = await TotpMultiFactorGenerator.generateSecret(session);
+    const qrCodeUrl = secret.generateQrCodeUrl(
+      user.email || 'School administrator',
+      'Lumi School',
+    );
+    const qrDataUrl = await QRCode.toDataURL(qrCodeUrl, {
+      width: 220,
+      margin: 1,
+      errorCorrectionLevel: 'M',
+    });
+    setTotpSecret(secret);
+    setTotpQrCode(qrDataUrl);
+  }
+
+  const handleEmailVerified = async () => {
+    const user = auth.currentUser;
+    if (!user || !totpEnrollmentToken) return;
+    setError('');
+    setTotpEnrollmentLoading(true);
+    try {
+      await user.reload();
+      if (!user.emailVerified) {
+        setError('Your email is not verified yet. Open the link in your email, then try again.');
+        return;
+      }
+      await beginTotpEnrollment(user, totpEnrollmentToken);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not continue setup. Please sign in again.');
+    } finally {
+      setTotpEnrollmentLoading(false);
+    }
+  };
+
+  const cancelTotpEnrollment = async () => {
+    await signOut(auth);
+    setTotpEnrollmentToken('');
+    setTotpSecret(null);
+    setTotpQrCode('');
+    setTotpEnrollmentCode('');
+    setEmailVerificationRequired(false);
+    setPassword('');
+    setError('');
+  };
+
+  const handleTotpEnrollmentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const user = auth.currentUser;
+    if (!user || !totpSecret || !totpEnrollmentToken) return;
+    setError('');
+    setTotpEnrollmentLoading(true);
+    try {
+      const assertion = TotpMultiFactorGenerator.assertionForEnrollment(
+        totpSecret,
+        totpEnrollmentCode.trim(),
+      );
+      await multiFactor(user).enroll(assertion, 'Google Authenticator');
+      await finishLogin(user, totpEnrollmentToken);
+    } catch (err) {
+      const code = (err as { code?: string })?.code ?? '';
+      if (code === 'auth/invalid-verification-code') {
+        setError("That code didn't match. Wait for a new code and try again.");
+      } else if (code === 'auth/requires-recent-login') {
+        setError('Setup expired. Return to sign in and enter your password again.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Authenticator setup failed. Please try again.');
+      }
+    } finally {
+      setTotpEnrollmentLoading(false);
+    }
   };
 
   // Send (or resend) the SMS code for the second factor. The invisible
@@ -102,20 +228,27 @@ function LoginForm() {
 
   const startMfaChallenge = async (err: MultiFactorError) => {
     const resolver = getMultiFactorResolver(auth, err);
-    const hint = resolver.hints.find((h) => h.factorId === PhoneMultiFactorGenerator.FACTOR_ID);
+    // Prefer TOTP when both are enrolled. The server requires TOTP for admins;
+    // teachers with only SMS continue through the existing flow.
+    const hint =
+      resolver.hints.find((h) => h.factorId === TotpMultiFactorGenerator.FACTOR_ID) ??
+      resolver.hints.find((h) => h.factorId === PhoneMultiFactorGenerator.FACTOR_ID);
     if (!hint) {
       setError('This account uses a second factor this portal does not support yet.');
       return;
     }
     setMfaResolver(resolver);
-    setMfaPhoneHint(hint);
+    setMfaHint(hint);
     setMfaCode('');
-    await sendMfaCode(resolver, hint);
+    setMfaVerificationId('');
+    if (hint.factorId === PhoneMultiFactorGenerator.FACTOR_ID) {
+      await sendMfaCode(resolver, hint);
+    }
   };
 
   const cancelMfa = () => {
     setMfaResolver(null);
-    setMfaPhoneHint(null);
+    setMfaHint(null);
     setMfaVerificationId('');
     setMfaCode('');
     setError('');
@@ -123,20 +256,31 @@ function LoginForm() {
 
   const handleMfaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!mfaResolver || !mfaVerificationId) return;
+    if (!mfaResolver || !mfaHint) return;
     setError('');
     setMfaLoading(true);
     try {
-      const phoneCredential = PhoneAuthProvider.credential(mfaVerificationId, mfaCode.trim());
-      const assertion = PhoneMultiFactorGenerator.assertion(phoneCredential);
+      const assertion = mfaHint.factorId === TotpMultiFactorGenerator.FACTOR_ID
+        ? TotpMultiFactorGenerator.assertionForSignIn(mfaHint.uid, mfaCode.trim())
+        : PhoneMultiFactorGenerator.assertion(
+            PhoneAuthProvider.credential(mfaVerificationId, mfaCode.trim()),
+          );
       const credential = await mfaResolver.resolveSignIn(assertion);
       await finishLogin(credential.user);
     } catch (err) {
       const code = (err as { code?: string })?.code ?? '';
       if (code === 'auth/invalid-verification-code') {
-        setError("That code didn't match. Check the SMS and try again.");
+        setError(
+          mfaHint.factorId === TotpMultiFactorGenerator.FACTOR_ID
+            ? "That code didn't match. Wait for a new code and try again."
+            : "That code didn't match. Check the SMS and try again.",
+        );
       } else if (code === 'auth/code-expired') {
-        setError('That code has expired — tap "Resend code" for a new one.');
+        setError(
+          mfaHint.factorId === TotpMultiFactorGenerator.FACTOR_ID
+            ? 'That code has expired. Wait for the next code and try again.'
+            : 'That code has expired — tap "Resend code" for a new one.',
+        );
       } else {
         setError(err instanceof Error ? err.message : 'Verification failed. Please try again.');
       }
@@ -156,7 +300,7 @@ function LoginForm() {
     } catch (err) {
       const code = (err as { code?: string })?.code ?? '';
       if (code === 'auth/multi-factor-auth-required') {
-        // Staff with SMS MFA (enrolled via the app) land here — run the challenge.
+        // Resolve either a TOTP or the existing staff SMS factor.
         try {
           await startMfaChallenge(err as MultiFactorError);
         } catch {
@@ -217,16 +361,117 @@ function LoginForm() {
           </div>
           <h1 className="font-display text-[28px] font-extrabold tracking-tight text-ink">Lumi School</h1>
           <p className="text-muted text-sm mt-1">
-            {mfaResolver
-              ? 'Two-step verification'
-              : forgotMode
-                ? 'Reset your password'
-                : 'Sign in to your school portal'}
+            {totpEnrollmentToken
+              ? 'Secure administrator access'
+              : mfaResolver
+                ? 'Two-step verification'
+                : forgotMode
+                  ? 'Reset your password'
+                  : 'Sign in to your school portal'}
           </p>
         </div>
 
-        {mfaResolver ? (
-          /* SMS second-factor challenge */
+        {totpEnrollmentToken ? (
+          /* Mandatory administrator TOTP enrollment */
+          <form onSubmit={handleTotpEnrollmentSubmit} className="space-y-4">
+            {error && (
+              <div className="bg-error/10 text-error text-sm rounded-[var(--radius-md)] px-4 py-3">
+                {error}
+              </div>
+            )}
+
+            <div className="rounded-[var(--radius-md)] border border-section/20 bg-section/5 px-4 py-3">
+              <p className="text-sm font-semibold text-ink">Authenticator app required</p>
+              <p className="mt-1 text-xs leading-5 text-muted">
+                School administrators must use two-step verification because they can access
+                student information and manage staff permissions.
+              </p>
+            </div>
+
+            {emailVerificationRequired ? (
+              <>
+                <p className="text-sm leading-6 text-muted">
+                  We sent a verification link to <span className="font-semibold text-ink">{auth.currentUser?.email}</span>.
+                  Verify your email first, then return here to continue setup.
+                </p>
+                <button
+                  type="button"
+                  disabled={totpEnrollmentLoading}
+                  onClick={handleEmailVerified}
+                  className="w-full py-3 px-4 rounded-[var(--radius-md)] bg-section text-white font-bold text-[15px] hover:bg-lumi-red-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-card"
+                >
+                  {totpEnrollmentLoading ? 'Checking…' : "I've verified my email"}
+                </button>
+              </>
+            ) : totpSecret && totpQrCode ? (
+              <>
+                <ol className="list-decimal space-y-2 pl-5 text-sm leading-5 text-muted">
+                  <li>Open Google Authenticator and tap the plus button.</li>
+                  <li>Scan this QR code.</li>
+                  <li>Enter the 6-digit code shown in the app.</li>
+                </ol>
+
+                <div className="flex justify-center rounded-[var(--radius-md)] border border-rule bg-white p-3">
+                  <img
+                    src={totpQrCode}
+                    alt="QR code for Google Authenticator setup"
+                    width={220}
+                    height={220}
+                    className="h-[220px] w-[220px]"
+                  />
+                </div>
+
+                <details className="rounded-[var(--radius-md)] border border-rule bg-paper px-4 py-3 text-sm">
+                  <summary className="cursor-pointer font-semibold text-ink">Can&apos;t scan the QR code?</summary>
+                  <p className="mt-2 text-xs text-muted">Enter this setup key manually:</p>
+                  <code className="mt-2 block break-all select-all rounded bg-cream px-3 py-2 text-xs font-semibold tracking-wider text-ink">
+                    {totpSecret.secretKey}
+                  </code>
+                </details>
+
+                <div>
+                  <label htmlFor="totp-enrollment-code" className="block text-sm font-semibold text-ink mb-1.5">
+                    Verification code
+                  </label>
+                  <input
+                    id="totp-enrollment-code"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                    value={totpEnrollmentCode}
+                    onChange={(e) => setTotpEnrollmentCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="123456"
+                    required
+                    autoFocus
+                    className="w-full px-4 py-3 rounded-[var(--radius-md)] border border-rule bg-paper text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-section/30 focus:border-section transition-colors text-[15px] tracking-[0.3em] text-center"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={totpEnrollmentLoading || totpEnrollmentCode.length < 6}
+                  className="w-full py-3 px-4 rounded-[var(--radius-md)] bg-section text-white font-bold text-[15px] hover:bg-lumi-red-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-card flex items-center justify-center gap-2"
+                >
+                  {totpEnrollmentLoading ? 'Securing account…' : 'Enable & Sign In'}
+                </button>
+              </>
+            ) : (
+              <p className="py-6 text-center text-sm text-muted">Preparing secure setup…</p>
+            )}
+
+            <button
+              type="button"
+              disabled={totpEnrollmentLoading}
+              onClick={cancelTotpEnrollment}
+              className="w-full text-sm text-muted hover:text-ink font-semibold transition-colors py-2 disabled:opacity-50"
+            >
+              Back to sign in
+            </button>
+          </form>
+        ) : mfaResolver ? (
+          /* Existing SMS or authenticator second-factor challenge */
           <form onSubmit={handleMfaSubmit} className="space-y-4">
             {error && (
               <div className="bg-error/10 text-error text-sm rounded-[var(--radius-md)] px-4 py-3">
@@ -234,13 +479,19 @@ function LoginForm() {
               </div>
             )}
 
-            <p className="text-sm text-muted">
-              We sent a 6-digit code by SMS
-              {(mfaPhoneHint as PhoneMultiFactorInfo | null)?.phoneNumber
-                ? ` to ${(mfaPhoneHint as PhoneMultiFactorInfo).phoneNumber}`
-                : ' to your enrolled phone'}
-              . Enter it below to finish signing in.
-            </p>
+            {mfaHint?.factorId === TotpMultiFactorGenerator.FACTOR_ID ? (
+              <p className="text-sm text-muted">
+                Open Google Authenticator and enter the current 6-digit code to finish signing in.
+              </p>
+            ) : (
+              <p className="text-sm text-muted">
+                We sent a 6-digit code by SMS
+                {(mfaHint as PhoneMultiFactorInfo | null)?.phoneNumber
+                  ? ` to ${(mfaHint as PhoneMultiFactorInfo).phoneNumber}`
+                  : ' to your enrolled phone'}
+                . Enter it below to finish signing in.
+              </p>
+            )}
 
             <div>
               <label htmlFor="mfa-code" className="block text-sm font-semibold text-ink mb-1.5">
@@ -264,7 +515,12 @@ function LoginForm() {
 
             <button
               type="submit"
-              disabled={mfaLoading || mfaSending || mfaCode.length < 6}
+              disabled={
+                mfaLoading ||
+                mfaSending ||
+                mfaCode.length < 6 ||
+                (mfaHint?.factorId === PhoneMultiFactorGenerator.FACTOR_ID && !mfaVerificationId)
+              }
               className="w-full py-3 px-4 rounded-[var(--radius-md)] bg-section text-white font-bold text-[15px] hover:bg-lumi-red-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-card flex items-center justify-center gap-2"
             >
               {mfaLoading && (
@@ -277,14 +533,16 @@ function LoginForm() {
             </button>
 
             <div className="flex items-center justify-between">
-              <button
-                type="button"
-                disabled={mfaSending}
-                onClick={() => mfaResolver && mfaPhoneHint && sendMfaCode(mfaResolver, mfaPhoneHint)}
-                className="text-sm text-section hover:text-lumi-red-dark font-semibold transition-colors py-2 disabled:opacity-50"
-              >
-                {mfaSending ? 'Sending…' : 'Resend code'}
-              </button>
+              {mfaHint?.factorId === PhoneMultiFactorGenerator.FACTOR_ID ? (
+                <button
+                  type="button"
+                  disabled={mfaSending}
+                  onClick={() => mfaResolver && mfaHint && sendMfaCode(mfaResolver, mfaHint)}
+                  className="text-sm text-section hover:text-lumi-red-dark font-semibold transition-colors py-2 disabled:opacity-50"
+                >
+                  {mfaSending ? 'Sending…' : 'Resend code'}
+                </button>
+              ) : <span />}
               <button
                 type="button"
                 onClick={cancelMfa}

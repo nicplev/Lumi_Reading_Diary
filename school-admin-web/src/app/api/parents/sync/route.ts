@@ -4,7 +4,7 @@ import { getSession } from '@/lib/auth/session';
 import { syncParentStudentLinks } from '@/lib/firestore/parents';
 
 export async function POST() {
-  const session = await getSession();
+  const session = await getSession({ requireMutable: true });
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if (session.role !== 'schoolAdmin') {
     return NextResponse.json(

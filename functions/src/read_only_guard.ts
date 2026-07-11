@@ -11,8 +11,9 @@ import * as functions from "firebase-functions/v1";
  * invoking a write callable. This is the callable-layer ("third") read-only
  * enforcement; call it at the top of every mutating callable.
  *
- * Safe to call unconditionally: a normal (non-impersonating) user never
- * carries the `devReadOnly` claim, so the guard is a no-op for them.
+ * It also blocks the shared-password, MFA-exempt demo administrator. That
+ * account is safe to expose only while it remains confined to synthetic data
+ * and cannot trigger Admin-SDK mutations that bypass Firestore rules.
  *
  * Accepts a structural `{auth?: {token?}}` shape so it works with BOTH the v1
  * `CallableContext` and the v2 `CallableRequest` (whose `.auth?.token` has the
@@ -27,10 +28,10 @@ export function assertNotReadOnly(
   ctx: {auth?: {token?: unknown} | null}
 ): void {
   const token = ctx.auth?.token as Record<string, unknown> | undefined;
-  if (token?.devReadOnly === true) {
+  if (token?.devReadOnly === true || token?.demoReadOnly === true) {
     throw new functions.https.HttpsError(
       "permission-denied",
-      "This action is blocked during a read-only impersonation session."
+      "This action is blocked in a read-only session."
     );
   }
 }

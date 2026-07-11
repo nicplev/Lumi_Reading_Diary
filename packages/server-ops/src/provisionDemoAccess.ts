@@ -1,5 +1,5 @@
 import type { Firestore } from "firebase-admin/firestore";
-import type { Auth } from "firebase-admin/auth";
+import type { Auth, UserRecord } from "firebase-admin/auth";
 import { z } from "zod";
 import { ServerOpsValidationError, type Actor } from "./audit";
 import { generateTempPassword } from "./utils/tempPassword";
@@ -111,21 +111,22 @@ export async function provisionDemoAccess(
   for (const spec of specs) {
     // Resolve the Auth uid.
     let uid: string;
+    let authUser: UserRecord;
     try {
-      const user = await auth.getUserByEmail(spec.email);
-      uid = user.uid;
+      authUser = await auth.getUserByEmail(spec.email);
+      uid = authUser.uid;
     } catch {
       if (!spec.ensure) {
         throw new ServerOpsValidationError(
           `${spec.email} has no Auth account — reseed the demo school before provisioning demo access.`
         );
       }
-      const created = await auth.createUser({
+      authUser = await auth.createUser({
         email: spec.email,
         displayName: "Lumi Demo Admin",
         emailVerified: true,
       });
-      uid = created.uid;
+      uid = authUser.uid;
     }
 
     // Verify (or, for the admin, ensure) demo-school membership. Never rotate an
@@ -153,7 +154,26 @@ export async function provisionDemoAccess(
       });
     }
 
-    await auth.updateUser(uid, { password });
+    authUser = await auth.updateUser(uid, {
+      password,
+      emailVerified: true,
+      // Demo accounts must remain friction-free. The shared administrator's
+      // TOTP exception is safe only while it is coupled to read-only claims.
+      multiFactor: { enrolledFactors: [] },
+    });
+    const claims: Record<string, unknown> = {
+      ...(authUser.customClaims ?? {}),
+      demoAccount: true,
+      demoSchoolId: schoolId,
+    };
+    if (spec.role === "admin") {
+      claims.demoAdminMfaExempt = true;
+      claims.demoReadOnly = true;
+    } else {
+      delete claims.demoAdminMfaExempt;
+      delete claims.demoReadOnly;
+    }
+    await auth.setCustomUserClaims(uid, claims);
     accounts.push({ role: spec.role, email: spec.email, uid });
   }
 

@@ -541,14 +541,14 @@ function buildPlan(now) {
   for (const s of STAFF) {
     staffByKey[s.key] = { ...s, uid: uidFor(s.key) };
     if (s.hasAuth) {
-      plan.authUsers.push({ key: s.key, email: s.email, fullName: s.fullName, uid: uidFor(s.key) });
+      plan.authUsers.push({ key: s.key, email: s.email, fullName: s.fullName, role: s.role, uid: uidFor(s.key) });
     }
   }
   const parentsByKey = {};
   for (const p of PARENTS) {
     parentsByKey[p.key] = { ...p, uid: uidFor(p.key) };
     if (p.hasAuth) {
-      plan.authUsers.push({ key: p.key, email: p.email, fullName: p.fullName, uid: uidFor(p.key) });
+      plan.authUsers.push({ key: p.key, email: p.email, fullName: p.fullName, role: "parent", uid: uidFor(p.key) });
     }
   }
   const classByKey = {};
@@ -984,40 +984,59 @@ async function resetDemoSchool(admin, db, plan) {
 async function ensureAuthUsers(admin, plan) {
   log("Ensuring Auth users (emailVerified, no MFA — demo accounts must log in friction-free)…");
   for (const u of plan.authUsers) {
+    let authUser;
     try {
       const existing = await admin.auth().getUserByEmail(u.email);
       if (existing.uid !== u.uid) {
-        // A previous partial run (or manual signup) claimed this email with a
-        // different uid; recreate so Firestore references stay consistent.
-        await admin.auth().deleteUser(existing.uid);
-        throw { code: "auth/user-not-found" };
+        throw new Error(
+          `SAFETY STOP: ${u.email} belongs to unexpected uid ${existing.uid}; ` +
+          `expected ${u.uid}. Refusing to delete or repurpose an Auth user.`
+        );
       }
-      await admin.auth().updateUser(u.uid, { password: DEMO_PASSWORD, emailVerified: true, displayName: u.fullName });
+      authUser = await admin.auth().updateUser(u.uid, {
+        password: DEMO_PASSWORD,
+        emailVerified: true,
+        displayName: u.fullName,
+        // A non-reset seed must also remove any factor accidentally enrolled
+        // during rehearsal; otherwise the documented friction-free login is
+        // not deterministic.
+        multiFactor: { enrolledFactors: [] },
+      });
       log(`   • exists   ${u.email}`);
     } catch (err) {
       if (err.code !== "auth/user-not-found") throw err;
-      // The (new) email is free. Either our deterministic uid already exists
-      // under a PREVIOUS email — a rename, e.g. demo.teacher@lumidemo.school →
-      // support+demo.teacher@lumi-reading.com — or the account is genuinely new.
-      // Rename by uid so Firestore docs (keyed by uid), classes, logs and linked
-      // children stay intact; only create when the uid is truly absent.
+
+      // The target email is free. Rename a known deterministic demo uid in
+      // place so class, log and child references remain intact; otherwise
+      // create the account for the first time.
       let existingByUid = null;
       try {
         existingByUid = await admin.auth().getUser(u.uid);
-      } catch (e) {
-        if (e.code !== "auth/user-not-found") throw e;
+      } catch (lookupErr) {
+        if (lookupErr.code !== "auth/user-not-found") throw lookupErr;
       }
+
       if (existingByUid) {
-        const previousEmail = existingByUid.email;
-        await admin.auth().updateUser(u.uid, {
+        const previousEmail = existingByUid.email || "";
+        const knownDemoEmail =
+          previousEmail.endsWith(`@${DEMO_EMAIL_DOMAIN}`) ||
+          /^support\+demo(?:\.[^@]+)?@lumi-reading\.com$/.test(previousEmail);
+        if (!knownDemoEmail) {
+          throw new Error(
+            `SAFETY STOP: deterministic demo uid ${u.uid} has unexpected email ` +
+            `${previousEmail}; refusing to repurpose it.`
+          );
+        }
+        authUser = await admin.auth().updateUser(u.uid, {
           email: u.email,
           password: DEMO_PASSWORD,
           emailVerified: true,
           displayName: u.fullName,
+          multiFactor: { enrolledFactors: [] },
         });
         log(`   • renamed  ${previousEmail} → ${u.email}`);
       } else {
-        await admin.auth().createUser({
+        authUser = await admin.auth().createUser({
           uid: u.uid,
           email: u.email,
           password: DEMO_PASSWORD,
@@ -1027,6 +1046,23 @@ async function ensureAuthUsers(admin, plan) {
         log(`   • created  ${u.email}`);
       }
     }
+
+    const claims = {
+      ...(authUser.customClaims || {}),
+      demoAccount: true,
+      demoSchoolId: SCHOOL_ID,
+    };
+    if (u.role === "schoolAdmin") {
+      // Demo administrators need an exception to the portal's
+      // mandatory TOTP policy. The exemption is coupled to read-only claims
+      // enforced by middleware, Firestore rules, and callable guards.
+      claims.demoAdminMfaExempt = true;
+      claims.demoReadOnly = true;
+    } else {
+      delete claims.demoAdminMfaExempt;
+      delete claims.demoReadOnly;
+    }
+    await admin.auth().setCustomUserClaims(u.uid, claims);
   }
 }
 

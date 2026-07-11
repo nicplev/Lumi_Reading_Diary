@@ -10,7 +10,7 @@ import {
 // who doesn't have live access yet, for the current academic year. The
 // self-serve replacement for the backfill-access ops script.
 export async function POST() {
-  const session = await getSession();
+  const session = await getSession({ requireMutable: true });
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if (session.role !== 'schoolAdmin') {
     return NextResponse.json(

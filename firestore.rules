@@ -180,8 +180,18 @@ service cloud.firestore {
           && request.auth.token.get('devReadOnly', false) == true;
     }
 
+    // The shared-password sales-demo administrator is allowed to skip MFA
+    // only because it is confined to a synthetic tenant and is read-only.
+    // This is an Admin-SDK custom claim; clients cannot grant it themselves.
+    function demoAdminReadOnly() {
+      return request.auth != null
+          && request.auth.token.get('demoAccount', false) == true
+          && request.auth.token.get('demoAdminMfaExempt', false) == true
+          && request.auth.token.get('demoReadOnly', false) == true;
+    }
+
     function writeAllowedForDev() {
-      return !devReadOnly();
+      return !devReadOnly() && !demoAdminReadOnly();
     }
 
     // ── Per-school feature gates ────────────────────────────────────

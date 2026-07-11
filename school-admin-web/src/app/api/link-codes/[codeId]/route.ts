@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth/session';
 import { revokeLinkCode, deleteLinkCode } from '@/lib/firestore/link-codes';
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ codeId: string }> }) {
-  const session = await getSession();
+  const session = await getSession({ requireMutable: true });
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if (session.role !== 'schoolAdmin') {
     return NextResponse.json({ error: 'Only school admins can manage link codes' }, { status: 403 });

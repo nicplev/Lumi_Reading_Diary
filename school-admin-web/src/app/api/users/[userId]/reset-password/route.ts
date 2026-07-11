@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth/session';
 import { resetUserPassword } from '@/lib/firestore/users';
 
 export async function POST(_request: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
-  const session = await getSession();
+  const session = await getSession({ requireMutable: true });
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   if (session.role !== 'schoolAdmin') {

@@ -41,7 +41,7 @@ const updateAllocationSchema = z.object({
 });
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ allocationId: string }> }) {
-  const session = await getSession();
+  const session = await getSession({ requireMutable: true });
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { allocationId } = await params;
@@ -59,7 +59,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 }
 
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ allocationId: string }> }) {
-  const session = await getSession();
+  const session = await getSession({ requireMutable: true });
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { allocationId } = await params;

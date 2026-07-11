@@ -84,6 +84,16 @@ in themselves during/after a Zoom demo without lingering access. The canonical
 (**Demo access** tab). Config (emails, store URLs) is in
 `platformConfig/demoAccess`; see `docs/DEMO_DAY_ACCESS_PLAN.md`.
 
+### MFA exception for the shared demo administrator
+
+The demo school-admin account also carries Admin-SDK-only
+`demoAdminMfaExempt` + `demoReadOnly` claims. The portal verifies those claims
+against the `isDemo: true` tenant before skipping mandatory authenticator MFA.
+That admin session is read-only in portal API handlers and middleware, Firestore
+Rules, and Cloud Functions. The demo parent and teacher remain able to perform
+the scripted activity inside the fictional tenant; neither role is subject to
+the admin-only TOTP policy.
+
 ### The students that matter
 
 | Student | Class | Why they exist |

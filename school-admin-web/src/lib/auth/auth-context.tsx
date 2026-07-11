@@ -73,10 +73,19 @@ export function AuthProvider({
               const data = await sessionRes.json();
               setUser(data);
             } else {
-              // Recovery failed — full logout
-              await fetch('/api/auth/logout', { method: 'POST' });
-              await signOut(auth);
-              setUser(null);
+              const failure = await sessionRes.json().catch(() => null);
+              if (failure?.code === 'admin-totp-enrollment-required') {
+                // The login page owns the enrollment proof and QR flow. Keep
+                // the freshly password-authenticated Firebase user alive so
+                // AuthContext's parallel recovery attempt cannot sign them out
+                // from underneath that flow.
+                setUser(null);
+              } else {
+                // Recovery failed — full logout
+                await fetch('/api/auth/logout', { method: 'POST' });
+                await signOut(auth);
+                setUser(null);
+              }
             }
           }
         } catch {

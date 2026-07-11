@@ -1368,6 +1368,70 @@ test('sanity: test environment initialized', async () => {
   assert.ok(testEnv);
 });
 
+// ── Shared-password demo administrator: readable but never writable ───────
+
+const DEMO_SCHOOL_ID = 'lumi_demo_primary_school';
+const DEMO_ADMIN_UID = 'demo_admin_1';
+
+function demoAdminClaims() {
+  return {
+    demoAccount: true,
+    demoSchoolId: DEMO_SCHOOL_ID,
+    demoAdminMfaExempt: true,
+    demoReadOnly: true,
+  };
+}
+
+async function seedDemoAdmin() {
+  await seedData(async (db) => {
+    await db.collection('schools').doc(DEMO_SCHOOL_ID).set({
+      name: 'Lumi Demo Primary School',
+      isDemo: true,
+      createdBy: DEMO_ADMIN_UID,
+    });
+    await db.collection('schools').doc(DEMO_SCHOOL_ID)
+      .collection('users').doc(DEMO_ADMIN_UID).set({
+        role: 'schoolAdmin',
+        schoolId: DEMO_SCHOOL_ID,
+        isActive: true,
+      });
+  });
+}
+
+test('demo admin: custom-claimed account can read its synthetic school', async () => {
+  await seedDemoAdmin();
+  const db = authDb(DEMO_ADMIN_UID, demoAdminClaims());
+  await assertSucceeds(db.collection('schools').doc(DEMO_SCHOOL_ID).get());
+});
+
+test('demo admin: custom-claimed account cannot change school settings', async () => {
+  await seedDemoAdmin();
+  const db = authDb(DEMO_ADMIN_UID, demoAdminClaims());
+  await assertFails(
+    db.collection('schools').doc(DEMO_SCHOOL_ID).update({ name: 'Changed' }),
+  );
+});
+
+test('demo admin: custom-claimed account cannot create students', async () => {
+  await seedDemoAdmin();
+  const db = authDb(DEMO_ADMIN_UID, demoAdminClaims());
+  await assertFails(
+    db.collection('schools').doc(DEMO_SCHOOL_ID).collection('students').doc('new').set({
+      schoolId: DEMO_SCHOOL_ID,
+      firstName: 'Not allowed',
+      isActive: true,
+    }),
+  );
+});
+
+test('demo admin: isDemo field alone does not activate the read-only claim', async () => {
+  await seedDemoAdmin();
+  const db = authDb(DEMO_ADMIN_UID);
+  await assertSucceeds(
+    db.collection('schools').doc(DEMO_SCHOOL_ID).update({ name: 'Still authorised' }),
+  );
+});
+
 // ────────────────────────────────────────────────────────────────────────────
 // Developer impersonation: read-only real-school access via custom claims.
 // Phase 1 of the impersonation pipeline. See firestore.rules helpers
