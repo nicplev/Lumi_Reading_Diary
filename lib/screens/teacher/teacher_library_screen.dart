@@ -74,6 +74,14 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
   // accurate totals without loading every book client-side.
   LibraryCounts _counts = LibraryCounts.empty;
 
+  // iPad-only grid density: number of columns to show. Large=3 / Medium=4 /
+  // Small=5. Phones always use 3. Persisted per-school so a teacher's choice
+  // sticks. Ignored on phones (see `_isTablet`).
+  int _tabletColumns = _defaultTabletColumns;
+  static const int _defaultTabletColumns = 4;
+  static const int _minTabletColumns = 3;
+  static const int _maxTabletColumns = 5;
+
   static const _filters = [
     'All',
     'Decodable',
@@ -83,6 +91,8 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
   ];
 
   String get _hiddenPrefsKey => 'hidden_books_${widget.teacher.schoolId ?? ''}';
+  String get _densityPrefsKey =>
+      'library_density_${widget.teacher.schoolId ?? ''}';
 
   @override
   void initState() {
@@ -91,6 +101,7 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
     _assignmentService =
         widget._assignmentService ?? SchoolLibraryAssignmentService();
     _loadHiddenBooks();
+    _loadDensity();
     _loadCounts();
     _loadNextPage();
   }
@@ -172,6 +183,22 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
     setState(() => _hiddenBookIds = ids.toSet());
   }
 
+  Future<void> _loadDensity() async {
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getInt(_densityPrefsKey);
+    if (stored == null || !mounted) return;
+    setState(() => _tabletColumns =
+        stored.clamp(_minTabletColumns, _maxTabletColumns));
+  }
+
+  Future<void> _setDensity(int columns) async {
+    final clamped = columns.clamp(_minTabletColumns, _maxTabletColumns);
+    if (clamped == _tabletColumns) return;
+    setState(() => _tabletColumns = clamped);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_densityPrefsKey, clamped);
+  }
+
   Future<void> _toggleHideBook(String bookId) async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -251,16 +278,42 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
                   searchQuery: _searchQuery,
                 );
 
-          // Decodable / library / visible counts come from the
-          // server-maintained libraryMeta/counts doc so they stay accurate
-          // even when only a slice of the books collection is paginated in.
-          // Subtract hidden count under the assumption it's a small set.
-          final decodableCount = (_counts.decodable - _hiddenBookIds.length)
-              .clamp(0, _counts.decodable);
-          final libraryCount = (_counts.library - _hiddenBookIds.length)
-              .clamp(0, _counts.library);
-          final visibleCount =
-              (_counts.total - hiddenCount).clamp(0, _counts.total);
+          // Chip counts. Prefer the server-maintained libraryMeta/counts doc
+          // while paginating — it covers the whole library without loading
+          // every page. But the doc isn't seeded for schools that had books
+          // before the maintainLibraryCounts function shipped, so it reads a
+          // misleading `total: 0` while the grid is clearly full. In that case
+          // (and whenever we've already loaded every page) count the loaded
+          // books directly so the chips never show 0 under a full grid.
+          final bool docSeeded = _counts.total > 0;
+          final bool useLoadedCounts = !_hasMore || !docSeeded;
+
+          final int decodableCount;
+          final int libraryCount;
+          final int visibleCount;
+          if (useLoadedCounts) {
+            final loadedVisible = allBooks
+                .where((b) => !_hiddenBookIds.contains(b.id))
+                .toList();
+            visibleCount = loadedVisible.length;
+            decodableCount =
+                loadedVisible.where(SchoolLibraryService.isDecodable).length;
+            libraryCount = visibleCount - decodableCount;
+          } else {
+            // Server doc available and library not fully loaded — trust it,
+            // subtracting the (small) hidden set as an approximation.
+            decodableCount = (_counts.decodable - hiddenCount)
+                .clamp(0, _counts.decodable);
+            libraryCount =
+                (_counts.library - hiddenCount).clamp(0, _counts.library);
+            visibleCount =
+                (_counts.total - hiddenCount).clamp(0, _counts.total);
+          }
+
+          // iPad-only grid density. Phones always use 3 columns.
+          final isTablet =
+              MediaQuery.of(context).size.shortestSide >= 600;
+          final gridColumns = isTablet ? _tabletColumns : 3;
 
           return StreamBuilder<LibraryAssignmentSnapshot>(
             stream: _assignmentService.summaryStream(schoolId),
@@ -324,37 +377,55 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
                               ),
                             ),
 
-                            // ── Filter chips ──────────────────────────────────────────
+                            // ── Filter chips (+ iPad density control) ──────────────────
                             SliverToBoxAdapter(
                               child: Padding(
                                 padding:
                                     const EdgeInsets.fromLTRB(16, 14, 0, 18),
                                 child: SizedBox(
                                   height: 40,
-                                  child: ListView.separated(
-                                    scrollDirection: Axis.horizontal,
-                                    itemCount: _filters.length,
-                                    separatorBuilder: (_, __) =>
-                                        const SizedBox(width: 8),
-                                    padding: const EdgeInsets.only(right: 16),
-                                    itemBuilder: (context, i) {
-                                      final f = _filters[i];
-                                      return TeacherFilterChip(
-                                        label: _filterLabel(
-                                          f,
-                                          visibleCount: visibleCount,
-                                          decodableCount: decodableCount,
-                                          libraryCount: libraryCount,
-                                          hiddenCount: hiddenCount,
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: ListView.separated(
+                                          scrollDirection: Axis.horizontal,
+                                          itemCount: _filters.length,
+                                          separatorBuilder: (_, __) =>
+                                              const SizedBox(width: 8),
+                                          padding:
+                                              const EdgeInsets.only(right: 16),
+                                          itemBuilder: (context, i) {
+                                            final f = _filters[i];
+                                            return TeacherFilterChip(
+                                              label: _filterLabel(
+                                                f,
+                                                visibleCount: visibleCount,
+                                                decodableCount: decodableCount,
+                                                libraryCount: libraryCount,
+                                                hiddenCount: hiddenCount,
+                                              ),
+                                              isActive: _activeFilter == f,
+                                              onTap: () => setState(
+                                                  () => _activeFilter = f),
+                                              icon: _filterIcon(f),
+                                              activeColor: _filterColor(f),
+                                              activeForegroundColor:
+                                                  LumiTokens.ink,
+                                            );
+                                          },
                                         ),
-                                        isActive: _activeFilter == f,
-                                        onTap: () =>
-                                            setState(() => _activeFilter = f),
-                                        icon: _filterIcon(f),
-                                        activeColor: _filterColor(f),
-                                        activeForegroundColor: LumiTokens.ink,
-                                      );
-                                    },
+                                      ),
+                                      // iPad-only: choose how many books per row.
+                                      if (isTablet)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                              left: 8, right: 16),
+                                          child: _DensityControl(
+                                            columns: _tabletColumns,
+                                            onChanged: _setDensity,
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 ),
                               ),
@@ -362,7 +433,7 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
 
                             // ── Body ──────────────────────────────────────────────────
                             if (isLoading)
-                              _buildSkeletonSliver()
+                              _buildSkeletonSliver(gridColumns)
                             else if (allBooks.isEmpty)
                               _buildEmptySliver()
                             else if (filtered.isEmpty)
@@ -372,11 +443,13 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
                               ..._buildTierSections(
                                 filtered,
                                 assignmentSummary: assignmentSummary,
+                                columns: gridColumns,
                               )
                             else
                               _buildFlatGrid(
                                 filtered,
                                 assignmentSummary: assignmentSummary,
+                                columns: gridColumns,
                               ),
 
                             const SliverToBoxAdapter(
@@ -463,6 +536,7 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
   List<Widget> _buildTierSections(
     List<BookModel> books, {
     required LibraryAssignmentSnapshot assignmentSummary,
+    required int columns,
   }) {
     final slivers = <Widget>[];
     final stageGroups = SchoolLibraryService.groupDecodableByStage(books);
@@ -504,7 +578,8 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
               : headerWidget,
         ),
       ));
-      slivers.add(_bookGrid(entry.value, assignmentSummary: assignmentSummary));
+      slivers.add(_bookGrid(entry.value,
+          assignmentSummary: assignmentSummary, columns: columns));
       slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 8)));
       sectionIndex++;
     }
@@ -545,7 +620,8 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
                 : libHeader,
           ),
         ));
-        slivers.add(_bookGrid(libBooks, assignmentSummary: assignmentSummary));
+        slivers.add(_bookGrid(libBooks,
+            assignmentSummary: assignmentSummary, columns: columns));
       }
     }
 
@@ -555,18 +631,20 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
   Widget _buildFlatGrid(
     List<BookModel> books, {
     required LibraryAssignmentSnapshot assignmentSummary,
+    required int columns,
   }) =>
-      _bookGrid(books, assignmentSummary: assignmentSummary);
+      _bookGrid(books, assignmentSummary: assignmentSummary, columns: columns);
 
   SliverPadding _bookGrid(
     List<BookModel> books, {
     required LibraryAssignmentSnapshot assignmentSummary,
+    required int columns,
   }) {
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
       sliver: SliverGrid(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: columns,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
           childAspectRatio: 0.68,
@@ -619,19 +697,19 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
 
   // ── Loading skeleton ─────────────────────────────────────────────────────
 
-  Widget _buildSkeletonSliver() {
+  Widget _buildSkeletonSliver(int columns) {
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       sliver: SliverGrid(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: columns,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
           childAspectRatio: 0.68,
         ),
         delegate: SliverChildBuilderDelegate(
           (_, __) => const LumiSkeleton(borderRadius: 16),
-          childCount: 9,
+          childCount: columns * 3,
         ),
       ),
     );
@@ -1663,6 +1741,92 @@ class _ErrorState extends StatelessWidget {
             icon: Icons.cloud_off_outlined,
             title: 'Library unavailable',
             message: message,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// iPad density control
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Compact segmented control (iPad only) letting a teacher choose how many
+/// book covers appear per row: Large (3), Medium (4) or Small (5). On phones
+/// the grid is always 3 columns and this control isn't shown.
+class _DensityControl extends StatelessWidget {
+  const _DensityControl({required this.columns, required this.onChanged});
+
+  final int columns;
+  final ValueChanged<int> onChanged;
+
+  static const List<({int cols, IconData icon, String label})> _options = [
+    (cols: 3, icon: Icons.grid_view_rounded, label: 'Large'),
+    (cols: 4, icon: Icons.window_rounded, label: 'Medium'),
+    (cols: 5, icon: Icons.apps_rounded, label: 'Small'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+        border: Border.all(color: LumiTokens.rule),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final o in _options)
+            _DensityButton(
+              icon: o.icon,
+              tooltip: '${o.label} — ${o.cols} per row',
+              active: columns == o.cols,
+              onTap: () => onChanged(o.cols),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DensityButton extends StatelessWidget {
+  const _DensityButton({
+    required this.icon,
+    required this.tooltip,
+    required this.active,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          width: 34,
+          height: 34,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: active
+                ? LumiTokens.yellow.withValues(alpha: 0.9)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+          ),
+          child: Icon(
+            icon,
+            size: 18,
+            color: active ? LumiTokens.ink : LumiTokens.muted,
           ),
         ),
       ),
