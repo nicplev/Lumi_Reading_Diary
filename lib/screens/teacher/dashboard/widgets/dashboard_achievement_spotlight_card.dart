@@ -113,7 +113,7 @@ class DashboardAchievementSpotlightCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${sa.studentFirstName} · $timeLabel',
+                  '${sa.studentDisplayName} · $timeLabel',
                   style: LumiType.caption,
                 ),
               ],
