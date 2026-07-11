@@ -8,10 +8,12 @@ import type {
   OnboardingDetail as OnboardingDetailType,
   OnboardingReadiness,
 } from "@/lib/firestore/onboarding";
+import type { DemoAccessView } from "@/lib/firestore/demo-access";
 import { OnboardingActions } from "./onboarding-actions";
 import { ProvisionPanel } from "./provision-panel";
 import { ReadinessPanel } from "./readiness-panel";
 import { FollowUpPanel } from "./follow-up-panel";
+import { DemoAccessPanel } from "./demo-access-panel";
 
 const ONBOARDING_STEPS = [
   { key: "schoolInfo", label: "School Info" },
@@ -25,11 +27,13 @@ const ONBOARDING_STEPS = [
 interface OnboardingDetailProps {
   onboarding: OnboardingDetailType;
   readiness: OnboardingReadiness | null;
+  demoAccessView: DemoAccessView | null;
 }
 
 export function OnboardingDetail({
   onboarding,
   readiness,
+  demoAccessView,
 }: OnboardingDetailProps) {
   return (
     <div className="space-y-6">
@@ -46,12 +50,12 @@ export function OnboardingDetail({
         </CardContent>
       </Card>
 
-      {onboarding.status === "demo" && (
-        <p className="text-sm text-muted-foreground">
-          Demos run as a live call on the shared Lumi Demo school — reset it
-          before each demo. Book the next step below and update the stage as you
-          go.
-        </p>
+      {onboarding.status === "demo" && demoAccessView && (
+        <DemoAccessPanel
+          onboardingId={onboarding.id}
+          contactEmail={onboarding.contactEmail}
+          view={demoAccessView}
+        />
       )}
 
       <div className="grid gap-6 md:grid-cols-2">

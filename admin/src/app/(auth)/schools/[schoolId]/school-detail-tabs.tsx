@@ -15,6 +15,8 @@ import { SchoolClassesTab } from "./school-classes-tab";
 import { SchoolParentsTab } from "./school-parents-tab";
 import { SchoolSubscriptionTab } from "./school-subscription-tab";
 import type { SchoolSubscriptionRow } from "@/lib/firestore/school-subscriptions";
+import { SchoolDemoAccessTab } from "./school-demo-access-tab";
+import type { DemoEmailHistoryItem } from "@/lib/firestore/demo-access";
 
 interface SchoolDetailTabsProps {
   school: SchoolDetail;
@@ -29,6 +31,8 @@ interface SchoolDetailTabsProps {
   recentLogCount?: number;
   subscriptions: SchoolSubscriptionRow[];
   currentAcademicYear: number;
+  /** Present only for the demo school → renders the "Demo access" tab. */
+  demoAccessEmails?: DemoEmailHistoryItem[] | null;
 }
 
 export function SchoolDetailTabs({
@@ -44,7 +48,9 @@ export function SchoolDetailTabs({
   recentLogCount,
   subscriptions,
   currentAcademicYear,
+  demoAccessEmails,
 }: SchoolDetailTabsProps) {
+  const showDemoTab = demoAccessEmails != null;
   return (
     <Tabs defaultValue={defaultTab || "overview"} className="space-y-4">
       <TabsList>
@@ -56,6 +62,9 @@ export function SchoolDetailTabs({
         <TabsTrigger value="students">Students</TabsTrigger>
         <TabsTrigger value="classes">Classes</TabsTrigger>
         <TabsTrigger value="parents">Parents</TabsTrigger>
+        {showDemoTab && (
+          <TabsTrigger value="demo-access">Demo access</TabsTrigger>
+        )}
       </TabsList>
       <TabsContent value="overview">
         <SchoolOverview
@@ -100,6 +109,11 @@ export function SchoolDetailTabs({
       <TabsContent value="parents">
         <SchoolParentsTab schoolId={school.id} parents={parents} />
       </TabsContent>
+      {showDemoTab && (
+        <TabsContent value="demo-access">
+          <SchoolDemoAccessTab emails={demoAccessEmails ?? []} />
+        </TabsContent>
+      )}
     </Tabs>
   );
 }

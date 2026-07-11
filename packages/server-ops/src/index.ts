@@ -11,3 +11,4 @@ export * from "./grantDevAccess";
 export * from "./setComprehensionRecordingFlag";
 export * from "./setComprehensionRetentionConfig";
 export * from "./comprehensionAudioActions";
+export * from "./provisionDemoAccess";

@@ -83,3 +83,11 @@ export const provisionSchoolSchema = z.object({
   createJoinCode: z.boolean().default(false),
 });
 export type ProvisionSchoolInput = z.infer<typeof provisionSchoolSchema>;
+
+// --- Demo-day access (rolling day password on the shared demo school) ---
+
+export const demoAccessActionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("provision") }),
+  z.object({ action: z.literal("sendEmail") }),
+]);
+export type DemoAccessActionInput = z.infer<typeof demoAccessActionSchema>;

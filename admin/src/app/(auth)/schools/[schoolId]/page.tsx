@@ -12,6 +12,7 @@ import {
   getCurrentAcademicYear,
   getSubscriptionsForSchool,
 } from "@/lib/firestore/school-subscriptions";
+import { isDemoSchool, listAllDemoAccessEmails } from "@/lib/firestore/demo-access";
 import { SchoolDetailTabs } from "./school-detail-tabs";
 
 export default async function SchoolDetailPage({
@@ -24,7 +25,7 @@ export default async function SchoolDetailPage({
   const { schoolId } = await params;
   const { tab } = await searchParams;
 
-  const [school, stats, users, students, classes, parents, bookCount, activeAllocationCount, recentLogCount, subscriptions, currentAcademicYear] = await Promise.all([
+  const [school, stats, users, students, classes, parents, bookCount, activeAllocationCount, recentLogCount, subscriptions, currentAcademicYear, isDemo] = await Promise.all([
     getSchool(schoolId),
     getSchoolStats(schoolId),
     listSchoolUsers(schoolId),
@@ -36,9 +37,14 @@ export default async function SchoolDetailPage({
     getReadingLogCountForSchool(schoolId),
     getSubscriptionsForSchool(schoolId),
     getCurrentAcademicYear(),
+    isDemoSchool(schoolId),
   ]);
 
   if (!school) notFound();
+
+  // Demo-access send history is the canonical "who has been given demo access"
+  // view — shown only on the demo school's page.
+  const demoAccessEmails = isDemo ? await listAllDemoAccessEmails() : null;
 
   return (
     <>
@@ -59,6 +65,7 @@ export default async function SchoolDetailPage({
         recentLogCount={recentLogCount}
         subscriptions={subscriptions}
         currentAcademicYear={currentAcademicYear}
+        demoAccessEmails={demoAccessEmails}
       />
     </>
   );
