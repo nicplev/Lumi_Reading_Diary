@@ -159,9 +159,23 @@ class AppRouter {
       // fall back to a direct Firestore read to avoid StreamProvider hang.
       UserModel? userModel = _ref.read(userProvider).value;
       if (userModel == null) {
-        final uid = firebaseService.auth.currentUser!.uid;
         final userRepository = _ref.read(userRepositoryProvider);
-        userModel = await userRepository.getUser(uid);
+        // Right after account creation the MFA enrol revokes + re-establishes
+        // the session; the first profile read can transiently miss even though
+        // the user is validly signed in. Retry briefly before bouncing to a
+        // (blank) login screen, so a fresh signup isn't kicked back to login.
+        for (var attempt = 0; attempt < 4; attempt++) {
+          final currentUser = firebaseService.auth.currentUser;
+          if (currentUser == null) break;
+          userModel = await userRepository.getUser(currentUser.uid);
+          if (userModel != null || attempt == 3) break;
+          await Future<void>.delayed(const Duration(milliseconds: 350));
+          try {
+            await firebaseService.auth.currentUser?.reload();
+          } catch (_) {
+            // Token may be mid-revocation; keep retrying.
+          }
+        }
       }
 
       if (userModel == null) {
