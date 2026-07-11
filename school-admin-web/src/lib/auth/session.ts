@@ -44,6 +44,40 @@ export interface SessionData {
 const SESSION_COOKIE_NAME = '__session';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 5; // 5 days
 
+// The shared sales-demo school. Its login accounts use a rolling daily password
+// (scrambled just after Sydney midnight — see functions/src/demo_access.ts), so
+// a demo-school session must not outlive the day. We cap it to end-of-day Sydney
+// instead of the usual 5 days — the __session JWT is only locally verified, so a
+// session opened on demo day would otherwise stay valid long after the password
+// was scrambled.
+const DEMO_ACCESS_SCHOOL_ID = 'lumi_demo_primary_school';
+const DEMO_ACCESS_TIMEZONE = 'Australia/Sydney';
+
+// Seconds from now until the next Sydney midnight (min 60s so a login right at
+// midnight still gets a usable session). DST transitions can make this off by up
+// to an hour — harmless for a session cap.
+function secondsUntilSydneyEndOfDay(now: Date = new Date()): number {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: DEMO_ACCESS_TIMEZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(now);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? '0');
+  const hour = get('hour') % 24; // some ICU builds render midnight as 24
+  const elapsed = hour * 3600 + get('minute') * 60 + get('second');
+  return Math.max(86400 - elapsed, 60);
+}
+
+// Cookie/JWT lifetime for a school: the usual 5 days, capped to end-of-day
+// Sydney for the shared demo school so a session can't outlive the day password.
+function sessionMaxAgeForSchool(schoolId: string): number {
+  return schoolId === DEMO_ACCESS_SCHOOL_ID
+    ? Math.min(SESSION_MAX_AGE, secondsUntilSydneyEndOfDay())
+    : SESSION_MAX_AGE;
+}
+
 function getSecret() {
   const secret = process.env.SESSION_SECRET;
   if (!secret) throw new Error('SESSION_SECRET environment variable is required');
@@ -51,10 +85,14 @@ function getSecret() {
 }
 
 export async function createSessionCookie(sessionData: SessionData) {
+  // Cap the demo school here rather than at the call site so no caller can
+  // forget it — the JWT `exp` and the cookie maxAge are set together, since
+  // capping only the cookie would leave a replayed token verifiable for 5 days.
+  const maxAgeSeconds = sessionMaxAgeForSchool(sessionData.schoolId);
   const token = await new SignJWT({ ...sessionData })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime(`${SESSION_MAX_AGE}s`)
+    .setExpirationTime(`${maxAgeSeconds}s`)
     .sign(getSecret());
 
   const cookieStore = await cookies();
@@ -62,7 +100,7 @@ export async function createSessionCookie(sessionData: SessionData) {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: SESSION_MAX_AGE,
+    maxAge: maxAgeSeconds,
     path: '/',
   });
 }
