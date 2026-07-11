@@ -24,8 +24,14 @@ import { auth } from '@/lib/firebase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { Icon } from '@/components/lumi/icon';
-import { useAuth } from '@/lib/auth/auth-context';
+import { useAuth, type AuthUser } from '@/lib/auth/auth-context';
 import { characterImageSrc, randomCharacterId } from '@/lib/characters';
+
+type SessionResponse = Partial<AuthUser> & {
+  code?: string;
+  error?: string;
+  enrollmentToken?: string;
+};
 
 function LoginForm() {
   const [email, setEmail] = useState('');
@@ -73,21 +79,34 @@ function LoginForm() {
       body: JSON.stringify({ idToken, enrollmentToken: enrollmentProof }),
     });
 
-    const sessionData = await res.json();
+    // A deployment or proxy error can return an empty/non-JSON response. Do
+    // not expose its parser error to a person trying to sign in.
+    const sessionData = await res.json().catch(() => null) as SessionResponse | null;
     if (
       res.status === 403 &&
-      sessionData.code === 'admin-totp-enrollment-required' &&
+      sessionData?.code === 'admin-totp-enrollment-required' &&
       typeof sessionData.enrollmentToken === 'string'
     ) {
       await beginTotpEnrollment(user, sessionData.enrollmentToken);
       return;
     }
     if (!res.ok) {
-      throw new Error(sessionData.error || 'Login failed');
+      throw new Error(sessionData?.error || 'We could not create a secure portal session. Please try again.');
+    }
+
+    if (
+      !sessionData ||
+      typeof sessionData.uid !== 'string' ||
+      typeof sessionData.email !== 'string' ||
+      typeof sessionData.schoolId !== 'string' ||
+      (sessionData.role !== 'teacher' && sessionData.role !== 'schoolAdmin') ||
+      typeof sessionData.fullName !== 'string'
+    ) {
+      throw new Error('We could not create a secure portal session. Please try again.');
     }
 
     // Inject session data directly into AuthContext to avoid race condition
-    setSessionData(sessionData);
+    setSessionData(sessionData as AuthUser);
 
     const requestedFrom = searchParams.get('from');
     // Never pass an untrusted absolute or javascript: URL to router.push().
