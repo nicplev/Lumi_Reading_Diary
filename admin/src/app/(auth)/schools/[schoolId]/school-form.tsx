@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,7 +55,10 @@ export function SchoolForm({ school }: SchoolFormProps) {
     watch,
     formState: { errors },
   } = useForm<UpdateSchoolInput>({
-    resolver: zodResolver(updateSchoolSchema),
+    // Cast: @hookform/resolvers@5.2.2's types are pinned to zod 4.0's internal
+    // version marker, but the app resolves zod 4.4.x — a types-only mismatch
+    // (runtime is fine). Remove when resolvers/zod versions are realigned.
+    resolver: zodResolver(updateSchoolSchema as never) as unknown as Resolver<UpdateSchoolInput>,
     defaultValues: {
       name: school.name,
       contactEmail: school.contactEmail ?? "",
