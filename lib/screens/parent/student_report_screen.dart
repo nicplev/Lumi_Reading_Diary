@@ -14,6 +14,7 @@ import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../core/widgets/lumi/lumi_card.dart';
 import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
+import '../../core/widgets/lumi/student_reading_level_label.dart';
 
 /// Screen for generating and sharing student progress reports
 /// Used by both parents and teachers
@@ -90,8 +91,9 @@ class _StudentReportScreenState extends State<StudentReportScreen> {
                       style: LumiTextStyles.h2(),
                     ),
                     LumiGap.xxs,
-                    Text(
-                      'Reading Level: ${widget.student.currentReadingLevel ?? "Not set"}',
+                    StudentReadingLevelLabel(
+                      student: widget.student,
+                      prefix: 'Reading Level: ',
                       style: LumiTextStyles.body(
                         color: AppColors.charcoal.withValues(alpha: 0.6),
                       ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/book_model.dart';
 import '../../services/book_recommendation_service.dart';
+import '../../services/reading_level_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/lumi_text_styles.dart';
 import '../../core/theme/lumi_spacing.dart';
@@ -30,7 +31,9 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final _bookService = BookRecommendationService();
+  final _levelService = ReadingLevelService();
 
+  String? _formattedLevel;
   bool _isLoading = true;
   List<BookModel> _recommendations = [];
   List<BookModel> _currentlyReading = [];
@@ -188,9 +191,7 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
           children: [
             _buildSectionHeader(
               'Popular at Your Level',
-              widget.student.currentReadingLevel != null
-                  ? 'Level ${widget.student.currentReadingLevel}'
-                  : 'All levels',
+              _formattedLevel ?? 'All levels',
             ),
             LumiGap.s,
             _buildBookGrid(_popular),
@@ -461,6 +462,17 @@ class _BookBrowserScreenState extends State<BookBrowserScreen>
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
+
+    // Resolves the stored level through the school's schema ("PM 12",
+    // "Level J", ...) — the raw value only reads correctly for A-Z schools.
+    _levelService
+        .formatStoredLevelForSchool(
+      widget.student.schoolId,
+      widget.student.currentReadingLevel,
+    )
+        .then((label) {
+      if (mounted) setState(() => _formattedLevel = label);
+    });
 
     try {
       final results = await Future.wait([

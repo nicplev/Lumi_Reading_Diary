@@ -12,6 +12,7 @@ import '../../core/widgets/lumi/lumi_buttons.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
+import '../../core/widgets/lumi/student_reading_level_label.dart';
 import '../../core/widgets/lumi/feedback_widget.dart';
 import '../../core/widgets/lumi/legal_links_row.dart';
 import '../../core/widgets/lumi/lumi_toast.dart';
@@ -445,8 +446,8 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen>
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 1),
-                  Text(
-                    'Level: ${child.currentReadingLevel ?? 'Not set'}',
+                  StudentReadingLevelLabel(
+                    student: child,
                     style: LumiType.caption,
                   ),
                 ],
