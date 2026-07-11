@@ -115,6 +115,20 @@ class LumiTourDefinitions {
         icon: Icons.person_add_alt_1_rounded,
         accent: LumiTokens.green,
       ),
+      // Appended without bumping `version`, so only new users (who haven't
+      // completed v1 yet) see it — existing parents aren't re-onboarded.
+      LumiTourStep(
+        id: 'widget',
+        targetId: 'parent.home',
+        title: 'Home Screen Widget',
+        body:
+            "Add the Lumi widget to your phone's home screen to see your child's reading streak and progress at a glance — without opening the app.",
+        tip:
+            'Long-press your home screen, tap the + button, then search for "Lumi" to add it.',
+        icon: Icons.widgets_rounded,
+        accent: LumiTokens.blue,
+        spotlightTarget: false,
+      ),
     ],
   );
 
@@ -221,6 +235,20 @@ class LumiTourDefinitions {
             'Notifications can be customised by audience and message before sending.',
         icon: Icons.settings_outlined,
         accent: LumiTokens.red,
+      ),
+      // Appended without bumping `version`, so only new users (who haven't
+      // completed v2 yet) see it — existing teachers aren't re-onboarded.
+      LumiTourStep(
+        id: 'widget',
+        targetId: 'teacher.home',
+        title: 'Home Screen Widgets',
+        body:
+            "Add Lumi widgets to your device's home screen for an at-a-glance view — today's reading, top readers, and the class calendar — without opening the app.",
+        tip:
+            'Long-press your home screen, tap the + button, then search for "Lumi" to add a widget.',
+        icon: Icons.widgets_rounded,
+        accent: LumiTokens.blue,
+        spotlightTarget: false,
       ),
     ],
   );
@@ -393,6 +421,27 @@ class LumiTourController extends ChangeNotifier {
     await Future<void>.delayed(const Duration(milliseconds: 140));
     _isTransitioning = false;
     notifyListeners();
+    _scheduleSettleRemeasure(step);
+  }
+
+  /// Some targets scroll or animate into place *after* their step activates —
+  /// e.g. the teacher dashboard auto-scrolls (~420ms) to the "Customise
+  /// dashboard" button, which sits off-screen at the bottom of the list. The
+  /// overlay only re-measures the target rect when the controller notifies, so
+  /// without this the spotlight freezes at a mid-scroll (or off-screen) rect
+  /// and only corrects itself once the user steps away and back. Re-notify a
+  /// few times over the following ~0.75s so the overlay re-measures once the
+  /// layout has settled.
+  void _scheduleSettleRemeasure(LumiTourStep step) {
+    if (!step.spotlightTarget) return;
+    const delaysMs = [150, 300, 500, 750];
+    for (final ms in delaysMs) {
+      Future<void>.delayed(Duration(milliseconds: ms), () {
+        if (_isActive && identical(currentStep, step)) {
+          notifyListeners();
+        }
+      });
+    }
   }
 }
 
