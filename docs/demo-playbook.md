@@ -105,7 +105,7 @@ the admin-only TOTP policy.
 | Ruby Jones / Harper Lee | 3G / 5B | `not_enrolled` — populate the parent-links onboarding funnel ("no subscription" state). |
 
 Everyone else fills out the charts with believable variety (~460 reading logs over
-60 days, allocations, reading levels J–P).
+60 days and allocations).
 
 ---
 

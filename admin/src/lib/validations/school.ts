@@ -11,6 +11,10 @@ export const createSchoolSchema = z.object({
   primaryColor: z.string().optional(),
   secondaryColor: z.string().optional(),
   displayName: z.string().max(100).optional(),
+  levelSchema: z
+    .enum(["none", "aToZ", "pmBenchmark", "lexile", "custom"])
+    .optional(),
+  customLevels: z.array(z.string()).optional(),
 });
 
 export const updateSchoolSchema = createSchoolSchema.partial();
