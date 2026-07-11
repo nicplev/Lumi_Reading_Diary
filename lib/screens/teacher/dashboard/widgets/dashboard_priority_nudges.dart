@@ -253,7 +253,7 @@ class _NudgeRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    student.firstName,
+                    student.firstNameWithLastInitial,
                     style: LumiType.body.copyWith(
                       fontWeight: FontWeight.w700,
                       fontSize: 14,

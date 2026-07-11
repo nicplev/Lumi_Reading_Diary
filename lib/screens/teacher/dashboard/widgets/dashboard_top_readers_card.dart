@@ -92,7 +92,7 @@ class DashboardTopReadersCard extends StatelessWidget {
       _ => LumiTokens.muted.withValues(alpha: 0.45),
     };
     final isTopThree = rank <= 3;
-    final name = student?.firstName ?? 'Unknown';
+    final name = student?.firstNameWithLastInitial ?? 'Unknown';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
