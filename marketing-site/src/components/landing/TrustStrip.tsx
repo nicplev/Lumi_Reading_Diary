@@ -1,7 +1,8 @@
 export function TrustStrip() {
   return (
-    <section style={{ padding: "38px 32px 8px" }}>
+    <section className="marketing-trust" style={{ padding: "38px 32px 8px" }}>
       <div
+        className="marketing-trust-inner"
         style={{
           maxWidth: 1180,
           margin: "0 auto",
@@ -23,7 +24,7 @@ export function TrustStrip() {
         >
           Built for Australian primary classrooms &amp; the science of reading
         </span>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div className="marketing-trust-levels" style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontWeight: 300, fontSize: 13, color: "#928B7F", marginRight: 4 }}>Level systems:</span>
           {["PM Benchmark", "A–Z", "Lexile", "Custom"].map((label) => (
             <span

@@ -2,8 +2,9 @@ import Link from "next/link";
 
 export function FinalCTA() {
   return (
-    <section id="demo" style={{ padding: "30px 32px 90px" }}>
+    <section id="demo" className="marketing-final-cta" style={{ padding: "30px 32px 90px" }}>
       <div
+        className="marketing-final-cta-panel"
         style={{
           maxWidth: 1180,
           margin: "0 auto",
@@ -30,7 +31,7 @@ export function FinalCTA() {
             See the parent app and teacher dashboard on a 20-minute call. We&apos;ll help you map it to your reading levels
             and library.
           </p>
-          <div style={{ display: "flex", gap: 14, justifyContent: "center", marginTop: 32 }}>
+          <div className="marketing-final-cta-actions" style={{ display: "flex", gap: 14, justifyContent: "center", marginTop: 32 }}>
             <Link
               href="/book-a-demo"
               style={{
@@ -64,7 +65,7 @@ export function FinalCTA() {
             </Link>
           </div>
         </div>
-        <div style={{ position: "absolute", right: 30, bottom: -6, width: 146, animation: "lumiFloat 5.5s ease-in-out infinite" }}>
+        <div className="marketing-final-cta-mascot" style={{ position: "absolute", right: 30, bottom: -6, width: 146, animation: "lumiFloat 5.5s ease-in-out infinite" }}>
           <img
             data-lumi-track
             src="/assets/lumi-reading.png"
@@ -72,7 +73,7 @@ export function FinalCTA() {
             style={{ display: "block", width: 146, height: "auto", filter: "drop-shadow(0 14px 14px rgba(0,0,0,0.18))", transition: "transform .25s ease-out" }}
           />
         </div>
-        <div style={{ position: "absolute", left: 40, top: 28, width: 78, opacity: 0.95, animation: "lumiFloatB 6s ease-in-out infinite" }}>
+        <div className="marketing-final-cta-mascot" style={{ position: "absolute", left: 40, top: 28, width: 78, opacity: 0.95, animation: "lumiFloatB 6s ease-in-out infinite" }}>
           <img
             data-lumi-track
             src="/assets/lumi-blue.png"

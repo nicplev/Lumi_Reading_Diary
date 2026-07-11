@@ -29,9 +29,9 @@ const TESTIMONIALS = [
 
 export function Testimonials() {
   return (
-    <section style={{ padding: "78px 32px" }}>
+    <section className="marketing-testimonials" style={{ padding: "78px 32px" }}>
       <div style={{ maxWidth: 1180, margin: "0 auto", position: "relative" }}>
-        <div style={{ position: "absolute", right: 4, top: -30, width: 92, animation: "lumiFloat 5.5s ease-in-out infinite" }}>
+        <div className="marketing-section-mascot" style={{ position: "absolute", right: 4, top: -30, width: 92, animation: "lumiFloat 5.5s ease-in-out infinite" }}>
           <img
             src="/assets/lumi-frog.png"
             alt="Lumi frog"
@@ -47,7 +47,7 @@ export function Testimonials() {
             Loved by literacy leaders, teachers and parents.
           </h2>
         </div>
-        <div data-anim="stagger" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
+        <div data-anim="stagger" className="marketing-testimonial-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
           {TESTIMONIALS.map((t) => (
             <div key={t.name} style={{ background: "#fff", border: "1px solid #ECE7DD", borderRadius: 22, padding: 30, display: "flex", flexDirection: "column" }}>
               <div style={{ display: "flex", gap: 3, marginBottom: 16 }}>

@@ -165,8 +165,8 @@ export function ForTeachers() {
   const tc = (t: Tab) => (tab === t ? "#56C8E6" : "#6B6B6B");
 
   return (
-    <section id="teachers" style={{ padding: "78px 32px", background: "#fff", borderTop: "1px solid #ECE7DD", borderBottom: "1px solid #ECE7DD" }}>
-      <div style={{ maxWidth: 1180, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1.05fr", gap: 56, alignItems: "center" }}>
+    <section id="teachers" className="marketing-teachers" style={{ padding: "78px 32px", background: "#fff", borderTop: "1px solid #ECE7DD", borderBottom: "1px solid #ECE7DD" }}>
+      <div className="marketing-teachers-layout" style={{ maxWidth: 1180, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1.05fr", gap: 56, alignItems: "center" }}>
         <div data-anim="reveal-left">
           <span style={{ fontFamily: "'Nunito',sans-serif", fontWeight: 800, fontSize: 13, letterSpacing: "0.12em", textTransform: "uppercase", color: "#1989CA" }}>
             For teachers
@@ -180,7 +180,7 @@ export function ForTeachers() {
             mood blobs. Celebrate milestones like &quot;Sarah reached 50 nights!&quot;, and assign the next round of readers in two
             taps. No more chasing paper journals.
           </p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 30 }}>
+          <div className="marketing-teacher-benefits" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 30 }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
               <span style={{ width: 30, height: 30, borderRadius: 9, background: "#DCF0F8", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -245,7 +245,7 @@ export function ForTeachers() {
         </div>
 
         {/* teacher phone mockup */}
-        <div data-anim="reveal-right" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+        <div data-anim="reveal-right" className="marketing-teacher-device" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
           <span
             style={{
               display: "inline-flex",

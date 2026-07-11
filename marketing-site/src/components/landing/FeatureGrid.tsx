@@ -73,7 +73,7 @@ const CHARACTERS = [
 
 export function FeatureGrid() {
   return (
-    <section style={{ padding: "78px 32px", background: "#fff", borderTop: "1px solid #ECE7DD", borderBottom: "1px solid #ECE7DD" }}>
+    <section className="marketing-features" style={{ padding: "78px 32px", background: "#fff", borderTop: "1px solid #ECE7DD", borderBottom: "1px solid #ECE7DD" }}>
       <div style={{ maxWidth: 1180, margin: "0 auto" }}>
         <div data-anim="reveal" style={{ textAlign: "center", maxWidth: 680, margin: "0 auto 48px" }}>
           <span style={{ fontFamily: "'Nunito',sans-serif", fontWeight: 800, fontSize: 13, letterSpacing: "0.12em", textTransform: "uppercase", color: "#C79400" }}>
@@ -83,7 +83,7 @@ export function FeatureGrid() {
             A whole reading ecosystem, minus the paperwork.
           </h2>
         </div>
-        <div data-anim="stagger" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 18 }}>
+        <div data-anim="stagger" className="marketing-feature-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 18 }}>
           {COLUMNS.map((col) => (
             <div key={col.key} style={{ border: "1px solid #ECE7DD", borderRadius: 22, overflow: "hidden" }}>
               <div style={{ background: col.headerBg, padding: "18px 22px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>

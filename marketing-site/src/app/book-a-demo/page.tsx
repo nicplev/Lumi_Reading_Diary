@@ -78,10 +78,10 @@ export default function BookADemoPage() {
   };
 
   return (
-    <div style={{ fontFamily: "'Helvetica Neue',Helvetica,Arial,sans-serif", color: "#211C16", background: "#F7F5F0", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+    <div className="marketing-form-page" style={{ fontFamily: "'Helvetica Neue',Helvetica,Arial,sans-serif", color: "#211C16", background: "#F7F5F0", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       {/* NAV */}
       <div style={{ background: "rgba(247,245,240,0.88)", borderBottom: "1px solid #ECE7DD" }}>
-        <div style={{ maxWidth: 1180, margin: "0 auto", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div className="marketing-form-nav" style={{ maxWidth: 1180, margin: "0 auto", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
             <span style={{ display: "block", width: 26, height: 28 }}>
               <img src="/assets/lumi-red.png" alt="Lumi" style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }} />
@@ -94,7 +94,7 @@ export default function BookADemoPage() {
         </div>
       </div>
 
-      <div style={{ flex: 1, maxWidth: 1180, width: "100%", margin: "0 auto", padding: "64px 32px 90px", display: "grid", gridTemplateColumns: "1fr 1.15fr", gap: 64, alignItems: "start" }}>
+      <div className="marketing-form-layout" style={{ flex: 1, maxWidth: 1180, width: "100%", margin: "0 auto", padding: "64px 32px 90px", display: "grid", gridTemplateColumns: "1fr 1.15fr", gap: 64, alignItems: "start" }}>
         {/* LEFT: info */}
         <div>
           <span
@@ -160,7 +160,7 @@ export default function BookADemoPage() {
         </div>
 
         {/* RIGHT: form / success */}
-        <div style={{ background: "#fff", border: "1px solid #ECE7DD", borderRadius: 26, padding: 38, boxShadow: "0 30px 70px -45px rgba(33,28,22,0.35)" }}>
+        <div className="marketing-form-card" style={{ background: "#fff", border: "1px solid #ECE7DD", borderRadius: 26, padding: 38, boxShadow: "0 30px 70px -45px rgba(33,28,22,0.35)" }}>
           {!submitted ? (
             <div>
               {/* intent toggle */}
@@ -203,7 +203,7 @@ export default function BookADemoPage() {
                 </span>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <div className="marketing-form-two-column" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                   <label style={{ fontFamily: "'Nunito',sans-serif", fontWeight: 800, fontSize: 13, color: "#1C1812" }}>Your name *</label>
                   <input
@@ -449,7 +449,7 @@ export default function BookADemoPage() {
       </div>
 
       {/* FOOTER STRIP */}
-      <div style={{ background: "#1C1812", padding: "22px 32px" }}>
+      <div className="marketing-form-footer" style={{ background: "#1C1812", padding: "22px 32px" }}>
         <div style={{ maxWidth: 1180, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
           <span style={{ fontWeight: 300, fontSize: 13, color: "#8A8276" }}>© 2026 Lumi Reading Diary</span>
           <span style={{ fontWeight: 300, fontSize: 13, color: "#8A8276" }}>Made in Australia for primary schools</span>

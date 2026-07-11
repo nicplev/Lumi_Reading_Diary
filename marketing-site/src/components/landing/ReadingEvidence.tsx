@@ -21,7 +21,7 @@ const EVIDENCE = [
 
 export function ReadingEvidence() {
   return (
-    <section style={{ padding: "36px 32px 8px" }} aria-labelledby="reading-evidence-title">
+    <section className="marketing-evidence" style={{ padding: "36px 32px 8px" }} aria-labelledby="reading-evidence-title">
       <div
         style={{
           maxWidth: 1180,
