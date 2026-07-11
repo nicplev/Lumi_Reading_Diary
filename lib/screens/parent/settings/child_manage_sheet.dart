@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/widgets/lumi/student_avatar.dart';
+import '../../../core/widgets/lumi/student_reading_level_label.dart';
 import '../../../core/widgets/lumi/lumi_toast.dart';
 import '../../../data/models/student_link_code_model.dart';
 import '../../../data/models/student_model.dart';
@@ -216,8 +217,8 @@ class _ChildManageSheetState extends State<_ChildManageSheet> {
                       children: [
                         Text(_child.fullName, style: LumiType.subhead),
                         const SizedBox(height: 2),
-                        Text(
-                          'Level: ${_child.currentReadingLevel ?? 'Not set'}',
+                        StudentReadingLevelLabel(
+                          student: _child,
                           style: LumiType.caption,
                         ),
                       ],

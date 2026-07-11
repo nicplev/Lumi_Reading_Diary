@@ -1,9 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/teacher_constants.dart';
 import '../../core/widgets/lumi/reading_level_picker_sheet.dart';
+import '../../core/widgets/lumi/teacher_filter_chip.dart';
 import '../../core/widgets/lumi/teacher_reading_level_pill.dart';
 import '../../core/widgets/lumi/student_avatar.dart';
 import '../../core/widgets/lumi/lumi_toast.dart';
@@ -14,6 +13,8 @@ import '../../data/models/user_model.dart';
 import '../../services/firebase_service.dart';
 import '../../services/reading_level_service.dart';
 import '../../services/student_reading_level_service.dart';
+import '../../theme/lumi_tokens.dart';
+import '../../theme/lumi_typography.dart';
 
 class TeacherLevelManagementScreen extends StatefulWidget {
   const TeacherLevelManagementScreen({
@@ -329,138 +330,121 @@ class _TeacherLevelManagementScreenState
     });
   }
 
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() => _searchQuery = '');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: LumiTokens.cream,
       appBar: AppBar(
-        title: const Text(
-          'Manage Reading Levels',
-          style: TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.w700),
-        ),
-        backgroundColor: AppColors.teacherPrimary,
-        foregroundColor: AppColors.white,
+        backgroundColor: LumiTokens.paper,
+        foregroundColor: LumiTokens.ink,
         elevation: 0,
+        surfaceTintColor: LumiTokens.paper,
+        toolbarHeight: 64,
+        title: Text('Manage Reading Levels', style: LumiType.subhead),
       ),
       bottomNavigationBar:
           _selectedStudentIds.isEmpty ? null : _buildBulkActionBar(),
       body: !_levelsEnabled
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.info_outline,
-                        size: 48, color: AppColors.textSecondary),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Reading levels are not enabled for your school',
-                      style: TeacherTypography.bodyLarge,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Contact your school admin to enable reading levels.',
-                      style: TeacherTypography.bodyMedium.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+          ? const Center(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(24),
+                child: _LevelStateCard(
+                  icon: Icons.info_outline_rounded,
+                  title: 'Reading levels are not enabled',
+                  message:
+                      'Contact your school admin to enable reading levels for your school.',
                 ),
               ),
             )
           : Column(
-        children: [
-          _buildHeader(),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseService.instance.firestore
-                  .collection('schools')
-                  .doc(widget.teacher.schoolId)
-                  .collection('students')
-                  .where('classId', isEqualTo: widget.classModel.id)
-                  .where('isActive', isEqualTo: true)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text(
-                      'Could not load students',
-                      style: TeacherTypography.bodyLarge.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  );
-                }
+              children: [
+                _buildHeader(),
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseService.instance.firestore
+                        .collection('schools')
+                        .doc(widget.teacher.schoolId)
+                        .collection('students')
+                        .where('classId', isEqualTo: widget.classModel.id)
+                        .where('isActive', isEqualTo: true)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        return Center(
+                          child: Text(
+                            'Could not load students',
+                            style:
+                                LumiType.body.copyWith(color: LumiTokens.muted),
+                          ),
+                        );
+                      }
 
-                if (!snapshot.hasData) {
-                  return const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.teacherPrimary,
-                    ),
-                  );
-                }
+                      if (!snapshot.hasData) {
+                        return const Center(
+                          child: CircularProgressIndicator(
+                            color: LumiTokens.green,
+                          ),
+                        );
+                      }
 
-                final students = snapshot.data!.docs
-                    .map((doc) => StudentModel.fromFirestore(doc))
-                    .toList(growable: false);
-                _currentStudents = students;
-                final filteredStudents = _filterStudents(students);
-                final distribution = _buildDistribution(students);
+                      final students = snapshot.data!.docs
+                          .map((doc) => StudentModel.fromFirestore(doc))
+                          .toList(growable: false);
+                      _currentStudents = students;
+                      final filteredStudents = _filterStudents(students);
+                      final distribution = _buildDistribution(students);
 
-                return Column(
-                  children: [
-                    _buildControls(filteredStudents, distribution),
-                    Expanded(
-                      child: filteredStudents.isEmpty
-                          ? _buildEmptyState()
-                          : ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-                              itemCount: filteredStudents.length,
-                              itemBuilder: (context, index) {
-                                final student = filteredStudents[index];
-                                final isSelected =
-                                    _selectedStudentIds.contains(student.id);
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: _buildStudentTile(
-                                    student: student,
-                                    isSelected: isSelected,
+                      return Column(
+                        children: [
+                          _buildControls(filteredStudents, distribution),
+                          Expanded(
+                            child: filteredStudents.isEmpty
+                                ? _buildEmptyState()
+                                : ListView.builder(
+                                    padding:
+                                        const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                                    itemCount: filteredStudents.length,
+                                    itemBuilder: (context, index) {
+                                      final student = filteredStudents[index];
+                                      final isSelected = _selectedStudentIds
+                                          .contains(student.id);
+                                      return Padding(
+                                        padding:
+                                            const EdgeInsets.only(bottom: 10),
+                                        child: _buildStudentTile(
+                                          student: student,
+                                          isSelected: isSelected,
+                                        ),
+                                      );
+                                    },
                                   ),
-                                );
-                              },
-                            ),
-                    ),
-                  ],
-                );
-              },
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
     );
   }
 
   Widget _buildHeader() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(widget.classModel.name, style: TeacherTypography.h2),
-          const SizedBox(height: 6),
+          Text(widget.classModel.name, style: LumiType.heading),
+          const SizedBox(height: 4),
           Text(
             'Set, move, and review reading levels for this class using your school\'s approved level system.',
-            style: TeacherTypography.bodyMedium.copyWith(
-              color: AppColors.textSecondary,
-            ),
+            style: LumiType.body.copyWith(color: LumiTokens.muted),
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -503,82 +487,50 @@ class _TeacherLevelManagementScreenState
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
       child: Column(
         children: [
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
-              boxShadow: TeacherDimensions.cardShadow,
-            ),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (value) => setState(() => _searchQuery = value),
-              decoration: InputDecoration(
-                hintText: 'Search students...',
-                hintStyle: TeacherTypography.bodyMedium.copyWith(
-                  color: AppColors.textSecondary.withValues(alpha: 0.7),
-                ),
-                prefixIcon: const Icon(
-                  Icons.search,
-                  color: AppColors.textSecondary,
-                ),
-                border: InputBorder.none,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              ),
-            ),
+          _LevelSearchBar(
+            controller: _searchController,
+            query: _searchQuery,
+            onChanged: (value) => setState(() => _searchQuery = value),
+            onClear: _clearSearch,
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              FilterChip(
-                label: const Text('Needs level'),
-                selected: _showNeedsLevelOnly,
-                onSelected: (value) {
-                  setState(() => _showNeedsLevelOnly = value);
-                },
-                selectedColor:
-                    AppColors.teacherPrimaryLight.withValues(alpha: 0.28),
-                checkmarkColor: AppColors.teacherPrimary,
+              TeacherFilterChip(
+                label: 'Needs level',
+                isActive: _showNeedsLevelOnly,
+                activeColor: LumiTokens.green,
+                onTap: () => setState(
+                    () => _showNeedsLevelOnly = !_showNeedsLevelOnly),
               ),
               const Spacer(),
-              TextButton.icon(
-                onPressed: filteredStudents.isEmpty
-                    ? null
-                    : () => _toggleSelectAll(filteredStudents),
-                icon: Icon(
-                  allVisibleSelected
-                      ? Icons.deselect_outlined
-                      : Icons.select_all_rounded,
-                ),
-                label: Text(
-                    allVisibleSelected ? 'Clear visible' : 'Select visible'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.teacherPrimary,
-                ),
+              _buildSelectVisibleButton(
+                filteredStudents,
+                allVisibleSelected: allVisibleSelected,
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           SizedBox(
-            height: 36,
+            height: 34,
             child: ListView(
               scrollDirection: Axis.horizontal,
               children: distribution.entries.map((entry) {
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: AppColors.white,
+                      color: LumiTokens.paper,
                       borderRadius:
-                          BorderRadius.circular(TeacherDimensions.radiusRound),
-                      border: Border.all(color: AppColors.divider),
+                          BorderRadius.circular(LumiTokens.radiusPill),
+                      border: Border.all(color: LumiTokens.rule),
                     ),
                     child: Text(
                       '${entry.key} · ${entry.value}',
-                      style: TeacherTypography.caption.copyWith(
-                        color: AppColors.textSecondary,
+                      style: LumiType.caption.copyWith(
+                        color: LumiTokens.ink,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -592,77 +544,42 @@ class _TeacherLevelManagementScreenState
     );
   }
 
-  Widget _buildStudentTile({
-    required StudentModel student,
-    required bool isSelected,
+  Widget _buildSelectVisibleButton(
+    List<StudentModel> filteredStudents, {
+    required bool allVisibleSelected,
   }) {
+    final enabled = filteredStudents.isNotEmpty;
+
     return Material(
-      color: AppColors.white,
-      borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
+      color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
-        onTap: () {
-          setState(() {
-            if (isSelected) {
-              _selectedStudentIds.remove(student.id);
-            } else {
-              _selectedStudentIds.add(student.id);
-            }
-          });
-        },
+        onTap: enabled ? () => _toggleSelectAll(filteredStudents) : null,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
         child: Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(TeacherDimensions.radiusM),
-            border: Border.all(
-              color: isSelected
-                  ? AppColors.teacherPrimary.withValues(alpha: 0.4)
-                  : Colors.transparent,
-              width: 1.5,
-            ),
-            boxShadow: TeacherDimensions.cardShadow,
+            color: LumiTokens.paper,
+            borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+            border: Border.all(color: LumiTokens.rule, width: 1.2),
           ),
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Checkbox(
-                value: isSelected,
-                activeColor: AppColors.teacherPrimary,
-                onChanged: (_) {
-                  setState(() {
-                    if (isSelected) {
-                      _selectedStudentIds.remove(student.id);
-                    } else {
-                      _selectedStudentIds.add(student.id);
-                    }
-                  });
-                },
+              Icon(
+                allVisibleSelected
+                    ? Icons.deselect_outlined
+                    : Icons.select_all_rounded,
+                size: 16,
+                color: enabled
+                    ? LumiTokens.green
+                    : LumiTokens.muted.withValues(alpha: 0.5),
               ),
-              StudentAvatar.fromStudent(student, size: 40),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      student.fullName,
-                      style: TeacherTypography.bodyLarge.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    TeacherReadingLevelPill(
-                      label: _readingLevelCompactLabel(student),
-                      isUnset: _isLevelUnset(student),
-                      isUnresolved: _isLevelUnresolved(student),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _readingLevelDisplayLabel(student),
-                      style: TeacherTypography.bodySmall.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
+              const SizedBox(width: 6),
+              Text(
+                allVisibleSelected ? 'Clear visible' : 'Select visible',
+                style: LumiType.caption.copyWith(
+                  color: enabled ? LumiTokens.ink : LumiTokens.muted,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -672,96 +589,193 @@ class _TeacherLevelManagementScreenState
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.search_off_rounded,
-              size: 48,
-              color: AppColors.textSecondary.withValues(alpha: 0.6),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'No students match this view',
-              style: TeacherTypography.h3,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Adjust your search or filter to see more students.',
-              style: TeacherTypography.bodyMedium.copyWith(
-                color: AppColors.textSecondary,
+  Widget _buildStudentTile({
+    required StudentModel student,
+    required bool isSelected,
+  }) {
+    void toggleSelection() {
+      setState(() {
+        if (isSelected) {
+          _selectedStudentIds.remove(student.id);
+        } else {
+          _selectedStudentIds.add(student.id);
+        }
+      });
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+        boxShadow: [
+          BoxShadow(
+            color: LumiTokens.ink.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: isSelected
+            ? LumiTokens.tintGreen.withValues(alpha: 0.24)
+            : LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+        child: InkWell(
+          onTap: toggleSelection,
+          borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+              border: Border.all(
+                color: isSelected
+                    ? LumiTokens.green.withValues(alpha: 0.55)
+                    : LumiTokens.rule,
+                width: 1.2,
               ),
-              textAlign: TextAlign.center,
             ),
-          ],
+            child: Row(
+              children: [
+                _SelectionIndicator(isSelected: isSelected),
+                const SizedBox(width: 12),
+                StudentAvatar.fromStudent(student, size: 40),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        student.fullName,
+                        style: LumiType.body
+                            .copyWith(fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          TeacherReadingLevelPill(
+                            label: _readingLevelCompactLabel(student),
+                            isUnset: _isLevelUnset(student),
+                            isUnresolved: _isLevelUnresolved(student),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              _readingLevelDisplayLabel(student),
+                              style: LumiType.caption,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return const Center(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.all(24),
+        child: _LevelStateCard(
+          icon: Icons.search_off_rounded,
+          title: 'No students match this view',
+          message: 'Adjust your search or filter to see more students.',
         ),
       ),
     );
   }
 
   Widget _buildBulkActionBar() {
-    return SafeArea(
-      top: false,
-      child: Container(
-        color: AppColors.white,
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-        child: Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _isApplying
-                    ? null
-                    : () => _moveSelectedLevels(increase: false),
-                icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                label: const Text('Move Down'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: _isApplying ? null : _showBulkLevelPicker,
-                icon: _isApplying
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.white,
-                        ),
-                      )
-                    : const Icon(Icons.tune_rounded),
-                label: const Text('Set Level'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.teacherPrimary,
-                  foregroundColor: AppColors.white,
+    final moveButtonStyle = OutlinedButton.styleFrom(
+      foregroundColor: LumiTokens.ink,
+      side: const BorderSide(color: LumiTokens.rule, width: 1.2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
+      ),
+      textStyle: LumiType.button.copyWith(fontSize: 13),
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: LumiTokens.paper,
+        border: const Border(top: BorderSide(color: LumiTokens.rule)),
+        boxShadow: LumiTokens.shadowFloat,
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _isApplying
+                      ? null
+                      : () => _moveSelectedLevels(increase: false),
+                  style: moveButtonStyle,
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
+                  label: const Text('Move Down'),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: OutlinedButton.icon(
+              const SizedBox(width: 8),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _isApplying ? null : _showBulkLevelPicker,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: LumiTokens.green,
+                    foregroundColor: LumiTokens.paper,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(LumiTokens.radiusLarge),
+                    ),
+                    textStyle: LumiType.button.copyWith(fontSize: 13),
+                  ),
+                  icon: _isApplying
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: LumiTokens.paper,
+                          ),
+                        )
+                      : const Icon(Icons.tune_rounded, size: 18),
+                  label: const Text('Set Level'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _isApplying
+                      ? null
+                      : () => _moveSelectedLevels(increase: true),
+                  style: moveButtonStyle,
+                  icon: const Icon(Icons.keyboard_arrow_up_rounded, size: 18),
+                  label: const Text('Move Up'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: 'Clear level',
                 onPressed: _isApplying
                     ? null
-                    : () => _moveSelectedLevels(increase: true),
-                icon: const Icon(Icons.keyboard_arrow_up_rounded),
-                label: const Text('Move Up'),
+                    : () => _applyBulkLevelChange(newLevel: null),
+                icon: const Icon(Icons.remove_circle_outline),
+                color: LumiTokens.red,
               ),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              tooltip: 'Clear level',
-              onPressed: _isApplying
-                  ? null
-                  : () => _applyBulkLevelChange(newLevel: null),
-              icon: const Icon(Icons.remove_circle_outline),
-              color: AppColors.warmOrange,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -780,24 +794,256 @@ class _InfoChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.teacherSurfaceTint,
-        borderRadius: BorderRadius.circular(TeacherDimensions.radiusRound),
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusPill),
+        border: Border.all(color: LumiTokens.rule),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: AppColors.teacherPrimary),
+          Icon(icon, size: 14, color: LumiTokens.muted),
           const SizedBox(width: 6),
           Text(
             label,
-            style: TeacherTypography.caption.copyWith(
-              color: AppColors.teacherPrimary,
+            style: LumiType.caption.copyWith(
+              color: LumiTokens.ink,
               fontWeight: FontWeight.w700,
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SelectionIndicator extends StatelessWidget {
+  const _SelectionIndicator({required this.isSelected});
+
+  final bool isSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 160),
+      width: 24,
+      height: 24,
+      decoration: BoxDecoration(
+        color: isSelected ? LumiTokens.green : LumiTokens.paper,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: isSelected ? LumiTokens.green : LumiTokens.rule,
+          width: 1.4,
+        ),
+      ),
+      child: isSelected
+          ? const Icon(Icons.check_rounded, size: 16, color: LumiTokens.paper)
+          : null,
+    );
+  }
+}
+
+class _LevelStateCard extends StatelessWidget {
+  const _LevelStateCard({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: LumiTokens.paper,
+        borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+        border: Border.all(color: LumiTokens.rule),
+        boxShadow: LumiTokens.shadowCard,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: LumiTokens.green.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(LumiTokens.radiusXL),
+            ),
+            child: Icon(icon, size: 34, color: LumiTokens.green),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            title,
+            style: LumiType.subhead,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: LumiType.body.copyWith(
+              color: LumiTokens.muted,
+              height: 1.4,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LevelSearchBar extends StatefulWidget {
+  const _LevelSearchBar({
+    required this.controller,
+    required this.query,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final String query;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  @override
+  State<_LevelSearchBar> createState() => _LevelSearchBarState();
+}
+
+class _LevelSearchBarState extends State<_LevelSearchBar>
+    with SingleTickerProviderStateMixin {
+  late final FocusNode _focusNode;
+  late final AnimationController _fillController;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode();
+    _focusNode.addListener(_handleFocusChange);
+    _fillController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+      reverseDuration: const Duration(milliseconds: 220),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.of(context).disableAnimations) {
+      _fillController.value = _focusNode.hasFocus ? 1.0 : 0.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_handleFocusChange);
+    _focusNode.dispose();
+    _fillController.dispose();
+    super.dispose();
+  }
+
+  void _handleFocusChange() {
+    final targetValue = _focusNode.hasFocus ? 1.0 : 0.0;
+
+    if (MediaQuery.of(context).disableAnimations) {
+      _fillController.value = targetValue;
+    } else if (_focusNode.hasFocus) {
+      _fillController.forward();
+    } else {
+      _fillController.reverse();
+    }
+
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasQuery = widget.query.isNotEmpty;
+    final isActive = _focusNode.hasFocus || hasQuery;
+    const borderRadius = BorderRadius.all(
+      Radius.circular(LumiTokens.radiusLarge),
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: LumiTokens.paper,
+        borderRadius: borderRadius,
+        border: Border.all(
+          color: isActive
+              ? LumiTokens.green.withValues(alpha: 0.45)
+              : LumiTokens.rule,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: borderRadius,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: AnimatedBuilder(
+                animation: _fillController,
+                builder: (context, child) {
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: FractionallySizedBox(
+                      widthFactor: _fillController.value.clamp(0.0, 1.0),
+                      heightFactor: 1,
+                      child: child,
+                    ),
+                  );
+                },
+                child: ColoredBox(
+                  color: LumiTokens.tintGreen.withValues(alpha: 0.3),
+                ),
+              ),
+            ),
+            TextField(
+              controller: widget.controller,
+              focusNode: _focusNode,
+              onChanged: widget.onChanged,
+              onTapOutside: (_) => FocusScope.of(context).unfocus(),
+              textInputAction: TextInputAction.search,
+              cursorColor: LumiTokens.green,
+              style: LumiType.body.copyWith(
+                fontWeight: FontWeight.w600,
+                color: LumiTokens.green,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Search students...',
+                hintStyle: LumiType.body.copyWith(
+                  color: LumiTokens.muted,
+                ),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: isActive
+                      ? LumiTokens.green
+                      : LumiTokens.muted.withValues(alpha: 0.58),
+                ),
+                suffixIcon: hasQuery
+                    ? IconButton(
+                        tooltip: 'Clear search',
+                        icon: const Icon(Icons.close_rounded, size: 20),
+                        color: LumiTokens.muted,
+                        onPressed: widget.onClear,
+                      )
+                    : null,
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

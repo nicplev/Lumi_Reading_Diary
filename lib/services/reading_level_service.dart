@@ -100,6 +100,42 @@ class ReadingLevelService {
     return null;
   }
 
+  /// Formats a stored student level through the school's schema, for surfaces
+  /// that only have the raw stored value on hand. [compact] picks the short
+  /// label ("J", "PM 12") for use after a "Level: " prefix; the default
+  /// display label ("Level J") stands alone. Falls back to the raw value when
+  /// the school has no schema configured or the value doesn't resolve against
+  /// it; returns null when no level is set.
+  Future<String?> formatStoredLevelForSchool(
+    String schoolId,
+    String? rawLevel, {
+    bool compact = false,
+  }) async {
+    final trimmed = rawLevel?.trim();
+    if (trimmed == null || trimmed.isEmpty) return null;
+    if (schoolId.isEmpty) return trimmed;
+
+    try {
+      final options = await loadSchoolLevels(schoolId);
+      if (options.isEmpty) return trimmed;
+      return compact
+          ? formatCompactLabel(
+              trimmed,
+              options: options,
+              unsetLabel: trimmed,
+              unknownLabel: trimmed,
+            )
+          : formatLevelLabel(
+              trimmed,
+              options: options,
+              unsetLabel: trimmed,
+              unknownLabel: trimmed,
+            );
+    } catch (_) {
+      return trimmed;
+    }
+  }
+
   String formatLevelLabel(
     String? rawLevel, {
     required List<ReadingLevelOption> options,
