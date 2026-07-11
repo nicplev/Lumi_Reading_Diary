@@ -50,7 +50,7 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
         <div className="lg:ml-[240px]">
           <Header />
           <RouteSectionScope>
-            <main className="p-6 pb-24 lg:pb-6">
+            <main className="p-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:p-6 sm:pb-24 lg:pb-6">
               {children}
             </main>
           </RouteSectionScope>

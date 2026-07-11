@@ -44,10 +44,10 @@ export function Modal({ open, onClose, title, description, children, footer, siz
         if (e.target === overlayRef.current) onClose();
       }}
     >
-      <div className={`${sizeClasses[size]} w-full mx-4 bg-paper rounded-[var(--radius-lg)] shadow-card-hover max-h-[90vh] flex flex-col`}>
-        <div className="px-6 pt-6 pb-4">
+      <div className={`${sizeClasses[size]} mx-4 flex max-h-[90vh] w-full flex-col rounded-[var(--radius-lg)] bg-paper shadow-card-hover`}>
+        <div className="px-4 pb-4 pt-5 sm:px-6 sm:pt-6">
           <div className="flex items-start justify-between">
-            <div>
+            <div className="min-w-0">
               <h2 className="text-lg font-bold text-ink">{title}</h2>
               {description && <p className="text-sm text-muted mt-1">{description}</p>}
             </div>
@@ -61,8 +61,8 @@ export function Modal({ open, onClose, title, description, children, footer, siz
             </button>
           </div>
         </div>
-        <div className="px-6 pb-4 overflow-y-auto flex-1">{children}</div>
-        {footer && <div className="px-6 py-4 border-t border-rule flex justify-end gap-3">{footer}</div>}
+        <div className="flex-1 overflow-y-auto px-4 pb-4 sm:px-6">{children}</div>
+        {footer && <div className="flex flex-col-reverse gap-3 border-t border-rule px-4 py-4 sm:flex-row sm:justify-end sm:px-6">{footer}</div>}
       </div>
     </div>
   );
