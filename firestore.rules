@@ -923,6 +923,16 @@ service cloud.firestore {
       allow list, create, update, delete: if false;
     }
 
+    // ── Ops metrics (admin-only telemetry) ──────────────────────────
+    // Written by Cloud Functions (storage-usage triggers + cron
+    // heartbeats), read only by the super-admin portal — both via the
+    // Admin SDK, which bypasses rules. Unlike platformConfig, these docs
+    // carry per-school telemetry (byte counts per school), so clients
+    // get no access at all.
+    match /opsMetrics/{docId} {
+      allow read, write: if false;
+    }
+
     // ── Super-admin allowlist ───────────────────────────────────────
     // Doc ID is the Firebase UID. Presence of a doc grants super-admin
     // power (revoke impersonation sessions, export audit logs). No
