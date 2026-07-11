@@ -142,6 +142,13 @@ export {
   getComprehensionAudioUrl,
 } from "./comprehension_retention";
 
+// Demo-day rolling access. processDemoAccessEmail emails a prospect the day's
+// demo credentials (freshness-gated); scrambleDemoPasswords nightly-rotates
+// every demo account so a demo-day password only works its own Sydney day.
+// The portal issues the day password into demoAccess/state via server-ops. See
+// functions/src/demo_access.ts and docs/DEMO_DAY_ACCESS_PLAN.md.
+export {processDemoAccessEmail, scrambleDemoPasswords} from "./demo_access";
+
 /**
  * CRITICAL SECURITY: Stats Aggregation
  * Prevents client-side manipulation of student statistics

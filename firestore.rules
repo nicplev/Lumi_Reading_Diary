@@ -945,5 +945,24 @@ service cloud.firestore {
     match /devImpersonationRateLimits/{devUid} {
       allow read, write: if false;
     }
+
+    // ── Demo-day rolling access (state) ─────────────────────────────
+    // demoAccess/state holds the plaintext day password for the shared
+    // sales-demo school. Written by the super-admin portal (Admin SDK)
+    // and read by Cloud Functions (email trigger + scramble cron) only —
+    // never by any client. Same plaintext-password precedent as
+    // schools/{id}/staffCredentials.
+    match /demoAccess/{docId} {
+      allow read, write: if false;
+    }
+
+    // ── Demo-day access emails (queue + permanent paper trail) ──────
+    // Written by the portal (Admin SDK) and consumed by the
+    // processDemoAccessEmail trigger; the docs are kept forever as the
+    // canonical "who was given demo access" record and rendered in the
+    // portal via Admin SDK reads. Entirely closed to clients.
+    match /demoAccessEmails/{docId} {
+      allow read, write: if false;
+    }
   }
 }

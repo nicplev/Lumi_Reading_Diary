@@ -1961,6 +1961,55 @@ test('impersonation collections: no one can write sessions directly', async () =
   );
 });
 
+// ── Demo-day access (deny-all; Admin SDK only) ─────────────────────────────
+
+test('demoAccess/state: no one can read the day password', async () => {
+  await seedData(async (db) => {
+    await db.collection('demoAccess').doc('state').set({
+      dayKey: '2026-07-11',
+      password: 'Xk7mPq9RtW2c',
+    });
+  });
+  await assertFails(authDb('me').collection('demoAccess').doc('state').get());
+  await assertFails(unauthDb().collection('demoAccess').doc('state').get());
+});
+
+test('demoAccess/state: no one can write it', async () => {
+  await assertFails(
+    authDb('me').collection('demoAccess').doc('state').set({ password: 'x' }),
+  );
+  await assertFails(
+    unauthDb().collection('demoAccess').doc('state').set({ password: 'x' }),
+  );
+});
+
+test('demoAccessEmails: no one can read the send history', async () => {
+  await seedData(async (db) => {
+    await db.collection('demoAccessEmails').doc('e1').set({
+      to: 'prospect@example.com',
+      status: 'sent',
+    });
+  });
+  await assertFails(authDb('me').collection('demoAccessEmails').doc('e1').get());
+  await assertFails(unauthDb().collection('demoAccessEmails').doc('e1').get());
+  await assertFails(authDb('me').collection('demoAccessEmails').get());
+});
+
+test('demoAccessEmails: no one can queue an email directly', async () => {
+  await assertFails(
+    authDb('me').collection('demoAccessEmails').doc('e1').set({
+      to: 'prospect@example.com',
+      status: 'queued',
+    }),
+  );
+  await assertFails(
+    unauthDb().collection('demoAccessEmails').doc('e1').set({
+      to: 'prospect@example.com',
+      status: 'queued',
+    }),
+  );
+});
+
 // ── Reading log delete (widget-undo banner powers this) ────────────────────
 
 async function seedSchoolWithParentAndLog({ parentUid, otherParentUid }) {
