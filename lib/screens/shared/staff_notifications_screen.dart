@@ -54,7 +54,13 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
   bool _isLoading = true;
   bool _isSubmitting = false;
   String _audienceType = 'classes';
-  String _messageType = 'reading_reminder';
+  // Message type is no longer teacher-selectable in the compose UI — the chip
+  // row caused layout issues on smaller devices and the value never affected
+  // delivery (it isn't used for channel selection, filtering or analytics).
+  // It still rides along to createCampaign as a stable label for the History
+  // view and the parent notification category, so it's kept as a constant that
+  // preserves the prior parent-facing behaviour.
+  static const String _messageType = 'reading_reminder';
   DateTime? _scheduledFor;
   final Set<String> _selectedClassIds = <String>{};
   final Set<String> _selectedStudentIds = <String>{};
@@ -1126,7 +1132,6 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
         _selectedStudentIds.clear();
         _scheduledFor = null;
         _audienceType = 'classes';
-        _messageType = 'reading_reminder';
       });
       await _refreshStudents();
       if (!mounted) return;
@@ -1543,56 +1548,6 @@ class _StaffNotificationsScreenState extends State<StaffNotificationsScreen>
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
       children: [
-        // ── Message type ──
-        Container(
-          decoration: _lumiCard(),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _cardHeader(Icons.category_rounded, 'Message type'),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Flexible(
-                    flex: 3,
-                    child: TeacherFilterChip(
-                      activeColor: LumiTokens.blue,
-                      label: 'Reading',
-                      isActive: _messageType == 'reading_reminder',
-                      onTap: () =>
-                          setState(() => _messageType = 'reading_reminder'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    flex: 4,
-                    child: TeacherFilterChip(
-                      activeColor: LumiTokens.blue,
-                      label: 'Announcement',
-                      isActive: _messageType == 'announcement',
-                      onTap: () =>
-                          setState(() => _messageType = 'announcement'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    flex: 3,
-                    child: TeacherFilterChip(
-                      activeColor: LumiTokens.blue,
-                      label: 'General',
-                      isActive: _messageType == 'general',
-                      onTap: () =>
-                          setState(() => _messageType = 'general'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-
         // ── Content ──
         Container(
           decoration: _lumiCard(),
