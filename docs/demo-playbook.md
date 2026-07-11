@@ -39,22 +39,50 @@ The script prints the resolved **project id** and asks for confirmation — chec
 says your LumiAU project before typing `yes`. `--dry-run` prints the full plan
 without connecting.
 
-### Logins (all share the password printed by the script: `LumiDemo!2026`)
+### Logins — rolling daily password
+
+The three **shared** logins below are on a **rolling daily password**: the seed
+sets an initial one, but in production a nightly cron (`scrambleDemoPasswords`,
+just after Sydney midnight) scrambles every demo account, and the super-admin
+portal issues that day's password on demand. So on a real demo day you don't use
+`LumiDemo!2026` — you **provision** the day's password first (see below).
 
 | Role | Email | Where they log in | What they show |
 |---|---|---|---|
-| School admin — *Dana Whitfield* | `demo.admin@lumidemo.school` | School-admin web portal | Analytics, roster, parent-link funnel |
-| Teacher — *Priya Sharma* | `demo.teacher@lumidemo.school` | Flutter web (or tablet app) | Class 3G dashboard, allocations, comments |
-| Parent — *Sarah Nguyen ("Mum")* | `demo.parent@lumidemo.school` | **iPhone app only** | Quick log, streaks, badges, two children |
-| Parent 2 — *Marcus Webb ("Dad")* | `demo.parent2@lumidemo.school` | iPhone app | Spare parent account |
+| School admin (shared) | `support+demo@lumi-reading.com` | School-admin web portal | Analytics, roster, parent-link funnel |
+| Teacher — *Priya Sharma* | `support+demo.teacher@lumi-reading.com` | Flutter web (or tablet app) | Class 3G dashboard, allocations, comments |
+| Parent — *Sarah Nguyen ("Mum")* | `support+demo.parent@lumi-reading.com` | **iPhone app only** | Quick log, streaks, badges, two children |
+| Parent 2 — *Marcus Webb ("Dad")* | `demo.parent2@lumidemo.school` | iPhone app | Spare parent account (scrambled nightly, not shared) |
+| School admin — *Dana Whitfield* | `demo.admin@lumidemo.school` | School-admin web portal | Internal/backup admin — **never shared**, scrambled nightly |
 
-> The parent experience is **deliberately mobile-only** (enforced in
-> `lib/core/routing/app_router.dart` — parents on web are redirected). Plan every
-> demo knowing the parent moment happens on a phone.
+> The three `support+demo…@lumi-reading.com` addresses plus-alias into a mailbox
+> Nic controls, so their password-reset emails are actually receivable. The
+> parent experience is **deliberately mobile-only** (enforced in
+> `lib/core/routing/app_router.dart` — parents on web are redirected).
 
-Demo accounts are created by the Admin SDK with `emailVerified: true` and **no SMS
+Demo accounts are created by the Admin SDK with `emailVerified: true` and **no
 MFA**, so logins are instant mid-demo. (Real parent registration enrols SMS MFA —
 worth *saying* when security comes up, since the demo accounts won't show it.)
+
+### Provisioning demo access (super-admin portal)
+
+Book-a-Demo requests from the marketing site land in the super-admin
+**Onboarding** pipeline's *demo* column. On the request's detail page, the
+**Demo access** panel drives the whole flow:
+
+1. **Provision today's demo password** — issues one shared password (idempotent
+   within the Sydney day; a second demo reuses the same one) and sets it on the
+   three shared accounts. Read it out on the call, or:
+2. **Email demo details** — SendGrids the requester the day's credentials, the
+   portal + marketing links, app-store instructions, and the teacher/parent app
+   logins (BCC'd to `support@lumi-reading.com` as a paper trail).
+
+Access **self-expires at midnight (Sydney)** — the password scrambles and even
+the school-portal session cookie is capped to end-of-day, so a prospect can log
+in themselves during/after a Zoom demo without lingering access. The canonical
+"who's been given demo access" history lives on the demo school's detail page
+(**Demo access** tab). Config (emails, store URLs) is in
+`platformConfig/demoAccess`; see `docs/DEMO_DAY_ACCESS_PLAN.md`.
 
 ### The students that matter
 
