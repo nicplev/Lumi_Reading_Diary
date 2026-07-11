@@ -67,3 +67,13 @@ export type { UserSchoolIndex } from "./user-school-index";
 
 export { AchievementCategory, AchievementRarity } from "./achievement";
 export type { Achievement } from "./achievement";
+
+export type {
+  PlatformDemoAccessConfig,
+  DemoAccessRole,
+  DemoAccessAccount,
+  DemoAccessLastEmail,
+  DemoAccessState,
+  DemoAccessEmailStatus,
+  DemoAccessEmailDoc,
+} from "./demo-access";
