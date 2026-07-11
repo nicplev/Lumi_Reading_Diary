@@ -94,6 +94,15 @@ class StudentModel {
 
   String get fullName => '$firstName $lastName';
 
+  /// First name plus the last-name initial, e.g. "Ari P." — used on the teacher
+  /// dashboard cards to tell apart students who share a first name in the same
+  /// class. Falls back to just the first name when there is no last name.
+  String get firstNameWithLastInitial {
+    final last = lastName.trim();
+    if (last.isEmpty) return firstName;
+    return '$firstName ${last[0].toUpperCase()}.';
+  }
+
   /// The character to render wherever the profile character is shown. A
   /// teacher-assigned [manualAward] wins, then the weekly [autoAward], then the
   /// student's own [characterId]. This is the single override point consumed by

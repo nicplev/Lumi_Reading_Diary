@@ -332,16 +332,16 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
             .where(FieldPath.documentId, whereIn: batch)
             .get();
         for (final doc in snapshot.docs) {
-          students.add(StudentModel.fromFirestore(doc));
+          final student = StudentModel.fromFirestore(doc);
+          students.add(student);
           // Extract achievements from raw doc (piggyback — zero extra reads)
           final data = doc.data();
           final achievementsData = data['achievements'] as List<dynamic>? ?? [];
-          final firstName = (data['firstName'] as String?) ?? '';
           for (final a in achievementsData) {
             try {
               achievements.add(StudentAchievement(
                 studentId: doc.id,
-                studentFirstName: firstName,
+                studentDisplayName: student.firstNameWithLastInitial,
                 achievement:
                     AchievementModel.fromMap(Map<String, dynamic>.from(a)),
               ));

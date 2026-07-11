@@ -160,7 +160,7 @@ class _DashboardRecentReadingCardState
                         Divider(height: 1, color: LumiTokens.rule),
                       _RecentLogRow(
                         group: group,
-                        studentName: student?.firstName ?? '?',
+                        studentName: student?.firstNameWithLastInitial ?? '?',
                         initials: _getInitials(student),
                         characterId: student?.displayCharacterId,
                         onTap: student == null

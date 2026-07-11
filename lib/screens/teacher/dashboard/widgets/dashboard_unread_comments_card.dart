@@ -221,7 +221,7 @@ class _UnreadCommentRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = student?.firstName ?? 'Unknown';
+    final name = student?.firstNameWithLastInitial ?? 'Unknown';
     return InkWell(
       onTap: student == null
           ? null
