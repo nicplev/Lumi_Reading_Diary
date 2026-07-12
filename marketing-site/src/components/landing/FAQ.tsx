@@ -16,7 +16,7 @@ const FAQS = [
     a: "Parents pick the time that fits their routine (morning, after school, evening or bedtime) and can change it anytime. If a night hasn't been logged by early evening, a gentle backup nudge goes out; if it has, Lumi stays quiet.",
   },
   {
-    q: "Does Lumi fit how our school runs home reading?",
+    q: "Will Lumi fit our school?",
     a: "Yes. Allocation is fully customisable: teachers assign books by reading group, theme, genre, title or free choice, on daily, weekly or fortnightly schedules. If your school uses reading levels you can configure those too, but they're never required. Lumi adapts to your existing routine rather than replacing it.",
   },
   {
@@ -38,10 +38,6 @@ const FAQS = [
   {
     q: "Is our students' data safe?",
     a: "Yes. Lumi is built privacy-first for Australian schools: student data is hosted in Australia and handled in line with the Australian Privacy Principles (APP). Your admins control users, roles and access, data is never shared or sold, and our full privacy policy and terms are published online.",
-  },
-  {
-    q: "How long does it take to set up?",
-    a: "Most schools are running within a week. Build your library by scanning ISBN barcodes, import classes, set your level system, and hand out linking codes.",
   },
   {
     q: "Do we still use physical books?",
@@ -68,7 +64,7 @@ export function FAQ() {
             Questions
           </span>
           <h2 style={{ fontFamily: "'Nunito',sans-serif", fontWeight: 900, fontSize: 46, lineHeight: 1.06, letterSpacing: "-0.02em", margin: "14px 0 0", color: "#1C1812" }}>
-            The things schools ask first.
+            What Schools Ask
           </h2>
         </div>
         <div data-anim="stagger" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
