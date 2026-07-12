@@ -8,12 +8,15 @@ let app: App;
 
 if (getApps().length === 0) {
   const serviceAccountPath = process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT_PATH;
+  // Default bucket so no-arg adminStorage.bucket() resolves — the
+  // comprehension-audio bulk delete relies on it.
+  const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
   if (serviceAccountPath) {
     const serviceAccount = JSON.parse(readFileSync(serviceAccountPath, 'utf-8'));
-    app = initializeApp({ credential: cert(serviceAccount) });
+    app = initializeApp({ credential: cert(serviceAccount), storageBucket });
   } else {
     // Falls back to GOOGLE_APPLICATION_CREDENTIALS or default credentials
-    app = initializeApp({ projectId: 'lumi-ninc-au' });
+    app = initializeApp({ projectId: 'lumi-ninc-au', storageBucket });
   }
 } else {
   app = getApps()[0];
