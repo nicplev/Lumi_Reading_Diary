@@ -66,8 +66,8 @@ export async function runStorageUsageReconcileNow(
   options?: { bucketName?: string }
 ): Promise<StorageUsageReconcileStats> {
   const startedAtMs = Date.now();
-  // The admin portal's Firebase app is initialised without a default
-  // bucket, so callers pass NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET.
+  // The portal app now sets a default bucket at init; callers may still
+  // pass NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET explicitly (defensive).
   const bucket = options?.bucketName
     ? storage.bucket(options.bucketName)
     : storage.bucket();
