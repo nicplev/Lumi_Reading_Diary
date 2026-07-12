@@ -5,12 +5,15 @@ import Link from "next/link";
 
 export function Nav() {
   const [condensed, setCondensed] = useState(false);
+  const [showDemoCta, setShowDemoCta] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     function update() {
       const y = window.scrollY || document.documentElement.scrollTop || 0;
       setCondensed(y > 40);
+      const hero = document.getElementById("hero");
+      setShowDemoCta(hero ? hero.getBoundingClientRect().bottom <= 82 : y > 640);
     }
     window.addEventListener("scroll", update, { passive: true, capture: true });
     window.addEventListener("resize", update, { passive: true });
@@ -89,24 +92,23 @@ export function Nav() {
           >
             Log in
           </a>
-          <Link href="/contact-sales" style={{ fontWeight: 400, fontSize: 15, color: "#4A453E", textDecoration: "none" }}>
-            Contact sales
-          </Link>
-          <Link
-            href="/book-a-demo"
-            style={{
-              fontFamily: "'Nunito',sans-serif",
-              fontWeight: 800,
-              fontSize: 15,
-              color: "#fff",
-              background: "#EC4544",
-              padding: "11px 22px",
-              borderRadius: 999,
-              textDecoration: "none",
-            }}
-          >
-            Book a demo
-          </Link>
+          {showDemoCta && (
+            <Link
+              href="/book-a-demo"
+              style={{
+                fontFamily: "'Nunito',sans-serif",
+                fontWeight: 800,
+                fontSize: 15,
+                color: "#fff",
+                background: "#EC4544",
+                padding: "11px 22px",
+                borderRadius: 999,
+                textDecoration: "none",
+              }}
+            >
+              Book a demo
+            </Link>
+          )}
         </div>
         <button
           type="button"
@@ -124,9 +126,11 @@ export function Nav() {
         <a href="#teachers" onClick={() => setMenuOpen(false)}>For teachers</a>
         <a href="#schools" onClick={() => setMenuOpen(false)}>For schools</a>
         <a href="#pricing" onClick={() => setMenuOpen(false)}>Pricing</a>
-        <a href="https://lumi-school-admin-au.web.app/login">Log in</a>
-        <Link href="/contact-sales" onClick={() => setMenuOpen(false)}>Contact sales</Link>
-        <Link href="/book-a-demo" onClick={() => setMenuOpen(false)}>Book a demo</Link>
+        <a className="marketing-mobile-login" href="https://lumi-school-admin-au.web.app/login">
+          <span>Already with Lumi?</span>
+          <strong>Log in →</strong>
+        </a>
+        <Link className="marketing-mobile-demo" href="/book-a-demo" onClick={() => setMenuOpen(false)}>Book a demo</Link>
       </div>
     </div>
   );

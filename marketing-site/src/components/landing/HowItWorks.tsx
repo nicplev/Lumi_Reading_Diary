@@ -4,31 +4,25 @@ import { useState } from "react";
 
 const TONIGHT_BOOKS = [
   {
-    title: "The Lost Kite",
-    iconGradient: "linear-gradient(135deg, rgba(86,200,230,0.35), rgba(86,200,230,0.1))",
-    iconStroke: "rgba(42,159,196,0.65)",
-    tag: "Level 12",
+    title: "The Magic Faraway Tree",
+    cover: "/assets/books/the-magic-faraway-tree.jpg",
+    tag: "Assigned",
     tagCol: "#2A9FC4",
     tagBg: "rgba(86,200,230,0.15)",
-    extra: "Assigned",
   },
   {
-    title: "Sam's Big Day",
-    iconGradient: "linear-gradient(135deg, rgba(86,200,230,0.35), rgba(86,200,230,0.1))",
-    iconStroke: "rgba(42,159,196,0.65)",
-    tag: "Level 12",
+    title: "Into the Blue",
+    cover: "/assets/books/into-the-blue.jpg",
+    tag: "Assigned",
     tagCol: "#2A9FC4",
     tagBg: "rgba(86,200,230,0.15)",
-    extra: "Assigned",
   },
   {
-    title: "Grandpa's Garden",
-    iconGradient: "linear-gradient(135deg, rgba(81,186,101,0.35), rgba(81,186,101,0.1))",
-    iconStroke: "rgba(66,150,84,0.65)",
+    title: "Diary of a Wimpy Kid",
+    cover: "/assets/books/diary-of-a-wimpy-kid.jpg",
     tag: "Free choice",
     tagCol: "#429654",
     tagBg: "rgba(81,186,101,0.15)",
-    extra: null,
   },
 ];
 
@@ -52,21 +46,8 @@ function CheckIcon() {
   );
 }
 
-function BookIcon({ stroke }: { stroke: string }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-      <path
-        d="M12 6c-1.8-1.6-4.2-2-7-2v14c2.8 0 5.2.4 7 2 1.8-1.6 4.2-2 7-2V4c-2.8 0-5.2.4-7 2Z"
-        stroke={stroke}
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 export function HowItWorks() {
-  const [booksOn, setBooksOn] = useState<string[]>(["The Lost Kite"]);
+  const [booksOn, setBooksOn] = useState<string[]>(["The Magic Faraway Tree"]);
   const [mins, setMins] = useState("10 min");
   const [blob, setBlob] = useState("Great!");
   const [chipsOn, setChipsOn] = useState<string[]>(["Read with expression"]);
@@ -201,14 +182,18 @@ export function HowItWorks() {
                           width: 32,
                           height: 42,
                           borderRadius: 6,
-                          background: b.iconGradient,
+                          overflow: "hidden",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
                           flexShrink: 0,
                         }}
                       >
-                        <BookIcon stroke={b.iconStroke} />
+                        <img
+                          src={b.cover}
+                          alt={`${b.title} cover`}
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
                       </span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div
@@ -237,11 +222,6 @@ export function HowItWorks() {
                           >
                             {b.tag}
                           </span>
-                          {b.extra && (
-                            <span style={{ fontWeight: 400, fontSize: 10, color: "#6B6B6B", whiteSpace: "nowrap" }}>
-                              {b.extra}
-                            </span>
-                          )}
                         </div>
                       </div>
                       <span
@@ -428,7 +408,7 @@ export function HowItWorks() {
               <span style={{ fontWeight: 300, fontSize: 13, color: "#928B7F" }}>One last tap</span>
             </div>
             <h3 style={{ fontFamily: "'Nunito',sans-serif", fontWeight: 800, fontSize: 22, margin: "22px 0 8px", color: "#1C1812" }}>
-              Add a quick chip
+              Add a quick comment chip
             </h3>
             <p style={{ fontWeight: 300, fontSize: 15, lineHeight: 1.6, color: "#4A453E", margin: "0 0 22px" }}>
               Tap chips to build the teacher&apos;s note. Pick up to three that fit the night.
