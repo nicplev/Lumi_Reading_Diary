@@ -32,9 +32,17 @@ export interface School {
   teacherCount: number;
   subscriptionPlan?: string;
   subscriptionExpiry?: Date;
+  /**
+   * Whole-school billing/access model, set by super-admin. Absent = whole_school_paid.
+   * whole_school_paid hides the per-student subscription surface (see access-mode
+   * feature); direct_allowed is reserved for the future direct-payment channel.
+   */
+  accessMode?: AccessMode;
   /** Materialised whole-school access verdict; absent on legacy docs (= active). */
   access?: SchoolAccess;
 }
+
+export type AccessMode = 'whole_school_paid' | 'direct_allowed';
 
 export type SchoolAccessStatus = 'active' | 'suspended';
 

@@ -1,7 +1,7 @@
 export type { FirestoreTimestamp } from "./common";
 
 export { ReadingLevelSchema } from "./school";
-export type { School, SchoolAccess, SchoolAccessStatus } from "./school";
+export type { School, SchoolAccess, SchoolAccessStatus, AccessMode } from "./school";
 
 export {
   ACTIVE_SUBSCRIPTION_STATUSES,

@@ -101,6 +101,8 @@ export interface SchoolDetail {
   parentCount: number;
   subscriptionPlan?: string;
   subscriptionExpiry?: string;
+  /** Whole-school billing/access model; absent = whole_school_paid. */
+  accessMode: "whole_school_paid" | "direct_allowed";
 }
 
 export async function getSchool(
@@ -131,6 +133,7 @@ export async function getSchool(
     parentCount: data.parentCount ?? 0,
     subscriptionPlan: data.subscriptionPlan,
     subscriptionExpiry: toISO(data.subscriptionExpiry) || undefined,
+    accessMode: data.accessMode ?? "whole_school_paid",
   };
 }
 

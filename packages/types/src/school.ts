@@ -33,9 +33,19 @@ export interface School {
   parentCount: number;
   subscriptionPlan?: string;
   subscriptionExpiry?: FirestoreTimestamp;
+  /**
+   * Whole-school billing/access model, set by super-admin. Absent on legacy docs
+   * (treated as `whole_school_paid`). `whole_school_paid`: the school is invoiced
+   * for its whole roster and every rostered student is auto-covered — the
+   * per-student subscription surface is hidden. `direct_allowed`: reserved for the
+   * future per-student direct-payment channel (not yet functional).
+   */
+  accessMode?: AccessMode;
   /** Materialised whole-school access verdict; absent on legacy docs (= active). */
   access?: SchoolAccess;
 }
+
+export type AccessMode = "whole_school_paid" | "direct_allowed";
 
 export type SchoolAccessStatus = "active" | "suspended";
 

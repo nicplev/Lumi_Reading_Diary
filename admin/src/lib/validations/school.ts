@@ -7,6 +7,7 @@ export const createSchoolSchema = z.object({
   address: z.string().optional(),
   timezone: z.string().min(1, "Timezone is required"),
   subscriptionPlan: z.string().optional(),
+  accessMode: z.enum(["whole_school_paid", "direct_allowed"]).optional(),
   logoUrl: z.string().url().optional().or(z.literal("")),
   primaryColor: z.string().optional(),
   secondaryColor: z.string().optional(),
