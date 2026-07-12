@@ -23,6 +23,7 @@ import {
 } from "./notification_helpers";
 import {buildOnboardingEmail, buildOnboardingQrAttachments, buildStaffOnboardingEmail} from "./email_templates";
 import {assertNotReadOnly} from "./read_only_guard";
+import {recordCronRun} from "./ops_heartbeat";
 import {lumiMascotAttachment} from "./email_assets";
 import {generateTempPassword} from "./temp_password";
 import {
@@ -1162,6 +1163,7 @@ export const dispatchScheduledNotificationCampaigns = onSchedule(
       await dispatchNotificationCampaign(schoolId, doc.ref);
     });
 
+    await recordCronRun("dispatchScheduledNotificationCampaigns", "ok");
     return;
   });
 
@@ -1472,11 +1474,14 @@ export const sendReadingReminders = onSchedule(
         ...totals,
       });
 
+      await recordCronRun("sendReadingReminders", "ok");
       return;
     } catch (error) {
       functions.logger.error("Error in sendReadingReminders", {
         error: error instanceof Error ? error.message : String(error),
       });
+      await recordCronRun("sendReadingReminders", "error",
+        error instanceof Error ? error.message : String(error));
       throw error;
     }
   });
@@ -1567,10 +1572,13 @@ export const pruneStaleFcmTokens = onSchedule(
         schools: schoolsSnap.size,
         removed: total,
       });
+      await recordCronRun("pruneStaleFcmTokens", "ok");
     } catch (error) {
       functions.logger.error("Error in pruneStaleFcmTokens", {
         error: error instanceof Error ? error.message : String(error),
       });
+      await recordCronRun("pruneStaleFcmTokens", "error",
+        error instanceof Error ? error.message : String(error));
       throw error;
     }
   });
@@ -2026,11 +2034,14 @@ export const cleanupExpiredLinkCodes = onSchedule(
         functions.logger.info(`Expired ${count} link codes`);
       }
 
+      await recordCronRun("cleanupExpiredLinkCodes", "ok");
       return;
     } catch (error) {
       functions.logger.error("Error cleaning up expired codes", {
         error: error instanceof Error ? error.message : String(error),
       });
+      await recordCronRun("cleanupExpiredLinkCodes", "error",
+        error instanceof Error ? error.message : String(error));
       throw error;
     }
   });
@@ -2657,10 +2668,13 @@ export const reconcileStatsScheduled = onSchedule(
         classBudget: 1000,
       });
       functions.logger.info("Stats reconcile pass complete", result);
+      await recordCronRun("reconcileStatsScheduled", "ok");
     } catch (err) {
       functions.logger.error("Stats reconcile pass failed", {
         error: err instanceof Error ? err.message : String(err),
       });
+      await recordCronRun("reconcileStatsScheduled", "error",
+        err instanceof Error ? err.message : String(err));
       throw err;
     }
     return;
@@ -2796,7 +2810,10 @@ export const processPendingUserDeletions = onSchedule(
       .where("scheduledDeletionAt", "<=", now)
       .get();
 
-    if (snap.empty) return;
+    if (snap.empty) {
+      await recordCronRun("processPendingUserDeletions", "ok", "no_pending");
+      return;
+    }
 
     let deleted = 0;
     for (const doc of snap.docs) {
@@ -2828,6 +2845,7 @@ export const processPendingUserDeletions = onSchedule(
     }
 
     functions.logger.info(`processPendingUserDeletions: deleted ${deleted} users`);
+    await recordCronRun("processPendingUserDeletions", "ok");
     return;
   });
 

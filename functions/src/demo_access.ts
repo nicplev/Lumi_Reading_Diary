@@ -8,6 +8,7 @@ import sgMail from "@sendgrid/mail";
 import {buildDemoAccessEmail} from "./email_templates";
 import {lumiMascotAttachment} from "./email_assets";
 import {DEFAULT_TIMEZONE} from "./access";
+import {recordCronRun} from "./ops_heartbeat";
 
 // Demo-day rolling-access backend. Two functions live here:
 //   • processDemoAccessEmail — Firestore-trigger that emails a prospect the
@@ -249,6 +250,11 @@ export const scrambleDemoPasswords = onSchedule(
       failed: failures.length,
       failures,
     });
+    await recordCronRun(
+      "scrambleDemoPasswords",
+      "ok",
+      failures.length > 0 ? `${failures.length} account(s) failed` : undefined,
+    );
   },
 );
 

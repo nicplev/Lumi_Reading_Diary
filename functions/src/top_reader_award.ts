@@ -9,6 +9,7 @@ import {
 } from "./dateUtils";
 import {DEFAULT_TIMEZONE} from "./access";
 import {isInvalidatedLog} from "./stats_aggregation";
+import {recordCronRun} from "./ops_heartbeat";
 
 /**
  * Weekly "Top Reader" award. Every Monday it looks at the week that just ended
@@ -268,5 +269,6 @@ export const topReaderAward = onSchedule(
       awarded,
       cleared,
     });
+    await recordCronRun("topReaderAward", "ok");
   },
 );

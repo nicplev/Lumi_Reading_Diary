@@ -12,6 +12,7 @@ import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
 import {assertNotReadOnly} from "./read_only_guard";
+import {recordCronRun} from "./ops_heartbeat";
 
 const RETENTION_DOC = "platformConfig/comprehensionRetention";
 const BATCH_SIZE = 500;
@@ -175,8 +176,10 @@ export const cleanupComprehensionAudio = onSchedule(
     );
     if ("skipped" in result) {
       functions.logger.info("comprehensionAudio.retention.skipped", result);
+      await recordCronRun("cleanupComprehensionAudio", "skipped", result.reason);
     } else {
       functions.logger.info("comprehensionAudio.retention.completed", result);
+      await recordCronRun("cleanupComprehensionAudio", "ok");
     }
     return;
   });
