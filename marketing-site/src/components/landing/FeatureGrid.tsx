@@ -5,8 +5,8 @@ const COLUMNS = [
     headerBg: "#EC4544",
     headerCol: "#fff",
     bullet: "#EC4544",
-    icon: "/assets/lumi-reading.png",
-    iconAlt: "Lumi reading a book",
+    icon: "/assets/green_bear.png",
+    iconAlt: "Green bear Lumi",
     items: [
       "One-tap quick log",
       "No typing, ever",
@@ -93,9 +93,9 @@ export function FeatureGrid() {
         <div data-anim="stagger" className="marketing-feature-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 18 }}>
           {COLUMNS.map((col) => (
             <div key={col.key} style={{ border: "1px solid #ECE7DD", borderRadius: 22, overflow: "hidden" }}>
-              <div style={{ background: col.headerBg, padding: "18px 22px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ background: col.headerBg, minHeight: 76, boxSizing: "border-box", padding: "18px 22px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <span style={{ fontFamily: "'Nunito',sans-serif", fontWeight: 900, fontSize: 18, color: col.headerCol }}>{col.header}</span>
-                {col.icon && <img src={col.icon} alt={col.iconAlt} style={{ display: "block", width: 30, height: "auto" }} />}
+                {col.icon && <img src={col.icon} alt={col.iconAlt} style={{ display: "block", width: 40, height: 40, objectFit: "contain", flexShrink: 0 }} />}
               </div>
               <div style={{ padding: 22, display: "flex", flexDirection: "column", gap: 13 }}>
                 {col.items.map((item) => (
