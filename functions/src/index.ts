@@ -137,6 +137,7 @@ export {verifySchoolCode} from "./code_verification";
 // (annualRollover cron) live in functions/src/renewals.ts. See
 // functions/src/access.ts for the shared AU boundary math.
 export {onSchoolSubscriptionWrite} from "./subscriptions";
+export {grantAccessOnStudentCreate} from "./whole_school_access";
 export {renewStudents, annualRollover} from "./renewals";
 export {topReaderAward} from "./top_reader_award";
 export {submitDemoRequest, submitContactSalesInquiry} from "./marketing_leads";
@@ -2175,6 +2176,11 @@ export const processParentOnboardingEmail = onDocumentCreated(
       // Fetch school
       const schoolSnap = await db.doc(`schools/${schoolId}`).get();
       const schoolName = schoolSnap.data()?.name ?? "Your School";
+      // Whole-school-paid schools cover every rostered student, so the
+      // enrollmentStatus "not_enrolled" skip below must not apply to them.
+      const wholeSchoolPaid =
+        (schoolSnap.data()?.accessMode ?? "whole_school_paid") ===
+        "whole_school_paid";
 
       const targetStudentIds: string[] = data.targetStudentIds ?? [];
       const customMessage: string | undefined = data.customMessage;
@@ -2213,7 +2219,7 @@ export const processParentOnboardingEmail = onDocumentCreated(
           const enrollmentStatus = student.enrollmentStatus;
           const isSubscribed =
             enrollmentStatus === "book_pack" || enrollmentStatus === "direct_purchase";
-          if (!isSubscribed) {
+          if (!wholeSchoolPaid && !isSubscribed) {
             recipients.push({
               studentId: snap.id,
               studentName,

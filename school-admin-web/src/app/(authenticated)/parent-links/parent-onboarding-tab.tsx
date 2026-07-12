@@ -15,6 +15,7 @@ import { InfoTooltip } from '@/components/lumi/tooltip';
 import { useToast } from '@/components/lumi/toast';
 import { useStudents, useUpdateEnrollmentStatus, useBulkUpdateEnrollmentStatus } from '@/lib/hooks/use-students';
 import { useClasses } from '@/lib/hooks/use-classes';
+import { useSchool } from '@/lib/hooks/use-school';
 import {
   useOnboardingEmails,
   useDeleteOnboardingEmail,
@@ -72,6 +73,11 @@ export function ParentOnboardingTab() {
   const { user } = useAuth();
   const { data: students, isLoading: studentsLoading } = useStudents();
   const { data: classes } = useClasses();
+  const { data: school } = useSchool();
+  // Whole-school-paid: every rostered student is covered, so hide the
+  // subscription editing surface (status editor, bulk "Mark Subscribed",
+  // legend, subscription filter). A covered student reads as "Included".
+  const wholeSchoolPaid = (school?.accessMode ?? 'whole_school_paid') === 'whole_school_paid';
   const { data: emailHistory, isLoading: emailsLoading } = useOnboardingEmails();
   const updateEnrollment = useUpdateEnrollmentStatus();
   const bulkUpdateEnrollment = useBulkUpdateEnrollmentStatus();
@@ -336,6 +342,11 @@ export function ParentOnboardingTab() {
             </Badge>
           );
         }
+        // Whole-school-paid: every student is covered, so there's nothing to
+        // mark — show a static "Included" chip instead of the status editor.
+        if (wholeSchoolPaid) {
+          return <Badge variant="success">Included</Badge>;
+        }
         return (
           <StatusEditorBadge
             status={row.enrollmentStatus}
@@ -397,10 +408,19 @@ export function ParentOnboardingTab() {
         <div className="flex items-center gap-1.5">
           <span className="text-sm font-semibold text-muted">Onboarding Status Guide</span>
           <InfoTooltip>
-            <strong>Not Subscribed</strong> = no paid subscription yet.{' '}
-            <strong>Subscribed</strong> = paid, ready to receive an invite.{' '}
-            <strong>Linked</strong> = parent account connected (done).
-            {' '}Mark subscriptions right here, or on the Students page.
+            {wholeSchoolPaid ? (
+              <>
+                <strong>To onboard</strong> = not yet linked to a parent.{' '}
+                <strong>Linked</strong> = parent account connected (done).
+              </>
+            ) : (
+              <>
+                <strong>Not Subscribed</strong> = no paid subscription yet.{' '}
+                <strong>Subscribed</strong> = paid, ready to receive an invite.{' '}
+                <strong>Linked</strong> = parent account connected (done).
+                {' '}Mark subscriptions right here, or on the Students page.
+              </>
+            )}
           </InfoTooltip>
         </div>
         <button
@@ -442,7 +462,7 @@ export function ParentOnboardingTab() {
             >
               To onboard: {activeStudents.filter((st) => getOnboardingStatus(st) !== 'linked').length}
             </button>
-            {(['ready', 'no_subscription', 'linked'] as OnboardingStatus[]).map((s) => {
+            {((wholeSchoolPaid ? ['linked'] : ['ready', 'no_subscription', 'linked']) as OnboardingStatus[]).map((s) => {
               const count = activeStudents.filter((st) => getOnboardingStatus(st) === s).length;
               const isActive = statusFilter === s;
               const variantColors: Record<OnboardingStatus, string> = {
@@ -471,9 +491,15 @@ export function ParentOnboardingTab() {
             </button>
           </div>
           {statusFilter === 'unlinked' && (
-            <p className="text-xs text-muted">
-              Mark paying students <span className="font-semibold text-ink">Subscribed</span> (tap their status), then select them and <span className="font-semibold text-ink">Send Onboarding Emails</span> — all here. Already-linked students are hidden; tap <span className="font-semibold text-ink">Linked</span> to re-send.
-            </p>
+            wholeSchoolPaid ? (
+              <p className="text-xs text-muted">
+                Select students and <span className="font-semibold text-ink">Send Onboarding Emails</span> to invite their parents. Already-linked students are hidden; tap <span className="font-semibold text-ink">Linked</span> to re-send.
+              </p>
+            ) : (
+              <p className="text-xs text-muted">
+                Mark paying students <span className="font-semibold text-ink">Subscribed</span> (tap their status), then select them and <span className="font-semibold text-ink">Send Onboarding Emails</span> — all here. Already-linked students are hidden; tap <span className="font-semibold text-ink">Linked</span> to re-send.
+              </p>
+            )
           )}
         </div>
       </div>
@@ -526,7 +552,7 @@ export function ParentOnboardingTab() {
           <Button variant="outline" size="sm" onClick={selectAllEligible}>
             Select All Eligible
           </Button>
-          {selectedNotSubscribedIds.length > 0 && (
+          {!wholeSchoolPaid && selectedNotSubscribedIds.length > 0 && (
             <Button
               variant="secondary"
               size="sm"
