@@ -10,5 +10,7 @@ export * from "./manageParentAccount";
 export * from "./grantDevAccess";
 export * from "./setComprehensionRecordingFlag";
 export * from "./setComprehensionRetentionConfig";
+export * from "./setStorageAlertsConfig";
+export * from "./storageUsageActions";
 export * from "./comprehensionAudioActions";
 export * from "./provisionDemoAccess";
