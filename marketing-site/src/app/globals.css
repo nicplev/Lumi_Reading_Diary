@@ -179,9 +179,30 @@ body {
     font-weight: 600;
     text-decoration: none;
   }
-  .marketing-mobile-menu a:last-child {
+  .marketing-mobile-login,
+  .marketing-mobile-demo {
+    grid-column: 1 / -1;
+  }
+  .marketing-mobile-login {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #FBFAF6 !important;
+    border: 1px solid #E0DBD0;
+  }
+  .marketing-mobile-login span {
+    color: #6B6258;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .marketing-mobile-login strong {
+    color: #1C1812;
+    font-size: 14px;
+  }
+  .marketing-mobile-demo {
     color: #fff;
     background: #EC4544;
+    text-align: center;
   }
 
   [data-anim="reveal-left"]:not([data-shown]),

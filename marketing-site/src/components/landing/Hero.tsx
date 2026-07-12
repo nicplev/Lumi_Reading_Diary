@@ -41,7 +41,7 @@ export function Hero() {
   };
 
   return (
-    <section className="marketing-hero" style={{ position: "relative", padding: "64px 32px 20px", overflow: "hidden" }}>
+    <section id="hero" className="marketing-hero" style={{ position: "relative", padding: "64px 32px 20px", overflow: "hidden" }}>
       <div style={{ maxWidth: 1180, margin: "0 auto", position: "relative" }}>
         <div
           className="hero-mascot"
