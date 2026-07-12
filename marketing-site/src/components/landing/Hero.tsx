@@ -56,8 +56,8 @@ export function Hero() {
         >
           <img
             data-lumi-track
-            src="/assets/lumi-headphones.png"
-            alt="Lumi with headphones"
+            src="/assets/green_bear.png"
+            alt="Green bear Lumi"
             style={{
               display: "block",
               width: 116,
@@ -305,7 +305,7 @@ export function Hero() {
             {demoStage === 2 && (
               <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 8 }}>
                 <p style={{ fontWeight: 300, fontSize: 13, color: "#6B5600", margin: "0 0 2px" }}>
-                  3 of 3 · Add a quick chip
+                  3 of 3 · Add a quick comment chip
                 </p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
                   {CHIPS.map((label) => (

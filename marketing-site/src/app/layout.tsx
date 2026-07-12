@@ -20,7 +20,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="font-body text-ink">{children}</body>
+      <body suppressHydrationWarning className="font-body text-ink">{children}</body>
     </html>
   );
 }
