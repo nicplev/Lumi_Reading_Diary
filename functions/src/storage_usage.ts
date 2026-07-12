@@ -33,6 +33,7 @@ import {
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
 import {localDateString} from "./dateUtils";
+import {recordCronRun} from "./ops_heartbeat";
 
 const USAGE_DOC = "opsMetrics/storageUsage";
 const BUCKET = "lumi-ninc-au.firebasestorage.app";
@@ -271,6 +272,13 @@ export const reconcileStorageUsage = onSchedule(
     memory: "512MiB",
   },
   async () => {
-    await performStorageReconcile("system:reconcileStorageUsage");
+    try {
+      await performStorageReconcile("system:reconcileStorageUsage");
+      await recordCronRun("reconcileStorageUsage", "ok");
+    } catch (err) {
+      await recordCronRun("reconcileStorageUsage", "error",
+        err instanceof Error ? err.message : String(err));
+      throw err;
+    }
   },
 );

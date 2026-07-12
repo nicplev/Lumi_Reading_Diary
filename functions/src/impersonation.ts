@@ -5,6 +5,7 @@ import {onDocumentDeleted} from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
 import {createHash} from "crypto";
 import {isSuperAdmin} from "./super_admin";
+import {recordCronRun} from "./ops_heartbeat";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -865,6 +866,7 @@ export const expireImpersonationSessions = onSchedule(
       .get();
 
     if (snap.empty) {
+      await recordCronRun("expireImpersonationSessions", "ok", "no_expired");
       return;
     }
 
@@ -892,6 +894,7 @@ export const expireImpersonationSessions = onSchedule(
     }
 
     functions.logger.info("impersonation.expired", {count: snap.size});
+    await recordCronRun("expireImpersonationSessions", "ok");
     return;
   });
 
@@ -972,6 +975,7 @@ export const monitorImpersonationAnomalies = onSchedule(
       .get();
 
     if (snap.empty) {
+      await recordCronRun("monitorImpersonationAnomalies", "ok", "no_sessions");
       return;
     }
 
@@ -1025,5 +1029,6 @@ export const monitorImpersonationAnomalies = onSchedule(
       devsScanned: perDev.size,
       flagged,
     });
+    await recordCronRun("monitorImpersonationAnomalies", "ok");
     return;
   });
