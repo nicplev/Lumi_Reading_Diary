@@ -39,6 +39,10 @@ export interface InvoiceParty {
 export interface InvoiceIssuer extends InvoiceParty {
   gstRegistered: boolean;
   gstRate: number;
+  bankName?: string;
+  bsb?: string;
+  accountNumber?: string;
+  accountName?: string;
   paymentDetails?: string;
 }
 
@@ -88,7 +92,12 @@ export interface BillingEntity {
   gstRegistered: boolean;
   /** Default GST fraction applied to new invoices, e.g. 0.10. */
   gstRate: number;
-  /** Bank/BSB/account or "pay to…" free text shown on invoices. */
+  /** Structured bank details shown labelled on invoices. */
+  bankName?: string;
+  bsb?: string;
+  accountNumber?: string;
+  accountName?: string;
+  /** Extra free-text payment instructions shown below the bank details. */
   paymentDetails?: string;
   /** Default price per student the invoice builder pre-fills (dollars). */
   pricePerStudent?: number;

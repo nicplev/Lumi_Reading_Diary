@@ -46,6 +46,10 @@ export interface InvoiceDocData {
     abn?: string;
     gstRegistered: boolean;
     gstRate: number;
+    bankName?: string;
+    bsb?: string;
+    accountNumber?: string;
+    accountName?: string;
     paymentDetails?: string;
   };
   lineItems: {
@@ -82,10 +86,8 @@ const styles = StyleSheet.create({
   },
   brandWrap: { flexDirection: "row", alignItems: "center" },
   logo: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: C.white,
+    width: 48,
+    height: 48,
     objectFit: "contain",
     marginRight: 10,
   },
@@ -165,6 +167,9 @@ const styles = StyleSheet.create({
   panel: { backgroundColor: C.cream, borderRadius: 8, padding: 10, marginTop: 18 },
   panelTitle: { fontSize: 8.5, color: C.muted, fontFamily: "Helvetica-Bold", textTransform: "uppercase", marginBottom: 4 },
   panelText: { fontSize: 9.5, color: C.ink, lineHeight: 1.4 },
+  payRow: { flexDirection: "row", marginBottom: 2 },
+  payLabel: { width: 95, fontSize: 9.5, color: C.muted },
+  payValue: { fontSize: 9.5, fontFamily: "Helvetica-Bold", color: C.ink },
 
   footer: {
     position: "absolute",
@@ -199,6 +204,21 @@ function fmtDate(iso?: string): string {
     month: "short",
     year: "numeric",
   });
+}
+
+/** Australian BSB is conventionally shown as XXX-XXX. */
+function formatBsb(bsb: string): string {
+  const digits = bsb.replace(/\D/g, "");
+  return digits.length === 6 ? `${digits.slice(0, 3)}-${digits.slice(3)}` : bsb;
+}
+
+function PayRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.payRow}>
+      <Text style={styles.payLabel}>{label}</Text>
+      <Text style={styles.payValue}>{value}</Text>
+    </View>
+  );
 }
 
 function Party({
@@ -320,10 +340,30 @@ export function InvoiceDocument({
           </View>
         </View>
 
-        {invoice.from.paymentDetails ? (
+        {invoice.from.bankName ||
+        invoice.from.bsb ||
+        invoice.from.accountNumber ||
+        invoice.from.accountName ||
+        invoice.from.paymentDetails ? (
           <View style={styles.panel}>
             <Text style={styles.panelTitle}>Payment details</Text>
-            <Text style={styles.panelText}>{invoice.from.paymentDetails}</Text>
+            {invoice.from.bankName ? (
+              <PayRow label="Bank" value={invoice.from.bankName} />
+            ) : null}
+            {invoice.from.bsb ? (
+              <PayRow label="BSB" value={formatBsb(invoice.from.bsb)} />
+            ) : null}
+            {invoice.from.accountNumber ? (
+              <PayRow label="Account number" value={invoice.from.accountNumber} />
+            ) : null}
+            {invoice.from.accountName ? (
+              <PayRow label="Account name" value={invoice.from.accountName} />
+            ) : null}
+            {invoice.from.paymentDetails ? (
+              <Text style={[styles.panelText, { marginTop: 4 }]}>
+                {invoice.from.paymentDetails}
+              </Text>
+            ) : null}
           </View>
         ) : null}
         {invoice.notes ? (

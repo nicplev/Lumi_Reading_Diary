@@ -21,6 +21,10 @@ export function BillingSettingsForm({ entity }: { entity: BillingEntity }) {
     email: entity.email ?? "",
     gstRegistered: entity.gstRegistered ?? false,
     gstRate: entity.gstRate ?? 0.1,
+    bankName: entity.bankName ?? "",
+    bsb: entity.bsb ?? "",
+    accountNumber: entity.accountNumber ?? "",
+    accountName: entity.accountName ?? "",
     paymentDetails: entity.paymentDetails ?? "",
     pricePerStudent: entity.pricePerStudent,
     paymentTermsDays: entity.paymentTermsDays ?? 30,
@@ -40,6 +44,10 @@ export function BillingSettingsForm({ entity }: { entity: BillingEntity }) {
           email: f.email,
           gstRegistered: f.gstRegistered,
           gstRate: f.gstRate,
+          bankName: f.bankName,
+          bsb: f.bsb,
+          accountNumber: f.accountNumber,
+          accountName: f.accountName,
           paymentDetails: f.paymentDetails,
           pricePerStudent:
             typeof f.pricePerStudent === "number" ? f.pricePerStudent : undefined,
@@ -105,9 +113,30 @@ export function BillingSettingsForm({ entity }: { entity: BillingEntity }) {
             />
           </div>
         </div>
+        <div className="space-y-3 rounded-md border p-3">
+          <p className="text-sm font-medium">Bank details (shown labelled on invoices)</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Bank name</Label>
+              <Input placeholder="e.g. Commonwealth Bank" value={f.bankName} onChange={(e) => setF({ ...f, bankName: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Account name</Label>
+              <Input placeholder="Account holder name" value={f.accountName} onChange={(e) => setF({ ...f, accountName: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>BSB</Label>
+              <Input placeholder="123-456" value={f.bsb} onChange={(e) => setF({ ...f, bsb: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Account number</Label>
+              <Input placeholder="12345678" value={f.accountNumber} onChange={(e) => setF({ ...f, accountNumber: e.target.value })} />
+            </div>
+          </div>
+        </div>
         <div className="space-y-2">
-          <Label>Payment details (bank / BSB / account, shown on invoices)</Label>
-          <Textarea rows={3} value={f.paymentDetails} onChange={(e) => setF({ ...f, paymentDetails: e.target.value })} />
+          <Label>Additional payment instructions (optional)</Label>
+          <Textarea rows={2} placeholder="e.g. Please quote the invoice number as the payment reference." value={f.paymentDetails} onChange={(e) => setF({ ...f, paymentDetails: e.target.value })} />
         </div>
         <Button onClick={save} disabled={saving}>
           {saving ? "Saving…" : "Save billing details"}
