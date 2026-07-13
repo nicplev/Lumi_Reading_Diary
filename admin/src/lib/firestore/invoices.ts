@@ -135,6 +135,10 @@ export async function createInvoice(
     abn: entity.abn,
     gstRegistered: entity.gstRegistered,
     gstRate: entity.gstRate,
+    bankName: entity.bankName,
+    bsb: entity.bsb,
+    accountNumber: entity.accountNumber,
+    accountName: entity.accountName,
     paymentDetails: entity.paymentDetails,
   };
 
