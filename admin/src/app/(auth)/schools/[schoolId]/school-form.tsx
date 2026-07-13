@@ -66,7 +66,6 @@ export function SchoolForm({ school }: SchoolFormProps) {
       address: school.address ?? "",
       timezone: school.timezone,
       subscriptionPlan: school.subscriptionPlan ?? "",
-      accessMode: school.accessMode ?? "whole_school_paid",
       displayName: school.displayName ?? "",
       logoUrl: school.logoUrl ?? "",
       primaryColor: school.primaryColor ?? "#6366f1",
@@ -223,32 +222,6 @@ export function SchoolForm({ school }: SchoolFormProps) {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Access model</Label>
-            <Select
-              defaultValue={school.accessMode ?? "whole_school_paid"}
-              onValueChange={(v) =>
-                v && setValue("accessMode", v as UpdateSchoolInput["accessMode"])
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="whole_school_paid">
-                  Whole school paid
-                </SelectItem>
-                <SelectItem value="direct_allowed" disabled>
-                  Direct payments allowed (coming soon)
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-muted-foreground">
-              Whole school paid: the school is invoiced for its whole roster,
-              every student is auto-covered, and the per-student subscription
-              controls are hidden in the school portal.
-            </p>
-          </div>
         </CardContent>
       </Card>
 

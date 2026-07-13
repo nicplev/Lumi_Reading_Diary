@@ -17,8 +17,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { formatDate } from "@/lib/utils";
+import Link from "next/link";
 import { tierForStudentCount } from "@lumi/types";
 import type {
+  AccessMode,
   SubscriptionStatus,
   SubscriptionTier,
 } from "@lumi/types";
@@ -45,6 +47,7 @@ interface Props {
   studentCount: number;
   currentAcademicYear: number;
   initialSubscriptions: SchoolSubscriptionRow[];
+  initialAccessMode: AccessMode;
 }
 
 export function SchoolSubscriptionTab({
@@ -52,11 +55,33 @@ export function SchoolSubscriptionTab({
   studentCount,
   currentAcademicYear,
   initialSubscriptions,
+  initialAccessMode,
 }: Props) {
   const router = useRouter();
   const [rows, setRows] = useState<SchoolSubscriptionRow[]>(
     initialSubscriptions
   );
+  const [accessMode, setAccessMode] = useState<AccessMode>(initialAccessMode);
+  const [savingAccess, setSavingAccess] = useState(false);
+
+  async function saveAccessMode(next: AccessMode) {
+    setAccessMode(next);
+    setSavingAccess(true);
+    try {
+      const res = await fetch(`/api/schools/${schoolId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessMode: next }),
+      });
+      if (!res.ok) throw new Error("Failed to update access model");
+      toast.success("Access model updated");
+      router.refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setSavingAccess(false);
+    }
+  }
   const existing = rows.find((r) => r.academicYear === currentAcademicYear);
   const suggestedTier = tierForStudentCount(studentCount);
 
@@ -92,11 +117,15 @@ export function SchoolSubscriptionTab({
           notes: notes || undefined,
         }),
       });
+      const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? "Save failed");
       }
-      toast.success(`Subscription saved for ${year}`);
+      toast.success(
+        typeof body.provisioned === "number" && body.provisioned > 0
+          ? `Subscription saved for ${year} · provisioned ${body.provisioned} student(s)`
+          : `Subscription saved for ${year}`
+      );
       // Refresh the list from the server.
       const listed = await fetch(
         `/api/school-subscriptions?schoolId=${schoolId}`
@@ -112,6 +141,44 @@ export function SchoolSubscriptionTab({
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Access model</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            How this school is billed &amp; covered. <strong>Whole school paid</strong>:
+            invoiced for the whole roster, every student auto-covered, and the
+            per-student subscription controls are hidden in the school portal.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Select
+              value={accessMode}
+              onValueChange={(v) => saveAccessMode(v as AccessMode)}
+            >
+              <SelectTrigger className="w-72">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="whole_school_paid">Whole school paid</SelectItem>
+                <SelectItem value="direct_allowed" disabled>
+                  Direct payments allowed (coming soon)
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            {savingAccess && (
+              <span className="text-sm text-muted-foreground">Saving…</span>
+            )}
+            <Link
+              href={`/operations/invoicing/new?schoolId=${schoolId}&year=${currentAcademicYear}`}
+              className="ml-auto"
+            >
+              <Button variant="outline">Generate invoice</Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>
