@@ -138,6 +138,7 @@ export {verifySchoolCode} from "./code_verification";
 // functions/src/access.ts for the shared AU boundary math.
 export {onSchoolSubscriptionWrite} from "./subscriptions";
 export {grantAccessOnStudentCreate} from "./whole_school_access";
+export {processInvoiceEmail} from "./invoice_email";
 export {renewStudents, annualRollover} from "./renewals";
 export {topReaderAward} from "./top_reader_award";
 export {submitDemoRequest, submitContactSalesInquiry} from "./marketing_leads";

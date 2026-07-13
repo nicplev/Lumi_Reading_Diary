@@ -81,6 +81,7 @@ export function SchoolDetailTabs({
           studentCount={stats.studentCount}
           currentAcademicYear={currentAcademicYear}
           initialSubscriptions={subscriptions}
+          initialAccessMode={school.accessMode}
         />
       </TabsContent>
       <TabsContent value="settings">

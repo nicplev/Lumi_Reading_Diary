@@ -14,6 +14,16 @@ export type SubscriptionStatus =
   | "grace"
   | "cancelled";
 
+/** All statuses in display order — drives the Select + zod (single source). */
+export const SUBSCRIPTION_STATUS_VALUES: readonly SubscriptionStatus[] = [
+  "paid",
+  "unpaid",
+  "comp",
+  "trial",
+  "grace",
+  "cancelled",
+];
+
 /** Statuses that grant active access to the school for the year. */
 export const ACTIVE_SUBSCRIPTION_STATUSES: readonly SubscriptionStatus[] = [
   "paid",
@@ -32,6 +42,14 @@ export function isActiveSubscriptionStatus(
 }
 
 export type SubscriptionTier = "S" | "M" | "L" | "XL";
+
+/** Tier values in display order — drives the Select + zod (single source). */
+export const SUBSCRIPTION_TIER_VALUES: readonly SubscriptionTier[] = [
+  "S",
+  "M",
+  "L",
+  "XL",
+];
 
 export interface SubscriptionTierBand {
   tier: SubscriptionTier;

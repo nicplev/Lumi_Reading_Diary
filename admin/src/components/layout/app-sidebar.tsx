@@ -18,6 +18,7 @@ import {
   Download,
   Wrench,
   CreditCard,
+  FileText,
 } from "lucide-react";
 import {
   Sidebar,
@@ -82,6 +83,7 @@ const navGroups = [
     items: [
       { title: "Operations", href: "/operations", icon: Wrench },
       { title: "Subscriptions", href: "/operations/subscriptions", icon: CreditCard },
+      { title: "Invoicing", href: "/operations/invoicing", icon: FileText },
       { title: "Export Data", href: "/operations/export", icon: Download },
     ],
   },
