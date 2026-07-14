@@ -189,6 +189,52 @@ test('parents: parent can create only own profile doc', async () => {
   );
 });
 
+test('parents self-create CANNOT pre-seed linkedChildren (cross-school PII grab)', async () => {
+  await seedData(async (db) => {
+    await db.collection('schools').doc('school_1').set({
+      name: 'Lumi School',
+      createdBy: 'admin_1',
+      teacherCount: 0,
+      parentCount: 0,
+      studentCount: 0,
+    });
+  });
+
+  const parentDb = authDb('parent_1');
+  const parentRef = parentDb
+    .collection('schools').doc('school_1')
+    .collection('parents').doc('parent_1');
+
+  // The exploit: a forged client self-creates its own parent membership with
+  // linkedChildren pre-populated with arbitrary student ids to gain read access
+  // to those children. Must be DENIED — linkedChildren is server-owned. The
+  // failed create leaves no document behind.
+  await assertFails(
+    parentRef.set({
+      email: 'attacker@example.com',
+      fullName: 'Attacker',
+      role: 'parent',
+      schoolId: 'school_1',
+      linkedChildren: ['victim_student_a', 'victim_student_b'],
+      createdAt: new Date(),
+      isActive: true,
+    }),
+  );
+
+  // A parent self-create that OMITS linkedChildren is allowed — the field
+  // defaults to empty and grants no child access (the legit client writes []).
+  await assertSucceeds(
+    parentRef.set({
+      email: 'parent@example.com',
+      fullName: 'Parent One',
+      role: 'parent',
+      schoolId: 'school_1',
+      createdAt: new Date(),
+      isActive: true,
+    }),
+  );
+});
+
 test('users self-update: whitelisted fields succeed, sensitive fields fail', async () => {
   await seedData(async (db) => {
     await db.collection('schools').doc('school_1').set({
