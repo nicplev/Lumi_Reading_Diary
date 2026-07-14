@@ -135,6 +135,12 @@ export {
 // unauthenticated `list` rules (enumeration risk). See code_verification.ts.
 export {verifySchoolCode} from "./code_verification";
 
+// Login-fallback school resolution (finding #5 enabler). Lets the app resolve an
+// un-indexed user's school server-side instead of listing the whole /schools
+// collection client-side, so the cross-tenant `allow list` rule on /schools can
+// later be removed. Dormant until the app adopts it. See school_resolution.ts.
+export {resolveUserSchoolByUid} from "./school_resolution";
+
 // Access/licensing lifecycle. T1 reacts to subscription changes to recompute
 // school.access + cascade student access. T2 (renewStudents callable) + T4
 // (annualRollover cron) live in functions/src/renewals.ts. See
