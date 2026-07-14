@@ -333,14 +333,21 @@ service cloud.firestore {
         // 1.3). The phone-primary and email+MFA parent signups now finalise
         // server-side (finalizeParentSignup / enrollLinkedPhoneAsMfa), but the
         // existing-MFA parent who links a child at a NEW school still
-        // client-creates their parent membership there. Residual risk is low: a
-        // bare parent doc has empty `linkedChildren`, which gates every child
-        // PII / allocation read, and parentIds self-append was removed below.
-        // Closing this fully needs a server path for cross-school existing-MFA
-        // linking (or a pendingParent/{uid} server marker).
+        // client-creates their parent membership there.
+        //
+        // `linkedChildren` MUST be empty on any client create. It is the sole
+        // authorization key for every child PII / reading-log / comment /
+        // allocation read (see getUserData().linkedChildren below), and the
+        // client-supplied create payload could otherwise pre-seed it with
+        // arbitrary student ids to read any child at any school. Linking is
+        // exclusively the server-side linkParentToStudent (Admin SDK) path,
+        // which appends via arrayUnion; the client never needs to seed it on
+        // create (the app already writes `linkedChildren: []`). The self-update
+        // rule below likewise excludes `linkedChildren`.
         allow create: if isSignedIn() &&
             writeAllowedForDev() &&
             request.resource.data.schoolId == schoolId &&
+            request.resource.data.get('linkedChildren', []).size() == 0 &&
             (
               isSchoolAdmin(schoolId) ||
               (
