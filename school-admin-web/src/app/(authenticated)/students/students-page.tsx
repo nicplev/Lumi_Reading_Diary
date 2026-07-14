@@ -29,6 +29,7 @@ import {
   useArchiveStudents,
   useRestoreStudents,
 } from '@/lib/hooks/use-students';
+import { useSchool } from '@/lib/hooks/use-school';
 import type { SchoolClass, ReadingLevelOption, ReadingLevelSchema, EnrollmentStatus } from '@/lib/types';
 
 type SerializedClass = Omit<SchoolClass, 'createdAt'> & { createdAt: string };
@@ -70,6 +71,12 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess, is
   const updateEnrollment = useUpdateEnrollmentStatus();
   const archiveStudents = useArchiveStudents();
   const restoreStudents = useRestoreStudents();
+
+  // Whole-school-paid schools cover every rostered student, so the per-student
+  // subscription surface (Subscription column, "Mark Subscribed" actions,
+  // subscribed/not-subscribed filter) is meaningless and is hidden. Absent = paid.
+  const { data: school } = useSchool();
+  const wholeSchoolPaid = (school?.accessMode ?? 'whole_school_paid') === 'whole_school_paid';
 
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState<string[]>([]);
@@ -401,9 +408,12 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess, is
     },
   ];
 
-  const baseColumns = levelSchema === 'none'
-    ? allColumns.filter((col) => col.id !== 'level')
-    : allColumns;
+  const baseColumns = allColumns.filter((col) => {
+    if (col.id === 'level' && levelSchema === 'none') return false;
+    // Whole-school-paid hides the per-student "Subscription" column.
+    if (col.id === 'enrollment' && wholeSchoolPaid) return false;
+    return true;
+  });
 
   // Archived view swaps the mid-table columns for the archive metadata and the
   // row actions for Restore / Delete forever.
@@ -474,12 +484,15 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess, is
                     { label: 'Delete forever', onClick: () => setDeletingStudent(row), variant: 'danger' },
                   ]
                 : [
-                    { label: 'Mark Subscribed', onClick: () => handleSingleEnrollment(row, 'book_pack') },
-                    { label: 'Mark Subscribed (Direct)', onClick: () => handleSingleEnrollment(row, 'direct_purchase') },
-                    { label: 'Revoke reading access', onClick: () => setRevokingStudent(row), variant: 'danger' },
+                    // Per-student subscription actions are hidden under whole-school-paid.
+                    ...(wholeSchoolPaid ? [] : [
+                      { label: 'Mark Subscribed', onClick: () => handleSingleEnrollment(row, 'book_pack') },
+                      { label: 'Mark Subscribed (Direct)', onClick: () => handleSingleEnrollment(row, 'direct_purchase') },
+                    ]),
+                    { label: 'Revoke reading access', onClick: () => setRevokingStudent(row), variant: 'danger' as const },
                     { label: 'Edit', onClick: () => setEditingStudent(row) },
                     { label: 'Archive', onClick: () => setArchivingStudent(row) },
-                    { label: 'Delete', onClick: () => setDeletingStudent(row), variant: 'danger' },
+                    { label: 'Delete', onClick: () => setDeletingStudent(row), variant: 'danger' as const },
                   ]
             }
           />
@@ -536,7 +549,7 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess, is
             onChange={(v) => setClassFilter(v === 'all' ? [] : [v])}
           />
         </div>
-        {statusView === 'active' && (
+        {statusView === 'active' && !wholeSchoolPaid && (
           <div className="sm:w-44 shrink-0">
             <Select
               options={[
@@ -581,12 +594,16 @@ export function StudentsPage({ classes, levelOptions, levelSchema, devAccess, is
               </Button>
             ) : (
               <>
-                <Button variant="outline" size="sm" onClick={() => handleBulkEnrollment('book_pack')}>
-                  Mark Subscribed
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => handleBulkEnrollment('direct_purchase')}>
-                  Mark Subscribed (Direct)
-                </Button>
+                {!wholeSchoolPaid && (
+                  <>
+                    <Button variant="outline" size="sm" onClick={() => handleBulkEnrollment('book_pack')}>
+                      Mark Subscribed
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleBulkEnrollment('direct_purchase')}>
+                      Mark Subscribed (Direct)
+                    </Button>
+                  </>
+                )}
                 <Button variant="outline" size="sm" onClick={() => setShowBulkRevokeConfirm(true)}>
                   Revoke reading access
                 </Button>

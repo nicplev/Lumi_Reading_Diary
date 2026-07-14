@@ -3,6 +3,7 @@ import {onSchedule} from "firebase-functions/v2/scheduler";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import {assertNotReadOnly} from "./read_only_guard";
+import {recordCronRun} from "./ops_heartbeat";
 import {
   buildSchoolAccess,
   buildStudentAccess,
@@ -237,6 +238,7 @@ export const annualRollover = onSchedule(
     const priorYear = (cfgSnap.data()?.currentAcademicYear as number | undefined);
     if (typeof priorYear !== "number") {
       functions.logger.error("annualRollover: config/academicYear missing; aborting.");
+      await recordCronRun("annualRollover", "error", "config_academicYear_missing");
       return;
     }
     const newYear = priorYear + 1;
@@ -297,6 +299,7 @@ export const annualRollover = onSchedule(
       `suspended ${suspendedSchools} unpaid school(s); ` +
       `expired/suspended ${expiredStudents} student(s).`,
     );
+    await recordCronRun("annualRollover", "ok");
     return;
   });
 

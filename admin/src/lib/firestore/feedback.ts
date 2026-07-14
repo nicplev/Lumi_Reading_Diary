@@ -22,11 +22,14 @@ export interface FeedbackListItem {
   createdAt: string;
 }
 
-export async function listFeedback(): Promise<FeedbackListItem[]> {
-  const snapshot = await getAdminDb()
+export async function listFeedback(limit?: number): Promise<FeedbackListItem[]> {
+  let query: FirebaseFirestore.Query = getAdminDb()
     .collection("feedback")
-    .orderBy("createdAt", "desc")
-    .get();
+    .orderBy("createdAt", "desc");
+  if (limit) {
+    query = query.limit(limit);
+  }
+  const snapshot = await query.get();
 
   return snapshot.docs.map((doc) => {
     const data = doc.data();

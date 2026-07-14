@@ -3,8 +3,8 @@ import { randomUUID } from 'crypto';
 import { getSession } from '@/lib/auth/session';
 import { adminStorage } from '@/lib/firebase/admin';
 
-// Address the bucket explicitly — admin.ts initializes without a default
-// storageBucket (same as the comprehension-audio route).
+// admin.ts now sets a default storageBucket; naming it here anyway keeps
+// the route self-documenting and independent of app-init options.
 const BUCKET = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB

@@ -44,6 +44,11 @@ export async function logAuditEvent(entry: {
     });
 }
 
+// Each single equality filter (action / targetType / schoolId /
+// performedBy) is backed by a composite index with createdAt DESC in
+// firestore.indexes.json. COMBINING two or more of those filters in one
+// call needs a further composite — add it there before shipping such a
+// caller, or the query throws FAILED_PRECONDITION.
 export async function listAuditLogs(options?: {
   action?: string;
   targetType?: string;

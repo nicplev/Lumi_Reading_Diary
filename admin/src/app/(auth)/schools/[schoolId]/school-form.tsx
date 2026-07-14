@@ -221,6 +221,7 @@ export function SchoolForm({ school }: SchoolFormProps) {
               />
             </div>
           </div>
+
         </CardContent>
       </Card>
 

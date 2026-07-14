@@ -6,6 +6,7 @@ import { Button } from '@/components/lumi/button';
 import { Badge } from '@/components/lumi/badge';
 import { useToast } from '@/components/lumi/toast';
 import { useSendOnboardingEmails } from '@/lib/hooks/use-onboarding-emails';
+import { useSchool } from '@/lib/hooks/use-school';
 
 interface SendOnboardingEmailModalProps {
   open: boolean;
@@ -31,6 +32,10 @@ export function SendOnboardingEmailModal({
 }: SendOnboardingEmailModalProps) {
   const { toast } = useToast();
   const sendEmails = useSendOnboardingEmails();
+  // Whole-school-paid schools cover every student, so "not subscribed" never
+  // skips a recipient — mirror the server-side skip logic (index.ts).
+  const { data: school } = useSchool();
+  const wholeSchoolPaid = (school?.accessMode ?? 'whole_school_paid') === 'whole_school_paid';
 
   const [customMessage, setCustomMessage] = useState('');
   const [emailSubject, setEmailSubject] = useState('Welcome to Lumi Reading Tracker');
@@ -40,31 +45,27 @@ export function SendOnboardingEmailModal({
     const selected = students.filter((s) => selectedStudentIds.includes(s.id));
     const total = selected.length;
 
+    // Under whole-school-paid every student is covered; otherwise coverage is
+    // the per-student book_pack/direct_purchase enrollment.
+    const isCovered = (s: (typeof selected)[number]) =>
+      wholeSchoolPaid ||
+      s.enrollmentStatus === 'book_pack' ||
+      s.enrollmentStatus === 'direct_purchase';
+
     const noEmail = selected.filter((s) => !s.parentEmail);
-    const notEnrolled = selected.filter(
-      (s) =>
-        !!s.parentEmail &&
-        s.enrollmentStatus !== 'book_pack' &&
-        s.enrollmentStatus !== 'direct_purchase'
-    );
+    const notEnrolled = selected.filter((s) => !!s.parentEmail && !isCovered(s));
     const alreadyLinked = selected.filter(
-      (s) =>
-        !!s.parentEmail &&
-        (s.enrollmentStatus === 'book_pack' || s.enrollmentStatus === 'direct_purchase') &&
-        s.parentIds.length > 0
+      (s) => !!s.parentEmail && isCovered(s) && s.parentIds.length > 0
     );
 
     const willReceive = selected.filter(
-      (s) =>
-        !!s.parentEmail &&
-        (s.enrollmentStatus === 'book_pack' || s.enrollmentStatus === 'direct_purchase') &&
-        s.parentIds.length === 0
+      (s) => !!s.parentEmail && isCovered(s) && s.parentIds.length === 0
     );
 
     const skipped = noEmail.length + notEnrolled.length + alreadyLinked.length;
 
     return { total, willReceive: willReceive.length, skipped, noEmail: noEmail.length, notEnrolled: notEnrolled.length, alreadyLinked: alreadyLinked.length };
-  }, [students, selectedStudentIds]);
+  }, [students, selectedStudentIds, wholeSchoolPaid]);
 
   const handleSend = async () => {
     if (summary.willReceive === 0) {

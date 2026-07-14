@@ -23,6 +23,7 @@ import {
 } from "./notification_helpers";
 import {buildOnboardingEmail, buildOnboardingQrAttachments, buildStaffOnboardingEmail} from "./email_templates";
 import {assertNotReadOnly} from "./read_only_guard";
+import {recordCronRun} from "./ops_heartbeat";
 import {lumiMascotAttachment} from "./email_assets";
 import {generateTempPassword} from "./temp_password";
 import {
@@ -64,6 +65,15 @@ const NOTIFICATION_CAMPAIGN_APP_CHECK_ENFORCED =
 // so the paginated library screen can render header badges without reading
 // the full books collection. See functions/src/library_counts.ts.
 export {maintainLibraryCounts} from "./library_counts";
+
+// Live bucket-usage counters (opsMetrics/storageUsage) for the super-admin
+// dashboard: storage triggers keep the totals current, a nightly reconcile
+// heals drift. See functions/src/storage_usage.ts.
+export {
+  trackStorageObjectFinalized,
+  trackStorageObjectDeleted,
+  reconcileStorageUsage,
+} from "./storage_usage";
 
 // Per-phone-number SMS rate-limit gate. Clients call this before
 // invoking verifyPhoneNumber to enforce a daily cap. See
@@ -127,6 +137,8 @@ export {verifySchoolCode} from "./code_verification";
 // (annualRollover cron) live in functions/src/renewals.ts. See
 // functions/src/access.ts for the shared AU boundary math.
 export {onSchoolSubscriptionWrite} from "./subscriptions";
+export {grantAccessOnStudentCreate} from "./whole_school_access";
+export {processInvoiceEmail} from "./invoice_email";
 export {renewStudents, annualRollover} from "./renewals";
 export {topReaderAward} from "./top_reader_award";
 export {submitDemoRequest, submitContactSalesInquiry} from "./marketing_leads";
@@ -1153,6 +1165,7 @@ export const dispatchScheduledNotificationCampaigns = onSchedule(
       await dispatchNotificationCampaign(schoolId, doc.ref);
     });
 
+    await recordCronRun("dispatchScheduledNotificationCampaigns", "ok");
     return;
   });
 
@@ -1463,11 +1476,14 @@ export const sendReadingReminders = onSchedule(
         ...totals,
       });
 
+      await recordCronRun("sendReadingReminders", "ok");
       return;
     } catch (error) {
       functions.logger.error("Error in sendReadingReminders", {
         error: error instanceof Error ? error.message : String(error),
       });
+      await recordCronRun("sendReadingReminders", "error",
+        error instanceof Error ? error.message : String(error));
       throw error;
     }
   });
@@ -1558,10 +1574,13 @@ export const pruneStaleFcmTokens = onSchedule(
         schools: schoolsSnap.size,
         removed: total,
       });
+      await recordCronRun("pruneStaleFcmTokens", "ok");
     } catch (error) {
       functions.logger.error("Error in pruneStaleFcmTokens", {
         error: error instanceof Error ? error.message : String(error),
       });
+      await recordCronRun("pruneStaleFcmTokens", "error",
+        error instanceof Error ? error.message : String(error));
       throw error;
     }
   });
@@ -2017,11 +2036,14 @@ export const cleanupExpiredLinkCodes = onSchedule(
         functions.logger.info(`Expired ${count} link codes`);
       }
 
+      await recordCronRun("cleanupExpiredLinkCodes", "ok");
       return;
     } catch (error) {
       functions.logger.error("Error cleaning up expired codes", {
         error: error instanceof Error ? error.message : String(error),
       });
+      await recordCronRun("cleanupExpiredLinkCodes", "error",
+        error instanceof Error ? error.message : String(error));
       throw error;
     }
   });
@@ -2155,6 +2177,11 @@ export const processParentOnboardingEmail = onDocumentCreated(
       // Fetch school
       const schoolSnap = await db.doc(`schools/${schoolId}`).get();
       const schoolName = schoolSnap.data()?.name ?? "Your School";
+      // Whole-school-paid schools cover every rostered student, so the
+      // enrollmentStatus "not_enrolled" skip below must not apply to them.
+      const wholeSchoolPaid =
+        (schoolSnap.data()?.accessMode ?? "whole_school_paid") ===
+        "whole_school_paid";
 
       const targetStudentIds: string[] = data.targetStudentIds ?? [];
       const customMessage: string | undefined = data.customMessage;
@@ -2193,7 +2220,7 @@ export const processParentOnboardingEmail = onDocumentCreated(
           const enrollmentStatus = student.enrollmentStatus;
           const isSubscribed =
             enrollmentStatus === "book_pack" || enrollmentStatus === "direct_purchase";
-          if (!isSubscribed) {
+          if (!wholeSchoolPaid && !isSubscribed) {
             recipients.push({
               studentId: snap.id,
               studentName,
@@ -2648,10 +2675,13 @@ export const reconcileStatsScheduled = onSchedule(
         classBudget: 1000,
       });
       functions.logger.info("Stats reconcile pass complete", result);
+      await recordCronRun("reconcileStatsScheduled", "ok");
     } catch (err) {
       functions.logger.error("Stats reconcile pass failed", {
         error: err instanceof Error ? err.message : String(err),
       });
+      await recordCronRun("reconcileStatsScheduled", "error",
+        err instanceof Error ? err.message : String(err));
       throw err;
     }
     return;
@@ -2787,7 +2817,10 @@ export const processPendingUserDeletions = onSchedule(
       .where("scheduledDeletionAt", "<=", now)
       .get();
 
-    if (snap.empty) return;
+    if (snap.empty) {
+      await recordCronRun("processPendingUserDeletions", "ok", "no_pending");
+      return;
+    }
 
     let deleted = 0;
     for (const doc of snap.docs) {
@@ -2819,6 +2852,7 @@ export const processPendingUserDeletions = onSchedule(
     }
 
     functions.logger.info(`processPendingUserDeletions: deleted ${deleted} users`);
+    await recordCronRun("processPendingUserDeletions", "ok");
     return;
   });
 

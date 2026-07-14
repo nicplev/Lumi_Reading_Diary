@@ -109,5 +109,6 @@ export async function getSchool(schoolId: string): Promise<School | null> {
     teacherCount: data.teacherCount ?? 0,
     subscriptionPlan: data.subscriptionPlan,
     subscriptionExpiry: data.subscriptionExpiry?.toDate(),
+    accessMode: data.accessMode ?? 'whole_school_paid',
   };
 }

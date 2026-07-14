@@ -22,7 +22,12 @@ function getApp(): App {
     Buffer.from(base64, "base64").toString("utf-8")
   );
 
-  _app = initializeApp({ credential: cert(serviceAccount) });
+  _app = initializeApp({
+    credential: cert(serviceAccount),
+    // Default bucket so no-arg storage.bucket() resolves — the
+    // @lumi/server-ops comprehension-audio delete paths rely on it.
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  });
   return _app;
 }
 
