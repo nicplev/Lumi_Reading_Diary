@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { SignJWT, jwtVerify } from 'jose';
+import { adminDb } from '@/lib/firebase/admin';
 
 export interface ImpersonationSessionBlock {
   sessionId: string;
@@ -192,6 +193,38 @@ export async function getSession(
       (payload.mfaExemptReason === 'isolatedDemoReadOnly' || payload.impersonation)
     ) {
       return null;
+    }
+
+    // Bind NORMAL sessions to current server state. The __session JWT is
+    // stateless and only locally verified, so deactivating, deleting or
+    // demoting a user in Firestore does NOT otherwise invalidate an already
+    // issued cookie until it expires (up to SESSION_MAX_AGE ≈ 5 days). Re-read
+    // the staff doc and reject on a definitive negative:
+    //   • doc missing / isActive:false / pendingDeletion:true → deactivated or
+    //     deleted user is logged out (they cannot log in again either).
+    //   • role changed → force a clean re-login so a demoted admin drops back
+    //     to teacher instead of keeping schoolAdmin from the stale token.
+    // Impersonation and demo sessions are skipped: their effective role/schoolId
+    // is intentionally not the real user's doc, and both are short-lived and
+    // separately gated. A transient Firestore error fails OPEN (the JWT is
+    // already cryptographically verified) so a blip can't log out every user;
+    // the bounded staleness window is exactly what this narrows, not a new hole.
+    if (!payload.impersonation && payload.mfaExemptReason !== 'isolatedDemoReadOnly') {
+      try {
+        const snap = await adminDb
+          .collection('schools').doc(payload.schoolId as string)
+          .collection('users').doc(payload.uid as string)
+          .get();
+        const u = snap.data();
+        if (!snap.exists || u?.isActive === false || u?.pendingDeletion === true) {
+          return null;
+        }
+        if (u?.role !== role) {
+          return null;
+        }
+      } catch (err) {
+        console.error('getSession: server-state re-check failed, proceeding on verified JWT', err);
+      }
     }
 
     return {
