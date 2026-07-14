@@ -1,6 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { getAdminAuth } from "./firebase-admin";
+import { isSuperAdminViaFirestore } from "./auth-firestore";
 
 const SESSION_COOKIE_NAME = "__session";
 const MAX_AGE = parseInt(process.env.SESSION_COOKIE_MAX_AGE || "432000", 10);
@@ -28,6 +29,14 @@ export async function verifySession() {
 
   try {
     const decoded = await getAdminAuth().verifySessionCookie(sessionCookie, true);
+    // Re-check super-admin membership on EVERY request, not just at login.
+    // verifySessionCookie(…, checkRevoked=true) only catches token revocation /
+    // account disable — NOT removal from the /superAdmins allowlist. Without
+    // this, a de-provisioned super-admin keeps full portal access until the
+    // ~5-day session cookie expires. This reuses the exact gate applied at
+    // login (isSuperAdminViaFirestore, incl. the SUPER_ADMIN_UIDS bootstrap),
+    // so nothing changes for current super-admins.
+    if (!(await isSuperAdminViaFirestore(decoded.uid))) return null;
     return decoded;
   } catch {
     return null;
