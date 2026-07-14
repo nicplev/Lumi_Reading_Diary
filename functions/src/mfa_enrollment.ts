@@ -375,16 +375,27 @@ export const enrollLinkedPhoneAsMfa = onCall(
     // into an arbitrary school — the teacher case is the high-severity one
     // (school membership grants broad read access to the school's students).
     //
-    // Transitional fallback: pre-1.3 clients that send only `data.schoolId`
-    // keep working until the app adopts the credential fields AND the rules
-    // deploy (1.3-rules) denies client self-create. Remove the fallback then.
+    // Teacher: a valid school code is REQUIRED and is the only accepted source
+    // of schoolId — never the bare client `data.schoolId`. Without this, an
+    // authenticated caller could mint a teacher membership at an arbitrary
+    // school (which grants broad read access to that school's students) simply
+    // by omitting `schoolCode` and passing a victim `data.schoolId`. Mirrors
+    // finalizeEmailSignup, which already hard-requires the code.
+    //
+    // Parent: schoolId is still derived from the (validated) student link code,
+    // with a transitional `data.schoolId` fallback ONLY on the retry-safe
+    // `code-used` path below (tracked for removal alongside the app rollout).
     let derivedSchoolId: string | null = null;
     if (role === "teacher") {
       const schoolCode = optStr(data?.schoolCode);
-      if (schoolCode) {
-        // Read-only — the school code is NOT consumed, so this is retry-safe.
-        derivedSchoolId = (await resolveSchoolCode(schoolCode)).schoolId;
+      if (!schoolCode) {
+        throw new HttpsError(
+          "invalid-argument",
+          "A valid school code is required to register as a teacher.",
+        );
       }
+      // Read-only — the school code is NOT consumed, so this is retry-safe.
+      derivedSchoolId = (await resolveSchoolCode(schoolCode)).schoolId;
     } else if (role === "parent" && linkCode) {
       try {
         derivedSchoolId =

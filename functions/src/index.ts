@@ -2916,14 +2916,37 @@ export const deleteStudentWithCascade = onCall(
       const remaining = linkedChildren.filter((id) => id !== studentId);
 
       if (remaining.length === 0) {
-        // Parent has no other children — delete their account entirely
+        // Parent has no other children AT THIS SCHOOL — remove the school-local
+        // membership doc. `parentId` IS the Firebase Auth uid, and the same
+        // account is reused across schools (a parent with children at two
+        // schools has one uid, one doc per school). So the GLOBAL Auth account
+        // may only be deleted when this uid is not a parent at ANY OTHER
+        // school; otherwise this single school's cascade would lock a
+        // multi-school parent out everywhere and orphan the other school's doc.
         await parentRef.delete();
-        try {
-          await admin.auth().deleteUser(parentId);
-        } catch (err) {
-          functions.logger.warn(
-            `Could not delete Auth user ${parentId} — may not exist`,
-            err
+
+        // Full collection-group scan is acceptable here — student deletion is
+        // an infrequent staff action. Filter by grandparent school id (not by
+        // whether the just-deleted local doc still appears), so it is robust to
+        // read-after-delete propagation. Switch to an indexed
+        // `where('uid','==')` query if parent volume grows large.
+        const allParentDocs = await db.collectionGroup("parents").get();
+        const memberElsewhere = allParentDocs.docs.some(
+          (d) => d.id === parentId && d.ref.parent.parent?.id !== schoolId
+        );
+
+        if (!memberElsewhere) {
+          try {
+            await admin.auth().deleteUser(parentId);
+          } catch (err) {
+            functions.logger.warn(
+              `Could not delete Auth user ${parentId} — may not exist`,
+              err
+            );
+          }
+        } else {
+          functions.logger.info(
+            `Kept Auth account ${parentId} — still a parent at another school`
           );
         }
       } else {
