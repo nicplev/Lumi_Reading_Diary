@@ -17,7 +17,9 @@ class LumiPrimaryButton extends StatelessWidget {
   final bool isLoading;
   final bool isFullWidth;
   final Color? color;
+  final Color? foregroundColor;
   final BorderRadius? borderRadius;
+  final double elevation;
 
   const LumiPrimaryButton({
     super.key,
@@ -27,12 +29,15 @@ class LumiPrimaryButton extends StatelessWidget {
     this.isLoading = false,
     this.isFullWidth = false,
     this.color,
+    this.foregroundColor,
     this.borderRadius,
+    this.elevation = 2,
   });
 
   @override
   Widget build(BuildContext context) {
     final primaryColor = color ?? AppColors.rosePinkAccessible;
+    final resolvedForegroundColor = foregroundColor ?? AppColors.white;
     final shape = borderRadius != null
         ? RoundedRectangleBorder(borderRadius: borderRadius!)
         : LumiBorders.shapePill;
@@ -44,20 +49,23 @@ class LumiPrimaryButton extends StatelessWidget {
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryColor,
-          foregroundColor: AppColors.white,
+          foregroundColor: resolvedForegroundColor,
           disabledBackgroundColor: primaryColor.withValues(alpha: 0.4),
+          disabledForegroundColor:
+              resolvedForegroundColor.withValues(alpha: 0.55),
           padding: LumiPadding.button,
           shape: shape,
-          elevation: 2,
+          elevation: elevation,
           shadowColor: primaryColor.withValues(alpha: 0.3),
         ),
         child: isLoading
-            ? const SizedBox(
+            ? SizedBox(
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.white),
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(resolvedForegroundColor),
                 ),
               )
             : Row(
@@ -69,19 +77,23 @@ class LumiPrimaryButton extends StatelessWidget {
                   ],
                   Text(
                     text,
-                    style: LumiTextStyles.button(),
+                    style: LumiTextStyles.button(
+                      color: resolvedForegroundColor,
+                    ),
                   ),
                 ],
               ),
       ),
-    ).animate(
-      target: onPressed != null && !isLoading ? 1 : 0,
-    ).scale(
-      duration: 150.ms,
-      begin: const Offset(1, 1),
-      end: const Offset(0.98, 0.98),
-      curve: Curves.easeOut,
-    );
+    )
+        .animate(
+          target: onPressed != null && !isLoading ? 1 : 0,
+        )
+        .scale(
+          duration: 150.ms,
+          begin: const Offset(1, 1),
+          end: const Offset(0.98, 0.98),
+          curve: Curves.easeOut,
+        );
   }
 }
 
