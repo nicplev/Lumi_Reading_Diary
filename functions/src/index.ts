@@ -52,6 +52,7 @@ import {
   runReconcilePass,
 } from "./stats_aggregation";
 import {runStreakRefreshPass} from "./streak_refresh";
+import {runStateTermDatesFillPass} from "./term_dates_fallback";
 
 // App Check enforcement, opt-in via env var (default OFF). Matches
 // code_verification.ts / impersonation.ts — flip a flag only AFTER the client
@@ -2778,6 +2779,38 @@ export const reconcileStatsScheduled = onSchedule(
         error: err instanceof Error ? err.message : String(err),
       });
       await recordCronRun("reconcileStatsScheduled", "error",
+        err instanceof Error ? err.message : String(err));
+      throw err;
+    }
+    return;
+  });
+
+/**
+ * Daily state term-dates fallback: fills any term slot a school hasn't
+ * (validly) entered for its current local year from the official state
+ * dates, resolved via the school's address. Custom same-year (or
+ * future-year) entries are never touched. Runs 45 minutes before
+ * refreshStreaksDaily so freshly filled dates feed the same morning's
+ * streak recompute. See term_dates_fallback.ts.
+ */
+export const applyStateTermDates = onSchedule(
+  {
+    schedule: "45 3 * * *",
+    timeZone: "Australia/Sydney",
+    timeoutSeconds: 300,
+    memory: "256MiB",
+  },
+  async () => {
+    try {
+      const result = await runStateTermDatesFillPass();
+      functions.logger.info("State term-dates fill complete", result);
+      await recordCronRun("applyStateTermDates", "ok",
+        result.missingYearsNote ?? undefined);
+    } catch (err) {
+      functions.logger.error("State term-dates fill failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      await recordCronRun("applyStateTermDates", "error",
         err instanceof Error ? err.message : String(err));
       throw err;
     }
