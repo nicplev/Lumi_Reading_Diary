@@ -221,7 +221,16 @@ service cloud.firestore {
     }
 
     match /schools/{schoolId} {
-      allow list: if isSignedIn();
+      // No client `list`. A collection query returns full documents, and the
+      // school doc holds cross-tenant org/billing data (address, contactEmail,
+      // contactPhone, subscription, access). Any signed-in user could otherwise
+      // enumerate every school (security finding #5). `get` stays member-scoped.
+      // The only client that needed `list` was the login fallback for users
+      // missing from userSchoolIndex; it now resolves the school server-side via
+      // the resolveUserSchoolByUid callable (see login_screen.dart).
+      // DEPLOY AFTER: functions:resolveUserSchoolByUid is live AND the app build
+      // that uses it (removing the client /schools list) has shipped.
+      allow list: if false;
       allow get: if belongsToSchool(schoolId) || isDevImpersonatingSchool(schoolId);
 
       allow create: if isSignedIn() &&
