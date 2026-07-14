@@ -51,6 +51,7 @@ import {
   readIncrementalConfig,
   runReconcilePass,
 } from "./stats_aggregation";
+import {runStreakRefreshPass} from "./streak_refresh";
 
 // App Check enforcement, opt-in via env var (default OFF). Matches
 // code_verification.ts / impersonation.ts — flip a flag only AFTER the client
@@ -2777,6 +2778,38 @@ export const reconcileStatsScheduled = onSchedule(
         error: err instanceof Error ? err.message : String(err),
       });
       await recordCronRun("reconcileStatsScheduled", "error",
+        err instanceof Error ? err.message : String(err));
+      throw err;
+    }
+    return;
+  });
+
+/**
+ * Daily refresh of the day-sensitive student stats (currentStreak,
+ * restDaysRemaining, last30/last50 counts). Those fields are otherwise only
+ * recomputed on a log write or the weekly reconcile, so a streak that dies
+ * mid-week keeps displaying until Sunday. See streak_refresh.ts.
+ *
+ * 04:30 Sydney is past midnight in every Australian timezone year-round, so
+ * each school's "today" is already the new local day when it runs.
+ */
+export const refreshStreaksDaily = onSchedule(
+  {
+    schedule: "30 4 * * *",
+    timeZone: "Australia/Sydney",
+    timeoutSeconds: 540,
+    memory: "512MiB",
+  },
+  async () => {
+    try {
+      const result = await runStreakRefreshPass();
+      functions.logger.info("Daily streak refresh complete", result);
+      await recordCronRun("refreshStreaksDaily", "ok");
+    } catch (err) {
+      functions.logger.error("Daily streak refresh failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      await recordCronRun("refreshStreaksDaily", "error",
         err instanceof Error ? err.message : String(err));
       throw err;
     }
