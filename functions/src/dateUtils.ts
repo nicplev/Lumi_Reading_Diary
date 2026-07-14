@@ -34,7 +34,7 @@ const TERM_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
  * @param {unknown} v The raw value from the school document.
  * @return {string | null} "YYYY-MM-DD", or null if unparseable.
  */
-function coerceTermDateStr(v: unknown): string | null {
+export function coerceTermDateStr(v: unknown): string | null {
   if (typeof v === "string") {
     const m = v.match(/^\d{4}-\d{2}-\d{2}/);
     return m ? m[0] : null;
