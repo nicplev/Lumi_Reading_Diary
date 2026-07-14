@@ -412,8 +412,25 @@ export const enrollLinkedPhoneAsMfa = onCall(
       }
     }
 
+    // For a parent, the only legitimate reason we still have no link-code-
+    // derived school is an idempotent RETRY: the first run already consumed the
+    // link code (now `code-used`) AND created the parent membership. Accept the
+    // client `data.schoolId` ONLY when that membership already exists, so a
+    // caller cannot self-provision a bare parent membership at an arbitrary
+    // school by omitting or reusing a link code. (Teachers never reach this — a
+    // valid schoolCode is required above.)
+    let parentRetrySchoolId: string | null = null;
+    if (role === "parent" && !derivedSchoolId) {
+      const candidate = optStr(data?.schoolId);
+      if (candidate) {
+        const existing = await admin.firestore()
+          .doc(`schools/${candidate}/parents/${uid}`).get();
+        if (existing.exists) parentRetrySchoolId = candidate;
+      }
+    }
+
     const ctx: FinalizeContext | null = role ? {
-      schoolId: derivedSchoolId ?? optStr(data?.schoolId) ?? "",
+      schoolId: derivedSchoolId ?? parentRetrySchoolId ?? "",
       fullName: optStr(data?.fullName) ?? "",
       email: tokenEmail ?? optStr(data?.email),
       phoneE164: rawPhone,
@@ -808,8 +825,21 @@ export const finalizeParentSignup = onCall(
     const tokenEmail = optStr(
       (request.auth?.token as {email?: unknown} | undefined)?.email,
     );
+    // Same retry-only fallback guard as enrollLinkedPhoneAsMfa: accept a client
+    // data.schoolId ONLY when this uid already has a parent membership there
+    // (the idempotent-retry case), never for a fresh arbitrary school.
+    let parentRetrySchoolId: string | null = null;
+    if (!derivedSchoolId) {
+      const candidate = optStr(data?.schoolId);
+      if (candidate) {
+        const existing = await admin.firestore()
+          .doc(`schools/${candidate}/parents/${uid}`).get();
+        if (existing.exists) parentRetrySchoolId = candidate;
+      }
+    }
+
     const ctx: FinalizeContext = {
-      schoolId: derivedSchoolId ?? optStr(data?.schoolId) ?? "",
+      schoolId: derivedSchoolId ?? parentRetrySchoolId ?? "",
       fullName: optStr(data?.fullName) ?? "",
       email: tokenEmail ?? optStr(data?.email),
       phoneE164: rawPhone,
