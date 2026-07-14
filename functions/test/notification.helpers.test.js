@@ -7,6 +7,7 @@ const {
   validateNotificationAudience,
   mergeRecipientsByParent,
   mergePushTargetsByToken,
+  excludeAmbiguousPushTokenRecipients,
   isDueAt,
   isWithinQuietHours,
 } = require('../lib/notification_helpers.js');
@@ -110,6 +111,19 @@ test('mergePushTargetsByToken sends once per device and retains every parent own
       { token: 'device_b', parentIds: ['parent_3'] },
     ],
   );
+});
+
+test('excludeAmbiguousPushTokenRecipients suppresses account-specific pushes to shared tokens', () => {
+  const result = excludeAmbiguousPushTokenRecipients([
+    { parentId: 'parent_1', token: 'device_a' },
+    { parentId: 'parent_2', token: 'device_a' },
+    { parentId: 'parent_3', token: 'device_b' },
+  ]);
+
+  assert.deepEqual(result.suppressedTokens, ['device_a']);
+  assert.deepEqual(result.recipients, [
+    { parentId: 'parent_3', token: 'device_b' },
+  ]);
 });
 
 test('isDueAt only returns true once the scheduled time has passed', () => {

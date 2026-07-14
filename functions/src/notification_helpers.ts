@@ -46,6 +46,11 @@ export interface UniquePushTarget {
   parentIds: string[];
 }
 
+export interface UnambiguousPushRecipients<T extends PushTokenRecipient> {
+  recipients: T[];
+  suppressedTokens: string[];
+}
+
 interface QuietHoursShape {
   start?: string | null;
   end?: string | null;
@@ -205,6 +210,43 @@ export function mergePushTargetsByToken(
     token,
     parentIds: [...parentIds],
   }));
+}
+
+/**
+ * Removes targets that would receive account-specific content for more than
+ * one parent record. Unlike a school-wide campaign, a reading reminder names
+ * a family's children, so collapsing duplicate tokens to one arbitrary parent
+ * could disclose the wrong child's name on a shared or previously-used device.
+ *
+ * This is a defense-in-depth guard. The parent-token ownership trigger keeps
+ * the source records exclusive; this helper avoids a bad send while a token
+ * hand-off is still propagating.
+ * @param {T[]} recipients Parent records eligible for an account-specific push.
+ * @return {UnambiguousPushRecipients<T>} Safe recipients and suppressed tokens.
+ */
+export function excludeAmbiguousPushTokenRecipients<T extends PushTokenRecipient>(
+  recipients: T[],
+): UnambiguousPushRecipients<T> {
+  const ownersByToken = new Map<string, number>();
+
+  for (const recipient of recipients) {
+    const token = recipient.token?.trim();
+    if (!token) continue;
+    ownersByToken.set(token, (ownersByToken.get(token) ?? 0) + 1);
+  }
+
+  const suppressedTokens = [...ownersByToken.entries()]
+    .filter(([, ownerCount]) => ownerCount > 1)
+    .map(([token]) => token);
+  const suppressed = new Set(suppressedTokens);
+
+  return {
+    recipients: recipients.filter((recipient) => {
+      const token = recipient.token?.trim();
+      return !!token && !suppressed.has(token);
+    }),
+    suppressedTokens,
+  };
 }
 
 export function isDueAt(scheduledForMs: number | null | undefined, nowMs: number): boolean {

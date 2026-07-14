@@ -14,6 +14,7 @@ const sendgridSenderEmail = defineSecret("SENDGRID_SENDER_EMAIL");
 import {
   isDueAt,
   isWithinQuietHours,
+  excludeAmbiguousPushTokenRecipients,
   mergePushTargetsByToken,
   mergeRecipientsByParent,
   NotificationAudienceType,
@@ -1177,7 +1178,7 @@ export const dispatchScheduledNotificationCampaigns = onSchedule(
  *  2. Fetch parents with tokens — filter eligible in memory.
  *  3. Gather student IDs from eligible parents' linkedChildren (no full students read).
  *  4. Check which of those students logged today (batched `in` queries).
- *  5. Build ONE message per parent listing all un-logged children.
+ *  5. Build ONE message per unambiguous parent device listing un-logged children.
  *  6. Send via sendEach in 500-msg chunks.
  *  7. Clean up stale tokens.
  *
@@ -1214,15 +1215,13 @@ async function processSchool(
   if (parentsSnap.empty) return {sent: 0, failed: 0, stale: 0};
 
   // ---- Step 2: Filter eligible parents in memory ----
-  // Also collect ALL student IDs we need to check (from linkedChildren)
   interface EligibleParent {
-    id: string;
+    parentId: string;
     token: string;
     linkedChildren: string[]; // student IDs
   }
 
   const eligible: EligibleParent[] = [];
-  const allStudentIds = new Set<string>();
 
   for (const pDoc of parentsSnap.docs) {
     const p = pDoc.data();
@@ -1252,11 +1251,31 @@ async function processSchool(
     const children: string[] = p.linkedChildren ?? [];
     if (children.length === 0) continue;
 
-    eligible.push({id: pDoc.id, token: p.fcmToken, linkedChildren: children});
-    children.forEach((c) => allStudentIds.add(c));
+    eligible.push({parentId: pDoc.id, token: p.fcmToken, linkedChildren: children});
   }
 
   if (eligible.length === 0) return {sent: 0, failed: 0, stale: 0};
+
+  // A reading reminder contains child names, unlike a generic school campaign.
+  // Never choose an arbitrary record when a token is attached to multiple due
+  // parent accounts: suppress it until the ownership trigger resolves it.
+  const {
+    recipients: unambiguousParents,
+    suppressedTokens,
+  } = excludeAmbiguousPushTokenRecipients(eligible);
+  if (suppressedTokens.length > 0) {
+    functions.logger.warn("Suppressed ambiguous reading reminder device targets", {
+      schoolId,
+      tokenCount: suppressedTokens.length,
+    });
+  }
+  if (unambiguousParents.length === 0) return {sent: 0, failed: 0, stale: 0};
+
+  // Do not read a child's activity or name when their reminder is suppressed.
+  const allStudentIds = new Set<string>();
+  unambiguousParents.forEach((parent) => {
+    parent.linkedChildren.forEach((childId) => allStudentIds.add(childId));
+  });
 
   // ---- Step 3: Check which students logged today ----
   // Use batched `in` queries on readingLogs (max 30 per query).
@@ -1326,7 +1345,7 @@ async function processSchool(
   const messages: admin.messaging.TokenMessage[] = [];
   const msgParentIds: string[] = [];
 
-  for (const parent of eligible) {
+  for (const parent of unambiguousParents) {
     const unloggedIds = parent.linkedChildren.filter(
       (id) => !loggedToday.has(id) && studentNames.has(id),
     );
@@ -1365,7 +1384,7 @@ async function processSchool(
         notification: {sound: "default", clickAction: "FLUTTER_NOTIFICATION_CLICK"},
       },
     });
-    msgParentIds.push(parent.id);
+    msgParentIds.push(parent.parentId);
   }
 
   if (messages.length === 0) return {sent: 0, failed: 0, stale: 0};
@@ -1434,6 +1453,83 @@ export const syncParentReminderHour = onDocumentWritten(
     const desired = parseReminderHour(data.preferences?.reminderTime);
     if (data.reminderHour === desired) return;
     await event.data.after.ref.update({reminderHour: desired});
+  });
+
+/**
+ * An FCM token identifies an app installation, not a Lumi account. Make the
+ * most recently authenticated parent its sole owner, so a shared or
+ * account-switched device cannot receive another family's child-specific push.
+ * This server-side guard also protects older app versions that write the token
+ * directly to Firestore.
+ */
+export const enforceUniqueParentFcmToken = onDocumentWritten(
+  {document: "schools/{schoolId}/parents/{parentId}", concurrency: 10},
+  async (event) => {
+    if (!event.data?.after.exists) return;
+    const parentRef = event.data.after.ref;
+
+    const after = event.data.after.data() ?? {};
+    const token = typeof after.fcmToken === "string" ? after.fcmToken.trim() : "";
+    if (!token) return;
+
+    const before = event.data.before.exists ? event.data.before.data() ?? {} : {};
+    const previousToken = typeof before.fcmToken === "string" ? before.fcmToken.trim() : "";
+    const beforeUpdatedAt = before.fcmTokenUpdatedAt?.toMillis?.() ?? null;
+    const afterUpdatedAt = after.fcmTokenUpdatedAt?.toMillis?.() ?? null;
+
+    // A profile/preference write must not unexpectedly reclaim a token. Token
+    // registration updates fcmTokenUpdatedAt, while a new token differs from
+    // the prior value.
+    if (previousToken === token && beforeUpdatedAt === afterUpdatedAt) return;
+
+    const removedOwners = await db.runTransaction(async (transaction) => {
+      // Re-read within the transaction so out-of-order trigger delivery can
+      // never let an earlier sign-in evict a later sign-in from the same phone.
+      const claimant = await transaction.get(parentRef);
+      const claimedToken = typeof claimant.data()?.fcmToken === "string" ?
+        claimant.data()?.fcmToken.trim() : "";
+      if (!claimant.exists || claimedToken !== token) return 0;
+
+      const owners = await transaction.get(
+        db.collectionGroup("parents").where("fcmToken", "==", token),
+      );
+      if (owners.size < 2) return 0;
+
+      const newestOwner = owners.docs.reduce((newest, candidate) => {
+        const newestUpdatedAt = newest.data().fcmTokenUpdatedAt?.toMillis?.() ?? 0;
+        const candidateUpdatedAt = candidate.data().fcmTokenUpdatedAt?.toMillis?.() ?? 0;
+        if (candidateUpdatedAt !== newestUpdatedAt) {
+          return candidateUpdatedAt > newestUpdatedAt ? candidate : newest;
+        }
+        return candidate.ref.path > newest.ref.path ? candidate : newest;
+      });
+      if (newestOwner.ref.path !== claimant.ref.path) return 0;
+
+      const staleOwners = owners.docs.filter((doc) => doc.ref.path !== claimant.ref.path);
+      // Firestore transactions allow at most 500 writes. Requiring an
+      // implausibly large duplicate set to be remediated manually is safer
+      // than partially changing ownership.
+      if (staleOwners.length > 499) {
+        functions.logger.error("Too many duplicate FCM token owners to clear atomically", {
+          tokenOwnerCount: owners.size,
+        });
+        return 0;
+      }
+
+      for (const owner of staleOwners) {
+        transaction.update(owner.ref, {
+          fcmToken: admin.firestore.FieldValue.delete(),
+          fcmTokenUpdatedAt: admin.firestore.FieldValue.delete(),
+        });
+      }
+      return staleOwners.length;
+    });
+    if (removedOwners === 0) return;
+
+    functions.logger.warn("Removed duplicate parent FCM token ownership", {
+      schoolId: event.params.schoolId,
+      removedOwners,
+    });
   });
 
 /**
