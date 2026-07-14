@@ -16,12 +16,6 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.75.0(react@19.2.3))
-      '@lumi/server-ops':
-        specifier: workspace:*
-        version: link:../packages/server-ops
-      '@lumi/types':
-        specifier: workspace:*
-        version: link:../packages/types
       '@react-pdf/renderer':
         specifier: ^4.5.1
         version: 4.5.1(react@19.2.3)
@@ -83,6 +77,12 @@ importers:
         specifier: ^4.3.6
         version: 4.4.3
     devDependencies:
+      '@lumi/server-ops':
+        specifier: workspace:*
+        version: link:../packages/server-ops
+      '@lumi/types':
+        specifier: workspace:*
+        version: link:../packages/types
       '@tailwindcss/postcss':
         specifier: ^4
         version: 4.3.0
