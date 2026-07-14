@@ -6,11 +6,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/config/dev_access.dart';
 import '../../core/services/dev_access_service.dart';
+import '../../core/services/functions_instance.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 import '../../core/widgets/lumi/lumi_buttons.dart';
@@ -317,57 +319,38 @@ class _LoginScreenState extends State<LoginScreen> {
               userSchoolId = schoolId;
             }
           } else {
-            // Fallback: Index not found (existing users before optimization)
-            // Iterate through schools (legacy behavior for backward compatibility)
-            final schoolsSnapshot =
-                await _firebaseService.firestore.collection('schools').get();
+            // Fallback: not in the email index yet. Resolve the school
+            // SERVER-SIDE via a Cloud callable instead of listing the whole
+            // /schools collection client-side — that client `list` required an
+            // over-broad rule that exposed every school's contact/subscription
+            // data cross-tenant (security finding #5). The callable finds this
+            // uid's own membership and backfills the index for next time.
+            try {
+              final resolve = await lumiFunctions
+                  .httpsCallable('resolveUserSchoolByUid')
+                  .call<Map<String, dynamic>>();
+              final data =
+                  Map<String, dynamic>.from(resolve.data as Map? ?? const {});
+              final schoolId = data['schoolId'] as String?;
+              final userType = (data['userType'] as String?) ?? 'user';
 
-            for (final schoolDoc in schoolsSnapshot.docs) {
-              final schoolId = schoolDoc.id;
-
-              // Try to find user in this school's users collection
-              final userDoc = await _firebaseService.firestore
-                  .collection('schools')
-                  .doc(schoolId)
-                  .collection('users')
-                  .doc(userCredential.user!.uid)
-                  .get();
-
-              if (userDoc.exists) {
-                user = UserModel.fromFirestore(userDoc);
-                userSchoolId = schoolId;
-
-                // Backfill the index for this user for future logins
-                await indexService.createOrUpdateIndex(
-                  email: email,
-                  schoolId: schoolId,
-                  userType: 'user',
-                  userId: userCredential.user!.uid,
-                );
-                break;
+              if (schoolId != null && schoolId.isNotEmpty) {
+                final collectionName =
+                    userType == 'parent' ? 'parents' : 'users';
+                final memberDoc = await _firebaseService.firestore
+                    .collection('schools')
+                    .doc(schoolId)
+                    .collection(collectionName)
+                    .doc(userCredential.user!.uid)
+                    .get();
+                if (memberDoc.exists) {
+                  user = UserModel.fromFirestore(memberDoc);
+                  userSchoolId = schoolId;
+                }
               }
-
-              // Also check parents collection
-              final parentDoc = await _firebaseService.firestore
-                  .collection('schools')
-                  .doc(schoolId)
-                  .collection('parents')
-                  .doc(userCredential.user!.uid)
-                  .get();
-
-              if (parentDoc.exists) {
-                user = UserModel.fromFirestore(parentDoc);
-                userSchoolId = schoolId;
-
-                // Backfill the index for this user for future logins
-                await indexService.createOrUpdateIndex(
-                  email: email,
-                  schoolId: schoolId,
-                  userType: 'parent',
-                  userId: userCredential.user!.uid,
-                );
-                break;
-              }
+            } on FirebaseFunctionsException catch (_) {
+              // not-found / unauthenticated → leave user null and fall through
+              // to the last-resort top-level users check below.
             }
           }
 
