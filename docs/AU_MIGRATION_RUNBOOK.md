@@ -87,8 +87,9 @@ These drive the plan; the original "repoint config" estimate missed several of t
 9. **CI deploys the admin portal** (`.github/workflows/admin-deploy.yml`) and hardcodes:
    project ID, auth domain, storage bucket, sender ID (in the "Write admin/.env.production"
    step), `projectId: lumi-kakakids`, `target: admin`, and the GH secrets
-   `FIREBASE_SERVICE_ACCOUNT_LUMI_KAKAKIDS`, `FIREBASE_SERVICE_ACCOUNT_KEY`,
-   `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_APP_ID` (Phase 6.3).
+   `FIREBASE_SERVICE_ACCOUNT_LUMI_KAKAKIDS`, `NEXT_PUBLIC_FIREBASE_API_KEY`,
+   `NEXT_PUBLIC_FIREBASE_APP_ID` (Phase 6.3). The portal runtime uses ADC; a
+   separate Admin SDK JSON secret must not be written into `.env.production`.
    `admin-ci.yml` uses dummy values — no change.
 
 10. **Out of scope / unaffected:** Cloudflare status worker (`.dart_define.json` →
@@ -248,9 +249,11 @@ The `flutter` block is rewritten by flutterfire — don't hand-edit.
 
 ### 2.6 admin (super-admin portal)
 
-- `.env.local` — new values for the six `NEXT_PUBLIC_FIREBASE_*` keys, new base64
-  `FIREBASE_SERVICE_ACCOUNT_KEY` (Phase 3), and add `FUNCTIONS_REGION=australia-southeast1`
-  (consumed at `src/lib/callDeployedCallable.ts:7`). Keep `SESSION_COOKIE_MAX_AGE`.
+- `.env.local` — new values for the six `NEXT_PUBLIC_FIREBASE_*` keys and add
+  `FUNCTIONS_REGION=australia-southeast1` (consumed at
+  `src/lib/callDeployedCallable.ts:7`). Keep `SESSION_COOKIE_MAX_AGE`. Firebase
+  Admin uses Application Default Credentials; do not add a JSON key to the
+  Next build environment.
 - `.env.example` — update placeholder project values to match, add `FUNCTIONS_REGION`.
 - Optional hardening: change the `callDeployedCallable.ts:7` default from `"us-central1"` to
   `"australia-southeast1"` so a missing env var can't silently point at the wrong region.
@@ -266,16 +269,13 @@ The `flutter` block is rewritten by flutterfire — don't hand-edit.
 
 ## Phase 3 — Service accounts & keys (~15 min)
 
-1. Console (new project) → Project settings → Service accounts → **Generate new private key**
-   → save as e.g. `~/keys/lumi-ninc-au-admin.json` (outside the repo!).
-2. Base64 for the admin portal:
-   ```bash
-   base64 -i ~/keys/lumi-ninc-au-admin.json | tr -d '\n' | pbcopy
-   ```
-   → paste into `admin/.env.local` `FIREBASE_SERVICE_ACCOUNT_KEY` (and later the GH secret).
-3. `school-admin-web/.env.local` → `FIREBASE_ADMIN_SERVICE_ACCOUNT_PATH=~/keys/lumi-ninc-au-admin.json`
-   (or however it's pathed today).
-4. For local gcloud work below: `gcloud auth login` with the account that owns both projects.
+1. Cloud Run/Functions workloads use their attached service accounts through
+   Application Default Credentials. Do not generate or inject JSON keys into
+   either portal build.
+2. For local Admin SDK work, use `gcloud auth application-default login` and
+   set the quota project to `lumi-ninc-au` where required.
+3. For local gcloud work below: `gcloud auth login` with the account that owns
+   both projects.
 
 ---
 
@@ -462,8 +462,8 @@ The widget-config bug aside, test push + audio on a **real device** (Simulator d
    roles and writes the secret), then discard the workflow files it generates and delete any
    extra secret names it created beyond the one you keep.
 2. Update repo secrets: new `FIREBASE_SERVICE_ACCOUNT_LUMI_NINC_AU` (deploy SA JSON),
-   `FIREBASE_SERVICE_ACCOUNT_KEY` (base64 admin SA from Phase 3),
    `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_APP_ID` (new web app values).
+   Do not add an Admin SDK runtime key; the deployed portal uses ADC.
 3. Edit the workflow: the hardcoded `.env.production` block (auth domain, project ID, storage
    bucket, sender ID), `firebaseServiceAccount:` secret name, `projectId: lumi-ninc-au`.
    `target: admin` stays (it's the target alias, resolved via `.firebaserc`).
