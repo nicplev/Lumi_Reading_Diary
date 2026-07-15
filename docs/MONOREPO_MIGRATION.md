@@ -8,16 +8,15 @@
 
 ```yaml
 current_phase: done
-current_phase_name: "Monorepo migration complete; two purely-additive follow-ups outstanding"
+current_phase_name: "Monorepo migration complete; additive follow-ups tracked"
 last_completed_step: "7.6"
 last_action_at: "2026-05-15"
 last_action_summary: "Phase 7 closed. PR #8 merged with `--merge` (commit `2676e60`); `post-monorepo-merge` tag pushed; local `lumi-admin-src` remote removed; `nicplev/lumi-admin` standalone GitHub repo archived (read-only, reversible via repo Settings)."
 blockers: []
 followups:
-  - "Move FIREBASE_SERVICE_ACCOUNT_KEY out of the Cloud Run env into Firebase Functions Secret Manager. Currently it's baked into admin/.env.production at deploy-time and ends up as a plaintext env var on the Cloud Run service — visible to anyone with Cloud Run viewer. Migrating to `firebase functions:secrets:set` + `frameworksBackend.secretEnv` is the proper play."
+  - "RESOLVED 2026-07-15: super-admin now uses the Cloud Run attached identity through ADC; FIREBASE_SERVICE_ACCOUNT_KEY was removed from code and the deploy bundle instead of being moved to another long-lived secret."
   - "Optional: separate prod Hosting site (current `lumi-dev-admin` is implicitly dev-flavoured). Would need a second `firebase target:apply hosting prod <new-site-id>` and a parallel deploy workflow gated on a release tag."
   - "admin is pinned to Next.js 16.0.11 because firebase-tools' web-frameworks adapter supports only Next ≤16.0. Re-bump to 16.1+ once firebase-tools' adapter advertises support (watch the 'known to work with Next.js version 12 - 16.0' line in deploy logs)."
-  - "Stray leading space in the `.env.local` `FIREBASE_SERVICE_ACCOUNT_KEY=` line (cosmetic — dotenv trims it; the GH secret carries it harmlessly). Tidy when convenient."
 chosen_layout: "flat"
 phase5_scope:
   sequencing: "one commit per route, straight through (no pause between routes)"

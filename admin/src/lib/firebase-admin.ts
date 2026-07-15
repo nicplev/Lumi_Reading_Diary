@@ -1,5 +1,5 @@
 import "server-only";
-import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
+import { getApps, initializeApp, type App } from "firebase-admin/app";
 import { getAuth, type Auth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { getStorage, type Storage } from "firebase-admin/storage";
@@ -13,17 +13,12 @@ function getApp(): App {
     return _app;
   }
 
-  const base64 = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (!base64) {
-    throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY env var is not set");
-  }
-
-  const serviceAccount = JSON.parse(
-    Buffer.from(base64, "base64").toString("utf-8")
-  );
-
+  // Use the runtime's attached service account in Cloud Run/Functions. Local
+  // development should use `gcloud auth application-default login`. Keeping a
+  // base64 JSON key in Next build configuration copies a permanent private
+  // key into the deployment bundle and is unnecessary on Google Cloud.
   _app = initializeApp({
-    credential: cert(serviceAccount),
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? "lumi-ninc-au",
     // Default bucket so no-arg storage.bucket() resolves — the
     // @lumi/server-ops comprehension-audio delete paths rely on it.
     storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,

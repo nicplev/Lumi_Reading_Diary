@@ -86,15 +86,15 @@ jobs:
           } > admin/.npmrc
 
       # The Next.js build needs every NEXT_PUBLIC_* it'll embed in the client
-      # bundle, and the Admin SDK needs FIREBASE_SERVICE_ACCOUNT_KEY at
-      # runtime. Public Firebase config values that are project identifiers
-      # (not secrets) are inlined; the credential and the API/App ids come
-      # from GH secrets so they're never committed.
+      # bundle. The Admin SDK uses the Cloud Run runtime's attached service
+      # account via ADC; never copy a JSON private key into this build file.
+      # The public API/App ids come from GH secrets so configuration remains
+      # managed in one place even though Firebase client identifiers are not
+      # credentials.
       - name: Write admin/.env.production
         env:
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
           NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
-          FIREBASE_SERVICE_ACCOUNT_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
         run: |
           {
             echo "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=lumi-ninc-au.firebaseapp.com"
@@ -105,7 +105,6 @@ jobs:
             echo "SESSION_COOKIE_MAX_AGE=432000"
             echo "NEXT_PUBLIC_FIREBASE_API_KEY=${NEXT_PUBLIC_FIREBASE_API_KEY}"
             echo "NEXT_PUBLIC_FIREBASE_APP_ID=${NEXT_PUBLIC_FIREBASE_APP_ID}"
-            echo "FIREBASE_SERVICE_ACCOUNT_KEY=${FIREBASE_SERVICE_ACCOUNT_KEY}"
           } > admin/.env.production
 
       - name: Deploy to Firebase Hosting (admin)
