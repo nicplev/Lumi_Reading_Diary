@@ -17,8 +17,8 @@
 
 ### 2026-07-15 — hardening implementation started
 
-- **Current item:** P1-7 secret-history/artifact scanning, followed by remaining in-repo P1 controls; P0-1/P0-5 now need only live App Check/IAM/on-device evidence and the full media-decoder decision, while P0-7 still needs a canary deployment.
-- **Status:** P0-2, P0-3, P0-4, P0-6, P0-8, P1-2, P1-6 and P1-8 are complete; P0-1/P0-5/P0-7 are partially implemented. Privileged audio operations derive the canonical path, cleanup quarantines mismatches, playback/upload fail closed on the recording flag, and App Check options are wired behind `COMPREHENSION_AUDIO_APP_CHECK_ENFORCED`. Client uploads require the owning parent + canonical metadata; `confirmComprehensionAudioUpload` verifies metadata plus the ISO-media byte signature and is the only client-reachable path that stamps server-owned audio receipt fields. The audio handler and real Auth/Functions HTTP emulator paths now have end-to-end negative coverage. Teacher access and client queries are class-scoped, reading-log identity/system fields are immutable, create schemas validate optional values, proxy child/class mismatch is denied, log IDs are random 128-bit values, and comments are schema-checked against their authoritative parent log. Parent memberships can no longer be self-created and public demo enquiries now pass through the App-Check-ready, durably rate-limited `submitDemoRequest` callable; direct client access to `schoolOnboarding` is denied. Mutable portal routes now fail closed if current membership cannot be verified, legacy `/users` writes are terms-only, and mobile dev-access lookup no longer exposes an email-hash oracle. Dangerous client provisioning and checked-in demo passwords are absent from the release APK. Functions and portal production dependency trees now have zero critical/high advisories.
+- **Current item:** P1-7 live credential restrictions/rotation and P1-3 analytics privacy, followed by the remaining external/on-device controls; P0-1/P0-5 still need live App Check/IAM/on-device evidence and the full media-decoder decision.
+- **Status:** P0-2, P0-3, P0-4, P0-6, P0-7, P0-8, P1-2, P1-5, P1-6 and P1-8 are complete; P0-1/P0-5/P1-4/P1-7 are partially implemented. Privileged audio operations derive the canonical path, cleanup quarantines mismatches, playback/upload fail closed on the recording flag, and App Check options are wired behind `COMPREHENSION_AUDIO_APP_CHECK_ENFORCED`. Client uploads require the owning parent + canonical metadata; `confirmComprehensionAudioUpload` verifies metadata plus the ISO-media byte signature and is the only client-reachable path that stamps server-owned audio receipt fields. The audio handler and real Auth/Functions HTTP emulator paths now have end-to-end negative coverage. Teacher access and client queries are class-scoped, reading-log identity/system fields are immutable, create schemas validate optional values, proxy child/class mismatch is denied, log IDs are random 128-bit values, and comments are schema-checked against their authoritative parent log. Parent memberships can no longer be self-created and public demo enquiries now pass through the App-Check-ready, durably rate-limited `submitDemoRequest` callable; direct client access to `schoolOnboarding` is denied. Mutable portal routes now fail closed if current membership cannot be verified, legacy `/users` writes are terms-only, and mobile dev-access lookup no longer exposes an email-hash oracle. Incremental student/class aggregation is live and fully reconciled; class query batching and local-day removal checks now respect Firestore limits and Australian DST. Dangerous client provisioning and checked-in demo passwords are absent from the release APK. Functions and portal production dependency trees have zero critical/high advisories.
 - **Working rule:** changes are being made in checklist order; each completed checkbox will include the verification command/result here or under the item.
 - **Baseline before edits:** Firestore rules 125/125, Storage rules 6/6, Functions 109/109, targeted Flutter offline/log tests 40/40. Functions dependency audit: 2 critical, 7 high, 12 moderate, 1 low.
 - **Verification so far:** `cd functions && npm run test:functions` → **116/116 passed**; `npm run test:rules` → **136/136 passed**; `npm run test:rules:storage` → **11/11 passed**; `npm run test:audio:integration` → **7/7 passed**; `npm run test:audio:http` → **4/4 passed**; `npm run test:audio:appcheck` → **1/1 passed**; `npm run test:deletion:integration` → **2/2 passed**; targeted Flutter audio/offline tests → **38/38 passed**. Functions build and lint pass (8 existing warnings, 0 errors), and the production dependency audit has **0 critical/high** advisories (8 moderate). Earlier targeted Flutter service/screen suite → **50/50 passed**, onboarding/callable migration suite → **28/28 passed**, mobile dev-access suite → **2/2 passed**, and portal session-policy suite → **2/2 passed**. The Next 15.5.20 production build succeeds. `flutter analyze --no-fatal-infos` → no errors/warnings (**123 existing info lints**). The broad Flutter run reports **400 passed / 8 unrelated UI-test failures**: stale finders in feelings tracker, splash, teacher assignment card, comment chips and week progress bar, plus a pending toast timer in the awards test. Android release APK builds successfully and provisioning/password/private-key scans are clean. `git diff --check` and the redacted Gitleaks working-diff scan are clean.
@@ -65,6 +65,15 @@
 - **Decision:** Conditional technical GO for the Australian `long` model path; **NO-GO for production/school processing**. No child audio was tested. Representative authorised recordings, teacher accuracy review, approved PIA/notice/opt-out/no-backfill rules, Anthropic DPA/APP 8/retention/ZDR and cost controls remain release blockers. Full evidence and the working PIA are in `docs/AI_EVALUATION_PLAN.md`.
 - **Resume point:** Finish the open Phase 0 gates in `docs/AI_COMPREHENSION_EVAL_CHECKLIST.md`. Do not deploy a provider-connected pipeline or set the kill switch true.
 
+### 2026-07-15 — incremental statistics audit, repair and production reconcile
+
+- **Production audit:** `platformConfig/incrementalAggregation` already had `studentStats:true` and `classStats:true`. All 52 sampled production students had `stats.readingDates`; all 14 classes had `stats.activeStudentIds`. Since the flag update, each hot-path function handled 1,089 HTTP 200 event deliveries with zero error entries.
+- **Backfill defect found:** The 12 July scheduled reconcile logged one per-class `INVALID_ARGUMENT` while still recording overall completion. The class query combined 30 student IDs with two statuses, producing 60 normalized disjunctions above Firestore's maximum of 30. The cursor still wrapped to null, so that class would remain stale until another successful pass.
+- **Fix:** Both legacy and self-heal class recomputation now share 15-ID batches. Incremental removal checks also convert the school-local reading date to an exclusive UTC range using the school timezone, including Melbourne/Sydney DST transitions, instead of treating local midnight as UTC.
+- **Verification:** Functions build and tests pass **123/123**; lint has zero errors and the same eight existing warnings; Firestore rules pass **145/145**; focused Flutter offline queue tests pass **34/34**. Regression tests cover the compound-query budget, Melbourne 23/25-hour DST days, a Sydney summer day and invalid-timezone fallback.
+- **Production result:** `aggregateStudentStats`, `updateClassStats` and `reconcileStatsScheduled` were updated in `australia-southeast1`. A controlled scheduled reconcile then processed **52 students and 14 classes with zero error entries**; the student/class cursors both returned to null. P1-5 is complete.
+- **Remaining offline work:** Server receipt timestamps, date bounds, write allowlists, idempotent IDs and parked permission-denied UI state exist and are tested. P1-4 remains partial until concurrent parent/teacher edit behavior and the full airplane-mode → access-revocation → reconnect experience are exercised on physical devices.
+
 ---
 
 ## Current implementation verdict (plain English)
@@ -79,7 +88,7 @@ Lumi is still **not ready to hold production children's data** until the remaini
 | Cloud Storage | 🟢 rules / 🟠 controls | Active rule hash matches local; full decode and live App Check/IAM/on-device evidence remain. |
 | Children's privacy | 🟠 | Account/student deletion is deployed and emulator-verified; analytics is still auto-on and UID-linked before consent. |
 | App Check | 🟠 | Wired into every sensitive fn, enforcement defaults off everywhere. |
-| Offline sync | 🟡 | Server streaks sound; offline client dates + last-write-wins can corrupt stats. |
+| Offline sync | 🟡 | Server receipt/date bounds, durable queue and AU/DST stats are covered; concurrent-edit and physical reconnect UX still need device testing. |
 | Scaling & cost | 🟡 | ~3–4 reads/write in rules; unbounded portal queries; no budget alert. |
 | Ops | 🟠 | Force-update + crash reporting exist; no evidenced backups/PITR/budget/incident readiness. |
 
@@ -174,13 +183,13 @@ No anonymous Firestore/Storage data path was found in the active rules. Public e
 - **Verify:**
   - [x] Test: comment denied when its child/parent doesn't match the containing log. *(Also denies extra fields; Firestore Emulator 131/131.)*
 
-### `[~]` P0-7 · Vulnerable production dependencies in Cloud Functions
+### `[x]` P0-7 · Vulnerable production dependencies in Cloud Functions
 - **Severity:** High
 - **Why:** `npm audit --omit=dev` in `functions/` (15 Jul 2026) = **22 advisories: 2 critical, 7 high, 12 moderate, 1 low**. Critical chains: `fast-xml-parser`, `protobufjs`; high: `@grpc/grpc-js`, Axios, `jws`, `node-forge`, Express/path-matching, `form-data`. Internet-facing privileged functions shouldn't ship an untriaged critical tree.
 - **Where:** `functions/` dependency tree.
 - **Fix:**
   - [x] Upgrade supported Firebase/Admin + direct packages; review breaking changes; rebuild. *(A non-breaking lockfile refresh removed the vulnerable transitive chains; Firebase Admin's remaining major upgrade is tracked for the 8 moderate findings.)*
-  - [~] Re-run `npm audit`; run all function/rules tests; canary deploy. *(Audit + tests/build pass; canary deploy remains an external release action.)*
+  - [x] Re-run `npm audit`; run all function/rules tests; canary deploy. *(Audit + tests/build pass. The refreshed bundle was canary-deployed through security Functions in Phase 1 and the statistics Functions in P1-4/P1-5; all are active.)*
   - [x] Re-run the portal audit with a working registry (pnpm endpoint returned HTTP 410 — not "clean"). *(Generated a temporary npm lock for audit compatibility, upgraded Next 15.5.7 → 15.5.20, and rebuilt successfully.)*
 - **Verify:**
   - [x] `npm audit --omit=dev` shows 0 critical/high (or documented, unreachable exceptions); full suite green. *(Functions: 8 moderate, 0 high/critical; portal: 2 moderate, 0 high/critical.)*
@@ -237,25 +246,25 @@ No anonymous Firestore/Storage data path was found in the active rules. Public e
 - **Verify:**
   - [ ] Runtime capture confirms no child data leaves before consent; labels/policy match traffic.
 
-### `[ ]` P1-4 · Offline: server receipt time, validated local dates, conflict policy
+### `[~]` P1-4 · Offline: server receipt time, validated local dates, conflict policy
 - **Severity:** Medium
-- **Why:** Logging uses `DateTime.now()` for dates/timestamps/IDs; rules don't bound the date vs server time; Firestore mobile offline = last-write-wins with no explicit conflict policy for concurrent parent/teacher edits. Also incremental stats build UTC-midnight bounds from a *school-local* date (`stats_aggregation.ts:324-335`), which for Melbourne/Sydney can query the wrong local-day window and drop a date that still has another log.
+- **Why:** The original implementation used client time for audit fields, lacked date bounds, silently dropped failed queue items and treated a school-local date as UTC during incremental removals. Those paths are repaired. The remaining risk is product-level concurrent parent/teacher edit policy plus real-device reconnect UX.
 - **Where:** `lib/services/reading_log_service.dart`; `functions/src/stats_aggregation.ts:324-335`.
 - **Fix:**
-  - [ ] Store a trusted `receivedAt` server timestamp; keep a separate validated local reading date with an allowed backdate/future-skew window.
-  - [ ] Define which fields may be edited by whom; use idempotency IDs; surface rejected queued writes.
-  - [ ] Convert school-local day boundaries to UTC using the school timezone; add DST regression tests.
+  - [x] Store a trusted `receivedAt` server timestamp; keep a separate validated local reading date with an allowed backdate/future-skew window. *(`createdAt` is the server receipt timestamp and must equal `request.time`; the user-selected `date` is separately bounded to 366 days back / 1 day forward.)*
+  - [~] Define which fields may be edited by whom; use idempotency IDs; surface rejected queued writes. *(Rules enforce identity/system-field immutability and content allowlists; random 128-bit log IDs make replays idempotent; server receipts prevent silent drops; persistent denials park and surface in service status. The explicit concurrent parent/teacher policy and real-device UX test remain.)*
+  - [x] Convert school-local day boundaries to UTC using the school timezone; add DST regression tests. *(Exclusive UTC bounds now cover 23/25-hour Melbourne DST days and Sydney summer time.)*
 - **Verify:**
-  - [ ] Tests: dates around Melbourne/Sydney midnight + DST preserve the correct local streak; offline write made before access revocation is rejected and clearly surfaced after reconnect.
+  - [~] Tests: dates around Melbourne/Sydney midnight + DST preserve the correct local streak; offline write made before access revocation is rejected and clearly surfaced after reconnect. *(Date/stats unit tests, Firestore revocation denials 145/145 and offline permission-denied parking 34/34 pass. Repeat the combined scenario on physical iOS/Android before marking complete.)*
 
-### `[ ]` P1-5 · Confirm incremental-aggregation flags + backfill before load
+### `[x]` P1-5 · Confirm incremental-aggregation flags + backfill before load
 - **Severity:** Medium (cost/correctness)
 - **Why:** Config defaults to legacy/full recomputation when flags are missing; legacy triggers can query *all* logs for a student/class after each write.
 - **Where:** `functions/src/stats_aggregation.ts` (flag `platformConfig/incrementalAggregation`).
 - **Fix:**
-  - [ ] Confirm prod flags + backfill are enabled before load.
+  - [x] Confirm prod flags + backfill are enabled before load. *(Both production flags are true. Seed fields were present on all 52 students and 14 classes checked; a controlled full reconcile completed after repairing the compound-query batch bug.)*
 - **Verify:**
-  - [ ] Console/flag read shows incremental on; spot-check a write triggers incremental, not full recompute.
+  - [x] Console/flag read shows incremental on; spot-check a write triggers incremental, not full recompute. *(Production flag read is true/true; each hot-path function processed 1,089 event deliveries with HTTP 200 and zero error entries after enablement; controlled reconcile processed 52 students/14 classes with zero errors and null completion cursors.)*
 
 ### `[x]` P1-6 · Lock down self-service tenant / parent / onboarding creation
 - **Severity:** Medium
