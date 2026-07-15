@@ -61,6 +61,7 @@
 - **Cost/capacity evidence:** Official V2 billing and observed requests use one-second upward rounding (1.35 s → 2 s; 6.23 s → 7 s). Live regional synchronous-recognition quota is 211 requests/minute versus planned `maxInstances=5`; this is enough for the spike, not a substitute for peak load testing.
 - **Safety evidence:** Added a synthetic-only adversarial transcript fixture covering injection, prompt exfiltration, off-topic answers, adult prompting, gibberish, empty speech, insufficient evidence and incidental personal information, plus an automated schema/coverage test.
 - **Repository verification:** Functions build and `npm run test:functions` pass **118/118**; lint has zero errors and the same eight existing non-null-assertion warnings. JSON validation and `git diff --check` pass.
+- **Repository reconciliation:** The isolated evidence/fixture slice is PR #391 from `ai/phase0-go-no-go`; squash-merge only after required CI passes.
 - **Decision:** Conditional technical GO for the Australian `long` model path; **NO-GO for production/school processing**. No child audio was tested. Representative authorised recordings, teacher accuracy review, approved PIA/notice/opt-out/no-backfill rules, Anthropic DPA/APP 8/retention/ZDR and cost controls remain release blockers. Full evidence and the working PIA are in `docs/AI_EVALUATION_PLAN.md`.
 - **Resume point:** Finish the open Phase 0 gates in `docs/AI_COMPREHENSION_EVAL_CHECKLIST.md`. Do not deploy a provider-connected pipeline or set the kill switch true.
 

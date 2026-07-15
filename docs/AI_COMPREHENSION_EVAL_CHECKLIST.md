@@ -26,6 +26,7 @@ Full design rationale, hostile-review resolutions, and pricing: `~/.claude/plans
 - `speech.googleapis.com` is enabled and the Functions runtime service account has only `roles/speech.client` for STT. Live regional quota is 211 synchronous requests/minute against the planned five-instance spike ceiling. Billing is per successful audio second rounded upward, confirmed by official pricing and observed 1.35 s → 2 s / 6.23 s → 7 s requests.
 - The permanent synthetic threat seed is `functions/test/fixtures/ai_evaluation_adversarial_transcripts.json`, with a schema/coverage test. It contains no real student content.
 - Phase 0 repository verification: `cd functions && npm run test:functions` → **118/118 passed**; build passed; lint passed with the same eight existing non-null-assertion warnings and no errors.
+- Phase 0 repository reconciliation: branch `ai/phase0-go-no-go`, PR #391. Squash-merge only after required CI passes.
 
 ### Resume point
 
