@@ -291,7 +291,7 @@ No anonymous Firestore/Storage data path was found in the active rules. Public e
 
 ## Verify outside the repo (console / IAM / ops — can't be proven from code)
 
-- `[x]` Deployed `firestore.rules` + `storage.rules` **exactly match** the reviewed local files. *(Rules API source hashes: Firestore local/remote `2698760b…502824`; Storage local/remote `10802186…825c`. Repository commit/PR reconciliation is still required.)*
+- `[x]` Deployed `firestore.rules` + `storage.rules` **exactly match** the reviewed source. *(Rules API source hashes: Firestore local/remote `2698760b…502824`; Storage local/remote `10802186…825c`. Source consolidated and squash-merged through PR #390 after Gitleaks CI passed.)*
 - `[ ]` App Check registration + metrics + enforcement (Firestore, Storage, Auth, Functions).
 - `[ ]` Firestore/Storage/Auth/Functions resource locations + cross-border support/data flows are AU.
 - `[ ]` Least-privilege IAM + service-account permissions.

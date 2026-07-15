@@ -11,11 +11,11 @@ Full design rationale, hostile-review resolutions, and pricing: `~/.claude/plans
 
 ### Session notes
 
-- The repository already has a large, security-hardening worktree in progress. Preserve those edits; do not reset or overwrite them.
+- The pre-existing security-hardening worktree was preserved and consolidated with this inert Phase 1 boundary in PR #390; no prior edits were reset or discarded.
 - Phase 0 contains account, billing, privacy, provider-contract and real-audio checks that cannot be honestly completed from the local repository. They remain prerequisites before enabling any AI entitlement or sending any child audio/transcript to a provider.
 - The safe local starting point is the inert portion of Phase 1: separate teacher-only evaluation documents, server-only job/config/cache collections, and rules regression tests. No STT or LLM dependencies/provider calls are being added in this slice.
 - `firestore.indexes.json` already contained one unrelated local-only reading-log index. A read-only production dump found 60 remote composite indexes and confirmed all 60 were already present locally before the AI indexes were added.
-- The house branch/PR checkbox remains open because the current worktree predates this slice and is not clean enough to split safely without first reconciling ownership of the existing changes.
+- Phase 1 repository reconciliation was completed on `security/hardening-ai-phase1-2026-07-15` and squash-merged through PR #390 after the Gitleaks CI check passed. Future phases must return to one phase per branch/PR.
 - Chosen server-only runtime config path: `aiEvalOpsConfig/runtime`. The signed-in client-readable kill-switch remains the single document `platformConfig/aiEvaluation`, and direct client writes to both paths are denied.
 - Local verification: `cd functions && npm run test:rules` → **145 passed, 0 failed** on 2026-07-15 (Java 21, Firebase CLI 15.23.0). The CLI printed the existing emulator project-ID mismatch warning; it did not affect the result.
 - Index/rule validation: `firebase deploy --only firestore:indexes --dry-run --project lumi-ninc-au` → **dry run complete**; index JSON accepted and `firestore.rules` compiled. This did not change production.
@@ -25,9 +25,9 @@ Full design rationale, hostile-review resolutions, and pricing: `~/.claude/plans
 
 ### Resume point
 
-1. Reconcile the broader dirty worktree into the required branch/PR workflow; do not discard existing hardening work.
-2. Complete the external Phase 0 go/no-go and privacy work before beginning any provider-connected pipeline or enabling a school.
-3. After Phase 0 passes, begin Phase 2 question denormalisation/enqueue on a new branch; keep both platform and school gates fail-closed.
+1. Complete the external Phase 0 go/no-go and privacy work before beginning any provider-connected pipeline or enabling a school.
+2. After Phase 0 passes, begin Phase 2 question denormalisation/enqueue on a new branch; keep both platform and school gates fail-closed.
+3. Keep each later phase isolated to its own PR and update this handoff with test/deployment evidence before merging.
 
 **Ground rules (apply to every phase):**
 - [ ] Every phase = its own branch → PR → squash-merge (house workflow)
@@ -72,7 +72,7 @@ Full design rationale, hostile-review resolutions, and pricing: `~/.claude/plans
 
 ## Phase 1 — Rules + indexes + rules tests (PR 1, deploys inert)
 
-- [ ] Reconcile uncommitted working-tree churn in `firestore.rules` + `firestore.indexes.json` (PRs #382–386 are already MERGED — re-pin all line refs against HEAD)
+- [x] Reconcile uncommitted working-tree churn in `firestore.rules` + `firestore.indexes.json` — consolidated and squash-merged through PR #390 after CI passed
 - [x] `firestore.rules`: `schools/{s}/comprehensionEvals/{logId}` — `get,list` for schoolAdmin/impersonation; `get,list` for teacher via `teacherTeachesClass(schoolId, resource.data.classId)`; **no parent clause**; `create,update,delete: if false`
 - [x] Deny-all blocks: `aiEvalJobs`, `aiQuestionClassifications`, `aiEvalOpsConfig`, `schools/*/adminMeta/*`
 - [x] Rules tests (`functions/test/firestore.rules.test.js`) — full suite: **145 passed, 0 failed**:
