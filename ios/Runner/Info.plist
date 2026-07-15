@@ -18,6 +18,11 @@
 	     this skips App Store Connect's encryption question on every upload. -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!-- Privacy-by-default: Dart enables either SDK only after an adult opts in. -->
+	<key>FIREBASE_ANALYTICS_COLLECTION_ENABLED</key>
+	<false/>
+	<key>FirebaseCrashlyticsCollectionEnabled</key>
+	<false/>
 	<key>CFBundleName</key>
 	<string>lumi_reading_tracker</string>
 	<key>CFBundlePackageType</key>

@@ -10,7 +10,6 @@ import '../../data/providers/user_provider.dart';
 import '../../services/firebase_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/analytics_service.dart';
-import '../../services/crash_reporting_service.dart';
 import '../../services/phone_verification_recovery_service.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -83,12 +82,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             .timeout(const Duration(seconds: 10));
 
         if (user != null && mounted) {
-          // Set analytics & crash reporting user context
-          AnalyticsService.instance.setUserId(user.id);
-          AnalyticsService.instance.setUserRole(user.role.name);
+          // Optional analytics is deliberately pseudonymous. Never attach the
+          // Firebase UID, child identity, school or account role.
           AnalyticsService.instance.logAppOpened(role: user.role.name);
-          CrashReportingService.instance.setUserId(user.id);
-          CrashReportingService.instance.setCustomKey('role', user.role.name);
 
           // Register the FCM token + flush any pending refresh. No-op for
           // non-parents or users without a school.

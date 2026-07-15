@@ -27,6 +27,7 @@ import 'services/isbn_assignment_service.dart';
 import 'services/notification_service.dart';
 import 'services/crash_reporting_service.dart';
 import 'services/analytics_service.dart';
+import 'services/diagnostics_preferences_service.dart';
 import 'services/phone_verification_recovery_service.dart';
 import 'services/teacher_device_book_cache_service.dart';
 import 'services/widget_data_service.dart';
@@ -60,7 +61,6 @@ void main() async {
     },
   );
 }
-
 /// The critical init chain. Idempotent so the [BootstrapErrorApp] retry can
 /// re-run it after a partial failure: Firebase.initializeApp is guarded on
 /// Firebase.apps, FirebaseService/NotificationService/Analytics guard
@@ -146,8 +146,28 @@ Future<void> _initializeCore() async {
       // No-op unless built with --dart-define=LUMI_APP_CHECK_ENABLED=true.
       await AppCheckService.initialize();
 
-      // Initialize crash reporting (must be after Firebase init)
-      await CrashReportingService.instance.initialize();
+      // Optional diagnostics are fail-closed and device-local. A missing or
+      // unreadable preference means both SDKs stay disabled.
+      DiagnosticsPreferences diagnosticsPreferences;
+      try {
+        diagnosticsPreferences =
+            await DiagnosticsPreferencesService.instance.load();
+      } catch (e) {
+        debugPrint('Warning: diagnostics preferences unavailable: $e');
+        diagnosticsPreferences = const DiagnosticsPreferences(
+          analyticsEnabled: false,
+          crashReportsEnabled: false,
+        );
+      }
+
+      // Apply the choices immediately after Firebase/App Check startup. Native
+      // mobile defaults are also off, so a fresh install cannot race this gate.
+      await CrashReportingService.instance.initialize(
+        collectionEnabled: diagnosticsPreferences.crashReportsEnabled,
+      );
+      await AnalyticsService.instance.initialize(
+        collectionEnabled: diagnosticsPreferences.analyticsEnabled,
+      );
 
       // Initialize Firebase services
       await FirebaseService.instance.initialize();
@@ -168,9 +188,6 @@ Future<void> _initializeCore() async {
 
       // Initialize notification service (local notifications, FCM, timezone data)
       await NotificationService.instance.initialize();
-
-      // Initialize analytics
-      await AnalyticsService.instance.initialize();
 
       // Initialize iOS home screen widget data bridge
       await WidgetDataService.initialize();
