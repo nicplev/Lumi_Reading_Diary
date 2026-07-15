@@ -9,9 +9,9 @@ enum CommentAuthorRole {
 /// A single message in the threaded conversation attached to a reading log.
 ///
 /// Stored at `schools/{schoolId}/readingLogs/{logId}/comments/{commentId}`.
-/// `studentId` and `parentId` are denormalized from the parent log so the
-/// Firestore security rules can authorize reads/writes without an extra
-/// `get()` on the log document.
+/// `studentId` and `parentId` are denormalized from the parent log for display
+/// and query convenience. Security rules load the parent log and require both
+/// values to match before accepting a comment.
 class LogCommentModel {
   final String id;
   final String authorId;
@@ -56,9 +56,8 @@ class LogCommentModel {
 
   /// Firestore payload for a new comment.
   ///
-  /// `createdAt` defaults to a server timestamp; the offline-sync replay passes
-  /// an explicit [Timestamp] so a comment composed offline keeps the time it
-  /// was written rather than the time it eventually syncs.
+  /// `createdAt` defaults to a server timestamp. Security rules require the
+  /// trusted server receipt time for both online and offline-replayed comments.
   Map<String, dynamic> toFirestore({Object? createdAt}) {
     return {
       'authorId': authorId,

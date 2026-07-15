@@ -122,7 +122,8 @@ void main() {
       fieldByName('customLevels'),
       'Blue, Green, Orange',
     );
-    await tester.tap(find.text('Complete Setup'));
+    await tester.ensureVisible(find.text('Finish'));
+    await tester.tap(find.text('Finish'));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 

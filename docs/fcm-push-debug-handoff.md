@@ -152,7 +152,8 @@ out → project-level SA→FCM auth linkage is broken.
 - App Engine default SA `lumi-ninc-au@appspot.gserviceaccount.com` (Editor, runtime SA for 1st-gen fns).
 - Compute default SA `3795320704-compute@developer.gserviceaccount.com` (Editor).
 - Test parent: `support+student0@lumi-reading.com`, uid `bSjSHpdAnHMryKSQdaWCKyem64P2`,
-  school `beaumaris_primary_school`, children Lincon + Lily Tale, password `LumiReview2026!`
+  school `beaumaris_primary_school`, children Lincon + Lily Tale; retrieve the
+  test password from the team password manager (it is not stored in Git)
   (restored earlier this session). NOTE: its `fcmToken` is removed on logout.
 - Deploy: `firebase deploy --only functions:sendTestReadingReminder --project lumi-ninc-au`
   (or `--only functions` for all). Predeploy runs `eslint` (no `--max-warnings`) + `tsc`.

@@ -9,7 +9,11 @@ void main() {
     test('counts current assigned students across active allocations',
         () async {
       final firestore = FakeFirebaseFirestore();
-      final service = SchoolLibraryAssignmentService(firestore: firestore);
+      final service = SchoolLibraryAssignmentService(
+        firestore: firestore,
+        staffId: 'admin_1',
+        schoolWide: true,
+      );
       final now = DateTime.now();
 
       await firestore
@@ -250,7 +254,11 @@ void main() {
     test('skips malformed allocation docs without failing the summary',
         () async {
       final firestore = FakeFirebaseFirestore();
-      final service = SchoolLibraryAssignmentService(firestore: firestore);
+      final service = SchoolLibraryAssignmentService(
+        firestore: firestore,
+        staffId: 'admin_1',
+        schoolWide: true,
+      );
       final now = DateTime.now();
 
       await firestore
@@ -293,6 +301,67 @@ void main() {
       );
 
       expect(summary.currentAssignedCountForBook(alphaBook), 0);
+    });
+
+    test('teacher summary includes assigned classes and excludes other classes',
+        () async {
+      final firestore = FakeFirebaseFirestore();
+      final service = SchoolLibraryAssignmentService(
+        firestore: firestore,
+        staffId: 'teacher_a',
+        schoolWide: false,
+      );
+      final now = DateTime.now();
+      final school = firestore.collection('schools').doc('school_1');
+
+      await school.collection('classes').doc('class_a').set({
+        'teacherId': 'teacher_a',
+        'teacherIds': ['teacher_a'],
+      });
+      await school.collection('classes').doc('class_b').set({
+        'teacherId': 'teacher_b',
+        'teacherIds': ['teacher_b'],
+      });
+
+      for (final suffix in ['a', 'b']) {
+        await school.collection('students').doc('student_$suffix').set({
+          'name': 'Student $suffix',
+          'classId': 'class_$suffix',
+          'schoolId': 'school_1',
+          'createdAt': Timestamp.fromDate(now),
+          'isActive': true,
+        });
+        await school.collection('allocations').doc('alloc_$suffix').set({
+          'schoolId': 'school_1',
+          'classId': 'class_$suffix',
+          'teacherId': 'teacher_$suffix',
+          'studentIds': ['student_$suffix'],
+          'type': 'byTitle',
+          'cadence': 'weekly',
+          'targetMinutes': 20,
+          'startDate':
+              Timestamp.fromDate(now.subtract(const Duration(days: 1))),
+          'endDate': Timestamp.fromDate(now.add(const Duration(days: 5))),
+          'assignmentItems': [
+            {
+              'id': 'item_$suffix',
+              'title': 'Book $suffix',
+              'bookId': 'book_$suffix',
+              'isDeleted': false,
+            },
+          ],
+          'createdAt': Timestamp.fromDate(now),
+          'createdBy': 'teacher_$suffix',
+          'isActive': true,
+        });
+      }
+
+      final summary = await service.summaryStream('school_1').first;
+      final ownBook = BookModel(id: 'book_a', title: 'Book a', createdAt: now);
+      final otherBook =
+          BookModel(id: 'book_b', title: 'Book b', createdAt: now);
+      expect(summary.currentAssignedCountForBook(ownBook), 1);
+      expect(summary.currentAssignedCountForBook(otherBook), 0);
     });
   });
 }

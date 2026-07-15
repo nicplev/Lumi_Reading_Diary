@@ -1,10 +1,19 @@
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../core/services/assert_writable.dart';
+import '../core/services/functions_instance.dart';
 import '../data/models/school_onboarding_model.dart';
 import '../data/models/school_model.dart';
 import '../data/models/user_model.dart';
+
+typedef WritableGuard = void Function({
+  required String opLabel,
+  String? collection,
+  String? docId,
+  String? operation,
+});
 
 class OnboardingService {
   final FirebaseFirestore _firestore;
@@ -13,8 +22,24 @@ class OnboardingService {
   OnboardingService({
     FirebaseFirestore? firestore,
     FirebaseAuth? auth,
+    Future<dynamic> Function(String name, Map<String, dynamic> data)?
+        callableInvoker,
+    WritableGuard writableGuard = assertWritable,
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _auth = auth ?? FirebaseAuth.instance;
+        _auth = auth ?? FirebaseAuth.instance,
+        _callableInvoker = callableInvoker,
+        _writableGuard = writableGuard;
+
+  final Future<dynamic> Function(String name, Map<String, dynamic> data)?
+      _callableInvoker;
+  final WritableGuard _writableGuard;
+
+  Future<dynamic> _call(String name, Map<String, dynamic> data) async {
+    final invoker = _callableInvoker;
+    if (invoker != null) return invoker(name, data);
+    final result = await lumiFunctions.httpsCallable(name).call(data);
+    return result.data;
+  }
 
   // Create a demo request
   Future<String> createDemoRequest({
@@ -26,30 +51,41 @@ class OnboardingService {
     int estimatedStudentCount = 0,
     int estimatedTeacherCount = 0,
   }) async {
-    assertWritable(
+    _writableGuard(
       opLabel: 'onboarding.createDemoRequest',
       collection: 'schoolOnboarding',
       operation: 'create',
     );
-    final onboarding = SchoolOnboardingModel(
-      id: '',
-      schoolName: schoolName,
-      contactEmail: contactEmail,
-      contactPhone: contactPhone,
-      contactPerson: contactPerson,
-      status: OnboardingStatus.demo,
-      currentStep: OnboardingStep.schoolInfo,
-      createdAt: DateTime.now(),
-      referralSource: referralSource,
-      estimatedStudentCount: estimatedStudentCount,
-      estimatedTeacherCount: estimatedTeacherCount,
-    );
-
-    final docRef = await _firestore
-        .collection('schoolOnboarding')
-        .add(onboarding.toFirestore());
-
-    return docRef.id;
+    final notes = <String>[
+      if (contactPhone?.trim().isNotEmpty == true)
+        'Phone: ${contactPhone!.trim()}',
+      if (referralSource?.trim().isNotEmpty == true)
+        'Referral: ${referralSource!.trim()}',
+      'Estimated students: $estimatedStudentCount',
+      'Estimated teachers: $estimatedTeacherCount',
+    ].join('\n');
+    final raw = await _call('submitDemoRequest', {
+      'schoolName': schoolName.trim(),
+      'contactPerson': contactPerson?.trim().isNotEmpty == true
+          ? contactPerson!.trim()
+          : 'School enquiry',
+      'contactEmail': contactEmail.trim(),
+      'intent': 'demo',
+      'message': notes,
+      if (contactPhone?.trim().isNotEmpty == true)
+        'contactPhone': contactPhone!.trim(),
+      if (referralSource?.trim().isNotEmpty == true)
+        'referralSource': referralSource!.trim(),
+      'estimatedStudentCount': estimatedStudentCount,
+      'estimatedTeacherCount': estimatedTeacherCount,
+    });
+    if (raw is! Map || raw['id'] is! String || (raw['id'] as String).isEmpty) {
+      throw FirebaseFunctionsException(
+        code: 'internal',
+        message: 'Demo request did not return a valid reference.',
+      );
+    }
+    return raw['id'] as String;
   }
 
   // Update onboarding status
@@ -57,7 +93,7 @@ class OnboardingService {
     String onboardingId,
     OnboardingStatus status,
   ) async {
-    assertWritable(
+    _writableGuard(
       opLabel: 'onboarding.updateOnboardingStatus',
       collection: 'schoolOnboarding',
       docId: onboardingId,
@@ -74,7 +110,7 @@ class OnboardingService {
     String onboardingId,
     OnboardingStep step,
   ) async {
-    assertWritable(
+    _writableGuard(
       opLabel: 'onboarding.completeStep',
       collection: 'schoolOnboarding',
       docId: onboardingId,
@@ -146,7 +182,7 @@ class OnboardingService {
     String? primaryColor,
     String? secondaryColor,
   }) async {
-    assertWritable(
+    _writableGuard(
       opLabel: 'onboarding.createSchoolAndAdmin',
       collection: 'schools',
       operation: 'create',

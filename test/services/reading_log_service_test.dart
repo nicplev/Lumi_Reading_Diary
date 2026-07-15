@@ -17,6 +17,14 @@ import 'package:lumi_reading_tracker/services/reading_log_service.dart';
 /// preview values (incl. the forgiving rest-day tolerance) and the
 /// no-persist guarantee.
 void main() {
+  test('generateLogId returns unique 128-bit random hex identifiers', () {
+    final ids = List.generate(100, (_) => ReadingLogService.generateLogId());
+    expect(ids.toSet(), hasLength(ids.length));
+    for (final id in ids) {
+      expect(id, matches(RegExp(r'^[0-9a-f]{32}$')));
+    }
+  });
+
   group('ReadingLogService.writeLog (preview-only)', () {
     late FakeFirebaseFirestore firestore;
     late ReadingLogService service;

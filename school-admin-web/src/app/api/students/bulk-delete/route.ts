@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
-import { deleteStudents } from '@/lib/firestore/students';
+import { queueStudentDeletions } from '@/lib/firestore/students';
 import { z } from 'zod';
 
 const bulkDeleteSchema = z.object({
@@ -17,7 +17,11 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const data = bulkDeleteSchema.parse(body);
-    const count = await deleteStudents(session.schoolId, data.studentIds);
+    const count = await queueStudentDeletions(
+      session.schoolId,
+      data.studentIds,
+      session.uid
+    );
     return NextResponse.json({ count });
   } catch (error) {
     if (error instanceof z.ZodError) {

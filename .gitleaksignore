@@ -1,0 +1,24 @@
+# Reviewed 2026-07-15. These fingerprints are historical false positives:
+# Firebase client configuration keys (public by design, console restrictions
+# still required), CocoaPods checksums, and synthetic test/example values.
+03a60c5a619ccacfd0178945c25496a8402824ce:ios/Podfile.lock:generic-api-key:1691
+03a60c5a619ccacfd0178945c25496a8402824ce:ios/Podfile.lock:generic-api-key:1701
+03a60c5a619ccacfd0178945c25496a8402824ce:ios/Podfile.lock:generic-api-key:1732
+03a60c5a619ccacfd0178945c25496a8402824ce:test/services/onboarding_service_test.dart:generic-api-key:32
+16fc8fbe56c28f00009ec915324aa0fde9ad88cf:admin/src/lib/firestore/demo-access.ts:generic-api-key:11
+410b3fb847efd86ca8562b6939134989450eea58:test/services/onboarding_service_test.dart:generic-api-key:163
+410b3fb847efd86ca8562b6939134989450eea58:test/services/onboarding_service_test.dart:generic-api-key:409
+5ff1634dc0fec12f392a52c6d0d0de2633d977bb:school-admin-web/src/lib/auth/session.ts:generic-api-key:54
+78444bbb085cbd8e8543cd116c44580536594fdd:android/app/google-services.json:gcp-api-key:18
+78444bbb085cbd8e8543cd116c44580536594fdd:ios/Podfile.lock:generic-api-key:1582
+78444bbb085cbd8e8543cd116c44580536594fdd:ios/Podfile.lock:generic-api-key:1588
+78444bbb085cbd8e8543cd116c44580536594fdd:ios/Podfile.lock:generic-api-key:1589
+78444bbb085cbd8e8543cd116c44580536594fdd:lib/firebase_options.dart:gcp-api-key:53
+78444bbb085cbd8e8543cd116c44580536594fdd:lib/firebase_options.dart:gcp-api-key:61
+833b5f3acb634a302ce9667b308c39325428d571:android/app/google-services.json:gcp-api-key:18
+833b5f3acb634a302ce9667b308c39325428d571:lib/firebase_options.dart:gcp-api-key:50
+833b5f3acb634a302ce9667b308c39325428d571:lib/firebase_options.dart:gcp-api-key:58
+833b5f3acb634a302ce9667b308c39325428d571:lib/firebase_options.dart:gcp-api-key:67
+a8c929de6771ace840033e5400c52320c2d48b7d:functions/test/firestore.rules.test.js:generic-api-key:1970
+c4b1572fc6bc7745ab8a79aba808a99576aaef8a:docs/DEMO_DAY_ACCESS_PLAN.md:generic-api-key:168
+e271ff12f97816e070ab0f7bee99c9941b0b11f3:lib/firebase_options.dart:gcp-api-key:67

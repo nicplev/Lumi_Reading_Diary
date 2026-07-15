@@ -329,6 +329,7 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
             .collection('schools')
             .doc(schoolId)
             .collection('students')
+            .where('classId', isEqualTo: widget.selectedClass.id)
             .where(FieldPath.documentId, whereIn: batch)
             .get();
         for (final doc in snapshot.docs) {

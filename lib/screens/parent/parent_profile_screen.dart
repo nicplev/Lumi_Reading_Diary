@@ -83,7 +83,7 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen>
         ref.read(parentChildrenProvider).value ?? const <StudentModel>[];
     _loadPreferences();
     _loadMfaStatus();
-    // Rebuild if dev-access flips (e.g. the Firestore lookup resolves after a
+    // Rebuild if dev-access flips (e.g. the server lookup resolves after a
     // session resume, or a super-admin grants/revokes access).
     _devAccess.addListener(_onDevAccessChanged);
   }
@@ -364,6 +364,15 @@ class _ParentProfileScreenState extends ConsumerState<ParentProfileScreen>
       title: 'You',
       child: _SettingsGroup(
         rows: [
+          _SettingsRow(
+            icon: Icons.manage_accounts_outlined,
+            title: 'Account',
+            subtitle: 'Sign-in details and data deletion',
+            onTap: () => context.push(
+              '/settings/account',
+              extra: widget.user,
+            ),
+          ),
           _SettingsRow(
             icon: Icons.diversity_1_outlined,
             title: 'Relationship',

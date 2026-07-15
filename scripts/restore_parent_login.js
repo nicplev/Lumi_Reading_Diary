@@ -48,11 +48,15 @@ function loadAdmin() {
 const admin = loadAdmin();
 
 const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT || 'lumi-ninc-au';
-const PASSWORD = process.env.RESTORE_PASSWORD || 'LumiReview2026!';
+const PASSWORD = process.env.RESTORE_PASSWORD;
 
 function die(msg, code = 1) {
   process.stderr.write(`${msg}\n`);
   process.exit(code);
+}
+
+if (!PASSWORD || PASSWORD.length < 16) {
+  die('RESTORE_PASSWORD is required and must be at least 16 characters.');
 }
 
 // Mirrors UserSchoolIndexService._hashEmail (lowercase + trim, SHA-256 hex).

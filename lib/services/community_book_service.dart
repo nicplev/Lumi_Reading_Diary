@@ -75,9 +75,7 @@ class CommunityBookService {
           .limit(limit)
           .get();
 
-      return snapshot.docs
-          .map((doc) => BookModel.fromFirestore(doc))
-          .toList();
+      return snapshot.docs.map((doc) => BookModel.fromFirestore(doc)).toList();
     } catch (e) {
       debugPrint('CommunityBookService.searchByTitle failed: $e');
       return [];
@@ -157,8 +155,7 @@ class CommunityBookService {
       updateData['contributedBy'] =
           existingDoc.data()!['contributedBy'] ?? contributorId;
       updateData['contributedBySchoolId'] =
-          existingDoc.data()!['contributedBySchoolId'] ??
-              contributorSchoolId;
+          existingDoc.data()!['contributedBySchoolId'] ?? contributorSchoolId;
 
       await docRef.update(updateData);
     } else {
@@ -195,6 +192,8 @@ class CommunityBookService {
   Future<String?> uploadCoverImage({
     required String isbn,
     required File imageFile,
+    required String contributorId,
+    required String contributorSchoolId,
   }) async {
     try {
       final bytes = await imageFile.readAsBytes();
@@ -206,7 +205,13 @@ class CommunityBookService {
 
       await ref.putData(
         processed,
-        SettableMetadata(contentType: 'image/jpeg'),
+        SettableMetadata(
+          contentType: 'image/jpeg',
+          customMetadata: {
+            'schoolId': contributorSchoolId,
+            'uploaderUid': contributorId,
+          },
+        ),
       );
 
       return await ref.getDownloadURL();

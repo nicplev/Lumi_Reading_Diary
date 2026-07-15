@@ -20,6 +20,7 @@ class FirebaseService {
 
   // Firebase instances
   late final FirebaseAuth _auth;
+
   /// SharedPreferences flag set on sign-out and honoured at the next app
   /// bootstrap (main.dart) to clear the Firestore cache safely — see signOut().
   static const firestoreClearPendingKey = 'firestore_clear_pending';
@@ -90,11 +91,13 @@ class FirebaseService {
           .where('studentId', isEqualTo: studentId);
 
       if (startDate != null) {
-        query = query.where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
+        query = query.where('date',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
       }
 
       if (endDate != null) {
-        query = query.where('date', isLessThanOrEqualTo: Timestamp.fromDate(endDate));
+        query = query.where('date',
+            isLessThanOrEqualTo: Timestamp.fromDate(endDate));
       }
 
       final snapshot = await query.orderBy('date', descending: true).get();
@@ -231,23 +234,6 @@ class FirebaseService {
       }
     } catch (e) {
       debugPrint('Error signing out: $e');
-      rethrow;
-    }
-  }
-
-  // Delete account
-  Future<void> deleteAccount() async {
-    try {
-      final user = _auth.currentUser;
-      if (user != null) {
-        // Delete user data from Firestore
-        await _firestore.collection('users').doc(user.uid).delete();
-
-        // Delete user account
-        await user.delete();
-      }
-    } catch (e) {
-      debugPrint('Error deleting account: $e');
       rethrow;
     }
   }

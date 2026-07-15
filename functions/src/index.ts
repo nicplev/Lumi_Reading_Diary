@@ -59,8 +59,6 @@ import {runStateTermDatesFillPass} from "./term_dates_fallback";
 // attestation rollout is verified in the App Check console, else a
 // half-rolled-out App Check locks out real clients (1.6). App Check attests the
 // APP, not the account, so it's safe on unauthenticated/pre-account calls too.
-const DELETE_STUDENT_APP_CHECK_ENFORCED =
-  process.env.DELETE_STUDENT_APP_CHECK_ENFORCED === "true";
 const NOTIFICATION_CAMPAIGN_APP_CHECK_ENFORCED =
   process.env.NOTIFICATION_CAMPAIGN_APP_CHECK_ENFORCED === "true";
 
@@ -107,6 +105,7 @@ const db = admin.firestore();
 // Firebase CLI picks them up as deployable functions.
 // ─────────────────────────────────────────────────────────────────────────────
 export {
+  checkDevAccess,
   startImpersonationSession,
   endImpersonationSession,
   revokeImpersonationSession,
@@ -160,9 +159,20 @@ export {submitDemoRequest, submitContactSalesInquiry} from "./marketing_leads";
 // functions/src/comprehension_retention.ts.
 export {
   cleanupComprehensionAudio,
+  confirmComprehensionAudioUpload,
   deleteComprehensionAudio,
   getComprehensionAudioUrl,
 } from "./comprehension_retention";
+
+// Idempotent account/student deletion jobs. All destructive work runs through
+// server-owned callables/the retry scheduler; clients can only request and
+// read their own sanitized job status.
+export {
+  getMyDeletionStatus,
+  processPendingUserDeletions,
+  requestAccountDeletion,
+  requestStudentDeletion,
+} from "./deletion";
 
 // Demo-day rolling access. processDemoAccessEmail emails a prospect the day's
 // demo credentials (freshness-gated); scrambleDemoPasswords nightly-rotates
@@ -188,6 +198,31 @@ export const aggregateStudentStats = onDocumentWritten(
     if (isStatsNoopUpdate(event.data)) return;
     const schoolId = event.params.schoolId;
 
+    // On delete, pull identity from the pre-delete snapshot. Resolve this
+    // before selecting the incremental/legacy path so both implementations
+    // honour the student-deletion guard below.
+    const log = event.data.after.exists ?
+      event.data.after.data() :
+      event.data.before.data();
+    if (!log) {
+      functions.logger.warn("Reading log write event with no before or after data", {
+        logId: event.params.logId,
+      });
+      return;
+    }
+    const studentId = log.studentId;
+    if (!studentId) {
+      functions.logger.warn("Reading log has no studentId", {
+        logId: event.params.logId,
+      });
+      return;
+    }
+    const studentRef = db.doc(`schools/${schoolId}/students/${studentId}`);
+    const deletionGuard = await studentRef.get();
+    if (!deletionGuard.exists || deletionGuard.data()?.pendingDeletion === true) {
+      return;
+    }
+
     // When the incremental flag is on, dispatch to the O(1)-reads path.
     // The new path self-heals (falls back to full recompute) if a student's
     // readingDates array hasn't been seeded yet by the backfill script.
@@ -209,25 +244,6 @@ export const aggregateStudentStats = onDocumentWritten(
     // Legacy path: full re-aggregation. Retained as the authoritative
     // implementation behind the flag until the incremental path has been
     // observed clean for at least one reconciler cycle.
-    // On delete, change.after.exists is false; pull studentId from the
-    // pre-delete snapshot so we still know which student's stats to recompute.
-    const log = event.data.after.exists ? event.data.after.data() : event.data.before.data();
-
-    if (!log) {
-      functions.logger.warn("Reading log write event with no before or after data", {
-        logId: event.params.logId,
-      });
-      return;
-    }
-
-    const studentId = log.studentId;
-    if (!studentId) {
-      functions.logger.warn("Reading log has no studentId", {logId: event.params.logId});
-      return;
-    }
-
-    const studentRef = db.doc(`schools/${schoolId}/students/${studentId}`);
-
     try {
       // Get all reading logs for this student
       const logsSnapshot = await db
@@ -2852,198 +2868,6 @@ export const refreshStreaksDaily = onSchedule(
         err instanceof Error ? err.message : String(err));
       throw err;
     }
-    return;
-  });
-
-/**
- * Callable: Delete a student with full cascade cleanup.
- * - Removes student from linked parent's linkedChildren array
- * - If a parent has no remaining linked children, deletes their Firestore doc + Auth account
- * - Revokes any active link codes for the student
- * - Deletes the student document
- */
-export const deleteStudentWithCascade = onCall(
-  {
-    enforceAppCheck: DELETE_STUDENT_APP_CHECK_ENFORCED,
-    consumeAppCheckToken: DELETE_STUDENT_APP_CHECK_ENFORCED,
-  },
-  async (request) => {
-    const data = request.data;
-    assertNotReadOnly(request);
-    if (!request.auth) {
-      throw new functions.https.HttpsError(
-        "unauthenticated",
-        "Must be signed in."
-      );
-    }
-
-    const {schoolId, studentId} = data as {schoolId: string; studentId: string};
-    if (!schoolId || !studentId) {
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        "schoolId and studentId are required."
-      );
-    }
-
-    // Authorization: caller must be a school admin or teacher of THIS school.
-    // Without this, any signed-in user could delete any child (and cascade-
-    // delete linked parents' Auth accounts) in any school. Mirrors the staff
-    // check in backfillGuardianProfiles.
-    const callerDoc = await db
-      .doc(`schools/${schoolId}/users/${request.auth.uid}`)
-      .get();
-    const callerRole = callerDoc.exists ? callerDoc.data()!.role : null;
-    if (callerRole !== "schoolAdmin" && callerRole !== "teacher") {
-      throw new functions.https.HttpsError(
-        "permission-denied",
-        "Only school staff can delete students."
-      );
-    }
-
-    const studentRef = db.doc(`schools/${schoolId}/students/${studentId}`);
-    const studentDoc = await studentRef.get();
-    if (!studentDoc.exists) {
-      throw new functions.https.HttpsError("not-found", "Student not found.");
-    }
-
-    const studentData = studentDoc.data()!;
-    const parentIds: string[] = studentData.parentIds ?? [];
-
-    // 1. Clean up each linked parent. Parent docs live under `parents/`, not
-    //    `users/` (see getUserData in firestore.rules and linkParentToStudent).
-    //    Reading `users/${parentId}` here always missed, so parents were never
-    //    actually cleaned up — the cascade silently `continue`d.
-    for (const parentId of parentIds) {
-      const parentRef = db.doc(`schools/${schoolId}/parents/${parentId}`);
-      const parentDoc = await parentRef.get();
-      if (!parentDoc.exists) continue;
-
-      const linkedChildren: string[] = parentDoc.data()!.linkedChildren ?? [];
-      const remaining = linkedChildren.filter((id) => id !== studentId);
-
-      if (remaining.length === 0) {
-        // Parent has no other children AT THIS SCHOOL — remove the school-local
-        // membership doc. `parentId` IS the Firebase Auth uid, and the same
-        // account is reused across schools (a parent with children at two
-        // schools has one uid, one doc per school). So the GLOBAL Auth account
-        // may only be deleted when this uid is not a parent at ANY OTHER
-        // school; otherwise this single school's cascade would lock a
-        // multi-school parent out everywhere and orphan the other school's doc.
-        await parentRef.delete();
-
-        // Full collection-group scan is acceptable here — student deletion is
-        // an infrequent staff action. Filter by grandparent school id (not by
-        // whether the just-deleted local doc still appears), so it is robust to
-        // read-after-delete propagation. Switch to an indexed
-        // `where('uid','==')` query if parent volume grows large.
-        const allParentDocs = await db.collectionGroup("parents").get();
-        const memberElsewhere = allParentDocs.docs.some(
-          (d) => d.id === parentId && d.ref.parent.parent?.id !== schoolId
-        );
-
-        if (!memberElsewhere) {
-          try {
-            await admin.auth().deleteUser(parentId);
-          } catch (err) {
-            functions.logger.warn(
-              `Could not delete Auth user ${parentId} — may not exist`,
-              err
-            );
-          }
-        } else {
-          functions.logger.info(
-            `Kept Auth account ${parentId} — still a parent at another school`
-          );
-        }
-      } else {
-        await parentRef.update({
-          linkedChildren: remaining,
-          // Audit trail so a stray "Don't forget to log <name>'s reading"
-          // notification can be traced back to the mutation that introduced it.
-          linkedChildrenUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          linkedChildrenUpdatedBy: `cascade:deleteStudent:${request.auth.uid}`,
-        });
-      }
-    }
-
-    // 2. Revoke any active link codes for this student
-    const codesSnap = await db
-      .collection("studentLinkCodes")
-      .where("studentId", "==", studentId)
-      .where("status", "==", "active")
-      .get();
-
-    const batch = db.batch();
-    for (const codeDoc of codesSnap.docs) {
-      batch.update(codeDoc.ref, {
-        status: "revoked",
-        revokedAt: admin.firestore.FieldValue.serverTimestamp(),
-        revokeReason: "student_deleted",
-      });
-    }
-
-    // 3. Delete the student document
-    batch.delete(studentRef);
-    await batch.commit();
-
-    return {success: true, parentsCleaned: parentIds.length};
-  }
-);
-
-/**
- * Scheduled: Process pending user deletions after the 24-hour cool-off period.
- * Runs hourly. For each user in pendingUserDeletions whose scheduledDeletionAt has passed,
- * permanently deletes the Firebase Auth account and Firestore user document.
- */
-export const processPendingUserDeletions = onSchedule(
-  {
-    schedule: "0 * * * *", // Every hour on the hour
-    timeZone: "UTC",
-  },
-  async () => {
-    const now = admin.firestore.Timestamp.now();
-
-    const snap = await db
-      .collection("pendingUserDeletions")
-      .where("scheduledDeletionAt", "<=", now)
-      .get();
-
-    if (snap.empty) {
-      await recordCronRun("processPendingUserDeletions", "ok", "no_pending");
-      return;
-    }
-
-    let deleted = 0;
-    for (const doc of snap.docs) {
-      const {userId, schoolId} = doc.data() as {userId: string; schoolId: string};
-      try {
-        // Delete Firebase Auth account
-        try {
-          await admin.auth().deleteUser(userId);
-        } catch (err) {
-          functions.logger.warn(
-            `Could not delete Auth user ${userId} — may not exist`,
-            err
-          );
-        }
-
-        // Delete Firestore user document
-        await db
-          .doc(`schools/${schoolId}/users/${userId}`)
-          .delete();
-
-        // Clean up the pending deletion record
-        await doc.ref.delete();
-
-        deleted++;
-        functions.logger.info(`Permanently deleted user ${userId} from school ${schoolId}`);
-      } catch (err) {
-        functions.logger.error(`Failed to delete user ${userId}`, err);
-      }
-    }
-
-    functions.logger.info(`processPendingUserDeletions: deleted ${deleted} users`);
-    await recordCronRun("processPendingUserDeletions", "ok");
     return;
   });
 

@@ -10,7 +10,7 @@ const SUPPORT_EMAIL = 'support@lumi-reading.com';
 
 export default function PrivacyPolicyPage() {
   return (
-    <LegalDocument title="Privacy Policy" lastUpdated="28 June 2026">
+    <LegalDocument title="Privacy Policy" lastUpdated="15 July 2026">
       <section>
         <p>
           This Privacy Policy explains how <strong>Lumi</strong> (&ldquo;Lumi&rdquo;, &ldquo;we&rdquo;,
@@ -159,10 +159,21 @@ export default function PrivacyPolicyPage() {
         <p>
           You may request access to, or correction of, the personal information we hold about you.
           Parents/carers can view and update much of their own and their child&rsquo;s information in the
-          app, and schools can manage student records directly. To request access, correction, or
-          deletion of an account and its associated data, contact us at{' '}
-          <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>. Because data is held on behalf of
-          schools, we may need to coordinate a student-data request with the relevant school.
+          app, and schools can manage student records directly. A parent/carer or teacher can
+          permanently delete their own Lumi account from <strong>Settings → Account</strong>. This
+          removes the login, memberships, direct attribution, authored messages and voice recordings.
+          Core school reading events may be retained only in de-identified form so deleting an
+          adult&rsquo;s login does not silently erase a child&rsquo;s educational record. A minimal
+          completion receipt is retained for security and audit purposes for 90 days and then deleted.
+        </p>
+        <p>
+          Authorised school staff can permanently delete a student record and its linked reading
+          history, messages, recordings, notifications and roster references. Deleting a student does
+          not delete the accounts of their parents/carers. Because Lumi holds student information on
+          behalf of schools, a parent/carer who wants a child&rsquo;s school record deleted should contact
+          the school or email <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>; legal or school
+          record-keeping requirements may apply. You may also use that address to request access or
+          correction, or if the in-app account deletion flow is unavailable.
         </p>
       </section>
 

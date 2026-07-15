@@ -1,3 +1,5 @@
+// ARCHIVED / NON-DEPLOYABLE REFERENCE. Do not copy or deploy this stale ruleset.
+// The only active rules file is firestore.rules as referenced by firebase.json.
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {

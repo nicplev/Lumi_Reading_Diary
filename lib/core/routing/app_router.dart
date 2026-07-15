@@ -36,6 +36,7 @@ import '../../screens/parent/progress_screen.dart';
 import '../../screens/parent/offline_management_screen.dart';
 import '../../screens/shared/app_icon_screen.dart';
 import '../../screens/shared/service_status_screen.dart';
+import '../../screens/settings/account_screen.dart';
 import '../../screens/parent/student_report_screen.dart';
 import '../../screens/parent/book_browser_screen.dart';
 import '../../screens/parent/parent_notifications_screen.dart';
@@ -54,8 +55,6 @@ import '../../screens/teacher/cover_scanner_screen.dart';
 import '../../screens/teacher/kiosk/classroom_kiosk_screen.dart';
 import '../../screens/teacher/teacher_level_management_screen.dart';
 import '../../screens/shared/staff_notifications_screen.dart';
-import '../../screens/onboarding/school_registration_wizard.dart';
-import '../../screens/onboarding/school_demo_screen.dart';
 import '../../screens/onboarding/demo_request_screen.dart';
 import '../../screens/marketing/landing_screen.dart';
 import '../../screens/design_system_demo_screen.dart';
@@ -340,25 +339,6 @@ class AppRouter {
         builder: (context, state) => const WebNotAvailableScreen(),
       ),
 
-      // ============================================
-      // ONBOARDING ROUTES
-      // ============================================
-      GoRoute(
-        path: '/onboarding/school-registration',
-        name: 'school-registration',
-        builder: (context, state) {
-          final onboardingId =
-              state.uri.queryParameters['onboardingId'] ?? 'default';
-          return SchoolRegistrationWizard(onboardingId: onboardingId);
-        },
-      ),
-
-      GoRoute(
-        path: '/onboarding/demo',
-        name: 'school-demo',
-        builder: (context, state) => const SchoolDemoScreen(),
-      ),
-
       GoRoute(
         path: '/onboarding/demo-request',
         name: 'demo-request',
@@ -491,6 +471,15 @@ class AppRouter {
         path: '/settings/service-status',
         name: 'service-status',
         builder: (context, state) => const ServiceStatusScreen(),
+      ),
+
+      GoRoute(
+        path: '/settings/account',
+        name: 'account',
+        builder: (context, state) => _userScopedRoute(
+          extra: state.extra,
+          child: (user) => AccountScreen(user: user),
+        ),
       ),
 
       // App-icon pack is still in testing — dev-access accounts only, like

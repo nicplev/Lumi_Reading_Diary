@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
-import { getStudent, updateStudent, deleteStudent } from '@/lib/firestore/students';
+import { getStudent, updateStudent, queueStudentDeletion } from '@/lib/firestore/students';
 import { z } from 'zod';
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ studentId: string }> }) {
@@ -70,7 +70,10 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
 
   const { studentId } = await params;
   try {
-    await deleteStudent(session.schoolId, studentId);
+    const queued = await queueStudentDeletion(session.schoolId, studentId, session.uid);
+    if (!queued) {
+      return NextResponse.json({ error: 'Student not found' }, { status: 404 });
+    }
     return NextResponse.json({ success: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to delete student';

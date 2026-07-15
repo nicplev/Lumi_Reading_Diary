@@ -98,8 +98,11 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
   void initState() {
     super.initState();
     _libraryService = widget._libraryService ?? SchoolLibraryService();
-    _assignmentService =
-        widget._assignmentService ?? SchoolLibraryAssignmentService();
+    _assignmentService = widget._assignmentService ??
+        SchoolLibraryAssignmentService(
+          staffId: widget.teacher.id,
+          schoolWide: widget.teacher.role == UserRole.schoolAdmin,
+        );
     _loadHiddenBooks();
     _loadDensity();
     _loadCounts();
@@ -187,8 +190,8 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
     final prefs = await SharedPreferences.getInstance();
     final stored = prefs.getInt(_densityPrefsKey);
     if (stored == null || !mounted) return;
-    setState(() => _tabletColumns =
-        stored.clamp(_minTabletColumns, _maxTabletColumns));
+    setState(() =>
+        _tabletColumns = stored.clamp(_minTabletColumns, _maxTabletColumns));
   }
 
   Future<void> _setDensity(int columns) async {
@@ -292,9 +295,8 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
           final int libraryCount;
           final int visibleCount;
           if (useLoadedCounts) {
-            final loadedVisible = allBooks
-                .where((b) => !_hiddenBookIds.contains(b.id))
-                .toList();
+            final loadedVisible =
+                allBooks.where((b) => !_hiddenBookIds.contains(b.id)).toList();
             visibleCount = loadedVisible.length;
             decodableCount =
                 loadedVisible.where(SchoolLibraryService.isDecodable).length;
@@ -302,8 +304,8 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
           } else {
             // Server doc available and library not fully loaded — trust it,
             // subtracting the (small) hidden set as an approximation.
-            decodableCount = (_counts.decodable - hiddenCount)
-                .clamp(0, _counts.decodable);
+            decodableCount =
+                (_counts.decodable - hiddenCount).clamp(0, _counts.decodable);
             libraryCount =
                 (_counts.library - hiddenCount).clamp(0, _counts.library);
             visibleCount =
@@ -311,8 +313,7 @@ class _TeacherLibraryScreenState extends State<TeacherLibraryScreen> {
           }
 
           // iPad-only grid density. Phones always use 3 columns.
-          final isTablet =
-              MediaQuery.of(context).size.shortestSide >= 600;
+          final isTablet = MediaQuery.of(context).size.shortestSide >= 600;
           final gridColumns = isTablet ? _tabletColumns : 3;
 
           return StreamBuilder<LibraryAssignmentSnapshot>(
@@ -1873,11 +1874,10 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
   bool get _isCommunityBook =>
       widget.book.metadata?['source'] == 'community_books';
 
-  // ── "Assigned to" — school-wide visibility ────────────────────────────────
+  // ── "Assigned to" — assigned-class visibility ─────────────────────────────
 
-  /// Resolves the assigned student IDs into students grouped by class, so any
-  /// teacher can see which rooms currently hold this book (books get shared
-  /// across year levels and classrooms).
+  /// Resolves assigned student IDs only within classes this teacher owns or
+  /// co-teaches. School admins retain whole-school visibility.
   Future<List<_AssigneeClass>> _loadAssignees() async {
     final schoolId = widget.teacher.schoolId;
     final ids = widget.assignedStudentIds;
@@ -1886,37 +1886,48 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
     }
 
     final fs = FirebaseFirestore.instance;
-    final studentsCol =
-        fs.collection('schools').doc(schoolId).collection('students');
+    final school = fs.collection('schools').doc(schoolId);
+    final classesCol = school.collection('classes');
+    final classNames = <String, String>{};
+
+    if (widget.teacher.role == UserRole.schoolAdmin) {
+      final snap = await classesCol.get();
+      for (final doc in snap.docs) {
+        final name = (doc.data()['name'] as String?)?.trim();
+        classNames[doc.id] = (name != null && name.isNotEmpty) ? name : 'Class';
+      }
+    } else {
+      final owned = await classesCol
+          .where('teacherId', isEqualTo: widget.teacher.id)
+          .get();
+      final coTaught = await classesCol
+          .where('teacherIds', arrayContains: widget.teacher.id)
+          .get();
+      for (final doc in [...owned.docs, ...coTaught.docs]) {
+        final name = (doc.data()['name'] as String?)?.trim();
+        classNames[doc.id] = (name != null && name.isNotEmpty) ? name : 'Class';
+      }
+    }
+
+    if (classNames.isEmpty) return const [];
+
+    final studentsCol = school.collection('students');
 
     final students = <StudentModel>[];
-    for (var i = 0; i < ids.length; i += 10) {
-      final end = (i + 10) > ids.length ? ids.length : i + 10;
-      final snap = await studentsCol
-          .where(FieldPath.documentId, whereIn: ids.sublist(i, end))
-          .get();
-      students.addAll(snap.docs.map(StudentModel.fromFirestore));
+    for (final classId in classNames.keys) {
+      for (var i = 0; i < ids.length; i += 10) {
+        final end = (i + 10) > ids.length ? ids.length : i + 10;
+        final snap = await studentsCol
+            .where('classId', isEqualTo: classId)
+            .where(FieldPath.documentId, whereIn: ids.sublist(i, end))
+            .get();
+        students.addAll(snap.docs.map(StudentModel.fromFirestore));
+      }
     }
 
     final byClass = <String, List<StudentModel>>{};
     for (final s in students) {
       byClass.putIfAbsent(s.classId, () => <StudentModel>[]).add(s);
-    }
-
-    // Resolve class display names.
-    final classNames = <String, String>{};
-    final classIds = byClass.keys.where((c) => c.trim().isNotEmpty).toList();
-    final classesCol =
-        fs.collection('schools').doc(schoolId).collection('classes');
-    for (var i = 0; i < classIds.length; i += 10) {
-      final end = (i + 10) > classIds.length ? classIds.length : i + 10;
-      final snap = await classesCol
-          .where(FieldPath.documentId, whereIn: classIds.sublist(i, end))
-          .get();
-      for (final d in snap.docs) {
-        final name = (d.data()['name'] as String?)?.trim();
-        classNames[d.id] = (name != null && name.isNotEmpty) ? name : 'Class';
-      }
     }
 
     final result = byClass.entries.map((e) {
@@ -1981,7 +1992,7 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${widget.book.title} · shared across your school',
+                        '${widget.book.title} · visible in your classes',
                         style:
                             LumiType.caption.copyWith(color: LumiTokens.muted),
                         maxLines: 1,
@@ -2265,6 +2276,8 @@ class _BookDetailSheetState extends State<BookDetailSheet> {
       final url = await communityService.uploadCoverImage(
         isbn: isbn,
         imageFile: imageFile,
+        contributorId: widget.teacher.id,
+        contributorSchoolId: widget.teacher.schoolId ?? '',
       );
 
       if (!mounted) return;

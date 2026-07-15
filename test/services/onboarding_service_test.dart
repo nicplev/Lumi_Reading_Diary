@@ -15,7 +15,34 @@ void main() {
     setUp(() {
       firestore = FakeFirebaseFirestore();
       auth = MockFirebaseAuth();
-      service = OnboardingService(firestore: firestore, auth: auth);
+      service = OnboardingService(
+        firestore: firestore,
+        auth: auth,
+        writableGuard: ({
+          required opLabel,
+          collection,
+          docId,
+          operation,
+        }) {},
+        callableInvoker: (name, data) async {
+          expect(name, 'submitDemoRequest');
+          final ref = firestore.collection('schoolOnboarding').doc();
+          await ref.set({
+            'schoolName': data['schoolName'],
+            'contactEmail': data['contactEmail'],
+            'contactPhone': data['contactPhone'],
+            'contactPerson': data['contactPerson'],
+            'referralSource': data['referralSource'],
+            'estimatedStudentCount': data['estimatedStudentCount'] ?? 0,
+            'estimatedTeacherCount': data['estimatedTeacherCount'] ?? 0,
+            'status': 'demo',
+            'currentStep': 'schoolInfo',
+            'completedSteps': <String>[],
+            'createdAt': Timestamp.now(),
+          });
+          return {'id': ref.id};
+        },
+      );
     });
 
     Future<String> seedOnboardingDoc({
@@ -160,7 +187,7 @@ void main() {
           onboardingId: id,
           schoolName: 'Lumi School',
           adminEmail: 'admin@school.test',
-          adminPassword: 'StrongPass123',
+          adminPassword: 'StrongPass123', // gitleaks:allow -- synthetic test credential
           adminFullName: 'Admin User',
           levelSchema: ReadingLevelSchema.aToZ,
         );
@@ -169,10 +196,8 @@ void main() {
         expect(result['adminUserId'], isNotEmpty);
 
         // Verify school document
-        final schoolDoc = await firestore
-            .collection('schools')
-            .doc(result['schoolId'])
-            .get();
+        final schoolDoc =
+            await firestore.collection('schools').doc(result['schoolId']).get();
         expect(schoolDoc.exists, isTrue);
         expect(schoolDoc.data()!['name'], 'Lumi School');
         expect(schoolDoc.data()!['levelSchema'], 'aToZ');
@@ -213,10 +238,8 @@ void main() {
           contactPhone: '0400000000',
         );
 
-        final schoolDoc = await firestore
-            .collection('schools')
-            .doc(result['schoolId'])
-            .get();
+        final schoolDoc =
+            await firestore.collection('schools').doc(result['schoolId']).get();
         expect(schoolDoc.data()!['address'], '123 School St');
         expect(schoolDoc.data()!['contactEmail'], 'office@full.test');
         expect(schoolDoc.data()!['contactPhone'], '0400000000');
@@ -234,10 +257,8 @@ void main() {
           levelSchema: ReadingLevelSchema.aToZ,
         );
 
-        final schoolDoc = await firestore
-            .collection('schools')
-            .doc(result['schoolId'])
-            .get();
+        final schoolDoc =
+            await firestore.collection('schools').doc(result['schoolId']).get();
         expect(schoolDoc.data()!['contactEmail'], 'admin@example.test');
       });
 
@@ -280,10 +301,8 @@ void main() {
           customLevels: ['Red', 'Blue', 'Green'],
         );
 
-        final schoolDoc = await firestore
-            .collection('schools')
-            .doc(result['schoolId'])
-            .get();
+        final schoolDoc =
+            await firestore.collection('schools').doc(result['schoolId']).get();
         expect(schoolDoc.data()!['levelSchema'], 'custom');
         expect(
           List<String>.from(schoolDoc.data()!['customLevels']),
@@ -308,10 +327,8 @@ void main() {
           levelSchema: ReadingLevelSchema.pmBenchmark,
         );
 
-        final schoolDoc = await firestore
-            .collection('schools')
-            .doc(result['schoolId'])
-            .get();
+        final schoolDoc =
+            await firestore.collection('schools').doc(result['schoolId']).get();
         expect(schoolDoc.data()!['levelSchema'], 'pmBenchmark');
         expect(schoolDoc.data()!['customLevels'], isNull);
       });
@@ -406,7 +423,7 @@ void main() {
           onboardingId: id,
           schoolName: 'Lumi School',
           adminEmail: 'admin@school.test',
-          adminPassword: 'StrongPass123',
+          adminPassword: 'StrongPass123', // gitleaks:allow -- synthetic test credential
           adminFullName: 'Admin User',
           levelSchema: ReadingLevelSchema.pmBenchmark,
         );
@@ -464,8 +481,7 @@ void main() {
         final demoDate = DateTime(2026, 4, 1);
         await service.scheduleDemo(demoId, demoDate);
 
-        doc =
-            await firestore.collection('schoolOnboarding').doc(demoId).get();
+        doc = await firestore.collection('schoolOnboarding').doc(demoId).get();
         expect(doc.data()!['status'], 'interested');
 
         // Step 3: Create school and admin
@@ -478,8 +494,7 @@ void main() {
           levelSchema: ReadingLevelSchema.aToZ,
         );
 
-        doc =
-            await firestore.collection('schoolOnboarding').doc(demoId).get();
+        doc = await firestore.collection('schoolOnboarding').doc(demoId).get();
         expect(doc.data()!['status'], 'setupInProgress');
         expect(doc.data()!['schoolId'], result['schoolId']);
 
@@ -492,8 +507,7 @@ void main() {
         // Step 5: Complete onboarding
         await service.completeOnboarding(demoId);
 
-        doc =
-            await firestore.collection('schoolOnboarding').doc(demoId).get();
+        doc = await firestore.collection('schoolOnboarding').doc(demoId).get();
         expect(doc.data()!['status'], 'active');
         expect(doc.data()!['currentStep'], 'completed');
       });
@@ -518,15 +532,13 @@ void main() {
     group('getOnboardingByEmail', () {
       test('finds record by contact email', () async {
         await seedOnboardingDoc();
-        final result =
-            await service.getOnboardingByEmail('admin@school.test');
+        final result = await service.getOnboardingByEmail('admin@school.test');
         expect(result, isNotNull);
         expect(result!.contactEmail, 'admin@school.test');
       });
 
       test('returns null when email not found', () async {
-        final result =
-            await service.getOnboardingByEmail('unknown@test.com');
+        final result = await service.getOnboardingByEmail('unknown@test.com');
         expect(result, isNull);
       });
     });
