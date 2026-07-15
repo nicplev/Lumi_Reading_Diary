@@ -30,6 +30,7 @@ import {
   computeGentleStreak,
   computeLongestStreak,
   countInWindow,
+  localDateUtcRange,
   localDateString,
   parseTermDates,
 } from "./dateUtils";
@@ -321,14 +322,14 @@ export async function applyStudentStatsDelta(
     beforeCounted &&
     (!afterCounted || beforeCounted.localDate !== afterCounted.localDate)
   ) {
-    const dayStart = new Date(`${beforeCounted.localDate}T00:00:00Z`);
-    const dayEnd = new Date(`${beforeCounted.localDate}T23:59:59.999Z`);
+    const {startInclusive, endExclusive} =
+      localDateUtcRange(beforeCounted.localDate, tz);
     const others = await db
       .collection(`schools/${schoolId}/readingLogs`)
       .where("studentId", "==", studentId)
       .where("status", "in", COUNTED_STATUSES)
-      .where("date", ">=", admin.firestore.Timestamp.fromDate(dayStart))
-      .where("date", "<=", admin.firestore.Timestamp.fromDate(dayEnd))
+      .where("date", ">=", admin.firestore.Timestamp.fromDate(startInclusive))
+      .where("date", "<", admin.firestore.Timestamp.fromDate(endExclusive))
       .where(admin.firestore.FieldPath.documentId(), "!=", change.before.id)
       .limit(1)
       .count()
@@ -395,12 +396,31 @@ export async function applyStudentStatsDelta(
 // Class stats
 // ──────────────────────────────────────────────────────────────────────
 
-const FIRESTORE_IN_LIMIT = 30;
+// Firestore permits at most 30 disjunctions after query normalization. Class
+// aggregation combines `studentId in [...]` with `status in [completed,
+// partial]`, so each student ID consumes two disjunctions. Batching 30 student
+// IDs produced 60 and caused the weekly reconciler to silently skip larger
+// classes while the overall scheduled run still completed.
+const FIRESTORE_MAX_DISJUNCTIONS = 30;
+const CLASS_AGGREGATION_STUDENT_BATCH_SIZE =
+  Math.floor(FIRESTORE_MAX_DISJUNCTIONS / COUNTED_STATUSES.length);
 
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
   return out;
+}
+
+/**
+ * Split class student IDs into batches safe for the compound `in` query used
+ * by both the incremental self-heal and legacy full recompute paths.
+ * @param {string[]} studentIds Student document IDs in the class.
+ * @return {Array<Array<string>>} Safe student ID batches.
+ */
+export function classAggregationStudentBatches(
+  studentIds: string[],
+): string[][] {
+  return chunk(studentIds, CLASS_AGGREGATION_STUDENT_BATCH_SIZE);
 }
 
 /**
@@ -439,7 +459,7 @@ export async function reconcileClassStats(
   let totalBooks = 0;
   const activeStudentIds = new Set<string>();
 
-  for (const studentBatch of chunk(classStudentIds, FIRESTORE_IN_LIMIT)) {
+  for (const studentBatch of classAggregationStudentBatches(classStudentIds)) {
     const logsSnap = await db
       .collection(`schools/${schoolId}/readingLogs`)
       .where("studentId", "in", studentBatch)

@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   localDateString,
+  localDateUtcRange,
   shiftDays,
   computeGentleStreak,
   computeLongestStreak,
@@ -26,6 +27,42 @@ test('localDateString buckets a late-night UTC instant into the local day', () =
 
 test('localDateString falls back to the UTC date for an invalid timezone', () => {
   assert.equal(localDateString(new Date('2026-06-07T12:30:00Z'), 'Not/AZone'), '2026-06-07');
+});
+
+test('localDateUtcRange maps a Melbourne local day to UTC', () => {
+  const range = localDateUtcRange('2026-06-07', 'Australia/Melbourne');
+  assert.equal(range.startInclusive.toISOString(), '2026-06-06T14:00:00.000Z');
+  assert.equal(range.endExclusive.toISOString(), '2026-06-07T14:00:00.000Z');
+});
+
+test('localDateUtcRange maps a Sydney summer day to UTC', () => {
+  const range = localDateUtcRange('2026-01-15', 'Australia/Sydney');
+  assert.equal(range.startInclusive.toISOString(), '2026-01-14T13:00:00.000Z');
+  assert.equal(range.endExclusive.toISOString(), '2026-01-15T13:00:00.000Z');
+});
+
+test('localDateUtcRange follows Melbourne DST start and end', () => {
+  const spring = localDateUtcRange('2026-10-04', 'Australia/Melbourne');
+  assert.equal(spring.startInclusive.toISOString(), '2026-10-03T14:00:00.000Z');
+  assert.equal(spring.endExclusive.toISOString(), '2026-10-04T13:00:00.000Z');
+  assert.equal(
+    spring.endExclusive.getTime() - spring.startInclusive.getTime(),
+    23 * 60 * 60 * 1000,
+  );
+
+  const autumn = localDateUtcRange('2026-04-05', 'Australia/Melbourne');
+  assert.equal(autumn.startInclusive.toISOString(), '2026-04-04T13:00:00.000Z');
+  assert.equal(autumn.endExclusive.toISOString(), '2026-04-05T14:00:00.000Z');
+  assert.equal(
+    autumn.endExclusive.getTime() - autumn.startInclusive.getTime(),
+    25 * 60 * 60 * 1000,
+  );
+});
+
+test('localDateUtcRange falls back to UTC for an invalid timezone', () => {
+  const range = localDateUtcRange('2026-06-07', 'Not/AZone');
+  assert.equal(range.startInclusive.toISOString(), '2026-06-07T00:00:00.000Z');
+  assert.equal(range.endExclusive.toISOString(), '2026-06-08T00:00:00.000Z');
 });
 
 // ─── shiftDays — calendar arithmetic across boundaries ────────────────────────

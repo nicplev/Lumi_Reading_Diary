@@ -130,6 +130,84 @@ export function localDateString(d: Date, tz: string): string {
 }
 
 /**
+ * Offset from UTC for an instant in an IANA timezone. Invalid timezones fall
+ * back to UTC, matching localDateString's failure posture.
+ * @param {Date} d The instant at which to resolve the offset.
+ * @param {string} tz The IANA timezone.
+ * @return {number} Local wall-clock minus UTC, in milliseconds.
+ */
+function timezoneOffsetMs(d: Date, tz: string): number {
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(d);
+    const values: Record<string, number> = {};
+    for (const part of parts) {
+      if (part.type !== "literal") values[part.type] = Number(part.value);
+    }
+    const wallClockAsUtc = Date.UTC(
+      values.year,
+      values.month - 1,
+      values.day,
+      values.hour,
+      values.minute,
+      values.second,
+    );
+    return wallClockAsUtc - d.getTime();
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Convert a local calendar midnight into its UTC instant. Resolving the
+ * offset twice handles dates where the offset at naive UTC midnight differs
+ * from the offset at local midnight because of a nearby DST transition.
+ * @param {string} dateStr Local date as YYYY-MM-DD.
+ * @param {string} tz The school's IANA timezone.
+ * @return {Date} UTC instant corresponding to local midnight.
+ */
+function localMidnightUtc(dateStr: string, tz: string): Date {
+  if (!TERM_DATE_RE.test(dateStr)) {
+    throw new RangeError(`Invalid local date: ${dateStr}`);
+  }
+  const naiveUtc = new Date(`${dateStr}T00:00:00.000Z`);
+  if (naiveUtc.toISOString().slice(0, 10) !== dateStr) {
+    throw new RangeError(`Invalid local date: ${dateStr}`);
+  }
+  let offset = timezoneOffsetMs(naiveUtc, tz);
+  let result = new Date(naiveUtc.getTime() - offset);
+  offset = timezoneOffsetMs(result, tz);
+  result = new Date(naiveUtc.getTime() - offset);
+  return result;
+}
+
+/**
+ * UTC query bounds for one school-local calendar day. The end is exclusive,
+ * so adjacent dates cannot overlap. Computing both midnights independently
+ * correctly yields 23- and 25-hour ranges across daylight-saving changes.
+ * @param {string} dateStr Local date as YYYY-MM-DD.
+ * @param {string} tz The school's IANA timezone.
+ * @return {{startInclusive: Date, endExclusive: Date}} UTC range.
+ */
+export function localDateUtcRange(
+  dateStr: string,
+  tz: string,
+): {startInclusive: Date; endExclusive: Date} {
+  return {
+    startInclusive: localMidnightUtc(dateStr, tz),
+    endExclusive: localMidnightUtc(shiftDays(dateStr, 1), tz),
+  };
+}
+
+/**
  * Add `delta` days to a "YYYY-MM-DD" string, returning a "YYYY-MM-DD".
  * Anchored at noon UTC so DST transitions can never shift the calendar day
  * (we only need day granularity here).
