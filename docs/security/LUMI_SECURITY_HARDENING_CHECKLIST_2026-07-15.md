@@ -54,6 +54,17 @@
 - **Security gates still open:** Complete the PIA/notice/APP 8 provider work and STT residency go/no-go before sending any child content externally. Keep AI disabled by default. The existing hardcoded production Functions service account still blocks a safe separate-project staging deploy.
 - **Resume point:** Continue in `docs/AI_COMPREHENSION_EVAL_CHECKLIST.md` at Phase 0. Do not begin provider-connected Phase 2/3 work until the privacy/go-no-go prerequisites are satisfied.
 
+### 2026-07-15 — AI comprehension Phase 0 Australian STT spike
+
+- **Cloud configuration:** Enabled `speech.googleapis.com` in `lumi-ninc-au` and granted the existing Australian Functions runtime service account `roles/speech.client`. No Anthropic secret, LLM dependency, AI worker or entitlement was added; the production kill switch remains exactly `{enabled:false}`.
+- **Regional evidence:** Speech-to-Text V2 requests reached `australia-southeast1`. Google Locations metadata reports `en-AU` `long`/`short` support. A synthetic 6.23-second AAC/M4A was transcribed correctly by `long` without transcoding; `latest_short` returned no transcript for that clip but did transcribe most of a 1.35-second sample. Chirp 2 returned unavailable for the Australian region.
+- **Cost/capacity evidence:** Official V2 billing and observed requests use one-second upward rounding (1.35 s → 2 s; 6.23 s → 7 s). Live regional synchronous-recognition quota is 211 requests/minute versus planned `maxInstances=5`; this is enough for the spike, not a substitute for peak load testing.
+- **Safety evidence:** Added a synthetic-only adversarial transcript fixture covering injection, prompt exfiltration, off-topic answers, adult prompting, gibberish, empty speech, insufficient evidence and incidental personal information, plus an automated schema/coverage test.
+- **Repository verification:** Functions build and `npm run test:functions` pass **118/118**; lint has zero errors and the same eight existing non-null-assertion warnings. JSON validation and `git diff --check` pass.
+- **Repository reconciliation:** The isolated evidence/fixture slice is PR #391 from `ai/phase0-go-no-go`; squash-merge only after required CI passes.
+- **Decision:** Conditional technical GO for the Australian `long` model path; **NO-GO for production/school processing**. No child audio was tested. Representative authorised recordings, teacher accuracy review, approved PIA/notice/opt-out/no-backfill rules, Anthropic DPA/APP 8/retention/ZDR and cost controls remain release blockers. Full evidence and the working PIA are in `docs/AI_EVALUATION_PLAN.md`.
+- **Resume point:** Finish the open Phase 0 gates in `docs/AI_COMPREHENSION_EVAL_CHECKLIST.md`. Do not deploy a provider-connected pipeline or set the kill switch true.
+
 ---
 
 ## Current implementation verdict (plain English)
