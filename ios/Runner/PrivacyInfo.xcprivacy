@@ -13,8 +13,11 @@
 	     ship their own privacy manifests (in ios/Pods), which Apple aggregates
 	     with this one for the app's Privacy Report. Keep this list in sync with
 	     the App Privacy labels in App Store Connect
-	     (docs/app-store/app-privacy-labels.md). All data is linked to the
-	     user's identity (via their Firebase account) and is NOT used to track. -->
+	     (docs/app-store/app-privacy-labels.md). Account/service data is linked
+	     to the Firebase account. Optional diagnostics are not linked to that
+	     account, but are conservatively declared "linked" because their
+	     pseudonymous SDK installation IDs can identify a device. No collected
+	     data is used to track across other companies' services. -->
 	<key>NSPrivacyCollectedDataTypes</key>
 	<array>
 		<dict>
@@ -99,7 +102,6 @@
 			<key>NSPrivacyCollectedDataTypePurposes</key>
 			<array>
 				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
-				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
 			</array>
 		</dict>
 		<dict>

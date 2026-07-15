@@ -13,50 +13,64 @@ class AnalyticsService {
 
   late final FirebaseAnalytics _analytics;
   bool _initialized = false;
+  bool _collectionEnabled = false;
 
   /// Global gate: skip all analytics when uninitialised OR while a developer
   /// impersonation session is active (avoids polluting a real school's
   /// analytics with dev-driven events).
   bool get _shouldSuppress =>
-      !_initialized || ImpersonationService.instance.isActive;
+      !_initialized ||
+      !_collectionEnabled ||
+      ImpersonationService.instance.isActive;
 
-  Future<void> initialize() async {
+  Future<void> initialize({bool collectionEnabled = false}) async {
     try {
       _analytics = FirebaseAnalytics.instance;
-      // setAnalyticsCollectionEnabled can hang on iOS 26 — use a timeout
-      await _analytics
-          .setAnalyticsCollectionEnabled(!kDebugMode)
-          .timeout(const Duration(seconds: 5));
       _initialized = true;
-      debugPrint('Analytics initialized (enabled: ${!kDebugMode})');
+      await setCollectionEnabled(collectionEnabled);
+      debugPrint('Analytics initialized (enabled: $_collectionEnabled)');
     } catch (e) {
       debugPrint('Warning: Analytics init failed or timed out: $e');
-      // Still mark as initialized so the app can function without analytics
       _analytics = FirebaseAnalytics.instance;
       _initialized = true;
+      _collectionEnabled = false;
     }
   }
 
   FirebaseAnalyticsObserver get observer =>
       FirebaseAnalyticsObserver(analytics: _analytics);
 
-  /// Set the current user for analytics tracking
-  Future<void> setUserId(String userId) async {
-    if (_shouldSuppress) return;
+  /// Applies the adult's optional analytics choice. Debug builds remain off.
+  /// Disabling also removes any legacy UID/property and rotates the local
+  /// Analytics app-instance identifier left by older Lumi releases.
+  Future<void> setCollectionEnabled(bool enabled) async {
+    if (!_initialized) return;
+    final effectiveEnabled = enabled && !kDebugMode;
     try {
-      await _analytics.setUserId(id: userId);
+      // Analytics consent is independent from advertising consent. Lumi never
+      // enables ad storage, ad-user-data or personalisation signals.
+      await _analytics
+          .setConsent(
+            analyticsStorageConsentGranted: effectiveEnabled,
+            adStorageConsentGranted: false,
+            adUserDataConsentGranted: false,
+            adPersonalizationSignalsConsentGranted: false,
+          )
+          .timeout(const Duration(seconds: 5));
+      // This native call has hung on some iOS versions, so it must never block
+      // startup or the settings screen indefinitely.
+      await _analytics
+          .setAnalyticsCollectionEnabled(effectiveEnabled)
+          .timeout(const Duration(seconds: 5));
+      _collectionEnabled = effectiveEnabled;
+      if (!effectiveEnabled) {
+        await _analytics.setUserId(id: null);
+        await _analytics.setUserProperty(name: 'user_role', value: null);
+        await _analytics.resetAnalyticsData();
+      }
     } catch (e) {
-      debugPrint('Error setting analytics user ID: $e');
-    }
-  }
-
-  /// Set user role property (parent, teacher, schoolAdmin)
-  Future<void> setUserRole(String role) async {
-    if (_shouldSuppress) return;
-    try {
-      await _analytics.setUserProperty(name: 'user_role', value: role);
-    } catch (e) {
-      debugPrint('Error setting user role: $e');
+      _collectionEnabled = false;
+      debugPrint('Error applying analytics privacy choice: $e');
     }
   }
 
@@ -70,14 +84,8 @@ class AnalyticsService {
   }) async {
     if (_shouldSuppress) return;
     try {
-      await _analytics.logEvent(
-        name: 'reading_logged',
-        parameters: {
-          'feeling': feeling,
-          'book_count': bookCount,
-          'minutes_read': minutesRead,
-        },
-      );
+      // Never attach child feelings, reading volume or duration.
+      await _analytics.logEvent(name: 'reading_logged');
     } catch (e) {
       debugPrint('Error logging reading_logged event: $e');
     }
@@ -87,10 +95,7 @@ class AnalyticsService {
   Future<void> logBadgeEarned({required String badgeType}) async {
     if (_shouldSuppress) return;
     try {
-      await _analytics.logEvent(
-        name: 'badge_earned',
-        parameters: {'badge_type': badgeType},
-      );
+      await _analytics.logEvent(name: 'badge_earned');
     } catch (e) {
       debugPrint('Error logging badge_earned event: $e');
     }
@@ -100,10 +105,7 @@ class AnalyticsService {
   Future<void> logStreakMilestone({required int streakCount}) async {
     if (_shouldSuppress) return;
     try {
-      await _analytics.logEvent(
-        name: 'streak_milestone',
-        parameters: {'streak_count': streakCount},
-      );
+      await _analytics.logEvent(name: 'streak_milestone');
     } catch (e) {
       debugPrint('Error logging streak_milestone event: $e');
     }
@@ -113,10 +115,7 @@ class AnalyticsService {
   Future<void> logAppOpened({required String role}) async {
     if (_shouldSuppress) return;
     try {
-      await _analytics.logEvent(
-        name: 'app_opened',
-        parameters: {'role': role},
-      );
+      await _analytics.logEvent(name: 'app_opened');
     } catch (e) {
       debugPrint('Error logging app_opened event: $e');
     }
@@ -126,10 +125,7 @@ class AnalyticsService {
   Future<void> logFeedbackSubmitted({required String category}) async {
     if (_shouldSuppress) return;
     try {
-      await _analytics.logEvent(
-        name: 'feedback_submitted',
-        parameters: {'category': category},
-      );
+      await _analytics.logEvent(name: 'feedback_submitted');
     } catch (e) {
       debugPrint('Error logging feedback_submitted event: $e');
     }
@@ -149,10 +145,7 @@ class AnalyticsService {
   Future<void> logAllocationCreated({required String type}) async {
     if (_shouldSuppress) return;
     try {
-      await _analytics.logEvent(
-        name: 'allocation_created',
-        parameters: {'type': type},
-      );
+      await _analytics.logEvent(name: 'allocation_created');
     } catch (e) {
       debugPrint('Error logging allocation_created event: $e');
     }
@@ -164,10 +157,7 @@ class AnalyticsService {
   }) async {
     if (_shouldSuppress) return;
     try {
-      await _analytics.logEvent(
-        name: 'onboarding_step_completed',
-        parameters: {'step': step},
-      );
+      await _analytics.logEvent(name: 'onboarding_step_completed');
     } catch (e) {
       debugPrint('Error logging onboarding_step_completed event: $e');
     }
@@ -180,13 +170,7 @@ class AnalyticsService {
   }) async {
     if (_shouldSuppress) return;
     try {
-      await _analytics.logEvent(
-        name: 'onboarding_failed',
-        parameters: {
-          'step': step,
-          'reason': reason,
-        },
-      );
+      await _analytics.logEvent(name: 'onboarding_failed');
     } catch (e) {
       debugPrint('Error logging onboarding_failed event: $e');
     }
@@ -216,10 +200,7 @@ class AnalyticsService {
   Future<void> logParentLinkingFailed({required String reason}) async {
     if (_shouldSuppress) return;
     try {
-      await _analytics.logEvent(
-        name: 'parent_linking_failed',
-        parameters: {'reason': reason},
-      );
+      await _analytics.logEvent(name: 'parent_linking_failed');
     } catch (e) {
       debugPrint('Error logging parent_linking_failed event: $e');
     }
@@ -229,10 +210,7 @@ class AnalyticsService {
   Future<void> logParentCodesExported({required int rowCount}) async {
     if (_shouldSuppress) return;
     try {
-      await _analytics.logEvent(
-        name: 'parent_codes_exported',
-        parameters: {'row_count': rowCount},
-      );
+      await _analytics.logEvent(name: 'parent_codes_exported');
     } catch (e) {
       debugPrint('Error logging parent_codes_exported event: $e');
     }

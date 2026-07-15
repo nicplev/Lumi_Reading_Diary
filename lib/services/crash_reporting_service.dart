@@ -6,24 +6,28 @@ import 'dart:async';
 /// Handles error tracking, crash reporting, and analytics
 class CrashReportingService {
   static CrashReportingService? _instance;
-  static CrashReportingService get instance => _instance ??= CrashReportingService._();
+  static CrashReportingService get instance =>
+      _instance ??= CrashReportingService._();
 
   CrashReportingService._();
 
   late FirebaseCrashlytics _crashlytics;
   bool _initialized = false;
+  bool _collectionEnabled = false;
 
   /// Initialize crash reporting
-  Future<void> initialize() async {
+  Future<void> initialize({bool collectionEnabled = false}) async {
     try {
       _crashlytics = FirebaseCrashlytics.instance;
 
-      // Enable crash collection in production only
-      await _crashlytics.setCrashlyticsCollectionEnabled(!kDebugMode);
+      _initialized = true;
+      await setCrashlyticsCollectionEnabled(collectionEnabled);
 
       // Pass all uncaught errors from the framework to Crashlytics
       FlutterError.onError = (FlutterErrorDetails details) {
-        _crashlytics.recordFlutterError(details);
+        if (_collectionEnabled) {
+          _crashlytics.recordFlutterError(details);
+        }
         if (kDebugMode) {
           FlutterError.presentError(details);
         }
@@ -31,35 +35,22 @@ class CrashReportingService {
 
       // Catch errors that occur outside of Flutter framework
       PlatformDispatcher.instance.onError = (error, stack) {
-        _crashlytics.recordError(error, stack, fatal: true);
+        if (_collectionEnabled) {
+          _crashlytics.recordError(error, stack, fatal: true);
+        }
         return true;
       };
 
-      _initialized = true;
-      debugPrint('Crash reporting initialized (enabled: ${!kDebugMode})');
+      debugPrint('Crash reporting initialized (enabled: $_collectionEnabled)');
     } catch (e) {
       debugPrint('Error initializing crash reporting: $e');
       _initialized = false;
     }
   }
 
-  /// Set user identifier for crash reports
-  Future<void> setUserId(String userId) async {
-    if (!_initialized) return;
-
-    try {
-      await _crashlytics.setUserIdentifier(userId);
-      if (kDebugMode) {
-        debugPrint('Crash reporting user ID set: $userId');
-      }
-    } catch (e) {
-      debugPrint('Error setting user ID for crash reporting: $e');
-    }
-  }
-
   /// Set custom key-value pairs for additional context
   Future<void> setCustomKey(String key, dynamic value) async {
-    if (!_initialized) return;
+    if (!_initialized || !_collectionEnabled) return;
 
     try {
       if (value is String) {
@@ -81,7 +72,7 @@ class CrashReportingService {
 
   /// Log a message to Crashlytics
   Future<void> log(String message) async {
-    if (!_initialized) return;
+    if (!_initialized || !_collectionEnabled) return;
 
     try {
       await _crashlytics.log(message);
@@ -99,7 +90,7 @@ class CrashReportingService {
     bool fatal = false,
     Iterable<Object> information = const [],
   }) async {
-    if (!_initialized) return;
+    if (!_initialized || !_collectionEnabled) return;
 
     try {
       await _crashlytics.recordError(
@@ -117,7 +108,7 @@ class CrashReportingService {
 
   /// Record Flutter framework error
   Future<void> recordFlutterError(FlutterErrorDetails details) async {
-    if (!_initialized) return;
+    if (!_initialized || !_collectionEnabled) return;
 
     try {
       await _crashlytics.recordFlutterError(details);
@@ -141,7 +132,7 @@ class CrashReportingService {
     if (!_initialized) return false;
 
     try {
-      return _crashlytics.isCrashlyticsCollectionEnabled;
+      return _collectionEnabled && _crashlytics.isCrashlyticsCollectionEnabled;
     } catch (e) {
       debugPrint('Error checking crashlytics status: $e');
       return false;
@@ -150,7 +141,7 @@ class CrashReportingService {
 
   /// Send unsent reports
   Future<void> sendUnsentReports() async {
-    if (!_initialized) return;
+    if (!_initialized || !_collectionEnabled) return;
 
     try {
       await _crashlytics.sendUnsentReports();
@@ -189,9 +180,17 @@ class CrashReportingService {
     if (!_initialized) return;
 
     try {
-      await _crashlytics.setCrashlyticsCollectionEnabled(enabled);
-      debugPrint('Crashlytics collection enabled: $enabled');
+      final effectiveEnabled = enabled && !kDebugMode;
+      await _crashlytics.setCrashlyticsCollectionEnabled(effectiveEnabled);
+      _collectionEnabled = effectiveEnabled;
+      if (!effectiveEnabled) {
+        // Clear identifiers and queued reports produced by older releases.
+        await _crashlytics.setUserIdentifier('');
+        await _crashlytics.deleteUnsentReports();
+      }
+      debugPrint('Crashlytics collection enabled: $effectiveEnabled');
     } catch (e) {
+      _collectionEnabled = false;
       debugPrint('Error setting crashlytics collection: $e');
     }
   }

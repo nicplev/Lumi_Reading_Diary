@@ -5,6 +5,7 @@ import '../../core/auth/sign_out_flow.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/user_model.dart';
 import '../../services/account_deletion_service.dart';
+import '../../services/diagnostics_preferences_service.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 
@@ -13,11 +14,13 @@ class AccountScreen extends StatefulWidget {
     super.key,
     required this.user,
     this.deletionService,
+    this.diagnosticsController,
     this.firestore,
   });
 
   final UserModel user;
   final AccountDeletionService? deletionService;
+  final DiagnosticsSettingsController? diagnosticsController;
   final FirebaseFirestore? firestore;
 
   @override
@@ -26,11 +29,16 @@ class AccountScreen extends StatefulWidget {
 
 class _AccountScreenState extends State<AccountScreen> {
   late final AccountDeletionService _deletionService;
+  late final DiagnosticsSettingsController _diagnosticsController;
   late final FirebaseFirestore _firestore;
   DeletionJobStatus? _accountStatus;
   bool _loadingStatus = true;
   bool _deletingAccount = false;
   bool _loadingStudents = false;
+  DiagnosticsPreferences? _diagnosticsPreferences;
+  bool _updatingAnalytics = false;
+  bool _updatingCrashReports = false;
+  String? _diagnosticsError;
   String? _error;
 
   bool get _canDeleteStudents =>
@@ -41,8 +49,84 @@ class _AccountScreenState extends State<AccountScreen> {
   void initState() {
     super.initState();
     _deletionService = widget.deletionService ?? AccountDeletionService();
+    _diagnosticsController =
+        widget.diagnosticsController ?? DiagnosticsPreferencesService.instance;
     _firestore = widget.firestore ?? FirebaseFirestore.instance;
     _refreshAccountStatus();
+    _loadDiagnosticsPreferences();
+  }
+
+  Future<void> _loadDiagnosticsPreferences() async {
+    try {
+      final preferences = await _diagnosticsController.load();
+      if (mounted) {
+        setState(() {
+          _diagnosticsPreferences = preferences;
+          _diagnosticsError = null;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _diagnosticsPreferences = const DiagnosticsPreferences(
+            analyticsEnabled: false,
+            crashReportsEnabled: false,
+          );
+          _diagnosticsError =
+              'Diagnostics choices could not be loaded. Collection remains off.';
+        });
+      }
+    }
+  }
+
+  Future<void> _setAnalyticsEnabled(bool enabled) async {
+    final current = _diagnosticsPreferences;
+    if (current == null || _updatingAnalytics) return;
+    setState(() {
+      _updatingAnalytics = true;
+      _diagnosticsError = null;
+    });
+    try {
+      await _diagnosticsController.setAnalyticsEnabled(enabled);
+      if (mounted) {
+        setState(() => _diagnosticsPreferences = DiagnosticsPreferences(
+              analyticsEnabled: enabled,
+              crashReportsEnabled: current.crashReportsEnabled,
+            ));
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _diagnosticsError =
+            'The analytics choice could not be saved. Collection remains unchanged.');
+      }
+    } finally {
+      if (mounted) setState(() => _updatingAnalytics = false);
+    }
+  }
+
+  Future<void> _setCrashReportsEnabled(bool enabled) async {
+    final current = _diagnosticsPreferences;
+    if (current == null || _updatingCrashReports) return;
+    setState(() {
+      _updatingCrashReports = true;
+      _diagnosticsError = null;
+    });
+    try {
+      await _diagnosticsController.setCrashReportsEnabled(enabled);
+      if (mounted) {
+        setState(() => _diagnosticsPreferences = DiagnosticsPreferences(
+              analyticsEnabled: current.analyticsEnabled,
+              crashReportsEnabled: enabled,
+            ));
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _diagnosticsError =
+            'The crash-report choice could not be saved. Collection remains unchanged.');
+      }
+    } finally {
+      if (mounted) setState(() => _updatingCrashReports = false);
+    }
   }
 
   Future<void> _refreshAccountStatus() async {
@@ -405,6 +489,63 @@ class _AccountScreenState extends State<AccountScreen> {
               onPressed: _loadingStudents ? null : _chooseStudentToDelete,
             ),
           ],
+          const SizedBox(height: LumiTokens.space5),
+          Text('Privacy & diagnostics', style: LumiType.subhead),
+          const SizedBox(height: LumiTokens.space2),
+          Text(
+            'Optional diagnostics are off unless you choose to share them. '
+            'Lumi does not attach your account ID, child identity, book titles, '
+            'recordings, notes or detailed reading results.',
+            style: LumiType.caption,
+          ),
+          const SizedBox(height: LumiTokens.space3),
+          if (_diagnosticsError != null) ...[
+            Container(
+              key: const Key('diagnostics-error'),
+              padding: const EdgeInsets.all(LumiTokens.space3),
+              decoration: BoxDecoration(
+                color: LumiTokens.tintYellow.withValues(alpha: 0.55),
+                borderRadius: BorderRadius.circular(LumiTokens.radiusMedium),
+              ),
+              child: Text(_diagnosticsError!),
+            ),
+            const SizedBox(height: LumiTokens.space3),
+          ],
+          _AccountCard(
+            child: Column(
+              children: [
+                SwitchListTile.adaptive(
+                  key: const Key('optional-analytics-toggle'),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Share product usage'),
+                  subtitle: const Text(
+                    'Sends pseudonymous feature-use events to help improve Lumi. '
+                    'Not used for advertising.',
+                  ),
+                  value: _diagnosticsPreferences?.analyticsEnabled ?? false,
+                  onChanged:
+                      _diagnosticsPreferences == null || _updatingAnalytics
+                          ? null
+                          : _setAnalyticsEnabled,
+                ),
+                const Divider(),
+                SwitchListTile.adaptive(
+                  key: const Key('optional-crash-reports-toggle'),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Share crash reports'),
+                  subtitle: const Text(
+                    'Sends pseudonymous crash and device diagnostics to help '
+                    'fix faults. Reports may be processed outside Australia.',
+                  ),
+                  value: _diagnosticsPreferences?.crashReportsEnabled ?? false,
+                  onChanged:
+                      _diagnosticsPreferences == null || _updatingCrashReports
+                          ? null
+                          : _setCrashReportsEnabled,
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

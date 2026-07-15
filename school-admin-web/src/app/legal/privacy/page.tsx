@@ -66,8 +66,8 @@ export default function PrivacyPolicyPage() {
         <h3>Device and technical information</h3>
         <ul>
           <li>a push-notification token, so we can deliver reminders and updates to your device;</li>
-          <li>app version, device type and basic diagnostics;</li>
-          <li>crash reports and limited product-usage analytics (collected only in production builds) to keep the app reliable and to understand which features are used;</li>
+          <li>app version and device type where needed to operate the Service;</li>
+          <li>optional crash reports and limited product-usage analytics, only where an adult account holder has enabled the relevant control on that device;</li>
           <li>information you provide when you contact support or send feedback.</li>
         </ul>
       </section>
@@ -79,7 +79,7 @@ export default function PrivacyPolicyPage() {
           <li>provide the Service — record and display reading activity, progress and achievements;</li>
           <li>enable communication between teachers and parents/carers about a child&rsquo;s reading;</li>
           <li>send reading reminders, achievement and comment notifications, and school announcements;</li>
-          <li>operate, secure, troubleshoot and improve the app (including crash reporting and aggregate usage analytics);</li>
+          <li>operate and secure the Service, and—where an adult has opted in—troubleshoot and improve the app using pseudonymous crash reports or product-usage analytics;</li>
           <li>verify school enrolment and manage access entitlements; and</li>
           <li>respond to support requests and meet legal obligations.</li>
         </ul>
@@ -181,8 +181,22 @@ export default function PrivacyPolicyPage() {
         <h2>8. Push notifications and analytics</h2>
         <p>
           You can turn off push notifications at any time in your device settings. Product-usage
-          analytics and crash reporting are collected only in production builds and are used in
-          aggregate to improve reliability and usability; they are not used for advertising.
+          analytics and crash reporting are separate, optional controls that are <strong>off by
+          default</strong>. An adult parent/carer or staff account holder may enable or withdraw
+          either choice at any time in <strong>Settings → Account → Privacy &amp; diagnostics</strong>.
+          Choices are stored on that device.
+        </p>
+        <p>
+          Lumi does not attach a Firebase account UID, child identity, school, book title,
+          recording, note or detailed reading result to Analytics. Feature events omit reading
+          duration and count, feelings, badge types and streak values. If enabled, Analytics uses a
+          pseudonymous app-instance identifier. If enabled, a crash report may contain a stack
+          trace plus app, operating-system and device diagnostics, but Lumi does not attach the
+          account UID. These services are provided by Google Firebase, may be processed outside
+          Australia, and are used only to improve reliability and usability—not for advertising or
+          tracking across other companies&rsquo; services. Turning a control off stops future
+          collection; Lumi also clears legacy identifiers and locally queued reports where the SDK
+          supports that action.
         </p>
       </section>
 
