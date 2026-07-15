@@ -72,6 +72,7 @@
 - **Fix:** Both legacy and self-heal class recomputation now share 15-ID batches. Incremental removal checks also convert the school-local reading date to an exclusive UTC range using the school timezone, including Melbourne/Sydney DST transitions, instead of treating local midnight as UTC.
 - **Verification:** Functions build and tests pass **123/123**; lint has zero errors and the same eight existing warnings; Firestore rules pass **145/145**; focused Flutter offline queue tests pass **34/34**. Regression tests cover the compound-query budget, Melbourne 23/25-hour DST days, a Sydney summer day and invalid-timezone fallback.
 - **Production result:** `aggregateStudentStats`, `updateClassStats` and `reconcileStatsScheduled` were updated in `australia-southeast1`. A controlled scheduled reconcile then processed **52 students and 14 classes with zero error entries**; the student/class cursors both returned to null. P1-5 is complete.
+- **Repository reconciliation:** Branch `security/stats-reconcile-disjunction`, PR #392. Squash-merge only after required CI passes.
 - **Remaining offline work:** Server receipt timestamps, date bounds, write allowlists, idempotent IDs and parked permission-denied UI state exist and are tested. P1-4 remains partial until concurrent parent/teacher edit behavior and the full airplane-mode → access-revocation → reconnect experience are exercised on physical devices.
 
 ---
