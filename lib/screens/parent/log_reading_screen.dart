@@ -51,7 +51,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
 
   // Pre-generated id reused as the storage filename for the comprehension
   // audio, so the path is stable across wizard, upload, and teacher player.
-  final String _logId = DateTime.now().millisecondsSinceEpoch.toString();
+  final String _logId = ReadingLogService.generateLogId();
 
   // Parent comment settings (loaded from school doc)
   ParentCommentSettings _commentSettings = ParentCommentSettings.defaults();
@@ -135,8 +135,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
       if (_hasDraftContent && !_isLoading) {
-        OfflineService.instance
-            .saveLogDraft(widget.student.id, _buildDraft());
+        OfflineService.instance.saveLogDraft(widget.student.id, _buildDraft());
       }
     }
   }
@@ -545,87 +544,87 @@ class _LogReadingScreenState extends State<LogReadingScreen>
                     ),
           ),
           child: SafeArea(
-        child: Column(
-          children: [
-            // Soft notice: another guardian already logged today.
-            if (_alreadyLoggedNotice != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: LumiTokens.yellow.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.info_outline,
-                          color: LumiTokens.yellow, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _alreadyLoggedNotice!,
-                          style: LumiTextStyles.bodySmall(
-                            color: LumiTokens.ink,
+            child: Column(
+              children: [
+                // Soft notice: another guardian already logged today.
+                if (_alreadyLoggedNotice != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: LumiTokens.yellow.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline,
+                              color: LumiTokens.yellow, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _alreadyLoggedNotice!,
+                              style: LumiTextStyles.bodySmall(
+                                color: LumiTokens.ink,
+                              ),
+                            ),
                           ),
-                        ),
+                          GestureDetector(
+                            onTap: () =>
+                                setState(() => _alreadyLoggedNotice = null),
+                            child: const Icon(Icons.close,
+                                color: LumiTokens.yellow, size: 18),
+                          ),
+                        ],
                       ),
-                      GestureDetector(
-                        onTap: () =>
-                            setState(() => _alreadyLoggedNotice = null),
-                        child: const Icon(Icons.close,
-                            color: LumiTokens.yellow, size: 18),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
 
-            // Page content
-            Expanded(
-              child: PageView(
-                controller: _pageController,
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  _buildStep1BookSelection(),
-                  if (_hasOptionalDetail) _buildStepDetail(),
-                  _buildStep4Confirmation(),
-                ],
-              ),
-            ),
-
-            // Error message
-            if (_errorMessage != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: LumiTokens.red.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
+                // Page content
+                Expanded(
+                  child: PageView(
+                    controller: _pageController,
+                    physics: const NeverScrollableScrollPhysics(),
                     children: [
-                      const Icon(Icons.error_outline,
-                          color: LumiTokens.red, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style:
-                              LumiTextStyles.bodySmall(color: LumiTokens.red),
-                        ),
-                      ),
+                      _buildStep1BookSelection(),
+                      if (_hasOptionalDetail) _buildStepDetail(),
+                      _buildStep4Confirmation(),
                     ],
                   ),
                 ),
-              ),
 
-            // Navigation buttons
-            _buildNavigationButtons(),
-          ],
-        ),
-        ),
+                // Error message
+                if (_errorMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: LumiTokens.red.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline,
+                              color: LumiTokens.red, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _errorMessage!,
+                              style: LumiTextStyles.bodySmall(
+                                  color: LumiTokens.red),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                // Navigation buttons
+                _buildNavigationButtons(),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -737,8 +736,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
             child:
                 (hasAssigned && !_showAddBookField && _customBookTitles.isEmpty)
                     ? InkWell(
-                        onTap: () =>
-                            setState(() => _showAddBookField = true),
+                        onTap: () => setState(() => _showAddBookField = true),
                         child: Row(
                           children: [
                             const Icon(Icons.add_rounded,
@@ -938,8 +936,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
       filled: true,
       fillColor: LumiTokens.cream,
       isDense: true,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       border: border(LumiTokens.rule, 1),
       enabledBorder: border(LumiTokens.rule, 1),
       focusedBorder: border(LumiTokens.red, 2),
@@ -999,8 +996,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _cardHeader(
-                      Icons.mic_none_rounded, 'Comprehension question'),
+                  _cardHeader(Icons.mic_none_rounded, 'Comprehension question'),
                   const SizedBox(height: 10),
                   // The teacher's question — prominent, so the child knows
                   // exactly what they're answering.

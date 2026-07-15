@@ -134,6 +134,10 @@ interface DemoRequestInput {
   preferredTime?: string;
   intent: "demo" | "info";
   message?: string;
+  contactPhone?: string;
+  referralSource?: string;
+  estimatedStudentCount?: number;
+  estimatedTeacherCount?: number;
 }
 
 export const submitDemoRequest = onCall(
@@ -158,6 +162,20 @@ export const submitDemoRequest = onCall(
       80
     );
     const message = limitedString(data.message, "Message", 2000);
+    const contactPhone = limitedString(data.contactPhone, "Phone", 40);
+    const referralSource = limitedString(
+      data.referralSource,
+      "Referral source",
+      100
+    );
+    const estimatedStudentCount = Number.isInteger(data.estimatedStudentCount) &&
+      (data.estimatedStudentCount as number) >= 0 &&
+      (data.estimatedStudentCount as number) <= 100000 ?
+      data.estimatedStudentCount as number : 0;
+    const estimatedTeacherCount = Number.isInteger(data.estimatedTeacherCount) &&
+      (data.estimatedTeacherCount as number) >= 0 &&
+      (data.estimatedTeacherCount as number) <= 10000 ?
+      data.estimatedTeacherCount as number : 0;
     await enforceMarketingRateLimit("demo", request, contactEmail);
 
     const notesParts: string[] = [];
@@ -174,13 +192,13 @@ export const submitDemoRequest = onCall(
       schoolName,
       contactEmail,
       contactPerson,
-      contactPhone: null,
+      contactPhone: contactPhone ?? null,
       status: "demo",
       currentStep: "schoolInfo",
       completedSteps: [],
-      estimatedStudentCount: 0,
-      estimatedTeacherCount: 0,
-      referralSource: "Marketing site",
+      estimatedStudentCount,
+      estimatedTeacherCount,
+      referralSource: referralSource ?? "Marketing site",
       createdAt: now,
       lastUpdatedAt: now,
       metadata: {notes: notesParts.join("\n")},

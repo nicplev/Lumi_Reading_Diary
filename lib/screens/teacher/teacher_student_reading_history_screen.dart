@@ -142,6 +142,7 @@ class _TeacherStudentReadingHistoryScreenState
             .collection('schools')
             .doc(widget.student.schoolId)
             .collection('readingLogs')
+            .where('classId', isEqualTo: widget.student.classId)
             .where('studentId', isEqualTo: widget.student.id)
             .orderBy('date', descending: true)
             .snapshots(),
@@ -168,8 +169,7 @@ class _TeacherStudentReadingHistoryScreenState
                   Icon(Icons.menu_book_outlined,
                       size: 48, color: LumiTokens.muted),
                   const SizedBox(height: 12),
-                  Text('No reading history yet',
-                      style: LumiType.caption),
+                  Text('No reading history yet', style: LumiType.caption),
                 ],
               ),
             );
@@ -256,11 +256,9 @@ class _TeacherStudentReadingHistoryScreenState
             child: Row(
               children: [
                 _buildStatCell('$totalNights', 'Nights logged'),
-                VerticalDivider(
-                    width: 1, thickness: 1, color: LumiTokens.rule),
+                VerticalDivider(width: 1, thickness: 1, color: LumiTokens.rule),
                 _buildStatCell('$totalMinutes', 'Total minutes'),
-                VerticalDivider(
-                    width: 1, thickness: 1, color: LumiTokens.rule),
+                VerticalDivider(width: 1, thickness: 1, color: LumiTokens.rule),
                 _buildStatCell('$booksRead', 'Books read'),
               ],
             ),
@@ -269,8 +267,7 @@ class _TeacherStudentReadingHistoryScreenState
             const SizedBox(height: 8),
             Text(
               'Showing $filteredCount of $totalNights sessions',
-              style: LumiType.caption
-                  .copyWith(color: LumiTokens.muted),
+              style: LumiType.caption.copyWith(color: LumiTokens.muted),
             ),
           ],
         ],
@@ -286,8 +283,7 @@ class _TeacherStudentReadingHistoryScreenState
           const SizedBox(height: 2),
           Text(
             label,
-            style: LumiType.caption
-                .copyWith(color: LumiTokens.muted),
+            style: LumiType.caption.copyWith(color: LumiTokens.muted),
             textAlign: TextAlign.center,
           ),
         ],
@@ -320,8 +316,7 @@ class _TeacherStudentReadingHistoryScreenState
                   style: LumiType.body,
                   decoration: InputDecoration(
                     hintText: 'Search by book name...',
-                    hintStyle: LumiType.body
-                        .copyWith(color: LumiTokens.muted),
+                    hintStyle: LumiType.body.copyWith(color: LumiTokens.muted),
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
@@ -337,8 +332,7 @@ class _TeacherStudentReadingHistoryScreenState
                     _searchController.clear();
                     setState(() => _searchQuery = '');
                   },
-                  child: Icon(Icons.close,
-                      size: 16, color: LumiTokens.muted),
+                  child: Icon(Icons.close, size: 16, color: LumiTokens.muted),
                 ),
             ],
           ),
@@ -496,8 +490,7 @@ class _TeacherStudentReadingHistoryScreenState
                 ],
                 if (log.hasRecording) ...[
                   const SizedBox(width: 8),
-                  RecordingAffordance(
-                      pending: !log.comprehensionAudioUploaded),
+                  RecordingAffordance(pending: !log.comprehensionAudioUploaded),
                 ],
                 const SizedBox(width: 8),
                 CommentAffordance(
@@ -554,8 +547,7 @@ class _TeacherStudentReadingHistoryScreenState
                     const SizedBox(height: 3),
                     Text(
                       '${book.sessionCount} ${book.sessionCount == 1 ? 'session' : 'sessions'}  ·  ${book.totalMinutes} min  ·  $dateRange',
-                      style: LumiType.caption
-                          .copyWith(color: LumiTokens.muted),
+                      style: LumiType.caption.copyWith(color: LumiTokens.muted),
                     ),
                   ],
                 ),
@@ -789,8 +781,7 @@ class _BlobFilterChip extends StatelessWidget {
           color: isActive ? LumiTokens.tintGreen : LumiTokens.paper,
           shape: BoxShape.circle,
           border: Border.all(
-            color:
-                isActive ? LumiTokens.green : LumiTokens.rule,
+            color: isActive ? LumiTokens.green : LumiTokens.rule,
             width: isActive ? 1.5 : 1.0,
           ),
         ),

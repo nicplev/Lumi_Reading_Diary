@@ -15,10 +15,17 @@ import 'book_lookup_service.dart';
 /// shared book documents so parent-safe book metadata stays separate from
 /// staff-only assignment visibility.
 class SchoolLibraryAssignmentService {
-  SchoolLibraryAssignmentService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+  SchoolLibraryAssignmentService({
+    FirebaseFirestore? firestore,
+    required String staffId,
+    required bool schoolWide,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _staffId = staffId.trim(),
+        _schoolWide = schoolWide;
 
   final FirebaseFirestore _firestore;
+  final String _staffId;
+  final bool _schoolWide;
 
   CollectionReference<Map<String, dynamic>> _allocationsRef(String schoolId) =>
       _firestore.collection('schools').doc(schoolId).collection('allocations');
@@ -26,12 +33,61 @@ class SchoolLibraryAssignmentService {
   CollectionReference<Map<String, dynamic>> _studentsRef(String schoolId) =>
       _firestore.collection('schools').doc(schoolId).collection('students');
 
-  Stream<LibraryAssignmentSnapshot> summaryStream(String schoolId) {
+  Stream<LibraryAssignmentSnapshot> summaryStream(String schoolId) async* {
     final scopedSchoolId = schoolId.trim();
-    if (scopedSchoolId.isEmpty) {
-      return Stream.value(const LibraryAssignmentSnapshot());
+    if (scopedSchoolId.isEmpty || (!_schoolWide && _staffId.isEmpty)) {
+      yield const LibraryAssignmentSnapshot();
+      return;
     }
 
+    Query<Map<String, dynamic>> allocationsQuery =
+        _allocationsRef(scopedSchoolId).where('isActive', isEqualTo: true);
+    Query<Map<String, dynamic>> studentsQuery =
+        _studentsRef(scopedSchoolId).where('isActive', isEqualTo: true);
+
+    if (!_schoolWide) {
+      final classes = _firestore
+          .collection('schools')
+          .doc(scopedSchoolId)
+          .collection('classes');
+      final owned = await classes.where('teacherId', isEqualTo: _staffId).get();
+      final coTaught =
+          await classes.where('teacherIds', arrayContains: _staffId).get();
+      final classIds = <String>{
+        ...owned.docs.map((doc) => doc.id),
+        ...coTaught.docs.map((doc) => doc.id),
+      }.toList();
+
+      if (classIds.isEmpty) {
+        yield const LibraryAssignmentSnapshot();
+        return;
+      }
+      if (classIds.length > 30) {
+        debugPrint(
+          'SchoolLibraryAssignmentService: $_staffId has ${classIds.length} '
+          'classes; assignment summary is disabled until batched listeners '
+          'are implemented.',
+        );
+        yield const LibraryAssignmentSnapshot();
+        return;
+      }
+
+      allocationsQuery = allocationsQuery.where('classId', whereIn: classIds);
+      studentsQuery = studentsQuery.where('classId', whereIn: classIds);
+    }
+
+    yield* _summaryStreamForQueries(
+      scopedSchoolId: scopedSchoolId,
+      allocationsQuery: allocationsQuery,
+      studentsQuery: studentsQuery,
+    );
+  }
+
+  Stream<LibraryAssignmentSnapshot> _summaryStreamForQueries({
+    required String scopedSchoolId,
+    required Query<Map<String, dynamic>> allocationsQuery,
+    required Query<Map<String, dynamic>> studentsQuery,
+  }) {
     late final StreamSubscription<QuerySnapshot<Map<String, dynamic>>>
         allocationsSubscription;
     late final StreamSubscription<QuerySnapshot<Map<String, dynamic>>>
@@ -61,10 +117,7 @@ class SchoolLibraryAssignmentService {
     }
 
     controller.onListen = () {
-      allocationsSubscription = _allocationsRef(scopedSchoolId)
-          .where('isActive', isEqualTo: true)
-          .snapshots()
-          .listen(
+      allocationsSubscription = allocationsQuery.snapshots().listen(
         (snapshot) {
           latestAllocations = snapshot;
           allocationsSettled = true;
@@ -85,10 +138,7 @@ class SchoolLibraryAssignmentService {
         },
       );
 
-      studentsSubscription = _studentsRef(scopedSchoolId)
-          .where('isActive', isEqualTo: true)
-          .snapshots()
-          .listen(
+      studentsSubscription = studentsQuery.snapshots().listen(
         (snapshot) {
           latestStudents = snapshot;
           studentsSettled = true;

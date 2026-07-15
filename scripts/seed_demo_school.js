@@ -9,6 +9,7 @@
  * See docs/demo-playbook.md for the demo flow this data is designed around.
  *
  * Usage:
+ *   DEMO_PASSWORD='<secret from your password manager>' \
  *   FIREBASE_ADMIN_SERVICE_ACCOUNT_PATH=/abs/path/to/service-account.json \
  *     node scripts/seed_demo_school.js [--dry-run] [--reset] [--yes]
  *
@@ -148,7 +149,14 @@ function daysAgoAt(now, daysAgo, hour, minute) {
 
 const SCHOOL_ID = "lumi_demo_primary_school";
 const TZ = "Australia/Melbourne";
-const DEMO_PASSWORD = "LumiDemo!2026";
+const suppliedDemoPassword = process.env.DEMO_PASSWORD;
+if (!DRY_RUN && (!suppliedDemoPassword || suppliedDemoPassword.length < 16)) {
+  die(
+    "DEMO_PASSWORD is required and must be at least 16 characters. " +
+      "Load it from a password manager; no default password is stored in Git."
+  );
+}
+const DEMO_PASSWORD = suppliedDemoPassword || "<dry-run-secret-not-loaded>";
 const DEMO_EMAIL_DOMAIN = "lumidemo.school";
 
 const SCHOOL_NAME = "Lumi Demo Primary School";
@@ -157,8 +165,8 @@ const SCHOOL_NAME = "Lumi Demo Primary School";
 // (plus-aliased into Nic's mailbox, so their Firebase password-reset emails are
 // actually receivable — plus-addressing to this domain is proven working). Their
 // passwords are rolled daily: the portal's "Provision today's demo password"
-// issues the day password and scrambleDemoPasswords scrambles it nightly, so
-// the DEMO_PASSWORD set here is only the initial value. Keep in sync with
+// issues the day password and scrambleDemoPasswords scrambles it nightly. The
+// required DEMO_PASSWORD environment secret is only the initial value. Keep in sync with
 // platformConfig/demoAccess (seedDemoAccessConfig) and functions/src/demo_access.ts.
 const SHARED_ADMIN_EMAIL = "support+demo@lumi-reading.com";
 const SHARED_TEACHER_EMAIL = "support+demo.teacher@lumi-reading.com";
@@ -848,7 +856,7 @@ function printDryRun(plan) {
   const show = (obj) => JSON.stringify(obj, null, 2);
   log("── DRY RUN — nothing will be written ─────────────────────────────");
   log(`School doc:            schools/${SCHOOL_ID}  (isDemo: true)`);
-  log(`Auth users:            ${plan.authUsers.length}  (password for all: ${DEMO_PASSWORD})`);
+  log(`Auth users:            ${plan.authUsers.length}  (password loaded from DEMO_PASSWORD)`);
   for (const u of plan.authUsers) log(`   • ${u.email}  uid=${u.uid}`);
   log(`Staff docs:            ${plan.users.length} (schools/${SCHOOL_ID}/users + top-level users mirror)`);
   log(`Parent docs:           ${plan.parents.length} (schools/${SCHOOL_ID}/parents)`);
@@ -1184,7 +1192,7 @@ async function main() {
   log("  Demo logins:");
   for (const u of plan.authUsers) log(`    ${u.email}`);
   log("");
-  log(`  Passwords are ROLLED DAILY. ${DEMO_PASSWORD} is only the seed value —`);
+  log("  Passwords are ROLLED DAILY. The DEMO_PASSWORD secret is only the seed value —");
   log("  scrambleDemoPasswords scrambles it nightly, and the super-admin portal's");
   log("  \"Provision today's demo password\" issues the shared day password.");
   log("");

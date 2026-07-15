@@ -877,6 +877,8 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
         coverUrl = await _communityService.uploadCoverImage(
           isbn: _scannedIsbn!,
           imageFile: _coverImage!,
+          contributorId: widget.teacher.id,
+          contributorSchoolId: widget.teacher.schoolId ?? '',
         );
         if (coverUrl != null) {
           coverPath = _communityService.coverStoragePath(_scannedIsbn!);

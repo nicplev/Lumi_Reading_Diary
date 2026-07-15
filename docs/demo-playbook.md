@@ -45,7 +45,8 @@ The three **shared** logins below are on a **rolling daily password**: the seed
 sets an initial one, but in production a nightly cron (`scrambleDemoPasswords`,
 just after Sydney midnight) scrambles every demo account, and the super-admin
 portal issues that day's password on demand. So on a real demo day you don't use
-`LumiDemo!2026` — you **provision** the day's password first (see below).
+Use the demo password from the team password manager — you **provision** the
+day's password first (see below). No demo password is stored in Git.
 
 | Role | Email | Where they log in | What they show |
 |---|---|---|---|

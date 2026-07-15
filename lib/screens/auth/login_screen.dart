@@ -25,7 +25,6 @@ import '../../services/notification_service.dart';
 import '../../services/phone_verification_recovery_service.dart';
 import '../../services/sms_verification_service.dart';
 import '../../core/services/user_school_index_service.dart';
-import '../../utils/setup_test_data.dart';
 import 'widgets/dev_access_modal.dart';
 import 'widgets/parent_registration_modal.dart';
 import 'widgets/teacher_registration_modal.dart';
@@ -74,7 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    // Rebuild whenever dev-access flips (e.g. Firestore lookup completes
+    // Rebuild whenever dev-access flips (e.g. the server lookup completes
     // after a session-resume, or after the long-press auth modal unlocks it).
     _devAccess.addListener(_onDevAccessChanged);
   }
@@ -558,76 +557,6 @@ class _LoginScreenState extends State<LoginScreen> {
               queryParameters: const {'firstParentLogin': '1'},
             ).toString()
           : homeRoute,
-    );
-  }
-
-  void _showCreateAdminDialog() {
-    final emailController = TextEditingController();
-    final passwordController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(LumiTokens.radiusLarge),
-        ),
-        title: const Text('Create Admin Account'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Use a real email you can verify.', style: LumiType.caption),
-            const SizedBox(height: 16),
-            LumiInput(
-              controller: emailController,
-              label: 'Email',
-              hintText: 'your.email@example.com',
-              keyboardType: TextInputType.emailAddress,
-            ),
-            const SizedBox(height: 8),
-            LumiPasswordInput(
-              controller: passwordController,
-              label: 'Password',
-              hintText: 'Min 8 chars, mixed case + number',
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              final email = emailController.text.trim();
-              final password = passwordController.text;
-              if (email.isEmpty || password.isEmpty) return;
-
-              Navigator.of(dialogContext).pop();
-
-              setState(() => _isLoading = true);
-              try {
-                await TestDataSetup.createNewSchoolAdmin(
-                  email: email,
-                  password: password,
-                );
-                if (!mounted) return;
-                showLumiToast(
-                  message:
-                      'Admin account created for $email. Check your inbox to verify, then log in.',
-                  type: LumiToastType.success,
-                  duration: const Duration(seconds: 8),
-                );
-              } catch (e) {
-                if (!mounted) return;
-                showLumiToast(message: 'Error: $e', type: LumiToastType.error);
-              } finally {
-                if (mounted) setState(() => _isLoading = false);
-              }
-            },
-            child: const Text('Create'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -1362,12 +1291,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                       color: Colors.orange,
                                       fontWeight: FontWeight.bold,
                                     ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  LumiTextButton(
-                                    onPressed: () => _showCreateAdminDialog(),
-                                    text: 'Create Admin Account',
-                                    icon: Icons.admin_panel_settings,
                                   ),
                                   const SizedBox(height: 8),
                                   LumiTextButton(

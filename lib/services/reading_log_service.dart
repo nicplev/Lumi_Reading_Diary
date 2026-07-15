@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -12,6 +13,7 @@ import '../data/models/reading_log_model.dart';
 import '../data/models/student_model.dart';
 import '../data/models/user_model.dart';
 import 'firebase_service.dart';
+import 'comprehension_audio_service.dart';
 import 'isbn_assignment_service.dart';
 import 'offline_service.dart';
 import 'widget_data_service.dart';
@@ -85,6 +87,18 @@ class ReadingLogService {
   /// Fallback target/duration when no allocation supplies one.
   static const int _defaultTargetMinutes = 20;
 
+  /// Generates an unguessable, idempotency-safe reading-log document ID.
+  ///
+  /// Timestamp IDs collide when two devices submit in the same millisecond and
+  /// reveal creation order. A 128-bit cryptographically random value avoids
+  /// both problems while remaining stable when an offline write is retried.
+  static String generateLogId() {
+    final random = Random.secure();
+    return List<int>.generate(16, (_) => random.nextInt(256))
+        .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+        .join();
+  }
+
   /// Builds a [ReadingLogModel] from logging inputs without persisting it.
   ///
   /// [minutesRead] and [bookTitles] fall back to allocation-derived defaults,
@@ -113,7 +127,7 @@ class ReadingLogService {
     final commentText = _composeComment(commentSelections, trimmedFreeText);
 
     return ReadingLogModel(
-      id: id ?? now.millisecondsSinceEpoch.toString(),
+      id: id ?? generateLogId(),
       studentId: student.id,
       parentId: parent.id,
       schoolId: student.schoolId,
@@ -208,7 +222,7 @@ class ReadingLogService {
         ? <String>[bookTitle.trim()]
         : const <String>['Reading'];
     final log = ReadingLogModel(
-      id: now.millisecondsSinceEpoch.toString(),
+      id: generateLogId(),
       studentId: studentId,
       parentId: parentId,
       schoolId: schoolId,
@@ -249,7 +263,7 @@ class ReadingLogService {
     final trimmedNotes = notes?.trim();
 
     final log = ReadingLogModel(
-      id: now.millisecondsSinceEpoch.toString(),
+      id: generateLogId(),
       studentId: student.id,
       parentId: teacher.id,
       schoolId: student.schoolId,
@@ -303,6 +317,19 @@ class ReadingLogService {
       // Server timestamp for an accurate audit trail (teachers can see the
       // exact submission time).
       logData['createdAt'] = FieldValue.serverTimestamp();
+      // Audio receipt fields are server-owned. The recording is uploaded only
+      // after this log exists, then confirmComprehensionAudioUpload verifies the
+      // canonical object and stamps these fields with Admin SDK privileges.
+      logData.remove('comprehensionAudioPath');
+      logData.remove('comprehensionAudioDurationSec');
+      logData.remove('comprehensionAudioUploaded');
+      logData.remove('teacherComment');
+      logData.remove('commentedAt');
+      logData.remove('commentedBy');
+      logData.remove('lastCommentPreview');
+      logData.remove('lastCommentAt');
+      logData.remove('lastCommentByRole');
+      logData.remove('commentsViewedAt');
 
       try {
         await _firestore
@@ -471,10 +498,10 @@ class ReadingLogService {
     required ReadingLogModel log,
     required String localFilePath,
   }) async {
-    final storagePath = log.comprehensionAudioPath;
-    if (storagePath == null) {
-      throw StateError('Log has no comprehensionAudioPath set');
-    }
+    final storagePath = comprehensionAudioStoragePath(
+      schoolId: log.schoolId,
+      logId: log.id,
+    );
     final file = File(localFilePath);
     if (!file.existsSync()) {
       throw const ComprehensionAudioMissingException();
@@ -488,12 +515,18 @@ class ReadingLogService {
               'uploadedAt': DateTime.now().toUtc().toIso8601String(),
               'durationSec': '${log.comprehensionAudioDurationSec ?? 0}',
               'schoolId': log.schoolId,
+              'logId': log.id,
+              'ownerUid': log.parentId,
               'studentId': log.studentId,
             },
           ),
         );
 
-    await _logRef(log).update({'comprehensionAudioUploaded': true});
+    await ComprehensionAudioService().confirmUpload(
+      schoolId: log.schoolId,
+      logId: log.id,
+      durationSec: log.comprehensionAudioDurationSec ?? 0,
+    );
 
     try {
       if (file.existsSync()) await file.delete();
@@ -534,14 +567,6 @@ class ReadingLogService {
       return;
     }
 
-    // Stamp the path + duration so a teacher sees the recording is on its way,
-    // then upload. Queue on failure so retries happen with backoff.
-    await _logRef(log).update({
-      'comprehensionAudioPath': storagePath,
-      'comprehensionAudioDurationSec': durationSec,
-      'comprehensionAudioUploaded': false,
-    });
-
     final patched = log.copyWith(
       comprehensionAudioPath: storagePath,
       comprehensionAudioDurationSec: durationSec,
@@ -558,12 +583,9 @@ class ReadingLogService {
   /// Live comment thread for a log, oldest message first. Powers the in-app
   /// conversation view for both parents and teachers.
   ///
-  /// The `studentId` equality filter is required, not cosmetic: the comment
-  /// security rule authorizes a parent's `list` only when the query is scoped
-  /// to a `studentId` in their `linkedChildren` (teachers are allowed
-  /// unconditionally). Without it the parent read is silently denied and the
-  /// thread renders empty even though writes succeed. All comments on a log
-  /// share the log's `studentId`, so this never narrows the result set.
+  /// The `studentId` equality filter keeps parent queries scoped to one linked
+  /// child. Rules additionally load the parent log and bind every comment to
+  /// its authoritative child, carer and class.
   ///
   /// Ordering is done client-side instead of via `orderBy('createdAt')` so the
   /// equality filter doesn't pull in a composite index, and so a just-sent

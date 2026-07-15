@@ -1,123 +1,35 @@
-# Temporary Firestore Rules for Testing
+# Firestore security-rule testing
 
-## ⚠️ WARNING: TESTING ONLY - NOT FOR PRODUCTION ⚠️
+Firestore and Storage security tests must run only against the Firebase Local
+Emulator Suite. Never weaken or replace the deployed rules to make a test pass.
 
-These rules are for testing purposes only. They allow authenticated users to read and write most data.
-**NEVER use these rules in a production environment!**
+## Run the rule suites
 
-## Temporary Testing Rules
+From `functions/`:
 
-Copy and paste these rules into your Firebase Console:
-1. Go to Firebase Console > Firestore Database > Rules
-2. Replace the existing rules with these temporary ones
-3. Click "Publish"
-
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Allow authenticated users to read/write everything for testing
-    // ⚠️ TESTING ONLY - VERY PERMISSIVE ⚠️
-
-    match /{document=**} {
-      // Allow read/write access to all authenticated users
-      allow read, write: if request.auth != null;
-    }
-  }
-}
+```sh
+npm install
+npm run test:rules
+npm run test:rules:storage
 ```
 
-## Alternative: Slightly More Restrictive Testing Rules
+The scripts start isolated emulators, load the checked-in `firestore.rules` and
+`storage.rules`, run both positive and negative cases, then stop the emulators.
+They do not deploy anything.
 
-If you want slightly more control while testing:
+## Add a regression test
 
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Helper functions
-    function isSignedIn() {
-      return request.auth != null;
-    }
+- Firestore: `functions/test/firestore.rules.test.js`
+- Storage: `functions/test/storage.rules.test.js`
 
-    // Allow authenticated users broader access for testing
-    match /users/{userId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
-    }
+Every new allow rule needs a matching denial test for the nearest other role,
+class, family and school. Use `withSecurityRulesDisabled` only to seed emulator
+fixtures; all assertions must use authenticated or unauthenticated test
+contexts with rules enabled.
 
-    match /schools/{schoolId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();  // Temporarily allow any authenticated user to create schools
-    }
+## Deployment safety
 
-    match /classes/{classId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();  // Temporarily allow any authenticated user to manage classes
-    }
-
-    match /students/{studentId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
-    }
-
-    match /readingLogs/{logId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
-    }
-
-    match /allocations/{allocationId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
-    }
-  }
-}
-```
-
-## How to Apply These Rules
-
-1. **Open Firebase Console:**
-   - Go to https://console.firebase.google.com
-   - Select your project
-
-2. **Navigate to Firestore Rules:**
-   - Click on "Firestore Database" in the left sidebar
-   - Click on the "Rules" tab
-
-3. **Replace Rules:**
-   - Copy one of the rule sets above
-   - Replace the entire contents in the rules editor
-   - Click "Publish"
-
-4. **Test Your App:**
-   - Now your app should be able to create test data
-   - You can create schools, classes, and other data for testing
-
-## ⚠️ IMPORTANT: Restore Production Rules
-
-After testing, **IMMEDIATELY** restore your production rules:
-
-1. Go back to Firebase Console > Firestore > Rules
-2. Copy the original rules from your FIREBASE_SETUP.md file
-3. Replace the testing rules with the production rules
-4. Click "Publish"
-
-## Original Production Rules Reference
-
-Your original production rules are saved in: `/Users/nicplev/lumi_reading_tracker/FIREBASE_SETUP.md`
-
-## Testing Checklist
-
-- [ ] Applied temporary testing rules
-- [ ] Completed testing
-- [ ] Restored production rules
-- [ ] Verified production rules are active
-
-## Security Note
-
-The temporary rules above allow ANY authenticated user to read and write data. This means:
-- Any logged-in user can see all data
-- Any logged-in user can modify all data
-- There's no role-based access control
-
-This is why these rules should ONLY be used for local development and testing, never in production.
+Only the reviewed rules referenced by `firebase.json` may be deployed. Before
+deploying, run both suites and inspect the diff. There is intentionally no
+"temporary permissive production rules" procedure: a broad authenticated-user
+allow exposes children's data to every account in the project.

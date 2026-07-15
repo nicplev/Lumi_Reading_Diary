@@ -23,6 +23,23 @@ class ComprehensionAudioService {
   ComprehensionAudioService({ComprehensionAudioCallableInvoker? invoker})
       : _invoke = invoker ?? _defaultInvoker;
 
+  /// Confirms that the current parent uploaded the canonical object for this
+  /// log. Only the server may set the log's audio receipt fields.
+  Future<void> confirmUpload({
+    required String schoolId,
+    required String logId,
+    required int durationSec,
+  }) async {
+    final data = await _invoke('confirmComprehensionAudioUpload', {
+      'schoolId': schoolId,
+      'logId': logId,
+      'durationSec': durationSec,
+    });
+    if (data is! Map || data['confirmed'] != true) {
+      throw StateError('Recording upload was not confirmed');
+    }
+  }
+
   /// Deletes the comprehension audio attached to a reading log. Returns true
   /// when the audio was deleted, false when the log already had no audio
   /// (raced with the cron or another delete) — both outcomes are safe for

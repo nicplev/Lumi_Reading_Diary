@@ -1,36 +1,46 @@
 import 'dart:async';
-import 'dart:convert';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import 'functions_instance.dart';
+
 /// Keeps a reactive cached answer to "does the signed-in user have dev access?"
 ///
-/// The source of truth is the Firestore collection `/devAccessEmails/{hash}`,
-/// where hash = sha256(lowercased email). The super-admin portal (lumi-admin)
-/// is the only writer; Firestore rules only permit a keyed `get` from signed-in
-/// clients, so the rest of the list is never exposed.
+/// The source of truth is the server-only Firestore collection
+/// `/devAccessEmails/{hash}`. Mobile callers use `checkDevAccess`, which derives
+/// the lookup from the authenticated token email and accepts no candidate
+/// email/hash, preventing allowlist probing.
 ///
 /// Listens to [FirebaseAuth.userChanges] so the flag updates automatically on
 /// sign-in / sign-out. Widgets can listen via [ValueNotifier] semantics and
 /// rebuild when the value flips.
 class DevAccessService extends ChangeNotifier {
-  DevAccessService._({FirebaseAuth? auth, FirebaseFirestore? firestore})
-      : _auth = auth ?? FirebaseAuth.instance,
-        _firestore = firestore ?? FirebaseFirestore.instance {
+  DevAccessService._({
+    FirebaseAuth? auth,
+    Future<dynamic> Function(String name, Map<String, dynamic> data)?
+        callableInvoker,
+  })  : _auth = auth ?? FirebaseAuth.instance,
+        _callableInvoker = callableInvoker {
     _authSub = _auth.userChanges().listen(_onAuthChanged);
     _onAuthChanged(_auth.currentUser);
   }
+
+  @visibleForTesting
+  factory DevAccessService.debug({
+    required FirebaseAuth auth,
+    required Future<dynamic> Function(
+      String name,
+      Map<String, dynamic> data,
+    ) callableInvoker,
+  }) = DevAccessService._;
 
   static DevAccessService? _instance;
 
   /// Singleton accessor. Call once at app boot (e.g. in `main.dart` after
   /// Firebase is initialised) to start observing auth state; subsequent calls
   /// return the same instance.
-  static DevAccessService get instance =>
-      _instance ??= DevAccessService._();
+  static DevAccessService get instance => _instance ??= DevAccessService._();
 
   /// Test seam — lets tests inject fakes and replace the singleton.
   @visibleForTesting
@@ -40,7 +50,8 @@ class DevAccessService extends ChangeNotifier {
   }
 
   final FirebaseAuth _auth;
-  final FirebaseFirestore _firestore;
+  final Future<dynamic> Function(String name, Map<String, dynamic> data)?
+      _callableInvoker;
   StreamSubscription<User?>? _authSub;
   String? _activeEmail;
   bool _hasAccess = false;
@@ -65,12 +76,11 @@ class DevAccessService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Email hash used as the Firestore doc ID. Exposed for tests / debugging.
-  @visibleForTesting
-  static String hashEmail(String email) {
-    return sha256
-        .convert(utf8.encode(email.trim().toLowerCase()))
-        .toString();
+  Future<dynamic> _call(String name, Map<String, dynamic> data) async {
+    final invoker = _callableInvoker;
+    if (invoker != null) return invoker(name, data);
+    final result = await lumiFunctions.httpsCallable(name).call(data);
+    return result.data;
   }
 
   Future<void> _onAuthChanged(User? user) async {
@@ -86,22 +96,10 @@ class DevAccessService extends ChangeNotifier {
     _activeEmail = email;
 
     try {
-      final snap = await _firestore
-          .collection('devAccessEmails')
-          .doc(hashEmail(email))
-          .get();
+      final raw = await _call('checkDevAccess', const {});
       // Guard against race: another auth change may have superseded this one.
       if (_activeEmail != email) return;
-      _setAccess(snap.exists);
-    } on FirebaseException catch (e) {
-      // `unavailable` is a transient Firestore connection hiccup (common
-      // immediately after a fresh sign-in, when gRPC is still warming up).
-      // Dev access just stays off; no need to pollute logs.
-      if (_activeEmail != email) return;
-      _setAccess(false);
-      if (e.code != 'unavailable' && kDebugMode) {
-        debugPrint('[DevAccessService] lookup failed for $email: $e');
-      }
+      _setAccess(raw is Map && raw['hasAccess'] == true);
     } catch (e, st) {
       if (kDebugMode) {
         debugPrint('[DevAccessService] lookup failed for $email: $e\n$st');

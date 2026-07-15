@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/widgets.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -19,6 +20,7 @@ import '../data/models/reading_log_model.dart';
 import '../data/models/student_model.dart';
 import '../data/models/allocation_model.dart';
 import 'firebase_service.dart';
+import 'comprehension_audio_service.dart';
 
 /// Local-first persistence + an outbound sync queue for writes made while
 /// Firestore is unreachable.
@@ -397,8 +399,9 @@ class OfflineService with WidgetsBindingObserver {
     // the thing that decides when this queue drains, so make sure it's
     // fresh rather than waiting out the slow periodic heartbeat. Coalesced
     // by the controller's min-probe interval; fire-and-forget.
-    unawaited(ServiceStatusController.instance.forceProbe().catchError(
-        (Object _) => ServiceStatusController.instance.current));
+    unawaited(ServiceStatusController.instance
+        .forceProbe()
+        .catchError((Object _) => ServiceStatusController.instance.current));
   }
 
   Future<void> _persistItem(PendingSync item) async {
@@ -854,7 +857,8 @@ class OfflineService with WidgetsBindingObserver {
     try {
       await _refreshAuthToken();
     } catch (e) {
-      debugPrint('[OfflineSync] pre-drain token refresh failed (non-fatal): $e');
+      debugPrint(
+          '[OfflineSync] pre-drain token refresh failed (non-fatal): $e');
     }
 
     final syncedItems = <String>[];
@@ -865,7 +869,8 @@ class OfflineService with WidgetsBindingObserver {
       // Drain in priority order: reading-log creates first (so dependent
       // comment writes have a doc to target), then comments, then prefs.
       final ordered = List<PendingSync>.from(_syncQueue)
-        ..sort((a, b) => _syncPriority(a.type).compareTo(_syncPriority(b.type)));
+        ..sort(
+            (a, b) => _syncPriority(a.type).compareTo(_syncPriority(b.type)));
 
       for (final item in ordered) {
         // Skip parked items and items still inside their backoff window.
@@ -947,8 +952,8 @@ class OfflineService with WidgetsBindingObserver {
       _recordHistory(item, SyncResult.permanentFail, item.lastError);
       debugPrint('Permanent sync failure for ${item.id}: ${item.lastError}');
     } else {
-      item.nextAttemptAt =
-          item.lastAttemptAt!.add(PendingSync.backoffFor(item.retryCount, _jitter));
+      item.nextAttemptAt = item.lastAttemptAt!
+          .add(PendingSync.backoffFor(item.retryCount, _jitter));
       _recordHistory(item, SyncResult.transientFail, item.lastError);
       debugPrint(
           'Transient sync failure for ${item.id} (attempt ${item.retryCount}); '
@@ -1071,7 +1076,19 @@ class OfflineService with WidgetsBindingObserver {
             await _resolveReadingLogConflict(log, existingDoc, logRef);
             resolvedConflict = true;
           } else {
-            await logRef.set(log.toFirestore());
+            final createData = log.toFirestore();
+            createData['createdAt'] = FieldValue.serverTimestamp();
+            createData.remove('comprehensionAudioPath');
+            createData.remove('comprehensionAudioDurationSec');
+            createData.remove('comprehensionAudioUploaded');
+            createData.remove('teacherComment');
+            createData.remove('commentedAt');
+            createData.remove('commentedBy');
+            createData.remove('lastCommentPreview');
+            createData.remove('lastCommentAt');
+            createData.remove('lastCommentByRole');
+            createData.remove('commentsViewedAt');
+            await logRef.set(createData);
           }
         }
         break;
@@ -1091,7 +1108,8 @@ class OfflineService with WidgetsBindingObserver {
     // here throws (transient) and the item is retried next cycle.
     final receipt = await logRef.get(const GetOptions(source: Source.server));
     if (!receipt.exists) {
-      throw Exception('Receipt failed: log ${log.id} not on server after write');
+      throw Exception(
+          'Receipt failed: log ${log.id} not on server after write');
     }
 
     if (!resolvedConflict) {
@@ -1129,6 +1147,16 @@ class OfflineService with WidgetsBindingObserver {
       throw Exception('Missing fields for comprehension audio upload sync');
     }
 
+    final expectedStoragePath =
+        'schools/$schoolId/comprehension_audio/$logId.m4a';
+    if (storagePath != expectedStoragePath) {
+      throw Exception('Non-canonical comprehension audio path');
+    }
+    final ownerUid = FirebaseAuth.instance.currentUser?.uid;
+    if (ownerUid == null) {
+      throw Exception('Sign in required for comprehension audio upload sync');
+    }
+
     var file = File(localFilePath);
     if (!file.existsSync()) {
       final originalPath = data['originalLocalFilePath'] as String?;
@@ -1161,6 +1189,8 @@ class OfflineService with WidgetsBindingObserver {
                 'uploadedAt': DateTime.now().toUtc().toIso8601String(),
                 'durationSec': '$durationSec',
                 'schoolId': schoolId,
+                'logId': logId,
+                'ownerUid': ownerUid,
                 'studentId': studentId,
                 // TODO(retention): used by the future term-aware cleanup function.
               },
@@ -1180,17 +1210,14 @@ class OfflineService with WidgetsBindingObserver {
         .doc(logId);
 
     try {
-      // Stamp the path + duration alongside the uploaded flag. Idempotent for
-      // the full flow (the log create already set them); required for logs that
-      // attached comprehension after the fact while offline.
-      await logRef.update({
-        'comprehensionAudioPath': storagePath,
-        'comprehensionAudioDurationSec': durationSec,
-        'comprehensionAudioUploaded': true,
-      });
-    } on FirebaseException catch (e) {
+      await ComprehensionAudioService().confirmUpload(
+        schoolId: schoolId,
+        logId: logId,
+        durationSec: durationSec,
+      );
+    } on FirebaseFunctionsException catch (e) {
       debugPrint(
-          '[CompAudioSync] step=firestore_patch failed logId=$logId code=${e.code} msg=${e.message}');
+          '[CompAudioSync] step=server_confirm failed logId=$logId code=${e.code} msg=${e.message}');
       if (e.code == 'not-found' || e.code == 'permission-denied') {
         // The log create hasn't drained yet, so the doc doesn't exist — and a
         // parent UPDATE on a missing readingLog is DENIED by the rules
@@ -1205,8 +1232,7 @@ class OfflineService with WidgetsBindingObserver {
     // Receipt confirmation: read back from the SERVER so we know the flag
     // landed before removing the item from the queue.
     try {
-      final receipt =
-          await logRef.get(const GetOptions(source: Source.server));
+      final receipt = await logRef.get(const GetOptions(source: Source.server));
       if (!receipt.exists ||
           receipt.data()?['comprehensionAudioUploaded'] != true) {
         debugPrint(
@@ -1296,7 +1322,8 @@ class OfflineService with WidgetsBindingObserver {
   Future<void> _syncAllocationAssignment(PendingSync pendingSync) async {
     final replay = _allocationReplay;
     if (replay == null) {
-      throw Exception('Allocation replay handler not registered yet; will retry');
+      throw Exception(
+          'Allocation replay handler not registered yet; will retry');
     }
     await replay(Map<String, dynamic>.from(pendingSync.data));
   }
@@ -1310,16 +1337,12 @@ class OfflineService with WidgetsBindingObserver {
     final schoolId = data['schoolId'] as String?;
     final commentId = data['commentId'] as String?;
     if (logId == null || schoolId == null || commentId == null) {
-      throw Exception('Missing logId/schoolId/commentId for comment reply sync');
+      throw Exception(
+          'Missing logId/schoolId/commentId for comment reply sync');
     }
 
     final roleName = data['authorRole'] as String? ?? 'parent';
     final body = data['body'] as String? ?? '';
-    final createdIso = data['createdAt'] as String?;
-    final createdAt = createdIso != null
-        ? Timestamp.fromDate(DateTime.parse(createdIso))
-        : Timestamp.now();
-
     final logRef = _firestore
         .collection('schools')
         .doc(schoolId)
@@ -1336,17 +1359,17 @@ class OfflineService with WidgetsBindingObserver {
       ),
       authorName: data['authorName'] as String? ?? '',
       body: body,
-      createdAt: createdAt.toDate(),
+      createdAt: DateTime.now(),
       studentId: data['studentId'] as String? ?? '',
       parentId: data['parentId'] as String? ?? '',
     );
 
     try {
       final batch = _firestore.batch();
-      batch.set(commentRef, comment.toFirestore(createdAt: createdAt));
+      batch.set(commentRef, comment.toFirestore());
       batch.update(logRef, {
         'lastCommentPreview': body,
-        'lastCommentAt': createdAt,
+        'lastCommentAt': FieldValue.serverTimestamp(),
         'lastCommentByRole': roleName,
       });
       await batch.commit();
@@ -1393,7 +1416,9 @@ class OfflineService with WidgetsBindingObserver {
       await logRef.set(localLog.toFirestore());
       await _readingLogsBox.put(
         localLog.id,
-        localLog.copyWith(syncedAt: DateTime.now(), isOfflineCreated: false).toLocal(),
+        localLog
+            .copyWith(syncedAt: DateTime.now(), isOfflineCreated: false)
+            .toLocal(),
       );
       return;
     }
@@ -1406,10 +1431,27 @@ class OfflineService with WidgetsBindingObserver {
     if (localTimestamp > remoteTimestamp) {
       // Local is newer, use local
       debugPrint('Local version is newer, updating remote');
-      await logRef.update(localLog.toFirestore());
+      // Identity, date, status, authorship and server-owned receipt fields are
+      // immutable after create. Conflict replay may update only the same
+      // user-editable content accepted by Firestore rules.
+      await logRef.update({
+        'minutesRead': localLog.minutesRead,
+        'targetMinutes': localLog.targetMinutes,
+        'bookTitles': localLog.bookTitles,
+        'notes': localLog.notes,
+        'photoUrls': localLog.photoUrls,
+        'childFeeling': localLog.childFeeling?.name,
+        'parentComment': localLog.parentComment,
+        'parentCommentSelections': localLog.parentCommentSelections,
+        'parentCommentFreeText': localLog.parentCommentFreeText,
+        'syncedAt': FieldValue.serverTimestamp(),
+        'isOfflineCreated': false,
+      });
       await _readingLogsBox.put(
         localLog.id,
-        localLog.copyWith(syncedAt: DateTime.now(), isOfflineCreated: false).toLocal(),
+        localLog
+            .copyWith(syncedAt: DateTime.now(), isOfflineCreated: false)
+            .toLocal(),
       );
     } else {
       // Remote is newer, keep remote and update local

@@ -292,7 +292,11 @@ class _FakeSchoolLibraryService extends SchoolLibraryService {
 class _FakeSchoolLibraryAssignmentService
     extends SchoolLibraryAssignmentService {
   _FakeSchoolLibraryAssignmentService()
-      : super(firestore: FakeFirebaseFirestore());
+      : super(
+          firestore: FakeFirebaseFirestore(),
+          staffId: 'teacher_1',
+          schoolWide: false,
+        );
 
   @override
   Stream<LibraryAssignmentSnapshot> summaryStream(String schoolId) {

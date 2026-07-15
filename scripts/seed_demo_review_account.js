@@ -31,7 +31,7 @@
  *     gcloud auth application-default login
  *     GOOGLE_CLOUD_PROJECT=lumi-ninc-au node scripts/seed_demo_review_account.js
  *
- * Override the password via DEMO_PASSWORD=... if you prefer.
+ * DEMO_PASSWORD is required and must be supplied from a password manager.
  */
 
 const path = require('path');
@@ -54,7 +54,13 @@ const crypto = require('crypto');
 
 // ── Config ────────────────────────────────────────────────────────────────
 const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT || 'lumi-ninc-au';
-const PASSWORD = process.env.DEMO_PASSWORD || 'LumiReview2026!';
+const PASSWORD = process.env.DEMO_PASSWORD;
+if (!PASSWORD || PASSWORD.length < 16) {
+  die(
+    'DEMO_PASSWORD is required and must be at least 16 characters. ' +
+      'No App Review password is stored in Git.',
+  );
+}
 const ACADEMIC_YEAR = 2026;
 
 const SCHOOL_ID = 'demo-review-school';
@@ -274,9 +280,9 @@ async function main() {
       '',
       '  Reviewer credentials (paste into App Store Connect → App Review Information):',
       '    Teacher login  email: ' + TEACHER.email,
-      '                password: ' + PASSWORD,
+      '                password: <the DEMO_PASSWORD secret supplied to this run>',
       '    Parent login   email: ' + PARENT.email,
-      '                password: ' + PASSWORD,
+      '                password: <the DEMO_PASSWORD secret supplied to this run>',
       '',
       '  Both sign in with email + password (no SMS code required).',
       '  School: ' + SCHOOL_NAME + ' · Class: ' + CLASS_NAME + ' · Student: Riley Reader',

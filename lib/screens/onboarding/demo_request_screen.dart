@@ -11,7 +11,6 @@ import '../../core/widgets/lumi_mascot.dart';
 import '../../services/onboarding_service.dart';
 import '../../services/analytics_service.dart';
 import '../../services/crash_reporting_service.dart';
-import 'school_registration_wizard.dart';
 
 class DemoRequestScreen extends StatefulWidget {
   const DemoRequestScreen({super.key});
@@ -45,7 +44,7 @@ class _DemoRequestScreenState extends State<DemoRequestScreen> {
       final values = _formKey.currentState!.value;
 
       try {
-        final onboardingId = await _onboardingService.createDemoRequest(
+        await _onboardingService.createDemoRequest(
           schoolName: values['schoolName'] as String,
           contactEmail: values['contactEmail'] as String,
           contactPhone: values['contactPhone'] as String?,
@@ -61,7 +60,8 @@ class _DemoRequestScreenState extends State<DemoRequestScreen> {
               0,
         );
 
-        AnalyticsService.instance.logOnboardingStepCompleted(step: 'demo_request');
+        AnalyticsService.instance
+            .logOnboardingStepCompleted(step: 'demo_request');
         CrashReportingService.instance.setCustomKey(
           'onboarding_last_step',
           'demo_request',
@@ -69,10 +69,12 @@ class _DemoRequestScreenState extends State<DemoRequestScreen> {
 
         if (!mounted) return;
 
-        // Show success message and navigate to registration wizard
+        // Provisioning is deliberately not performed in the client. A school
+        // admin account is created only after the request is reviewed through
+        // the audited server/admin workflow.
         showDialog(
           context: context,
-          builder: (context) => AlertDialog(
+          builder: (dialogContext) => AlertDialog(
             shape: LumiBorders.shapeLarge,
             title: Row(
               children: [
@@ -82,23 +84,16 @@ class _DemoRequestScreenState extends State<DemoRequestScreen> {
               ],
             ),
             content: Text(
-              'Thank you for your interest in Lumi! You can now proceed to complete your school registration.',
+              'Thank you for your interest in Lumi! Our team will review the request and contact you about next steps.',
               style: LumiTextStyles.body(),
             ),
             actions: [
               LumiPrimaryButton(
                 onPressed: () {
-                  Navigator.pop(context);
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => SchoolRegistrationWizard(
-                        onboardingId: onboardingId,
-                      ),
-                    ),
-                  );
+                  Navigator.pop(dialogContext);
+                  Navigator.maybePop(context);
                 },
-                text: 'Continue Registration',
+                text: 'Done',
                 color: LumiTokens.red,
               ),
             ],
@@ -167,7 +162,8 @@ class _DemoRequestScreenState extends State<DemoRequestScreen> {
 
               Text(
                 'Fill in the details below and we\'ll help you get set up',
-                style: LumiTextStyles.body(color: LumiTokens.ink.withValues(alpha: 0.7)),
+                style: LumiTextStyles.body(
+                    color: LumiTokens.ink.withValues(alpha: 0.7)),
                 textAlign: TextAlign.center,
               ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
 
@@ -190,7 +186,8 @@ class _DemoRequestScreenState extends State<DemoRequestScreen> {
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: LumiTextStyles.bodySmall(color: LumiTokens.red),
+                          style:
+                              LumiTextStyles.bodySmall(color: LumiTokens.red),
                         ),
                       ),
                     ],
@@ -213,121 +210,121 @@ class _DemoRequestScreenState extends State<DemoRequestScreen> {
                           ),
                 ),
                 child: FormBuilder(
-                key: _formKey,
-                child: Column(
-                  children: [
-                    // School Name
-                    FormBuilderTextField(
-                      name: 'schoolName',
-                      decoration: const InputDecoration(
-                        labelText: 'School Name *',
-                        prefixIcon: Icon(Icons.school),
-                      ),
-                      validator: FormBuilderValidators.required(
-                        errorText: 'School name is required',
-                      ),
-                    ).animate().fadeIn(delay: 400.ms, duration: 500.ms),
-
-                    LumiGap.s,
-
-                    // Contact Person
-                    FormBuilderTextField(
-                      name: 'contactPerson',
-                      decoration: const InputDecoration(
-                        labelText: 'Your Name *',
-                        prefixIcon: Icon(Icons.person),
-                      ),
-                      validator: FormBuilderValidators.required(
-                        errorText: 'Your name is required',
-                      ),
-                    ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
-
-                    LumiGap.s,
-
-                    // Email
-                    FormBuilderTextField(
-                      name: 'contactEmail',
-                      decoration: const InputDecoration(
-                        labelText: 'Email Address *',
-                        prefixIcon: Icon(Icons.email),
-                      ),
-                      keyboardType: TextInputType.emailAddress,
-                      validator: FormBuilderValidators.compose([
-                        FormBuilderValidators.required(
-                          errorText: 'Email is required',
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      // School Name
+                      FormBuilderTextField(
+                        name: 'schoolName',
+                        decoration: const InputDecoration(
+                          labelText: 'School Name *',
+                          prefixIcon: Icon(Icons.school),
                         ),
-                        FormBuilderValidators.email(
-                          errorText: 'Enter a valid email',
+                        validator: FormBuilderValidators.required(
+                          errorText: 'School name is required',
                         ),
-                      ]),
-                    ).animate().fadeIn(delay: 600.ms, duration: 500.ms),
+                      ).animate().fadeIn(delay: 400.ms, duration: 500.ms),
 
-                    LumiGap.s,
+                      LumiGap.s,
 
-                    // Phone
-                    FormBuilderTextField(
-                      name: 'contactPhone',
-                      decoration: const InputDecoration(
-                        labelText: 'Phone Number (Optional)',
-                        prefixIcon: Icon(Icons.phone),
-                      ),
-                      keyboardType: TextInputType.phone,
-                    ).animate().fadeIn(delay: 700.ms, duration: 500.ms),
+                      // Contact Person
+                      FormBuilderTextField(
+                        name: 'contactPerson',
+                        decoration: const InputDecoration(
+                          labelText: 'Your Name *',
+                          prefixIcon: Icon(Icons.person),
+                        ),
+                        validator: FormBuilderValidators.required(
+                          errorText: 'Your name is required',
+                        ),
+                      ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
 
-                    LumiGap.s,
+                      LumiGap.s,
 
-                    // Estimated Student Count
-                    FormBuilderTextField(
-                      name: 'estimatedStudentCount',
-                      decoration: const InputDecoration(
-                        labelText: 'Estimated Number of Students',
-                        prefixIcon: Icon(Icons.people),
-                      ),
-                      keyboardType: TextInputType.number,
-                    ).animate().fadeIn(delay: 800.ms, duration: 500.ms),
+                      // Email
+                      FormBuilderTextField(
+                        name: 'contactEmail',
+                        decoration: const InputDecoration(
+                          labelText: 'Email Address *',
+                          prefixIcon: Icon(Icons.email),
+                        ),
+                        keyboardType: TextInputType.emailAddress,
+                        validator: FormBuilderValidators.compose([
+                          FormBuilderValidators.required(
+                            errorText: 'Email is required',
+                          ),
+                          FormBuilderValidators.email(
+                            errorText: 'Enter a valid email',
+                          ),
+                        ]),
+                      ).animate().fadeIn(delay: 600.ms, duration: 500.ms),
 
-                    LumiGap.s,
+                      LumiGap.s,
 
-                    // Estimated Teacher Count
-                    FormBuilderTextField(
-                      name: 'estimatedTeacherCount',
-                      decoration: const InputDecoration(
-                        labelText: 'Estimated Number of Teachers',
-                        prefixIcon: Icon(Icons.groups),
-                      ),
-                      keyboardType: TextInputType.number,
-                    ).animate().fadeIn(delay: 900.ms, duration: 500.ms),
+                      // Phone
+                      FormBuilderTextField(
+                        name: 'contactPhone',
+                        decoration: const InputDecoration(
+                          labelText: 'Phone Number (Optional)',
+                          prefixIcon: Icon(Icons.phone),
+                        ),
+                        keyboardType: TextInputType.phone,
+                      ).animate().fadeIn(delay: 700.ms, duration: 500.ms),
 
-                    LumiGap.s,
+                      LumiGap.s,
 
-                    // Referral Source
-                    FormBuilderDropdown<String>(
-                      name: 'referralSource',
-                      decoration: const InputDecoration(
-                        labelText: 'How did you hear about us?',
-                        prefixIcon: Icon(Icons.info_outline),
-                      ),
-                      items: _referralSources
-                          .map((source) => DropdownMenuItem(
-                                value: source,
-                                child: Text(source),
-                              ))
-                          .toList(),
-                    ).animate().fadeIn(delay: 1000.ms, duration: 500.ms),
+                      // Estimated Student Count
+                      FormBuilderTextField(
+                        name: 'estimatedStudentCount',
+                        decoration: const InputDecoration(
+                          labelText: 'Estimated Number of Students',
+                          prefixIcon: Icon(Icons.people),
+                        ),
+                        keyboardType: TextInputType.number,
+                      ).animate().fadeIn(delay: 800.ms, duration: 500.ms),
 
-                    LumiGap.l,
+                      LumiGap.s,
 
-                    // Submit button
-                    LumiPrimaryButton(
-                      onPressed: _isLoading ? null : _submitRequest,
-                      text: 'Submit Request',
-                      isLoading: _isLoading,
-                      isFullWidth: true,
-                      color: LumiTokens.red,
-                    ).animate().fadeIn(delay: 1100.ms, duration: 500.ms),
-                  ],
+                      // Estimated Teacher Count
+                      FormBuilderTextField(
+                        name: 'estimatedTeacherCount',
+                        decoration: const InputDecoration(
+                          labelText: 'Estimated Number of Teachers',
+                          prefixIcon: Icon(Icons.groups),
+                        ),
+                        keyboardType: TextInputType.number,
+                      ).animate().fadeIn(delay: 900.ms, duration: 500.ms),
+
+                      LumiGap.s,
+
+                      // Referral Source
+                      FormBuilderDropdown<String>(
+                        name: 'referralSource',
+                        decoration: const InputDecoration(
+                          labelText: 'How did you hear about us?',
+                          prefixIcon: Icon(Icons.info_outline),
+                        ),
+                        items: _referralSources
+                            .map((source) => DropdownMenuItem(
+                                  value: source,
+                                  child: Text(source),
+                                ))
+                            .toList(),
+                      ).animate().fadeIn(delay: 1000.ms, duration: 500.ms),
+
+                      LumiGap.l,
+
+                      // Submit button
+                      LumiPrimaryButton(
+                        onPressed: _isLoading ? null : _submitRequest,
+                        text: 'Submit Request',
+                        isLoading: _isLoading,
+                        isFullWidth: true,
+                        color: LumiTokens.red,
+                      ).animate().fadeIn(delay: 1100.ms, duration: 500.ms),
+                    ],
+                  ),
                 ),
-              ),
               ),
 
               LumiGap.m,

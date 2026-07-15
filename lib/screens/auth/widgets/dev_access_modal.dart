@@ -13,8 +13,8 @@ import '../../../core/widgets/lumi/lumi_buttons.dart';
 /// Flow:
 ///  1. User enters email + password.
 ///  2. We call `signInWithEmailAndPassword` to verify credentials.
-///  3. If sign-in succeeds, we refresh [DevAccessService] (Firestore lookup
-///     against `/devAccessEmails/{sha256(email)}`).
+///  3. If sign-in succeeds, we refresh [DevAccessService] through the
+///     `checkDevAccess` callable, which uses the authenticated token email.
 ///  4. If they're on the allowlist → mark [DevAccessService.unlockForSession],
 ///     sign the dev account out (so it doesn't poison the mobile auth
 ///     session), and close the modal with `true`.
@@ -83,11 +83,11 @@ class _DevAccessDialogState extends State<_DevAccessDialog> {
     }
 
     // Credentials accepted — now verify the account is actually on the
-    // dev allowlist. refresh() awaits the Firestore lookup.
+    // dev allowlist. refresh() awaits the server-owned lookup.
     await DevAccessService.instance.refresh();
     if (!mounted) return;
 
-    // Defense in depth: make sure the Firestore lookup we just awaited
+    // Defense in depth: make sure the callable result we just awaited
     // applied to the account we actually signed in as (no concurrent
     // auth change swapped the user out from under us).
     final stillDevAccount =

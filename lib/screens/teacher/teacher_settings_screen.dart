@@ -63,7 +63,7 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen>
     _loadClasses();
     _loadReadingLevelOptions();
     _loadMfaStatus();
-    // Rebuild if dev-access flips (e.g. the Firestore lookup resolves after a
+    // Rebuild if dev-access flips (e.g. the server lookup resolves after a
     // session resume, or a super-admin grants/revokes access).
     _devAccess.addListener(_onDevAccessChanged);
   }
@@ -531,6 +531,15 @@ class _TeacherSettingsScreenState extends State<TeacherSettingsScreen>
               TeacherSettingsSection(
                 title: 'Security',
                 items: [
+                  TeacherSettingsItem(
+                    icon: Icons.manage_accounts_outlined,
+                    iconBgColor: LumiTokens.muted,
+                    label: 'Account',
+                    onTap: () => context.push(
+                      '/settings/account',
+                      extra: widget.user,
+                    ),
+                  ),
                   TeacherSettingsItem(
                     icon: Icons.shield_outlined,
                     iconBgColor: LumiTokens.muted,

@@ -151,7 +151,7 @@ test('students: a parent-doc holder cannot self-append to parentIds (1.3)', asyn
   );
 });
 
-test('parents: parent can create only own profile doc', async () => {
+test('parents: client cannot self-create a parent membership', async () => {
   await seedData(async (db) => {
     await db.collection('schools').doc('school_1').set({
       name: 'Lumi School',
@@ -164,7 +164,7 @@ test('parents: parent can create only own profile doc', async () => {
 
   const parentDb = authDb('parent_1');
 
-  await assertSucceeds(
+  await assertFails(
     parentDb.collection('schools').doc('school_1').collection('parents').doc('parent_1').set({
       email: 'parent@example.com',
       fullName: 'Parent One',
@@ -221,9 +221,8 @@ test('parents self-create CANNOT pre-seed linkedChildren (cross-school PII grab)
     }),
   );
 
-  // A parent self-create that OMITS linkedChildren is allowed — the field
-  // defaults to empty and grants no child access (the legit client writes []).
-  await assertSucceeds(
+  // Even an empty profile is server-owned: a valid linking callable creates it.
+  await assertFails(
     parentRef.set({
       email: 'parent@example.com',
       fullName: 'Parent One',
@@ -302,6 +301,53 @@ test('users self-update: whitelisted fields succeed, sensitive fields fail', asy
   }));
 });
 
+test('legacy top-level user: self can record terms but cannot set role or create/delete profile', async () => {
+  await seedData(async (db) => {
+    await db.collection('users').doc('legacy_1').set({
+      email: 'legacy@example.test',
+      fullName: 'Legacy User',
+      role: 'parent',
+    });
+  });
+
+  const ownRef = authDb('legacy_1').collection('users').doc('legacy_1');
+  await assertSucceeds(ownRef.get());
+  await assertSucceeds(ownRef.update({
+    termsAccepted: true,
+    termsAcceptedAt: serverTimestamp(),
+    termsAcceptedVersion: '2026-07-10',
+    termsAcceptedPlatform: 'android',
+  }));
+  await assertFails(ownRef.update({ role: 'schoolAdmin' }));
+  await assertFails(ownRef.update({
+    termsAccepted: true,
+    termsAcceptedAt: serverTimestamp(),
+    termsAcceptedVersion: '2026-07-10',
+    termsAcceptedPlatform: 'android',
+    role: 'schoolAdmin',
+  }));
+  await assertFails(ownRef.delete());
+  await assertFails(
+    authDb('new_legacy').collection('users').doc('new_legacy').set({
+      role: 'schoolAdmin',
+    }),
+  );
+});
+
+test('dev access allowlist: clients cannot probe any hashed email document', async () => {
+  await seedData(async (db) => {
+    await db.collection('devAccessEmails').doc('known_hash').set({
+      email: 'developer@example.test',
+      enabled: true,
+    });
+  });
+
+  const signedIn = authDb('user_1', {email: 'user@example.test'});
+  await assertFails(signedIn.collection('devAccessEmails').doc('known_hash').get());
+  await assertFails(signedIn.collection('devAccessEmails').doc('guessed_hash').get());
+  await assertFails(signedIn.collection('devAccessEmails').get());
+});
+
 test('parents self-update: whitelisted fields succeed, sensitive fields fail', async () => {
   await seedData(async (db) => {
     await db.collection('schools').doc('school_1').set({
@@ -358,6 +404,12 @@ test('school counters: only role-aligned increments are allowed', async () => {
     await db.collection('schools').doc('school_1').collection('users').doc('teacher_1').set({
       role: 'teacher',
       schoolId: 'school_1',
+    });
+    await db.collection('schools').doc('school_1').collection('classes').doc('class_1').set({
+      schoolId: 'school_1',
+      teacherId: 'teacher_1',
+      teacherIds: ['teacher_1'],
+      studentIds: ['student_1'],
     });
 
     await db.collection('schools').doc('school_1').collection('parents').doc('parent_1').set({
@@ -444,7 +496,7 @@ test('studentLinkCodes: parent verification query is bounded and role writes are
   );
 });
 
-test('schoolOnboarding: admin can claim ownership during first setup update', async () => {
+test('schoolOnboarding: all client reads/writes are denied (callable/Admin SDK only)', async () => {
   await seedData(async (db) => {
     await db.collection('schoolOnboarding').doc('onboarding_1').set({
       schoolName: 'Lumi School',
@@ -458,7 +510,7 @@ test('schoolOnboarding: admin can claim ownership during first setup update', as
 
   const adminDb = authDb('admin_1', { email: 'admin@school.test' });
 
-  await assertSucceeds(
+  await assertFails(
     adminDb.collection('schoolOnboarding').doc('onboarding_1').update({
       adminUserId: 'admin_1',
       status: 'registered',
@@ -471,51 +523,16 @@ test('schoolOnboarding: admin can claim ownership during first setup update', as
       status: 'active',
     }),
   );
-});
-
-test('schoolOnboarding: anonymous demo create is shape-validated', async () => {
-  const anon = unauthDb();
-
-  // A genuine, well-formed demo request from the public form still works
-  // (the flow runs before any account exists).
-  await assertSucceeds(
-    anon.collection('schoolOnboarding').doc('good_1').set({
+  await assertFails(
+    adminDb.collection('schoolOnboarding').doc('onboarding_1').get(),
+  );
+  await assertFails(
+    unauthDb().collection('schoolOnboarding').doc('new_request').set({
       schoolName: 'Lumi School',
       contactEmail: 'owner@school.test',
       status: 'demo',
       currentStep: 'schoolInfo',
       createdAt: new Date(),
-      adminUserId: null,
-    }),
-  );
-
-  // Pre-claiming an admin owner is rejected (adminUserId is set later, only by
-  // the authenticated ownership-claim update).
-  await assertFails(
-    anon.collection('schoolOnboarding').doc('bad_admin').set({
-      schoolName: 'Lumi School',
-      contactEmail: 'owner@school.test',
-      status: 'demo',
-      createdAt: new Date(),
-      adminUserId: 'attacker',
-    }),
-  );
-
-  // Non-demo status / missing required fields are rejected.
-  await assertFails(
-    anon.collection('schoolOnboarding').doc('bad_status').set({
-      schoolName: 'Lumi School',
-      contactEmail: 'owner@school.test',
-      status: 'active',
-      createdAt: new Date(),
-      adminUserId: null,
-    }),
-  );
-  await assertFails(
-    anon.collection('schoolOnboarding').doc('bad_shape').set({
-      status: 'demo',
-      createdAt: new Date(),
-      adminUserId: null,
     }),
   );
 });
@@ -683,7 +700,7 @@ test('books: legacy top-level books are school-scoped read-only fallback', async
   );
 });
 
-test('allocations: teacher can query school allocations', async () => {
+test('allocations: teacher can query allocations for an assigned class', async () => {
   await seedData(async (db) => {
     await db.collection('schools').doc('school_1').set({
       name: 'Lumi School One',
@@ -692,6 +709,12 @@ test('allocations: teacher can query school allocations', async () => {
     await db.collection('schools').doc('school_1').collection('users').doc('teacher_1').set({
       role: 'teacher',
       schoolId: 'school_1',
+    });
+    await db.collection('schools').doc('school_1').collection('classes').doc('class_1').set({
+      schoolId: 'school_1',
+      teacherId: 'teacher_1',
+      teacherIds: ['teacher_1'],
+      studentIds: ['student_1'],
     });
     await db.collection('schools').doc('school_1').collection('allocations').doc('alloc_1').set({
       schoolId: 'school_1',
@@ -716,6 +739,7 @@ test('allocations: teacher can query school allocations', async () => {
       .collection('schools')
       .doc('school_1')
       .collection('allocations')
+      .where('classId', '==', 'class_1')
       .where('isActive', '==', true)
       .get(),
   );
@@ -871,6 +895,11 @@ test('readingLevelEvents: teacher can create and read student level history', as
       fullName: 'Teacher One',
     });
 
+    await db.collection('schools').doc('school_1').collection('classes').doc('class_1').set({
+      schoolId: 'school_1', teacherId: 'teacher_1', teacherIds: ['teacher_1'],
+      studentIds: ['student_1'],
+    });
+
     await db.collection('schools').doc('school_1').collection('students').doc('student_1').set({
       schoolId: 'school_1',
       classId: 'class_1',
@@ -948,6 +977,11 @@ test('students: teacher can update student reading level fields', async () => {
       fullName: 'Teacher One',
     });
 
+    await db.collection('schools').doc('school_1').collection('classes').doc('class_1').set({
+      schoolId: 'school_1', teacherId: 'teacher_1', teacherIds: ['teacher_1'],
+      studentIds: ['student_1'],
+    });
+
     await db.collection('schools').doc('school_1').collection('students').doc('student_1').set({
       schoolId: 'school_1',
       classId: 'class_1',
@@ -995,6 +1029,10 @@ test('students: staff cannot write the server-owned access map or parentIds', as
     await db.collection('schools').doc('school_1').collection('users').doc('admin_1').set({
       role: 'schoolAdmin',
       schoolId: 'school_1',
+    });
+    await db.collection('schools').doc('school_1').collection('classes').doc('class_1').set({
+      schoolId: 'school_1', teacherId: 'teacher_1', teacherIds: ['teacher_1'],
+      studentIds: ['student_1'],
     });
     await db.collection('schools').doc('school_1').collection('students').doc('student_1').set({
       schoolId: 'school_1',
@@ -1637,6 +1675,14 @@ async function seedTwoSchools(session = {}) {
       });
     await db
       .collection('schools').doc(SCHOOL_A)
+      .collection('comprehensionEvals').doc('log_a_1').set({
+        schoolId: SCHOOL_A,
+        classId: CLASS_A_ID,
+        studentId: STUDENT_A_ID,
+        status: 'evaluated',
+      });
+    await db
+      .collection('schools').doc(SCHOOL_A)
       .collection('books').doc('book_a_1').set({
         schoolId: SCHOOL_A,
         title: 'Book A',
@@ -1705,6 +1751,15 @@ test('impersonation: dev can read reading logs in target school', async () => {
   const db = authDb(DEV_UID, impersonationClaims());
   await assertSucceeds(
     db.collection('schools').doc(SCHOOL_A).collection('readingLogs').doc('log_a_1').get(),
+  );
+});
+
+test('impersonation: live read-only session can read AI evals in target school', async () => {
+  await seedTwoSchools();
+  const db = authDb(DEV_UID, impersonationClaims());
+  await assertSucceeds(
+    db.collection('schools').doc(SCHOOL_A)
+      .collection('comprehensionEvals').doc('log_a_1').get(),
   );
 });
 
@@ -1840,6 +1895,49 @@ test('impersonation: dev cannot delete student', async () => {
   await assertFails(
     db.collection('schools').doc(SCHOOL_A).collection('students').doc(STUDENT_A_ID).delete(),
   );
+});
+
+test('deletion workflow: assigned teacher cannot bypass the server cascade', async () => {
+  await seedTwoSchools();
+  const ref = authDb(TEACHER_A_UID)
+    .collection('schools').doc(SCHOOL_A)
+    .collection('students').doc(STUDENT_A_ID);
+
+  await assertFails(ref.delete());
+  await assertFails(ref.update({ pendingDeletion: true }));
+  await assertFails(ref.update({ pendingDeletionAt: new Date() }));
+  // Ordinary profile editing remains available to the assigned teacher.
+  await assertSucceeds(ref.update({ firstName: 'Updated' }));
+});
+
+test('deletion workflow: school admin cannot directly delete a student', async () => {
+  await seedTwoSchools();
+  await seedData((db) => db.collection('schools').doc(SCHOOL_A)
+    .collection('users').doc('admin_a').set({
+      email: 'admin_a@lumi.app',
+      fullName: 'Admin A',
+      role: 'schoolAdmin',
+      schoolId: SCHOOL_A,
+      isActive: true,
+    }));
+
+  await assertFails(authDb('admin_a')
+    .collection('schools').doc(SCHOOL_A)
+    .collection('students').doc(STUDENT_A_ID).delete());
+});
+
+test('deletion workflow: internal jobs are inaccessible to clients', async () => {
+  await seedData((db) => db.collection('deletionJobs').doc('job_1').set({
+    kind: 'account',
+    status: 'pending',
+    requesterUid: 'teacher_a_1',
+  }));
+  const signedIn = authDb(TEACHER_A_UID).collection('deletionJobs').doc('job_1');
+  const signedOut = unauthDb().collection('deletionJobs').doc('job_1');
+
+  await assertFails(signedIn.get());
+  await assertFails(signedIn.set({ status: 'completed' }, { merge: true }));
+  await assertFails(signedOut.get());
 });
 
 test('impersonation: dev cannot create own user doc in target school', async () => {
@@ -2106,7 +2204,7 @@ test('demoAccess/state: no one can read the day password', async () => {
   await seedData(async (db) => {
     await db.collection('demoAccess').doc('state').set({
       dayKey: '2026-07-11',
-      password: 'Xk7mPq9RtW2c',
+      password: 'Xk7mPq9RtW2c', // gitleaks:allow -- synthetic test credential
     });
   });
   await assertFails(authDb('me').collection('demoAccess').doc('state').get());
@@ -2233,9 +2331,16 @@ async function seedSchoolForComments() {
       schoolId: 'school_1',
       classIds: ['class_1'],
     });
+    await db.collection('schools').doc('school_1').collection('classes').doc('class_1').set({
+      schoolId: 'school_1',
+      teacherId: 'teacher_1',
+      teacherIds: ['teacher_1'],
+      studentIds: ['student_1'],
+    });
     await db.collection('schools').doc('school_1').collection('readingLogs').doc('log_1').set({
       schoolId: 'school_1',
       studentId: 'student_1',
+      classId: 'class_1',
       parentId: 'parent_1',
       minutesRead: 20,
       status: 'completed',
@@ -2267,7 +2372,7 @@ const parentComment = {
   body: 'Thank you!',
   studentId: 'student_1',
   parentId: 'parent_1',
-  createdAt: new Date(),
+  createdAt: serverTimestamp(),
 };
 
 test('comments: parent of the student can read the thread and post', async () => {
@@ -2287,7 +2392,7 @@ test('comments: teacher can post a teacher comment on any log in the school', as
     body: 'Great progress',
     studentId: 'student_1',
     parentId: 'parent_1',
-    createdAt: new Date(),
+    createdAt: serverTimestamp(),
   }));
 });
 
@@ -2322,6 +2427,115 @@ test('comments: unauthenticated user cannot read or post', async () => {
   const db = unauthDb();
   await assertFails(commentRef(db, 'existing').get());
   await assertFails(commentRef(db, 'u1').set({ ...parentComment, authorId: 'anon' }));
+});
+
+// ── Class isolation: ordinary teachers see only assigned classes ─────────
+
+async function seedClassIsolationSchool() {
+  await seedData(async (db) => {
+    const school = db.collection('schools').doc('school_1');
+    await school.set({ name: 'Isolation School', createdBy: 'admin_1' });
+    await school.collection('users').doc('admin_1').set({
+      role: 'schoolAdmin', schoolId: 'school_1',
+    });
+    await school.collection('users').doc('teacher_a').set({
+      role: 'teacher', schoolId: 'school_1',
+    });
+    await school.collection('users').doc('teacher_b').set({
+      role: 'teacher', schoolId: 'school_1',
+    });
+    await school.collection('classes').doc('class_a').set({
+      schoolId: 'school_1', teacherId: 'teacher_a',
+      teacherIds: ['teacher_a'], studentIds: ['student_a'],
+    });
+    await school.collection('classes').doc('class_b').set({
+      schoolId: 'school_1', teacherId: 'teacher_b',
+      teacherIds: ['teacher_b'], studentIds: ['student_b'],
+    });
+    await school.collection('students').doc('student_a').set({
+      schoolId: 'school_1', classId: 'class_a', firstName: 'Alice', isActive: true,
+    });
+    await school.collection('students').doc('student_b').set({
+      schoolId: 'school_1', classId: 'class_b', firstName: 'Bob', isActive: true,
+    });
+    for (const suffix of ['a', 'b']) {
+      await school.collection('readingLogs').doc(`log_${suffix}`).set({
+        schoolId: 'school_1', classId: `class_${suffix}`,
+        studentId: `student_${suffix}`, parentId: `parent_${suffix}`,
+        minutesRead: 20, status: 'completed', bookTitles: ['Reading'],
+      });
+      await school.collection('readingLogs').doc(`log_${suffix}`)
+        .collection('comments').doc(`comment_${suffix}`).set({
+          authorId: `parent_${suffix}`, authorRole: 'parent', authorName: 'Parent',
+          body: 'Hello', studentId: `student_${suffix}`,
+          parentId: `parent_${suffix}`, createdAt: new Date(),
+        });
+      await school.collection('allocations').doc(`allocation_${suffix}`).set({
+        schoolId: 'school_1', classId: `class_${suffix}`,
+        studentIds: [`student_${suffix}`], isActive: true,
+      });
+      await school.collection('readingGroups').doc(`group_${suffix}`).set({
+        schoolId: 'school_1', classId: `class_${suffix}`,
+        studentIds: [`student_${suffix}`], name: `Group ${suffix}`,
+      });
+    }
+  });
+}
+
+test('class isolation: teacher cannot get another class student/log/comment/allocation/group', async () => {
+  await seedClassIsolationSchool();
+  const school = authDb('teacher_a').collection('schools').doc('school_1');
+
+  await assertSucceeds(school.collection('students').doc('student_a').get());
+  await assertFails(school.collection('students').doc('student_b').get());
+  await assertSucceeds(school.collection('readingLogs').doc('log_a').get());
+  await assertFails(school.collection('readingLogs').doc('log_b').get());
+  await assertSucceeds(school.collection('readingLogs').doc('log_a')
+    .collection('comments').doc('comment_a').get());
+  await assertFails(school.collection('readingLogs').doc('log_b')
+    .collection('comments').doc('comment_b').get());
+  await assertSucceeds(school.collection('allocations').doc('allocation_a').get());
+  await assertFails(school.collection('allocations').doc('allocation_b').get());
+  await assertSucceeds(school.collection('readingGroups').doc('group_a').get());
+  await assertFails(school.collection('readingGroups').doc('group_b').get());
+});
+
+test('class isolation: teacher queries must be constrained to an assigned class', async () => {
+  await seedClassIsolationSchool();
+  const school = authDb('teacher_a').collection('schools').doc('school_1');
+
+  await assertSucceeds(school.collection('students').where('classId', '==', 'class_a').get());
+  await assertFails(school.collection('students').get());
+  await assertSucceeds(school.collection('readingLogs').where('classId', '==', 'class_a').get());
+  await assertFails(school.collection('readingLogs').get());
+  await assertSucceeds(school.collection('allocations').where('classId', '==', 'class_a').get());
+  await assertFails(school.collection('allocations').get());
+  await assertSucceeds(school.collection('readingGroups').where('classId', '==', 'class_a').get());
+  await assertFails(school.collection('readingGroups').get());
+});
+
+test('class isolation: teacher cannot update or delete another class records; admin can', async () => {
+  await seedClassIsolationSchool();
+  const teacherSchool = authDb('teacher_a').collection('schools').doc('school_1');
+  await assertFails(teacherSchool.collection('students').doc('student_b').update({ firstName: 'Stolen' }));
+  await assertFails(teacherSchool.collection('readingLogs').doc('log_b').update({ minutesRead: 30 }));
+  await assertFails(teacherSchool.collection('allocations').doc('allocation_b').delete());
+  await assertFails(teacherSchool.collection('readingGroups').doc('group_b').delete());
+
+  const adminSchool = authDb('admin_1').collection('schools').doc('school_1');
+  await assertSucceeds(adminSchool.collection('students').doc('student_b').get());
+  await assertSucceeds(adminSchool.collection('readingLogs').doc('log_b').get());
+  await assertSucceeds(adminSchool.collection('allocations').doc('allocation_b').get());
+  await assertSucceeds(adminSchool.collection('readingGroups').doc('group_b').get());
+});
+
+test('comments: child and parent fields must match the containing reading log', async () => {
+  await seedSchoolForComments();
+  const parentDb = authDb('parent_1');
+  const base = { ...parentComment, createdAt: serverTimestamp() };
+  await assertFails(commentRef(parentDb, 'wrong_child').set({ ...base, studentId: 'student_999' }));
+  await assertFails(commentRef(parentDb, 'wrong_parent').set({ ...base, parentId: 'parent_outsider' }));
+  await assertFails(commentRef(parentDb, 'extra_field').set({ ...base, admin: true }));
 });
 
 function logRef(db) {
@@ -2413,6 +2627,194 @@ test('platformConfig: clients cannot create, update, or delete flags', async () 
   await assertFails(db.collection('platformConfig').doc('someOtherFlag').set({ enabled: false }));
 });
 
+// ── AI comprehension evaluation (dark/inert Phase 1) ───────────────
+
+async function seedAiEvaluationRulesFixture() {
+  await seedData(async (db) => {
+    const school = db.collection('schools').doc('school_1');
+    await school.set({
+      name: 'Lumi School One',
+      createdBy: 'admin_1',
+      settings: { messaging: { enabled: true } },
+    });
+
+    await school.collection('users').doc('admin_1').set({
+      role: 'schoolAdmin',
+      schoolId: 'school_1',
+    });
+    await school.collection('users').doc('teacher_1').set({
+      role: 'teacher',
+      schoolId: 'school_1',
+    });
+    await school.collection('users').doc('teacher_2').set({
+      role: 'teacher',
+      schoolId: 'school_1',
+    });
+    await school.collection('parents').doc('parent_1').set({
+      role: 'parent',
+      schoolId: 'school_1',
+      linkedChildren: ['student_1'],
+    });
+
+    await school.collection('classes').doc('class_1').set({
+      schoolId: 'school_1',
+      teacherId: 'teacher_1',
+      teacherIds: ['teacher_1'],
+      studentIds: ['student_1'],
+    });
+    await school.collection('classes').doc('class_2').set({
+      schoolId: 'school_1',
+      teacherId: 'teacher_2',
+      teacherIds: ['teacher_2'],
+      studentIds: ['student_2'],
+    });
+
+    await school.collection('students').doc('student_1').set({
+      schoolId: 'school_1',
+      classId: 'class_1',
+      parentIds: ['parent_1'],
+    });
+    await school.collection('readingLogs').doc('log_1').set({
+      schoolId: 'school_1',
+      classId: 'class_1',
+      studentId: 'student_1',
+      parentId: 'parent_1',
+      minutesRead: 10,
+      targetMinutes: 10,
+      bookTitles: ['A Book'],
+      comprehensionQuestionText: 'What happened in the story?',
+    });
+
+    await school.collection('comprehensionEvals').doc('log_1').set({
+      schoolId: 'school_1',
+      classId: 'class_1',
+      studentId: 'student_1',
+      status: 'evaluated',
+      evaluatedAt: new Date(),
+      level: 'developing',
+    });
+    await school.collection('comprehensionEvals').doc('log_2').set({
+      schoolId: 'school_1',
+      classId: 'class_2',
+      studentId: 'student_2',
+      status: 'evaluated',
+      evaluatedAt: new Date(),
+      level: 'secure',
+    });
+    await school.collection('adminMeta').doc('aiEvaluation').set({
+      plan: 'pilot',
+      capPerDay: 100,
+    });
+  });
+}
+
+function aiEvalsRef(db) {
+  return db.collection('schools').doc('school_1').collection('comprehensionEvals');
+}
+
+test('AI evals: parent cannot read an evaluation for their own linked child', async () => {
+  await seedAiEvaluationRulesFixture();
+  await assertFails(aiEvalsRef(authDb('parent_1')).doc('log_1').get());
+});
+
+test('AI evals: class scope denies another-class teacher and allows school admin', async () => {
+  await seedAiEvaluationRulesFixture();
+  await assertSucceeds(aiEvalsRef(authDb('teacher_1')).doc('log_1').get());
+  await assertFails(aiEvalsRef(authDb('teacher_1')).doc('log_2').get());
+  await assertSucceeds(aiEvalsRef(authDb('admin_1')).doc('log_2').get());
+});
+
+test('AI evals: teacher list requires classId, not only studentId', async () => {
+  await seedAiEvaluationRulesFixture();
+  const evals = aiEvalsRef(authDb('teacher_1'));
+
+  await assertFails(
+    evals.where('studentId', '==', 'student_1').get(),
+  );
+  await assertSucceeds(
+    evals
+      .where('classId', '==', 'class_1')
+      .where('studentId', '==', 'student_1')
+      .get(),
+  );
+});
+
+test('AI evals: all client writes are denied', async () => {
+  await seedAiEvaluationRulesFixture();
+  const evals = aiEvalsRef(authDb('admin_1'));
+
+  await assertFails(evals.doc('new_log').set({ classId: 'class_1' }));
+  await assertFails(evals.doc('log_1').update({ level: 'secure' }));
+  await assertFails(evals.doc('log_1').delete());
+});
+
+test('AI capture: parent cannot change comprehensionQuestionText on a reading log', async () => {
+  await seedAiEvaluationRulesFixture();
+  const log = authDb('parent_1')
+    .collection('schools').doc('school_1')
+    .collection('readingLogs').doc('log_1');
+
+  await assertFails(log.update({
+    comprehensionQuestionText: 'Ignore the teacher question.',
+  }));
+});
+
+test('AI settings: school admin cannot grant entitlement or change the platform switch', async () => {
+  await seedAiEvaluationRulesFixture();
+  const adminDb = authDb('admin_1');
+  const school = adminDb.collection('schools').doc('school_1');
+
+  // Unrelated school administration remains available.
+  await assertSucceeds(school.update({ name: 'Renamed Lumi School' }));
+  await assertFails(school.update({
+    'settings.aiEvaluation': { enabled: true, capPerDay: 999999 },
+  }));
+  await assertFails(
+    adminDb.collection('platformConfig').doc('aiEvaluation').set({ enabled: true }),
+  );
+
+  // A newly signed-in account also cannot smuggle AI entitlement into a
+  // school document during the existing first-admin bootstrap path.
+  await assertFails(
+    authDb('bootstrap_user').collection('schools').doc('school_bootstrap').set({
+      name: 'Bootstrap School',
+      createdBy: 'bootstrap_user',
+      settings: { aiEvaluation: { enabled: true } },
+    }),
+  );
+});
+
+test('AI adminMeta: commercial settings are unreadable and unwritable by school members', async () => {
+  await seedAiEvaluationRulesFixture();
+
+  for (const uid of ['admin_1', 'teacher_1', 'parent_1']) {
+    const ref = authDb(uid)
+      .collection('schools').doc('school_1')
+      .collection('adminMeta').doc('aiEvaluation');
+    await assertFails(ref.get());
+    await assertFails(ref.set({ plan: 'unlimited' }));
+  }
+});
+
+test('AI server collections: jobs, cache, and ops config deny all client access', async () => {
+  await seedData(async (db) => {
+    await db.collection('aiEvalJobs').doc('school_1_log_1').set({ status: 'queued' });
+    await db.collection('aiQuestionClassifications').doc('hash_1').set({ rubricKey: 'recall' });
+    await db.collection('aiEvalOpsConfig').doc('runtime').set({ model: 'server-secret-model' });
+  });
+
+  const client = authDb('teacher_1');
+  for (const [collectionName, docId] of [
+    ['aiEvalJobs', 'school_1_log_1'],
+    ['aiQuestionClassifications', 'hash_1'],
+    ['aiEvalOpsConfig', 'runtime'],
+  ]) {
+    const ref = client.collection(collectionName).doc(docId);
+    await assertFails(ref.get());
+    await assertFails(ref.set({ compromised: true }));
+  }
+});
+
 // ── Access entitlement: reading-log create is gated on student.access ───────
 // The parent logging path is the single enforcement point. A parent linked to
 // the student may create a log ONLY when that student's materialised `access`
@@ -2486,15 +2888,24 @@ async function seedSchoolWithAccessStates({ quickLoggingEnabled } = {}) {
   });
 }
 
-function logFor(db, studentId, { quickLog = false, logId = `log_${studentId}` } = {}) {
+function logFor(db, studentId, {
+  quickLog = false,
+  logId = `log_${studentId}`,
+  overrides = {},
+} = {}) {
   return db.collection('schools').doc('school_1').collection('readingLogs').doc(logId).set({
     schoolId: 'school_1',
     studentId,
     parentId: 'parent_1',
+    classId: 'class_1',
+    date: new Date(),
+    createdAt: serverTimestamp(),
     minutesRead: 20,
+    targetMinutes: 20,
     status: 'completed',
     bookTitles: ['Reading'],
     ...(quickLog ? { metadata: { quickLog: true } } : {}),
+    ...overrides,
   });
 }
 
@@ -2502,6 +2913,30 @@ test('access: parent CAN create a log for a student with live access', async () 
   await seedSchoolWithAccessStates();
   const db = authDb('parent_1');
   await assertSucceeds(logFor(db, 'student_active'));
+});
+
+test('reading log create rejects malformed optional fields and metadata extras', async () => {
+  await seedSchoolWithAccessStates();
+  const db = authDb('parent_1');
+  const invalid = [
+    { photoUrls: 'not-a-list' },
+    { photoUrls: ['1', '2', '3', '4', '5', '6'] },
+    { isOfflineCreated: 'yes' },
+    { syncedAt: 'yesterday' },
+    { allocationId: 'x'.repeat(201) },
+    { parentCommentSelections: Array(11).fill('tag') },
+    { parentComment: 'x'.repeat(2001) },
+    { parentCommentFreeText: 'x'.repeat(2001) },
+    { loggedByName: 'x'.repeat(201) },
+    { loggedByLabel: 'x'.repeat(201) },
+    { metadata: { quickLog: false, admin: true } },
+  ];
+  for (let i = 0; i < invalid.length; i += 1) {
+    await assertFails(logFor(db, 'student_active', {
+      logId: `invalid_optional_${i}`,
+      overrides: invalid[i],
+    }));
+  }
 });
 
 test('access: parent CANNOT create a log for an expired student', async () => {
@@ -2570,11 +3005,15 @@ test('quick logging: parent quick log is denied when school disables it', async 
 // content updates (a log could otherwise be created valid, edited to 99999).
 
 function logWithMinutes(db, minutes) {
-  return db.collection('schools').doc('school_1').collection('readingLogs').doc('log_bounds').set({
+  return db.collection('schools').doc('school_1').collection('readingLogs').doc(`log_bounds_${minutes}`).set({
     schoolId: 'school_1',
     studentId: 'student_active',
     parentId: 'parent_1',
+    classId: 'class_1',
+    date: new Date(),
+    createdAt: serverTimestamp(),
     minutesRead: minutes,
+    targetMinutes: 20,
     status: 'completed',
     bookTitles: ['Reading'],
   });
@@ -2606,7 +3045,8 @@ test('minutes bounds: owner cannot edit an existing log up to 600 minutes', asyn
   await seedData(async (db) => {
     await db.collection('schools').doc('school_1').collection('readingLogs').doc('log_edit').set({
       schoolId: 'school_1', studentId: 'student_active', parentId: 'parent_1',
-      minutesRead: 20, status: 'completed', bookTitles: ['Reading'],
+      classId: 'class_1', minutesRead: 20, targetMinutes: 20,
+      status: 'completed', bookTitles: ['Reading'],
     });
   });
   const db = authDb('parent_1');
@@ -2619,6 +3059,39 @@ test('minutes bounds: owner cannot edit an existing log up to 600 minutes', asyn
     db.collection('schools').doc('school_1').collection('readingLogs').doc('log_edit')
       .update({ notes: 'great reading tonight' }),
   );
+});
+
+test('readingLogs: parent cannot mutate identity, system, status, validation, stats, or audio fields', async () => {
+  await seedSchoolWithAccessStates();
+  await seedData(async (db) => {
+    await db.collection('schools').doc('school_1').collection('readingLogs').doc('log_immutable').set({
+      schoolId: 'school_1', studentId: 'student_active', parentId: 'parent_1',
+      classId: 'class_1', date: new Date(), createdAt: new Date(),
+      minutesRead: 20, targetMinutes: 20, status: 'completed',
+      bookTitles: ['Reading'], loggedByRole: 'parent',
+    });
+  });
+  const ref = authDb('parent_1')
+    .collection('schools').doc('school_1')
+    .collection('readingLogs').doc('log_immutable');
+  const forbiddenPatches = [
+    { studentId: 'student_expired' },
+    { classId: 'class_other' },
+    { parentId: 'parent_other' },
+    { schoolId: 'school_other' },
+    { date: new Date(0) },
+    { createdAt: new Date() },
+    { status: 'partial' },
+    { loggedByRole: 'teacher' },
+    { validationStatus: 'valid' },
+    { stats: { totalMinutes: 999999 } },
+    { comprehensionAudioPath: 'schools/school_other/comprehension_audio/victim.m4a' },
+    { comprehensionAudioDurationSec: 60 },
+    { comprehensionAudioUploaded: true },
+  ];
+  for (const patch of forbiddenPatches) {
+    await assertFails(ref.update(patch));
+  }
 });
 
 test('access: student reads stay open so the app can render the lapsed screen', async () => {
@@ -2663,7 +3136,11 @@ test('readingLogs offline-drain: parent get/update on a NON-EXISTENT log is deni
       schoolId: 'school_1',
       studentId: 'student_active',
       parentId: 'parent_1',
+      classId: 'class_1',
+      date: new Date(),
+      createdAt: serverTimestamp(),
       minutesRead: 20,
+      targetMinutes: 20,
       status: 'completed',
       bookTitles: ['Reading'],
     }),
@@ -2714,15 +3191,28 @@ async function seedSchoolForTeacherProxy() {
       isActive: true,
       access: { status: 'active', academicYear: 2026, expiresAt: FUTURE },
     });
+    await db.collection('schools').doc('school_1').collection('students').doc('student_2').set({
+      schoolId: 'school_1', classId: 'class_other', firstName: 'Other', lastName: 'Student',
+      isActive: true,
+      access: { status: 'active', academicYear: 2026, expiresAt: FUTURE },
+    });
   });
 }
 
-function proxyLog(db, { logId, parentId, classId, loggedByRole = 'teacher' }) {
+function proxyLog(db, {
+  logId,
+  parentId,
+  classId,
+  studentId = 'student_1',
+  loggedByRole = 'teacher',
+}) {
   return db.collection('schools').doc('school_1').collection('readingLogs').doc(logId).set({
     schoolId: 'school_1',
-    studentId: 'student_1',
+    studentId,
     parentId,
     classId,
+    date: new Date(),
+    createdAt: serverTimestamp(),
     loggedByRole,
     minutesRead: 15,
     targetMinutes: 20,
@@ -2747,6 +3237,17 @@ test('proxy: a teacher CANNOT log for a class they do not teach', async () => {
   await seedSchoolForTeacherProxy();
   const db = authDb('teacher_other');
   await assertFails(proxyLog(db, { logId: 'p3', parentId: 'teacher_other', classId: 'class_1' }));
+});
+
+test('proxy: teacher cannot pair their class with a student from another class', async () => {
+  await seedSchoolForTeacherProxy();
+  const db = authDb('teacher_array');
+  await assertFails(proxyLog(db, {
+    logId: 'p_mismatch',
+    parentId: 'teacher_array',
+    classId: 'class_1',
+    studentId: 'student_2',
+  }));
 });
 
 test('proxy: parentId must be the teacher\'s own uid', async () => {
@@ -2781,7 +3282,7 @@ const teacherCommentDoc = {
   body: 'Great progress',
   studentId: 'student_1',
   parentId: 'parent_1',
-  createdAt: new Date(),
+  createdAt: serverTimestamp(),
 };
 
 test('comments: blocked for both roles when school messaging is disabled', async () => {

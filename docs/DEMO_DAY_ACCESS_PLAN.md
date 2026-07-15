@@ -49,7 +49,7 @@ Do **not** rebuild these — reuse them.
 | Piece | Where | Notes |
 |---|---|---|
 | Persistent demo school | `scripts/seed_demo_school.js` — `SCHOOL_ID = "lumi_demo_primary_school"`, "Lumi Demo Primary School", `isDemo: true` (`:149,154,532`) | Fully populated sales-demo tenant; `--reset` guard refuses non-`isDemo` schools (`:900-903`). This is the school to use. |
-| Demo accounts (Auth + Firestore) | `seed_demo_school.js:157-215` | `demo.admin@lumidemo.school` (schoolAdmin), `demo.teacher@lumidemo.school`, `demo.parent@lumidemo.school` (+ demo.teacher2/parent2/ghosts). Shared **hardcoded** password `LumiDemo!2026` (`:151`) — in the repo, effectively public. The rolling rotation fixes this. |
+| Demo accounts (Auth + Firestore) | `seed_demo_school.js` | `demo.admin@lumidemo.school` (schoolAdmin), `demo.teacher@lumidemo.school`, `demo.parent@lumidemo.school` (+ demo.teacher2/parent2/ghosts). The seed password is supplied through `DEMO_PASSWORD` from the team password manager and is not stored in Git. Daily rotation remains required. |
 | Demo playbook | `docs/demo-playbook.md` | 300-line runbook incl. logins table and pipeline flow; must be updated at the end (§9). |
 | Marketing demo form → pipeline | `marketing-site/src/app/book-a-demo/page.tsx` → callable `submitDemoRequest` (`functions/src/marketing_leads.ts:56-113`) | Writes a `schoolOnboarding` doc: `status:"demo"`, `contactEmail`, `contactPerson`, `schoolName`, extras packed into `metadata.notes`. **No email is sent** on this path today. |
 | Kanban board + demo column | `admin/src/app/(auth)/onboarding/onboarding-pipeline.tsx:13-20` (STAGES, `demo` is first, cyan) | Cards route to `/onboarding/{id}`; the only board action is drag-to-change-status. All real actions live on the detail page. |
@@ -83,7 +83,7 @@ functions deploys are manual/slow to iterate.
   `updateUser(uid, { password: <random 40+ chars, never stored> })` + `revokeRefreshTokens(uid)`,
   then stamp `scrambledAt` on the state doc.
 - Unconditional daily scramble is idempotent, needs no state to be correct, and permanently
-  neutralises the hardcoded `LumiDemo!2026` from the seed script.
+  replaces the password-manager seed value from the seed script.
 - App sessions die ≤ ~1h after revocation (ID tokens expire, refresh is revoked).
 - **Portal session tail:** the school portal's cookie is a locally-verified JWT (5 days), so a
   session opened on demo day would otherwise outlive the password. Fix in workstream PR-4:
@@ -165,7 +165,7 @@ in `docs/fcm-push-debug-handoff.md:154`).
   new top-level collection, explicit deny-all rules like `superAdmins` at `firestore.rules:921-923`):
   ```
   { dayKey: "2026-07-11",            // Sydney YYYY-MM-DD
-    password: "Xk7mPq9RtW2c",        // plaintext, staffCredentials precedent (rules:659)
+    password: "Xk7mPq9RtW2c",        // gitleaks:allow -- synthetic example only
     issuedAt, issuedBy: {uid,email},
     accounts: [{role, email, uid}],  // the 3 shared accounts as rotated
     scrambledAt: null,
@@ -382,7 +382,7 @@ into PR-2.
    attempting Email now returns the stale-state failure.
 6. Next day Provision issues a fresh password.
 7. Confirm `review.teacher@`/`review.parent@` (App Review school) still log in with
-   `LumiReview2026!` — proves the scramble scope is correct.
+   the password stored in App Store Connect — proves the scramble scope is correct.
 8. Rules check: unauthenticated + authed non-admin clients cannot read `demoAccess/*` or
    `demoAccessEmails/*` (covered by rules tests, spot-check live).
 

@@ -16,7 +16,7 @@ import type {
   RolloverCommitResult,
   RolloverPlan,
 } from '@/lib/rollover/plan';
-import { deleteStudents } from '@/lib/firestore/students';
+import { deleteStudentsForRolloverRollback } from '@/lib/firestore/students';
 
 export interface RolloverPreview extends RolloverClassification {
   targetAcademicYear: number;
@@ -799,7 +799,9 @@ export async function undoRolloverImport(
   // 2. Delete created students via the existing cascade (they are minutes-to-
   //    days old; the cascade also fixes rosters, parents and the counter).
   const createdStudents = ((importData.createdStudents as { index: number; docId: string }[] | undefined) ?? []).map((c) => c.docId);
-  const createdDeleted = createdStudents.length > 0 ? await deleteStudents(schoolId, createdStudents) : 0;
+  const createdDeleted = createdStudents.length > 0
+    ? await deleteStudentsForRolloverRollback(schoolId, createdStudents)
+    : 0;
 
   // 3. Restore each entry from its snapshot.
   const present = new Set<string>();

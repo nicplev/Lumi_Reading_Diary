@@ -290,6 +290,26 @@ async function revokeActiveSessionsForDev(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Callable: checkDevAccess
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Returns only whether the authenticated caller's token email is allowlisted.
+ * No input email/hash is accepted, so the endpoint cannot probe other users.
+ */
+export const checkDevAccess = onCall(
+  impersonationRuntime({timeoutSeconds: 15, memory: "256MiB"}),
+  async (request) => {
+    const {email} = requireAuthed(request);
+    const snap = await db()
+      .collection(COLL_DEV_ACCESS)
+      .doc(hashEmail(email))
+      .get();
+    return {hasAccess: snap.exists};
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Callable: startImpersonationSession
 // ─────────────────────────────────────────────────────────────────────────────
 

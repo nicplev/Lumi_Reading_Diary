@@ -12,8 +12,8 @@ step**.
 
 | Role | Email | Password |
 |---|---|---|
-| Teacher | `review.teacher@lumi-reading.com` | `LumiReview2026!` |
-| Parent | `review.parent@lumi-reading.com` | `LumiReview2026!` |
+| Teacher | `review.teacher@lumi-reading.com` | `<set in App Store Connect; not stored in Git>` |
+| Parent | `review.parent@lumi-reading.com` | `<set in App Store Connect; not stored in Git>` |
 
 > Both accounts sign in with **email + password only** — no SMS / one-time code
 > is required. (If you set `DEMO_PASSWORD` when seeding, use that value instead.)

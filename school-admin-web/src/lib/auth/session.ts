@@ -1,6 +1,10 @@
 import { cookies } from 'next/headers';
 import { SignJWT, jwtVerify } from 'jose';
 import { adminDb } from '@/lib/firebase/admin';
+import {
+  allowVerifiedJwtAfterMembershipLookupFailure,
+  isCurrentMembershipValid,
+} from '@/lib/auth/session-policy';
 
 export interface ImpersonationSessionBlock {
   sessionId: string;
@@ -63,7 +67,7 @@ const MFA_ENROLLMENT_MAX_AGE = '10m';
 // session opened on demo day would otherwise stay valid long after the password
 // was scrambled.
 const DEMO_ACCESS_SCHOOL_ID = 'lumi_demo_primary_school';
-const DEMO_ACCESS_TIMEZONE = 'Australia/Sydney';
+const DEMO_ACCESS_TIMEZONE = 'Australia/Sydney'; // gitleaks:allow -- timezone, not a credential
 
 // Seconds from now until the next Sydney midnight (min 60s so a login right at
 // midnight still gets a usable session). DST transitions can make this off by up
@@ -206,9 +210,10 @@ export async function getSession(
     //     to teacher instead of keeping schoolAdmin from the stale token.
     // Impersonation and demo sessions are skipped: their effective role/schoolId
     // is intentionally not the real user's doc, and both are short-lived and
-    // separately gated. A transient Firestore error fails OPEN (the JWT is
-    // already cryptographically verified) so a blip can't log out every user;
-    // the bounded staleness window is exactly what this narrows, not a new hole.
+    // separately gated. Read-only routes may use the verified JWT during a
+    // transient Firestore failure, but Admin-SDK mutation routes fail closed:
+    // without a current membership read we cannot prove the user is still
+    // active and still holds the role carried by the cookie.
     if (!payload.impersonation && payload.mfaExemptReason !== 'isolatedDemoReadOnly') {
       try {
         const snap = await adminDb
@@ -216,14 +221,14 @@ export async function getSession(
           .collection('users').doc(payload.uid as string)
           .get();
         const u = snap.data();
-        if (!snap.exists || u?.isActive === false || u?.pendingDeletion === true) {
-          return null;
-        }
-        if (u?.role !== role) {
+        if (!isCurrentMembershipValid(snap.exists, u, role)) {
           return null;
         }
       } catch (err) {
-        console.error('getSession: server-state re-check failed, proceeding on verified JWT', err);
+        console.error('getSession: server-state re-check failed', err);
+        if (!allowVerifiedJwtAfterMembershipLookupFailure(options.requireMutable === true)) {
+          return null;
+        }
       }
     }
 

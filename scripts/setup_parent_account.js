@@ -35,7 +35,7 @@
  * Flags:
  *   --email <addr>          (required) parent email
  *   --code <CODE>           (repeatable) link code to redeem
- *   --password <pw>         sign-in password (default LumiReview2026! or $RESTORE_PASSWORD)
+ *   --password <pw>         sign-in password (required here or via $RESTORE_PASSWORD)
  *   --name "<Full Name>"    fullName used only when CREATING a new parent doc
  *   --relationship <label>  relationship label for a new parent doc (default Parent)
  *   --phone <+E164>         phoneNumber for a new parent doc (optional)
@@ -84,7 +84,10 @@ function parseArgs(argv) {
   if (!out.email || !out.email.includes('@')) {
     die('Usage: node scripts/setup_parent_account.js --email <addr> [--code CODE ...]');
   }
-  out.password = out.password || process.env.RESTORE_PASSWORD || 'LumiReview2026!';
+  out.password = out.password || process.env.RESTORE_PASSWORD;
+  if (!out.password || out.password.length < 16) {
+    die('A password of at least 16 characters is required via --password or RESTORE_PASSWORD.');
+  }
   out.codes = out.codes.map((c) => c.trim().toUpperCase()).filter(Boolean);
   return out;
 }

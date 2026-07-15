@@ -1,5 +1,6 @@
 import { adminDb } from '@/lib/firebase/admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { createHash } from 'crypto';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getCurrentAcademicYear, hardExpiryFor } from '@/lib/access';
 import type { Student } from '@/lib/types';
 
@@ -210,75 +211,86 @@ export async function updateStudent(
   await studentRef.update(data);
 }
 
-export async function deleteStudent(schoolId: string, studentId: string): Promise<void> {
+/**
+ * Queue the same complete deletion cascade used by the mobile Account screen.
+ * The student is hidden immediately; the Cloud Function owns cross-collection
+ * and Storage cleanup, retries, and the minimal completion receipt.
+ */
+export async function queueStudentDeletion(
+  schoolId: string,
+  studentId: string,
+  requestedBy: string
+): Promise<boolean> {
   const schoolRef = adminDb.collection('schools').doc(schoolId);
-  const studentDoc = await schoolRef.collection('students').doc(studentId).get();
+  const studentRef = schoolRef.collection('students').doc(studentId);
+  const jobId = `student_${createHash('sha256').update(`${schoolId}:${studentId}`).digest('hex')}`;
+  const jobRef = adminDb.collection('deletionJobs').doc(jobId);
 
-  if (!studentDoc.exists) throw new Error('Student not found');
-  const data = studentDoc.data()!;
-  const classId = data.classId as string | undefined;
-  const parentIds = (data.parentIds ?? []) as string[];
+  return adminDb.runTransaction(async (transaction) => {
+    const [student, job] = await Promise.all([
+      transaction.get(studentRef),
+      transaction.get(jobRef),
+    ]);
+    if (!student.exists) return false;
 
-  // Decide parent-side action (delete orphan vs arrayRemove) by re-reading each parent.
-  const parentsRef = schoolRef.collection('parents');
-  const parentActions: Array<{ ref: FirebaseFirestore.DocumentReference; action: 'delete' | 'remove' }> = [];
-  if (parentIds.length > 0) {
-    const parentSnaps = await Promise.all(parentIds.map((pid) => parentsRef.doc(pid).get()));
-    for (const snap of parentSnaps) {
-      if (!snap.exists) continue;
-      const linked = (snap.data()!.linkedChildren ?? []) as string[];
-      const remaining = linked.filter((id) => id !== studentId);
-      parentActions.push({ ref: snap.ref, action: remaining.length === 0 ? 'delete' : 'remove' });
+    const data = student.data()!;
+    const wasActive = (data.isActive ?? true) === true;
+    const now = Timestamp.now();
+    if (!job.exists) {
+      transaction.create(jobRef, {
+        kind: 'student',
+        status: 'pending',
+        requesterUid: requestedBy,
+        requesterHash: createHash('sha256').update(requestedBy).digest('hex'),
+        schoolId,
+        studentId,
+        requestedAt: now,
+        scheduledDeletionAt: now,
+        attemptCount: 0,
+        inventoryVersion: 1,
+        source: 'school_portal',
+      });
     }
-  }
-
-  // Revoke any active link codes pointing at this student so the next
-  // parent who tries to redeem one isn't stranded at "student-missing"
-  // inside linkParentToStudent. Mirrors the cascade in the Cloud Function
-  // deleteStudentWithCascade.
-  const activeCodes = await adminDb
-    .collection('studentLinkCodes')
-    .where('studentId', '==', studentId)
-    .where('status', '==', 'active')
-    .get();
-
-  const batch = adminDb.batch();
-  batch.delete(studentDoc.ref);
-
-  for (const codeDoc of activeCodes.docs) {
-    batch.update(codeDoc.ref, {
-      status: 'revoked',
-      revokedAt: FieldValue.serverTimestamp(),
-      revokeReason: 'student_deleted',
+    transaction.update(studentRef, {
+      pendingDeletion: true,
+      pendingDeletionAt: now,
+      isActive: false,
     });
-  }
-
-  if (classId) {
-    batch.update(schoolRef.collection('classes').doc(classId), {
-      studentIds: FieldValue.arrayRemove(studentId),
-    });
-  }
-
-  for (const { ref, action } of parentActions) {
-    if (action === 'delete') {
-      batch.delete(ref);
-    } else {
-      batch.update(ref, { linkedChildren: FieldValue.arrayRemove(studentId) });
+    const classId = data.classId as string | undefined;
+    if (classId) {
+      transaction.update(schoolRef.collection('classes').doc(classId), {
+        studentIds: FieldValue.arrayRemove(studentId),
+      });
     }
-  }
-
-  // Archived students already left the count when they were archived —
-  // decrementing again on delete-forever would double-count.
-  if ((data.isActive ?? true) === true) {
-    batch.update(schoolRef, {
-      studentCount: FieldValue.increment(-1),
-    });
-  }
-
-  await batch.commit();
+    if (wasActive) {
+      transaction.update(schoolRef, {
+        studentCount: FieldValue.increment(-1),
+      });
+    }
+    return true;
+  });
 }
 
-export async function deleteStudents(schoolId: string, studentIds: string[]): Promise<number> {
+export async function queueStudentDeletions(
+  schoolId: string,
+  studentIds: string[],
+  requestedBy: string
+): Promise<number> {
+  const results = await Promise.all(
+    studentIds.map((studentId) =>
+      queueStudentDeletion(schoolId, studentId, requestedBy)
+    )
+  );
+  return results.filter(Boolean).length;
+}
+
+// Internal compensation only: annual rollover uses this to undo student docs
+// it created in the same failed operation. User-facing deletion must always use
+// queueStudentDeletion(s), which invokes the complete Cloud Function cascade.
+export async function deleteStudentsForRolloverRollback(
+  schoolId: string,
+  studentIds: string[]
+): Promise<number> {
   if (studentIds.length === 0) return 0;
 
   const schoolRef = adminDb.collection('schools').doc(schoolId);

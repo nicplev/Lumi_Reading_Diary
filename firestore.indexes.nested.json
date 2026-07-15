@@ -1,4 +1,5 @@
 {
+  "_ARCHIVED_DO_NOT_DEPLOY": "Stale reference only; use firestore.indexes.json from firebase.json",
   "indexes": [
     {
       "collectionGroup": "users",

@@ -221,6 +221,23 @@ service cloud.firestore {
     }
 
     match /schools/{schoolId} {
+      // AI evaluation commercial/runtime settings are server-owned. The
+      // mobile app can read only the platformConfig/aiEvaluation kill switch;
+      // it must never grant a school an entitlement or change provider limits.
+      function aiEvaluationSettingsAbsentOnCreate() {
+        let settings = request.resource.data.get('settings', {});
+        return settings is map && !settings.keys().hasAny(['aiEvaluation']);
+      }
+
+      function aiEvaluationSettingsUnchanged() {
+        let oldSettings = resource.data.get('settings', {});
+        let newSettings = request.resource.data.get('settings', {});
+        return oldSettings is map &&
+            newSettings is map &&
+            oldSettings.get('aiEvaluation', null) ==
+                newSettings.get('aiEvaluation', null);
+      }
+
       // No client `list`. A collection query returns full documents, and the
       // school doc holds cross-tenant org/billing data (address, contactEmail,
       // contactPhone, subscription, access). Any signed-in user could otherwise
@@ -235,9 +252,12 @@ service cloud.firestore {
 
       allow create: if isSignedIn() &&
           request.resource.data.createdBy == request.auth.uid &&
+          aiEvaluationSettingsAbsentOnCreate() &&
           writeAllowedForDev();
 
-      allow update: if isSchoolAdmin(schoolId) && writeAllowedForDev();
+      allow update: if isSchoolAdmin(schoolId) &&
+          writeAllowedForDev() &&
+          aiEvaluationSettingsUnchanged();
 
       // Controlled counter increments for onboarding/registration lifecycle.
       allow update: if isSignedIn() &&
@@ -338,32 +358,11 @@ service cloud.firestore {
             isTeacher(schoolId) ||
             isDevImpersonatingSchool(schoolId);
 
-        // Parent self-create REMAINS (unlike teacher self-create, removed in
-        // 1.3). The phone-primary and email+MFA parent signups now finalise
-        // server-side (finalizeParentSignup / enrollLinkedPhoneAsMfa), but the
-        // existing-MFA parent who links a child at a NEW school still
-        // client-creates their parent membership there.
-        //
-        // `linkedChildren` MUST be empty on any client create. It is the sole
-        // authorization key for every child PII / reading-log / comment /
-        // allocation read (see getUserData().linkedChildren below), and the
-        // client-supplied create payload could otherwise pre-seed it with
-        // arbitrary student ids to read any child at any school. Linking is
-        // exclusively the server-side linkParentToStudent (Admin SDK) path,
-        // which appends via arrayUnion; the client never needs to seed it on
-        // create (the app already writes `linkedChildren: []`). The self-update
-        // rule below likewise excludes `linkedChildren`.
-        allow create: if isSignedIn() &&
-            writeAllowedForDev() &&
-            request.resource.data.schoolId == schoolId &&
-            request.resource.data.get('linkedChildren', []).size() == 0 &&
-            (
-              isSchoolAdmin(schoolId) ||
-              (
-                request.auth.uid == parentId &&
-                request.resource.data.role == 'parent'
-              )
-            );
+        // Membership creation is server-only. Parent signup/linking callables
+        // verify a live child code, then create the profile and linkedChildren
+        // atomically with Admin SDK privileges. A bare signed-in account must
+        // not be able to join an arbitrary known school id.
+        allow create: if false;
 
         // Self-updates restricted to a small set of parent-owned fields.
         // Anything outside this list (rate limits, subscription/entitlement
@@ -417,14 +416,18 @@ service cloud.firestore {
 
       match /students/{studentId} {
         allow get, list: if isSchoolAdmin(schoolId) ||
-            isTeacher(schoolId) ||
             isDevImpersonatingSchool(schoolId);
+
+        allow get, list: if isTeacher(schoolId) &&
+            teacherTeachesClass(schoolId, resource.data.classId);
 
         allow get: if isSignedIn() &&
             getUserData(schoolId).linkedChildren != null &&
             studentId in getUserData(schoolId).linkedChildren;
 
-        allow create: if (isSchoolAdmin(schoolId) || isTeacher(schoolId)) &&
+        allow create: if (isSchoolAdmin(schoolId) ||
+              (isTeacher(schoolId) &&
+                teacherTeachesClass(schoolId, request.resource.data.classId))) &&
             writeAllowedForDev() &&
             request.resource.data.schoolId == schoolId;
 
@@ -438,13 +441,25 @@ service cloud.firestore {
         // topReaderAward Cloud Function (Admin SDK); clients must not spoof it.
         // (`manualAward`, the teacher's special award, is intentionally NOT
         // blocked — teachers set it from the app.)
-        allow update: if (isSchoolAdmin(schoolId) || isTeacher(schoolId)) &&
+        allow update: if (isSchoolAdmin(schoolId) ||
+              (isTeacher(schoolId) &&
+                teacherTeachesClass(schoolId, resource.data.classId) &&
+                teacherTeachesClass(schoolId, request.resource.data.classId))) &&
             writeAllowedForDev() &&
             !request.resource.data.diff(resource.data).affectedKeys()
-                .hasAny(['access', 'parentIds', 'autoAward']);
+                .hasAny([
+                  'access',
+                  'parentIds',
+                  'autoAward',
+                  'pendingDeletion',
+                  'pendingDeletionAt'
+                ]);
 
-        allow delete: if (isSchoolAdmin(schoolId) || isTeacher(schoolId)) &&
-            writeAllowedForDev();
+        // Deletion is intentionally server-only. The requestStudentDeletion
+        // callable re-checks role/class scope, requires recent authentication
+        // and performs the full cross-collection/storage cascade. A direct
+        // client delete would leave personal data and broken references behind.
+        allow delete: if false;
 
         // Parent linking writes `parentIds` SERVER-SIDE only, via the
         // linkParentToStudent callable (Admin SDK, TOCTOU-safe code validation
@@ -464,9 +479,20 @@ service cloud.firestore {
 
         match /readingLevelEvents/{eventId} {
           allow get, list: if isSchoolAdmin(schoolId) ||
-              isTeacher(schoolId) ||
               isDevImpersonatingSchool(schoolId);
-          allow create: if (isSchoolAdmin(schoolId) || isTeacher(schoolId)) &&
+
+          allow get, list: if isTeacher(schoolId) &&
+              teacherTeachesClass(
+                schoolId,
+                get(/databases/$(database)/documents/schools/$(schoolId)/students/$(studentId)).data.classId
+              );
+
+          allow create: if (isSchoolAdmin(schoolId) ||
+                (isTeacher(schoolId) &&
+                  teacherTeachesClass(
+                    schoolId,
+                    get(/databases/$(database)/documents/schools/$(schoolId)/students/$(studentId)).data.classId
+                  ))) &&
               writeAllowedForDev();
           allow update, delete: if false;
         }
@@ -513,9 +539,131 @@ service cloud.firestore {
               request.resource.data.get('metadata', {}).get('quickLog', false) == true;
         }
 
+        function incomingStudentData() {
+          return get(
+            /databases/$(database)/documents/schools/$(schoolId)/students/$(request.resource.data.studentId)
+          ).data;
+        }
+
+        function createSchemaIsValid() {
+          let data = request.resource.data;
+          let student = incomingStudentData();
+          return data.keys().hasAll([
+              'studentId', 'parentId', 'schoolId', 'classId', 'date',
+              'minutesRead', 'targetMinutes', 'status', 'bookTitles',
+              'createdAt'
+            ]) &&
+            data.keys().hasOnly([
+              'studentId', 'parentId', 'schoolId', 'classId', 'date',
+              'minutesRead', 'targetMinutes', 'status', 'bookTitles',
+              'notes', 'photoUrls', 'isOfflineCreated', 'createdAt',
+              'syncedAt', 'allocationId', 'metadata', 'childFeeling',
+              'parentComment', 'parentCommentSelections',
+              'parentCommentFreeText', 'loggedByName', 'loggedByLabel',
+              'loggedByRole'
+            ]) &&
+            data.schoolId == schoolId &&
+            data.studentId is string && data.studentId.size() > 0 &&
+            data.parentId is string && data.parentId.size() > 0 &&
+            data.classId is string && data.classId.size() > 0 &&
+            student.schoolId == schoolId &&
+            student.classId == data.classId &&
+            data.date is timestamp &&
+            data.date >= request.time - duration.value(366, 'd') &&
+            data.date <= request.time + duration.value(1, 'd') &&
+            data.createdAt == request.time &&
+            data.targetMinutes is int &&
+            data.targetMinutes >= 1 && data.targetMinutes <= 240 &&
+            data.status in ['completed', 'partial', 'skipped', 'pending'] &&
+            data.bookTitles is list && data.bookTitles.size() <= 20 &&
+            (data.get('notes', null) == null ||
+              (data.notes is string && data.notes.size() <= 2000)) &&
+            (data.get('childFeeling', null) == null ||
+              data.childFeeling in ['hard', 'tricky', 'okay', 'good', 'great']) &&
+            (data.get('photoUrls', null) == null ||
+              (data.photoUrls is list && data.photoUrls.size() <= 5)) &&
+            (data.get('isOfflineCreated', null) == null ||
+              data.isOfflineCreated is bool) &&
+            (data.get('syncedAt', null) == null ||
+              data.syncedAt is timestamp) &&
+            (data.get('allocationId', null) == null ||
+              (data.allocationId is string && data.allocationId.size() <= 200)) &&
+            (data.get('metadata', null) == null ||
+              (data.metadata is map &&
+                data.metadata.keys().hasOnly(['quickLog']) &&
+                data.metadata.get('quickLog', false) is bool)) &&
+            (data.get('parentCommentSelections', null) == null ||
+              (data.parentCommentSelections is list &&
+                data.parentCommentSelections.size() <= 10)) &&
+            (data.get('parentComment', null) == null ||
+              (data.parentComment is string && data.parentComment.size() <= 2000)) &&
+            (data.get('parentCommentFreeText', null) == null ||
+              (data.parentCommentFreeText is string &&
+                data.parentCommentFreeText.size() <= 2000)) &&
+            (data.get('loggedByName', null) == null ||
+              (data.loggedByName is string && data.loggedByName.size() <= 200)) &&
+            (data.get('loggedByLabel', null) == null ||
+              (data.loggedByLabel is string && data.loggedByLabel.size() <= 200)) &&
+            (data.get('loggedByRole', null) == null ||
+              data.loggedByRole in ['parent', 'teacher']);
+        }
+
+        function contentUpdateIsValid() {
+          let changed = request.resource.data.diff(resource.data).affectedKeys();
+          let data = request.resource.data;
+          return changed.hasOnly([
+              'minutesRead', 'targetMinutes', 'bookTitles', 'notes',
+              'photoUrls', 'childFeeling', 'parentComment',
+              'parentCommentSelections', 'parentCommentFreeText',
+              'syncedAt', 'isOfflineCreated'
+            ]) &&
+            minutesInBounds() &&
+            data.targetMinutes is int &&
+            data.targetMinutes >= 1 && data.targetMinutes <= 240 &&
+            data.bookTitles is list && data.bookTitles.size() <= 20 &&
+            (data.get('notes', null) == null ||
+              (data.notes is string && data.notes.size() <= 2000)) &&
+            (data.get('photoUrls', null) == null ||
+              (data.photoUrls is list && data.photoUrls.size() <= 5)) &&
+            (data.get('childFeeling', null) == null ||
+              data.childFeeling in ['hard', 'tricky', 'okay', 'good', 'great']) &&
+            (data.get('parentCommentSelections', null) == null ||
+              (data.parentCommentSelections is list &&
+                data.parentCommentSelections.size() <= 10)) &&
+            (data.get('parentComment', null) == null ||
+              (data.parentComment is string && data.parentComment.size() <= 2000)) &&
+            (data.get('parentCommentFreeText', null) == null ||
+              (data.parentCommentFreeText is string &&
+                data.parentCommentFreeText.size() <= 2000));
+        }
+
+        function threadPreviewUpdateIsValid() {
+          let changed = request.resource.data.diff(resource.data).affectedKeys();
+          let role = request.resource.data.lastCommentByRole;
+          return changed.hasOnly([
+              'lastCommentPreview', 'lastCommentAt', 'lastCommentByRole'
+            ]) &&
+            request.resource.data.lastCommentPreview is string &&
+            request.resource.data.lastCommentPreview.size() > 0 &&
+            request.resource.data.lastCommentPreview.size() <= 2000 &&
+            request.resource.data.lastCommentAt is timestamp &&
+            request.resource.data.lastCommentAt <= request.time &&
+            request.resource.data.lastCommentAt >=
+              request.time - duration.value(7, 'd') &&
+            role in ['parent', 'teacher'] &&
+            (
+              (role == 'parent' && resource.data.parentId == request.auth.uid) ||
+              (role == 'teacher' &&
+                (isSchoolAdmin(schoolId) ||
+                  teacherTeachesClass(schoolId, resource.data.classId)))
+            );
+        }
+
         allow get, list: if isSchoolAdmin(schoolId) ||
-            isTeacher(schoolId) ||
             isDevImpersonatingSchool(schoolId);
+
+        allow get, list: if isTeacher(schoolId) &&
+            teacherTeachesClass(schoolId, resource.data.classId);
 
         allow get, list: if isSignedIn() &&
             getUserData(schoolId).linkedChildren != null &&
@@ -528,17 +676,9 @@ service cloud.firestore {
         // — the trigger cascades status to 'suspended'), the write is DENIED.
         // Student READS are intentionally left open so the app can read
         // `access` to render the "access lapsed — contact your school" screen.
-        allow create: if isSignedIn() &&
-            writeAllowedForDev() &&
-            minutesInBounds() &&
-            (!isQuickLogCreate() || quickLoggingEnabled(schoolId)) &&
-            getUserData(schoolId).linkedChildren != null &&
-            request.resource.data.studentId in getUserData(schoolId).linkedChildren &&
-            request.resource.data.parentId == request.auth.uid &&
-            studentAccessLive(
-              get(/databases/$(database)/documents/schools/$(schoolId)/students/$(request.resource.data.studentId)).data
-            );
-
+        // Parent logs and teacher-proxy logs share one schema/access evaluation.
+        // Keeping this as a single allow avoids evaluating the expensive schema
+        // twice (Firestore caps a request at 1,000 rule expressions).
         // Teacher proxy logs: a teacher logs reading on behalf of a student
         // whose carer can't use the app. `parentId` holds the teacher's UID
         // (creator) so the existing ownership clauses in update/delete keep
@@ -550,22 +690,39 @@ service cloud.firestore {
         // synced by the portal, so relying on it denied every proxy log.
         allow create: if isSignedIn() &&
             writeAllowedForDev() &&
+            createSchemaIsValid() &&
             minutesInBounds() &&
-            isTeacher(schoolId) &&
-            request.resource.data.parentId == request.auth.uid &&
-            request.resource.data.loggedByRole == 'teacher' &&
-            teacherTeachesClass(schoolId, request.resource.data.classId) &&
             studentAccessLive(
               get(/databases/$(database)/documents/schools/$(schoolId)/students/$(request.resource.data.studentId)).data
+            ) &&
+            (
+              (
+                (!isQuickLogCreate() || quickLoggingEnabled(schoolId)) &&
+                getUserData(schoolId).linkedChildren != null &&
+                request.resource.data.studentId in getUserData(schoolId).linkedChildren &&
+                request.resource.data.parentId == request.auth.uid &&
+                request.resource.data.get('loggedByRole', 'parent') == 'parent'
+              ) ||
+              (
+                isTeacher(schoolId) &&
+                request.resource.data.parentId == request.auth.uid &&
+                request.resource.data.loggedByRole == 'teacher' &&
+                teacherTeachesClass(schoolId, request.resource.data.classId)
+              )
             );
 
         allow update: if writeAllowedForDev() &&
-            minutesInBounds() &&
+            contentUpdateIsValid() &&
             (
               (isSignedIn() && resource.data.parentId == request.auth.uid) ||
               isSchoolAdmin(schoolId) ||
-              isTeacher(schoolId)
+              (isTeacher(schoolId) &&
+                teacherTeachesClass(schoolId, resource.data.classId))
             );
+
+        allow update: if writeAllowedForDev() &&
+            isSignedIn() &&
+            threadPreviewUpdateIsValid();
 
         // A linked parent who didn't create the log (a co-carer, or someone
         // viewing a teacher-proxy log for their child) may still clear their
@@ -595,9 +752,40 @@ service cloud.firestore {
         // these rules mirror the parent/teacher access on the parent log
         // without an extra get() to read it.
         match /comments/{commentId} {
+          function parentLogData() {
+            return get(
+              /databases/$(database)/documents/schools/$(schoolId)/readingLogs/$(logId)
+            ).data;
+          }
+
+          function commentSchemaIsValid() {
+            let data = request.resource.data;
+            let log = parentLogData();
+            return data.keys().hasAll([
+                'authorId', 'authorRole', 'authorName', 'body', 'createdAt',
+                'studentId', 'parentId'
+              ]) &&
+              data.keys().hasOnly([
+                'authorId', 'authorRole', 'authorName', 'body', 'createdAt',
+                'studentId', 'parentId'
+              ]) &&
+              data.authorId == request.auth.uid &&
+              data.authorRole in ['parent', 'teacher'] &&
+              data.authorName is string && data.authorName.size() > 0 &&
+              data.authorName.size() <= 200 &&
+              data.body is string && data.body.size() > 0 &&
+              data.body.size() <= 2000 &&
+              data.createdAt == request.time &&
+              data.studentId == log.studentId &&
+              data.parentId == log.parentId &&
+              log.schoolId == schoolId;
+          }
+
           allow get, list: if isSchoolAdmin(schoolId) ||
-              isTeacher(schoolId) ||
               isDevImpersonatingSchool(schoolId);
+
+          allow get, list: if isTeacher(schoolId) &&
+              teacherTeachesClass(schoolId, parentLogData().classId);
 
           allow get, list: if isSignedIn() &&
               getUserData(schoolId).linkedChildren != null &&
@@ -610,10 +798,11 @@ service cloud.firestore {
           // threads created regardless of client state.
           allow create: if writeAllowedForDev() &&
               messagingEnabled(schoolId) &&
-              request.resource.data.authorId == request.auth.uid &&
+              commentSchemaIsValid() &&
               (
                 (isTeacher(schoolId) &&
-                    request.resource.data.authorRole == 'teacher') ||
+                    request.resource.data.authorRole == 'teacher' &&
+                    teacherTeachesClass(schoolId, parentLogData().classId)) ||
                 (isSignedIn() &&
                     request.resource.data.authorRole == 'parent' &&
                     getUserData(schoolId).linkedChildren != null &&
@@ -627,10 +816,27 @@ service cloud.firestore {
 
       match /allocations/{allocationId} {
         allow get, list: if isSchoolAdmin(schoolId) ||
-            isTeacher(schoolId) ||
+            (isTeacher(schoolId) &&
+              teacherTeachesClass(schoolId, resource.data.classId)) ||
             parentCanReadAllocation(schoolId, resource.data) ||
             isDevImpersonatingSchool(schoolId);
-        allow create, update, delete: if (isSchoolAdmin(schoolId) || isTeacher(schoolId)) &&
+
+        allow create: if (isSchoolAdmin(schoolId) ||
+              (isTeacher(schoolId) &&
+                teacherTeachesClass(schoolId, request.resource.data.classId))) &&
+            writeAllowedForDev() &&
+            request.resource.data.schoolId == schoolId;
+
+        allow update: if (isSchoolAdmin(schoolId) ||
+              (isTeacher(schoolId) &&
+                teacherTeachesClass(schoolId, resource.data.classId) &&
+                teacherTeachesClass(schoolId, request.resource.data.classId))) &&
+            writeAllowedForDev() &&
+            request.resource.data.schoolId == schoolId;
+
+        allow delete: if (isSchoolAdmin(schoolId) ||
+              (isTeacher(schoolId) &&
+                teacherTeachesClass(schoolId, resource.data.classId))) &&
             writeAllowedForDev();
       }
 
@@ -647,10 +853,31 @@ service cloud.firestore {
       }
 
       match /readingGroups/{groupId} {
-        allow get, list: if belongsToSchool(schoolId) || isDevImpersonatingSchool(schoolId);
-        allow create: if (isTeacher(schoolId) || isSchoolAdmin(schoolId)) && writeAllowedForDev();
-        allow update: if (isTeacher(schoolId) || isSchoolAdmin(schoolId)) && writeAllowedForDev();
-        allow delete: if (isTeacher(schoolId) || isSchoolAdmin(schoolId)) && writeAllowedForDev();
+        allow get, list: if isSchoolAdmin(schoolId) ||
+            (isTeacher(schoolId) &&
+              teacherTeachesClass(schoolId, resource.data.classId)) ||
+            (isParentMember(schoolId) &&
+              resource.data.studentIds is list &&
+              resource.data.studentIds.hasAny(linkedChildrenForSchool(schoolId))) ||
+            isDevImpersonatingSchool(schoolId);
+
+        allow create: if (isSchoolAdmin(schoolId) ||
+              (isTeacher(schoolId) &&
+                teacherTeachesClass(schoolId, request.resource.data.classId))) &&
+            writeAllowedForDev() &&
+            request.resource.data.schoolId == schoolId;
+
+        allow update: if (isSchoolAdmin(schoolId) ||
+              (isTeacher(schoolId) &&
+                teacherTeachesClass(schoolId, resource.data.classId) &&
+                teacherTeachesClass(schoolId, request.resource.data.classId))) &&
+            writeAllowedForDev() &&
+            request.resource.data.schoolId == schoolId;
+
+        allow delete: if (isSchoolAdmin(schoolId) ||
+              (isTeacher(schoolId) &&
+                teacherTeachesClass(schoolId, resource.data.classId))) &&
+            writeAllowedForDev();
       }
 
       match /notificationCampaigns/{campaignId} {
@@ -683,6 +910,26 @@ service cloud.firestore {
       // only (the credentials API and the email Cloud Function) — never
       // readable by any client, including the staff member themselves.
       match /staffCredentials/{userId} {
+        allow read, write: if false;
+      }
+
+      // AI-generated evaluations are deliberately separated from parent-
+      // readable readingLogs. Teachers must prove class scope in the query;
+      // school admins and live read-only impersonation sessions may inspect
+      // the school. All writes are performed by trusted Admin SDK workers.
+      match /comprehensionEvals/{logId} {
+        allow get, list: if isSchoolAdmin(schoolId) ||
+            isDevImpersonatingSchool(schoolId);
+
+        allow get, list: if isTeacher(schoolId) &&
+            teacherTeachesClass(schoolId, resource.data.classId);
+
+        allow create, update, delete: if false;
+      }
+
+      // Commercial entitlements and per-school caps are never visible to
+      // school members. The super-admin portal and workers use Admin SDK.
+      match /adminMeta/{docId} {
         allow read, write: if false;
       }
     }
@@ -741,43 +988,33 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow get: if isSignedIn() && request.auth.uid == userId;
-      allow create, update, delete: if isSignedIn() &&
+      // Legacy profiles are server-owned. Keep only the narrow terms-consent
+      // update needed while old accounts are migrated to school membership
+      // documents; identity, role and tenant fields cannot be introduced or
+      // changed by the client.
+      allow update: if isSignedIn() &&
           request.auth.uid == userId &&
-          writeAllowedForDev();
+          writeAllowedForDev() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'termsAccepted', 'termsAcceptedAt', 'termsAcceptedVersion',
+            'termsAcceptedPlatform'
+          ]) &&
+          request.resource.data.termsAccepted == true &&
+          request.resource.data.termsAcceptedAt == request.time &&
+          request.resource.data.termsAcceptedVersion is string &&
+          request.resource.data.termsAcceptedVersion.size() > 0 &&
+          request.resource.data.termsAcceptedVersion.size() <= 40 &&
+          request.resource.data.termsAcceptedPlatform in [
+            'web', 'ios', 'android', 'macos', 'windows', 'linux', 'fuchsia'
+          ];
+      allow create, delete: if false;
     }
 
     match /schoolOnboarding/{onboardingId} {
-      // Demo-request create is intentionally reachable by an ANONYMOUS visitor
-      // (the public "request a demo" form runs before any account exists), so
-      // we can't require isSignedIn() here. Instead validate the shape: it must
-      // look like a genuine demo request and must NOT pre-claim an admin owner
-      // (adminUserId is set later, only by the authenticated ownership-claim
-      // update below). This stops anonymous callers writing arbitrary docs.
-      allow create: if writeAllowedForDev() &&
-          request.resource.data.schoolName is string &&
-          request.resource.data.schoolName.size() > 0 &&
-          request.resource.data.contactEmail is string &&
-          request.resource.data.contactEmail.size() > 0 &&
-          request.resource.data.status == 'demo' &&
-          request.resource.data.createdAt is timestamp &&
-          request.resource.data.get('adminUserId', null) == null;
-
-      allow get, list: if isSignedIn() &&
-          (
-            resource.data.contactEmail == request.auth.token.email ||
-            resource.data.adminUserId == request.auth.uid
-          );
-
-      allow update: if isSignedIn() &&
-          writeAllowedForDev() &&
-          (
-            resource.data.contactEmail == request.auth.token.email ||
-            resource.data.adminUserId == request.auth.uid ||
-            (resource.data.adminUserId == null &&
-                request.resource.data.adminUserId == request.auth.uid)
-          );
-
-      allow delete: if false;
+      // Public requests go through submitDemoRequest, which applies App Check
+      // rollout settings, durable rate limits, schema/size checks and trusted
+      // timestamps. Provisioning/status changes are server/admin-only.
+      allow read, write: if false;
     }
 
     match /studentLinkCodes/{codeId} {
@@ -899,6 +1136,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Resumable account/student deletion jobs contain internal identifiers,
+    // retry state and audit metadata. Status is exposed only through the
+    // requester-bound getMyDeletionStatus callable.
+    match /deletionJobs/{jobId} {
+      allow read, write: if false;
+    }
+
     match /userSchoolIndex/{emailHash} {
       allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
 
@@ -918,14 +1162,26 @@ service cloud.firestore {
       allow list: if false;
     }
 
-    // Dev-access allowlist. Doc ID is sha256(lowercased email). Clients
-    // (Flutter, school-admin-web) can only `get` a specific doc by hash —
-    // typically the hash of their own email — which lets them self-check
-    // without exposing who else is on the list. Listing is denied.
-    // Writes go exclusively through the super-admin portal (Admin SDK).
+    // Dev-access allowlist is server-only. Mobile self-checks go through the
+    // checkDevAccess callable, which derives the lookup hash from the verified
+    // Auth token email and therefore cannot be used as an email oracle.
     match /devAccessEmails/{emailHash} {
-      allow get: if isSignedIn();
-      allow list, create, update, delete: if false;
+      allow read, write: if false;
+    }
+
+    // AI evaluation pipeline state is server-only. Cloud Functions use the
+    // Admin SDK; no mobile/web client may inspect, forge or mutate jobs,
+    // prompt-classification cache entries, or provider/cost configuration.
+    match /aiEvalJobs/{jobId} {
+      allow read, write: if false;
+    }
+
+    match /aiQuestionClassifications/{classificationId} {
+      allow read, write: if false;
+    }
+
+    match /aiEvalOpsConfig/{configId} {
+      allow read, write: if false;
     }
 
     // ── Platform-wide feature flags ─────────────────────────────────

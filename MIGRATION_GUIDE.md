@@ -96,7 +96,7 @@ After migration is complete and verified:
 firebase deploy --only firestore:rules
 
 # Use the nested rules file
-cp firestore.rules.nested firestore.rules
+# ARCHIVED: do not copy firestore.rules.nested. Use the reviewed firestore.rules.
 firebase deploy --only firestore:rules
 ```
 
@@ -104,7 +104,7 @@ firebase deploy --only firestore:rules
 
 ```bash
 # Deploy the optimized indexes
-cp firestore.indexes.nested.json firestore.indexes.json
+# ARCHIVED: do not copy firestore.indexes.nested.json. Use firestore.indexes.json.
 firebase deploy --only firestore:indexes
 ```
 
@@ -242,7 +242,7 @@ If you need to rollback:
 
 1. **Revert Security Rules:**
    ```bash
-   cp firestore.rules.production firestore.rules
+   # ARCHIVED: never restore firestore.rules.production; revert a reviewed Git commit instead.
    firebase deploy --only firestore:rules
    ```
 
