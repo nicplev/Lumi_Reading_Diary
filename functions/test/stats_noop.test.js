@@ -2,7 +2,22 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
 // Built to lib/ by `npm run build`.
-const { isStatsNoopUpdate } = require('../lib/stats_aggregation.js');
+const {
+  classAggregationStudentBatches,
+  isStatsNoopUpdate,
+} = require('../lib/stats_aggregation.js');
+
+test('class aggregation batches remain under Firestore disjunction limit', () => {
+  const ids = Array.from({length: 34}, (_, index) => `student_${index}`);
+  const batches = classAggregationStudentBatches(ids);
+
+  assert.deepEqual(batches.map((batch) => batch.length), [15, 15, 4]);
+  for (const batch of batches) {
+    // The query also has `status in [completed, partial]`, so Firestore
+    // normalizes it to batch.length * 2 disjunctions (maximum 30).
+    assert.ok(batch.length * 2 <= 30);
+  }
+});
 
 // Minimal structural fakes for functions.Change<DocumentSnapshot>.
 const ts = (ms) => ({ toMillis: () => ms });

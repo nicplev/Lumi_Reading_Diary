@@ -46,6 +46,7 @@ import {DEFAULT_TIMEZONE} from "./access";
 import {
   applyClassStatsDelta,
   applyStudentStatsDelta,
+  classAggregationStudentBatches,
   isInvalidatedLog,
   isStatsNoopUpdate,
   readIncrementalConfig,
@@ -2745,7 +2746,7 @@ export const updateClassStats = onDocumentWritten(
     let totalBooks = 0;
     const uniqueStudents = new Set<string>();
 
-    for (const studentBatch of chunk(classStudentIds, FIRESTORE_IN_LIMIT)) {
+    for (const studentBatch of classAggregationStudentBatches(classStudentIds)) {
       const logsSnapshot = await db
         .collection(`schools/${schoolId}/readingLogs`)
         .where("studentId", "in", studentBatch)
