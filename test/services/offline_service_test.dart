@@ -38,6 +38,28 @@ ReadingLogModel _log(
 void main() {
   final binding = TestWidgetsFlutterBinding.ensureInitialized();
 
+  group('friendlyOfflineSyncError', () {
+    test('replaces permission errors with actionable parent-safe wording', () {
+      const raw = 'permission-denied: The caller does not have permission to '
+          'execute the specified operation.';
+
+      final message = friendlyOfflineSyncError(raw);
+
+      expect(message, contains('sign-in or access changed'));
+      expect(message, isNot(contains('permission-denied')));
+      expect(message, isNot(contains('specified operation')));
+    });
+
+    test('never exposes an unknown backend error', () {
+      final message = friendlyOfflineSyncError(
+        'internal: backend trace 123 and private implementation detail',
+      );
+
+      expect(message, contains('still saved on this device'));
+      expect(message, isNot(contains('backend trace')));
+    });
+  });
+
   // Mock the connectivity plugin
   binding.defaultBinaryMessenger.setMockMethodCallHandler(
     const MethodChannel('dev.fluttercommunity.plus/connectivity'),
@@ -654,8 +676,7 @@ void main() {
 
         expect(offlineService.pendingSyncs, isEmpty);
         expect((await ref.get()).data()!['minutesRead'], 55);
-        final cached =
-            await offlineService.getLocalReadingLogs('student-1');
+        final cached = await offlineService.getLocalReadingLogs('student-1');
         expect(cached.single.minutesRead, 55);
       });
 
@@ -893,6 +914,47 @@ void main() {
         final item = offlineService.pendingSyncs.single;
         expect(item.retryCount, equals(3));
         expect(item.needsAttention, isTrue);
+      });
+
+      test('explicit retry attempts a parked item and removes it on success',
+          () async {
+        var attempts = 0;
+        offlineService.syncOneOverrideForTest = (_) async {
+          attempts++;
+        };
+
+        await offlineService.saveReadingLogLocally(_log('rl-retry-parked'));
+        offlineService.pendingSyncs.single
+          ..retryCount = 3
+          ..needsAttention = true
+          ..lastError = 'permission-denied';
+
+        // Let the preceding spec's fire-and-forget health re-probe settle,
+        // then make this drain deterministic.
+        await Future<void>.delayed(const Duration(milliseconds: 25));
+        goHealthy();
+        await offlineService.triggerSync(retryParked: true);
+
+        expect(attempts, equals(1));
+        expect(offlineService.pendingSyncs, isEmpty);
+      });
+
+      test('explicit retry while offline leaves the item parked', () async {
+        var attempts = 0;
+        offlineService.syncOneOverrideForTest = (_) async => attempts++;
+        await offlineService.saveReadingLogLocally(_log('rl-retry-offline'));
+        final item = offlineService.pendingSyncs.single
+          ..retryCount = 3
+          ..needsAttention = true
+          ..lastError = 'permission-denied';
+        ServiceStatusController.instance
+            .debugSetCurrent(ServiceStatusSnapshot.unknown());
+
+        await offlineService.triggerSync(retryParked: true);
+
+        expect(attempts, equals(0));
+        expect(item.needsAttention, isTrue);
+        expect(item.lastError, equals('permission-denied'));
       });
 
       test('corrupted payload trips the integrity check', () async {

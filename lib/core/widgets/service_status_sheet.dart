@@ -249,7 +249,7 @@ class _PendingRow extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(left: 26, top: 2),
               child: Text(
-                err,
+                friendlyOfflineSyncError(err),
                 style: TextStyle(
                   fontSize: 11,
                   color: (attention ? AppColors.error : AppColors.charcoal)
@@ -368,7 +368,7 @@ class _SyncButtonState extends ConsumerState<_SyncButton> {
     try {
       final controller = ref.read(serviceStatusControllerProvider);
       await controller.forceProbe();
-      await OfflineService.instance.triggerSync();
+      await OfflineService.instance.triggerSync(retryParked: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
