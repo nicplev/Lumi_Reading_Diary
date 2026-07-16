@@ -368,7 +368,7 @@ class _SyncButtonState extends ConsumerState<_SyncButton> {
     try {
       final controller = ref.read(serviceStatusControllerProvider);
       await controller.forceProbe();
-      await OfflineService.instance.triggerSync(retryParked: true);
+      await OfflineService.instance.triggerSync(retryPendingNow: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
