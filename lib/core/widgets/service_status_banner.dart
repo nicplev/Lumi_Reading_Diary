@@ -22,13 +22,13 @@ class ServiceStatusBanner extends ConsumerWidget {
     final snapshot = ref.watch(serviceStatusProvider).value;
     final health = ref.watch(pendingSyncHealthProvider).value;
 
-    // Healthy / still-booting connection: normally render nothing — but a
-    // queue that's been stuck past the stale threshold (48h) or has parked
-    // items must still surface here, which the connectivity-driven banner
-    // would otherwise hide.
+    // Healthy / still-booting connection: normally render nothing — but every
+    // pending write must remain visible until the server confirms it. Hiding a
+    // recent retry would make a healthy connection look like a successful
+    // sync even when the queue still contains data.
     if (snapshot == null || !snapshot.shouldShowBanner) {
-      if (health != null && health.shouldEscalate) {
-        return _StaleEscalationBar(health: health);
+      if (health != null && health.shouldSurface) {
+        return _PendingSyncBar(health: health);
       }
       return const SizedBox.shrink();
     }
@@ -177,16 +177,16 @@ void _openStatusSheet(BuildContext context) {
 /// stuck: either an item is parked needing attention, or the oldest pending
 /// write has been waiting past the 48h stale threshold. Tapping opens the
 /// status sheet with its "Try syncing now" action.
-class _StaleEscalationBar extends StatelessWidget {
-  const _StaleEscalationBar({required this.health});
+class _PendingSyncBar extends StatelessWidget {
+  const _PendingSyncBar({required this.health});
 
   final PendingSyncHealth health;
 
   @override
   Widget build(BuildContext context) {
     return _StatusCard(
-      icon: Icons.error_outline,
-      accent: LumiTokens.red,
+      icon: health.shouldEscalate ? Icons.error_outline : Icons.sync,
+      accent: health.shouldEscalate ? LumiTokens.red : LumiTokens.yellow,
       primary: _title(health),
       onTap: () => _openStatusSheet(context),
     );
@@ -199,6 +199,7 @@ class _StaleEscalationBar extends StatelessWidget {
           ? "1 reading log couldn't sync"
           : "$n reading logs couldn't sync";
     }
-    return "Some reading logs haven't synced";
+    if (h.total == 1) return '1 reading log waiting to sync';
+    return '${h.total} reading logs waiting to sync';
   }
 }

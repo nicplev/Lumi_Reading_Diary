@@ -391,8 +391,7 @@ void main() {
             .doc(log.id)
             .set(log.toFirestore());
 
-        final doc =
-            await firestore.collection('readingLogs').doc(log.id).get();
+        final doc = await firestore.collection('readingLogs').doc(log.id).get();
         final restored = ReadingLogModel.fromFirestore(doc);
 
         expect(restored.childFeeling, equals(ReadingFeeling.tricky));
@@ -596,8 +595,7 @@ void main() {
             .collection('readingLogs')
             .doc(log.id)
             .set(log.toFirestore());
-        final doc =
-            await firestore.collection('readingLogs').doc(log.id).get();
+        final doc = await firestore.collection('readingLogs').doc(log.id).get();
         final restored = ReadingLogModel.fromFirestore(doc);
 
         expect(restored.lastCommentPreview, equals('See you tomorrow'));
@@ -620,6 +618,35 @@ void main() {
         expect(restored.lastCommentByRole, equals('parent'));
         expect(restored.lastCommentAt, equals(lastAt));
         expect(restored.commentsViewedAt['teacher-9'], equals(viewed));
+      });
+
+      test('accepts Hive maps whose key/value types are dynamic', () {
+        final viewed = DateTime(2026, 1, 2, 9);
+        final local = buildLog(
+          commentsViewedAt: {'teacher-9': viewed},
+        ).toLocal();
+        local['commentsViewedAt'] = <dynamic, dynamic>{
+          'teacher-9': viewed.toIso8601String(),
+        };
+        local['metadata'] = <dynamic, dynamic>{'quickLog': false};
+
+        final restored = ReadingLogModel.fromLocal(local);
+
+        expect(restored.commentsViewedAt['teacher-9'], equals(viewed));
+        expect(restored.metadata, equals({'quickLog': false}));
+      });
+
+      test('ignores malformed local comment-view markers', () {
+        final local = buildLog().toLocal();
+        local['commentsViewedAt'] = <dynamic, dynamic>{
+          7: '2026-01-02T09:00:00.000',
+          'bad-date': 'not-a-date',
+          'bad-value': 123,
+        };
+
+        final restored = ReadingLogModel.fromLocal(local);
+
+        expect(restored.commentsViewedAt, isEmpty);
       });
 
       test('hasUnreadFor truth table', () {
@@ -647,7 +674,9 @@ void main() {
           buildLog(
             lastCommentAt: lastAt,
             lastCommentByRole: 'teacher',
-            commentsViewedAt: {'parent-1': lastAt.subtract(const Duration(hours: 1))},
+            commentsViewedAt: {
+              'parent-1': lastAt.subtract(const Duration(hours: 1))
+            },
           ).hasUnreadFor('parent-1', 'parent'),
           isTrue,
         );
@@ -657,7 +686,9 @@ void main() {
           buildLog(
             lastCommentAt: lastAt,
             lastCommentByRole: 'teacher',
-            commentsViewedAt: {'parent-1': lastAt.add(const Duration(minutes: 1))},
+            commentsViewedAt: {
+              'parent-1': lastAt.add(const Duration(minutes: 1))
+            },
           ).hasUnreadFor('parent-1', 'parent'),
           isFalse,
         );
