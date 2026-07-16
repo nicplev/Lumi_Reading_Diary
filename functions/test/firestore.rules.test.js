@@ -2915,6 +2915,19 @@ test('access: parent CAN create a log for a student with live access', async () 
   await assertSucceeds(logFor(db, 'student_active'));
 });
 
+test('readingLogs: parent client payload with explicit null role remains authorised', async () => {
+  await seedSchoolWithAccessStates();
+  const db = authDb('parent_1');
+
+  // Older/current clients serialise nullable model fields instead of omitting
+  // them. The parent branch must treat null like the historical missing role,
+  // while still enforcing auth UID, linked child, class, schema and live access.
+  await assertSucceeds(logFor(db, 'student_active', {
+    logId: 'log_parent_null_role',
+    overrides: { loggedByRole: null },
+  }));
+});
+
 test('reading log create rejects malformed optional fields and metadata extras', async () => {
   await seedSchoolWithAccessStates();
   const db = authDb('parent_1');

@@ -146,6 +146,7 @@ class ReadingLogService {
       allocationId: allocations.isNotEmpty ? allocations.first.id : null,
       loggedByName: parent.fullName,
       loggedByLabel: parent.relationshipLabel,
+      loggedByRole: LoggedByRole.parent,
       metadata: quickLog ? const {'quickLog': true} : null,
       comprehensionAudioPath: comprehensionAudioPath,
       comprehensionAudioDurationSec: comprehensionAudioDurationSec,
@@ -235,6 +236,7 @@ class ReadingLogService {
       createdAt: now,
       loggedByName: loggedByName,
       loggedByLabel: loggedByLabel,
+      loggedByRole: LoggedByRole.parent,
       metadata: const {'quickLog': true},
     );
     return writeLog(log);
