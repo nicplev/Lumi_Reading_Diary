@@ -365,8 +365,14 @@ class OfflineService with WidgetsBindingObserver {
   }
 
   /// Externally callable sync trigger — used by the "Try syncing now"
-  /// button on the service-status sheet. Coalesces with an in-flight sync.
-  Future<void> triggerSync() => _syncPendingData();
+  /// buttons. Coalesces with an in-flight sync.
+  ///
+  /// Automatic drains leave parked items alone. An explicit user retry may
+  /// make one fresh attempt, which is useful after signing in again or after
+  /// a school restores access. A still-invalid write is parked again by the
+  /// normal failure classifier and is never discarded.
+  Future<void> triggerSync({bool retryParked = false}) =>
+      _syncPendingData(retryParked: retryParked);
 
   /// Manually drop a parked item the user has acknowledged. The only path by
   /// which a queued write ever leaves the queue without syncing.
@@ -834,7 +840,7 @@ class OfflineService with WidgetsBindingObserver {
   /// try/finally so a timeout can never leave the syncer wedged. Items are
   /// removed only after a confirmed write; failures persist their backoff
   /// state and stay queued (transient) or are parked (permanent).
-  Future<void> _syncPendingData() async {
+  Future<void> _syncPendingData({bool retryParked = false}) async {
     if (_isSyncing || _syncQueue.isEmpty) return;
     if (!ServiceStatusController.instance.current.canWriteToFirebase) {
       debugPrint(
@@ -842,6 +848,18 @@ class OfflineService with WidgetsBindingObserver {
         'pending=${_syncQueue.length}',
       );
       return;
+    }
+    if (retryParked) {
+      // Only unpark after the authoritative write-path probe is healthy.
+      // Otherwise an offline button tap could remove the attention state
+      // without making an attempt or scheduling a later retry.
+      for (final item in _syncQueue.where((item) => item.needsAttention)) {
+        item
+          ..needsAttention = false
+          ..nextAttemptAt = null;
+        await _persistItem(item);
+      }
+      _broadcastQueue();
     }
     debugPrint(
       '[OfflineSync] drain starting; pending=${_syncQueue.length}',
@@ -1669,6 +1687,40 @@ enum SyncStatus {
   syncing,
   pending,
   offline,
+}
+
+/// Parent-safe explanation for a stored sync failure.
+///
+/// The diagnostic queue retains the original backend error for support, but
+/// user-facing surfaces must not expose Firebase exception text or imply that
+/// a rejected write was lost.
+String friendlyOfflineSyncError(String? error) {
+  final value = error?.trim().toLowerCase() ?? '';
+  if (value.contains('permission-denied') ||
+      value.contains('does not have permission')) {
+    return "Lumi couldn't upload this because your sign-in or access changed. "
+        'Sign in again, or contact your school if you still need access.';
+  }
+  if (value.contains('unauthenticated') ||
+      value.contains('session') && value.contains('expired')) {
+    return "Lumi couldn't upload this because your session expired. "
+        'Sign in again, then retry.';
+  }
+  if (value.contains('integrity check failed')) {
+    return "Lumi couldn't verify this saved change. It is still on this "
+        'device; contact support before dismissing it.';
+  }
+  if (value.contains('recording file is no longer available')) {
+    return "Lumi couldn't find the recording on this device. Record it "
+        'again, then dismiss this copy.';
+  }
+  if (value.contains('invalid-argument') ||
+      value.contains('failed-precondition')) {
+    return "Lumi couldn't accept this saved change. Check it and try again, "
+        'or contact support.';
+  }
+  return "Lumi couldn't upload this change. It is still saved on this "
+      'device; check your connection and try again.';
 }
 
 /// Outcome of a single sync attempt, recorded in the diagnostic history.

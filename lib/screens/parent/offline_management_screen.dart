@@ -94,8 +94,7 @@ class _StatusCard extends StatelessWidget {
               Container(
                 padding: LumiPadding.allXS,
                 decoration: BoxDecoration(
-                  color:
-                      isOnline ? AppColors.success : AppColors.warmOrange,
+                  color: isOnline ? AppColors.success : AppColors.warmOrange,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -112,9 +111,8 @@ class _StatusCard extends StatelessWidget {
                     Text(
                       isOnline ? 'Connected' : 'Offline',
                       style: LumiTextStyles.h2(
-                        color: isOnline
-                            ? AppColors.success
-                            : AppColors.warmOrange,
+                        color:
+                            isOnline ? AppColors.success : AppColors.warmOrange,
                       ),
                     ),
                     LumiGap.xxs,
@@ -209,7 +207,8 @@ class _PendingCard extends ConsumerWidget {
                         await ref
                             .read(serviceStatusControllerProvider)
                             .forceProbe();
-                        await OfflineService.instance.triggerSync();
+                        await OfflineService.instance
+                            .triggerSync(retryParked: true);
                         if (!context.mounted) return;
                         final after =
                             OfflineService.instance.pendingSyncs.length;
@@ -364,9 +363,7 @@ class _PendingDetailRow extends StatelessWidget {
 
     String? detail;
     if (attention) {
-      detail = sync.lastError == null
-          ? "Couldn't sync"
-          : "Couldn't sync — ${sync.lastError}";
+      detail = friendlyOfflineSyncError(sync.lastError);
     } else if (sync.retryCount > 0) {
       detail = 'Retrying… (attempt ${sync.retryCount})';
     }
@@ -448,8 +445,8 @@ class _SyncHistoryCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final history = ref.watch(syncHistoryProvider).value ??
-        const <SyncHistoryEntry>[];
+    final history =
+        ref.watch(syncHistoryProvider).value ?? const <SyncHistoryEntry>[];
 
     return LumiCard(
       child: Column(
