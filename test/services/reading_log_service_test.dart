@@ -3,6 +3,7 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lumi_reading_tracker/core/models/service_status.dart';
 import 'package:lumi_reading_tracker/core/services/service_status_controller.dart';
+import 'package:lumi_reading_tracker/data/models/reading_log_model.dart';
 import 'package:lumi_reading_tracker/data/models/student_model.dart';
 import 'package:lumi_reading_tracker/data/models/user_model.dart';
 import 'package:lumi_reading_tracker/services/reading_log_service.dart';
@@ -111,6 +112,8 @@ void main() {
           .get();
       expect(logs.docs, hasLength(1));
       expect(logs.docs.first.data()['studentId'], studentId);
+      expect(logs.docs.first.data()['loggedByRole'], 'parent');
+      expect(result.log.loggedByRole, LoggedByRole.parent);
 
       // The preview reflects the first night.
       expect(result.updatedStats?['currentStreak'], 1);
@@ -238,6 +241,28 @@ void main() {
           .collection('readingLogs')
           .get();
       expect(logs.docs, isEmpty);
+    });
+
+    test('identifier-only quick log writes explicit parent attribution',
+        () async {
+      await seedStudent(null);
+
+      final result = await service.logQuickFromIds(
+        studentId: studentId,
+        parentId: parentId,
+        schoolId: schoolId,
+        classId: 'class_1',
+      );
+
+      final raw = (await firestore
+              .collection('schools')
+              .doc(schoolId)
+              .collection('readingLogs')
+              .doc(result.log.id)
+              .get())
+          .data()!;
+      expect(result.log.loggedByRole, LoggedByRole.parent);
+      expect(raw['loggedByRole'], 'parent');
     });
   });
 }
