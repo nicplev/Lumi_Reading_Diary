@@ -182,6 +182,10 @@ async function deleteReadingLog(
       `schools/${schoolId}/comprehension_audio/${log.id}.m4a`,
       counts
     );
+    await deleteStorageFile(
+      `comprehension_audio_uploads/${schoolId}/${log.id}.m4a`,
+      counts
+    );
   }
   await admin.firestore().recursiveDelete(log.ref);
   bump(counts, "readingLogsDeleted");
@@ -197,6 +201,10 @@ async function deidentifyAuthoredReadingLog(
     // needed to retain the core educational reading event.
     await deleteStorageFile(
       `schools/${schoolId}/comprehension_audio/${log.id}.m4a`,
+      counts
+    );
+    await deleteStorageFile(
+      `comprehension_audio_uploads/${schoolId}/${log.id}.m4a`,
       counts
     );
   }
@@ -215,6 +223,11 @@ async function deidentifyAuthoredReadingLog(
     comprehensionAudioPath: admin.firestore.FieldValue.delete(),
     comprehensionAudioDurationSec: admin.firestore.FieldValue.delete(),
     comprehensionAudioUploaded: false,
+    comprehensionAudioObjectGeneration: admin.firestore.FieldValue.delete(),
+    comprehensionAudioSourceGeneration: admin.firestore.FieldValue.delete(),
+    comprehensionAudioValidationVersion: admin.firestore.FieldValue.delete(),
+    comprehensionAudioValidatedDurationMs: admin.firestore.FieldValue.delete(),
+    comprehensionAudioSha256: admin.firestore.FieldValue.delete(),
     accountDeidentifiedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
   bump(counts, "readingLogsDeidentified");

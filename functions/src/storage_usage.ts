@@ -53,6 +53,7 @@ export interface ObjectClassification {
 }
 
 const AUDIO_RE = /^schools\/([^/]+)\/comprehension_audio\//;
+const AUDIO_UPLOAD_RE = /^comprehension_audio_uploads\/([^/]+)\//;
 const LOGO_RE = /^schools\/([^/]+)\/logo\.[^/]+$/;
 
 /**
@@ -68,6 +69,10 @@ const LOGO_RE = /^schools\/([^/]+)\/logo\.[^/]+$/;
 export function classifyObject(name: string): ObjectClassification {
   const audio = AUDIO_RE.exec(name);
   if (audio) return {category: "comprehensionAudio", schoolId: audio[1]};
+  const audioUpload = AUDIO_UPLOAD_RE.exec(name);
+  if (audioUpload) {
+    return {category: "comprehensionAudio", schoolId: audioUpload[1]};
+  }
   if (name.startsWith("community_books/covers/")) {
     return {category: "communityBookCovers"};
   }

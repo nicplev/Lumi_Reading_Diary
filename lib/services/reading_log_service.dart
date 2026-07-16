@@ -479,14 +479,14 @@ class ReadingLogService {
         .doc(log.id);
   }
 
-  /// Builds the canonical Storage path for a comprehension audio recording.
-  /// Filename matches the log id so a teacher viewing the log can resolve
-  /// the audio without an extra lookup.
-  static String comprehensionAudioStoragePath({
+  /// Builds the private pending-upload path for an untrusted recording.
+  /// The backend decodes/transcodes this object and alone writes the separate
+  /// `comprehension_audio/{logId}.m4a` teacher-playback object.
+  static String comprehensionAudioUploadStoragePath({
     required String schoolId,
     required String logId,
   }) =>
-      'schools/$schoolId/comprehension_audio/$logId.m4a';
+      'comprehension_audio_uploads/$schoolId/$logId.m4a';
 
   /// Uploads the comprehension recording from [localFilePath] to the Storage
   /// path on [log], then patches the log doc to set
@@ -500,7 +500,7 @@ class ReadingLogService {
     required ReadingLogModel log,
     required String localFilePath,
   }) async {
-    final storagePath = comprehensionAudioStoragePath(
+    final storagePath = comprehensionAudioUploadStoragePath(
       schoolId: log.schoolId,
       logId: log.id,
     );
@@ -547,7 +547,7 @@ class ReadingLogService {
     required String localFilePath,
     required int durationSec,
   }) async {
-    final storagePath = comprehensionAudioStoragePath(
+    final storagePath = comprehensionAudioUploadStoragePath(
       schoolId: log.schoolId,
       logId: log.id,
     );

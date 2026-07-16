@@ -408,7 +408,7 @@ class _LogReadingScreenState extends State<LogReadingScreen>
       final recording = _comprehensionRecording;
       final storagePath = recording == null
           ? null
-          : ReadingLogService.comprehensionAudioStoragePath(
+          : ReadingLogService.comprehensionAudioUploadStoragePath(
               schoolId: widget.student.schoolId,
               logId: _logId,
             );

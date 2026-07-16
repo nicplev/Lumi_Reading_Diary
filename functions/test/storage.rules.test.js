@@ -20,7 +20,8 @@ const PROJECT_ID = 'demo-lumi-rules-test';
 const FIRESTORE_RULES_PATH = path.resolve(__dirname, '../../firestore.rules');
 const STORAGE_RULES_PATH = path.resolve(__dirname, '../../storage.rules');
 
-const AUDIO_PATH = 'schools/school_1/comprehension_audio/log_1.m4a';
+const AUDIO_PATH = 'comprehension_audio_uploads/school_1/log_1.m4a';
+const CANONICAL_AUDIO_PATH = 'schools/school_1/comprehension_audio/log_1.m4a';
 const AUDIO_BYTES = new Uint8Array([0, 1, 2, 3]);
 const AUDIO_METADATA = {
   contentType: 'audio/mp4',
@@ -77,7 +78,7 @@ async function seedFlag(enabled) {
   });
 }
 
-async function seedAudioLog() {
+async function seedAudioLog(uploaded = false) {
   await testEnv.withSecurityRulesDisabled(async (context) => {
     await context.firestore()
       .collection('schools').doc('school_1')
@@ -87,6 +88,7 @@ async function seedAudioLog() {
         studentId: 'student_1',
         parentId: 'parent_1',
         loggedByRole: 'parent',
+        comprehensionAudioUploaded: uploaded,
       });
   });
 }
@@ -165,7 +167,7 @@ test('comprehension audio: metadata cannot redirect upload to another log or sch
   }));
   const otherSchoolRef = ref(
     testEnv.authenticatedContext('parent_1').storage(),
-    'schools/school_2/comprehension_audio/log_1.m4a',
+    'comprehension_audio_uploads/school_2/log_1.m4a',
   );
   await assertFails(uploadBytes(otherSchoolRef, AUDIO_BYTES, AUDIO_METADATA));
 });
@@ -184,18 +186,37 @@ test('comprehension audio: owner may retry but outsider cannot overwrite', async
   }));
 });
 
+test('comprehension audio: pending upload closes after server receipt', async () => {
+  await seedAudioLog(true);
+  await seedFlag(true);
+  await assertFails(uploadBytes(audioRef('parent_1'), AUDIO_BYTES, AUDIO_METADATA));
+});
+
 test('comprehension audio: direct authenticated read is denied (signed-URL only)', async () => {
   // The object is seeded with rules disabled, then a normal authed client tries
   // to read it directly — denied (2.2). Playback must go through the
   // getComprehensionAudioUrl callable's signed URL, which bypasses these rules.
   await testEnv.withSecurityRulesDisabled(async (context) => {
     await uploadBytes(
-      ref(context.storage(), AUDIO_PATH),
+      ref(context.storage(), CANONICAL_AUDIO_PATH),
       AUDIO_BYTES,
       AUDIO_METADATA,
     );
   });
-  await assertFails(getBytes(audioRef('teacher_1')));
+  await assertFails(getBytes(ref(
+    testEnv.authenticatedContext('teacher_1').storage(),
+    CANONICAL_AUDIO_PATH,
+  )));
+});
+
+test('comprehension audio: clients cannot write the canonical playback object', async () => {
+  await seedAudioLog();
+  await seedFlag(true);
+  const canonical = ref(
+    testEnv.authenticatedContext('parent_1').storage(),
+    CANONICAL_AUDIO_PATH,
+  );
+  await assertFails(uploadBytes(canonical, AUDIO_BYTES, AUDIO_METADATA));
 });
 
 test('community cover: verified teacher can create but cannot overwrite', async () => {

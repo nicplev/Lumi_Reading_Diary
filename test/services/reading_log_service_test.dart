@@ -26,6 +26,16 @@ void main() {
     }
   });
 
+  test('comprehension audio uploads use the private pending prefix', () {
+    expect(
+      ReadingLogService.comprehensionAudioUploadStoragePath(
+        schoolId: 'school_1',
+        logId: 'log_1',
+      ),
+      'comprehension_audio_uploads/school_1/log_1.m4a',
+    );
+  });
+
   group('ReadingLogService.writeLog (preview-only)', () {
     late FakeFirebaseFirestore firestore;
     late ReadingLogService service;

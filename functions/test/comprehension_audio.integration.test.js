@@ -2,6 +2,8 @@ const { before, after, beforeEach, test } = require('node:test');
 const assert = require('node:assert/strict');
 const admin = require('firebase-admin');
 const { File } = require('@google-cloud/storage');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const PROJECT_ID = 'demo-lumi-audio';
 const BUCKET = `${PROJECT_ID}.appspot.com`;
@@ -23,6 +25,7 @@ beforeEach(async () => {
   const db = admin.firestore();
   for (const name of [
     'adminAuditLog',
+    'backendRateLimits',
     'opsCronHeartbeats',
     'platformConfig',
     'schools',
@@ -91,6 +94,8 @@ async function seedLog({
     ...(uploaded ? {
       comprehensionAudioPath: path,
       comprehensionAudioDurationSec: 12,
+      comprehensionAudioValidationVersion: 'ffmpeg-aac-mono-v1',
+      comprehensionAudioObjectGeneration: 'test-generation',
     } : {}),
   });
   return ref;
@@ -125,8 +130,11 @@ async function saveAudio({
   bytes = validM4aHeader(),
   contentType = 'audio/mp4',
   metadata = {},
+  pending = false,
 } = {}) {
-  const path = `schools/${schoolId}/comprehension_audio/${logId}.m4a`;
+  const path = pending ?
+    `comprehension_audio_uploads/${schoolId}/${logId}.m4a` :
+    `schools/${schoolId}/comprehension_audio/${logId}.m4a`;
   const file = admin.storage().bucket().file(path);
   await file.save(bytes, {
     metadata: {
@@ -143,10 +151,13 @@ async function saveAudio({
   return file;
 }
 
-test('upload confirmation accepts only the owning parent and a valid canonical object', async () => {
+test('upload confirmation decodes pending media and writes a canonical server object', async () => {
   await seedFlag(true);
   const log = await seedLog();
-  await saveAudio();
+  const pending = await saveAudio({
+    pending: true,
+    bytes: fs.readFileSync(path.join(__dirname, 'fixtures', 'valid-tone.m4a')),
+  });
 
   const result = await invoke(
     audio.confirmComprehensionAudioUpload,
@@ -154,20 +165,34 @@ test('upload confirmation accepts only the owning parent and a valid canonical o
     { schoolId: 'school_x', logId: 'log_x', durationSec: 12 }
   );
 
-  assert.deepEqual(result, { confirmed: true });
+  assert.equal(result.confirmed, true);
+  assert.equal(result.validationVersion, 'ffmpeg-aac-mono-v1');
   const data = (await log.get()).data();
   assert.equal(
     data.comprehensionAudioPath,
     'schools/school_x/comprehension_audio/log_x.m4a'
   );
-  assert.equal(data.comprehensionAudioDurationSec, 12);
+  assert.equal(data.comprehensionAudioDurationSec, 1);
   assert.equal(data.comprehensionAudioUploaded, true);
+  assert.equal(data.comprehensionAudioValidationVersion, 'ffmpeg-aac-mono-v1');
+  assert.match(data.comprehensionAudioSha256, /^[a-f0-9]{64}$/);
   assert.ok(data.comprehensionAudioUploadedAt);
+  assert.equal((await pending.exists())[0], false);
+  assert.equal((await admin.storage().bucket().file(
+    'schools/school_x/comprehension_audio/log_x.m4a'
+  ).exists())[0], true);
+
+  const retry = await invoke(
+    audio.confirmComprehensionAudioUpload,
+    'parent_x',
+    { schoolId: 'school_x', logId: 'log_x', durationSec: 12 }
+  );
+  assert.deepEqual(retry, { confirmed: true, alreadyConfirmed: true });
 });
 
 test('upload confirmation fails closed for unauthenticated, disabled and non-owner requests', async () => {
   await seedLog();
-  await saveAudio();
+  await saveAudio({ pending: true });
   const input = { schoolId: 'school_x', logId: 'log_x', durationSec: 12 };
 
   await rejectsCode(
@@ -189,7 +214,10 @@ test('upload confirmation fails closed for unauthenticated, disabled and non-own
 test('upload confirmation deletes MIME-only junk and mismatched metadata', async () => {
   await seedFlag(true);
   await seedLog();
-  const junk = await saveAudio({ bytes: Buffer.from('not really audio') });
+  const junk = await saveAudio({
+    pending: true,
+    bytes: validM4aHeader(),
+  });
   const input = { schoolId: 'school_x', logId: 'log_x', durationSec: 12 };
 
   await rejectsCode(
@@ -198,7 +226,10 @@ test('upload confirmation deletes MIME-only junk and mismatched metadata', async
   );
   assert.equal((await junk.exists())[0], false);
 
-  const mismatch = await saveAudio({ metadata: { logId: 'other_log' } });
+  const mismatch = await saveAudio({
+    pending: true,
+    metadata: { logId: 'other_log' },
+  });
   await rejectsCode(
     invoke(audio.confirmComprehensionAudioUpload, 'parent_x', input),
     'failed-precondition'

@@ -1,6 +1,8 @@
 const { before, after, test } = require('node:test');
 const assert = require('node:assert/strict');
 const admin = require('firebase-admin');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const PROJECT_ID = process.env.GCLOUD_PROJECT || 'demo-lumi-audio-http';
 const BUCKET = `${PROJECT_ID}.appspot.com`;
@@ -69,6 +71,8 @@ async function seedLog({schoolId, logId, classId, parentId, uploaded = false}) {
       // Deliberately hostile stored value: privileged operations must ignore it.
       comprehensionAudioPath: 'schools/school_y/comprehension_audio/injected.m4a',
       comprehensionAudioDurationSec: 12,
+      comprehensionAudioValidationVersion: 'ffmpeg-aac-mono-v1',
+      comprehensionAudioObjectGeneration: 'test-generation',
     } : {}),
   });
   return {ref, canonicalPath};
@@ -97,6 +101,21 @@ async function saveAudio({schoolId, logId, ownerUid}) {
       metadata: {ownerUid, schoolId, logId, studentId: `student_${logId}`},
     },
   });
+  return file;
+}
+
+async function savePendingAudio({schoolId, logId, ownerUid}) {
+  const objectPath = `comprehension_audio_uploads/${schoolId}/${logId}.m4a`;
+  const file = admin.storage().bucket().file(objectPath);
+  await file.save(
+    fs.readFileSync(path.join(__dirname, 'fixtures', 'valid-tone.m4a')),
+    {
+      metadata: {
+        contentType: 'audio/mp4',
+        metadata: {ownerUid, schoolId, logId, studentId: `student_${logId}`},
+      },
+    }
+  );
   return file;
 }
 
@@ -130,7 +149,11 @@ test('authenticated owner confirms a canonical upload through HTTP', async () =>
     classId: 'class_confirm',
     parentId: identities.parent.uid,
   });
-  await saveAudio({schoolId, logId, ownerUid: identities.parent.uid});
+  const pending = await savePendingAudio({
+    schoolId,
+    logId,
+    ownerUid: identities.parent.uid,
+  });
 
   const result = await callFunction(
     'confirmComprehensionAudioUpload',
@@ -139,10 +162,16 @@ test('authenticated owner confirms a canonical upload through HTTP', async () =>
   );
 
   assert.equal(result.status, 200, JSON.stringify(result.body));
-  assert.deepEqual(result.body.result, {confirmed: true});
+  assert.equal(result.body.result.confirmed, true);
+  assert.equal(
+    result.body.result.validationVersion,
+    'ffmpeg-aac-mono-v1'
+  );
   const data = (await ref.get()).data();
   assert.equal(data.comprehensionAudioPath, canonicalPath);
   assert.equal(data.comprehensionAudioUploaded, true);
+  assert.equal(data.comprehensionAudioDurationSec, 1);
+  assert.equal((await pending.exists())[0], false);
 });
 
 test('School Y teacher cannot access a School X recording through HTTP', async () => {
