@@ -26,7 +26,7 @@ import * as admin from "firebase-admin";
 import * as functions from "firebase-functions/v1";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {linkParentToStudentCore, resolveLinkCodeSchool} from "./parent_linking";
-import {resolveSchoolCode} from "./code_verification";
+import {consumeSchoolCode} from "./code_verification";
 
 // App Check enforcement, opt-in via env var (default OFF). These callables fire
 // during signup — before the account is fully set up — so enforcement must NOT
@@ -395,7 +395,7 @@ export const enrollLinkedPhoneAsMfa = onCall(
         );
       }
       // Read-only — the school code is NOT consumed, so this is retry-safe.
-      derivedSchoolId = (await resolveSchoolCode(schoolCode)).schoolId;
+      derivedSchoolId = (await consumeSchoolCode(schoolCode, uid)).schoolId;
     } else if (role === "parent" && linkCode) {
       try {
         derivedSchoolId =
@@ -651,7 +651,7 @@ export const finalizeEmailSignup = onCall(
           "schoolCode is required for teacher signup.",
         );
       }
-      derivedSchoolId = (await resolveSchoolCode(schoolCode)).schoolId;
+      derivedSchoolId = (await consumeSchoolCode(schoolCode, uid)).schoolId;
     } else if (role === "parent" && linkCode) {
       derivedSchoolId =
         (await resolveLinkCodeSchool(linkCode.toUpperCase())).schoolId;

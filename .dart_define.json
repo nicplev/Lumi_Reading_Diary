@@ -1,3 +1,4 @@
 {
-  "LUMI_STATUS_WORKER_URL": "https://lumistatus.aged-morning-985b.workers.dev/status"
+  "LUMI_STATUS_WORKER_URL": "https://lumistatus.aged-morning-985b.workers.dev/status",
+  "LUMI_APP_CHECK_ENABLED": true
 }

@@ -1071,9 +1071,11 @@ class OfflineService with WidgetsBindingObserver {
             existingDoc = null;
           }
           if (existingDoc != null && existingDoc.exists) {
-            // Conflict (or a re-run after a half-completed sync): resolve by
-            // last-write-wins. The resolver owns the local-copy update.
-            await _resolveReadingLogConflict(log, existingDoc, logRef);
+            // The random log ID is the idempotency key. If that ID already
+            // exists, the server copy is authoritative: a retry is a receipt,
+            // while an astronomically unlikely collision must never overwrite
+            // another parent's/teacher's accepted record.
+            await _resolveReadingLogConflict(log, existingDoc);
             resolvedConflict = true;
           } else {
             final createData = log.toFirestore();
@@ -1408,57 +1410,22 @@ class OfflineService with WidgetsBindingObserver {
   Future<void> _resolveReadingLogConflict(
     ReadingLogModel localLog,
     dynamic remoteDoc,
-    dynamic logRef,
   ) async {
     final remoteData = remoteDoc.data() as Map<String, dynamic>?;
     if (remoteData == null) {
-      // Remote was deleted, use local
-      await logRef.set(localLog.toFirestore());
-      await _readingLogsBox.put(
-        localLog.id,
-        localLog
-            .copyWith(syncedAt: DateTime.now(), isOfflineCreated: false)
-            .toLocal(),
+      throw StateError(
+        'Existing reading log ${localLog.id} had no server data; retry safely',
       );
-      return;
     }
 
-    // Simple conflict resolution: Last write wins based on timestamp
-    final localTimestamp = localLog.syncedAt?.millisecondsSinceEpoch ?? 0;
-    final remoteTimestamp =
-        (remoteData['syncedAt'] as dynamic)?.millisecondsSinceEpoch ?? 0;
-
-    if (localTimestamp > remoteTimestamp) {
-      // Local is newer, use local
-      debugPrint('Local version is newer, updating remote');
-      // Identity, date, status, authorship and server-owned receipt fields are
-      // immutable after create. Conflict replay may update only the same
-      // user-editable content accepted by Firestore rules.
-      await logRef.update({
-        'minutesRead': localLog.minutesRead,
-        'targetMinutes': localLog.targetMinutes,
-        'bookTitles': localLog.bookTitles,
-        'notes': localLog.notes,
-        'photoUrls': localLog.photoUrls,
-        'childFeeling': localLog.childFeeling?.name,
-        'parentComment': localLog.parentComment,
-        'parentCommentSelections': localLog.parentCommentSelections,
-        'parentCommentFreeText': localLog.parentCommentFreeText,
-        'syncedAt': FieldValue.serverTimestamp(),
-        'isOfflineCreated': false,
-      });
-      await _readingLogsBox.put(
-        localLog.id,
-        localLog
-            .copyWith(syncedAt: DateTime.now(), isOfflineCreated: false)
-            .toLocal(),
-      );
-    } else {
-      // Remote is newer, keep remote and update local
-      debugPrint('Remote version is newer, updating local');
-      final remoteLog = ReadingLogModel.fromFirestore(remoteDoc);
-      await _readingLogsBox.put(localLog.id, remoteLog.toLocal());
-    }
+    // Explicit policy: reading logs are create-once events, not shared drafts.
+    // Parent and teacher devices generate independent 128-bit IDs, so their
+    // entries coexist. Field-specific later actions (feelings/comments) use
+    // separate merge queues. Device clocks are therefore never used to choose
+    // a winner and an offline create can never clobber accepted server data.
+    debugPrint('Reading-log id already accepted; keeping server version');
+    final remoteLog = ReadingLogModel.fromFirestore(remoteDoc);
+    await _readingLogsBox.put(localLog.id, remoteLog.toLocal());
   }
 
   Future<void> _syncStudent(PendingSync pendingSync) async {

@@ -398,7 +398,7 @@ class OnboardingService {
         .toUpperCase()
         .replaceAll(RegExp(r'[^A-Z]'), '')
         .substring(0, min(3, schoolName.length));
-    final random = Random().nextInt(9999).toString().padLeft(4, '0');
+    final random = Random.secure().nextInt(100000).toString().padLeft(5, '0');
     return '$cleanName$random';
   }
 }

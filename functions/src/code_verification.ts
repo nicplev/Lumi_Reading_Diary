@@ -1,6 +1,8 @@
 import * as functions from "firebase-functions/v1";
 import {onCall, CallableOptions} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
+import * as crypto from "crypto";
+import {enforcePublicCodeRateLimit} from "./public_code_rate_limit";
 
 const COLL_SCHOOL_CODES = "schoolCodes";
 
@@ -50,6 +52,30 @@ export interface ResolvedSchoolCode {
   ref: FirebaseFirestore.DocumentReference;
 }
 
+export function assertSchoolCodeUsable(
+  d: FirebaseFirestore.DocumentData,
+  now = new Date(),
+): void {
+  if (d.isActive !== true) {
+    throw failedPrecondition(
+      "code_inactive",
+      "This school code has been deactivated.",
+    );
+  }
+  const expiresAt = parseExpiresAt(d.expiresAt);
+  if (expiresAt !== null && expiresAt < now) {
+    throw failedPrecondition("code_expired", "This school code has expired.");
+  }
+  const maxUsages = typeof d.maxUsages === "number" ? d.maxUsages : null;
+  const usageCount = typeof d.usageCount === "number" ? d.usageCount : 0;
+  if (maxUsages !== null && usageCount >= maxUsages) {
+    throw failedPrecondition(
+      "code_max_usage",
+      "This school code has reached its maximum usage limit.",
+    );
+  }
+}
+
 // Resolves a school code by EXACT value and runs the validity ladder (mirrors
 // SchoolCodeModel.isValid / invalidReason). Throws the same typed HttpsErrors
 // (with `kind`) as `verifySchoolCode`. Read-only — never mutates the code doc.
@@ -92,25 +118,7 @@ export async function resolveSchoolCode(
   const doc = snap.docs[0];
   const d = doc.data() ?? {};
 
-  const isActive = d.isActive === true;
-  if (!isActive) {
-    throw failedPrecondition(
-      "code_inactive",
-      "This school code has been deactivated."
-    );
-  }
-  const expiresAt = parseExpiresAt(d.expiresAt);
-  if (expiresAt !== null && expiresAt < new Date()) {
-    throw failedPrecondition("code_expired", "This school code has expired.");
-  }
-  const maxUsages = typeof d.maxUsages === "number" ? d.maxUsages : null;
-  const usageCount = typeof d.usageCount === "number" ? d.usageCount : 0;
-  if (maxUsages !== null && usageCount >= maxUsages) {
-    throw failedPrecondition(
-      "code_max_usage",
-      "This school code has reached its maximum usage limit."
-    );
-  }
+  assertSchoolCodeUsable(d);
 
   return {
     codeId: doc.id,
@@ -118,6 +126,77 @@ export async function resolveSchoolCode(
     schoolName: String(d.schoolName ?? ""),
     ref: doc.ref,
   };
+}
+
+/**
+ * Atomically consumes one teacher school-code use. A server-owned redemption
+ * record makes retries by the same Auth UID idempotent while enforcing expiry
+ * and max-usage limits for new accounts.
+ * @param {string} rawCode Submitted school join code.
+ * @param {string} uid Authenticated teacher UID consuming the code.
+ * @return {Promise<ResolvedSchoolCode>} The server-derived school identity.
+ */
+export async function consumeSchoolCode(
+  rawCode: string,
+  uid: string,
+): Promise<ResolvedSchoolCode> {
+  const normalized = rawCode.toUpperCase().trim();
+  if (!uid) {
+    throw new functions.https.HttpsError("unauthenticated", "Sign-in required.");
+  }
+  if (normalized.length < 6 || normalized.length > 16) {
+    throw invalidArgument("invalid_code", "School code format is invalid.");
+  }
+
+  const db = admin.firestore();
+  const snap = await db.collection(COLL_SCHOOL_CODES)
+    .where("code", "==", normalized).limit(1).get();
+  if (snap.empty) {
+    throw notFound(
+      "code_not_found",
+      "Invalid school code. Please check the code and try again.",
+    );
+  }
+
+  const codeRef = snap.docs[0].ref;
+  const redemptionId = crypto.createHash("sha256")
+    .update(`${codeRef.id}:${uid}`).digest("hex");
+  const redemptionRef = db.collection("schoolCodeRedemptions").doc(redemptionId);
+
+  return db.runTransaction(async (tx) => {
+    const [fresh, redemption] = await Promise.all([
+      tx.get(codeRef),
+      tx.get(redemptionRef),
+    ]);
+    const d = fresh.data() ?? {};
+    if (String(d.code ?? "").toUpperCase() !== normalized) {
+      throw notFound("code_not_found", "Invalid school code.");
+    }
+
+    const schoolId = String(d.schoolId ?? "");
+    const schoolName = String(d.schoolName ?? "");
+    if (!schoolId) {
+      throw failedPrecondition("invalid_code", "School code is malformed.");
+    }
+
+    if (!redemption.exists) {
+      assertSchoolCodeUsable(d);
+      const usageCount = typeof d.usageCount === "number" ? d.usageCount : 0;
+      const now = admin.firestore.Timestamp.now();
+      tx.update(codeRef, {usageCount: usageCount + 1, lastUsedAt: now});
+      tx.create(redemptionRef, {
+        codeId: codeRef.id,
+        uid,
+        schoolId,
+        redeemedAt: now,
+        expiresAt: admin.firestore.Timestamp.fromMillis(
+          now.toMillis() + 400 * 24 * 60 * 60 * 1000,
+        ),
+      });
+    }
+
+    return {codeId: codeRef.id, schoolId, schoolName, ref: codeRef};
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -138,6 +217,7 @@ export const verifySchoolCode = onCall(
   async (request) => {
     const data: {code?: unknown} = request.data;
     const raw = typeof data?.code === "string" ? data.code : "";
+    await enforcePublicCodeRateLimit("school", request);
     const resolved = await resolveSchoolCode(raw);
     return {
       ok: true,

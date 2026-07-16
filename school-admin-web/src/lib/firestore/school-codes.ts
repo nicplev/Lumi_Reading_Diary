@@ -1,5 +1,6 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import { randomInt } from 'node:crypto';
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const COLLECTION = 'schoolCodes';
@@ -13,8 +14,8 @@ export interface SchoolCode {
 
 function generateCodeString(): string {
   let code = '';
-  for (let i = 0; i < 8; i++) {
-    code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+  for (let i = 0; i < 10; i++) {
+    code += CODE_CHARS[randomInt(CODE_CHARS.length)];
   }
   return code;
 }
@@ -86,6 +87,8 @@ export async function rotateSchoolCode(
     createdAt: FieldValue.serverTimestamp(),
     createdBy,
     usageCount: 0,
+    maxUsages: 100,
+    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
   });
 
   await batch.commit();

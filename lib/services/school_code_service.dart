@@ -57,9 +57,12 @@ class SchoolCodeService {
     // active join code. The callable mirrors SchoolCodeModel.isValid /
     // invalidReason and returns only the single matching school.
     try {
-      final callable = lumiFunctions.httpsCallable('verifySchoolCode');
-      final result =
-          await callable.call<Object?>(<String, dynamic>{'code': normalizedCode});
+      final callable = lumiFunctions.httpsCallable(
+        'verifySchoolCode',
+        options: HttpsCallableOptions(limitedUseAppCheckToken: true),
+      );
+      final result = await callable
+          .call<Object?>(<String, dynamic>{'code': normalizedCode});
       final data = result.data;
       if (data is! Map) {
         throw SchoolCodeException(
@@ -90,19 +93,6 @@ class SchoolCodeService {
         kind ?? 'code_invalid',
       );
     }
-  }
-
-  /// Increments the usage count for a school code
-  ///
-  /// This should be called after successfully creating a teacher account
-  /// to track how many times a code has been used.
-  Future<void> incrementCodeUsage(String codeId) async {
-    await _firestore
-        .collection(_collectionName)
-        .doc(codeId)
-        .update({
-      'usageCount': FieldValue.increment(1),
-    });
   }
 
   /// Creates a new school code

@@ -3,10 +3,9 @@ import 'package:flutter/foundation.dart';
 
 /// Activates Firebase App Check for the current platform.
 ///
-/// Kept opt-in via the `LUMI_APP_CHECK_ENABLED` dart-define so the code can
-/// ship to production without risk — attestation only turns on once every
-/// platform has been wired and the server-side env var
-/// `IMPERSONATION_APP_CHECK_ENFORCED` is also flipped to `true`.
+/// Controlled by the `LUMI_APP_CHECK_ENABLED` dart-define. The supported
+/// mobile release-build wrapper requires it to be true; debug runs may still
+/// opt in explicitly while registering a revocable debug-provider token.
 ///
 /// Build with:
 ///   flutter run --dart-define=LUMI_APP_CHECK_ENABLED=true \
@@ -22,8 +21,9 @@ import 'package:flutter/foundation.dart';
 class AppCheckService {
   AppCheckService._();
 
-  /// Dart-define switch — default OFF so ordinary `flutter run`/`flutter build`
-  /// skip activation. Flip true for the attested build.
+  /// Dart-define switch. It remains false for an ad-hoc raw `flutter run`, but
+  /// `.dart_define.json` plus `scripts/flutter-build.sh` require it for every
+  /// supported mobile release artifact.
   static const bool _enabled = bool.fromEnvironment(
     "LUMI_APP_CHECK_ENABLED",
     defaultValue: false,

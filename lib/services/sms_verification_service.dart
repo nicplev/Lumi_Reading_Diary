@@ -64,21 +64,27 @@ class SmsVerificationService {
   ///  - On `resource-exhausted` from the gate, rethrows as a
   ///    `FirebaseAuthException(code: 'quota-exceeded')` so the existing
   ///    [friendlyError] mapping surfaces a clean message to the user.
-  ///  - On any other gate error (network down, server bug, etc.), swallows
-  ///    it and lets the SMS attempt proceed. We never want to lock out
-  ///    legitimate users because our own anti-abuse plumbing is broken.
-  ///  - When [phoneE164] is null or fails E.164 validation, skips the gate
-  ///    entirely (e.g. the MFA login path where the phone may come back
-  ///    masked from the resolver hint).
+  ///  - Any other gate error fails closed with a friendly temporary-error
+  ///    message. An explicit server-side emergency override is the only bypass.
+  ///  - A masked MFA resolver hint is the sole unavoidable exception because
+  ///    Firebase does not expose an E.164 number to send to the counter.
   Future<void> _checkRateLimit({
     required String? phoneE164,
     required String purpose,
   }) async {
-    if (phoneE164 == null) return;
-    final trimmed = phoneE164.trim();
-    if (!isValidE164(trimmed)) return;
+    final trimmed = phoneE164?.trim() ?? '';
+    if (!isValidE164(trimmed)) {
+      if (purpose == 'login' && trimmed.isNotEmpty) return;
+      throw FirebaseAuthException(
+        code: 'invalid-phone-number',
+        message: 'A valid phone number is required before requesting an SMS.',
+      );
+    }
     try {
-      final callable = _functions.httpsCallable('requestSmsVerification');
+      final callable = _functions.httpsCallable(
+        'requestSmsVerification',
+        options: HttpsCallableOptions(limitedUseAppCheckToken: true),
+      );
       await callable.call<Map<String, dynamic>>({
         'phoneE164': trimmed,
         'purpose': purpose,
@@ -92,13 +98,23 @@ class SmsVerificationService {
         );
       }
       if (kDebugMode) {
-        debugPrint('[phone-auth] rate-limit gate non-fatal error: '
+        debugPrint('[phone-auth] rate-limit gate blocked SMS: '
             'code=${e.code} message=${e.message}');
       }
+      throw FirebaseAuthException(
+        code: 'rate-limit-unavailable',
+        message: e.message ??
+            'Phone verification is temporarily unavailable. Please try again.',
+      );
     } catch (e) {
       if (kDebugMode) {
         debugPrint('[phone-auth] rate-limit gate threw: $e');
       }
+      throw FirebaseAuthException(
+        code: 'rate-limit-unavailable',
+        message:
+            'Phone verification is temporarily unavailable. Please try again.',
+      );
     }
   }
 
@@ -661,6 +677,8 @@ class SmsVerificationService {
       'too-many-requests' =>
         'Too many attempts. Please wait a few minutes before trying again.',
       'quota-exceeded' => 'SMS quota reached for now. Please try again later.',
+      'rate-limit-unavailable' =>
+        'Phone verification is temporarily unavailable. Please try again shortly.',
       'missing-phone-number' => 'Please enter your phone number.',
       'second-factor-already-in-use' =>
         'This phone number is already set up as a second factor on another account.',
