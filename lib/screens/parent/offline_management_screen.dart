@@ -208,7 +208,7 @@ class _PendingCard extends ConsumerWidget {
                             .read(serviceStatusControllerProvider)
                             .forceProbe();
                         await OfflineService.instance
-                            .triggerSync(retryParked: true);
+                            .triggerSync(retryPendingNow: true);
                         if (!context.mounted) return;
                         final after =
                             OfflineService.instance.pendingSyncs.length;

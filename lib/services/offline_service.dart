@@ -367,12 +367,13 @@ class OfflineService with WidgetsBindingObserver {
   /// Externally callable sync trigger — used by the "Try syncing now"
   /// buttons. Coalesces with an in-flight sync.
   ///
-  /// Automatic drains leave parked items alone. An explicit user retry may
-  /// make one fresh attempt, which is useful after signing in again or after
-  /// a school restores access. A still-invalid write is parked again by the
-  /// normal failure classifier and is never discarded.
-  Future<void> triggerSync({bool retryParked = false}) =>
-      _syncPendingData(retryParked: retryParked);
+  /// Automatic drains respect backoff and leave parked items alone. An
+  /// explicit user retry may make one fresh attempt at every queued item,
+  /// which is useful after connectivity, sign-in or school access recovers.
+  /// A still-invalid write remains queued under the normal failure classifier
+  /// and is never discarded.
+  Future<void> triggerSync({bool retryPendingNow = false}) =>
+      _syncPendingData(retryPendingNow: retryPendingNow);
 
   /// Manually drop a parked item the user has acknowledged. The only path by
   /// which a queued write ever leaves the queue without syncing.
@@ -840,7 +841,7 @@ class OfflineService with WidgetsBindingObserver {
   /// try/finally so a timeout can never leave the syncer wedged. Items are
   /// removed only after a confirmed write; failures persist their backoff
   /// state and stay queued (transient) or are parked (permanent).
-  Future<void> _syncPendingData({bool retryParked = false}) async {
+  Future<void> _syncPendingData({bool retryPendingNow = false}) async {
     if (_isSyncing || _syncQueue.isEmpty) return;
     if (!ServiceStatusController.instance.current.canWriteToFirebase) {
       debugPrint(
@@ -849,14 +850,15 @@ class OfflineService with WidgetsBindingObserver {
       );
       return;
     }
-    if (retryParked) {
-      // Only unpark after the authoritative write-path probe is healthy.
-      // Otherwise an offline button tap could remove the attention state
+    if (retryPendingNow) {
+      // Only clear backoff/attention after the authoritative write-path probe
+      // is healthy. Otherwise an offline button tap could change queue state
       // without making an attempt or scheduling a later retry.
-      for (final item in _syncQueue.where((item) => item.needsAttention)) {
+      for (final item in _syncQueue) {
         item
           ..needsAttention = false
-          ..nextAttemptAt = null;
+          ..nextAttemptAt = null
+          ..lastError = null;
         await _persistItem(item);
       }
       _broadcastQueue();

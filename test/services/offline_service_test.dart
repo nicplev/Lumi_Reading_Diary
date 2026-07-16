@@ -933,7 +933,7 @@ void main() {
         // then make this drain deterministic.
         await Future<void>.delayed(const Duration(milliseconds: 25));
         goHealthy();
-        await offlineService.triggerSync(retryParked: true);
+        await offlineService.triggerSync(retryPendingNow: true);
 
         expect(attempts, equals(1));
         expect(offlineService.pendingSyncs, isEmpty);
@@ -950,11 +950,27 @@ void main() {
         ServiceStatusController.instance
             .debugSetCurrent(ServiceStatusSnapshot.unknown());
 
-        await offlineService.triggerSync(retryParked: true);
+        await offlineService.triggerSync(retryPendingNow: true);
 
         expect(attempts, equals(0));
         expect(item.needsAttention, isTrue);
         expect(item.lastError, equals('permission-denied'));
+      });
+
+      test('explicit retry bypasses a transient backoff window', () async {
+        var attempts = 0;
+        offlineService.syncOneOverrideForTest = (_) async => attempts++;
+        await offlineService.saveReadingLogLocally(_log('rl-retry-backoff'));
+        offlineService.pendingSyncs.single
+          ..retryCount = 2
+          ..nextAttemptAt = DateTime.now().add(const Duration(minutes: 10))
+          ..lastError = 'unavailable';
+        goHealthy();
+
+        await offlineService.triggerSync(retryPendingNow: true);
+
+        expect(attempts, equals(1));
+        expect(offlineService.pendingSyncs, isEmpty);
       });
 
       test('corrupted payload trips the integrity check', () async {
