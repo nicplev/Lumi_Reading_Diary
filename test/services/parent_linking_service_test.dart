@@ -47,8 +47,7 @@ class _RecordingInvoker {
         calls.putIfAbsent(name, () => []).add(args);
         final queue = _responses[name];
         if (queue == null || queue.isEmpty) {
-          throw StateError(
-              'No queued response for callable "$name" (call '
+          throw StateError('No queued response for callable "$name" (call '
               '#${calls[name]!.length}).');
         }
         final next = queue.removeAt(0);
@@ -148,10 +147,7 @@ void main() {
       String lastName = 'Booker',
       List<String> parentIds = const [],
     }) async {
-      await firestore
-          .collection('schools')
-          .doc(schoolId)
-          .set({'name': 'Lumi'});
+      await firestore.collection('schools').doc(schoolId).set({'name': 'Lumi'});
       await firestore
           .collection('schools')
           .doc(schoolId)
@@ -342,7 +338,8 @@ void main() {
                 metadata ?? <String, dynamic>{'studentFullName': 'Sam Booker'},
           };
 
-      void stubVerifyFailure({required String code, String? kind, String? reason}) {
+      void stubVerifyFailure(
+          {required String code, String? kind, String? reason}) {
         invoker.queueFailure(
           'verifyStudentLinkCode',
           FirebaseFunctionsException(
@@ -370,8 +367,8 @@ void main() {
             'verifyStudentLinkCode', verifyPayload(code: 'ABCD1234'));
 
         await service.verifyCode('abcd1234');
-        expect(invoker.calls['verifyStudentLinkCode']!.single['code'],
-            'ABCD1234');
+        expect(
+            invoker.calls['verifyStudentLinkCode']!.single['code'], 'ABCD1234');
       });
 
       test('maps failed-precondition/invalid-code to InvalidCodeException',
@@ -426,7 +423,8 @@ void main() {
     // ── createCoParentInviteCode ──
 
     group('createCoParentInviteCode', () {
-      test('forwards schoolId/studentId/validityDays to the callable', () async {
+      test('forwards schoolId/studentId/validityDays to the callable',
+          () async {
         invoker.queueSuccess('createCoParentInvite', <String, dynamic>{
           'ok': true,
           'id': 'invite_1',
@@ -450,7 +448,7 @@ void main() {
         final sent = invoker.calls['createCoParentInvite']!.single;
         expect(sent['schoolId'], 'school_1');
         expect(sent['studentId'], 'student_1');
-        expect(sent['validityDays'], 365);
+        expect(sent['validityDays'], 7);
       });
 
       test('maps permission-denied to TransactionFailedException', () async {
@@ -791,8 +789,7 @@ void main() {
         );
       });
 
-      test(
-          'maps failed-precondition/not-linked to TransactionFailedException',
+      test('maps failed-precondition/not-linked to TransactionFailedException',
           () async {
         stubUnlinkFailure(code: 'failed-precondition', kind: 'not-linked');
         await expectLater(

@@ -31,6 +31,19 @@ fi
 target="$1"
 shift
 
+# Store-bound mobile artifacts must never silently omit App Check. Debug runs
+# can still choose their provider/token explicitly with `flutter run`, while
+# every release build produced by this supported wrapper is attested from its
+# first Firebase request.
+case "${target}" in
+  ios|ipa|apk|appbundle)
+    if ! grep -Eq '"LUMI_APP_CHECK_ENABLED"[[:space:]]*:[[:space:]]*true' "${DEFINES_FILE}"; then
+      echo "error: mobile release builds require LUMI_APP_CHECK_ENABLED=true in ${DEFINES_FILE}" >&2
+      exit 1
+    fi
+    ;;
+esac
+
 exec flutter build "${target}" \
   --dart-define-from-file="${DEFINES_FILE}" \
   "$@"

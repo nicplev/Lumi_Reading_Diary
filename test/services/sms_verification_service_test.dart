@@ -26,5 +26,18 @@ void main() {
 
       expect(message, contains('Tap resend'));
     });
+
+    test('keeps rate-limit infrastructure failures fail-closed and friendly',
+        () {
+      final message = SmsVerificationService.friendlyError(
+        FirebaseAuthException(
+          code: 'rate-limit-unavailable',
+          message: 'internal counter transaction failed',
+        ),
+      );
+
+      expect(message, contains('temporarily unavailable'));
+      expect(message, isNot(contains('counter transaction')));
+    });
   });
 }

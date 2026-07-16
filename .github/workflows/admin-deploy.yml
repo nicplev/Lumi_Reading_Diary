@@ -29,10 +29,22 @@ jobs:
     permissions:
       contents: read
       checks: write
+      id-token: write
     env:
       FIREBASE_CLI_EXPERIMENTS: webframeworks
     steps:
       - uses: actions/checkout@v4
+
+      # Keyless Google authentication. The provider condition accepts only
+      # this repository's main branch, and the service-account IAM binding is
+      # scoped to that provider principal — no JSON private key is stored in
+      # GitHub or copied into the build.
+      - id: google-auth
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: lumi-ninc-au
+          workload_identity_provider: projects/3795320704/locations/global/workloadIdentityPools/github-actions/providers/lumi-reading-diary
+          service_account: github-actions-admin@lumi-ninc-au.iam.gserviceaccount.com
 
       # pnpm version is sourced from the root package.json `packageManager`
       # field; passing `version:` here conflicts with it.
@@ -115,10 +127,8 @@ jobs:
         # accept the existing peer-dep resolution instead of erroring out.
         env:
           NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_LUMI_NINC_AU }}
-          projectId: lumi-ninc-au
-          target: admin
-          channelId: live
+        run: >-
+          pnpm dlx firebase-tools@15.23.0 deploy
+          --only hosting:admin
+          --project lumi-ninc-au
+          --non-interactive

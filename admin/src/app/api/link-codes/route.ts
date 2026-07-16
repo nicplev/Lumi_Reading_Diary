@@ -7,7 +7,7 @@ import { logAuditEvent } from "@/lib/firestore/audit-log";
 const createLinkCodeSchema = z.object({
   studentId: z.string().min(1, "Student ID is required"),
   schoolId: z.string().min(1, "School ID is required"),
-  expiresInDays: z.number().int().min(1).optional(),
+  expiresInDays: z.number().int().min(1).max(30).optional(),
 });
 
 export async function POST(request: Request) {

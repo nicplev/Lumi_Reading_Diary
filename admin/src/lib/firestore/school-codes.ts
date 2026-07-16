@@ -1,6 +1,7 @@
 import "server-only";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import {randomInt} from "node:crypto";
 
 function toISO(ts: unknown): string {
   if (!ts || typeof ts !== "object") return "";
@@ -13,8 +14,8 @@ function toISO(ts: unknown): string {
 function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
-  for (let i = 0; i < 6; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  for (let i = 0; i < 10; i++) {
+    code += chars.charAt(randomInt(chars.length));
   }
   return code;
 }
@@ -97,15 +98,11 @@ export async function createSchoolCode(data: {
     usageCount: 0,
   };
 
-  if (data.maxUsages) {
-    docData.maxUsages = data.maxUsages;
-  }
+  docData.maxUsages = data.maxUsages ?? 100;
 
-  if (data.expiresInDays) {
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + data.expiresInDays);
-    docData.expiresAt = Timestamp.fromDate(expiresAt);
-  }
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + (data.expiresInDays ?? 30));
+  docData.expiresAt = Timestamp.fromDate(expiresAt);
 
   const docRef = await db.collection("schoolCodes").add(docData);
   return { id: docRef.id, code };

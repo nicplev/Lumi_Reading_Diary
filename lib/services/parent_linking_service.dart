@@ -25,7 +25,10 @@ Future<Object?> _defaultCallableInvoker(
   String name,
   Map<String, dynamic> args,
 ) async {
-  final callable = lumiFunctions.httpsCallable(name);
+  final callable = lumiFunctions.httpsCallable(
+    name,
+    options: HttpsCallableOptions(limitedUseAppCheckToken: true),
+  );
   final result = await callable.call<Object?>(args);
   return result.data;
 }
@@ -43,7 +46,7 @@ class ParentLinkingService {
   // Generate unique 8-character code
   String _generateCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Exclude similar chars
-    final random = Random();
+    final random = Random.secure();
     return List.generate(8, (index) => chars[random.nextInt(chars.length)])
         .join();
   }
@@ -76,7 +79,7 @@ class ParentLinkingService {
     required String studentId,
     required String schoolId,
     required String createdBy,
-    int validityDays = 365, // Code valid for 1 year by default
+    int validityDays = 30,
     String intendedFor = LinkCodeIntent.staffIssued,
     String? note,
   }) async {
@@ -85,6 +88,9 @@ class ParentLinkingService {
       collection: 'studentLinkCodes',
       operation: 'create',
     );
+    if (validityDays < 1 || validityDays > 30) {
+      throw ArgumentError.value(validityDays, 'validityDays', 'must be 1–30');
+    }
     final code = await _generateUniqueCode();
 
     // Fetch student info to store in metadata
@@ -178,7 +184,7 @@ class ParentLinkingService {
     required String studentId,
     required String schoolId,
     required String parentUserId,
-    int validityDays = 365,
+    int validityDays = 7,
     String? note,
   }) async {
     assertWritable(
@@ -208,7 +214,7 @@ class ParentLinkingService {
     required List<String> studentIds,
     required String schoolId,
     required String createdBy,
-    int validityDays = 365,
+    int validityDays = 30,
   }) async {
     final Map<String, StudentLinkCodeModel> codes = {};
     final dedupedStudentIds = studentIds.toSet().toList(growable: false);

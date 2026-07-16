@@ -627,6 +627,38 @@ void main() {
         expect(doc.exists, isTrue);
       });
 
+      test('existing server log wins without trusting either device clock',
+          () async {
+        final fake = FakeFirebaseFirestore();
+        offlineService.firestoreForTest = fake;
+        goHealthy();
+
+        final remote = _log('rl-conflict').copyWith(
+          minutesRead: 55,
+          isOfflineCreated: false,
+          syncedAt: DateTime(2020), // Deliberately older than the local clock.
+        );
+        final ref = fake
+            .collection('schools')
+            .doc('school-1')
+            .collection('readingLogs')
+            .doc('rl-conflict');
+        await ref.set(remote.toFirestore());
+
+        final local = _log('rl-conflict').copyWith(
+          minutesRead: 20,
+          syncedAt: DateTime(2035), // Must not overwrite accepted server data.
+        );
+        await offlineService.saveReadingLogLocally(local);
+        await offlineService.triggerSync();
+
+        expect(offlineService.pendingSyncs, isEmpty);
+        expect((await ref.get()).data()!['minutesRead'], 55);
+        final cached =
+            await offlineService.getLocalReadingLogs('student-1');
+        expect(cached.single.minutesRead, 55);
+      });
+
       test('comment reply writes the comment and updates the log preview',
           () async {
         final fake = FakeFirebaseFirestore();

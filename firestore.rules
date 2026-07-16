@@ -1020,6 +1020,18 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Durable unauthenticated school/student code-attempt counters. Only
+    // callable Admin SDK code may observe or mutate them.
+    match /publicCodeVerificationRateLimits/{counterId} {
+      allow read, write: if false;
+    }
+
+    // Idempotent server-side teacher-code redemption receipts. These bind one
+    // code use to one Auth UID and make max-usage enforcement retry-safe.
+    match /schoolCodeRedemptions/{redemptionId} {
+      allow read, write: if false;
+    }
+
     match /studentLinkCodes/{codeId} {
       // Verification is server-side only: the verifyStudentLinkCode /
       // linkParentToStudent / createCoParentInvite callables (Admin SDK) look
@@ -1041,42 +1053,10 @@ service cloud.firestore {
             resource.data.usedBy == request.auth.uid
           );
 
-      // Co-parent invites are created by the createCoParentInvite callable
-      // (Admin SDK), which verifies the caller is a parent linked to the
-      // student — so parents no longer create link codes from the client.
-      // Only staff may create a code directly.
-      allow create: if isSignedIn() &&
-          writeAllowedForDev() &&
-          request.resource.data.createdBy == request.auth.uid &&
-          (
-            isSchoolAdmin(request.resource.data.schoolId) ||
-            isTeacher(request.resource.data.schoolId)
-          );
-
-      allow update: if isSignedIn() &&
-          writeAllowedForDev() &&
-          (
-            (
-              isSchoolAdmin(resource.data.schoolId) ||
-              isTeacher(resource.data.schoolId)
-            ) ||
-            (
-              request.auth.uid == request.resource.data.usedBy &&
-              resource.data.status == 'active' &&
-              request.resource.data.status == 'used' &&
-              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'usedBy', 'usedAt'])
-            ) ||
-            (
-              // A guardian cancelling their own pending co-parent invite.
-              resource.data.createdBy == request.auth.uid &&
-              resource.data.intendedFor == 'co_parent_invite' &&
-              resource.data.status == 'active' &&
-              request.resource.data.status == 'revoked' &&
-              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'revokedBy', 'revokedAt', 'revokeReason'])
-            )
-          );
-
-      allow delete: if isSignedIn() && isSchoolAdmin(resource.data.schoolId) && writeAllowedForDev();
+      // Creation, redemption, revocation and deletion all pass through
+      // tenant-authorised Admin SDK callables/portal routes. No mobile client
+      // may mint, consume or mutate this credential directly.
+      allow create, update, delete: if false;
     }
 
     match /notifications/{notificationId} {
@@ -1102,24 +1082,10 @@ service cloud.firestore {
             isTeacher(resource.data.schoolId)
           );
 
-      allow create: if isSignedIn() &&
-          writeAllowedForDev() &&
-          request.resource.data.createdBy == request.auth.uid &&
-          isSchoolAdmin(request.resource.data.schoolId);
-
-      allow update: if isSignedIn() &&
-          writeAllowedForDev() &&
-          isSchoolAdmin(resource.data.schoolId) &&
-          request.resource.data.schoolId == resource.data.schoolId;
-
-      // Teacher registration increments usage count by exactly 1.
-      allow update: if isSignedIn() &&
-          writeAllowedForDev() &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usageCount']) &&
-          request.resource.data.usageCount == resource.data.usageCount + 1 &&
-          (isSchoolAdmin(resource.data.schoolId) || isTeacher(resource.data.schoolId));
-
-      allow delete: if isSignedIn() && isSchoolAdmin(resource.data.schoolId) && writeAllowedForDev();
+      // Generation/rotation and retry-safe usage consumption are server-owned.
+      // This also prevents a teacher from incrementing usage repeatedly to
+      // exhaust a shared code and deny access to other legitimate staff.
+      allow create, update, delete: if false;
     }
 
     // ── User Feedback ──────────────────────────────────────────────

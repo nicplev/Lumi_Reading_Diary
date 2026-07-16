@@ -1,5 +1,6 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import { randomInt } from 'node:crypto';
 import type { StudentLinkCode } from '@/lib/types';
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Exclude I/O/0/1
@@ -7,7 +8,7 @@ const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Exclude I/O/0/1
 function generateCode(): string {
   let code = '';
   for (let i = 0; i < 8; i++) {
-    code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+    code += CODE_CHARS[randomInt(CODE_CHARS.length)];
   }
   return code;
 }
@@ -104,7 +105,7 @@ export async function createLinkCode(
   }
 
   const expiresAt = new Date();
-  expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+  expiresAt.setDate(expiresAt.getDate() + 30);
 
   const ref = adminDb.collection('studentLinkCodes').doc();
   batch.set(ref, {

@@ -7,6 +7,7 @@ import {onDocumentWritten, onDocumentCreated, onDocumentUpdated} from "firebase-
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {defineSecret} from "firebase-functions/params";
 import * as admin from "firebase-admin";
+import * as crypto from "crypto";
 import sgMail from "@sendgrid/mail";
 
 const sendgridApiKey = defineSecret("SENDGRID_API_KEY");
@@ -2178,14 +2179,12 @@ export const cleanupExpiredLinkCodes = onSchedule(
 
 const LINK_CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const LINK_CODE_LENGTH = 8;
-const LINK_CODE_EXPIRY_DAYS = 365;
+const LINK_CODE_EXPIRY_DAYS = 30;
 
 function generateLinkCode(): string {
   let code = "";
   for (let i = 0; i < LINK_CODE_LENGTH; i++) {
-    code += LINK_CODE_CHARS.charAt(
-      Math.floor(Math.random() * LINK_CODE_CHARS.length)
-    );
+    code += LINK_CODE_CHARS.charAt(crypto.randomInt(LINK_CODE_CHARS.length));
   }
   return code;
 }

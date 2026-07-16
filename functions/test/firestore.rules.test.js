@@ -49,6 +49,10 @@ function unauthDb() {
 
 test('schoolCodes: unauthenticated reads are denied (verification is server-side)', async () => {
   await seedData(async (db) => {
+    await db.collection('schools').doc('school_1').set({name: 'Lumi School'});
+    await db.collection('schools').doc('school_1').collection('users').doc('admin_1').set({
+      role: 'schoolAdmin', schoolId: 'school_1',
+    });
     await db.collection('schoolCodes').doc('code_1').set({
       code: 'ABC123',
       schoolId: 'school_1',
@@ -69,6 +73,18 @@ test('schoolCodes: unauthenticated reads are denied (verification is server-side
 
   await assertFails(
     unauthDb().collection('schoolCodes').limit(1).get(),
+  );
+
+  const adminDb = authDb('admin_1');
+  await assertFails(
+    adminDb.collection('schoolCodes').doc('code_1').update({usageCount: 1}),
+  );
+  await assertFails(
+    adminDb.collection('schoolCodes').doc('code_2').set({
+      code: 'WEAK01', schoolId: 'school_1', schoolName: 'Lumi School',
+      usageCount: 0, createdBy: 'admin_1', isActive: true,
+      createdAt: new Date(),
+    }),
   );
 });
 
@@ -441,7 +457,7 @@ test('school counters: only role-aligned increments are allowed', async () => {
   );
 });
 
-test('studentLinkCodes: parent verification query is bounded and role writes are enforced', async () => {
+test('studentLinkCodes: verification and all mutations are server-owned', async () => {
   await seedData(async (db) => {
     await db.collection('schools').doc('school_1').set({
       name: 'Lumi School',
@@ -487,11 +503,20 @@ test('studentLinkCodes: parent verification query is bounded and role writes are
 
   const parentDb = authDb('parent_1');
 
-  await assertSucceeds(
+  await assertFails(
     parentDb.collection('studentLinkCodes').doc('code_doc_1').update({
       status: 'used',
       usedBy: 'parent_1',
       usedAt: new Date(),
+    }),
+  );
+
+  const adminDb = authDb('admin_1');
+  await assertFails(
+    adminDb.collection('studentLinkCodes').doc('new_code').set({
+      code: 'NEWW2345', schoolId: 'school_1', studentId: 'student_1',
+      status: 'active', createdBy: 'admin_1', createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 86400000),
     }),
   );
 });
@@ -535,6 +560,19 @@ test('schoolOnboarding: all client reads/writes are denied (callable/Admin SDK o
       createdAt: new Date(),
     }),
   );
+});
+
+test('public security counters and school-code redemptions are server-only', async () => {
+  const caller = authDb('attacker_1');
+  for (const collection of [
+    'publicCodeVerificationRateLimits',
+    'schoolCodeRedemptions',
+  ]) {
+    await assertFails(caller.collection(collection).doc('counter_1').get());
+    await assertFails(caller.collection(collection).doc('counter_1').set({
+      count: 0,
+    }));
+  }
 });
 
 test('books: teacher can read and write school-scoped books', async () => {

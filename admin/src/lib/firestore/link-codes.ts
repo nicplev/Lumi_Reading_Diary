@@ -1,6 +1,7 @@
 import "server-only";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import {randomInt} from "node:crypto";
 
 function toISO(ts: unknown): string {
   if (!ts || typeof ts !== "object") return "";
@@ -17,7 +18,7 @@ function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
   for (let i = 0; i < 8; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+    code += chars.charAt(randomInt(chars.length));
   }
   return code;
 }

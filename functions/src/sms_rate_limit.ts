@@ -8,10 +8,12 @@
  * resend timeout is the only other guard.
  *
  * Configurable via `/platformConfig/smsRateLimits` (super-admin tunable):
- *  - enabled: boolean — when false the gate fails open (no enforcement).
- *    Defaults to false so deploying this code alone is a no-op.
+ *  - enabled: boolean — defaults true. `false` is an explicit emergency
+ *    operational bypass and must never be the result of a missing document.
  *  - maxPerDay: number — per-phone-number cap inside a rolling 24h window.
  *    Defaults to 5; generous for normal use (signup is 1 SMS, MFA is 1).
+ *  - emergencyFailOpen: boolean — defaults false. When true, an internal
+ *    counter failure is logged but does not block SMS. Emergency use only.
  */
 
 import * as admin from "firebase-admin";
@@ -34,11 +36,12 @@ const E164_REGEX = /^\+[1-9]\d{7,14}$/;
 interface RateLimitConfig {
   enabled: boolean;
   maxPerDay: number;
+  emergencyFailOpen: boolean;
 }
 
 /**
- * Reads the super-admin tunable rate-limit config. Defaults `enabled` to
- * false so deploying the function before super-admin opt-in is a no-op.
+ * Reads the super-admin tunable rate-limit config. Missing/malformed config
+ * keeps the security gate enabled with conservative defaults.
  * @return {Promise<RateLimitConfig>} The current config.
  */
 async function readConfig(): Promise<RateLimitConfig> {
@@ -50,8 +53,9 @@ async function readConfig(): Promise<RateLimitConfig> {
       Math.floor(rawCap) :
       DEFAULT_MAX_PER_DAY;
   return {
-    enabled: data.enabled === true,
+    enabled: data.enabled !== false,
     maxPerDay,
+    emergencyFailOpen: data.emergencyFailOpen === true,
   };
 }
 
@@ -105,9 +109,15 @@ export const requestSmsVerification = onCall({
 
   const config = await readConfig();
   if (!config.enabled) {
-    // Gate is opted-out (the default). Fail open — don't block users
-    // while the rollout is still in monitoring mode.
-    return {ok: true, remainingToday: -1, gateEnabled: false};
+    functions.logger.warn(
+      "requestSmsVerification: emergency rate-limit bypass is active",
+    );
+    return {
+      ok: true,
+      remainingToday: -1,
+      gateEnabled: false,
+      emergencyBypass: true,
+    };
   }
 
   const db = admin.firestore();
@@ -156,10 +166,21 @@ export const requestSmsVerification = onCall({
       phoneTail: phone.slice(-4),
       error: err instanceof Error ? err.message : String(err),
     });
-    // Internal error in our own code shouldn't lock the user out — fall
-    // through and let the SMS attempt go through. If this becomes a
-    // pattern, flip the policy to closed.
-    return {ok: true, remainingToday: -1, gateEnabled: true, fallthrough: true};
+    if (config.emergencyFailOpen) {
+      functions.logger.warn(
+        "requestSmsVerification: emergency fail-open override used",
+      );
+      return {
+        ok: true,
+        remainingToday: -1,
+        gateEnabled: true,
+        emergencyBypass: true,
+      };
+    }
+    throw new HttpsError(
+      "unavailable",
+      "SMS verification is temporarily unavailable. Please try again shortly.",
+    );
   }
 
   if (!allowed) {

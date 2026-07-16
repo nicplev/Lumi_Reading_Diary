@@ -1,7 +1,9 @@
 import * as functions from "firebase-functions/v1";
 import {onCall, CallableOptions} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
+import * as crypto from "crypto";
 import {assertNotReadOnly} from "./read_only_guard";
+import {enforcePublicCodeRateLimit} from "./public_code_rate_limit";
 import {
   academicYearForDate,
   buildStudentAccess,
@@ -496,6 +498,7 @@ export const verifyStudentLinkCode = onCall(
   async (request) => {
     const data: {code?: unknown} = request.data;
     const codeUpper = asNonEmptyString(data?.code, "code").toUpperCase();
+    await enforcePublicCodeRateLimit("student", request);
     const best = await findBestCodeForString(codeUpper);
     if (!best) {
       throw failedPrecondition("invalid-code", "Link code not recognised.");
@@ -540,9 +543,7 @@ const LINK_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 function generateCandidateCode(): string {
   let s = "";
   for (let i = 0; i < 8; i++) {
-    s += LINK_CODE_ALPHABET.charAt(
-      Math.floor(Math.random() * LINK_CODE_ALPHABET.length)
-    );
+    s += LINK_CODE_ALPHABET.charAt(crypto.randomInt(LINK_CODE_ALPHABET.length));
   }
   return s;
 }
@@ -582,9 +583,9 @@ export const createCoParentInvite = onCall(
     const validityDays =
       typeof data.validityDays === "number" &&
       data.validityDays > 0 &&
-      data.validityDays <= 3650 ?
+      data.validityDays <= 30 ?
         Math.floor(data.validityDays) :
-        365;
+        7;
 
     await enforceRateLimit(uid);
 
