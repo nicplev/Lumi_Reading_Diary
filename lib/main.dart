@@ -61,6 +61,7 @@ void main() async {
     },
   );
 }
+
 /// The critical init chain. Idempotent so the [BootstrapErrorApp] retry can
 /// re-run it after a partial failure: Firebase.initializeApp is guarded on
 /// Firebase.apps, FirebaseService/NotificationService/Analytics guard
@@ -72,22 +73,22 @@ Future<void> _initializeCore() async {
 
   // Set preferred orientations (mobile only)
   if (!kIsWeb) {
-        await SystemChrome.setPreferredOrientations([
-          DeviceOrientation.portraitUp,
-          DeviceOrientation.portraitDown,
-        ]);
-      }
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+  }
 
-      // Initialize Hive for local storage
-      await Hive.initFlutter();
+  // Initialize Hive for local storage
+  await Hive.initFlutter();
 
-      // Initialize teacher device book cache (Hive-backed, persists across sessions).
-      // Non-fatal if it fails — lookups fall back to Firestore/API chain.
-      try {
-        await TeacherDeviceBookCacheService.instance.initialize();
-      } catch (e) {
-        debugPrint('Warning: Teacher device book cache init failed: $e');
-      }
+  // Initialize teacher device book cache (Hive-backed, persists across sessions).
+  // Non-fatal if it fails — lookups fall back to Firestore/API chain.
+  try {
+    await TeacherDeviceBookCacheService.instance.initialize();
+  } catch (e) {
+    debugPrint('Warning: Teacher device book cache init failed: $e');
+  }
 
   // Initialize Firebase with platform-specific options (guarded so a
   // bootstrap retry after a later-step failure doesn't double-initialize).
@@ -95,6 +96,19 @@ Future<void> _initializeCore() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+  }
+
+  // Physical-device security tests may reinstall over an iOS Keychain-backed
+  // Firebase session. This opt-in debug flag removes that restored session and
+  // its Firestore cache before any application listener can mount. It is
+  // ignored in profile/release builds.
+  const forceDebugSignOut = bool.fromEnvironment(
+    'LUMI_FORCE_DEBUG_SIGN_OUT_ON_START',
+  );
+  if (kDebugMode && forceDebugSignOut) {
+    await FirebaseAuth.instance.signOut();
+    await FirebaseFirestore.instance.clearPersistence();
+    debugPrint('bootstrap: forced debug sign-out and cleared Firestore cache');
   }
 
   // If a previous sign-out flagged the Firestore cache for clearing, do it now
@@ -109,7 +123,8 @@ Future<void> _initializeCore() async {
     if (prefs.getBool(FirebaseService.firestoreClearPendingKey) ?? false) {
       await FirebaseFirestore.instance.clearPersistence();
       await prefs.remove(FirebaseService.firestoreClearPendingKey);
-      debugPrint('bootstrap: cleared Firestore persistence from prior sign-out');
+      debugPrint(
+          'bootstrap: cleared Firestore persistence from prior sign-out');
     }
   } catch (e) {
     // Non-fatal — worst case the cache survives to the next launch, which is
@@ -117,121 +132,121 @@ Future<void> _initializeCore() async {
     debugPrint('bootstrap: deferred Firestore clear skipped: $e');
   }
 
-      // OPT-IN: skip phone app-verification so configured Firebase test numbers
-      // (e.g. +61400000000 → 123456) sign in directly on the iOS Simulator,
-      // which can't receive the silent push used for real app-verification.
-      //
-      // CRITICAL — off by default. With this on, ONLY console test numbers work;
-      // a real number fails with `missing-client-identifier`. The previous
-      // `if (kDebugMode)` guard applied it to EVERY debug build, so a debug
-      // build sideloaded onto a real phone couldn't sign up with a real number.
-      // A physical device (even a debug build) does app-verification for real,
-      // so it must stay on. Enable for simulator/test-number runs only with:
-      //   flutter run --dart-define=LUMI_DISABLE_APP_VERIFICATION=true
-      // NEVER put this in .dart_define.json (that file feeds release builds).
-      const disableAppVerification =
-          bool.fromEnvironment('LUMI_DISABLE_APP_VERIFICATION');
-      if (kDebugMode && !kIsWeb && disableAppVerification) {
-        try {
-          await FirebaseAuth.instance
-              .setSettings(appVerificationDisabledForTesting: true);
-          debugPrint('[phone-auth] app verification disabled for testing');
-        } catch (e) {
-          debugPrint('Warning: phone-auth test settings not applied: $e');
-        }
-      }
+  // OPT-IN: skip phone app-verification so configured Firebase test numbers
+  // (e.g. +61400000000 → 123456) sign in directly on the iOS Simulator,
+  // which can't receive the silent push used for real app-verification.
+  //
+  // CRITICAL — off by default. With this on, ONLY console test numbers work;
+  // a real number fails with `missing-client-identifier`. The previous
+  // `if (kDebugMode)` guard applied it to EVERY debug build, so a debug
+  // build sideloaded onto a real phone couldn't sign up with a real number.
+  // A physical device (even a debug build) does app-verification for real,
+  // so it must stay on. Enable for simulator/test-number runs only with:
+  //   flutter run --dart-define=LUMI_DISABLE_APP_VERIFICATION=true
+  // NEVER put this in .dart_define.json (that file feeds release builds).
+  const disableAppVerification =
+      bool.fromEnvironment('LUMI_DISABLE_APP_VERIFICATION');
+  if (kDebugMode && !kIsWeb && disableAppVerification) {
+    try {
+      await FirebaseAuth.instance
+          .setSettings(appVerificationDisabledForTesting: true);
+      debugPrint('[phone-auth] app verification disabled for testing');
+    } catch (e) {
+      debugPrint('Warning: phone-auth test settings not applied: $e');
+    }
+  }
 
-      // Activate App Check before any other Firebase SDK calls so attested
-      // requests include the token from the very first ID-token mint.
-      // No-op unless built with --dart-define=LUMI_APP_CHECK_ENABLED=true.
-      await AppCheckService.initialize();
+  // Activate App Check before any other Firebase SDK calls so attested
+  // requests include the token from the very first ID-token mint.
+  // No-op unless built with --dart-define=LUMI_APP_CHECK_ENABLED=true.
+  await AppCheckService.initialize();
 
-      // Optional diagnostics are fail-closed and device-local. A missing or
-      // unreadable preference means both SDKs stay disabled.
-      DiagnosticsPreferences diagnosticsPreferences;
-      try {
-        diagnosticsPreferences =
-            await DiagnosticsPreferencesService.instance.load();
-      } catch (e) {
-        debugPrint('Warning: diagnostics preferences unavailable: $e');
-        diagnosticsPreferences = const DiagnosticsPreferences(
-          analyticsEnabled: false,
-          crashReportsEnabled: false,
-        );
-      }
+  // Optional diagnostics are fail-closed and device-local. A missing or
+  // unreadable preference means both SDKs stay disabled.
+  DiagnosticsPreferences diagnosticsPreferences;
+  try {
+    diagnosticsPreferences =
+        await DiagnosticsPreferencesService.instance.load();
+  } catch (e) {
+    debugPrint('Warning: diagnostics preferences unavailable: $e');
+    diagnosticsPreferences = const DiagnosticsPreferences(
+      analyticsEnabled: false,
+      crashReportsEnabled: false,
+    );
+  }
 
-      // Apply the choices immediately after Firebase/App Check startup. Native
-      // mobile defaults are also off, so a fresh install cannot race this gate.
-      await CrashReportingService.instance.initialize(
-        collectionEnabled: diagnosticsPreferences.crashReportsEnabled,
-      );
-      await AnalyticsService.instance.initialize(
-        collectionEnabled: diagnosticsPreferences.analyticsEnabled,
-      );
+  // Apply the choices immediately after Firebase/App Check startup. Native
+  // mobile defaults are also off, so a fresh install cannot race this gate.
+  await CrashReportingService.instance.initialize(
+    collectionEnabled: diagnosticsPreferences.crashReportsEnabled,
+  );
+  await AnalyticsService.instance.initialize(
+    collectionEnabled: diagnosticsPreferences.analyticsEnabled,
+  );
 
-      // Initialize Firebase services
-      await FirebaseService.instance.initialize();
+  // Initialize Firebase services
+  await FirebaseService.instance.initialize();
 
-      // Bring up the phone-verification recovery store before any auth UI
-      // mounts. It needs to be ready before the splash screen runs its
-      // peek check, and before the registration/login screens can install
-      // the `codeSent` persistence callbacks.
-      try {
-        await PhoneVerificationRecoveryService.instance.initialize();
-      } catch (e) {
-        debugPrint('Warning: PhoneVerificationRecoveryService init failed: $e');
-      }
+  // Bring up the phone-verification recovery store before any auth UI
+  // mounts. It needs to be ready before the splash screen runs its
+  // peek check, and before the registration/login screens can install
+  // the `codeSent` persistence callbacks.
+  try {
+    await PhoneVerificationRecoveryService.instance.initialize();
+  } catch (e) {
+    debugPrint('Warning: PhoneVerificationRecoveryService init failed: $e');
+  }
 
-      // Kick off the dev-access listener so the flag is hot by the time
-      // the login screen (or any DEV-gated surface) reads it.
-      DevAccessService.instance;
+  // Kick off the dev-access listener so the flag is hot by the time
+  // the login screen (or any DEV-gated surface) reads it.
+  DevAccessService.instance;
 
-      // Initialize notification service (local notifications, FCM, timezone data)
-      await NotificationService.instance.initialize();
+  // Initialize notification service (local notifications, FCM, timezone data)
+  await NotificationService.instance.initialize();
 
-      // Initialize iOS home screen widget data bridge
-      await WidgetDataService.initialize();
+  // Initialize iOS home screen widget data bridge
+  await WidgetDataService.initialize();
 
-      // Bring up the layered service-status probe before any UI mounts so
-      // the first probe is already in flight by the time the splash screen
-      // renders. Non-fatal — the controller defaults to `unknown` on
-      // failure and the banner suppresses itself.
-      try {
-        await ServiceStatusController.instance.initialize();
-      } catch (e) {
-        debugPrint('Warning: ServiceStatusController init failed: $e');
-      }
+  // Bring up the layered service-status probe before any UI mounts so
+  // the first probe is already in flight by the time the splash screen
+  // renders. Non-fatal — the controller defaults to `unknown` on
+  // failure and the banner suppresses itself.
+  try {
+    await ServiceStatusController.instance.initialize();
+  } catch (e) {
+    debugPrint('Warning: ServiceStatusController init failed: $e');
+  }
 
-      // Bring up the offline sync service: open its Hive boxes and load any
-      // writes queued during a prior offline session so they start draining.
-      // Without this the offline-fallback path (saveReadingLogLocally) throws
-      // a LateInitializationError and the write is lost — the root cause of
-      // "logged offline but never synced." Non-fatal; runs after Firebase and
-      // the status controller so the first drain has both available.
-      try {
-        await OfflineService.instance.initialize();
-        // Register the offline allocation-assignment replay: queued classroom
-        // scans drain by re-running the assignment transaction online (the
-        // dependency is inverted so OfflineService doesn't import the feature).
-        OfflineService.instance.registerAllocationReplay(
-          (data) => IsbnAssignmentService().replayQueuedAssignment(data),
-        );
-      } catch (e) {
-        debugPrint('Warning: OfflineService init failed: $e');
-      }
+  // Bring up the offline sync service: open its Hive boxes and load any
+  // writes queued during a prior offline session so they start draining.
+  // Without this the offline-fallback path (saveReadingLogLocally) throws
+  // a LateInitializationError and the write is lost — the root cause of
+  // "logged offline but never synced." Non-fatal; runs after Firebase and
+  // the status controller so the first drain has both available.
+  try {
+    await OfflineService.instance.initialize();
+    // Register the offline allocation-assignment replay: queued classroom
+    // scans drain by re-running the assignment transaction online (the
+    // dependency is inverted so OfflineService doesn't import the feature).
+    OfflineService.instance.registerAllocationReplay(
+      (data) => IsbnAssignmentService().replayQueuedAssignment(data),
+    );
+  } catch (e) {
+    debugPrint('Warning: OfflineService init failed: $e');
+  }
 
-      // Bring up the out-of-band remote-message client. No-op unless
-      // `LUMI_STATUS_WORKER_URL` was supplied at build time.
-      if (isRemoteMessageConfigured) {
-        try {
-          await RemoteMessageController.instance.initialize();
-        } catch (e) {
-          debugPrint('Warning: RemoteMessageController init failed: $e');
-        }
-      }
+  // Bring up the out-of-band remote-message client. No-op unless
+  // `LUMI_STATUS_WORKER_URL` was supplied at build time.
+  if (isRemoteMessageConfigured) {
+    try {
+      await RemoteMessageController.instance.initialize();
+    } catch (e) {
+      debugPrint('Warning: RemoteMessageController init failed: $e');
+    }
+  }
 
-      // Configure Flutter Animate
-      Animate.restartOnHotReload = true;
+  // Configure Flutter Animate
+  Animate.restartOnHotReload = true;
 }
 
 /// Minimal fallback app shown when the critical bootstrap throws — no
@@ -300,8 +315,7 @@ class _BootstrapErrorAppState extends State<BootstrapErrorApp> {
                       'Something went wrong while starting up. Check your '
                       'connection and try again — if it keeps happening, '
                       'restart the app.',
-                      style:
-                          TextStyle(fontSize: 15, color: Color(0xFF6B6B6B)),
+                      style: TextStyle(fontSize: 15, color: Color(0xFF6B6B6B)),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 12),
@@ -320,8 +334,7 @@ class _BootstrapErrorAppState extends State<BootstrapErrorApp> {
                           ? const SizedBox(
                               width: 16,
                               height: 16,
-                              child:
-                                  CircularProgressIndicator(strokeWidth: 2),
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.refresh_rounded),
                       label: Text(_retrying ? 'Retrying…' : 'Try again'),

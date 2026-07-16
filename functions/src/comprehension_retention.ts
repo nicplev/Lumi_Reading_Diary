@@ -48,6 +48,30 @@ const AUDIO_CONFIRM_CALLABLE_OPTIONS = {
   consumeAppCheckToken: COMPREHENSION_AUDIO_APP_CHECK_ENFORCED,
 };
 
+type AudioAppCheckRequest = {
+  app?: {alreadyConsumed?: boolean};
+};
+
+/**
+ * Reject replayed limited-use App Check tokens while enforcement is live.
+ * @param {AudioAppCheckRequest} request Callable request attestation state.
+ * @param {boolean} enforcementEnabled Active rollout state; injectable in tests.
+ */
+export function assertFreshAudioAppCheckToken(
+  request: AudioAppCheckRequest,
+  enforcementEnabled = COMPREHENSION_AUDIO_APP_CHECK_ENFORCED
+): void {
+  if (
+    enforcementEnabled &&
+    request.app?.alreadyConsumed === true
+  ) {
+    throw new HttpsError(
+      "failed-precondition",
+      "The App Check token has already been used"
+    );
+  }
+}
+
 const AUDIO_VALIDATOR_FUNCTION_NAME = "validateComprehensionAudioMedia";
 const AUDIO_VALIDATOR_REGION = "australia-southeast1";
 const AUDIO_VALIDATOR_SERVICE_ACCOUNT =
@@ -694,6 +718,7 @@ export const confirmComprehensionAudioUpload = onCall(
   AUDIO_CONFIRM_CALLABLE_OPTIONS,
   async (request) => {
     const data: ConfirmUploadInput = request.data;
+    assertFreshAudioAppCheckToken(request);
     assertNotReadOnly(request);
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
@@ -974,6 +999,7 @@ export const deleteComprehensionAudio = onCall(
   AUDIO_CALLABLE_OPTIONS,
   async (request) => {
     const data: DeleteOneInput = request.data;
+    assertFreshAudioAppCheckToken(request);
     assertNotReadOnly(request);
     const uid = request.auth?.uid;
     if (!uid) {
@@ -1088,6 +1114,7 @@ export const getComprehensionAudioUrl = onCall(
   AUDIO_CALLABLE_OPTIONS,
   async (request) => {
     const data: AudioUrlInput = request.data;
+    assertFreshAudioAppCheckToken(request);
     const uid = request.auth?.uid;
     if (!uid) {
       throw new HttpsError(

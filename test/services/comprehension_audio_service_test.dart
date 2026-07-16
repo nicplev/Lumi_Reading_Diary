@@ -3,10 +3,16 @@ import 'package:lumi_reading_tracker/services/comprehension_audio_service.dart';
 
 class _Invoker {
   final calls = <String, List<Map<String, dynamic>>>{};
+  final limitedUseAppCheck = <String, List<bool>>{};
   Object? response;
 
-  Future<Object?> call(String name, Map<String, dynamic> arguments) async {
+  Future<Object?> call(
+    String name,
+    Map<String, dynamic> arguments, {
+    required bool limitedUseAppCheckToken,
+  }) async {
     calls.putIfAbsent(name, () => []).add(arguments);
+    limitedUseAppCheck.putIfAbsent(name, () => []).add(limitedUseAppCheckToken);
     return response;
   }
 }
@@ -25,6 +31,8 @@ void main() {
     expect(invoker.calls['confirmComprehensionAudioUpload'], [
       {'schoolId': 'school_x', 'logId': 'log_x', 'durationSec': 12}
     ]);
+    expect(
+        invoker.limitedUseAppCheck['confirmComprehensionAudioUpload'], [true]);
   });
 
   test('delete audio returns the server idempotency result', () async {
@@ -39,6 +47,7 @@ void main() {
     expect(invoker.calls['deleteComprehensionAudio'], [
       {'schoolId': 'school_x', 'logId': 'log_x'}
     ]);
+    expect(invoker.limitedUseAppCheck['deleteComprehensionAudio'], [true]);
   });
 
   test('playback URL and lifetime are parsed from the callable', () async {
@@ -56,6 +65,7 @@ void main() {
     expect(invoker.calls['getComprehensionAudioUrl'], [
       {'schoolId': 'school_x', 'logId': 'log_x'}
     ]);
+    expect(invoker.limitedUseAppCheck['getComprehensionAudioUrl'], [true]);
   });
 
   test('invalid playback response fails closed', () async {
