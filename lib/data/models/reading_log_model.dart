@@ -261,8 +261,8 @@ class ReadingLogModel {
       'lastCommentAt':
           lastCommentAt != null ? Timestamp.fromDate(lastCommentAt!) : null,
       'lastCommentByRole': lastCommentByRole,
-      'commentsViewedAt': commentsViewedAt
-          .map((k, v) => MapEntry(k, Timestamp.fromDate(v))),
+      'commentsViewedAt':
+          commentsViewedAt.map((k, v) => MapEntry(k, Timestamp.fromDate(v))),
       'loggedByName': loggedByName,
       'loggedByLabel': loggedByLabel,
       'loggedByRole': loggedByRole?.toString().split('.').last,
@@ -393,6 +393,19 @@ class ReadingLogModel {
   }
 
   factory ReadingLogModel.fromLocal(Map<String, dynamic> map) {
+    final viewedAt = <String, DateTime>{};
+    final rawViewedAt = map['commentsViewedAt'];
+    if (rawViewedAt is Map) {
+      for (final entry in rawViewedAt.entries) {
+        final key = entry.key;
+        final value = entry.value;
+        if (key is! String || value is! String) continue;
+        final parsed = DateTime.tryParse(value);
+        if (parsed != null) viewedAt[key] = parsed;
+      }
+    }
+    final rawMetadata = map['metadata'];
+
     return ReadingLogModel(
       id: map['id'] ?? '',
       studentId: map['studentId'] ?? '',
@@ -415,7 +428,8 @@ class ReadingLogModel {
       syncedAt:
           map['syncedAt'] != null ? DateTime.parse(map['syncedAt']) : null,
       allocationId: map['allocationId'],
-      metadata: map['metadata'],
+      metadata:
+          rawMetadata is Map ? Map<String, dynamic>.from(rawMetadata) : null,
       childFeeling: map['childFeeling'] != null
           ? ReadingFeeling.values.firstWhere(
               (e) => e.toString() == 'ReadingFeeling.${map['childFeeling']}',
@@ -436,9 +450,7 @@ class ReadingLogModel {
           ? DateTime.parse(map['lastCommentAt'])
           : null,
       lastCommentByRole: map['lastCommentByRole'],
-      commentsViewedAt: (map['commentsViewedAt'] as Map<String, dynamic>?)
-              ?.map((k, v) => MapEntry(k, DateTime.parse(v as String))) ??
-          const {},
+      commentsViewedAt: viewedAt,
       loggedByName: map['loggedByName'],
       loggedByLabel: map['loggedByLabel'],
       loggedByRole: map['loggedByRole'] != null

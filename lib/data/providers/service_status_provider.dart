@@ -37,8 +37,7 @@ final pendingSyncCountProvider = StreamProvider<int>((ref) async* {
 });
 
 /// Live list of pending syncs for the detail sheet.
-final pendingSyncListProvider =
-    StreamProvider<List<PendingSync>>((ref) async* {
+final pendingSyncListProvider = StreamProvider<List<PendingSync>>((ref) async* {
   final service = OfflineService.instance;
   yield service.pendingSyncs;
   yield* service.queueStream;
@@ -67,6 +66,7 @@ class PendingSyncHealth {
   final DateTime? oldestPendingAt;
 
   bool get hasNeedsAttention => needsAttentionCount > 0;
+  bool get hasPending => total > 0;
 
   Duration? get oldestAge => oldestPendingAt == null
       ? null
@@ -82,6 +82,10 @@ class PendingSyncHealth {
   /// queue has been stuck for too long — surfaced even on a healthy
   /// connection, which the connectivity banner alone would hide.
   bool get shouldEscalate => hasNeedsAttention || isStale;
+
+  /// Keep every unsynced write visible, even when Firebase is reachable.
+  /// A healthy connection does not mean the queue itself is empty.
+  bool get shouldSurface => hasPending;
 }
 
 PendingSyncHealth _healthFrom(List<PendingSync> queue) {
@@ -99,7 +103,8 @@ PendingSyncHealth _healthFrom(List<PendingSync> queue) {
 }
 
 /// Live [PendingSyncHealth] derived from the queue stream.
-final pendingSyncHealthProvider = StreamProvider<PendingSyncHealth>((ref) async* {
+final pendingSyncHealthProvider =
+    StreamProvider<PendingSyncHealth>((ref) async* {
   final service = OfflineService.instance;
   yield _healthFrom(service.pendingSyncs);
   yield* service.queueStream.map(_healthFrom);

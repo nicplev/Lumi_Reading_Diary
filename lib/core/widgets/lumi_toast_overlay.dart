@@ -47,12 +47,12 @@ class _LumiToastOverlayState extends ConsumerState<LumiToastOverlay> {
     final toasts = _controller.toasts;
 
     // The service-status banner floats in the same top slot. When it (or the
-    // stale-queue escalation) is showing, drop the toast column below it so the
+    // pending-queue notice) is showing, drop the toast column below it so the
     // two never overlap.
     final snapshot = ref.watch(serviceStatusProvider).value;
     final health = ref.watch(pendingSyncHealthProvider).value;
-    final bannerShowing =
-        (snapshot?.shouldShowBanner ?? false) || (health?.shouldEscalate ?? false);
+    final bannerShowing = (snapshot?.shouldShowBanner ?? false) ||
+        (health?.shouldSurface ?? false);
 
     return Stack(
       children: [
