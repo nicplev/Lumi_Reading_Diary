@@ -1,18 +1,36 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const path = require('node:path');
 
 // Built to lib/ by `npm run build`.
 const {
   audioPathMustBeQuarantined,
   comprehensionAudioObjectPath,
+  comprehensionAudioUploadObjectPath,
   hasIsoMediaFtypSignature,
   teacherIsAssignedToClassData,
 } = require('../lib/comprehension_retention.js');
+const {
+  AudioMediaValidationError,
+  validateAndTranscodeAudioBuffer,
+} = require('../lib/audio_media_validation.js');
 
 test('audio object path is derived only from school and log ids', () => {
   assert.equal(
     comprehensionAudioObjectPath('school_x', 'log_123'),
     'schools/school_x/comprehension_audio/log_123.m4a',
+  );
+});
+
+test('untrusted and canonical audio paths are separate', () => {
+  assert.equal(
+    comprehensionAudioUploadObjectPath('school_x', 'log_123'),
+    'comprehension_audio_uploads/school_x/log_123.m4a',
+  );
+  assert.notEqual(
+    comprehensionAudioUploadObjectPath('school_x', 'log_123'),
+    comprehensionAudioObjectPath('school_x', 'log_123'),
   );
 });
 
@@ -42,6 +60,39 @@ test('audio receipt accepts an ISO media ftyp header and rejects MIME-only junk'
   wrongBox.writeUInt32BE(16, 0);
   wrongBox.write('free', 4, 'ascii');
   assert.equal(hasIsoMediaFtypSignature(wrongBox), false);
+});
+
+test('server media validator fully decodes and canonicalises real m4a audio', async () => {
+  const input = await fs.readFile(
+    path.join(__dirname, 'fixtures', 'valid-tone.m4a'),
+  );
+  const result = await validateAndTranscodeAudioBuffer(input);
+
+  assert.ok(result.durationMs >= 1100 && result.durationMs <= 1300);
+  assert.equal(result.sizeBytes, result.bytes.length);
+  assert.match(result.sha256, /^[a-f0-9]{64}$/);
+  assert.equal(result.bytes.toString('ascii', 4, 8), 'ftyp');
+});
+
+test('server media validator rejects truncated ftyp-only bytes', async () => {
+  const fake = Buffer.alloc(32);
+  fake.writeUInt32BE(32, 0);
+  fake.write('ftyp', 4, 'ascii');
+  fake.write('M4A ', 8, 'ascii');
+  await assert.rejects(
+    validateAndTranscodeAudioBuffer(fake),
+    (error) => error instanceof AudioMediaValidationError,
+  );
+});
+
+test('server media validator rejects audio beyond the 60 second bound', async () => {
+  const input = await fs.readFile(
+    path.join(__dirname, 'fixtures', 'too-long.m4a'),
+  );
+  await assert.rejects(
+    validateAndTranscodeAudioBuffer(input),
+    (error) => error instanceof AudioMediaValidationError,
+  );
 });
 
 test('audio access recognises only the assigned teacher or co-teacher', () => {

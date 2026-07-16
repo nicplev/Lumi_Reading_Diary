@@ -3101,6 +3101,11 @@ test('readingLogs: parent cannot mutate identity, system, status, validation, st
     { comprehensionAudioPath: 'schools/school_other/comprehension_audio/victim.m4a' },
     { comprehensionAudioDurationSec: 60 },
     { comprehensionAudioUploaded: true },
+    { comprehensionAudioObjectGeneration: '123456' },
+    { comprehensionAudioSourceGeneration: '654321' },
+    { comprehensionAudioValidationVersion: 'forged' },
+    { comprehensionAudioValidatedDurationMs: 60000 },
+    { comprehensionAudioSha256: '0'.repeat(64) },
   ];
   for (const patch of forbiddenPatches) {
     await assertFails(ref.update(patch));

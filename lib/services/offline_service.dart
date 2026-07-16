@@ -1148,7 +1148,7 @@ class OfflineService with WidgetsBindingObserver {
     }
 
     final expectedStoragePath =
-        'schools/$schoolId/comprehension_audio/$logId.m4a';
+        'comprehension_audio_uploads/$schoolId/$logId.m4a';
     if (storagePath != expectedStoragePath) {
       throw Exception('Non-canonical comprehension audio path');
     }

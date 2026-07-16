@@ -9,6 +9,10 @@ test('comprehension audio maps to its school', () => {
     classifyObject('schools/abc123/comprehension_audio/log456.m4a'),
     { category: 'comprehensionAudio', schoolId: 'abc123' },
   );
+  assert.deepEqual(
+    classifyObject('comprehension_audio_uploads/abc123/log456.m4a'),
+    { category: 'comprehensionAudio', schoolId: 'abc123' },
+  );
 });
 
 test('flutter community-book covers', () => {

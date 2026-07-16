@@ -81,6 +81,10 @@ test('account cascade removes identity while preserving deidentified school read
     `schools/${school.id}/comprehension_audio/log_1.m4a`
   );
   await audio.save(Buffer.from('voice'));
+  const pendingAudio = admin.storage().bucket().file(
+    `comprehension_audio_uploads/${school.id}/log_1.m4a`
+  );
+  await pendingAudio.save(Buffer.from('untrusted voice'));
 
   await deleteAccountData(uid);
 
@@ -100,6 +104,7 @@ test('account cascade removes identity while preserving deidentified school read
   assert.equal((await log.collection('comments').doc('mine').get()).exists, false);
   assert.equal((await log.collection('comments').doc('teacher').get()).exists, true);
   assert.equal((await audio.exists())[0], false);
+  assert.equal((await pendingAudio.exists())[0], false);
   assert.equal((await db.collection('feedback').doc('feedback_1').get()).exists, false);
   assert.equal((await db.collection('userSchoolIndex').doc('index_1').get()).exists, false);
   assert.equal((await db.collection('users').doc(uid).get()).exists, false);
@@ -145,12 +150,17 @@ test('student cascade removes the profile, history, audio and every linked roste
     `schools/${school.id}/comprehension_audio/log_student.m4a`
   );
   await audio.save(Buffer.from('voice'));
+  const pendingAudio = admin.storage().bucket().file(
+    `comprehension_audio_uploads/${school.id}/log_student.m4a`
+  );
+  await pendingAudio.save(Buffer.from('untrusted voice'));
 
   await deleteStudentData(school.id, studentId);
 
   assert.equal((await student.get()).exists, false);
   assert.equal((await log.get()).exists, false);
   assert.equal((await audio.exists())[0], false);
+  assert.equal((await pendingAudio.exists())[0], false);
   assert.deepEqual((await school.collection('parents').doc('parent_1').get()).data().linkedChildren, []);
   assert.deepEqual((await school.collection('classes').doc('class_1').get()).data().studentIds, []);
   const group = (await school.collection('readingGroups').doc('group_1').get()).data();

@@ -28,7 +28,8 @@ service firebase.storage {
           fileName == logId + '.m4a' &&
           log.data.schoolId == schoolId &&
           log.data.parentId == request.auth.uid &&
-          log.data.get('loggedByRole', 'parent') != 'teacher';
+          log.data.get('loggedByRole', 'parent') != 'teacher' &&
+          log.data.get('comprehensionAudioUploaded', false) != true;
     }
 
     // Community book covers: any authenticated user can read.
@@ -50,40 +51,25 @@ service firebase.storage {
                    && request.resource.contentType == 'image/jpeg';
     }
 
-    // Comprehension voice recordings: short m4a clips recorded by children
-    // at the end of the parent's reading-log wizard, played back by
-    // teachers on the student detail screen.
-    //
-    // Read: any authenticated user; role-based access is enforced at the
-    // Firestore layer when reading the corresponding reading-log doc.
-    // Create/update: <2MB, audio/* content type. Role authorization
-    // piggybacks on the parent's Firestore log update (same pattern as
-    // community book covers).
-    //
-    // The platformConfig/comprehensionRecording kill switch is enforced
-    // app-side via PlatformConfigService.isComprehensionRecordingEnabled().
-    // Storage-rules cross-service Firestore calls were also enforcing it
-    // here, but those silently failed under lumi-ninc-au (no comprehension
-    // audio ever uploaded after the AU migration) — every upload returned
-    // firebase_storage/unauthorized. App-side enforcement is the source of
-    // truth; the storage rule trusts auth + size + contentType.
-    match /schools/{schoolId}/comprehension_audio/{fileName} {
-      // NOT client-readable (2.2). A child's voice is PII at rest; the old
-      // `read: if request.auth != null` let ANY authed user fetch ANY child's
-      // recording given the path. Playback now goes through the
-      // `getComprehensionAudioUrl` callable, which authorizes the caller against
-      // the log's school and returns a short-lived signed URL (signed URLs
-      // bypass these rules). GATED: deploy only once the app build that fetches
-      // via the callable is adopted — older installs still read directly.
+    // Client holding area for untrusted comprehension recordings. The parent
+    // may create/retry only the pending object bound to their own reading log.
+    // The backend fully decodes/transcodes it, writes the separate canonical
+    // playback object with Admin credentials, then deletes this pending copy.
+    match /comprehension_audio_uploads/{schoolId}/{fileName} {
       allow read: if false;
-
-      // Create and retry-overwrite use the same canonical owner check. Deletes
-      // have request.resource == null and therefore remain Admin-SDK only.
       allow write: if request.resource != null
                    && ownsAudioLog(schoolId, fileName)
                    && comprehensionRecordingEnabled()
                    && request.resource.size < 2 * 1024 * 1024
                    && request.resource.contentType == 'audio/mp4';
+    }
+
+    // Trusted, server-produced playback objects. No client may create,
+    // overwrite, read or delete these bytes. Teacher playback is exclusively
+    // through the class-scoped signed-URL callable.
+    match /schools/{schoolId}/comprehension_audio/{fileName} {
+      allow read: if false;
+      allow write: if false;
     }
 
     // Default deny for all other paths.

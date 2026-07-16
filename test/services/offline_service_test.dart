@@ -502,7 +502,7 @@ void main() {
           schoolId: 'school-1',
           studentId: 'student-1',
           storagePath:
-              'schools/school-1/comprehension_audio/log-audio-copy.m4a',
+              'comprehension_audio_uploads/school-1/log-audio-copy.m4a',
           localFilePath: source.path,
           durationSec: 12,
         );
@@ -531,7 +531,7 @@ void main() {
           schoolId: 'school-1',
           studentId: 'student-1',
           storagePath:
-              'schools/school-1/comprehension_audio/log-audio-dismiss.m4a',
+              'comprehension_audio_uploads/school-1/log-audio-dismiss.m4a',
           localFilePath: source.path,
           durationSec: 8,
         );
@@ -552,7 +552,7 @@ void main() {
           schoolId: 'school-1',
           studentId: 'student-1',
           storagePath:
-              'schools/school-1/comprehension_audio/log-audio-missing.m4a',
+              'comprehension_audio_uploads/school-1/log-audio-missing.m4a',
           localFilePath: '${testDirectory.path}/does-not-exist.m4a',
           durationSec: 5,
         );
@@ -576,7 +576,7 @@ void main() {
           schoolId: 'school-1',
           studentId: 'student-1',
           storagePath:
-              'schools/school-1/comprehension_audio/log-audio-synced.m4a',
+              'comprehension_audio_uploads/school-1/log-audio-synced.m4a',
           localFilePath: source.path,
           durationSec: 9,
         );
@@ -658,7 +658,8 @@ void main() {
         await offlineService.triggerSync();
 
         expect(offlineService.pendingSyncs, isEmpty);
-        final commentDoc = await logRef.collection('comments').doc('cmt-1').get();
+        final commentDoc =
+            await logRef.collection('comments').doc('cmt-1').get();
         expect(commentDoc.exists, isTrue);
         expect(commentDoc.data()!['body'], 'Thank you!');
         expect(commentDoc.data()!['authorRole'], 'parent');
@@ -714,7 +715,11 @@ void main() {
           studentId: 'student-1',
           teacherId: 'teacher-1',
           books: [
-            {'isbn': '9781234567890', 'title': 'A Book', 'resolvedFromCatalog': true},
+            {
+              'isbn': '9781234567890',
+              'title': 'A Book',
+              'resolvedFromCatalog': true
+            },
           ],
           targetMinutes: 20,
           sessionId: 'sess-1',
@@ -733,7 +738,8 @@ void main() {
         expect(replayed!['renewedIsbns'], contains('9781234567890'));
       });
 
-      test('queued allocation is retried (not parked) when no replay registered',
+      test(
+          'queued allocation is retried (not parked) when no replay registered',
           () async {
         offlineService.firestoreForTest = FakeFirebaseFirestore();
         goHealthy();
@@ -765,7 +771,8 @@ void main() {
           () async {
         goHealthy();
         offlineService.syncOneOverrideForTest = (_) async {
-          throw FirebaseException(plugin: 'cloud_firestore', code: 'unavailable');
+          throw FirebaseException(
+              plugin: 'cloud_firestore', code: 'unavailable');
         };
 
         await offlineService.saveReadingLogLocally(_log('rl-transient'));

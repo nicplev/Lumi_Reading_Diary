@@ -160,9 +160,11 @@ export {submitDemoRequest, submitContactSalesInquiry} from "./marketing_leads";
 // functions/src/comprehension_retention.ts.
 export {
   cleanupComprehensionAudio,
+  cleanupPendingComprehensionAudio,
   confirmComprehensionAudioUpload,
   deleteComprehensionAudio,
   getComprehensionAudioUrl,
+  validateComprehensionAudioMedia,
 } from "./comprehension_retention";
 
 // Idempotent account/student deletion jobs. All destructive work runs through

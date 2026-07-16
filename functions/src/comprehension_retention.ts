@@ -8,12 +8,22 @@
 // Mirrors the scheduled-pubsub pattern used by impersonation.ts:849.
 
 import * as functions from "firebase-functions/v1";
-import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
 import {FieldValue, Timestamp} from "firebase-admin/firestore";
+import {createHash} from "node:crypto";
+import {GoogleAuth, IdTokenClient} from "google-auth-library";
 import {assertNotReadOnly} from "./read_only_guard";
 import {recordCronRun} from "./ops_heartbeat";
+import {
+  AUDIO_VALIDATION_VERSION,
+  AudioMediaValidationError,
+  MAX_TRANSCODED_AUDIO_BYTES,
+  MAX_UNTRUSTED_AUDIO_BYTES,
+  validateAndTranscodeAudioBuffer,
+  type ValidatedAudioBuffer,
+} from "./audio_media_validation";
 
 const RETENTION_DOC = "platformConfig/comprehensionRetention";
 const RECORDING_FLAG_DOC = "platformConfig/comprehensionRecording";
@@ -28,6 +38,26 @@ const AUDIO_CALLABLE_OPTIONS = {
   enforceAppCheck: COMPREHENSION_AUDIO_APP_CHECK_ENFORCED,
   consumeAppCheckToken: COMPREHENSION_AUDIO_APP_CHECK_ENFORCED,
 };
+
+const AUDIO_CONFIRM_CALLABLE_OPTIONS = {
+  timeoutSeconds: 60,
+  memory: "512MiB" as const,
+  maxInstances: 10,
+  concurrency: 10,
+  enforceAppCheck: COMPREHENSION_AUDIO_APP_CHECK_ENFORCED,
+  consumeAppCheckToken: COMPREHENSION_AUDIO_APP_CHECK_ENFORCED,
+};
+
+const AUDIO_VALIDATOR_FUNCTION_NAME = "validateComprehensionAudioMedia";
+const AUDIO_VALIDATOR_REGION = "australia-southeast1";
+const AUDIO_VALIDATOR_SERVICE_ACCOUNT =
+  "lumi-audio-validator@lumi-ninc-au.iam.gserviceaccount.com";
+const AUDIO_VALIDATOR_CALLER =
+  "lumi-ninc-au@appspot.gserviceaccount.com";
+const AUDIO_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const AUDIO_RATE_LIMIT_MAX_ATTEMPTS = 20;
+const PENDING_AUDIO_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const PENDING_AUDIO_MAX_PER_RUN = 5000;
 
 // Bounds match those enforced server-side in @lumi/server-ops. The function
 // re-validates so a hand-edited Firestore doc cannot deliver an absurd value.
@@ -65,6 +95,20 @@ export function comprehensionAudioObjectPath(
   logId: string
 ): string {
   return `schools/${schoolId}/comprehension_audio/${logId}.m4a`;
+}
+
+/**
+ * Private holding path for client-uploaded, untrusted media. Clients never
+ * write the canonical playback path; only validated server output lands there.
+ * @param {string} schoolId Owning school document ID.
+ * @param {string} logId Owning reading-log document ID.
+ * @return {string} Canonical pending-upload Storage object path.
+ */
+export function comprehensionAudioUploadObjectPath(
+  schoolId: string,
+  logId: string
+): string {
+  return `comprehension_audio_uploads/${schoolId}/${logId}.m4a`;
 }
 
 /**
@@ -146,6 +190,24 @@ async function deleteStorageObjectIfExists(path: string): Promise<void> {
   }
 }
 
+// Delete only the generation that was inspected. A parent may retry-overwrite
+// a pending upload while confirmation is running; a rejected old generation
+// must never cause the backend to delete a newer attempt.
+async function deleteStorageObjectGenerationIfExists(
+  path: string,
+  generation: string
+): Promise<void> {
+  try {
+    await admin.storage().bucket().file(path, {generation}).delete();
+  } catch (err: unknown) {
+    const code = (err as {code?: number | string}).code;
+    if (code === 404 || code === "404" || code === 412 || code === "412") {
+      return;
+    }
+    throw err;
+  }
+}
+
 async function performCleanup(
   performedBy: string,
   performedByEmail: string | null
@@ -208,6 +270,11 @@ async function performCleanup(
             comprehensionAudioPath: FieldValue.delete(),
             comprehensionAudioDurationSec: FieldValue.delete(),
             comprehensionAudioUploaded: false,
+            comprehensionAudioObjectGeneration: FieldValue.delete(),
+            comprehensionAudioSourceGeneration: FieldValue.delete(),
+            comprehensionAudioValidationVersion: FieldValue.delete(),
+            comprehensionAudioValidatedDurationMs: FieldValue.delete(),
+            comprehensionAudioSha256: FieldValue.delete(),
             comprehensionAudioPathRejectedAt:
               FieldValue.serverTimestamp(),
           });
@@ -221,10 +288,18 @@ async function performCleanup(
         }
 
         await deleteStorageObjectIfExists(expectedPath);
+        await deleteStorageObjectIfExists(
+          comprehensionAudioUploadObjectPath(schoolId as string, doc.id)
+        );
         await doc.ref.update({
           comprehensionAudioPath: FieldValue.delete(),
           comprehensionAudioDurationSec: FieldValue.delete(),
           comprehensionAudioUploaded: false,
+          comprehensionAudioObjectGeneration: FieldValue.delete(),
+          comprehensionAudioSourceGeneration: FieldValue.delete(),
+          comprehensionAudioValidationVersion: FieldValue.delete(),
+          comprehensionAudioValidatedDurationMs: FieldValue.delete(),
+          comprehensionAudioSha256: FieldValue.delete(),
           comprehensionAudioDeletedAt:
             FieldValue.serverTimestamp(),
         });
@@ -292,6 +367,59 @@ export const cleanupComprehensionAudio = onSchedule(
     }
     return;
   });
+
+// Unconfirmed uploads can be stranded if the app is killed after Storage
+// succeeds but before the receipt callable runs. They contain a child's voice,
+// so a separate fail-safe removes pending objects after 24 hours even when the
+// school's normal recording-retention job is disabled.
+export const cleanupPendingComprehensionAudio = onSchedule(
+  {
+    schedule: "every 24 hours",
+    timeZone: "Australia/Sydney",
+    timeoutSeconds: 300,
+    memory: "512MiB",
+  },
+  async () => {
+    const cutoffMs = Date.now() - PENDING_AUDIO_MAX_AGE_MS;
+    const [files] = await admin.storage().bucket().getFiles({
+      prefix: "comprehension_audio_uploads/",
+      maxResults: PENDING_AUDIO_MAX_PER_RUN,
+      autoPaginate: false,
+    });
+    let deletedCount = 0;
+    let skippedCount = 0;
+    let failedCount = 0;
+    for (const file of files) {
+      try {
+        let metadata = file.metadata;
+        if (!metadata?.timeCreated || !metadata?.generation) {
+          [metadata] = await file.getMetadata();
+        }
+        const createdMs = Date.parse(String(metadata.timeCreated ?? ""));
+        const generation = String(metadata.generation ?? "");
+        if (!Number.isFinite(createdMs) || !generation || createdMs >= cutoffMs) {
+          skippedCount++;
+          continue;
+        }
+        await deleteStorageObjectGenerationIfExists(file.name, generation);
+        deletedCount++;
+      } catch (err: unknown) {
+        failedCount++;
+        functions.logger.error("comprehensionAudio.pendingCleanup.failed", {
+          objectName: file.name,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+    const result = {deletedCount, skippedCount, failedCount, scanned: files.length};
+    functions.logger.info("comprehensionAudio.pendingCleanup.completed", result);
+    await recordCronRun(
+      "cleanupPendingComprehensionAudio",
+      failedCount > 0 ? "error" : "ok",
+      failedCount > 0 ? `${failedCount} delete failures` : undefined
+    );
+  }
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // deleteComprehensionAudio: teacher / school-admin per-row trash button.
@@ -377,13 +505,193 @@ async function callerCanAccessLogAudio(
   return teacherIsAssignedToClassData(uid, classData);
 }
 
+interface AudioValidatorResponse {
+  validationVersion: string;
+  durationMs: number;
+  sizeBytes: number;
+  sha256: string;
+  audioBase64: string;
+}
+
+let validatorClientPromise: Promise<IdTokenClient> | null = null;
+
+function audioValidatorUrl(): string {
+  const override = process.env.COMPREHENSION_AUDIO_VALIDATOR_URL?.trim();
+  if (override) return override;
+  const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT;
+  if (!projectId) throw new Error("Cannot resolve validator project id");
+  return `https://${AUDIO_VALIDATOR_REGION}-${projectId}.cloudfunctions.net/` +
+    AUDIO_VALIDATOR_FUNCTION_NAME;
+}
+
+function parseValidatorResponse(data: unknown): ValidatedAudioBuffer {
+  if (!data || typeof data !== "object") {
+    throw new Error("Audio validator returned no result");
+  }
+  const result = data as Partial<AudioValidatorResponse>;
+  if (
+    result.validationVersion !== AUDIO_VALIDATION_VERSION ||
+    !Number.isInteger(result.durationMs) ||
+    (result.durationMs as number) < 500 ||
+    (result.durationMs as number) > 60_750 ||
+    !Number.isInteger(result.sizeBytes) ||
+    (result.sizeBytes as number) <= 0 ||
+    (result.sizeBytes as number) >= MAX_TRANSCODED_AUDIO_BYTES ||
+    typeof result.sha256 !== "string" ||
+    !/^[a-f0-9]{64}$/.test(result.sha256) ||
+    typeof result.audioBase64 !== "string" ||
+    result.audioBase64.length > Math.ceil(MAX_TRANSCODED_AUDIO_BYTES / 3) * 4
+  ) {
+    throw new Error("Audio validator returned an invalid result");
+  }
+  const bytes = Buffer.from(result.audioBase64, "base64");
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  if (
+    bytes.length !== result.sizeBytes ||
+    sha256 !== result.sha256 ||
+    !hasIsoMediaFtypSignature(bytes.subarray(0, 32))
+  ) {
+    throw new Error("Audio validator result integrity check failed");
+  }
+  return {
+    bytes,
+    durationMs: result.durationMs as number,
+    sizeBytes: result.sizeBytes as number,
+    sha256,
+  };
+}
+
+async function processAudioInIsolatedValidator(
+  bytes: Buffer
+): Promise<ValidatedAudioBuffer> {
+  // Emulator tests run the exact decoder locally. Production crosses an IAM-
+  // authenticated process boundary into a no-data-permissions worker, keeping
+  // native media parsing out of the privileged Firestore/Storage container.
+  if (
+    process.env.FUNCTIONS_EMULATOR === "true" ||
+    Boolean(process.env.FIRESTORE_EMULATOR_HOST)
+  ) {
+    return validateAndTranscodeAudioBuffer(bytes);
+  }
+  const url = audioValidatorUrl();
+  validatorClientPromise ??= new GoogleAuth().getIdTokenClient(url);
+  const client = await validatorClientPromise;
+  try {
+    const response = await client.request<AudioValidatorResponse>({
+      url,
+      method: "POST",
+      headers: {"content-type": "application/json"},
+      data: {audioBase64: bytes.toString("base64")},
+      timeout: 25_000,
+    });
+    return parseValidatorResponse(response.data);
+  } catch (err: unknown) {
+    const status = (err as {response?: {status?: number}}).response?.status;
+    if (status === 422) {
+      throw new AudioMediaValidationError("Media decode rejected the upload");
+    }
+    throw err;
+  }
+}
+
+async function consumeAudioValidationRateLimit(uid: string): Promise<void> {
+  const key = createHash("sha256").update(uid).digest("hex");
+  const ref = admin.firestore().doc(`backendRateLimits/audioValidation_${key}`);
+  const nowMs = Date.now();
+  await admin.firestore().runTransaction(async (transaction) => {
+    const snap = await transaction.get(ref);
+    const data = snap.data() ?? {};
+    const windowStartMs = data.windowStart?.toMillis?.() ?? 0;
+    const inCurrentWindow =
+      windowStartMs > 0 && nowMs - windowStartMs < AUDIO_RATE_LIMIT_WINDOW_MS;
+    const attempts = inCurrentWindow && Number.isInteger(data.attempts) ?
+      data.attempts :
+      0;
+    if (attempts >= AUDIO_RATE_LIMIT_MAX_ATTEMPTS) {
+      throw new HttpsError(
+        "resource-exhausted",
+        "Too many recording validation attempts. Please try again later."
+      );
+    }
+    transaction.set(ref, {
+      windowStart: Timestamp.fromMillis(inCurrentWindow ? windowStartMs : nowMs),
+      attempts: attempts + 1,
+      updatedAt: FieldValue.serverTimestamp(),
+      expiresAt: Timestamp.fromMillis(nowMs + AUDIO_RATE_LIMIT_WINDOW_MS * 2),
+    });
+  });
+}
+
+/**
+ * Native decoder/transcoder worker. IAM permits only the pinned Functions
+ * runtime service account to invoke it, while this worker's own service
+ * account has no Firestore or Storage roles. It receives bytes and returns
+ * bytes; it never receives a school, child, log, bucket or user identifier.
+ */
+export const validateComprehensionAudioMedia = onRequest(
+  {
+    timeoutSeconds: 30,
+    memory: "512MiB",
+    maxInstances: 5,
+    concurrency: 1,
+    serviceAccount: AUDIO_VALIDATOR_SERVICE_ACCOUNT,
+    invoker: [AUDIO_VALIDATOR_CALLER],
+  },
+  async (request, response) => {
+    if (request.method !== "POST") {
+      response.status(405).json({error: "method_not_allowed"});
+      return;
+    }
+    const encoded = request.body?.audioBase64;
+    const maxBase64Length = Math.ceil(MAX_UNTRUSTED_AUDIO_BYTES / 3) * 4;
+    if (
+      typeof encoded !== "string" ||
+      encoded.length === 0 ||
+      encoded.length > maxBase64Length ||
+      !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)
+    ) {
+      response.status(422).json({error: "invalid_media"});
+      return;
+    }
+    const bytes = Buffer.from(encoded, "base64");
+    if (bytes.toString("base64") !== encoded) {
+      response.status(422).json({error: "invalid_media"});
+      return;
+    }
+    try {
+      const result = await validateAndTranscodeAudioBuffer(bytes);
+      response.status(200).json({
+        validationVersion: AUDIO_VALIDATION_VERSION,
+        durationMs: result.durationMs,
+        sizeBytes: result.sizeBytes,
+        sha256: result.sha256,
+        audioBase64: result.bytes.toString("base64"),
+      } satisfies AudioValidatorResponse);
+    } catch (err: unknown) {
+      if (err instanceof AudioMediaValidationError) {
+        functions.logger.warn("comprehensionAudio.validator.rejected", {
+          reason: err.message,
+          inputBytes: bytes.length,
+        });
+        response.status(422).json({error: "invalid_media"});
+        return;
+      }
+      functions.logger.error("comprehensionAudio.validator.failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      response.status(500).json({error: "validation_unavailable"});
+    }
+  }
+);
+
 /**
  * Server-owned receipt for a client Storage upload. The caller can upload only
- * to the canonical object enforced by Storage rules; this callable verifies
- * the object again before setting the audio fields with Admin SDK privileges.
+ * to an untrusted pending object enforced by Storage rules; this callable
+ * validates and transcodes it before publishing a server-owned canonical
+ * object and setting the audio fields with Admin SDK privileges.
  */
 export const confirmComprehensionAudioUpload = onCall(
-  AUDIO_CALLABLE_OPTIONS,
+  AUDIO_CONFIRM_CALLABLE_OPTIONS,
   async (request) => {
     const data: ConfirmUploadInput = request.data;
     assertNotReadOnly(request);
@@ -430,10 +738,20 @@ export const confirmComprehensionAudioUpload = onCall(
     }
 
     const storagePath = comprehensionAudioObjectPath(schoolId, logId);
-    const file = admin.storage().bucket().file(storagePath);
+    if (
+      logData.comprehensionAudioUploaded === true &&
+      logData.comprehensionAudioPath === storagePath &&
+      logData.comprehensionAudioValidationVersion === AUDIO_VALIDATION_VERSION
+    ) {
+      return {confirmed: true, alreadyConfirmed: true};
+    }
+
+    const uploadPath = comprehensionAudioUploadObjectPath(schoolId, logId);
+    const bucket = admin.storage().bucket();
+    const uploadFile = bucket.file(uploadPath);
     let metadata;
     try {
-      [metadata] = await file.getMetadata();
+      [metadata] = await uploadFile.getMetadata();
     } catch (err: unknown) {
       const code = (err as {code?: number}).code;
       if (code === 404) {
@@ -443,51 +761,212 @@ export const confirmComprehensionAudioUpload = onCall(
     }
 
     const size = Number(metadata.size ?? 0);
+    const sourceGeneration = String(metadata.generation ?? "");
     const custom = metadata.metadata ?? {};
     if (
       !Number.isFinite(size) ||
       size <= 0 ||
-      size >= 2 * 1024 * 1024 ||
+      size >= MAX_UNTRUSTED_AUDIO_BYTES ||
+      !sourceGeneration ||
       metadata.contentType !== "audio/mp4" ||
       custom.ownerUid !== uid ||
       custom.schoolId !== schoolId ||
-      custom.logId !== logId
+      custom.logId !== logId ||
+      custom.studentId !== logData.studentId
     ) {
       // Do not leave a rejected child recording sitting in the bucket.
-      await deleteStorageObjectIfExists(storagePath);
+      if (sourceGeneration) {
+        await deleteStorageObjectGenerationIfExists(
+          uploadPath,
+          sourceGeneration
+        );
+      }
       throw new HttpsError(
         "failed-precondition",
         "Recording metadata failed validation"
       );
     }
 
-    let header: Buffer;
+    const versionedUpload = bucket.file(uploadPath, {
+      generation: sourceGeneration,
+    });
+    let untrustedBytes: Buffer;
     try {
-      [header] = await file.download({start: 0, end: 31});
+      [untrustedBytes] = await versionedUpload.download();
     } catch (err: unknown) {
-      functions.logger.error("Audio signature read failed", {
+      functions.logger.error("Audio pending upload read failed", {
         schoolId,
         logId,
         error: err instanceof Error ? err.message : String(err),
       });
       throw new HttpsError("internal", "Could not validate recording upload");
     }
-    if (!hasIsoMediaFtypSignature(header)) {
-      await deleteStorageObjectIfExists(storagePath);
+    if (
+      untrustedBytes.length !== size ||
+      !hasIsoMediaFtypSignature(untrustedBytes.subarray(0, 32))
+    ) {
+      await deleteStorageObjectGenerationIfExists(uploadPath, sourceGeneration);
       throw new HttpsError(
         "failed-precondition",
         "Recording content failed media validation"
       );
     }
 
-    await logSnap.ref.update({
-      comprehensionAudioPath: storagePath,
-      comprehensionAudioDurationSec: durationSec,
-      comprehensionAudioUploaded: true,
-      comprehensionAudioUploadedAt:
-        FieldValue.serverTimestamp(),
-    });
-    return {confirmed: true};
+    await consumeAudioValidationRateLimit(uid);
+
+    let validated: ValidatedAudioBuffer;
+    try {
+      validated = await processAudioInIsolatedValidator(untrustedBytes);
+    } catch (err: unknown) {
+      if (err instanceof AudioMediaValidationError) {
+        await deleteStorageObjectGenerationIfExists(uploadPath, sourceGeneration);
+        throw new HttpsError(
+          "failed-precondition",
+          "Recording content failed media validation"
+        );
+      }
+      functions.logger.error("Comprehension audio validator unavailable", {
+        schoolId,
+        logId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      // Preserve the pending upload for the offline queue to retry later.
+      throw new HttpsError("internal", "Could not validate recording upload");
+    }
+
+    const canonicalFile = bucket.file(storagePath);
+    let canonicalMetadata;
+    try {
+      // Create-only publication prevents two confirmations from overwriting
+      // each other's validated object before either Firestore receipt commits.
+      await canonicalFile.save(validated.bytes, {
+        resumable: false,
+        validation: "crc32c",
+        preconditionOpts: {ifGenerationMatch: 0},
+        metadata: {
+          contentType: "audio/mp4",
+          cacheControl: "private, no-store",
+          metadata: {
+            ownerUid: uid,
+            schoolId,
+            logId,
+            studentId: String(logData.studentId),
+            durationMs: String(validated.durationMs),
+            sourceGeneration,
+            validationVersion: AUDIO_VALIDATION_VERSION,
+            sha256: validated.sha256,
+          },
+        },
+      });
+      [canonicalMetadata] = await canonicalFile.getMetadata();
+    } catch (err: unknown) {
+      const code = (err as {code?: number | string}).code;
+      if (code !== 412 && code !== "412") throw err;
+
+      // A previous attempt can crash after writing bytes but before stamping
+      // Firestore. Reuse that orphan only when every server-derived identity
+      // and integrity field matches this exact validation result.
+      const [existing] = await canonicalFile.getMetadata();
+      const existingCustom = existing.metadata ?? {};
+      if (
+        existing.contentType !== "audio/mp4" ||
+        existingCustom.ownerUid !== uid ||
+        existingCustom.schoolId !== schoolId ||
+        existingCustom.logId !== logId ||
+        existingCustom.studentId !== String(logData.studentId) ||
+        existingCustom.durationMs !== String(validated.durationMs) ||
+        existingCustom.sourceGeneration !== sourceGeneration ||
+        existingCustom.validationVersion !== AUDIO_VALIDATION_VERSION ||
+        existingCustom.sha256 !== validated.sha256
+      ) {
+        throw new HttpsError(
+          "aborted",
+          "Another recording confirmation is in progress. Please retry."
+        );
+      }
+      canonicalMetadata = existing;
+    }
+    const canonicalGeneration = String(canonicalMetadata.generation ?? "");
+    if (!canonicalGeneration) {
+      await deleteStorageObjectIfExists(storagePath);
+      throw new HttpsError("internal", "Could not finalize recording upload");
+    }
+
+    const validatedDurationSec = Math.max(
+      1,
+      Math.min(60, Math.round(validated.durationMs / 1000))
+    );
+    try {
+      await db.runTransaction(async (transaction) => {
+        const [freshFlag, freshLog] = await Promise.all([
+          transaction.get(db.doc(RECORDING_FLAG_DOC)),
+          transaction.get(logSnap.ref),
+        ]);
+        if (!freshFlag.exists || freshFlag.data()?.enabled !== true) {
+          throw new HttpsError(
+            "failed-precondition",
+            "Comprehension recording is not enabled"
+          );
+        }
+        const freshData = freshLog.data() ?? {};
+        if (!freshLog.exists) {
+          throw new HttpsError("not-found", "Reading log not found");
+        }
+        if (
+          freshData.parentId !== uid ||
+          freshData.loggedByRole === "teacher" ||
+          freshData.studentId !== logData.studentId
+        ) {
+          throw new HttpsError(
+            "permission-denied",
+            "Recording ownership changed during validation"
+          );
+        }
+        transaction.update(logSnap.ref, {
+          comprehensionAudioPath: storagePath,
+          comprehensionAudioDurationSec: validatedDurationSec,
+          comprehensionAudioUploaded: true,
+          comprehensionAudioUploadedAt: FieldValue.serverTimestamp(),
+          comprehensionAudioObjectGeneration: canonicalGeneration,
+          comprehensionAudioSourceGeneration: sourceGeneration,
+          comprehensionAudioValidationVersion: AUDIO_VALIDATION_VERSION,
+          comprehensionAudioValidatedDurationMs: validated.durationMs,
+          comprehensionAudioSha256: validated.sha256,
+        });
+      });
+    } catch (err: unknown) {
+      await deleteStorageObjectGenerationIfExists(
+        storagePath,
+        canonicalGeneration
+      );
+      if (err instanceof HttpsError) {
+        await deleteStorageObjectGenerationIfExists(
+          uploadPath,
+          sourceGeneration
+        );
+        throw err;
+      }
+      throw err;
+    }
+
+    try {
+      await deleteStorageObjectGenerationIfExists(uploadPath, sourceGeneration);
+    } catch (err: unknown) {
+      // The validated canonical object and Firestore receipt are complete.
+      // A scheduled pending-upload cleanup is the safe retry path for this
+      // non-fatal residue rather than telling the client the save failed.
+      functions.logger.warn("Comprehension audio pending cleanup failed", {
+        schoolId,
+        logId,
+        sourceGeneration,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    return {
+      confirmed: true,
+      durationSec: validatedDurationSec,
+      validationVersion: AUDIO_VALIDATION_VERSION,
+    };
   }
 );
 
@@ -545,10 +1024,18 @@ export const deleteComprehensionAudio = onCall(
     }
     const storagePath = comprehensionAudioObjectPath(schoolId, logId);
     await deleteStorageObjectIfExists(storagePath);
+    await deleteStorageObjectIfExists(
+      comprehensionAudioUploadObjectPath(schoolId, logId)
+    );
     await logRef.update({
       comprehensionAudioPath: FieldValue.delete(),
       comprehensionAudioDurationSec: FieldValue.delete(),
       comprehensionAudioUploaded: false,
+      comprehensionAudioObjectGeneration: FieldValue.delete(),
+      comprehensionAudioSourceGeneration: FieldValue.delete(),
+      comprehensionAudioValidationVersion: FieldValue.delete(),
+      comprehensionAudioValidatedDurationMs: FieldValue.delete(),
+      comprehensionAudioSha256: FieldValue.delete(),
       comprehensionAudioDeletedAt:
         FieldValue.serverTimestamp(),
     });
@@ -654,6 +1141,19 @@ export const getComprehensionAudioUrl = onCall(
         "This log has no recording."
       );
     }
+    const objectGeneration =
+      typeof logData.comprehensionAudioObjectGeneration === "string" ?
+        logData.comprehensionAudioObjectGeneration.trim() :
+        "";
+    if (
+      logData.comprehensionAudioValidationVersion !== AUDIO_VALIDATION_VERSION ||
+      !objectGeneration
+    ) {
+      throw new HttpsError(
+        "failed-precondition",
+        "This recording has not completed server media validation."
+      );
+    }
     const storagePath = comprehensionAudioObjectPath(schoolId, logId);
 
     const expiresAt = Date.now() + AUDIO_URL_TTL_MS;
@@ -661,7 +1161,7 @@ export const getComprehensionAudioUrl = onCall(
       const [url] = await admin
         .storage()
         .bucket()
-        .file(storagePath)
+        .file(storagePath, {generation: objectGeneration})
         .getSignedUrl({action: "read", expires: expiresAt});
       return {url, expiresInSec: Math.floor(AUDIO_URL_TTL_MS / 1000)};
     } catch (err) {
