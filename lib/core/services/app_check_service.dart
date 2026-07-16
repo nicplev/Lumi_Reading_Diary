@@ -34,6 +34,19 @@ class AppCheckService {
     defaultValue: "",
   );
 
+  // Optional, revocable credentials for physical debug builds. Keep the
+  // values out of source control and pass them only via --dart-define while
+  // testing. Release builds never select the debug providers.
+  static const String _androidDebugToken = String.fromEnvironment(
+    "LUMI_APP_CHECK_ANDROID_DEBUG_TOKEN",
+    defaultValue: "",
+  );
+
+  static const String _appleDebugToken = String.fromEnvironment(
+    "LUMI_APP_CHECK_APPLE_DEBUG_TOKEN",
+    defaultValue: "",
+  );
+
   /// Call once during startup, after `Firebase.initializeApp`. Safe to call
   /// when disabled — returns early without touching the SDK.
   static Future<void> initialize() async {
@@ -44,10 +57,15 @@ class AppCheckService {
     try {
       await FirebaseAppCheck.instance.activate(
         providerAndroid: kDebugMode
-            ? const AndroidDebugProvider()
+            ? const AndroidDebugProvider(
+                debugToken:
+                    _androidDebugToken == "" ? null : _androidDebugToken,
+              )
             : const AndroidPlayIntegrityProvider(),
         providerApple: kDebugMode
-            ? const AppleDebugProvider()
+            ? const AppleDebugProvider(
+                debugToken: _appleDebugToken == "" ? null : _appleDebugToken,
+              )
             : const AppleAppAttestWithDeviceCheckFallbackProvider(),
         providerWeb: _webRecaptchaKey.isEmpty
             ? null

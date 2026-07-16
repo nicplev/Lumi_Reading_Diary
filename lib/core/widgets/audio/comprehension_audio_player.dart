@@ -43,6 +43,14 @@ class ComprehensionAudioPlayer extends StatefulWidget {
   final String logId;
   final VoidCallback? onDeleted;
 
+  /// Injectable boundary for focused widget tests.
+  @visibleForTesting
+  final ComprehensionAudioService? audioService;
+
+  /// Avoids creating a native audio player in focused widget tests.
+  @visibleForTesting
+  final bool debugSkipPlayerInitialization;
+
   const ComprehensionAudioPlayer({
     super.key,
     required this.storagePath,
@@ -50,6 +58,8 @@ class ComprehensionAudioPlayer extends StatefulWidget {
     required this.logId,
     this.durationSec,
     this.onDeleted,
+    this.audioService,
+    this.debugSkipPlayerInitialization = false,
   });
 
   @override
@@ -73,6 +83,7 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
   bool _failed = false;
   bool _isPlaying = false;
   bool _deleting = false;
+  bool _deleted = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
 
@@ -80,7 +91,11 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
   void initState() {
     super.initState();
     _duration = Duration(seconds: widget.durationSec ?? 0);
-    _initPlayer();
+    if (widget.debugSkipPlayerInitialization) {
+      _loading = false;
+    } else {
+      _initPlayer();
+    }
   }
 
   Future<void> _initPlayer() async {
@@ -130,7 +145,8 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
         cached.expiresAt.isAfter(now.add(const Duration(seconds: 30)))) {
       return cached.url;
     }
-    final result = await ComprehensionAudioService().getAudioUrl(
+    final result =
+        await (widget.audioService ?? ComprehensionAudioService()).getAudioUrl(
       schoolId: widget.schoolId,
       logId: widget.logId,
     );
@@ -189,12 +205,16 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
     setState(() => _deleting = true);
     try {
       await _player?.pause();
-      await ComprehensionAudioService().deleteAudio(
+      await (widget.audioService ?? ComprehensionAudioService()).deleteAudio(
         schoolId: widget.schoolId,
         logId: widget.logId,
       );
       _urlCache.remove(widget.storagePath);
       if (!mounted) return;
+      setState(() {
+        _deleting = false;
+        _deleted = true;
+      });
       widget.onDeleted?.call();
     } on FirebaseFunctionsException catch (e) {
       if (!mounted) return;
@@ -223,6 +243,7 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
 
   @override
   Widget build(BuildContext context) {
+    if (_deleted) return const SizedBox.shrink();
     return Container(
       margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -302,8 +323,8 @@ class _ComprehensionAudioPlayerState extends State<ComprehensionAudioPlayer> {
               LinearProgressIndicator(
                 value: total > 0 ? pos / total : 0,
                 backgroundColor: AppColors.charcoal.withValues(alpha: 0.08),
-                valueColor: const AlwaysStoppedAnimation(
-                    AppColors.rosePinkAccessible),
+                valueColor:
+                    const AlwaysStoppedAnimation(AppColors.rosePinkAccessible),
                 minHeight: 4,
               ),
               const SizedBox(height: 4),

@@ -1,3 +1,5 @@
+import 'package:cloud_functions/cloud_functions.dart';
+
 import '../core/services/functions_instance.dart';
 
 /// Thin client wrapper around the `deleteComprehensionAudio` callable.
@@ -7,12 +9,20 @@ import '../core/services/functions_instance.dart';
 /// verifies the caller is a teacher or schoolAdmin at the log's school, then
 /// deletes the Storage object and clears the audio fields on the log doc.
 typedef ComprehensionAudioCallableInvoker = Future<Object?> Function(
-  String name,
-  Map<String, dynamic> args,
-);
+    String name, Map<String, dynamic> args,
+    {required bool limitedUseAppCheckToken});
 
-Future<Object?> _defaultInvoker(String name, Map<String, dynamic> args) async {
-  final callable = lumiFunctions.httpsCallable(name);
+Future<Object?> _defaultInvoker(
+  String name,
+  Map<String, dynamic> args, {
+  required bool limitedUseAppCheckToken,
+}) async {
+  final callable = lumiFunctions.httpsCallable(
+    name,
+    options: HttpsCallableOptions(
+      limitedUseAppCheckToken: limitedUseAppCheckToken,
+    ),
+  );
   final res = await callable.call<Object?>(args);
   return res.data;
 }
@@ -30,11 +40,14 @@ class ComprehensionAudioService {
     required String logId,
     required int durationSec,
   }) async {
-    final data = await _invoke('confirmComprehensionAudioUpload', {
-      'schoolId': schoolId,
-      'logId': logId,
-      'durationSec': durationSec,
-    });
+    final data = await _invoke(
+        'confirmComprehensionAudioUpload',
+        {
+          'schoolId': schoolId,
+          'logId': logId,
+          'durationSec': durationSec,
+        },
+        limitedUseAppCheckToken: true);
     if (data is! Map || data['confirmed'] != true) {
       throw StateError('Recording upload was not confirmed');
     }
@@ -48,10 +61,13 @@ class ComprehensionAudioService {
     required String schoolId,
     required String logId,
   }) async {
-    final data = await _invoke('deleteComprehensionAudio', {
-      'schoolId': schoolId,
-      'logId': logId,
-    });
+    final data = await _invoke(
+        'deleteComprehensionAudio',
+        {
+          'schoolId': schoolId,
+          'logId': logId,
+        },
+        limitedUseAppCheckToken: true);
     if (data is Map && data['deleted'] == true) return true;
     return false;
   }
@@ -68,10 +84,13 @@ class ComprehensionAudioService {
     required String schoolId,
     required String logId,
   }) async {
-    final data = await _invoke('getComprehensionAudioUrl', {
-      'schoolId': schoolId,
-      'logId': logId,
-    });
+    final data = await _invoke(
+        'getComprehensionAudioUrl',
+        {
+          'schoolId': schoolId,
+          'logId': logId,
+        },
+        limitedUseAppCheckToken: true);
     if (data is Map &&
         data['url'] is String &&
         (data['url'] as String).isNotEmpty) {

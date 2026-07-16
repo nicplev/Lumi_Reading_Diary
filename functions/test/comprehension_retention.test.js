@@ -5,6 +5,7 @@ const path = require('node:path');
 
 // Built to lib/ by `npm run build`.
 const {
+  assertFreshAudioAppCheckToken,
   audioPathMustBeQuarantined,
   comprehensionAudioObjectPath,
   comprehensionAudioUploadObjectPath,
@@ -15,6 +16,24 @@ const {
   AudioMediaValidationError,
   validateAndTranscodeAudioBuffer,
 } = require('../lib/audio_media_validation.js');
+
+test('audio callables reject replayed App Check tokens when enforced', () => {
+  assert.throws(
+    () => assertFreshAudioAppCheckToken(
+      {app: {alreadyConsumed: true}},
+      true,
+    ),
+    (error) => error.code === 'failed-precondition',
+  );
+  assert.doesNotThrow(() => assertFreshAudioAppCheckToken(
+    {app: {alreadyConsumed: false}},
+    true,
+  ));
+  assert.doesNotThrow(() => assertFreshAudioAppCheckToken(
+    {app: {alreadyConsumed: true}},
+    false,
+  ));
+});
 
 test('audio object path is derived only from school and log ids', () => {
   assert.equal(
