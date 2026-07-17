@@ -59,8 +59,10 @@ contractual/APP 8 review already tracked in the vendor register.
    rollout updated 75 Functions with zero errors; post-deploy traffic reached
    the Sydney bucket without an error or prohibited identifier field.
 7. Created three new user-managed Secret Manager resources with a single
-   `australia-southeast1` replica and secret-level access only for the relevant
-   dedicated runtime identity. Payload equality and the SendGrid credential's
+   `australia-southeast1` replica and payload access only for the relevant
+   dedicated runtime identity. The keyless admin deploy identity has
+   secret-level metadata viewer only so Firebase can validate that the named
+   version exists; it cannot access the payload. Payload equality and the SendGrid credential's
    `mail.send` scope were checked without printing values. Five email Functions
    and the super-admin backend were deployed and verified `ACTIVE`; the live
    admin login returned HTTP 200 and no post-cutover error log was found. The
