@@ -22,6 +22,7 @@ import '../../../data/models/school_model.dart';
 import '../../../data/models/student_model.dart';
 import '../../../data/models/user_model.dart';
 import '../../../services/firebase_service.dart';
+import '../../../services/class_daily_reading_service.dart';
 import '../../../services/staff_notification_service.dart';
 import '../../../services/widget_data_service.dart';
 import 'models/student_achievement.dart';
@@ -65,6 +66,8 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
   static const _customizeTourStepId = 'dashboard_customize';
 
   final ScrollController _scrollController = ScrollController();
+  final ClassDailyReadingService _dailyReadingService =
+      ClassDailyReadingService();
   int _bellAnimCount = 0;
   String? _dailyInsight;
   int? _momentumDiff; // positive = up, negative = down
@@ -389,13 +392,12 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
         recentLogs: const [],
       );
 
-      final snapshot = await FirebaseService.instance.firestore
-          .collection('schools')
-          .doc(schoolId)
-          .collection('readingLogs')
-          .where('classId', isEqualTo: selectedClass.id)
-          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(cutoff))
-          .get();
+      final summaries = await _dailyReadingService.fetchRange(
+        schoolId: schoolId,
+        classId: selectedClass.id,
+        startInclusive: cutoff,
+        endInclusive: today,
+      );
 
       if (!mounted ||
           generation != _teacherWidgetRefreshGeneration ||
@@ -403,14 +405,12 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
         return;
       }
 
-      final recentLogs = snapshot.docs
-          .map((doc) => ReadingLogModel.fromFirestore(doc))
-          .toList();
       await WidgetDataService.instance.updateFromTeacherDashboard(
         teacher: widget.user,
         classModel: selectedClass,
         students: _students,
-        recentLogs: recentLogs,
+        recentLogs: const [],
+        dailySummaries: summaries,
       );
     } catch (e) {
       debugPrint('Error refreshing teacher home-screen widget: $e');
@@ -514,35 +514,26 @@ class _TeacherDashboardViewState extends State<TeacherDashboardView> {
       final startOfLastWeek = startOfWeek.subtract(const Duration(days: 7));
       final thirtyDaysAgo = today.subtract(const Duration(days: 30));
 
-      // ONE 30-day whole-class query feeds all of: yesterday's insight and the
-      // this-week/last-week momentum. Previously a separate yesterday-only query
-      // ran first — redundant, since the 30-day window already covers it, so a
-      // big-class dashboard did two full scans per class switch instead of one.
-      final recentLogs = await FirebaseService.instance.firestore
-          .collection('schools')
-          .doc(schoolId)
-          .collection('readingLogs')
-          .where('classId', isEqualTo: widget.selectedClass.id)
-          .where('date',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(thirtyDaysAgo))
-          .get();
+      final summaries = await _dailyReadingService.fetchRange(
+        schoolId: schoolId,
+        classId: widget.selectedClass.id,
+        startInclusive: thirtyDaysAgo,
+        endInclusive: today,
+      );
 
       final Set<String> yesterdayStudents = {};
       final Set<String> thisWeekStudents = {};
       final Set<String> lastWeekStudents = {};
 
-      for (final doc in recentLogs.docs) {
-        final data = doc.data();
-        final date = (data['date'] as Timestamp).toDate();
-        final studentId = data['studentId'] as String?;
-        if (studentId == null) continue;
+      for (final summary in summaries) {
+        final date = summary.date;
         if (!date.isBefore(yesterday) && date.isBefore(today)) {
-          yesterdayStudents.add(studentId);
+          yesterdayStudents.addAll(summary.students.keys);
         }
         if (!date.isBefore(startOfWeek)) {
-          thisWeekStudents.add(studentId);
+          thisWeekStudents.addAll(summary.students.keys);
         } else if (!date.isBefore(startOfLastWeek)) {
-          lastWeekStudents.add(studentId);
+          lastWeekStudents.addAll(summary.students.keys);
         }
       }
 

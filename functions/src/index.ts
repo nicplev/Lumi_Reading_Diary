@@ -55,6 +55,10 @@ import {
 } from "./stats_aggregation";
 import {runStreakRefreshPass} from "./streak_refresh";
 import {runStateTermDatesFillPass} from "./term_dates_fallback";
+import {
+  reconcileClassDailyReadingPass,
+  syncReadingLogDailySummary,
+} from "./class_daily_reading";
 
 // App Check enforcement, opt-in via env var (default OFF). Matches
 // code_verification.ts / impersonation.ts — flip a flag only AFTER the client
@@ -68,6 +72,53 @@ const NOTIFICATION_CAMPAIGN_APP_CHECK_ENFORCED =
 // so the paginated library screen can render header badges without reading
 // the full books collection. See functions/src/library_counts.ts.
 export {maintainLibraryCounts} from "./library_counts";
+
+// Server-owned, sharded class/day summaries used by teacher dashboards.
+// The synchronizer reads the current source log inside an idempotent
+// transaction, so duplicate and out-of-order Firestore events converge.
+export const maintainClassDailyReading = onDocumentWritten(
+  {
+    document: "schools/{schoolId}/readingLogs/{logId}",
+    // The synchronizer is idempotent, so retrying transient failures is safe
+    // and avoids waiting for the weekly reconciliation to heal missed events.
+    retry: true,
+  },
+  async (event) => {
+    await syncReadingLogDailySummary(event.params.schoolId, event.params.logId);
+  },
+);
+
+export const reconcileClassDailyReadingScheduled = onSchedule(
+  {
+    schedule: "every sunday 04:30",
+    timeZone: "Australia/Melbourne",
+    timeoutSeconds: 540,
+    memory: "1GiB",
+  },
+  async () => {
+    try {
+      const result = await reconcileClassDailyReadingPass();
+      functions.logger.info("class daily reading reconciliation complete", result);
+      await recordCronRun(
+        "reconcileClassDailyReadingScheduled",
+        "ok",
+        `${result.schools} schools; ${result.logs} logs; ` +
+          `${result.summaries} summaries`,
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      functions.logger.error("class daily reading reconciliation failed", {
+        error: message,
+      });
+      await recordCronRun(
+        "reconcileClassDailyReadingScheduled",
+        "error",
+        message,
+      );
+      throw err;
+    }
+  },
+);
 
 // Live bucket-usage counters (opsMetrics/storageUsage) for the super-admin
 // dashboard: storage triggers keep the totals current, a nightly reconcile

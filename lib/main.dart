@@ -237,9 +237,11 @@ Future<void> _initializeCore() async {
 
   // Bring up the out-of-band remote-message client. No-op unless
   // `LUMI_STATUS_WORKER_URL` was supplied at build time.
-  if (isRemoteMessageConfigured) {
+  final statusEndpoint = remoteMessageEndpoint;
+  if (statusEndpoint != null) {
     try {
-      await RemoteMessageController.instance.initialize();
+      final controller = RemoteMessageController.ensureInstance(statusEndpoint);
+      await controller.initialize();
     } catch (e) {
       debugPrint('Warning: RemoteMessageController init failed: $e');
     }

@@ -99,8 +99,8 @@ fetch.
 | `severity`      | Colour: `info`=blue, `warn`=yellow, `critical`=red.                     |
 | `dismissible`   | When false the X button is hidden.                                      |
 | `updatedAt`     | Set by the Worker on every POST. Shown in the connection-status screen. |
-| `minAppVersion` | Reserved for v2 (force-update flow). v1 client ignores it.              |
-| `platforms`     | Reserved for v2 (targeting). v1 client ignores it.                      |
+| `minAppVersion` | Blocks older releases behind the update screen. Malformed policy fails into support mode. |
+| `platforms`     | Optional `ios` / `android` targeting for the minimum-version policy.    |
 
 ## Typical workflow during an outage
 
@@ -131,10 +131,9 @@ curl -X POST https://lumistatus.aged-morning-985b.workers.dev/status \
 ## What the user CAN'T do remotely (yet)
 
 The v1 client deliberately keeps the JSON small. Things to defer to v2:
-- Per-platform targeting (only show on iOS, only show on web)
+- Per-platform targeting for ordinary banners (minimum-version targeting is supported)
 - Per-role targeting (only show parents, only show teachers)
 - CTA button + URL on the banner
-- `minAppVersion` for a force-update blocker
 - Markdown / rich text
 
 If any of those become urgent, extend `packages/status-worker/src/index.ts`

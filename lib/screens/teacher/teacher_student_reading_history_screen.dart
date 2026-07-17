@@ -1,7 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../core/widgets/inline_stream_error.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
@@ -11,6 +10,7 @@ import '../../core/widgets/lumi/teacher_filter_chip.dart';
 import '../../data/models/reading_log_model.dart';
 import '../../data/models/student_model.dart';
 import '../../services/firebase_service.dart';
+import '../../services/reading_history_service.dart';
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
@@ -36,6 +36,15 @@ class TeacherStudentReadingHistoryScreen extends StatefulWidget {
 class _TeacherStudentReadingHistoryScreenState
     extends State<TeacherStudentReadingHistoryScreen> {
   final FirebaseService _firebaseService = FirebaseService.instance;
+  late final ReadingHistoryService _readingHistoryService =
+      ReadingHistoryService(firestore: _firebaseService.firestore);
+
+  final List<_ReadingLogSnapshot> _history = [];
+  ReadingHistoryCursor? _historyCursor;
+  bool _historyHasMore = true;
+  bool _historyLoading = false;
+  Object? _historyError;
+  int _historyGeneration = 0;
 
   _ViewMode _viewMode = _ViewMode.logs;
   Set<String> _selectedFeelings = {};
@@ -44,9 +53,73 @@ class _TeacherStudentReadingHistoryScreenState
   final TextEditingController _searchController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _loadNextHistoryPage();
+  }
+
+  @override
+  void didUpdateWidget(
+    covariant TeacherStudentReadingHistoryScreen oldWidget,
+  ) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.student.id == widget.student.id &&
+        oldWidget.student.schoolId == widget.student.schoolId &&
+        oldWidget.student.classId == widget.student.classId) {
+      return;
+    }
+    _resetHistory();
+    _loadNextHistoryPage();
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _resetHistory() {
+    _historyGeneration++;
+    _history.clear();
+    _historyCursor = null;
+    _historyHasMore = true;
+    _historyLoading = false;
+    _historyError = null;
+  }
+
+  Future<void> _loadNextHistoryPage() async {
+    if (_historyLoading || !_historyHasMore) return;
+    final generation = _historyGeneration;
+    setState(() {
+      _historyLoading = true;
+      _historyError = null;
+    });
+    try {
+      final page = await _readingHistoryService.fetchStudentPage(
+        schoolId: widget.student.schoolId,
+        studentId: widget.student.id,
+        classId: widget.student.classId,
+        startAfter: _historyCursor,
+      );
+      if (!mounted || generation != _historyGeneration) return;
+      setState(() {
+        final existingIds = _history.map((log) => log.id).toSet();
+        _history.addAll(
+          page.logs
+              .map(_ReadingLogSnapshot.fromModel)
+              .where((log) => existingIds.add(log.id)),
+        );
+        _historyCursor = page.nextCursor;
+        _historyHasMore = page.hasMore;
+        _historyLoading = false;
+      });
+    } catch (error) {
+      if (!mounted || generation != _historyGeneration) return;
+      setState(() {
+        _historyLoading = false;
+        _historyError = error;
+      });
+    }
   }
 
   // ─── Filter & Group ─────────────────────────────────────────────────────────
@@ -137,103 +210,105 @@ class _TeacherStudentReadingHistoryScreenState
           const SizedBox(width: 8),
         ],
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: _firebaseService.firestore
-            .collection('schools')
-            .doc(widget.student.schoolId)
-            .collection('readingLogs')
-            .where('classId', isEqualTo: widget.student.classId)
-            .where('studentId', isEqualTo: widget.student.id)
-            .orderBy('date', descending: true)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: InlineStreamError(
-                message: "Couldn't load reading history.",
-                onRetry: () => setState(() {}),
-              ),
-            );
-          }
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: _buildHistoryBody(),
+    );
+  }
 
-          final allLogs = _toReadingLogs(snapshot.data!);
+  Widget _buildHistoryBody() {
+    if (_history.isEmpty && _historyLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_history.isEmpty && _historyError != null) {
+      return Center(
+        child: InlineStreamError(
+          message: "Couldn't load reading history.",
+          onRetry: _loadNextHistoryPage,
+        ),
+      );
+    }
+    if (_history.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.menu_book_outlined,
+              size: 48,
+              color: LumiTokens.muted,
+            ),
+            const SizedBox(height: 12),
+            Text('No reading history yet', style: LumiType.caption),
+          ],
+        ),
+      );
+    }
 
-          if (allLogs.isEmpty) {
-            return Center(
+    final filtered = _applyFilters(_history);
+    final books = _viewMode == _ViewMode.books
+        ? _groupByBook(filtered)
+        : <_BookSummary>[];
+
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: _buildStatsBar(
+            _history,
+            filteredCount: _hasActiveFilters ? filtered.length : null,
+            historyComplete: !_historyHasMore,
+          ),
+        ),
+        SliverToBoxAdapter(child: _buildFilterSection()),
+        if (filtered.isEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.menu_book_outlined,
-                      size: 48, color: LumiTokens.muted),
-                  const SizedBox(height: 12),
-                  Text('No reading history yet', style: LumiType.caption),
+                  Icon(
+                    Icons.filter_list_off,
+                    size: 40,
+                    color: LumiTokens.muted,
+                  ),
+                  const SizedBox(height: 10),
+                  Text('No loaded logs match your filters',
+                      style: LumiType.caption),
                 ],
               ),
-            );
-          }
-
-          final filtered = _applyFilters(allLogs);
-          final books = _viewMode == _ViewMode.books
-              ? _groupByBook(filtered)
-              : <_BookSummary>[];
-
-          return CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
-                  child: _buildStatsBar(allLogs,
-                      filteredCount:
-                          _hasActiveFilters ? filtered.length : null)),
-              SliverToBoxAdapter(child: _buildFilterSection()),
-              if (filtered.isEmpty)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.filter_list_off,
-                            size: 40, color: LumiTokens.muted),
-                        const SizedBox(height: 10),
-                        Text('No logs match your filters',
-                            style: LumiType.caption),
-                      ],
-                    ),
-                  ),
-                )
-              else if (_viewMode == _ViewMode.logs)
-                SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) => _buildReadingLogRow(
-                      filtered[index],
-                      showDivider: index < filtered.length - 1,
-                    ),
-                    childCount: filtered.length,
-                  ),
-                )
-              else
-                SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) => _buildBookSummaryRow(
-                      books[index],
-                      showDivider: index < books.length - 1,
-                    ),
-                    childCount: books.length,
-                  ),
-                ),
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
-            ],
-          );
-        },
-      ),
+            ),
+          )
+        else if (_viewMode == _ViewMode.logs)
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => _buildReadingLogRow(
+                filtered[index],
+                showDivider: index < filtered.length - 1,
+              ),
+              childCount: filtered.length,
+            ),
+          )
+        else
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => _buildBookSummaryRow(
+                books[index],
+                showDivider: index < books.length - 1,
+              ),
+              childCount: books.length,
+            ),
+          ),
+        SliverToBoxAdapter(child: _buildPaginationFooter()),
+        const SliverToBoxAdapter(child: SizedBox(height: 24)),
+      ],
     );
   }
 
   // ─── Stats Bar ──────────────────────────────────────────────────────────────
 
-  Widget _buildStatsBar(List<_ReadingLogSnapshot> logs, {int? filteredCount}) {
+  Widget _buildStatsBar(
+    List<_ReadingLogSnapshot> logs, {
+    int? filteredCount,
+    required bool historyComplete,
+  }) {
     final totalNights = logs.length;
     final totalMinutes = logs.fold(0, (acc, l) => acc + l.minutesRead);
     final booksRead = logs
@@ -255,11 +330,20 @@ class _TeacherStudentReadingHistoryScreenState
           IntrinsicHeight(
             child: Row(
               children: [
-                _buildStatCell('$totalNights', 'Nights logged'),
+                _buildStatCell(
+                  '$totalNights',
+                  historyComplete ? 'Nights logged' : 'Nights loaded',
+                ),
                 VerticalDivider(width: 1, thickness: 1, color: LumiTokens.rule),
-                _buildStatCell('$totalMinutes', 'Total minutes'),
+                _buildStatCell(
+                  '$totalMinutes',
+                  historyComplete ? 'Total minutes' : 'Minutes loaded',
+                ),
                 VerticalDivider(width: 1, thickness: 1, color: LumiTokens.rule),
-                _buildStatCell('$booksRead', 'Books read'),
+                _buildStatCell(
+                  '$booksRead',
+                  historyComplete ? 'Books read' : 'Books loaded',
+                ),
               ],
             ),
           ),
@@ -270,6 +354,55 @@ class _TeacherStudentReadingHistoryScreenState
               style: LumiType.caption.copyWith(color: LumiTokens.muted),
             ),
           ],
+          if (!historyComplete) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Showing recent history. Load older sessions below for complete totals and search results.',
+              textAlign: TextAlign.center,
+              style: LumiType.caption.copyWith(color: LumiTokens.muted),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaginationFooter() {
+    if (!_historyHasMore && _historyError == null) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 16),
+        child: Text(
+          'All ${_history.length} sessions loaded',
+          textAlign: TextAlign.center,
+          style: LumiType.caption.copyWith(color: LumiTokens.muted),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+      child: Column(
+        children: [
+          if (_historyError != null) ...[
+            Text(
+              "Couldn't load older history. The sessions already shown are unaffected.",
+              textAlign: TextAlign.center,
+              style: LumiType.caption.copyWith(color: LumiTokens.red),
+            ),
+            const SizedBox(height: 8),
+          ],
+          OutlinedButton.icon(
+            onPressed: _historyLoading ? null : _loadNextHistoryPage,
+            icon: _historyLoading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.history_rounded),
+            label: Text(
+              _historyLoading ? 'Loading older history…' : 'Load older history',
+            ),
+          ),
         ],
       ),
     );
@@ -629,54 +762,6 @@ class _TeacherStudentReadingHistoryScreenState
     );
   }
 
-  List<_ReadingLogSnapshot> _toReadingLogs(QuerySnapshot snapshot) {
-    return snapshot.docs.map((doc) {
-      final data = doc.data() as Map<String, dynamic>;
-      final dateTimestamp = data['date'] as Timestamp?;
-      final commentSelections = data['parentCommentSelections'];
-      final viewedRaw = data['commentsViewedAt'] as Map<String, dynamic>?;
-      return _ReadingLogSnapshot(
-        id: doc.id,
-        date: dateTimestamp?.toDate() ?? DateTime.fromMillisecondsSinceEpoch(0),
-        createdAt: (data['createdAt'] as Timestamp?)?.toDate() ??
-            dateTimestamp?.toDate() ??
-            DateTime.fromMillisecondsSinceEpoch(0),
-        allocationId: data['allocationId'] as String?,
-        bookTitles: List<String>.from(data['bookTitles'] ?? const []),
-        status: (data['status'] as String?) ?? '',
-        minutesRead: (data['minutesRead'] as num?)?.toInt() ?? 0,
-        targetMinutes: (data['targetMinutes'] as num?)?.toInt() ?? 0,
-        notes: (data['notes'] as String?)?.trim(),
-        parentId: data['parentId'] as String?,
-        parentComment: (data['parentComment'] as String?)?.trim(),
-        parentCommentSelections: commentSelections is List
-            ? commentSelections.whereType<String>().toList()
-            : const [],
-        parentCommentFreeText:
-            (data['parentCommentFreeText'] as String?)?.trim(),
-        childFeeling: data['childFeeling'] as String?,
-        comprehensionAudioPath: data['comprehensionAudioPath'] as String?,
-        comprehensionAudioDurationSec:
-            (data['comprehensionAudioDurationSec'] as num?)?.toInt(),
-        comprehensionAudioUploaded:
-            data['comprehensionAudioUploaded'] as bool? ?? false,
-        isQuickLog:
-            (data['metadata'] as Map<String, dynamic>?)?['quickLog'] == true,
-        loggedByName: (data['loggedByName'] as String?)?.trim(),
-        loggedByLabel: (data['loggedByLabel'] as String?)?.trim(),
-        lastCommentAt: (data['lastCommentAt'] as Timestamp?)?.toDate(),
-        lastCommentByRole: data['lastCommentByRole'] as String?,
-        commentsViewedAt: viewedRaw == null
-            ? const {}
-            : {
-                for (final entry in viewedRaw.entries)
-                  if (entry.value is Timestamp)
-                    entry.key: (entry.value as Timestamp).toDate(),
-              },
-      );
-    }).toList();
-  }
-
   String _formatCommentDate(DateTime date) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -851,6 +936,34 @@ class _ReadingLogSnapshot {
     this.lastCommentByRole,
     this.commentsViewedAt = const {},
   });
+
+  factory _ReadingLogSnapshot.fromModel(ReadingLogModel log) {
+    return _ReadingLogSnapshot(
+      id: log.id,
+      date: log.date,
+      createdAt: log.createdAt,
+      allocationId: log.allocationId,
+      bookTitles: log.bookTitles,
+      status: log.status.name,
+      minutesRead: log.minutesRead,
+      targetMinutes: log.targetMinutes,
+      notes: log.notes?.trim(),
+      parentId: log.parentId,
+      parentComment: log.parentComment?.trim(),
+      parentCommentSelections: log.parentCommentSelections,
+      parentCommentFreeText: log.parentCommentFreeText?.trim(),
+      childFeeling: log.childFeeling?.name,
+      loggedByName: log.loggedByName?.trim(),
+      loggedByLabel: log.loggedByLabel?.trim(),
+      comprehensionAudioPath: log.comprehensionAudioPath,
+      comprehensionAudioDurationSec: log.comprehensionAudioDurationSec,
+      comprehensionAudioUploaded: log.comprehensionAudioUploaded,
+      isQuickLog: log.isQuickLog,
+      lastCommentAt: log.lastCommentAt,
+      lastCommentByRole: log.lastCommentByRole,
+      commentsViewedAt: log.commentsViewedAt,
+    );
+  }
 
   /// "Logged by …" attribution, or null if this is a legacy log.
   String? get loggedByDisplay => loggedByLabel ?? loggedByName;
