@@ -75,7 +75,11 @@ The detailed register is `VENDOR_DATA_FLOW_REGISTER.md`. The main paths are:
   managed-service enforcement awaits store-signed attestation evidence.
 - Analytics and Crashlytics are independently off by default and adult
   controlled. Physical iPhone traffic evidence confirmed withdrawal.
-- Voice is off by default per school and the AI pipeline remains off.
+- Voice is off by default per school. On first opt-in, the portal requires a
+  school admin to confirm authority and family notice/opt-out responsibility
+  and choose 7, 30, 90 or 365-day retention. Versioned evidence is written by
+  the server; Firestore/Storage clients cannot forge it, and uploads fail closed
+  without current evidence. The AI pipeline remains off.
 - Account and student deletion are idempotent server jobs; pending audio is
   removed after 24 hours and deletion receipts after 90 days.
 - Firestore has seven-day point-in-time recovery and deletion protection.
@@ -98,7 +102,7 @@ Likelihood and impact are rated Low / Medium / High after current controls.
 | --- | --- | --- | --- | --- | --- |
 | P-01 | Teacher/parent can access another class, family or school | Low | High | Maintain rule tests for every changed collection and production denial canaries | Controlled; review every auth/data release |
 | P-02 | Client forges role, ownership, timestamps, stats or system fields | Low | High | Keep roles/system fields server-owned and schemas allow-listed | Controlled |
-| P-03 | Voice recorded without documented school authority or retained too long | Medium | High | Obtain school authority/notice evidence before enabling; choose and record retention days; quarterly audit enabled schools | Open release blocker |
+| P-03 | Voice recorded without documented school authority or retained too long | Low | High | First-enable server gate records authority/notice declarations and 7/30/90/365-day retention; uploads fail closed without current evidence; audit enabled schools quarterly | Technical gate implemented; each school must still make and honour its decision |
 | P-04 | Transcript/audio disclosed to an overseas AI provider or used for training | Medium if enabled | High | Keep kill switch off; execute DPA; document countries/subprocessors, ZDR/training, deletion and APP 8 steps; approve a new PIA | Blocked by design / no-go |
 | P-05 | Optional SDK sends data before consent or policy differs from runtime | Low | Medium | Keep native+Dart defaults off; repeat store-signed traffic capture and questionnaires every SDK change | Store evidence open |
 | P-06 | App Check enforcement locks out real users or is left unenforced indefinitely | Medium | Medium | Observe store-attested valid traffic, stage enforcement, monitor denials and maintain rollback | Store evidence open |
@@ -117,8 +121,10 @@ Likelihood and impact are rated Low / Medium / High after current controls.
 - **APP 3 / collection:** the purpose table records necessity; voice,
   diagnostics and AI are not treated as necessary core data.
 - **APP 5 / notice:** the live privacy page describes categories, providers,
-  location, optional diagnostics and deletion. School-specific voice notice and
-  authority evidence remain open.
+  location, optional diagnostics and deletion. First audio opt-in now records
+  the school's authority and its commitment to notify families, explain purpose
+  and retention, and offer a practical opt-out. The school must still deliver
+  that notice; the checkbox is evidence, not a substitute for it.
 - **APP 6 / use and disclosure:** school use is role/class/child-scoped. New
   vendors or AI purposes require change review.
 - **APP 8 / overseas recipients:** contracts and overseas support/subprocessor
@@ -149,13 +155,18 @@ https://www.oaic.gov.au/privacy/privacy-registers/privacy-codes/childrens-online
 
 ### Must close before processing real school voice or AI data
 
-- [ ] Record the enabling school's authority, notice/consent basis, contact and
-  chosen audio retention period.
+- [x] Require and record the enabling school's authority declaration, family
+  notice/opt-out commitment and chosen 7/30/90/365-day audio retention period
+  before collection. *(Implemented as a first-opt-in portal gate with protected
+  audit evidence and fail-closed upload enforcement. Each school remains
+  responsible for the declared notice/authority process.)*
 - [ ] Complete Google/Firebase and SendGrid DPA/subprocessor/location/support
   evidence and an APP 8 decision approved by counsel.
 - [ ] Keep AI provider processing disabled until a separate approved PIA and
   vendor controls exist.
-- [ ] Confirm both security alert inboxes and the support mailbox are monitored.
+- [~] Confirm both security alert inboxes and the support mailbox are monitored.
+  *(Support is owner-confirmed daily and MFA-protected; synthetic alert receipt
+  in the primary and backup security inboxes is still unconfirmed.)*
 - [ ] Complete the user's signed-in account/student deletion device test.
 
 ### Must close before public store launch

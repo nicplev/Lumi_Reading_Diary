@@ -238,6 +238,25 @@ service cloud.firestore {
                 newSettings.get('aiEvaluation', null);
       }
 
+      // The school admin portal records a versioned authority statement and
+      // retention choice with Admin SDK. Mobile/Web Firestore clients must not
+      // be able to forge that evidence or enable child voice collection by
+      // editing the nested school setting directly.
+      function comprehensionRecordingSettingsAbsentOnCreate() {
+        let settings = request.resource.data.get('settings', {});
+        return settings is map &&
+            !settings.keys().hasAny(['comprehensionRecording']);
+      }
+
+      function comprehensionRecordingSettingsUnchanged() {
+        let oldSettings = resource.data.get('settings', {});
+        let newSettings = request.resource.data.get('settings', {});
+        return oldSettings is map &&
+            newSettings is map &&
+            oldSettings.get('comprehensionRecording', null) ==
+                newSettings.get('comprehensionRecording', null);
+      }
+
       // No client `list`. A collection query returns full documents, and the
       // school doc holds cross-tenant org/billing data (address, contactEmail,
       // contactPhone, subscription, access). Any signed-in user could otherwise
@@ -253,11 +272,13 @@ service cloud.firestore {
       allow create: if isSignedIn() &&
           request.resource.data.createdBy == request.auth.uid &&
           aiEvaluationSettingsAbsentOnCreate() &&
+          comprehensionRecordingSettingsAbsentOnCreate() &&
           writeAllowedForDev();
 
       allow update: if isSchoolAdmin(schoolId) &&
           writeAllowedForDev() &&
-          aiEvaluationSettingsUnchanged();
+          aiEvaluationSettingsUnchanged() &&
+          comprehensionRecordingSettingsUnchanged();
 
       // Controlled counter increments for onboarding/registration lifecycle.
       allow update: if isSignedIn() &&

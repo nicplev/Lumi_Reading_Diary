@@ -1,12 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
 import { getSchool, updateSchool } from '@/lib/firestore/school';
+import {
+  AudioAuthorityRequiredError,
+  updateComprehensionRecordingPreference,
+} from '@/lib/firestore/comprehension-authority';
 import { isComprehensionRecordingGloballyEnabled } from '@/lib/firestore/platform-config';
 import { z } from 'zod';
 
+function serializeDateLike(value: unknown): unknown {
+  if (value instanceof Date) return value.toISOString();
+  if (
+    value &&
+    typeof value === 'object' &&
+    typeof (value as { toDate?: unknown }).toDate === 'function'
+  ) {
+    return (value as { toDate: () => Date }).toDate().toISOString();
+  }
+  return value;
+}
+
 function serializeSchool(s: Record<string, unknown>) {
+  const settings = s.settings && typeof s.settings === 'object'
+    ? { ...(s.settings as Record<string, unknown>) }
+    : {};
+  const audio = settings.comprehensionRecording;
+  if (audio && typeof audio === 'object') {
+    const serializedAudio = { ...(audio as Record<string, unknown>) };
+    serializedAudio.authorityConfirmedAt = serializeDateLike(
+      serializedAudio.authorityConfirmedAt,
+    );
+    serializedAudio.updatedAt = serializeDateLike(serializedAudio.updatedAt);
+    settings.comprehensionRecording = serializedAudio;
+  }
   return {
     ...s,
+    settings,
     createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
     subscriptionExpiry: s.subscriptionExpiry instanceof Date ? s.subscriptionExpiry.toISOString() : s.subscriptionExpiry ?? null,
     termDates: s.termDates
@@ -66,9 +95,19 @@ const updateSchema = z.object({
   quickLoggingSettings: z.object({
     enabled: z.boolean(),
   }).optional(),
-  comprehensionRecordingSettings: z.object({
-    enabled: z.boolean(),
-  }).optional(),
+  comprehensionRecordingSettings: z.discriminatedUnion('enabled', [
+    z.object({ enabled: z.literal(false) }).strict(),
+    z.object({
+      enabled: z.literal(true),
+      authorityDecision: z.object({
+        authorisedBySchool: z.literal(true),
+        familyNoticeConfirmed: z.literal(true),
+        retentionDays: z.union([
+          z.literal(7), z.literal(30), z.literal(90), z.literal(365),
+        ]),
+      }).strict().optional(),
+    }).strict(),
+  ]).optional(),
   messagingSettings: z.object({
     enabled: z.boolean(),
   }).optional(),
@@ -152,11 +191,27 @@ export async function PATCH(request: NextRequest) {
         { status: 409 }
       );
     }
-    await updateSchool(session.schoolId, data);
+    const { comprehensionRecordingSettings, ...ordinarySettings } = data;
+    if (comprehensionRecordingSettings) {
+      await updateComprehensionRecordingPreference(
+        session.schoolId,
+        comprehensionRecordingSettings,
+        { uid: session.uid, role: 'schoolAdmin' },
+      );
+    }
+    if (Object.keys(ordinarySettings).length > 0) {
+      await updateSchool(session.schoolId, ordinarySettings);
+    }
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.errors[0].message }, { status: 400 });
+    }
+    if (error instanceof AudioAuthorityRequiredError) {
+      return NextResponse.json(
+        { error: error.message, code: 'audio-authority-required' },
+        { status: 409 },
+      );
     }
     return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 });
   }

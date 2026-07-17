@@ -2939,6 +2939,39 @@ test('AI settings: school admin cannot grant entitlement or change the platform 
   );
 });
 
+test('audio authority: school admin clients cannot forge collection authority', async () => {
+  await seedAiEvaluationRulesFixture();
+  const adminDb = authDb('admin_1');
+  const school = adminDb.collection('schools').doc('school_1');
+
+  // Ordinary school administration remains available through the client.
+  await assertSucceeds(school.update({ contactPhone: '03 9000 0000' }));
+  await assertFails(school.update({
+    'settings.comprehensionRecording': {
+      enabled: true,
+      authorityVersion: 'school-audio-v1-2026-07-17',
+      authorityConfirmedAt: serverTimestamp(),
+      retentionDays: 365,
+    },
+  }));
+
+  // The bootstrap path cannot smuggle authority into a newly-created school.
+  await assertFails(
+    authDb('audio_bootstrap').collection('schools').doc('audio_bootstrap').set({
+      name: 'Audio Bootstrap School',
+      createdBy: 'audio_bootstrap',
+      settings: {
+        comprehensionRecording: {
+          enabled: true,
+          authorityVersion: 'school-audio-v1-2026-07-17',
+          authorityConfirmedAt: serverTimestamp(),
+          retentionDays: 365,
+        },
+      },
+    }),
+  );
+});
+
 test('AI adminMeta: commercial settings are unreadable and unwritable by school members', async () => {
   await seedAiEvaluationRulesFixture();
 

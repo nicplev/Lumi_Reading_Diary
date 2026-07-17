@@ -16,6 +16,18 @@ service firebase.storage {
       return config.data.enabled == true;
     }
 
+    function schoolAudioCollectionAuthorised(schoolId) {
+      let school = firestore.get(
+        /databases/(default)/documents/schools/$(schoolId)
+      );
+      let audio = school.data.get('settings', {})
+          .get('comprehensionRecording', {});
+      return audio.get('enabled', false) == true
+          && audio.get('authorityVersion', '') == 'school-audio-v1-2026-07-17'
+          && audio.get('authorityConfirmedAt', null) is timestamp
+          && audio.get('retentionDays', 0) in [7, 30, 90, 365];
+    }
+
     function ownsAudioLog(schoolId, fileName) {
       let logId = request.resource.metadata.logId;
       let log = firestore.get(
@@ -60,6 +72,7 @@ service firebase.storage {
       allow write: if request.resource != null
                    && ownsAudioLog(schoolId, fileName)
                    && comprehensionRecordingEnabled()
+                   && schoolAudioCollectionAuthorised(schoolId)
                    && request.resource.size < 2 * 1024 * 1024
                    && request.resource.contentType == 'audio/mp4';
     }

@@ -25,7 +25,7 @@ listed gate is closed.
 | Google Books API | ISBN/title search and public book metadata | Google public API; may process globally | No identity data intended | Request includes only ISBN/title; API-key target restriction; manual entry fallback | Confirm privacy terms and remove/replace obsolete key if unnecessary | Low risk |
 | Open Library / Internet Archive | ISBN/title search, description and cover images | Overseas public service | No identity data intended | Request includes only ISBN/title/work ID; manual entry fallback | Record current privacy/retention terms | Low risk |
 | Apple App Store / Google Play | Distribution, purchase/account and store diagnostics governed by platform | Platform-defined global processing | Adult/device data; store age context may apply | No ad SDK; privacy disclosures prepared | Organisation enrolment, final questionnaires, agreements and signed artifact evidence | Store blocked |
-| Support mailbox provider | Privacy, access, correction, deletion and incident reports | Not recorded | Potentially yes | Stable `support@lumi-reading.com` address and public support page | Name provider, enable MFA, restrict delegates, define retention and prove monitoring | Open release action |
+| Support mailbox provider | Privacy, access, correction, deletion and incident reports | Not recorded | Potentially yes | Stable `support@lumi-reading.com` address and public support page; owner confirmed daily monitoring and MFA on 17 July 2026 | Name provider, record/restrict delegates and define mailbox retention | Open release action |
 
 ## Configured but prohibited for production personal data
 

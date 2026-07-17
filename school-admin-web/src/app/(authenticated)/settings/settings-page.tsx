@@ -21,6 +21,7 @@ import type {
   ParentCommentSettings,
   QuickLoggingSettings,
   ComprehensionRecordingSettings,
+  ComprehensionRecordingUpdate,
   MessagingSettings,
 } from '@/lib/types';
 import { ParentCommentSettingsSection, DEFAULT_PRESETS, type CommentPreviewState } from './parent-comment-settings';
@@ -254,7 +255,7 @@ export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
   };
 
   const handleSaveComprehension = async (
-    comprehensionSettings: ComprehensionRecordingSettings,
+    comprehensionSettings: ComprehensionRecordingUpdate,
   ) => {
     setSavingComprehension(true);
     try {
@@ -264,6 +265,7 @@ export function SettingsPage({ initialTab, renewals }: SettingsPageProps) {
       toast('Comprehension recording updated', 'success');
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Failed to save', 'error');
+      throw error;
     } finally {
       setSavingComprehension(false);
     }

@@ -78,11 +78,20 @@ async function seedFlag(enabled) {
   });
 }
 
-async function seedAudioLog(uploaded = false) {
+async function seedAudioLog(uploaded = false, authorised = true) {
   await testEnv.withSecurityRulesDisabled(async (context) => {
-    await context.firestore()
-      .collection('schools').doc('school_1')
-      .collection('readingLogs').doc('log_1').set({
+    const school = context.firestore().collection('schools').doc('school_1');
+    await school.set({
+      settings: {
+        comprehensionRecording: authorised ? {
+          enabled: true,
+          authorityVersion: 'school-audio-v1-2026-07-17',
+          authorityConfirmedAt: new Date(),
+          retentionDays: 30,
+        } : {enabled: true},
+      },
+    });
+    await school.collection('readingLogs').doc('log_1').set({
         schoolId: 'school_1',
         classId: 'class_1',
         studentId: 'student_1',
@@ -134,6 +143,12 @@ test('comprehension audio: owning parent can upload canonical object when enable
 test('comprehension audio: disabled kill switch denies upload', async () => {
   await seedAudioLog();
   await seedFlag(false);
+  await assertFails(uploadBytes(audioRef('parent_1'), AUDIO_BYTES, AUDIO_METADATA));
+});
+
+test('comprehension audio: school authority and retention evidence fail closed', async () => {
+  await seedAudioLog(false, false);
+  await seedFlag(true);
   await assertFails(uploadBytes(audioRef('parent_1'), AUDIO_BYTES, AUDIO_METADATA));
 });
 

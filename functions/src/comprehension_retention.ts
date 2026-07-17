@@ -18,6 +18,10 @@ import {assertNotReadOnly} from "./read_only_guard";
 import {recordCronRun} from "./ops_heartbeat";
 import {errorCodeForLog} from "./log_safety";
 import {
+  retentionDaysForSchool,
+  schoolAudioCollectionIsAuthorised,
+} from "./audio_authority";
+import {
   AUDIO_VALIDATION_VERSION,
   AudioMediaValidationError,
   MAX_TRANSCODED_AUDIO_BYTES,
@@ -98,8 +102,9 @@ interface RunStats {
   deletedCount: number;
   failedCount: number;
   durationMs: number;
-  cutoffISO: string;
-  retentionDays: number;
+  schoolCount: number;
+  legacyDefaultRetentionDays: number;
+  retentionPolicyCounts: Record<string, number>;
 }
 
 interface SkippedReason {
@@ -251,13 +256,9 @@ async function performCleanup(
     return {skipped: true, reason: "invalid_retentionDays"} as const;
   }
 
-  const cutoff = Timestamp.fromMillis(
-    startedAtMs - config.retentionDays * DAY_MS
-  );
-  const cutoffISO = cutoff.toDate().toISOString();
-
   let deletedCount = 0;
   let failedCount = 0;
+  const retentionPolicyCounts: Record<string, number> = {};
   // Defence-in-depth: the page loop cannot exceed (BATCH_SIZE × N) per run.
   // The collection-group query keeps returning expired docs until they get
   // patched (we clear comprehensionAudioUploaded), so without an outer cap
@@ -265,32 +266,69 @@ async function performCleanup(
   // far beyond any realistic 24-hour backlog.
   const MAX_PAGES = 50;
 
-  for (let page = 0; page < MAX_PAGES; page++) {
-    const snap = await db
-      .collectionGroup("readingLogs")
-      .where("comprehensionAudioUploaded", "==", true)
-      .where("createdAt", "<", cutoff)
-      .limit(BATCH_SIZE)
-      .get();
+  const schools = await db.collection("schools").get();
+  for (const school of schools.docs) {
+    const retentionDays = retentionDaysForSchool(
+      school.data(),
+      config.retentionDays
+    );
+    retentionPolicyCounts[String(retentionDays)] =
+      (retentionPolicyCounts[String(retentionDays)] ?? 0) + 1;
+    const cutoff = Timestamp.fromMillis(
+      startedAtMs - retentionDays * DAY_MS
+    );
 
-    if (snap.empty) break;
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const snap = await school.ref
+        .collection("readingLogs")
+        .where("comprehensionAudioUploaded", "==", true)
+        .where("createdAt", "<", cutoff)
+        .limit(BATCH_SIZE)
+        .get();
 
-    for (const doc of snap.docs) {
-      const data = doc.data();
-      const schoolId = schoolIdForReadingLogRef(doc.ref);
-      const expectedPath = schoolId ?
-        comprehensionAudioObjectPath(schoolId, doc.id) :
-        null;
-      const storedPath =
-        typeof data.comprehensionAudioPath === "string" ?
-          data.comprehensionAudioPath :
+      if (snap.empty) break;
+
+      for (const doc of snap.docs) {
+        const data = doc.data();
+        const schoolId = schoolIdForReadingLogRef(doc.ref);
+        const expectedPath = schoolId === school.id ?
+          comprehensionAudioObjectPath(schoolId, doc.id) :
           null;
-      try {
-        // Never follow an unexpected client-supplied path with Admin SDK
-        // credentials. Quarantine the row so it cannot repeatedly enter this
-        // cleanup query or be played, while retaining enough metadata for an
-        // operator to investigate the legacy/corrupt value.
-        if (!expectedPath || audioPathMustBeQuarantined(storedPath, expectedPath)) {
+        const storedPath =
+          typeof data.comprehensionAudioPath === "string" ?
+            data.comprehensionAudioPath :
+            null;
+        try {
+          // Never follow an unexpected client-supplied path with Admin SDK
+          // credentials. Quarantine the row so it cannot repeatedly enter this
+          // cleanup query or be played, while retaining enough metadata for an
+          // operator to investigate the legacy/corrupt value.
+          if (
+            !schoolId ||
+            !expectedPath ||
+            audioPathMustBeQuarantined(storedPath, expectedPath)
+          ) {
+            await doc.ref.update({
+              comprehensionAudioPath: FieldValue.delete(),
+              comprehensionAudioDurationSec: FieldValue.delete(),
+              comprehensionAudioUploaded: false,
+              comprehensionAudioObjectGeneration: FieldValue.delete(),
+              comprehensionAudioSourceGeneration: FieldValue.delete(),
+              comprehensionAudioValidationVersion: FieldValue.delete(),
+              comprehensionAudioValidatedDurationMs: FieldValue.delete(),
+              comprehensionAudioSha256: FieldValue.delete(),
+              comprehensionAudioPathRejectedAt:
+                FieldValue.serverTimestamp(),
+            });
+            failedCount++;
+            functions.logger.error("comprehensionAudio.retention.pathRejected");
+            continue;
+          }
+
+          await deleteStorageObjectIfExists(expectedPath);
+          await deleteStorageObjectIfExists(
+            comprehensionAudioUploadObjectPath(schoolId, doc.id)
+          );
           await doc.ref.update({
             comprehensionAudioPath: FieldValue.delete(),
             comprehensionAudioDurationSec: FieldValue.delete(),
@@ -300,48 +338,29 @@ async function performCleanup(
             comprehensionAudioValidationVersion: FieldValue.delete(),
             comprehensionAudioValidatedDurationMs: FieldValue.delete(),
             comprehensionAudioSha256: FieldValue.delete(),
-            comprehensionAudioPathRejectedAt:
+            comprehensionAudioDeletedAt:
               FieldValue.serverTimestamp(),
           });
+          deletedCount++;
+        } catch (err) {
           failedCount++;
-          functions.logger.error("comprehensionAudio.retention.pathRejected");
-          continue;
+          functions.logger.error("comprehensionAudio.retention.deleteFailed", {
+            errorCode: errorCodeForLog(err),
+          });
         }
-
-        await deleteStorageObjectIfExists(expectedPath);
-        await deleteStorageObjectIfExists(
-          comprehensionAudioUploadObjectPath(schoolId as string, doc.id)
-        );
-        await doc.ref.update({
-          comprehensionAudioPath: FieldValue.delete(),
-          comprehensionAudioDurationSec: FieldValue.delete(),
-          comprehensionAudioUploaded: false,
-          comprehensionAudioObjectGeneration: FieldValue.delete(),
-          comprehensionAudioSourceGeneration: FieldValue.delete(),
-          comprehensionAudioValidationVersion: FieldValue.delete(),
-          comprehensionAudioValidatedDurationMs: FieldValue.delete(),
-          comprehensionAudioSha256: FieldValue.delete(),
-          comprehensionAudioDeletedAt:
-            FieldValue.serverTimestamp(),
-        });
-        deletedCount++;
-      } catch (err) {
-        failedCount++;
-        functions.logger.error("comprehensionAudio.retention.deleteFailed", {
-          errorCode: errorCodeForLog(err),
-        });
       }
-    }
 
-    if (snap.size < BATCH_SIZE) break;
+      if (snap.size < BATCH_SIZE) break;
+    }
   }
 
   const stats: RunStats = {
     deletedCount,
     failedCount,
     durationMs: Date.now() - startedAtMs,
-    cutoffISO,
-    retentionDays: config.retentionDays,
+    schoolCount: schools.size,
+    legacyDefaultRetentionDays: config.retentionDays,
+    retentionPolicyCounts,
   };
 
   await db.doc(RETENTION_DOC).set(
@@ -735,11 +754,17 @@ export const confirmComprehensionAudioUpload = onCall(
     }
 
     const db = admin.firestore();
-    const [flagSnap, logSnap] = await Promise.all([
+    const [flagSnap, schoolSnap, logSnap] = await Promise.all([
       db.doc(RECORDING_FLAG_DOC).get(),
+      db.doc(`schools/${schoolId}`).get(),
       db.doc(`schools/${schoolId}/readingLogs/${logId}`).get(),
     ]);
-    if (!flagSnap.exists || flagSnap.data()?.enabled !== true) {
+    if (
+      !flagSnap.exists ||
+      flagSnap.data()?.enabled !== true ||
+      !schoolSnap.exists ||
+      !schoolAudioCollectionIsAuthorised(schoolSnap.data())
+    ) {
       throw new HttpsError(
         "failed-precondition",
         "Comprehension recording is not enabled"
@@ -913,11 +938,17 @@ export const confirmComprehensionAudioUpload = onCall(
     );
     try {
       await db.runTransaction(async (transaction) => {
-        const [freshFlag, freshLog] = await Promise.all([
+        const [freshFlag, freshSchool, freshLog] = await Promise.all([
           transaction.get(db.doc(RECORDING_FLAG_DOC)),
+          transaction.get(db.doc(`schools/${schoolId}`)),
           transaction.get(logSnap.ref),
         ]);
-        if (!freshFlag.exists || freshFlag.data()?.enabled !== true) {
+        if (
+          !freshFlag.exists ||
+          freshFlag.data()?.enabled !== true ||
+          !freshSchool.exists ||
+          !schoolAudioCollectionIsAuthorised(freshSchool.data())
+        ) {
           throw new HttpsError(
             "failed-precondition",
             "Comprehension recording is not enabled"

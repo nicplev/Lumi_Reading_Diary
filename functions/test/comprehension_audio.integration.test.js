@@ -76,7 +76,18 @@ async function seedLog({
   uploaded = false,
   storedPath,
   createdAt = admin.firestore.Timestamp.now(),
+  retentionDays = 7,
 } = {}) {
+  await admin.firestore().doc(`schools/${schoolId}`).set({
+    settings: {
+      comprehensionRecording: {
+        enabled: true,
+        authorityVersion: 'school-audio-v1-2026-07-17',
+        authorityConfirmedAt: admin.firestore.Timestamp.now(),
+        retentionDays,
+      },
+    },
+  }, { merge: true });
   const path = storedPath ??
     `schools/${schoolId}/comprehension_audio/${logId}.m4a`;
   const ref = admin.firestore().doc(
@@ -208,6 +219,26 @@ test('upload confirmation fails closed for unauthenticated, disabled and non-own
   await rejectsCode(
     invoke(audio.confirmComprehensionAudioUpload, 'parent_outsider', input),
     'permission-denied'
+  );
+});
+
+test('upload confirmation fails closed without current school authority evidence', async () => {
+  await seedFlag(true);
+  await seedLog();
+  await admin.firestore().doc('schools/school_x').update({
+    'settings.comprehensionRecording': {
+      enabled: true,
+      authorityVersion: 'outdated-authority-version',
+      authorityConfirmedAt: admin.firestore.Timestamp.now(),
+      retentionDays: 30,
+    },
+  });
+
+  await rejectsCode(
+    invoke(audio.confirmComprehensionAudioUpload, 'parent_x', {
+      schoolId: 'school_x', logId: 'log_x', durationSec: 12,
+    }),
+    'failed-precondition'
   );
 });
 
@@ -357,23 +388,38 @@ test('scheduled retention deletes canonical objects and quarantines injected pat
     createdAt: old,
     storedPath: 'schools/school_y/comprehension_audio/do_not_delete.m4a',
   });
+  const retainedLog = await seedLog({
+    schoolId: 'school_long_retention',
+    logId: 'not_expired_for_school',
+    uploaded: true,
+    createdAt: old,
+    retentionDays: 90,
+  });
   const canonical = await saveAudio({ logId: 'expired_good' });
   const injected = await saveAudio({
     schoolId: 'school_y', logId: 'do_not_delete',
+  });
+  const retained = await saveAudio({
+    schoolId: 'school_long_retention',
+    logId: 'not_expired_for_school',
   });
 
   await audio.cleanupComprehensionAudio.run({});
 
   assert.equal((await canonical.exists())[0], false);
   assert.equal((await injected.exists())[0], true);
+  assert.equal((await retained.exists())[0], true);
   const good = (await canonicalLog.get()).data();
   const rejected = (await rejectedLog.get()).data();
+  const notExpired = (await retainedLog.get()).data();
   assert.equal(good.comprehensionAudioUploaded, false);
   assert.ok(good.comprehensionAudioDeletedAt);
   assert.equal(rejected.comprehensionAudioUploaded, false);
   assert.ok(rejected.comprehensionAudioPathRejectedAt);
+  assert.equal(notExpired.comprehensionAudioUploaded, true);
   const config = (await admin.firestore()
     .doc('platformConfig/comprehensionRetention').get()).data();
   assert.equal(config.lastRunStats.deletedCount, 1);
   assert.equal(config.lastRunStats.failedCount, 1);
+  assert.deepEqual(config.lastRunStats.retentionPolicyCounts, {7: 1, 90: 1});
 });
