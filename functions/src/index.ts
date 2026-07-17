@@ -581,6 +581,11 @@ function schoolRef(schoolId: string) {
   return db.collection("schools").doc(schoolId);
 }
 
+async function isAuthoritativeDemoSchool(schoolId: string): Promise<boolean> {
+  const snap = await schoolRef(schoolId).get();
+  return snap.exists && snap.data()?.isDemo === true;
+}
+
 async function getTeacherAllowedClassIds(
   schoolId: string,
   userId: string,
@@ -828,6 +833,13 @@ async function dispatchNotificationCampaign(
   schoolId: string,
   campaignRef: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>,
 ): Promise<void> {
+  if (await isAuthoritativeDemoSchool(schoolId)) {
+    await campaignRef.set({
+      status: "failed",
+      errorSummary: "External notification delivery is disabled for the shared demo tenant.",
+    }, {merge: true});
+    return;
+  }
   const claimed = await db.runTransaction(async (transaction) => {
     const snap = await transaction.get(campaignRef);
     if (!snap.exists) return false;
@@ -1269,6 +1281,10 @@ async function processSchool(
   schoolData: FirebaseFirestore.DocumentData,
   utcNow: Date,
 ): Promise<{sent: number; failed: number; stale: number}> {
+  // Shared demo credentials must never cause scheduled external pushes.
+  if (schoolData.isDemo === true) {
+    return {sent: 0, failed: 0, stale: 0};
+  }
   const schoolTz = schoolData.timezone || DEFAULT_TIMEZONE;
   const {hour: localHour, weekday: localWeekday} = getLocalTime(utcNow, schoolTz);
 
@@ -1845,6 +1861,10 @@ export const detectAchievements = onDocumentUpdated(
       awarded: toAward.map((a) => a.id),
     });
 
+    // Keep the in-app demo achievement, but never send an external push from
+    // activity performed with shared credentials.
+    if (await isAuthoritativeDemoSchool(schoolId)) return;
+
     // Notify parents (single notification listing all new achievements)
     if (newData.parentIds?.length > 0) {
       const achievementNames = toAward.map((a) => a.name).join(", ");
@@ -1905,6 +1925,7 @@ export const notifyAwardChanges = onDocumentUpdated(
     const parentIds: string[] =
       Array.isArray(after.parentIds) ? after.parentIds : [];
     if (parentIds.length === 0) return;
+    if (await isAuthoritativeDemoSchool(schoolId)) return;
 
     const firstName = (after.firstName as string) || "Your child";
 
@@ -2325,6 +2346,15 @@ export const processParentOnboardingEmail = onDocumentCreated(
     const schoolId = event.params.schoolId;
     const docRef = event.data.ref;
 
+    const schoolSnap = await db.doc(`schools/${schoolId}`).get();
+    if (schoolSnap.data()?.isDemo === true) {
+      await docRef.update({
+        status: "failed",
+        errorSummary: "External email delivery is disabled for the shared demo tenant",
+      });
+      return;
+    }
+
     // Claim the document
     await docRef.update({status: "processing"});
 
@@ -2341,7 +2371,6 @@ export const processParentOnboardingEmail = onDocumentCreated(
       sgMail.setApiKey(sendgridKey);
 
       // Fetch school
-      const schoolSnap = await db.doc(`schools/${schoolId}`).get();
       const schoolName = schoolSnap.data()?.name ?? "Your School";
       // Whole-school-paid schools cover every rostered student, so the
       // enrollmentStatus "not_enrolled" skip below must not apply to them.
@@ -2580,6 +2609,15 @@ export const processStaffOnboardingEmail = onDocumentCreated(
     const schoolId = event.params.schoolId;
     const docRef = event.data.ref;
 
+    const schoolSnap = await db.doc(`schools/${schoolId}`).get();
+    if (schoolSnap.data()?.isDemo === true) {
+      await docRef.update({
+        status: "failed",
+        errorSummary: "External email delivery is disabled for the shared demo tenant",
+      });
+      return;
+    }
+
     // Claim the document
     await docRef.update({status: "processing"});
 
@@ -2594,7 +2632,6 @@ export const processStaffOnboardingEmail = onDocumentCreated(
       }
       sgMail.setApiKey(sendgridKey);
 
-      const schoolSnap = await db.doc(`schools/${schoolId}`).get();
       const schoolName = schoolSnap.data()?.name ?? "Your School";
 
       const targetUserIds: string[] = data.targetUserIds ?? [];
@@ -3194,6 +3231,9 @@ export const onCommentCreated = onDocumentCreated(
       commentedBy: authorName,
     });
 
+    const schoolSnap = await db.doc(`schools/${schoolId}`).get();
+    if (schoolSnap.data()?.isDemo === true) return;
+
     const parentId =
       typeof comment.parentId === "string" ? comment.parentId : "";
     if (!parentId) return;
@@ -3217,7 +3257,6 @@ export const onCommentCreated = onDocumentCreated(
 
     // Respect the school's quiet hours (the thread + badge still land; only the
     // push is suppressed).
-    const schoolSnap = await db.doc(`schools/${schoolId}`).get();
     const schoolData = schoolSnap.data() ?? {};
     const timezone = String(schoolData.timezone ?? "UTC");
     if (isWithinQuietHours(new Date(), timezone, schoolData.quietHours)) {

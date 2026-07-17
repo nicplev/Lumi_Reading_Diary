@@ -1623,6 +1623,15 @@ function demoAdminClaims() {
   };
 }
 
+function interactiveDemoAdminClaims(overrides = {}) {
+  return {
+    ...demoAdminClaims(),
+    schoolId: DEMO_SCHOOL_ID,
+    demoInteractive: true,
+    ...overrides,
+  };
+}
+
 async function seedDemoAdmin() {
   await seedData(async (db) => {
     await db.collection('schools').doc(DEMO_SCHOOL_ID).set({
@@ -1636,6 +1645,11 @@ async function seedDemoAdmin() {
         schoolId: DEMO_SCHOOL_ID,
         isActive: true,
       });
+    await db.collection('demoAccess').doc('reseedStatus').set({
+      schoolId: DEMO_SCHOOL_ID,
+      state: 'succeeded',
+      phase: 'complete',
+    });
   });
 }
 
@@ -1663,6 +1677,85 @@ test('demo admin: custom-claimed account cannot create students', async () => {
       isActive: true,
     }),
   );
+});
+
+test('demo admin: constrained interactive claim can write school-local books and allocations', async () => {
+  await seedDemoAdmin();
+  const db = authDb(DEMO_ADMIN_UID, interactiveDemoAdminClaims());
+  await assertSucceeds(
+    db.collection('schools').doc(DEMO_SCHOOL_ID).collection('books')
+      .doc('isbn_9780123456786').set({
+        title: 'Synthetic demo book',
+        isbn: '9780123456786',
+        schoolId: DEMO_SCHOOL_ID,
+      }),
+  );
+  await assertSucceeds(
+    db.collection('schools').doc(DEMO_SCHOOL_ID).collection('allocations')
+      .doc('demo_allocation').set({
+        schoolId: DEMO_SCHOOL_ID,
+        classId: 'demo_class',
+        studentIds: [],
+        isActive: true,
+      }),
+  );
+});
+
+test('demo admin: constrained claim cannot mutate global catalogue or queue email', async () => {
+  await seedDemoAdmin();
+  const db = authDb(DEMO_ADMIN_UID, interactiveDemoAdminClaims());
+  await assertFails(
+    db.collection('community_books').doc('9780123456786').set({
+      title: 'Global pollution',
+      contributedBy: DEMO_ADMIN_UID,
+      contributedBySchoolId: DEMO_SCHOOL_ID,
+    }),
+  );
+  await assertFails(
+    db.collection('schools').doc(DEMO_SCHOOL_ID)
+      .collection('parentOnboardingEmails').doc('spam').set({
+        status: 'queued',
+        schoolId: DEMO_SCHOOL_ID,
+        to: 'victim@example.com',
+      }),
+  );
+});
+
+test('demo admin: interactive writes fail closed while reseed is running', async () => {
+  await seedDemoAdmin();
+  await seedData(async (db) => {
+    await db.collection('demoAccess').doc('reseedStatus').update({
+      state: 'running',
+      phase: 'delete',
+    });
+  });
+  const db = authDb(DEMO_ADMIN_UID, interactiveDemoAdminClaims());
+  await assertFails(
+    db.collection('schools').doc(DEMO_SCHOOL_ID).collection('books')
+      .doc('blocked').set({
+        title: 'Blocked during reseed',
+        schoolId: DEMO_SCHOOL_ID,
+      }),
+  );
+});
+
+test('demo admin: incomplete or cross-school capability shapes are denied', async () => {
+  await seedDemoAdmin();
+  const missingReadOnly = authDb(DEMO_ADMIN_UID, interactiveDemoAdminClaims({
+    demoReadOnly: false,
+  }));
+  const wrongSchool = authDb(DEMO_ADMIN_UID, interactiveDemoAdminClaims({
+    demoSchoolId: 'other_school',
+  }));
+  for (const db of [missingReadOnly, wrongSchool]) {
+    await assertFails(
+      db.collection('schools').doc(DEMO_SCHOOL_ID).collection('books')
+        .doc('blocked').set({
+          title: 'Blocked shape',
+          schoolId: DEMO_SCHOOL_ID,
+        }),
+    );
+  }
 });
 
 test('demo admin: isDemo field alone does not activate the read-only claim', async () => {

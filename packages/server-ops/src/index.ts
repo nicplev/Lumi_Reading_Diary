@@ -14,3 +14,5 @@ export * from "./setStorageAlertsConfig";
 export * from "./storageUsageActions";
 export * from "./comprehensionAudioActions";
 export * from "./provisionDemoAccess";
+export * from "./demoSchool/plan";
+export * from "./demoSchool/reseed";

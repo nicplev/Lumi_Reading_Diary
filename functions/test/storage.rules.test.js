@@ -140,6 +140,19 @@ test('comprehension audio: owning parent can upload canonical object when enable
   await assertSucceeds(uploadBytes(audioRef('parent_1'), AUDIO_BYTES, AUDIO_METADATA));
 });
 
+test('comprehension audio: shared demo account cannot create unconfirmed uploads', async () => {
+  await seedAudioLog();
+  await seedFlag(true);
+  const demoRef = ref(
+    testEnv.authenticatedContext('parent_1', {
+      demoAccount: true,
+      demoSchoolId: 'school_1',
+    }).storage(),
+    AUDIO_PATH,
+  );
+  await assertFails(uploadBytes(demoRef, AUDIO_BYTES, AUDIO_METADATA));
+});
+
 test('comprehension audio: disabled kill switch denies upload', async () => {
   await seedAudioLog();
   await seedFlag(false);
@@ -251,6 +264,18 @@ test('community cover: verified teacher can create but cannot overwrite', async 
   await seedTeacher();
   const cover = ref(testEnv.authenticatedContext('teacher_1').storage(), COVER_PATH);
   await assertSucceeds(uploadBytes(cover, AUDIO_BYTES, COVER_METADATA));
+  await assertFails(uploadBytes(cover, AUDIO_BYTES, COVER_METADATA));
+});
+
+test('community cover: shared demo accounts cannot mutate the global catalogue', async () => {
+  await seedTeacher();
+  const cover = ref(
+    testEnv.authenticatedContext('teacher_1', {
+      demoAccount: true,
+      demoSchoolId: 'school_1',
+    }).storage(),
+    COVER_PATH,
+  );
   await assertFails(uploadBytes(cover, AUDIO_BYTES, COVER_METADATA));
 });
 

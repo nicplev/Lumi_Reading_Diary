@@ -16,6 +16,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../core/models/decodable_grading.dart';
+import '../../core/services/demo_session_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/lumi/lumi_toast.dart';
 import '../../data/models/book_model.dart';
@@ -166,6 +167,7 @@ class CommunityBookContributionResult {
     this.coverStoragePath,
     this.bookId,
     this.readingLevel,
+    this.schoolLocalOnly = false,
   });
 
   final String isbn;
@@ -175,6 +177,7 @@ class CommunityBookContributionResult {
   final String? coverStoragePath;
   final String? bookId;
   final String? readingLevel;
+  final bool schoolLocalOnly;
 }
 
 /// Flow:
@@ -1055,10 +1058,11 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
     });
 
     try {
+      final demoSchoolLocalOnly = await DemoSessionService.isDemoAccount();
       // Upload cover image.
       String? coverUrl;
       String? coverPath;
-      if (_coverImage != null) {
+      if (_coverImage != null && !demoSchoolLocalOnly) {
         coverUrl = await _communityService.uploadCoverImage(
           isbn: _scannedIsbn!,
           imageFile: _coverImage!,
@@ -1102,40 +1106,44 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
         }
       }
 
-      // Save book to community database.
+      // Shared demo credentials never write the global catalogue or cover
+      // bucket. The temporary book is still materialized into the isolated
+      // school library below, and disappears on the next fenced reseed.
       final effectiveCoverUrl = coverUrl ?? _resolvedLookupBook?.coverImageUrl;
-      await _communityService.addBook(
-        isbn: _scannedIsbn!,
-        title: title,
-        contributorId: widget.teacher.id,
-        contributorSchoolId: widget.teacher.schoolId ?? '',
-        contributorName: widget.teacher.fullName,
-        author: _authorController.text.trim().isNotEmpty
-            ? _authorController.text.trim()
-            : null,
-        coverImageUrl: coverUrl,
-        coverStoragePath: coverPath,
-        readingLevel: resolvedReadingLevel,
-        levelSchema: resolvedLevelSchema,
-        source: 'teacher_scan',
-        metadata: {
-          'coverSource': coverUrl != null ? 'camera_scan' : null,
-          'hasCameraScannedCover': coverUrl != null,
-          'coverWasManuallyCropped': _coverWasManuallyCropped,
-          'coverWasRotated': _rotationQuarterTurns > 0,
-          if (_isDecodableBook) 'isDecodable': true,
-          if (_isDecodableBook &&
-              _applyGrade &&
-              _selectedSchemaDef != null &&
-              _selectedSchemaDef!.schema != GradingSchema.custom)
-            'gradingSchema': _selectedSchemaDef!.metadataKey,
-        },
-      );
+      if (!demoSchoolLocalOnly) {
+        await _communityService.addBook(
+          isbn: _scannedIsbn!,
+          title: title,
+          contributorId: widget.teacher.id,
+          contributorSchoolId: widget.teacher.schoolId ?? '',
+          contributorName: widget.teacher.fullName,
+          author: _authorController.text.trim().isNotEmpty
+              ? _authorController.text.trim()
+              : null,
+          coverImageUrl: coverUrl,
+          coverStoragePath: coverPath,
+          readingLevel: resolvedReadingLevel,
+          levelSchema: resolvedLevelSchema,
+          source: 'teacher_scan',
+          metadata: {
+            'coverSource': coverUrl != null ? 'camera_scan' : null,
+            'hasCameraScannedCover': coverUrl != null,
+            'coverWasManuallyCropped': _coverWasManuallyCropped,
+            'coverWasRotated': _rotationQuarterTurns > 0,
+            if (_isDecodableBook) 'isDecodable': true,
+            if (_isDecodableBook &&
+                _applyGrade &&
+                _selectedSchemaDef != null &&
+                _selectedSchemaDef!.schema != GradingSchema.custom)
+              'gradingSchema': _selectedSchemaDef!.metadataKey,
+          },
+        );
+      }
 
       if (!_isInlineMode) {
         await _materializeBookToSchoolLibrary(
           isbn: _scannedIsbn!,
-          source: 'community_books',
+          source: demoSchoolLocalOnly ? 'demo_school_local' : 'community_books',
           book: BookModel(
             id: 'isbn_${_scannedIsbn!}',
             title: title,
@@ -1179,6 +1187,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
           coverStoragePath: coverPath,
           bookId: 'isbn_${_scannedIsbn!}',
           readingLevel: resolvedReadingLevel,
+          schoolLocalOnly: demoSchoolLocalOnly,
         ));
       } else {
         setState(() {

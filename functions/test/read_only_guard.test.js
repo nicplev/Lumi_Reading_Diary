@@ -17,7 +17,14 @@ test('assertNotReadOnly: throws when devReadOnly claim is true', () => {
 
 test('assertNotReadOnly: throws for the read-only demo administrator', () => {
   assert.throws(
-    () => assertNotReadOnly(ctx({ demoReadOnly: true })),
+    () => assertNotReadOnly(ctx({ demoAccount: true, demoReadOnly: true })),
+    (e) => e.code === 'permission-denied',
+  );
+});
+
+test('assertNotReadOnly: blocks shared demo teacher and parent accounts too', () => {
+  assert.throws(
+    () => assertNotReadOnly(ctx({ demoAccount: true })),
     (e) => e.code === 'permission-denied',
   );
 });
@@ -35,6 +42,6 @@ test('assertNotReadOnly: only the boolean true blocks, not truthy values', () =>
   // pairing the minter sets, not incidental truthy strings.
   assert.doesNotThrow(() => assertNotReadOnly(ctx({ devReadOnly: 'false' })));
   assert.doesNotThrow(() => assertNotReadOnly(ctx({ devReadOnly: false })));
-  assert.doesNotThrow(() => assertNotReadOnly(ctx({ demoReadOnly: 'true' })));
-  assert.doesNotThrow(() => assertNotReadOnly(ctx({ demoReadOnly: false })));
+  assert.doesNotThrow(() => assertNotReadOnly(ctx({ demoAccount: 'true' })));
+  assert.doesNotThrow(() => assertNotReadOnly(ctx({ demoAccount: false })));
 });

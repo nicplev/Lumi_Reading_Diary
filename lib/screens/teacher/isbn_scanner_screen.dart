@@ -470,7 +470,9 @@ class _IsbnScannerScreenState extends State<IsbnScannerScreen> {
           readingLevel: contributionResult.readingLevel,
           createdAt: DateTime.now(),
         ),
-        source: 'community_books',
+        source: contributionResult.schoolLocalOnly
+            ? 'demo_school_local'
+            : 'community_books',
         schoolId: schoolId,
         actorId: widget.teacher.id,
       );
