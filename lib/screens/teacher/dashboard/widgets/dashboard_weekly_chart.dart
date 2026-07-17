@@ -8,7 +8,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../theme/lumi_tokens.dart';
 import '../../../../theme/lumi_typography.dart';
-import '../../../../core/widgets/lumi_mascot.dart';
 import '../../../../data/models/class_model.dart';
 import '../../../../services/class_daily_reading_service.dart';
 
@@ -570,7 +569,11 @@ class _DashboardWeeklyChartState extends State<DashboardWeeklyChart> {
     return Column(
       children: [
         const SizedBox(height: 8),
-        const LumiMascot(variant: LumiVariant.teacherWhy, size: 48),
+        Image.asset(
+          'assets/UI Lumi/lumi welcome.png',
+          height: 60,
+          fit: BoxFit.contain,
+        ),
         const SizedBox(height: 8),
         Text(
           _weekOffset == 0

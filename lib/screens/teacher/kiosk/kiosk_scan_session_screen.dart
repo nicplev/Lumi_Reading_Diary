@@ -379,12 +379,20 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
                 }
                 return Column(
                   children: [
-                    if (_bannerMessage != null) _buildBanner(),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                      child: _buildScanPanel(),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: [
+                            if (_bannerMessage != null) _buildBanner(),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                              child: _buildScanPanel(),
+                            ),
+                            _buildEntriesPane(shrinkWrap: true),
+                          ],
+                        ),
+                      ),
                     ),
-                    Expanded(child: _buildEntriesPane()),
                     _buildDoneBar(),
                   ],
                 );
@@ -614,8 +622,9 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
         .slideY(begin: -0.15, end: 0, curve: Curves.easeOut);
   }
 
-  Widget _buildEntriesPane() {
+  Widget _buildEntriesPane({bool shrinkWrap = false}) {
     return Column(
+      mainAxisSize: shrinkWrap ? MainAxisSize.min : MainAxisSize.max,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
@@ -627,29 +636,37 @@ class _KioskScanSessionScreenState extends State<KioskScanSessionScreen> {
             style: LumiType.sectionLabel,
           ),
         ),
-        Expanded(child: _buildEntries()),
+        if (shrinkWrap)
+          _buildEntries(shrinkWrap: true)
+        else
+          Expanded(child: _buildEntries()),
       ],
     );
   }
 
-  Widget _buildEntries() {
+  Widget _buildEntries({bool shrinkWrap = false}) {
     if (_entries.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.menu_book_rounded, size: 48, color: LumiTokens.rule),
-            const SizedBox(height: 12),
-            Text(
-              'Your scanned books\nwill appear here.',
-              style: LumiType.body.copyWith(color: LumiTokens.muted),
-              textAlign: TextAlign.center,
-            ),
-          ],
+      return SizedBox(
+        height: 150,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.menu_book_rounded, size: 48, color: LumiTokens.rule),
+              const SizedBox(height: 12),
+              Text(
+                'Your scanned books\nwill appear here.',
+                style: LumiType.body.copyWith(color: LumiTokens.muted),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       );
     }
     return ListView.separated(
+      shrinkWrap: shrinkWrap,
+      physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       itemCount: _entries.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),

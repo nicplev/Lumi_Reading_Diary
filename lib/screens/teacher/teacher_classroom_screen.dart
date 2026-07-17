@@ -606,38 +606,54 @@ class _TeacherClassroomScreenState extends State<TeacherClassroomScreen> {
         child: Row(
           children: [
             // Class name + optional dropdown
-            GestureDetector(
-              onTap: widget.classes.length > 1
-                  ? () => _showClassSelectorBottomSheet(context)
-                  : null,
+            Expanded(
               child: Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    selectedClass.name,
-                    style: LumiType.heading,
+                  Flexible(
+                    flex: 2,
+                    child: GestureDetector(
+                      onTap: widget.classes.length > 1
+                          ? () => _showClassSelectorBottomSheet(context)
+                          : null,
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              selectedClass.name,
+                              style: LumiType.heading,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (widget.classes.length > 1) ...[
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              size: 22,
+                              color: LumiTokens.muted,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
-                  if (widget.classes.length > 1) ...[
-                    const SizedBox(width: 4),
-                    Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      size: 22,
-                      color: LumiTokens.muted,
+                  if (!isLoading) ...[
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        summaryParts.join(' · '),
+                        style: LumiType.caption.copyWith(
+                          color: LumiTokens.muted,
+                          fontWeight: FontWeight.w400,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ],
               ),
             ),
-            const Spacer(),
-            // Inline summary stats
-            if (!isLoading)
-              Text(
-                summaryParts.join(' · '),
-                style: LumiType.caption.copyWith(
-                  color: LumiTokens.muted,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
             const SizedBox(width: 12),
             LumiTourTarget(
               id: 'teacher.class.assignBooks',

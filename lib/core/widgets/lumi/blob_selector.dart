@@ -86,7 +86,18 @@ class _BlobSelectorState extends State<BlobSelector> {
         ],
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: _blobData.map((blob) => _buildBlobItem(blob)).toList(),
+          children: _blobData
+              .map(
+                (blob) => Expanded(
+                  child: Center(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: _buildBlobItem(blob),
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
         ),
       ],
     );
@@ -102,74 +113,74 @@ class _BlobSelectorState extends State<BlobSelector> {
       selected: isSelected,
       label: 'Reading felt ${blob.label}',
       child: GestureDetector(
-      onTap: () => widget.onFeelingSelected(blob.feeling),
-      onTapDown: (_) => setState(() => _hoveredFeeling = blob.feeling),
-      onTapUp: (_) => setState(() => _hoveredFeeling = null),
-      onTapCancel: () => setState(() => _hoveredFeeling = null),
-      child: Padding(
-        padding: const EdgeInsets.all(4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedScale(
-              scale: isSelected
-                  ? 1.2
-                  : isHovered
-                      ? 1.1
-                      : 1.0,
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOut,
-              // A tinted ring + fill on selection so each blob reads as a
-              // control, not just an illustration. Border is always 2px (and
-              // transparent when unselected) so the layout never shifts.
-              child: AnimatedContainer(
+        onTap: () => widget.onFeelingSelected(blob.feeling),
+        onTapDown: (_) => setState(() => _hoveredFeeling = blob.feeling),
+        onTapUp: (_) => setState(() => _hoveredFeeling = null),
+        onTapCancel: () => setState(() => _hoveredFeeling = null),
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedScale(
+                scale: isSelected
+                    ? 1.2
+                    : isHovered
+                        ? 1.1
+                        : 1.0,
                 duration: const Duration(milliseconds: 200),
-                width: 56,
-                height: 64,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? blob.color.withValues(alpha: 0.16)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isSelected ? blob.color : Colors.transparent,
-                    width: 2,
+                curve: Curves.easeOut,
+                // A tinted ring + fill on selection so each blob reads as a
+                // control, not just an illustration. Border is always 2px (and
+                // transparent when unselected) so the layout never shifts.
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 56,
+                  height: 64,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? blob.color.withValues(alpha: 0.16)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isSelected ? blob.color : Colors.transparent,
+                      width: 2,
+                    ),
                   ),
-                ),
-                child: SizedBox(
-                  width: 46,
-                  height: 54,
-                  child: Image.asset(
-                    blob.asset,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => Center(
-                      child: Text(
-                        blob.label[0],
-                        style: LumiTextStyles.h2(color: blob.color),
+                  child: SizedBox(
+                    width: 46,
+                    height: 54,
+                    child: Image.asset(
+                      blob.asset,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => Center(
+                        child: Text(
+                          blob.label[0],
+                          style: LumiTextStyles.h2(color: blob.color),
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              height: isSelected ? 28 : 6,
-            ),
-            Text(
-              blob.label,
-              style: LumiTextStyles.caption(
-                color: isSelected
-                    ? blob.color
-                    : LumiTokens.ink.withValues(alpha: 0.7),
-              ).copyWith(
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                height: isSelected ? 28 : 6,
               ),
-            ),
-          ],
+              Text(
+                blob.label,
+                style: LumiTextStyles.caption(
+                  color: isSelected
+                      ? blob.color
+                      : LumiTokens.ink.withValues(alpha: 0.7),
+                ).copyWith(
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
       ).animate(
         target: isActive ? 1 : 0,
       ),
