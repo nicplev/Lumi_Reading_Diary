@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_model.dart';
 import '../../core/services/user_school_index_service.dart';
+import '../../core/exceptions/session_exceptions.dart';
 
 class UserRepository {
   final FirebaseFirestore _firestore;
@@ -25,8 +26,8 @@ class UserRepository {
       // Phone-only fallback: parents who registered without an email don't
       // have an email-hash record, but they do have a phone-hash record.
       if (indexResult == null && firebaseUser?.phoneNumber != null) {
-        indexResult = await indexService
-            .lookupSchoolByPhone(firebaseUser!.phoneNumber!);
+        indexResult =
+            await indexService.lookupSchoolByPhone(firebaseUser!.phoneNumber!);
       }
 
       if (indexResult != null) {
@@ -51,8 +52,16 @@ class UserRepository {
       if (doc.exists) {
         return UserModel.fromFirestore(doc);
       }
-    } catch (e) {
-      print('Error getting user: $e');
+    } on FirebaseException catch (e) {
+      if (isInvalidOwnProfileSessionError(e)) {
+        throw const InvalidUserSessionException();
+      }
+      // Preserve the difference between "no profile" and "could not check".
+      // Callers keep the current screen and offer retry for transient service
+      // failures instead of dumping a valid user onto the login route.
+      rethrow;
+    } catch (_) {
+      return null;
     }
     return null;
   }

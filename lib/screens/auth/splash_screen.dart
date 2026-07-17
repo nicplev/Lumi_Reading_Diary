@@ -11,6 +11,7 @@ import '../../services/firebase_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/analytics_service.dart';
 import '../../services/phone_verification_recovery_service.dart';
+import '../../core/exceptions/session_exceptions.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -20,15 +21,20 @@ class SplashScreen extends ConsumerStatefulWidget {
 }
 
 class _SplashScreenState extends ConsumerState<SplashScreen> {
+  bool _checking = true;
+  String? _resolutionError;
+
   @override
   void initState() {
     super.initState();
     _checkAuthAndNavigate();
   }
 
-  Future<void> _checkAuthAndNavigate() async {
+  Future<void> _checkAuthAndNavigate({bool includeSplashDelay = true}) async {
     // Wait for splash animation
-    await Future.delayed(const Duration(seconds: 2));
+    if (includeSplashDelay) {
+      await Future.delayed(const Duration(seconds: 2));
+    }
 
     if (!mounted) return;
 
@@ -52,6 +58,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       try {
         await firebaseUser.reload().timeout(const Duration(seconds: 5));
       } catch (e) {
+        if (isTerminalAuthSessionError(e)) {
+          await _endInvalidSession(firebaseService);
+          return;
+        }
         debugPrint('Firebase reload timed out or failed: $e');
         // Continue with cached state rather than hanging
       }
@@ -102,17 +112,56 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           final homeRoute = AppRouter.getHomeRouteForRole(user.role);
           context.go(homeRoute);
         } else {
-          // User document doesn't exist, go to login
-          _navigateToLogin();
+          // A local Auth user without an authoritative profile must not stay
+          // half-signed-in (that state loops public login routes).
+          await _endInvalidSession(firebaseService);
         }
+      } on InvalidUserSessionException {
+        await _endInvalidSession(firebaseService);
       } catch (e) {
         debugPrint('Error getting user data: $e');
-        _navigateToLogin();
+        _showResolutionError();
       }
     } else {
       // User is not logged in
       _navigateToLogin();
     }
+  }
+
+  Future<void> _endInvalidSession(FirebaseService firebaseService) async {
+    try {
+      await firebaseService.signOut();
+    } catch (_) {
+      try {
+        await firebaseService.auth.signOut();
+      } catch (_) {
+        // Checked below; never navigate into a public-route loop while the SDK
+        // still reports this dead local user as signed in.
+      }
+    }
+    if (firebaseService.auth.currentUser != null) {
+      _showResolutionError();
+      return;
+    }
+    if (mounted) _navigateToLogin();
+  }
+
+  void _showResolutionError() {
+    if (!mounted) return;
+    setState(() {
+      _checking = false;
+      _resolutionError = 'Lumi could not check your sign-in. Check your '
+          'connection and try again. Your local reading data is still safe.';
+    });
+  }
+
+  Future<void> _retryResolution() async {
+    if (_checking) return;
+    setState(() {
+      _checking = true;
+      _resolutionError = null;
+    });
+    await _checkAuthAndNavigate(includeSplashDelay: false);
   }
 
   void _navigateToLogin() {
@@ -146,10 +195,39 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             child: SafeArea(
               minimum: const EdgeInsets.only(bottom: 48),
               child: Center(
-                child: const CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 3,
-                ).animate().fadeIn(delay: 800.ms, duration: 500.ms),
+                child: _resolutionError == null
+                    ? const CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 3,
+                      ).animate().fadeIn(delay: 800.ms, duration: 500.ms)
+                    : Container(
+                        constraints: const BoxConstraints(maxWidth: 420),
+                        margin: const EdgeInsets.symmetric(horizontal: 24),
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.96),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _resolutionError!,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.black87,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            FilledButton.icon(
+                              onPressed: _checking ? null : _retryResolution,
+                              icon: const Icon(Icons.refresh_rounded),
+                              label: const Text('Try again'),
+                            ),
+                          ],
+                        ),
+                      ),
               ),
             ),
           ),

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import '../../services/widget_channel_handler.dart';
 import '../../services/notification_service.dart';
@@ -17,6 +18,7 @@ import '../../data/providers/user_provider.dart';
 import '../../data/providers/student_by_id_provider.dart';
 import '../../services/firebase_service.dart';
 import '../services/navigation_state_service.dart';
+import '../exceptions/session_exceptions.dart';
 import '../../screens/auth/splash_screen.dart';
 import '../../screens/auth/login_screen.dart';
 import '../../screens/dev/impersonation_picker_screen.dart';
@@ -157,28 +159,42 @@ class AppRouter {
       // Verify user role server-side. Try the cached provider first,
       // fall back to a direct Firestore read to avoid StreamProvider hang.
       UserModel? userModel = _ref.read(userProvider).value;
-      if (userModel == null) {
-        final userRepository = _ref.read(userRepositoryProvider);
-        // Right after account creation the MFA enrol revokes + re-establishes
-        // the session; the first profile read can transiently miss even though
-        // the user is validly signed in. Retry briefly before bouncing to a
-        // (blank) login screen, so a fresh signup isn't kicked back to login.
-        for (var attempt = 0; attempt < 4; attempt++) {
-          final currentUser = firebaseService.auth.currentUser;
-          if (currentUser == null) break;
-          userModel = await userRepository.getUser(currentUser.uid);
-          if (userModel != null || attempt == 3) break;
-          await Future<void>.delayed(const Duration(milliseconds: 350));
-          try {
-            await firebaseService.auth.currentUser?.reload();
-          } catch (_) {
-            // Token may be mid-revocation; keep retrying.
+      try {
+        if (userModel == null) {
+          final userRepository = _ref.read(userRepositoryProvider);
+          // Right after account creation the MFA enrol revokes + re-establishes
+          // the session; the first profile read can transiently miss even though
+          // the user is validly signed in. Retry briefly before bouncing to a
+          // (blank) login screen, so a fresh signup isn't kicked back to login.
+          for (var attempt = 0; attempt < 4; attempt++) {
+            final currentUser = firebaseService.auth.currentUser;
+            if (currentUser == null) break;
+            userModel = await userRepository.getUser(currentUser.uid);
+            if (userModel != null || attempt == 3) break;
+            await Future<void>.delayed(const Duration(milliseconds: 350));
+            try {
+              await firebaseService.auth.currentUser?.reload();
+            } catch (error) {
+              if (isTerminalAuthSessionError(error)) {
+                throw const InvalidUserSessionException();
+              }
+              // Network failure is recoverable; the direct profile read on the
+              // next attempt decides whether navigation can proceed.
+            }
           }
         }
+      } on InvalidUserSessionException {
+        await _invalidateLocalSession(firebaseService);
+        return firebaseService.auth.currentUser == null ? '/auth/login' : null;
+      } on FirebaseException {
+        // Do not turn a temporary profile-read outage into logout/MFA churn.
+        // Staying put lets splash or the current screen expose retry/offline UI.
+        return null;
       }
 
       if (userModel == null) {
-        return '/auth/login';
+        await _invalidateLocalSession(firebaseService);
+        return firebaseService.auth.currentUser == null ? '/auth/login' : null;
       }
 
       final userRole = userModel.role;
@@ -866,6 +882,19 @@ class AppRouter {
       ),
     ),
   );
+
+  Future<void> _invalidateLocalSession(FirebaseService firebaseService) async {
+    try {
+      await firebaseService.signOut();
+    } catch (_) {
+      try {
+        await firebaseService.auth.signOut();
+      } catch (_) {
+        // Fail closed: protected routing remains blocked while this dead local
+        // user cannot be cleared, and splash retains its retry state.
+      }
+    }
+  }
 
   /// Helper method to navigate to the appropriate home screen based on role
   static String getHomeRouteForRole(UserRole role) {

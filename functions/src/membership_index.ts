@@ -22,11 +22,8 @@ async function maintainMembershipIndex(
         (previous?.schoolId !== schoolId || previous?.userType !== userType)
       ) {
         logger.warn("Replacing conflicting user membership index", {
-          uid,
-          previousSchoolId: previous?.schoolId ?? null,
           previousUserType: previous?.userType ?? null,
-          schoolId,
-          userType,
+          nextUserType: userType,
         });
       }
 

@@ -104,6 +104,18 @@ async function seedTeacher() {
   });
 }
 
+async function seedUnrelatedParent() {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const school = context.firestore().collection('schools').doc('school_1');
+    await school.collection('parents').doc('parent_2').set({
+      schoolId: 'school_1', role: 'parent', linkedChildren: ['student_2'],
+    });
+    await school.collection('students').doc('student_2').set({
+      schoolId: 'school_1', classId: 'class_1', parentIds: ['parent_2'],
+    });
+  });
+}
+
 function audioRef(uid) {
   return ref(testEnv.authenticatedContext(uid).storage(), AUDIO_PATH);
 }
@@ -143,14 +155,15 @@ test('comprehension audio: non-audio content type denied even when enabled', asy
   );
 });
 
-test('comprehension audio: authenticated outsider cannot upload another parent\'s object', async () => {
+test('comprehension audio: unrelated valid parent cannot upload another family\'s object', async () => {
   await seedAudioLog();
+  await seedUnrelatedParent();
   await seedFlag(true);
-  await assertFails(uploadBytes(audioRef('parent_outsider'), AUDIO_BYTES, {
+  await assertFails(uploadBytes(audioRef('parent_2'), AUDIO_BYTES, {
     ...AUDIO_METADATA,
     customMetadata: {
       ...AUDIO_METADATA.customMetadata,
-      ownerUid: 'parent_outsider',
+      ownerUid: 'parent_2',
     },
   }));
 });

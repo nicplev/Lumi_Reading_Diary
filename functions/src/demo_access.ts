@@ -9,6 +9,7 @@ import {buildDemoAccessEmail} from "./email_templates";
 import {lumiMascotAttachment} from "./email_assets";
 import {DEFAULT_TIMEZONE} from "./access";
 import {recordCronRun} from "./ops_heartbeat";
+import {errorCodeForLog} from "./log_safety";
 
 // Demo-day rolling-access backend. Two functions live here:
 //   • processDemoAccessEmail — Firestore-trigger that emails a prospect the
@@ -135,7 +136,7 @@ async function readDemoConfig(
     };
   } catch (err) {
     functions.logger.error("readDemoConfig failed; using defaults", {
-      error: err instanceof Error ? err.message : String(err),
+      errorCode: errorCodeForLog(err),
     });
     return DEFAULT_CONFIG;
   }
@@ -241,7 +242,7 @@ export const scrambleDemoPasswords = onSchedule(
       }
     } catch (err) {
       functions.logger.error("scrambleDemoPasswords: state stamp failed", {
-        error: err instanceof Error ? err.message : String(err),
+        errorCode: errorCodeForLog(err),
       });
     }
 
@@ -280,7 +281,6 @@ export const processDemoAccessEmail = onDocumentCreated(
     if (data.status !== "queued") return;
 
     const docRef = event.data.ref;
-    const emailId = event.params.emailId;
     const db = admin.firestore();
     const now = new Date();
     const todayKey = sydneyDayKey(now);
@@ -294,7 +294,7 @@ export const processDemoAccessEmail = onDocumentCreated(
       typeof data.onboardingId === "string" ? data.onboardingId : null;
 
     const markFailed = async (reason: string) => {
-      functions.logger.error("processDemoAccessEmail failed", {emailId, reason});
+      functions.logger.error("processDemoAccessEmail failed");
       await docRef.update({
         status: "failed",
         error: reason,

@@ -89,9 +89,7 @@ export const onSchoolSubscriptionWrite = onDocumentWritten(
     const year = after.academicYear as number | undefined;
     const status = after.status as string | undefined;
     if (!schoolId || typeof year !== "number" || !status) {
-      functions.logger.warn("onSchoolSubscriptionWrite: malformed row", {
-        subId: event.params.subId,
-      });
+      functions.logger.warn("onSchoolSubscriptionWrite: malformed row");
       return;
     }
 
@@ -127,9 +125,10 @@ export const onSchoolSubscriptionWrite = onDocumentWritten(
     );
 
     const cascaded = await cascadeStudentAccess(schoolId, year, active);
-    functions.logger.info(
-      `onSchoolSubscriptionWrite: school ${schoolId} year ${year} -> ` +
-      `${active ? "active" : "suspended"}; cascaded ${cascaded} student(s).`,
-    );
+    functions.logger.info("onSchoolSubscriptionWrite complete", {
+      year,
+      active,
+      cascaded,
+    });
     return;
   });

@@ -16,6 +16,7 @@ import {createHash} from "node:crypto";
 import {GoogleAuth, IdTokenClient} from "google-auth-library";
 import {assertNotReadOnly} from "./read_only_guard";
 import {recordCronRun} from "./ops_heartbeat";
+import {errorCodeForLog} from "./log_safety";
 import {
   AUDIO_VALIDATION_VERSION,
   AudioMediaValidationError,
@@ -303,11 +304,7 @@ async function performCleanup(
               FieldValue.serverTimestamp(),
           });
           failedCount++;
-          functions.logger.error("comprehensionAudio.retention.pathRejected", {
-            logPath: doc.ref.path,
-            storedPath,
-            expectedPath,
-          });
+          functions.logger.error("comprehensionAudio.retention.pathRejected");
           continue;
         }
 
@@ -331,9 +328,7 @@ async function performCleanup(
       } catch (err) {
         failedCount++;
         functions.logger.error("comprehensionAudio.retention.deleteFailed", {
-          logPath: doc.ref.path,
-          storagePath: expectedPath,
-          error: err instanceof Error ? err.message : String(err),
+          errorCode: errorCodeForLog(err),
         });
       }
     }
@@ -430,8 +425,7 @@ export const cleanupPendingComprehensionAudio = onSchedule(
       } catch (err: unknown) {
         failedCount++;
         functions.logger.error("comprehensionAudio.pendingCleanup.failed", {
-          objectName: file.name,
-          error: err instanceof Error ? err.message : String(err),
+          errorCode: errorCodeForLog(err),
         });
       }
     }
@@ -694,14 +688,14 @@ export const validateComprehensionAudioMedia = onRequest(
     } catch (err: unknown) {
       if (err instanceof AudioMediaValidationError) {
         functions.logger.warn("comprehensionAudio.validator.rejected", {
-          reason: err.message,
+          errorCode: errorCodeForLog(err),
           inputBytes: bytes.length,
         });
         response.status(422).json({error: "invalid_media"});
         return;
       }
       functions.logger.error("comprehensionAudio.validator.failed", {
-        error: err instanceof Error ? err.message : String(err),
+        errorCode: errorCodeForLog(err),
       });
       response.status(500).json({error: "validation_unavailable"});
     }
@@ -820,9 +814,7 @@ export const confirmComprehensionAudioUpload = onCall(
       [untrustedBytes] = await versionedUpload.download();
     } catch (err: unknown) {
       functions.logger.error("Audio pending upload read failed", {
-        schoolId,
-        logId,
-        error: err instanceof Error ? err.message : String(err),
+        errorCode: errorCodeForLog(err),
       });
       throw new HttpsError("internal", "Could not validate recording upload");
     }
@@ -851,9 +843,7 @@ export const confirmComprehensionAudioUpload = onCall(
         );
       }
       functions.logger.error("Comprehension audio validator unavailable", {
-        schoolId,
-        logId,
-        error: err instanceof Error ? err.message : String(err),
+        errorCode: errorCodeForLog(err),
       });
       // Preserve the pending upload for the offline queue to retry later.
       throw new HttpsError("internal", "Could not validate recording upload");
@@ -981,10 +971,7 @@ export const confirmComprehensionAudioUpload = onCall(
       // A scheduled pending-upload cleanup is the safe retry path for this
       // non-fatal residue rather than telling the client the save failed.
       functions.logger.warn("Comprehension audio pending cleanup failed", {
-        schoolId,
-        logId,
-        sourceGeneration,
-        error: err instanceof Error ? err.message : String(err),
+        errorCode: errorCodeForLog(err),
       });
     }
     return {
@@ -1193,10 +1180,7 @@ export const getComprehensionAudioUrl = onCall(
       return {url, expiresInSec: Math.floor(AUDIO_URL_TTL_MS / 1000)};
     } catch (err) {
       functions.logger.error("getComprehensionAudioUrl sign failed", {
-        uid,
-        schoolId,
-        logId,
-        error: err instanceof Error ? err.message : String(err),
+        errorCode: errorCodeForLog(err),
       });
       throw new HttpsError(
         "internal",

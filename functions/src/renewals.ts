@@ -202,11 +202,12 @@ export const renewStudents = onCall(
       await batch.commit();
     }
 
-    functions.logger.info(
-      `renewStudents: school ${schoolId} year ${academicYear} -> ` +
-      `renewed ${renewed}, ${graduates} graduate(s) flagged, ` +
-      `${skipped} skipped.`,
-    );
+    functions.logger.info("renewStudents complete", {
+      academicYear,
+      renewed,
+      graduates,
+      skipped,
+    });
     return {renewed, graduates, skipped, academicYear};
   });
 
@@ -294,11 +295,12 @@ export const annualRollover = onSchedule(
       );
     }
 
-    functions.logger.info(
-      `annualRollover: advanced ${priorYear} -> ${newYear}; ` +
-      `suspended ${suspendedSchools} unpaid school(s); ` +
-      `expired/suspended ${expiredStudents} student(s).`,
-    );
+    functions.logger.info("annualRollover complete", {
+      priorYear,
+      newYear,
+      suspendedSchoolCount: suspendedSchools,
+      expiredStudentCount: expiredStudents,
+    });
     await recordCronRun("annualRollover", "ok");
     return;
   });

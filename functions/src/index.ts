@@ -44,6 +44,7 @@ import {
   shiftDays,
 } from "./dateUtils";
 import {DEFAULT_TIMEZONE} from "./access";
+import {errorCodeForLog} from "./log_safety";
 import {
   applyClassStatsDelta,
   applyStudentStatsDelta,
@@ -106,14 +107,14 @@ export const reconcileClassDailyReadingScheduled = onSchedule(
           `${result.summaries} summaries`,
       );
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const errorCode = errorCodeForLog(err);
       functions.logger.error("class daily reading reconciliation failed", {
-        error: message,
+        errorCode,
       });
       await recordCronRun(
         "reconcileClassDailyReadingScheduled",
         "error",
-        message,
+        errorCode,
       );
       throw err;
     }
@@ -267,16 +268,12 @@ export const aggregateStudentStats = onDocumentWritten(
       event.data.after.data() :
       event.data.before.data();
     if (!log) {
-      functions.logger.warn("Reading log write event with no before or after data", {
-        logId: event.params.logId,
-      });
+      functions.logger.warn("Reading log write event with no before or after data");
       return;
     }
     const studentId = log.studentId;
     if (!studentId) {
-      functions.logger.warn("Reading log has no studentId", {
-        logId: event.params.logId,
-      });
+      functions.logger.warn("Reading log has no studentId");
       return;
     }
     const studentRef = db.doc(`schools/${schoolId}/students/${studentId}`);
@@ -294,9 +291,7 @@ export const aggregateStudentStats = onDocumentWritten(
         await applyStudentStatsDelta(event.data, schoolId);
       } catch (err) {
         functions.logger.error("applyStudentStatsDelta failed", {
-          schoolId,
-          logId: event.params.logId,
-          error: err instanceof Error ? err.message : String(err),
+          errorCode: errorCodeForLog(err),
         });
         throw err;
       }
@@ -395,7 +390,6 @@ export const aggregateStudentStats = onDocumentWritten(
       });
 
       functions.logger.info("Student stats aggregated", {
-        studentId,
         totalMinutesRead,
         totalBooksRead,
         currentStreak,
@@ -404,8 +398,7 @@ export const aggregateStudentStats = onDocumentWritten(
       return;
     } catch (error) {
       functions.logger.error("Error aggregating student stats", {
-        studentId,
-        error: error instanceof Error ? error.message : String(error),
+        errorCode: errorCodeForLog(error),
       });
       throw error;
     }
@@ -937,8 +930,6 @@ async function dispatchNotificationCampaign(
     const tokenOwnerCount = deliveries.filter((delivery) => delivery.token).length;
     if (pushTargets.length < tokenOwnerCount) {
       functions.logger.info("Deduplicated notification campaign device tokens", {
-        schoolId,
-        campaignId: campaignRef.id,
         tokenOwners: tokenOwnerCount,
         uniquePushTargets: pushTargets.length,
       });
@@ -1351,7 +1342,6 @@ async function processSchool(
   } = excludeAmbiguousPushTokenRecipients(eligible);
   if (suppressedTokens.length > 0) {
     functions.logger.warn("Suppressed ambiguous reading reminder device targets", {
-      schoolId,
       tokenCount: suppressedTokens.length,
     });
   }
@@ -1613,7 +1603,6 @@ export const enforceUniqueParentFcmToken = onDocumentWritten(
     if (removedOwners === 0) return;
 
     functions.logger.warn("Removed duplicate parent FCM token ownership", {
-      schoolId: event.params.schoolId,
       removedOwners,
     });
   });
@@ -1662,10 +1651,10 @@ export const sendReadingReminders = onSchedule(
       return;
     } catch (error) {
       functions.logger.error("Error in sendReadingReminders", {
-        error: error instanceof Error ? error.message : String(error),
+        errorCode: errorCodeForLog(error),
       });
       await recordCronRun("sendReadingReminders", "error",
-        error instanceof Error ? error.message : String(error));
+        errorCodeForLog(error));
       throw error;
     }
   });
@@ -1759,10 +1748,10 @@ export const pruneStaleFcmTokens = onSchedule(
       await recordCronRun("pruneStaleFcmTokens", "ok");
     } catch (error) {
       functions.logger.error("Error in pruneStaleFcmTokens", {
-        error: error instanceof Error ? error.message : String(error),
+        errorCode: errorCodeForLog(error),
       });
       await recordCronRun("pruneStaleFcmTokens", "error",
-        error instanceof Error ? error.message : String(error));
+        errorCodeForLog(error));
       throw error;
     }
   });
@@ -1852,7 +1841,9 @@ export const detectAchievements = onDocumentUpdated(
       achievements: admin.firestore.FieldValue.arrayUnion(...toAward),
     });
 
-    functions.logger.info("Achievements awarded", {studentId, schoolId, awarded: toAward.map((a) => a.id)});
+    functions.logger.info("Achievements awarded", {
+      awarded: toAward.map((a) => a.id),
+    });
 
     // Notify parents (single notification listing all new achievements)
     if (newData.parentIds?.length > 0) {
@@ -1876,11 +1867,10 @@ export const detectAchievements = onDocumentUpdated(
               achievements: JSON.stringify(toAward.map(({id, name, icon}) => ({id, name, icon}))),
             },
           });
-          functions.logger.info("Achievement notification sent", {parentId, studentId});
+          functions.logger.info("Achievement notification sent");
         } catch (error) {
           functions.logger.error("Failed to send achievement notification", {
-            parentId,
-            error: error instanceof Error ? error.message : String(error),
+            errorCode: errorCodeForLog(error),
           });
         }
       }
@@ -1993,13 +1983,11 @@ export const notifyAwardChanges = onDocumentUpdated(
             },
           });
           functions.logger.info("Award notification sent", {
-            parentId, studentId, awardType: awardEvent.type,
+            awardType: awardEvent.type,
           });
         } catch (error) {
           functions.logger.error("Failed to send award notification", {
-            parentId,
-            studentId,
-            error: error instanceof Error ? error.message : String(error),
+            errorCode: errorCodeForLog(error),
           });
         }
       }
@@ -2108,14 +2096,13 @@ export const backfillAchievements = onCall(async (request) => {
       studentsUpdated++;
       achievementsAwarded += toAward.length;
     } catch (err) {
-      functions.logger.warn(
-        `backfillAchievements: failed for student ${doc.id}`, err,
-      );
+      functions.logger.warn("backfillAchievements: student update failed", {
+        errorCode: errorCodeForLog(err),
+      });
     }
   }
 
   functions.logger.info("backfillAchievements complete", {
-    schoolId, studentId: studentId ?? "all",
     studentsProcessed, studentsUpdated, achievementsAwarded,
   });
   return {success: true, studentsProcessed, studentsUpdated, achievementsAwarded};
@@ -2171,7 +2158,6 @@ export const validateReadingLog = onDocumentCreated(
       });
 
       functions.logger.warn("Invalid reading log detected", {
-        logId: event.params.logId,
         errors: validationErrors,
       });
     }
@@ -2222,10 +2208,10 @@ export const cleanupExpiredLinkCodes = onSchedule(
       return;
     } catch (error) {
       functions.logger.error("Error cleaning up expired codes", {
-        error: error instanceof Error ? error.message : String(error),
+        errorCode: errorCodeForLog(error),
       });
       await recordCronRun("cleanupExpiredLinkCodes", "error",
-        error instanceof Error ? error.message : String(error));
+        errorCodeForLog(error));
       throw error;
     }
   });
@@ -2512,7 +2498,9 @@ export const processParentOnboardingEmail = onDocumentCreated(
         } catch (err) {
           failedCount++;
           const errMsg = err instanceof Error ? err.message : String(err);
-          functions.logger.error("Parent onboarding email send failed", {parentEmail: email, error: errMsg});
+          functions.logger.error("Parent onboarding email send failed", {
+            errorCode: errorCodeForLog(err),
+          });
           for (const r of group) {
             r.status = "failed";
             r.error = errMsg;
@@ -2545,12 +2533,15 @@ export const processParentOnboardingEmail = onDocumentCreated(
         })),
       });
 
-      functions.logger.info(
-        `Onboarding emails for school ${schoolId}: ` +
-        `sent=${sentCount}, failed=${failedCount}, skipped=${skippedCount}`
-      );
+      functions.logger.info("Parent onboarding email batch complete", {
+        sent: sentCount,
+        failed: failedCount,
+        skipped: skippedCount,
+      });
     } catch (error) {
-      functions.logger.error("processParentOnboardingEmail error:", error);
+      functions.logger.error("processParentOnboardingEmail failed", {
+        errorCode: errorCodeForLog(error),
+      });
       await docRef.update({
         status: "failed",
         errorSummary: error instanceof Error ? error.message : String(error),
@@ -2703,7 +2694,9 @@ export const processStaffOnboardingEmail = onDocumentCreated(
             sentCount++;
           } catch (err) {
             const errMsg = err instanceof Error ? err.message : String(err);
-            functions.logger.error("Staff onboarding email send failed", {userId, email, error: errMsg});
+            functions.logger.error("Staff onboarding email send failed", {
+              errorCode: errorCodeForLog(err),
+            });
             recipients.push({userId, email, status: "failed", error: errMsg});
             failedCount++;
           }
@@ -2733,12 +2726,15 @@ export const processStaffOnboardingEmail = onDocumentCreated(
         })),
       });
 
-      functions.logger.info(
-        `Staff onboarding emails for school ${schoolId}: ` +
-        `sent=${sentCount}, failed=${failedCount}, skipped=${skippedCount}`
-      );
+      functions.logger.info("Staff onboarding email batch complete", {
+        sent: sentCount,
+        failed: failedCount,
+        skipped: skippedCount,
+      });
     } catch (error) {
-      functions.logger.error("processStaffOnboardingEmail error:", error);
+      functions.logger.error("processStaffOnboardingEmail failed", {
+        errorCode: errorCodeForLog(error),
+      });
       await docRef.update({
         status: "failed",
         errorSummary: error instanceof Error ? error.message : String(error),
@@ -2766,9 +2762,7 @@ export const updateClassStats = onDocumentWritten(
         await applyClassStatsDelta(event.data, schoolId);
       } catch (err) {
         functions.logger.error("applyClassStatsDelta failed", {
-          schoolId,
-          logId: event.params.logId,
-          error: err instanceof Error ? err.message : String(err),
+          errorCode: errorCodeForLog(err),
         });
         throw err;
       }
@@ -2858,10 +2852,10 @@ export const reconcileStatsScheduled = onSchedule(
       await recordCronRun("reconcileStatsScheduled", "ok");
     } catch (err) {
       functions.logger.error("Stats reconcile pass failed", {
-        error: err instanceof Error ? err.message : String(err),
+        errorCode: errorCodeForLog(err),
       });
       await recordCronRun("reconcileStatsScheduled", "error",
-        err instanceof Error ? err.message : String(err));
+        errorCodeForLog(err));
       throw err;
     }
     return;
@@ -2890,10 +2884,10 @@ export const applyStateTermDates = onSchedule(
         result.missingYearsNote ?? undefined);
     } catch (err) {
       functions.logger.error("State term-dates fill failed", {
-        error: err instanceof Error ? err.message : String(err),
+        errorCode: errorCodeForLog(err),
       });
       await recordCronRun("applyStateTermDates", "error",
-        err instanceof Error ? err.message : String(err));
+        errorCodeForLog(err));
       throw err;
     }
     return;
@@ -2922,10 +2916,10 @@ export const refreshStreaksDaily = onSchedule(
       await recordCronRun("refreshStreaksDaily", "ok");
     } catch (err) {
       functions.logger.error("Daily streak refresh failed", {
-        error: err instanceof Error ? err.message : String(err),
+        errorCode: errorCodeForLog(err),
       });
       await recordCronRun("refreshStreaksDaily", "error",
-        err instanceof Error ? err.message : String(err));
+        errorCodeForLog(err));
       throw err;
     }
     return;
@@ -3010,10 +3004,9 @@ export const syncGuardianProfiles = onDocumentWritten(
     try {
       await batch.commit();
     } catch (err) {
-      functions.logger.warn(
-        `syncGuardianProfiles: partial failure for parent ${parentId}`,
-        err
-      );
+      functions.logger.warn("syncGuardianProfiles: partial failure", {
+        errorCode: errorCodeForLog(err),
+      });
     }
     return;
   });
@@ -3078,11 +3071,9 @@ export const refreshGuardianProfilesOnLink = onDocumentWritten(
     try {
       await batch.commit();
     } catch (err) {
-      functions.logger.warn(
-        "refreshGuardianProfilesOnLink: failed for student " +
-          event.params.studentId,
-        err
-      );
+      functions.logger.warn("refreshGuardianProfilesOnLink failed", {
+        errorCode: errorCodeForLog(err),
+      });
     }
     return;
   });
@@ -3148,10 +3139,9 @@ export const backfillGuardianProfiles = onCall(
       try {
         await batch.commit();
       } catch (err) {
-        functions.logger.warn(
-          `backfillGuardianProfiles: failed for parent ${parentDoc.id}`,
-          err
-        );
+        functions.logger.warn("backfillGuardianProfiles: parent update failed", {
+          errorCode: errorCodeForLog(err),
+        });
       }
     }
 
@@ -3232,8 +3222,7 @@ export const onCommentCreated = onDocumentCreated(
     const timezone = String(schoolData.timezone ?? "UTC");
     if (isWithinQuietHours(new Date(), timezone, schoolData.quietHours)) {
       functions.logger.info("Comment push suppressed by quiet hours", {
-        schoolId,
-        logId,
+        suppressed: true,
       });
       return;
     }
@@ -3263,17 +3252,10 @@ export const onCommentCreated = onDocumentCreated(
           },
         },
       });
-      functions.logger.info("Comment notification sent", {
-        schoolId,
-        logId,
-        parentId,
-      });
+      functions.logger.info("Comment notification sent");
     } catch (error) {
       functions.logger.error("Failed to send comment notification", {
-        schoolId,
-        logId,
-        parentId,
-        error: error instanceof Error ? error.message : String(error),
+        errorCode: errorCodeForLog(error),
       });
     }
 
@@ -3365,7 +3347,9 @@ export const sendTestReadingReminder = onCall(
       });
       return {sent: true};
     } catch (e) {
-      functions.logger.warn("sendTestReadingReminder send failed", {uid, e});
+      functions.logger.warn("sendTestReadingReminder send failed", {
+        errorCode: errorCodeForLog(e),
+      });
       // Stale/invalid token — fall back to a local preview on the client.
       return {sent: false, reason: "send-failed"};
     }

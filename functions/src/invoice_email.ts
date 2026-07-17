@@ -2,6 +2,7 @@ import {onDocumentCreated} from "firebase-functions/v2/firestore";
 import {defineSecret} from "firebase-functions/params";
 import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
+import {errorCodeForLog} from "./log_safety";
 import sgMail from "@sendgrid/mail";
 
 const sendgridApiKey = defineSecret("SENDGRID_API_KEY");
@@ -88,7 +89,9 @@ export const processInvoiceEmail = onDocumentCreated(
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      functions.logger.error("processInvoiceEmail failed", {error: msg});
+      functions.logger.error("processInvoiceEmail failed", {
+        errorCode: errorCodeForLog(e),
+      });
       await snap.ref.update({status: "failed", error: msg});
     }
   }

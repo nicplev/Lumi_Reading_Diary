@@ -194,9 +194,6 @@ async function writeAuditEvent(params: {
     });
   functions.logger.info("impersonation.audit", {
     eventType: params.eventType,
-    sessionId: params.sessionId,
-    devUid: params.devUid,
-    targetSchoolId: params.targetSchoolId,
   });
 }
 
@@ -958,7 +955,6 @@ export const revokeOnDevAccessRemoval = onDocumentDeleted(
       });
     }
     functions.logger.info("impersonation.revoked_on_dev_access_removal", {
-      emailHash,
       count: q.size,
     });
     return;
@@ -1002,14 +998,13 @@ export const monitorImpersonationAnomalies = onSchedule(
     // Group by devUid → { sessionCount, schoolIds }.
     const perDev = new Map<
       string,
-      {devEmail: string; count: number; schools: Set<string>}
+      {count: number; schools: Set<string>}
     >();
     for (const doc of snap.docs) {
       const d = doc.data();
       const devUid = String(d.devUid ?? "");
       if (!devUid) continue;
       const entry = perDev.get(devUid) ?? {
-        devEmail: String(d.devEmail ?? ""),
         count: 0,
         schools: new Set<string>(),
       };
@@ -1019,7 +1014,7 @@ export const monitorImpersonationAnomalies = onSchedule(
     }
 
     let flagged = 0;
-    for (const [devUid, info] of perDev.entries()) {
+    for (const info of perDev.values()) {
       const schoolCount = info.schools.size;
       const exceedsSchools = schoolCount >= ANOMALY_SCHOOLS_PER_HOUR;
       const exceedsSessions = info.count >= ANOMALY_SESSIONS_PER_HOUR;
@@ -1028,12 +1023,9 @@ export const monitorImpersonationAnomalies = onSchedule(
       flagged++;
       functions.logger.warn("impersonation.anomaly", {
         eventType: "impersonation.anomaly",
-        devUid,
-        devEmail: info.devEmail,
         windowMinutes: 60,
         sessionCount: info.count,
         schoolCount,
-        schools: Array.from(info.schools),
         thresholds: {
           schoolsPerHour: ANOMALY_SCHOOLS_PER_HOUR,
           sessionsPerHour: ANOMALY_SESSIONS_PER_HOUR,

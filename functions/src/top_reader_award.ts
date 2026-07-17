@@ -10,6 +10,7 @@ import {
 import {DEFAULT_TIMEZONE} from "./access";
 import {isInvalidatedLog} from "./stats_aggregation";
 import {recordCronRun} from "./ops_heartbeat";
+import {errorCodeForLog} from "./log_safety";
 
 /**
  * Weekly "Top Reader" award. Every Monday it looks at the week that just ended
@@ -164,8 +165,7 @@ export const topReaderAward = onSchedule(
           .get();
       } catch (err) {
         functions.logger.error("topReaderAward: classes read failed", {
-          school: school.id,
-          error: err instanceof Error ? err.message : String(err),
+          errorCode: errorCodeForLog(err),
         });
         continue;
       }
@@ -256,9 +256,7 @@ export const topReaderAward = onSchedule(
           }
         } catch (err) {
           functions.logger.error("topReaderAward: class failed", {
-            school: school.id,
-            classId: cls.id,
-            error: err instanceof Error ? err.message : String(err),
+            errorCode: errorCodeForLog(err),
           });
         }
       }

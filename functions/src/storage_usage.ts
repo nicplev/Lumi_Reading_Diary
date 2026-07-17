@@ -34,6 +34,7 @@ import {onSchedule} from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
 import {localDateString} from "./dateUtils";
 import {recordCronRun} from "./ops_heartbeat";
+import {errorCodeForLog} from "./log_safety";
 
 const USAGE_DOC = "opsMetrics/storageUsage";
 const BUCKET = "lumi-ninc-au.firebasestorage.app";
@@ -136,9 +137,8 @@ async function applyStorageEvent(
       .set(usageDelta(name, size, sign), {merge: true});
   } catch (err) {
     functions.logger.error("storageUsage.eventApplyFailed", {
-      name,
       sign,
-      error: err instanceof Error ? err.message : String(err),
+      errorCode: errorCodeForLog(err),
     });
   }
 }
@@ -172,12 +172,9 @@ export interface StorageReconcileStats {
  * entry, then REPLACES the counter doc wholesale. Objects uploaded or
  * deleted mid-scan produce bounded one-night drift — the next reconcile
  * heals it, same trade-off the stats reconciler makes.
- * @param {string} performedBy Actor label for the structured log line.
  * @return {Promise<StorageReconcileStats>} Scan summary.
  */
-export async function performStorageReconcile(
-  performedBy: string,
-): Promise<StorageReconcileStats> {
+export async function performStorageReconcile(): Promise<StorageReconcileStats> {
   const startedAtMs = Date.now();
   const db = admin.firestore();
   const bucket = admin.storage().bucket(BUCKET);
@@ -263,7 +260,6 @@ export async function performStorageReconcile(
   });
 
   functions.logger.info("storageUsage.reconcile.completed", {
-    performedBy,
     ...stats,
   });
   return stats;
@@ -278,11 +274,11 @@ export const reconcileStorageUsage = onSchedule(
   },
   async () => {
     try {
-      await performStorageReconcile("system:reconcileStorageUsage");
+      await performStorageReconcile();
       await recordCronRun("reconcileStorageUsage", "ok");
     } catch (err) {
       await recordCronRun("reconcileStorageUsage", "error",
-        err instanceof Error ? err.message : String(err));
+        errorCodeForLog(err));
       throw err;
     }
   },

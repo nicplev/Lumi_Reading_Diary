@@ -23,6 +23,7 @@
  */
 
 import * as admin from "firebase-admin";
+import {errorCodeForLog} from "./log_safety";
 import * as functions from "firebase-functions/v1";
 import {
   MAX_REST_DAYS,
@@ -686,8 +687,7 @@ async function pageAndReconcile(
           await fn(schoolDoc, doc.id);
         } catch (err) {
           functions.logger.error(`reconcile ${sub} doc failed`, {
-            schoolId: schoolDoc.id, docId: doc.id,
-            error: err instanceof Error ? err.message : String(err),
+            errorCode: errorCodeForLog(err),
           });
         }
         processed++;
