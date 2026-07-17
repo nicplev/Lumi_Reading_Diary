@@ -15,6 +15,7 @@ on:
       - 'firebase.json'
       - '.firebaserc'
       - '.github/workflows/admin-deploy.yml'
+      - 'scripts/security/disable-admin-firebase-framework-auth-bridge.sh'
   workflow_dispatch: {}
 
 # Serialize deploys on main so two near-simultaneous pushes don't race; do not
@@ -132,3 +133,12 @@ jobs:
           --only hosting:admin
           --project lumi-ninc-au
           --non-interactive
+
+      # Lumi owns its session boundary in admin/src/lib/auth.ts and verifies the
+      # HttpOnly cookie with the Admin SDK. Firebase's preview framework bridge
+      # is redundant and makes a server-side Auth request with the public
+      # browser-referrer-restricted key, which fails because a server request
+      # has no Referer. Disable it after every deploy and move the Hosting-pinned
+      # tag to the repaired revision; do not weaken the browser API-key rules.
+      - name: Disable redundant Firebase Frameworks auth bridge
+        run: ./scripts/security/disable-admin-firebase-framework-auth-bridge.sh
