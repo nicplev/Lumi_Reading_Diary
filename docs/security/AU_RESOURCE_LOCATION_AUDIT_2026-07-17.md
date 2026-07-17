@@ -14,11 +14,11 @@ route to an Australian log bucket with 30-day retention.
 
 This does **not** mean all Lumi data stays in Australia. Firebase
 Authentication is officially US-only. FCM, App Check, Analytics and
-Crashlytics use global infrastructure. The three existing Secret Manager
-secrets use automatic global replication. Google's unavoidable `_Required`
+Crashlytics use global infrastructure. Google's unavoidable `_Required`
 audit-log bucket is global. SendGrid and the mobile-store providers are also
-cross-border services. These exceptions require the contractual/APP 8 review
-already tracked in the vendor register.
+cross-border services. The three application secrets were migrated during this
+audit to Sydney-only payload replicas. The remaining exceptions require the
+contractual/APP 8 review already tracked in the vendor register.
 
 ## Live location inventory
 
@@ -32,7 +32,7 @@ already tracked in the vendor register.
 | Ordinary Cloud Logging | `australia-southeast1` | Remediated during this audit. `_Default` now routes future included logs to `lumi-au-default`, retained for 30 days. |
 | Required Cloud audit logs | `global` | Exception. Google does not allow `_Required` to be redirected; retention is locked at 400 days. |
 | Old `_Default` logs | `global` | Transitional exception. Entries written before the routing change remain for their existing 30-day retention and then expire. |
-| Secret Manager payloads | automatic / global | Exception. `ADMIN_SESSION_SECRET`, `SENDGRID_API_KEY` and `SENDGRID_SENDER_EMAIL` were created with automatic replication. They contain application secrets, not child content, but are not AU-pinned. Replication policy cannot be changed in place. |
+| Secret Manager payloads | `australia-southeast1` | Remediated. `ADMIN_SESSION_SECRET_AU`, `SENDGRID_API_KEY_AU` and `SENDGRID_SENDER_EMAIL_AU` each have one user-managed Sydney replica. Six live consumers were cut over and verified before the former automatically replicated secret resources were deleted. No child content is intended in these values. |
 | Firebase Authentication | United States | Cross-border exception. Adult email/phone/password, IP and user-agent data are processed by the US-only service. |
 | FCM / App Check / Analytics / Crashlytics | global infrastructure | Cross-border exception. Analytics and Crashlytics remain adult opt-in and default-off; no child content or Lumi UID is intended. |
 | Legacy managed Functions source bucket | `US-CENTRAL1` | Legacy code-only exception. `gcf-sources-3795320704-us-central1` contains old deployment archives and no live Function references it. Redacted inspection found only source/build files and public project/config identifiers, not a secret value or identified child record. Do not delete it blindly: it is Google-managed and carries `DO_NOT_DELETE_THE_BUCKET.md`. |
@@ -58,6 +58,13 @@ already tracked in the vendor register.
    source-wide regression now rejects their reintroduction. The production
    rollout updated 75 Functions with zero errors; post-deploy traffic reached
    the Sydney bucket without an error or prohibited identifier field.
+7. Created three new user-managed Secret Manager resources with a single
+   `australia-southeast1` replica and secret-level access only for the relevant
+   dedicated runtime identity. Payload equality and the SendGrid credential's
+   `mail.send` scope were checked without printing values. Five email Functions
+   and the super-admin backend were deployed and verified `ACTIVE`; the live
+   admin login returned HTTP 200 and no post-cutover error log was found. The
+   three automatically replicated predecessor resources were then deleted.
 
 ## Privacy interpretation
 
@@ -69,10 +76,9 @@ already tracked in the vendor register.
 - Firebase describes FCM, App Check, Crashlytics and several other products as
   global services. Product location must be assessed separately rather than
   inherited from Firestore.
-- Secret Manager automatic replication is global. A future AU-only secret
-  migration requires new user-managed-replication secrets plus a controlled
-  workload cut-over; the replication policy of the existing secret cannot be
-  edited.
+- Secret Manager's former automatic-replication exception is closed for Lumi's
+  three application secrets. Future secrets must use user-managed Sydney
+  replication and must not contain personal information.
 - Required Cloud audit logs remain global even after regionalising ordinary
   logs. Application logs now exclude direct user/school/record identifiers and
   raw exception payloads by implementation and regression test; names, email
@@ -82,10 +88,12 @@ already tracked in the vendor register.
 
 - [ ] Obtain owner/privacy-counsel approval of the Firebase/Google contract,
       subprocessor and APP 8 assessment, including US Authentication.
-- [ ] Complete SendGrid processing-country, subprocessor, support-access,
-      retention and deletion evidence.
-- [ ] Decide whether the three non-child-content secrets need migration to new
-      AU user-managed-replication secrets.
+- [~] Complete SendGrid processing-country, subprocessor, support-access,
+      retention and deletion evidence. Public Twilio DPA/subprocessor/security/
+      retention evidence is captured; account acceptance and counsel review
+      remain.
+- [x] Migrate the three non-child-content secrets to new AU
+      user-managed-replication secrets and delete the old global resources.
 - [ ] Let the old global `_Default` log data age out for 30 days; retain the
       global `_Required` exception in school-facing disclosures.
 - [ ] Review the legacy US Functions source bucket with Google/Firebase support

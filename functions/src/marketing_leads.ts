@@ -6,8 +6,8 @@ import * as crypto from "crypto";
 import sgMail from "@sendgrid/mail";
 import {errorCodeForLog} from "./log_safety";
 
-const sendgridApiKey = defineSecret("SENDGRID_API_KEY");
-const sendgridSenderEmail = defineSecret("SENDGRID_SENDER_EMAIL");
+const sendgridApiKey = defineSecret("SENDGRID_API_KEY_AU");
+const sendgridSenderEmail = defineSecret("SENDGRID_SENDER_EMAIL_AU");
 
 // App Check enforcement, opt-in via env var. Default off until the marketing
 // site's web app is registered with App Check (reCAPTCHA) and verified.
@@ -252,7 +252,7 @@ export const submitContactSalesInquiry = onCall(
 
     const key = sendgridApiKey.value();
     if (!key) {
-      functions.logger.error("submitContactSalesInquiry: SENDGRID_API_KEY not configured");
+      functions.logger.error("submitContactSalesInquiry: SendGrid API key not configured");
       throw new HttpsError("failed-precondition", "Email is not configured.");
     }
     sgMail.setApiKey(key);

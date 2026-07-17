@@ -1,0 +1,889 @@
+
+English
+
+	•	English
+	•	Japanese
+	•	Portuguese
+	•	Spanish
+Support
+	•	Help Center
+	•	Support Plans
+	•	Partner Solutions
+Login
+	•	Log in to
+	◦	Twilio Console Conversations, Communications and Authentication
+	•
+	•	Or log in to access:
+	◦	Twilio Segment Customer Data Platform
+	◦	Twilio SendGrid Email and Marketing Campaigns
+
+Products
+	•	Twilio Platform Next gen  Built for engagement in the agentic era. Twilio connects communication channels, customer context, and AI on one flexible platform.
+Conversations
+
+
+
+	•	  Conversation Memory New  Build a persistent memory of customer interactions
+	•	  Conversation Orchestrator New  Keep conversations connected across channels
+	•	  Conversation Intelligence  Extract context from real-time conversations
+	•	  Conversation Relay  Build advanced voice AI for natural conversations
+	•	Conversations
+Communications
+
+
+
+	•	Messaging  
+	•	SMS  
+	•	WhatsApp  
+	•	RCS  
+	•	Voice  
+	•	SIP Trunking  
+	•	Email  
+	•	SMTP Service  
+	•	Phone Numbers  
+	•	Toll-free  
+	•	10DLC  
+	•	Short Codes  
+	•	Video API  
+	•	Flex  
+	•	Communications
+
+Authentication
+
+
+
+	•	Verify  
+	•	Lookup  
+	•	Authentication
+Customer Data
+
+
+
+	•	Connections  
+	•	Warehouses  
+	•	Protocols  
+	•	Unify  
+	•	Engage  
+	•	Audiences  
+	•	Journeys  
+	•	Customer Data
+See all products
+See Twilio’s latest innovations and CDP integrations
+Solutions
+Use Cases
+
+
+
+	•	Verification and identity  
+	•	Fraud prevention  
+	•	Alerts and notifications  
+	•	Appointment reminders  
+	•	Lead alerts  
+	•	Mass texting  
+	•	Marketing and promotions  
+	•	SMS marketing  
+	•	Cross-sell and upsell  
+	•	Optimize ad spend  
+	•	Support and sales  
+	•	AI agent productivity  
+	•	IVR  
+	•	Contact center  
+	•	Customer data management  
+Teams
+
+
+
+	•	Developers  
+	•	Data Engineering  
+	•	Marketing  
+	•	Product  
+	•	Customer Experience  
+Industry
+
+
+
+	•	Financial services  
+	•	Healthcare  
+	•	Retail  
+	•	Nonprofit  
+	•	Hospitality  
+	•	Ecommerce  
+	•	Public sector  
+	•	Education  
+
+Company Size
+
+
+
+	•	Enterprise  
+	•	Startup  
+See all solutions
+Why Twilio
+Overview
+
+
+
+	•	Why Twilio  We help you build amazing experiences with contextual data, the right communication channels, and AI to scale personalization and increase efficiency.
+	•	Customer stories  
+Differentiators
+
+
+
+	•	One platform  
+	•	Privacy and security  
+	•	Built for builders  
+	•	Enterprise scale  
+	•	Extensible by design  
+	•	Real-time customer data  
+	•	Artificial intelligence  
+	•	Infrastructure  
+Company
+
+
+
+	•	About us  
+	•	Values  
+	•	Diversity  
+	•	Careers  
+	•	Twilio.org  
+	•	Investor relations  
+	•	Press and media  
+	•	Events  
+
+Resources
+Developers
+
+
+
+	•	Documentation  
+	•	Code samples  
+	•	Developer Hub  
+	•	Champions  
+	•	Changelog  
+	•	Serverless  
+Learn
+
+
+
+	•	Blog  
+	•	Resource Center  
+	•	Guides  
+	•	Reports  
+	•	Webinars  
+	•	Podcasts  
+	•	Customer stories  
+	•	State of Customer Engagement  
+	•	Events  
+	•	Customer data recipes  
+Support and services
+
+
+
+	•	Help Center  
+	•	Find a partner  
+	•	Become a partner  
+	•	Professional services  
+	•	Support plans  
+	•	Status  
+	•	SendGrid status  
+	•	Segment status  
+
+Pricing
+Overview
+
+
+
+	•	All Pricing  Transparent pricing with discounts as you scale. Sign up for a free trial—no credit card required.
+Conversations
+
+
+
+	•	Conversations  
+	•	Conversation Memory  
+	•	Conversation Orchestrator  
+	•	Conversation Intelligence  
+	•	Conversation Relay  
+Communications
+
+
+
+	•	Messaging  
+	•	SMS  
+	•	WhatsApp  
+	•	Conversations API  
+	•	Voice  
+	•	SIP Trunking  
+	•	Conferencing  
+	•	Email API  
+	•	Marketing Campaigns  
+	•	Video API  
+	•	Flex  
+Authentication
+
+
+
+	•	Verify  
+	•	Lookup  
+Customer Data
+
+
+
+	•	Customer Data Platform  
+	•	Customer Data Pipeline  
+
+
+Data is collected based on search terms. Privacy Policy
+Contact sales Start for free
+
+
+
+
+Data is collected based on search terms. Privacy Policy
+Products
+	•	Twilio Platform Next gen  Built for engagement in the agentic era. Twilio connects communication channels, customer context, and AI on one flexible platform.
+Conversations
+
+
+
+	•	  Conversation Memory New  Build a persistent memory of customer interactions
+	•	  Conversation Orchestrator New  Keep conversations connected across channels
+	•	  Conversation Intelligence  Extract context from real-time conversations
+	•	  Conversation Relay  Build advanced voice AI for natural conversations
+	•	Conversations
+Communications
+
+
+
+	•	Messaging  
+	•	SMS  
+	•	WhatsApp  
+	•	RCS  
+	•	Voice  
+	•	SIP Trunking  
+	•	Email  
+	•	SMTP Service  
+	•	Phone Numbers  
+	•	Toll-free  
+	•	10DLC  
+	•	Short Codes  
+	•	Video API  
+	•	Flex  
+	•	Communications
+
+Authentication
+
+
+
+	•	Verify  
+	•	Lookup  
+	•	Authentication
+Customer Data
+
+
+
+	•	Connections  
+	•	Warehouses  
+	•	Protocols  
+	•	Unify  
+	•	Engage  
+	•	Audiences  
+	•	Journeys  
+	•	Customer Data
+See all products
+See Twilio’s latest innovations and CDP integrations
+Solutions
+Use Cases
+
+
+
+	•	Verification and identity  
+	•	Fraud prevention  
+	•	Alerts and notifications  
+	•	Appointment reminders  
+	•	Lead alerts  
+	•	Mass texting  
+	•	Marketing and promotions  
+	•	SMS marketing  
+	•	Cross-sell and upsell  
+	•	Optimize ad spend  
+	•	Support and sales  
+	•	AI agent productivity  
+	•	IVR  
+	•	Contact center  
+	•	Customer data management  
+Teams
+
+
+
+	•	Developers  
+	•	Data Engineering  
+	•	Marketing  
+	•	Product  
+	•	Customer Experience  
+Industry
+
+
+
+	•	Financial services  
+	•	Healthcare  
+	•	Retail  
+	•	Nonprofit  
+	•	Hospitality  
+	•	Ecommerce  
+	•	Public sector  
+	•	Education  
+
+Company Size
+
+
+
+	•	Enterprise  
+	•	Startup  
+See all solutions
+Why Twilio
+Overview
+
+
+
+	•	Why Twilio  We help you build amazing experiences with contextual data, the right communication channels, and AI to scale personalization and increase efficiency.
+	•	Customer stories  
+Differentiators
+
+
+
+	•	One platform  
+	•	Privacy and security  
+	•	Built for builders  
+	•	Enterprise scale  
+	•	Extensible by design  
+	•	Real-time customer data  
+	•	Artificial intelligence  
+	•	Infrastructure  
+Company
+
+
+
+	•	About us  
+	•	Values  
+	•	Diversity  
+	•	Careers  
+	•	Twilio.org  
+	•	Investor relations  
+	•	Press and media  
+	•	Events  
+
+Resources
+Developers
+
+
+
+	•	Documentation  
+	•	Code samples  
+	•	Developer Hub  
+	•	Champions  
+	•	Changelog  
+	•	Serverless  
+Learn
+
+
+
+	•	Blog  
+	•	Resource Center  
+	•	Guides  
+	•	Reports  
+	•	Webinars  
+	•	Podcasts  
+	•	Customer stories  
+	•	State of Customer Engagement  
+	•	Events  
+	•	Customer data recipes  
+Support and services
+
+
+
+	•	Help Center  
+	•	Find a partner  
+	•	Become a partner  
+	•	Professional services  
+	•	Support plans  
+	•	Status  
+	•	SendGrid status  
+	•	Segment status  
+
+Pricing
+Overview
+
+
+
+	•	All Pricing  Transparent pricing with discounts as you scale. Sign up for a free trial—no credit card required.
+Conversations
+
+
+
+	•	Conversations  
+	•	Conversation Memory  
+	•	Conversation Orchestrator  
+	•	Conversation Intelligence  
+	•	Conversation Relay  
+Communications
+
+
+
+	•	Messaging  
+	•	SMS  
+	•	WhatsApp  
+	•	Conversations API  
+	•	Voice  
+	•	SIP Trunking  
+	•	Conferencing  
+	•	Email API  
+	•	Marketing Campaigns  
+	•	Video API  
+	•	Flex  
+Authentication
+
+
+
+	•	Verify  
+	•	Lookup  
+Customer Data
+
+
+
+	•	Customer Data Platform  
+	•	Customer Data Pipeline  
+Contact sales Start for free
+
+
+
+Print this page
+Customer and Partner Agreements
+Terms of Service
+Acceptable Use Policy
+Service and Country Specific Requirements
+Data Protection Addendum (DPA)
+Security Overview
+Service Level Agreements
+Advisory Services Terms
+Professional Services Terms
+Twilio Marketplace Terms
+Twilio Segment Customer Data Platform Destination Integration and Listing Terms
+AI/ML Terms
+Twilio Messaging Campaign Terms
+Customer Name Changes and Assignments
+Updates to Legal Terms and Conditions
+Country Specific Disclosures
+EU Data Act Disclosures and Twilio’s Commitment to Open Portability and Switching
+European Electronic Communications Code Disclosures
+Italy ALIAS Database Code of Conduct
+Germany - Impressum
+Privacy
+Data Privacy at Twilio
+Privacy Notice
+Binding Corporate Rules
+Customer Proprietary Network Information (CPNI)
+Sub-processors
+Customer Data Protection Addendum
+Supplier Data Protection Addendum
+Global Applicant Privacy Notice
+Mobile Application Terms
+Twilio Frontline End User App Terms
+Twilio Authy App Terms
+Supplier Agreements
+Supplier Purchase Order Terms and Conditions
+Country-Specific Terms
+Supplier Data Protection Addendum
+Supplier Code of Conduct
+Intellectual Property
+DMCA Policy
+Trademark
+Resources for Law Enforcement
+Government Requests
+Transparency Report
+Civil Requests
+Submit a request or subpoena
+Code of Conduct & Ethics Hotline
+Twilio Code of Conduct
+Ethics and Whistleblower Hotline
+Discord Community Code of Conduct
+Twilio Discord FAQ
+Digital Promotions General Rules
+Sweepstakes Rules
+Customer Research and User Experience
+Acknowledgement and Waiver
+Twilio Data Protection Addendum
+Last Updated: April 9, 2026
+This Data Protection Addendum (“Addendum”) forms part of the agreement(s) between Customer and Twilio covering Customer’s use of the Services (as defined below) (“Agreement”) and governs the use of Customer Data (as defined below), and the related processing of Customer Personal Data (as defined below), by Twilio.
+1. Definitions
+ “Affiliate” means any entity that directly or indirectly controls or is controlled by, or is under common control with, the party specified. For purposes of this definition, “control” means direct or indirect ownership of more than fifty percent (50%) of the voting interests of the subject entity.
+“Applicable Data Protection Law” means all laws and regulations applicable to Twilio’s processing of personal data (as defined below) under the Agreement, including the following, without limitation, and as amended or replaced from time to time:
+(a) Australia: Australian Privacy Act 1988;
+(b) Brazil:  Lei Geral de Proteção de Dados (General Personal Data Protection Act);
+(c) Canada: Federal Personal Information Protection and Electronic Documents Act;
+(d) European Economic Area: General Data Protection Regulation EU 2016/679 and the Privacy and Electronic Communications Directive 2002/EC/58;
+(e) Israel: Protection of Privacy Law;
+(f) Japan: Act on the Protection of Personal Information;
+(g) Mexico: Federal Law for the Protection of Personal Data Held by Private Parties and its Regulations;
+(h) Singapore: Personal Data Protection Act 2012;
+(i) Switzerland: Swiss Federal Act on Data Protection, as revised;
+(j) United Kingdom: UK General Data Protection Regulation, Data Protection Act 2018, and the Privacy and Electronic Communications Regulations 2003; and
+(k) United States of America: All state laws relating to the protection and processing of personal data in effect in the United States of America, which may include, without limitation, 28 CFR Part 202 (Access to U.S. Sensitive Personal Data and Government-Related Data by Countries of Concern or Covered Persons), the California Consumer Privacy Act, as amended by the California Privacy Rights Act, the Virginia Consumer Data Protection Act, the Colorado Privacy Act, the Connecticut Data Privacy Act, and the Utah Consumer Privacy Act.
+“controller” means the natural or legal person, public authority, agency, or other body which, alone or jointly with others, determines the purposes and means of the processing of personal data or as otherwise defined or interpreted under Applicable Data Protection Law.
+“Customer Account Data” means personal data that relates to Customer’s relationship with Twilio, including (a) contact data of Customer (if a natural person), of individuals, or of individuals authorized by Customer to set up and access Customer’s account; (b) data relating to billing management and purchase history; (c) personal data Twilio may need to administer Customer’s account, provision the Services (as defined below), or verify the identity of End Users (as defined below) for security and verification purposes, such as information collected in connection with the fulfillment of Know-Your-Customer (KYC) requirements, as part of Twilio’s obligation to retain Subscriber Records (as defined below), and other applicable statutory requirements as described in this Addendum.
+“Customer Content” means data, including personal data, (a) within any communications content exchanged as a result of using the Services, such as text message bodies, voice, sound, video media, images, email bodies, subject lines, and recipients and, where applicable, within any data (x) Customer submits to the Services from its designated software applications or other products and services or (y) generated for Customer’s use as part of the Services and (b) stored on Customer’s behalf, such as (i) communications content, transcripts, recordings, or communications logs, within the Services or (ii) marketing campaign data that Customer has uploaded to the Services.
+“Communications Usage Data” means data, including personal data, processed by Twilio to transmit, distribute, or exchange Customer Content through the public switched telephone network or other communications network, as well as to optimize and maintain Service performance, investigate and prevent system abuse, and identify the source of Service requests, including (a) electronic communications metadata such as traffic records and routing details used to identify the source and destination of a communications, such as sender/recipient information, and phone numbers communication logs, and other metadata regarding the type, date, time, duration and status of a communications (e.g., delivered, opened, or bounced) or (b) device data generated in the context of providing the Services or using Twilio’s application programming interfaces, such as operating systems, browser details, IP addresses, identifiers, general location data, and activity logs.
+“Customer Data” means any data (a) provided by Customer or Customer's End Users to Twilio in connection with Customer's use of the Services or (b) generated for Customer's use as part of the Services.
+“Customer Personal Data” means personal data, including Sensitive Data, within Customer Data.
+“End User” means any user of the Services, including via any software application or other products and services provided by Customer and used in connection with Customer’s use of the Services under the Agreement.
+“personal data” means any data or other information relating to an identified or identifiable natural person (“data subject”) or as both terms are otherwise defined or interpreted under Applicable Data Protection Law. An identifiable natural person is one who can be identified, directly or indirectly, in particular by reference to an identifier, such as a name, an identification number, location data, an online identifier, or one or more factors specific to the physical, physiological, genetic, mental, economic, cultural, or social identity of that natural person.
+“processor” means the entity which processes personal data on behalf of the controller or as otherwise defined or interpreted under Applicable Data Protection Law.
+“processing” (and “process”) means any operation or set of operations performed on personal data, or on sets of personal data, whether or not by automated means, such as collection, recording, organization, structuring, storage, adaptation or alteration, retrieval, consultation, use, disclosure by transmission, dissemination, or otherwise making available, alignment or combination, restriction, erasure, or destruction.
+“Security Incident” means a confirmed accidental or unlawful destruction, loss, alteration, unauthorized disclosure of, or access to, Customer Personal Data, or as otherwise defined in Applicable Data Protection Law.
+“Sensitive Data” means an individual’s (a) social security number, passport number, driver’s license number, or similar identifier (or any portion thereof); (b) credit or debit card number (other than the truncated (i.e., last four digits) of a credit or debit card number), financial information, banking account numbers, or passwords; (c) employment, financial, genetic, biometric or health information; (d) racial, ethnic, political, or religious affiliation, trade union membership, or information about sexual life or sexual orientation; (e) account passwords, mother’s maiden name, or date of birth; (f) criminal history; or (g) any other information or combinations of information that falls within the definition of “sensitive” or “special categories of data” under Applicable Data Protection Law.
+“Service Abuse” means any abuse or misuse of the Services, including spam, fraud, illegal activities, or violations of Twilio's Acceptable Use Policy, the current version of which is available at https://www.twilio.com/legal/aup.
+“Services” means the products, services, and platforms provided by Twilio or its Affiliates, as applicable, including all updates, modifications, or improvements thereto, that Customer purchases pursuant to an order form or otherwise uses.
+“Subscriber Records” means Customer Account Data containing proof of identification and proof of physical address necessary for Twilio to provide Customer or Customer’s End Users with phone numbers in certain countries.
+“sub-processor” means (a) Twilio and its Affiliates, where Twilio or its Affiliate is processing Customer Personal Data and Customer is a processor of such data or (b) any third-party processor engaged by Twilio to process Customer Personal Data as a sub-processor of Twilio in order to provide the Services to Customer. Telecommunications providers used by Twilio to provide the Services are not considered sub-processors.
+“Third-Party Request” means any request, correspondence, inquiry, or complaint from a data subject, regulatory authority, or third party.
+“Twilio Privacy Notice” means the privacy notice applicable to the Services, the current version of which is available at https://www.twilio.com/legal/privacy.
+Any capitalized term not defined in this Section 1 will have the meaning provided in this Addendum or the Agreement, as applicable. References in this Addendum to Sections or Schedules are to sections or schedules of this Addendum.
+2. Role of Twilio and Customer in Relation to Customer Personal Data.  Customer and Twilio acknowledge and agree that (a) Twilio is a processor or sub-processor (acting on behalf of Customer), except where Twilio processes Customer Personal Data as a controller as set forth in Section 3 (Processing of Customer Personal Data as a Controller) and (b) Customer may act as a controller or processor on behalf of its End Users of Customer Personal Data. Twilio’s processing of Customer Personal Data as a processor or sub-processor is set forth in Section 4 (Processing of Customer Personal Data as a Processor).
+3. Processing of Customer Personal Data as a Controller
+3.1 Twilio as a Controller of Customer Personal Data.  Customer and Twilio acknowledge and agree that Twilio acts as an independent controller of Customer Personal Data:
+(a) to the extent necessary for the legitimate business purposes described in Section 3.2 (Twilio as a Controller of Customer Account Data), Section 3.3 (Twilio as a Controller of Communications Usage Data), and Section 3.4 (Twilio as a Controller of Customer Content), provided that such processing is in accordance with the Agreement, the Twilio Privacy Notice, and applicable law or regulation, including Applicable Data Protection Law;
+(b) as otherwise permitted under Applicable Data Protection Law and in accordance with this Addendum, the Agreement, and the Twilio Privacy Notice; and
+(c) as otherwise authorized or requested by Customer, including as agreed in Service-specific terms or Customer’s use and configuration of certain features of the Services.
+Customer and Twilio each have all rights and obligations with respect to Customer Personal Data as independent controllers of Customer Personal Data, not as joint controllers.
+3.2 Twilio as a Controller of Customer Account Data.  Customer and Twilio agree that Twilio is an independent controller of Customer Account Data which it processes:
+(a) to manage billing, Customer’s account, and Twilio’s relationship with Customer, including Know-Your-Customer (KYC) and identity verification required to access or use the Services;
+(b) to carry out Twilio’s core business operations, such as accounting, auditing, and filing taxes;
+(c) to prevent, detect, or investigate security incidents and manage the security of Twilio's platform and services;
+(d) to prevent, detect, or investigate Service Abuse, through the development or improvement of Twilio’s internal tools and related model training for such purposes, or to assist telecommunications providers, regulators, or law enforcement agencies with combating spam, fraud, or illegal activities;
+(e) for business analytics, internal reporting, financial reporting, forecasting capacity and revenue planning, and product strategy;
+(f) to develop and improve new products and services and improve the performance, functionality, safety, and security of the Services; and
+(g) to comply with Twilio’s legal and regulatory obligations, including, without limitation, to maintain Subscriber Records.
+3.3 Twilio as a Controller of Communications Usage Data.  Customer and Twilio agree that Twilio is an independent controller of Communications Usage Data which it processes in order to:
+(a) carry out the necessary functions as an electronic communications service provider, such as (i) for Twilio’s accounting, tax, billing, audit, and compliance purposes; (ii) to provide, optimize, and maintain the Services; and (iii) to prevent, detect, or investigate security incidents and manage the security of Twilio’s platform and services;
+(b) prevent, detect, or investigate Service Abuse, including through the development or improvement of Twilio’s internal tools and related model training for such purposes, or to assist telecommunications providers, regulators, or law enforcement agencies with combating spam, fraud, or illegal activities;
+(c) comply with Twilio’s legal and regulatory obligations, including, without limitation, to maintain Subscriber Records, communications industry codes of conduct, and contractual commitments to telecommunications providers;
+(d) develop and improve new products and services and improve the performance, functionality, safety, and security of the Services; and
+(e) anonymize, de-identify, or aggregate Communications Usage Data such that it does not identify Customer, Customer’s End Users, or any data subject.
+3.4 Twilio as a Controller of Customer Content.  Customer and Twilio acknowledge and agree that Twilio is an independent controller of Customer Content, which it processes to the extent necessary: 
+(a) to prevent, detect, or investigate security incidents and manage the security of Twilio’s platform and services;
+(b) to prevent, detect, or investigate Service Abuse, through the development or improvement of Twilio’s internal tools and related model training for such purposes, or to assist telecommunications providers, regulators, or law enforcement agencies with combating spam, fraud, or illegal activities;
+(c) to comply with Twilio’s legal and regulatory obligations, including, without limitation, to maintain Subscriber Records, communications industry codes of conduct, and contractual commitments to telecommunications providers; 
+(d) to develop and improve new products and services and improve the performance, functionality, safety, and security of the Services; 
+(e) for business analytics, internal reporting, financial reporting, forecasting capacity and revenue planning, and product strategy; and
+(f) as otherwise authorized or requested by Customer, including as agreed in Service-specific terms or Customer’s use and configuration of certain features of the Services.
+3.5 Data Minimization and Privacy Preservation Methods.  Where reasonably necessary, Twilio will apply appropriate measures to minimize, anonymize, de-identify, pseudonymize, and/or aggregate Customer Personal Data used for the foregoing purposes in Sections 3.1 (Twilio as a Controller of Customer Personal Data) through 3.4 (Twilio as a Controller of Customer Content) such that it does not (a) identify Customer, Customer’s End Users, or any data subject and (b) constitute personal data under Applicable Data Protection Law. 
+3.6 Anonymized, De-identified, and Aggregated Data.  Customer Personal Data that is anonymized, de-identified, or aggregated by Twilio pursuant to Section 3.5 (Data Minimization and Privacy Preservation Methods) or the Agreement is not subject to this Addendum; provided, however, Twilio will not re-identify, or attempt to re-identify, Customer Personal Data. 
+4. Processing of Customer Personal Data as a Processor
+4.1 Twilio as a Processor of Customer Personal Data.  Customer and Twilio agree that Twilio will process Customer Personal Data as a processor or sub-processor, rather than as a controller, except as set forth in Section 3 (Processing of Customer Personal Data as a Controller). As a processor or sub-processor, Twilio will process Customer Personal Data in accordance with Customer’s instructions as set forth in Section 4.2 (Customer Instructions), any terms that Customer has accepted for certain Services or through Customer’s use and configuration of certain features within the Services.
+4.2 Customer Instructions.  Except as otherwise set forth in Section 3 (Processing of Customer Personal Data as a Controller), Customer appoints Twilio as a processor or sub-processor to process Customer Personal Data on behalf of, and in accordance with, Customer’s instructions, as set forth in the Agreement, this Addendum (including Schedule 1 (Details of Processing)), and as otherwise necessary to provide the Services to Customer, which includes providing recommendations or demonstrations of other Twilio products, services, or features to Customer.
+4.3 Lawfulness of Instructions.  Customer will ensure that its instructions to process Customer Personal Data comply with Applicable Data Protection Law. If Customer is a processor of Customer Personal Data, Customer will ensure that the appointment of Twilio as a sub-processor, and its instructions, have been authorized by the relevant controller. Customer acknowledges that Twilio is neither responsible for determining which laws or regulations are applicable to Customer’s business nor whether Twilio’s provision of the Services meets, or will meet, the requirements of such laws or regulations. Customer will ensure that Twilio’s processing of Customer Personal Data, where done in accordance with Customer’s instructions, will not cause Twilio to violate any applicable law or regulation, including Applicable Data Protection Law. Twilio will inform Customer if it becomes aware, or reasonably believes, that Customer’s instructions violate any applicable law or regulation, including Applicable Data Protection Law.
+4.4 Additional Instructions.  Additional instructions for the processing of Customer Personal Data outside the scope of the Agreement and this Addendum will be agreed to in writing between Customer and Twilio, including any additional fees that may be payable by Customer to Twilio to carry out such additional instructions.
+5. Confidentiality
+5.1 Responding to Third-Party Requests.  In the event any Third-Party Request is made directly to Twilio in connection with Twilio’s processing of Customer Personal Data as a processor or sub-processor, Twilio will promptly inform Customer and provide details of such Third-Party Request, to the extent legally permitted. Twilio will not respond to any Third-Party Request without Customer’s prior consent, unless Twilio is legally required to do so or to confirm that such Third-Party Request relates to Customer. Where applicable, Twilio will (a) comply with its law enforcement guidelines, the current version of which is available at https://www.twilio.com/legal/law-enforcement-guidelines, and (b) limit any Customer Personal Data provided as part of a Third-Party Request to the minimum extent necessary and strictly for the required purpose of such Third-Party Request.
+5.2 Subscriber Records.  Where required by applicable law or regulation, Subscriber Records are shared with local telecommunications providers, which provide local connectivity services, or local government authorities. Additional information about these regulatory requirements is available at https://www.twilio.com/guidelines/regulatory.
+5.3 Confidentiality Obligations of Twilio Personnel.  Twilio will ensure that any person it authorizes to process Customer Personal Data has agreed to protect Customer Personal Data in accordance with Twilio's confidentiality obligations in the Agreement.
+6. Sub-Processors
+6.1 Authorization for Sub-Processing.  Customer hereby provides a general authorization for Twilio to engage third-party sub-processors for the onward processing of Customer Personal Data that Twilio processes as a processor or sub-processor, subject to the following requirements: 
+(a) Twilio will restrict its sub-processors’ access to, and processing of, Customer Personal Data only to what is strictly necessary to provide the Services;
+(b) Twilio agrees to impose contractual data protection obligations on its sub-processors, including appropriate technical and organizational measures, designed to protect Customer Personal Data in accordance with the standard required under Applicable Data Protection Law, including, without limitation, the requirements set forth in Schedule 4 (California Specific Terms); and
+(c) Twilio will remain liable for any breach of this Addendum that is caused by an act, error, or omission of its sub-processors.
+6.2 Current Sub-Processors and Notification of Sub-Processor Changes.  Twilio maintains an up-to-date list of its sub-processors available at https://www.twilio.com/legal/sub-processors, which contains a mechanism for Customer to subscribe to notifications of new sub-processors or replacement of existing sub-processors. If Customer subscribes to such notifications, Twilio will provide details of any change in its sub-processors as soon as reasonably practicable. With respect to any change in infrastructure providers of the Services, Twilio will provide written notice to Customer as soon as reasonably practicable but not less than thirty (30) days prior to such change. With respect to any change in Twilio’s sub-processors that are not infrastructure providers of the Services, Twilio will provide written notice to Customer as soon as reasonably practicable, but not less than ten (10) days prior to such change.
+6.3 Objection Right for Sub-Processors.  Customer may object to Twilio's appointment of a new sub-processor or replacement of an existing sub-processor during the applicable notice period set forth in Section 6.2 (Current Sub-Processors and Notification of Sub-Processor Changes), provided such objection is in writing and based on reasonable grounds relating to data protection. In such an event, Customer and Twilio agree to discuss commercially reasonable alternative solutions in good faith. If Customer and Twilio cannot reach a resolution within the applicable notice period set forth in Section 6.2 (Current Sub-Processors and Notification of Sub-Processor Changes), Customer may discontinue the use of the affected Services by providing written notice to Twilio. Any discontinued use of the affected Services will be without prejudice to any fees incurred by Customer prior to the discontinued use. If no objection has been raised by Customer prior to the end of the applicable notice period set forth in Section 6.2 (Current Sub-Processors and Notification of Sub-Processor Changes), Twilio will deem Customer to have authorized the new sub-processor or updated sub-processor, as applicable.
+7. Data Subject Rights.  Twilio provides Customer with a number of self-service features via the Services to delete, obtain a copy of, or restrict use of Customer Personal Data for which Twilio is a processor or sub-processor. Customer may use these self-service features to assist in complying with its obligations under Applicable Data Protection Law with respect to responding to Third-Party Requests from data subjects via the Services at no additional cost. Upon Customer’s written request, Twilio will provide reasonable additional and timely assistance to Customer in complying with Customer’s data protection obligations with respect to data subject rights under Applicable Data Protection Law to the extent Customer does not have the ability to resolve a Third-Party Request from a data subject through self-service features made available via the Services.
+8. Impact Assessments and Consultations.  Where Twilio processes Customer Personal Data as a processor or sub-processor, Twilio will provide reasonable cooperation to Customer in connection with any data protection impact assessment (at Customer’s expense only if such reasonable cooperation will require Twilio to assign significant resources to that effort) or consultation with any regulatory authority that may be required under Applicable Data Protection Law.
+9. Return or Deletion of Customer Personal Data.  Where Twilio processes Customer Personal Data as a processor or sub-processor, Twilio will, in accordance with Section 6 (Duration of the Processing) of Schedule 1 (Details of Processing), delete or return to Customer any Customer Personal Data stored within the Services.
+9.1 Extension of Addendum.  Upon termination of the Agreement, Twilio may continue to retain and store Customer Personal Data for the time periods set forth in Schedule 1 (Details of Processing), provided that Twilio ensures that Customer Personal Data is processed only as necessary for the purposes set forth in Schedule 1 (Details of Processing) and remains protected in accordance with the terms of the Agreement, this Addendum, and Applicable Data Protection Law.
+9.2 Retention Required by Law.  Notwithstanding anything to the contrary in this Section 9, Twilio may retain Customer Personal Data, or any portion of it, if required by applicable law or regulation, including Applicable Data Protection Law, provided such Customer Personal Data remains protected in accordance with the terms of the Agreement, this Addendum, and Applicable Data Protection Law.
+10. Security
+10.1 Security Measures.  Twilio has implemented, and will maintain, the technical and organizational security measures set forth in the Agreement designed to protect Customer Data, including Customer Personal Data. Additional information about Twilio’s technical and organizational security measures is set forth in Schedule 2 (Technical and Organizational Security Measures).
+10.2 Determination of Security Requirements.  Customer acknowledges the Services include certain features and functionalities that Customer may elect to use which impact the security of Customer Data processed as result of Customer’s use of the Services, including, without limitation, encryption of voice recordings, availability of multi-factor authentication on Customer’s account, or optional Transport Layer Security (TLS) encryption. Customer is responsible for reviewing the information Twilio makes available regarding its data security, including its audit reports, and making an independent determination regarding whether the Services meet Customer’s requirements and legal obligations, including its obligations under Applicable Data Protection Law. Customer is further responsible for properly configuring the Services and using features and functionalities made available by Twilio to maintain appropriate security in light of the nature of Customer Data processed as a result of Customer’s use of the Services.
+10.3 Security Incident Notification.  Twilio will provide notification of a Security Incident in the following manner:
+(a) Twilio will notify Customer of any Security Incident involving Customer Personal Data that Twilio processes as a processor or sub-processor, without undue delay, after Twilio’s discovery of such Security Incident; 
+(b) Twilio will, to the extent permitted and required by applicable law or regulation, including Applicable Data Protection Law, notify Customer, without undue delay, of any Security Incident involving Customer Personal Data of which Twilio is a controller; and
+(c) Twilio will notify Customer of any Security Incident via email to the email address(es) designated by Customer in Customer’s account.
+Twilio will provide reasonable assistance to Customer in the event that Customer is required under Applicable Data Protection Law to notify a regulatory authority or any data subjects impacted by a Security Incident.
+11. Audits.  Customer will have the following audit rights where Twilio is acting as a processor or sub-processor of Customer Personal Data.
+11.1 Twilio’s Audit Program.  Twilio uses external auditors to verify the adequacy of its technical and organizational security measures with respect to its processing of Customer Personal Data where Twilio is a processor or sub-processor. Any audits are performed at least once per calendar year at Twilio’s expense by independent third-party security professionals selected by Twilio and result in the generation of a confidential audit report (“Audit Report”). Upon Customer’s written request at reasonable intervals, and subject to reasonable confidentiality controls, Twilio will make available to Customer a summary copy of Twilio’s most recent Audit Report. Additionally, no more than once per calendar year, Twilio will provide written responses, on a confidential basis, to Customer’s reasonable request for information made in writing that is necessary to confirm Twilio’s compliance with this Addendum related to Twilio’s processing of Customer Personal Data as a processor or sub-processor.
+11.2 Customer Audit.  Customer agrees that only where any audit rights required under Applicable Data Protection Law cannot reasonably be satisfied through exercise of the rights set forth in Section 11.1 (Twilio’s Audit Program), Customer, or its authorized representatives, may conduct an audit (each, a “Customer Audit”), during the term of the Agreement, to assess Twilio’s compliance with the terms of this Addendum. To the extent Customer and Twilio determine that the exercise of the rights set forth in Section 11.1 (Twilio’s Audit Program) does not satisfy the audit rights required under Applicable Data Protection Law, Customer will agree to a mutually agreed-upon audit plan with Twilio that includes the following:
+(a) requires the use of an independent third-party auditor;
+(b) requires Customer to provide reasonable prior written notice to Twilio regarding exercising its right under this Section 11.2 for a Customer Audit;
+(c) limits Customer’s access to Twilio-managed facilities and Twilio personnel only during regular business hours;
+(d) requires Customer to pay Twilio’s then-current rates to assist with a Customer Audit;
+(e) limits the occurrence of a Customer Audit to no more than once per calendar year;
+(f) restricts Customer Audit findings to only Customer Personal Data that is relevant to Customer, where Twilio is a processor or sub-processor; and
+(g) obligates Customer, to the extent permitted by law or regulation, to keep confidential any information gathered from a Customer Audit that, by its nature, should be confidential.
+12. International Provisions
+12.1 California Specific Terms.  To the extent Twilio processes personal information, as defined by the California Consumer Privacy Act, Cal. Civ. Code § 1798.100 et. seq., as amended by the California Privacy Rights Act and its implementing regulation (collectively, “CCPA”), the terms set forth in Schedule 4 (California Specific Terms) will apply.
+12.2 Cross Border Data Transfer Mechanisms.  To the extent Customer’s use of the Services requires an onward transfer mechanism to lawfully transfer personal data from a jurisdiction (e.g., the European Economic Area, the United Kingdom, Switzerland, Guernsey, and Jersey) to Twilio’s operations located outside of that jurisdiction (“Transfer Mechanisms”), the terms set forth in Schedule 3 (Cross Border Data Transfer Mechanisms) will apply.
+13. Miscellaneous
+13.1 Compliance.  Customer is responsible for ensuring that (a) it has complied, and will continue to comply, with Applicable Data Protection Law in its use of the Services and its own processing of personal data, and (b) it has, and will continue to have, the right to transfer, or provide access to, personal data to Twilio for processing in accordance with the terms of the Agreement and this Addendum.
+13.2 Conflict.  In the event of any conflict or inconsistency among the following documents, the order of precedence will be as follows: (1) the Transfer Mechanisms; (2) the applicable terms set forth in Schedule 4 (California Specific Terms); (3) the terms of this Addendum outside of Schedule 4 (California Specific Terms); (4) the Agreement; and (5) the Twilio Privacy Notice. Any claims brought in connection with this Addendum will be subject to the terms, including, without limitation, the exclusions and limitations, set forth in the Agreement.
+13.3 Entire Agreement.  This Addendum supersedes data protection terms or terms relating to the processing of personal data previously agreed to between Customer and Twilio. 
+13.4 Updates.  Twilio may update the terms of this Addendum from time to time upon at least thirty (30) days prior written notice to Customer. The then-current terms of this Addendum are available at https://www.twilio.com/legal/data-protection-addendum.
+Schedule 1
+Details of Processing
+
+Where applicable, this Schedule 1 will serve as Annex 1 to the EU Standard Contractual Clauses, the UK International Data Transfer Agreement, and the Brazil Standard Contractual Clauses (each of which is defined in Schedule 3 (Cross Border Data Transfer Mechanisms)).
+1. Categories of Data Subjects.  Customer’s End Users and end-consumers of Customer.
+2. Categories of Customer Personal Data.  Customer Account Data, Communications Usage Data, and Customer Content.
+3. Sensitive Data or Special Categories of Data.  Customer Content may constitute Sensitive Data under Applicable Data Protection Law and, Customer Content may, from time to time, include Sensitive Data to be processed via the Services where Customer or Customer’s End Users choose to include Sensitive Data within Customer Content. Customer is responsible for ensuring that suitable safeguards are in place prior to transmitting or processing, or prior to permitting Customer’s End Users to transmit or process, any Sensitive Data via the Services.
+4. The Frequency of the Transfer: Continuous
+5. Nature and Purpose of the Processing.  Customer Personal Data will be subject to the following basic processing activities:
+Twilio, as a processor or sub-processor, will process Customer Personal Data in accordance with Customer’s instructions as set forth in Section 4.2 (Customer Instructions). As a controller, Twilio will process Customer Personal Data as necessary to carry out its legitimate business purposes set forth in Section 3 (Processing of Customer Personal Data as a Controller).
+6. Duration of the Processing.  The period for which personal data will be retained by Twilio and the criteria used to determine that period is as follows:
+Where Twilio is acting as a processor or sub-processor, Customer Personal Data will be retained as long as necessary to fulfill the purposes for which such personal data was collected and/or received by Twilio, as set forth in Section 6.1 and Section 6.2 of this Schedule 1, and as otherwise set forth in the data retention and deletion documentation for the Services available at at https://help.twilio.com/articles/4410585868443 and https://segment.com/docs/privacy/account-deletion.
+6.1 Services.  Prior to the termination of the Agreement, (a) Twilio will process stored Customer Content for the purposes set forth in Section 4.2 (Customer Instructions) until Customer elects to delete such Customer Content via the Services and (b) Customer agrees that it is solely responsible for deleting Customer Content via the Services. Except as set forth in Section 6.2 (SendGrid Services) of this Schedule 1, upon termination of the Agreement, Twilio will (i) provide Customer with thirty (30) days after the termination effective date to obtain a copy of any stored Customer Content via the Services; (ii) automatically delete any stored Customer Content  thirty (30) days after the termination effective date; and (iii) automatically delete any stored Customer Content on Twilio’s back-up systems sixty (60) days after the termination effective date. Any Customer Content archived on Twilio’s back-up systems will be securely isolated and protected from any further processing, except as otherwise required by applicable law or regulation, including Applicable Data Protection Law. 
+6.2 SendGrid Services.  Upon termination of the Agreement, Twilio will (a) at Customer’s election, delete or return to Customer any Customer Content (including copies) stored within any services and application programming interfaces branded as “SendGrid” or “Twilio SendGrid” (collectively, “SendGrid Services”) and (b) automatically delete any stored Customer Content in the SendGrid Services on Twilio’s back-up systems one (1) year after the termination effective date.
+Where Twilio is acting as a controller, Customer Personal Data will be retained for as long as necessary to fulfill the purposes for which such personal data was collected and/or received by Twilio and in accordance with Twilio’s data retention policies.
+Schedule 2
+Technical and Organizational Security Measures
+The full text of Twilio’s technical and organizational security measures to protect Customer Data, including Customer Personal Data, is available at https://www.twilio.com/legal/security-overview (“Security Overview”). Twilio’s Binding Corporate Rules Processor Policy is available at https://www.twilio.com/en-us/legal/bcr/processor.
+Where applicable, this Schedule 2 will serve as Annex II to the EU Standard Contractual Clauses, Table 3 of the UK International Data Transfer Agreement and the security measures required under the Brazilian Standard Contractual Clauses. 
+In the event of a conflict or inconsistency between the Security Overview and any security-related terms set forth in the Agreement, the security-related terms set forth in the Agreement will prevail.
+The following table provides more information about Twilio’s technical and organizational security measures.
+Technical and Organizational Security Measure
+
+Evidence of Technical and Organizational Security Measure
+
+Measures of pseudonymisation and encryption of personal data
+
+See Section 12 (Encryption) of the Security Overview
+
+Measures for ensuring ongoing confidentiality, integrity, availability and resilience of processing systems and services
+
+See Section 16 (Resilience and Service Continuity) and Section 17 (Customer Data Backups) of the Security Overview
+
+Measures for ensuring the ability to restore the availability and access to personal data in a timely manner in the event of a physical or technical incident
+
+See Section 16 (Resilience and Service Continuity) and Section 17 (Customer Data Backups) of the Security Overview
+
+Processes for regularly testing, assessing and evaluating the effectiveness of technical and organizational measures in order to ensure the security of the processing
+
+See Section 3 (Security Organization and Program), Section 7 (Security Certifications and Attestations), and Section 14 (Penetration Testing) of the Security Overview
+
+Measures for user identification and authorisation
+
+See Section 10 (Access Controls) of the Security Overview
+
+Measures for the protection of data during transmission
+
+See Section 12 (Encryption) and Section 17 (Customer Data Backups) of the Security Overview
+
+Measures for the protection of data during storage
+
+See Section 8 (Hosting Architecture and Data Segregation) and Section 12 (Encryption) of the Security Overview
+
+Measures for ensuring physical security of locations at which personal data are processed
+
+See Section 5 (Physical Security) of the Security Overview
+
+Measures for ensuring events logging
+
+See: 
+https://www.twilio.com/docs/verify/viewing-logs-with-twilio-console
+and:  
+https://docs.sendgrid.com/ui/analytics-and-reporting/email-activity-feed
+
+Measures for ensuring system configuration, including default configuration
+
+See:
+https://www.twilio.com/docs/runtime/functions-assets-api/api/logs
+and:
+https://docs.sendgrid.com/ui/analytics-and-reporting/email-activity-feed
+
+Measures for internal IT and IT security governance and management
+
+See Section 3 (Security Organization and Program) of the Security Overview
+
+Measures for certification/assurance of processes and products
+
+See Section 3 (Security Organization and Program) and Section 7 (Security Certifications and Attestations) of the Security Overview
+
+Measures for ensuring data quality and data minimisation
+
+Where Twilio acts as a processor of Customer Personal Data and based on the instructions of the Customer, Twilio will assist Customer in complying with its obligation to keep personal data accurate and up to date.
+Where Customer informs Twilio that Customer Personal Data Twilio processes on its behalf is inaccurate, Twilio will assist Customer to update, correct, or erase such data without undue delay. Twilio will also take measures to inform its group members or third-party processors to whom such data has been disclosed of the need to update, correct, or erase such personal data.
+
+Measures for ensuring limited data retention
+
+Where Twilio acts as a processor of Customer Personal Data and based on the instructions of the Customer, Twilio will assist Customer in storing Customer Personal Data only for as long as is necessary for the purpose for which such data was initially collected.
+Where Customer instructs Twilio that Customer Personal Data Twilio processes on its behalf is no longer needed, Twilio will assist Customer to erase, restrict, or anonymize such data without undue delay and in accordance with the terms of the Agreement. Twilio will also take measures to inform its group members or third-party processors to whom such data has been disclosed of the need to erase, restrict, or anonymize that personal data.
+
+Measures for ensuring accountability
+
+Twilio has adopted Binding Corporate Rules which govern the global handling, processing and transfer of personal data within Twilio.
+
+Measures for allowing data portability and ensuring erasure
+
+Customer is able to export or delete Customer Content using the self-service features of the Services as set forth in the applicable documentation for the Services available at https://www.twilio.com/docs.  
+For an example of data portability self-service features, see:
+https://support.twilio.com/hc/en-us/articles/223183588-Exporting-SMS-and-Call-Logs.  
+For an example of data portability self-service features, see:
+https://docs.sendgrid.com/ui/managing-contacts/create-and-manage-contacts#export-contacts. 
+For an example of data erasure self-service features, see:
+https://support.twilio.com/hc/en-us/articles/223181008-Twilio-SMS-message-and-traffic-storage. 
+For an example of data erasure self-service features, see:
+https://www.twilio.com/docs/sendgrid/api-reference/contacts/delete-contacts.
+
+Measures to be taken by third-party sub-processors
+
+Where Twilio engages a sub-processor under Section 6.1 (Authorization for Sub-Processing), Twilio and the sub-processor enter into an agreement with data protection obligations substantially similar to those set forth in this Addendum. Each sub-processor agreement must ensure that Twilio is able to meet its obligations to Customer. In addition to implementing technical and organizational measures to protect personal data, sub-processors must (a) notify Twilio in the event of a Security Incident, so Twilio may notify Customer; (b) delete personal data where instructed by Twilio in accordance with Customer’s instructions to Twilio; (c) not engage additional sub-processors without Twilio’s authorization; (d) not change the location where personal data is processed; or (e) not process personal data in a manner which conflicts with Customer’s instructions to Twilio.
+
+Schedule 3
+Cross Border Data Transfer Mechanisms
+1. Definitions
+	•	“BCR Services” means all Services, except the SendGrid Services and Private Beta Offerings (as defined below).
+	•	“Brazil Standard Contractual Clauses” means the Standard Contractual Clause contained in Annex II of Resolution CD/ANPD No. 19/2024, of August 23, 2024.
+	•	“Data Privacy Framework” means the EU-US and/or Swiss-US Data Privacy Framework self-certification program operated by the U.S. Department of Commerce.
+	•	“Data Privacy Principles” means the Data Privacy Framework principles (as supplemented by the Supplemental Principles).
+	•	“EEA” means the European Economic Area.
+	•	“EU Standard Contractual Clauses” mean the Standard Contractual Clauses approved by the European Commission in decision 2021/914.
+	•	“Private Beta Offerings” means certain Services that are identified as alpha, beta, not generally available, limited release, developer preview, or any similar Services that are, in all the foregoing cases, only made available to a limited number of customers on an invitation basis in a non-public or private matter.
+	•	“Twilio BCRs” means Twilio’s Binding Corporate Rules as set forth at https://www.twilio.com/legal/binding-corporate-rules.
+	•	“Twilio Global CBPR and Global PRP Certifications” means Twilio’s certification under the Global Cross-Border Privacy Rules System (“Global  CBPRs”) and Global Privacy Recognition for Processors System (“Global  PRPs”), as recorded in the directory available at  https://www.globalcbpr.org.
+	•	“UK International Data Transfer Agreement” means the International Data Transfer Addendum to the EU Commission Standard Contractual Clauses issued by the UK Information Commissioner, Version B1.0, in force 21 March 2022.
+2. Cross Border Data Transfer Mechanisms
+2.1 Order of Precedence.  In the event the Services are covered by more than one  transfer mechanism, the transfer of personal data will be subject to a single transfer mechanism. These transfer mechanisms will apply in following order of precedence, as set forth in this Schedule 3: (a) the Data Privacy Framework (Section 2.2 ); (b) Twilio BCRs (Section 2.3 ); (c) the EU Standard Contractual Clauses (Section 2.4 ); (d) the UK International Data Transfer Agreement (Section 2.5); (e) the Brazil Standard Contractual Clauses (Section 2.7); (f) the Twilio Global CBPR or Global PRP Certifications (Section 2.8); or (g) if none of the foregoing apply, any other data transfer mechanism permitted under Applicable Data Protection Law.
+2.2 Data Privacy Framework.  To the extent Twilio Inc. processes any personal data via the Services originating from the EEA, Switzerland, or the United Kingdom, Twilio represents that Twilio Inc. is self-certified under the EU-U.S. Data Privacy Framework, the UK Extension to the EU-U.S. Data Privacy Framework, and the Swiss-U.S. Data Privacy Framework, and complies with the Data Privacy Principles where processing any such personal data. To the extent that Customer is (a) located in the United States of America and is self-certified under the Data Privacy Framework or (b) located in the EEA, Switzerland, and the United Kingdom, Twilio further agrees (i) to provide at least the same level of protection to any personal data as required by the Data Privacy Principles; (ii) to notify Customer in writing, without undue delay, if its self-certification to the Data Privacy Framework is withdrawn, terminated, revoked, or otherwise invalidated (in which case, an alternative Transfer Mechanism will apply in accordance with the order of precedence in Section 2.1 (Order of Precedence) of this Schedule 3); and (iii) upon written notice, to work with Customer to take reasonable and appropriate steps to stop and remediate any unauthorized processing of personal data.
+2.3 Twilio BCRs.  Twilio will process personal data within the BCR Services in accordance with the Twilio BCRs. Customer and Twilio agree that, with respect to the BCR Services, the Twilio BCRs will be the lawful transfer mechanism of Customer Personal Data from the EEA or Switzerland to (a) Twilio in the United States of America or (b) any other non-EEA Twilio entity. For avoidance of doubt, the Twilio BCRs do not serve as a transfer mechanism for the SendGrid Services or Private Beta Offerings.
+2.4 EU Standard Contractual Clauses.  The EU Standard Contractual Clauses will apply to personal data that is transferred via the Services from the EEA, Switzerland, Guernsey, or Jersey, either directly or via onward transfer, to any country or recipient outside the EEA, Switzerland, Guernsey, or Jersey that is not (a) recognized by the relevant competent authority as providing an adequate level of protection for personal data and (b) covered by the Twilio BCRs. For data transfers that are subject to the EU Standard Contractual Clauses, the EU Standard Contractual Clauses will be deemed entered into, and incorporated into this Addendum by this reference, and completed as follows:
+(a) Module One (Controller to Controller) of the EU Standard Contractual Clauses will apply where (i) Twilio is processing Customer Account Data and Communications Usage Data and (ii) Customer is a controller of Customer Personal Data, and Twilio is processing Customer Personal Data pursuant to Section 3 (Processing of Customer Personal Data as a Controller);  
+(b) Module Two (Controller to Processor) of the EU Standard Contractual Clauses will apply where Customer is a controller of Customer Personal Data, and Twilio is processing Customer Personal Data pursuant to Section 4 (Processing of Customer Personal Data as a Processor); and
+(c) Module Three (Processor to Processor) of the EU Standard Contractual Clauses will apply where Customer is a processor of Customer Personal Data, and Twilio is processing Customer Personal Data pursuant to Section 4 (Processing of Customer Personal Data as a Processor);
+(d) For each Module, where applicable:  
+(i) in Clause 7 of the EU Standard Contractual Clauses, the optional docking clause will not apply;
+(ii) in Clause 9 of the EU Standard Contractual Clauses, Option 2 will apply and the time period for prior written notice of sub-processor changes will be as set forth in Section 6.2 (Current Sub-Processors and Notification of Sub-Processor Changes);
+(iii) in Clause 11 of the EU Standard Contractual Clauses, the optional language will not apply;
+(iv) in Clause 17 (Option 1), the EU Standard Contractual Clauses will be governed by Irish law;
+(v) in Clause 18(b) of the EU Standard Contractual Clauses, disputes will be resolved before the courts of Ireland;
+(vi) in Annex I, Part A of the EU Standard Contractual Clauses:
+Data Exporter: Customer
+Contact details: The email address(es) designated by Customer in Customer’s account via its notification preferences.
+Data Exporter Role: The Data Exporter’s role is set forth in Section 3 (Processing of Customer Personal Data as a Controller) and Section 4 (Processing of Customer Personal Data as a Processor), as applicable.
+Signature and Date: By entering into the Agreement, Data Exporter is deemed to have signed these EU Standard Contractual Clauses incorporated herein, including their Annexes, as of the effective date of the Agreement.
+Data Importer: Twilio Inc.
+Contact details: Twilio Privacy - privacy@twilio.com
+Data Importer Role: The Data Importer’s role is set forth in Section 3 (Processing of Customer Personal Data as a Controller) and Section 4 (Processing of Customer Personal Data as a Processor), as applicable.
+Signature and Date: By entering into the Agreement, Data Importer is deemed to have signed these EU Standard Contractual Clauses, incorporated herein, including their Annexes, as of the effective date of the Agreement;
+(vii) in Annex I, Part B of the EU Standard Contractual Clauses:
+The categories of data subjects are set forth in Section 1 (Categories of Data Subjects) of Schedule 1 (Details of Processing).
+The Sensitive Data transferred is set forth in Section 3 (Sensitive Data or Special Categories of Data) of Schedule 1 (Details of Processing).
+The frequency of the transfer is a continuous basis for the duration of the Agreement.
+The nature and purpose of the processing is set forth in Section 5 (Nature and Purpose of the Processing) of Schedule 1 (Details of Processing).
+The period for which the personal data will be retained is set forth in Section 6 (Duration of the Processing) of Schedule 1 (Details of Processing).
+For transfers to sub-processors, the subject matter, nature, and duration of the processing is set forth at https://www.twilio.com/legal/sub-processors;
+(viii) in Annex I, Part C of the EU Standard Contractual Clauses: The Irish Data Protection Commission will be the competent supervisory authority; and
+(ix) Schedule 2 (Technical and Organizational Security Measures) serves as Annex II of the EU Standard Contractual Clauses.
+2.5 UK International Data Transfer Agreement.  Customer and Twilio agree that the UK International Data Transfer Agreement will apply to personal data that is transferred via the Services from the United Kingdom, either directly or via onward transfer, to any country or recipient outside of the United Kingdom that is not (a) recognized by the competent United Kingdom regulatory authority or governmental body for the United Kingdom as providing an adequate level of protection for personal data and (b) covered by the Twilio BCRs. For data transfers from the United Kingdom that are subject to the UK International Data Transfer Agreement, the UK International Data Transfer Agreement will be deemed entered into, and incorporated into this Addendum by this reference, and completed as follows:
+(a) In Table 1 of the UK International Data Transfer Agreement, Customer’s and Twilio’s details and key contact information are set forth in Section 2.4(d)(vi) of this Schedule 3;
+(b) In Table 2 of the UK International Data Transfer Agreement, information about the version of the Approved EU SCCs, modules, and selected clauses, which the UK International Data Transfer Agreement is appended to, are set forth in Section 2.4 (EU Standard Contractual Clauses) of this Schedule 3; 
+(c) In Table 3 of the UK International Data Transfer Agreement:
+(i) The list of Parties is set forth in Section 2.4(d)(vi) of this Schedule 3.
+(ii) The description of the transfer is set forth in Section 5 (Nature and Purpose of the Processing) of Schedule 1 (Details of the Processing). 
+(iii) Annex II is located in Schedule 2 (Technical and Organizational Security Measures).
+(iv) The list of sub-processors is available at https://www.twilio.com/legal/sub-processors; and
+(d) In Table 4 of the UK International Data Transfer Agreement, both the Importer and the Exporter may end the UK International Data Transfer Agreement in accordance with the terms of the UK International Data Transfer Agreement.
+2.6 Application of EU Standard Contractual Clauses.  The EU Standard Contractual Clauses apply to all Customer Personal Data that is transferred from or accessed remotely from outside any country whose data protection laws or regulations require an adequacy means for the international transfer or access. The required adequacy means can be met by entering into the EU Standard Contractual Clauses, either directly or via onward transfer to any country or recipient, in each case, where such transfer or access would be prohibited under Applicable Data Protection Law in the absence of the EU Standard Contractual Clauses. The EU Standard Contractual Clauses must be slightly modified (e.g., in terms of terminology) to ensure that this entire Addendum applies to all parties, regardless of the location of the parties, whether within or outside the EEA, Switzerland, Guernsey, or Jersey. Such modifications, however, do not apply for data transfers governed by EEA, Switzerland, Guernsey, or Jersey data protection laws or regulations.
+2.7 Application of Brazil Standard Contractual Clauses.  The Brazil Standard Contractual Clauses will apply to personal data that is transferred via the Services from Brazil, either directly or via onward transfer, to any third country or territory, or any recipient located in a third country or territory, (a) subject to an adequacy determination by the Brazilian Data Protection Authority (“ANPD”) or (b) as otherwise covered by a transfer mechanism recognized or approved by the ANPD as providing appropriate safeguards for personal data in accordance with Article 33 of the Lei Geral de Proteção de Dados (General Personal Data Protection Act). For data transfers that are subject to the Brazil Standard Contractual Clauses, the Brazil Standard Contractual Clauses will be deemed entered into, and incorporated into this Addendum by this reference, and completed as follows:
+(i) Clause 2 of the Brazil Standard Contractual Clauses is satisfied by the information set forth in Section 2.4(d)(vi) of this Schedule 3, which describes the data transfer;
+(ii) In Clause 3 of the Brazil Standard Contractual Clauses, OPTION B will apply, with onward transfers permitted in accordance with Section 6 (Sub-Processors) of this Addendum. The subject matter, nature, and duration of processing are set forth at https://www.twilio.com/legal/sub-processors;
+(iii) Clause 4 of the Brazil Standard Contractual Clauses is satisfied by the information set forth in Section 2.4(d)(vi) of this Schedule 3. Where Twilio is a controller, it will be the “Designated Party”, as defined in the Brazil Standard Contractual Clauses, and for the purposes of Clause 14 (Transparency), Clause 15 (Data Subject Rights), and Clause 16 (Incident Reporting) of the Brazil Standard Contractual Clauses. Customer remains responsible for compliance with Clause 14 (Transparency), Clause 15 (Data Subject Rights), and Clause 16 Incident Reporting) of the Brazil Standard Contractual Clauses for any personal data of which it may otherwise be controller;
+(iv) In Clause 9 of the Brazil Standard Contractual Clauses, the optional docking clause will not apply; and
+(v) Section III (Security Measures) of the Brazil Standard Contractual Clauses will be deemed completed with the information set forth in Schedule 2 (Technical and Organizational Security Measures).
+2.8 Application of Global Cross Border Privacy Rules.  Twilio’s privacy program has been certified under the Global CBPRs and Global PRPs, which are government-backed data privacy certifications that demonstrate compliance with internationally-recognized data privacy protections. Twilio will process personal data transferred from a participating Global CPBR economy to Twilio in accordance with the Twilio Global CBPR and Global PRP Certifications, to the extent applicable.
+2.9 Conflict.  In the event of any conflict or inconsistency among (a) the EU Standard Contractual Clauses, the UK International Data Transfer Agreement, or the Brazil Standard Contractual Clauses, as applicable; (b) any other terms in this Addendum, including Schedule 4 (California Specific Terms); (c) the Agreement; or (d) the Twilio Privacy Notice, the EU Standard Contractual Clauses, the UK International Data Transfer Agreement, as applicable, will prevail.
+Schedule 4
+California Specific Terms
+1. Twilio is an independent “business” where processing Customer Personal Data subject to the CCPA as a controller pursuant to Section 3 (Processing of Customer Personal Data as a Controller).
+2. The following terms apply where Twilio is processing Customer Personal Data subject to the CCPA as a processor pursuant to Section 4 (Processing of Customer Personal Data as a Processor) and acting as a “service provider”: 
+(a) The term “personal information”, as used in this Schedule 4, will have the meaning provided in the CCPA;
+(b)  Twilio will process any personal information within Customer Personal Data only for the business purposes set forth in the Agreement, including the purpose of processing and processing activities set forth in this Addendum (“Purpose”). Where acting as a service provider, Twilio will not sell or share personal information within Customer Personal Data or retain, use, or disclose such data (i) for any purpose other than the Purpose, including retaining, using, or disclosing the data for a commercial purpose other than the Purpose, or as otherwise permitted under the CCPA or (ii) outside of the direct business relationship between Customer and Twilio;
+(c) Twilio will (i) comply with obligations applicable to it where it acts as a service provider under the CCPA and (ii) provide personal information with the same level of privacy protection as is required under the CCPA. Customer is responsible for ensuring that it has complied, and will continue to comply, with the requirements of the CCPA in its use of the Services and its own processing of personal information;
+(d) Customer will have the right to take reasonable and appropriate steps to help ensure that Twilio uses personal information in a manner consistent with Customer’s obligations under the CCPA;
+(e) Twilio will notify Customer if it makes a determination that it can no longer meet its obligations as a service provider under the CCPA; 
+(f) Upon notice, Customer will have the right to take reasonable and appropriate steps in accordance with the Agreement to stop and remediate unauthorized use of personal information;
+(g) Twilio will provide reasonable additional and timely assistance to assist Customer in complying with its obligations with respect to consumer requests as set forth in the Agreement;
+(h) For any sub-processor used by Twilio to process personal information subject to the CCPA, Twilio will ensure that Twilio’s agreement with such sub-processor complies with the CCPA, including, without limitation, the contractual requirements for service providers and contractors;
+(i) Twilio will not combine Customer Personal Data that it receives from, or on behalf of, Customer, with personal information that it receives from, or on behalf of, another person or persons, or collects from its own interaction with the consumer, unless such combination is required to perform any business purpose as permitted under the CCPA, including any regulations thereto, or by regulations adopted by the California Privacy Protection Agency; and
+(j) Twilio certifies that it understands and will comply with its obligations under the CCPA.
+3. Twilio acknowledges and confirms that it does not receive personal information within Customer Personal Data as consideration for any Services provided to Customer.
+
+	•	Twilio careers  
+	•	Twilio.org  
+	•	Press and media  
+	•	Investor relations  
+	•	Legal  
+	•	Privacy  
+	•	Security  
+	•	Sitemap  
+	•	LLMS  
+	•
+	•	Follow us on Twitter
+	•
+	•
+Copyright © 2026 Twilio Inc. All rights reserved.
+Considering Twilio?
+
+
+
+	•	About Twilio  
+	•	Customer Engagement Platform (CEP)  
+	•	Communications  
+	•	Conversational AI  
+	•	User authentication and identity  
+	•	Customer Data Platform (CDP)  
+	•	AI  
+	•	Customer stories  
+	•	Events  
+	•	Contact sales  
+	•	Why Twilio  
+Products and Features
+
+
+
+	•	SMTP  
+	•	Branded Calling  
+	•	Twilio Segment  
+	•	Twilio Engage  
+	•	Connections  
+	•	SendGrid Email API  
+	•	RCS messaging  
+	•	Latest innovations  
+	•	Pre-built solutions  
+	•	Support plans  
+	•	All products  
+Use Cases
+
+
+
+	•	AI agent productivity  
+	•	Customer data management  
+	•	Audience segmentation  
+	•	Contact center  
+	•	SMS marketing  
+	•	Customer acquisition  
+	•	Fraud prevention  
+	•	Voice response system (IVR)  
+	•	Bulk text messaging  
+	•	Mass email sender  
+	•	All use cases  
+Developers
+
+
+
+	•	Developer resources  
+	•	Twilio Essentials  
+	•	SDKs  
+	•	CDP integrations  
+	•	Serverless  
+	•	Conversations  
+	•	SMTP Email API  
+	•	SMS API  
+	•	WhatsApp API  
+	•	Voice API  
+	•	Connections  
+	•	All docs  

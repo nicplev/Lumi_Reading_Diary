@@ -21,8 +21,8 @@ import {errorCodeForLog} from "./log_safety";
 // demoAccess/state; both functions here only READ that state. See
 // docs/DEMO_DAY_ACCESS_PLAN.md.
 
-const sendgridApiKey = defineSecret("SENDGRID_API_KEY");
-const sendgridSenderEmail = defineSecret("SENDGRID_SENDER_EMAIL");
+const sendgridApiKey = defineSecret("SENDGRID_API_KEY_AU");
+const sendgridSenderEmail = defineSecret("SENDGRID_SENDER_EMAIL_AU");
 
 // Permanent demo tenant seeded by scripts/seed_demo_school.js. The live values
 // are read from platformConfig/demoAccess so store URLs can be filled in later
