@@ -107,9 +107,9 @@ Likelihood and impact are rated Low / Medium / High after current controls.
 | P-05 | Optional SDK sends data before consent or policy differs from runtime | Low | Medium | Keep native+Dart defaults off; repeat store-signed traffic capture and questionnaires every SDK change | Store evidence open |
 | P-06 | App Check enforcement locks out real users or is left unenforced indefinitely | Medium | Medium | Observe store-attested valid traffic, stage enforcement, monitor denials and maintain rollback | Store evidence open |
 | P-07 | Deletion fails partially, misses a subcollection/object or backup copy | Low | High | Retain integration tests and job receipts; complete signed-in device retest; document PITR/beyond-use period | Device retest open |
-| P-08 | Overseas provider/support access is not contractually assessed | Medium | High | Technical locations are inventoried; complete vendor DPA, subprocessor, support-access and APP 8 approval for US Authentication, global services/logs/secrets and SendGrid | Open release blocker |
+| P-08 | Overseas provider/support access is not contractually assessed | Medium | High | Technical locations are inventoried and dated public Google/Firebase/Twilio terms are retained; complete account-acceptance, support-access and APP 8 approval for US Authentication, global services/logs and SendGrid | Open release blocker |
 | P-09 | Unbounded reads/listeners expose more data than needed and create cost pressure | Low | Medium | Retain pagination, summary, listener and 30/100/1,000-student regression evidence | Controlled; review every data/UI release |
-| P-10 | Security alert is missed or incident response is improvised | Medium | High | Confirm both alert inboxes; approve response roles; run six-monthly tabletop | Technical drill complete; owner sign-off open |
+| P-10 | Security alert is missed or incident response is improvised | Low | High | Reconfirm both alert inboxes, roles and six-monthly tabletop cadence | Dual delivery and operational roles verified; Privacy/Legal Lead remains unappointed |
 | P-11 | Support/access/deletion requester impersonates a parent or school | Medium | High | Verify authority through existing account and school contact; never act from an unverified email alone; log decisions | Procedure defined; exercise required |
 | P-12 | Book lookup leaks child context through titles/searches | Low | Medium | Send only ISBN/title; never include child, school, notes or account identifiers; retain manual entry | Controlled |
 
@@ -127,10 +127,12 @@ Likelihood and impact are rated Low / Medium / High after current controls.
   that notice; the checkbox is evidence, not a substitute for it.
 - **APP 6 / use and disclosure:** school use is role/class/child-scoped. New
   vendors or AI purposes require change review.
-- **APP 8 / overseas recipients:** contracts and overseas support/subprocessor
-  evidence are not complete. The technical audit confirms US-only Firebase
-  Authentication plus global Firebase, required-log, secret-replication and
-  SendGrid paths; these are not made Australian by Firestore's Sydney region.
+- **APP 8 / overseas recipients:** dated public contract/subprocessor evidence
+  is retained, but Lumi account-acceptance, overseas support-access and counsel
+  approval are not complete. The technical audit confirms US-only Firebase
+  Authentication plus global Firebase, required-log and SendGrid paths; these
+  are not made Australian by Firestore's Sydney region. The three application
+  secrets were separately migrated to Sydney-only payload replicas.
   The OAIC notes that reasonable steps may be
   required before disclosure and an entity may remain accountable for an
   overseas recipient: https://www.oaic.gov.au/privacy/australian-privacy-principles/australian-privacy-principles-guidelines/chapter-8-app-8-cross-border-disclosure-of-personal-information
@@ -160,13 +162,16 @@ https://www.oaic.gov.au/privacy/privacy-registers/privacy-codes/childrens-online
   before collection. *(Implemented as a first-opt-in portal gate with protected
   audit evidence and fail-closed upload enforcement. Each school remains
   responsible for the declared notice/authority process.)*
-- [ ] Complete Google/Firebase and SendGrid DPA/subprocessor/location/support
-  evidence and an APP 8 decision approved by counsel.
+- [~] Complete Google/Firebase and SendGrid DPA/subprocessor/location/support
+  evidence and an APP 8 decision approved by counsel. *(Official public terms,
+  subprocessors, security and retention evidence are retained with hashes;
+  private Lumi account-acceptance evidence and counsel approval remain.)*
 - [ ] Keep AI provider processing disabled until a separate approved PIA and
   vendor controls exist.
-- [~] Confirm both security alert inboxes and the support mailbox are monitored.
-  *(Support is owner-confirmed daily and MFA-protected; synthetic alert receipt
-  in the primary and backup security inboxes is still unconfirmed.)*
+- [x] Confirm both security alert inboxes and the support mailbox are monitored.
+  *(Support is owner-confirmed daily and MFA-protected. Nicholas Plevritis
+  confirmed on 17 July 2026 that synthetic Cloud Monitoring incident
+  `0.oabm7h2yj055` arrived in both the primary and backup security inboxes.)*
 - [ ] Complete the user's signed-in account/student deletion device test.
 
 ### Must close before public store launch

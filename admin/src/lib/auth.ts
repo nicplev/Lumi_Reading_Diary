@@ -17,9 +17,9 @@ export interface AdminSession {
 }
 
 function sessionSecret(): string {
-  const secret = process.env.ADMIN_SESSION_SECRET;
+  const secret = process.env.ADMIN_SESSION_SECRET_AU;
   if (!secret || secret.length < 32) {
-    throw new Error("ADMIN_SESSION_SECRET must contain at least 32 characters");
+    throw new Error("ADMIN_SESSION_SECRET_AU must contain at least 32 characters");
   }
   return secret;
 }

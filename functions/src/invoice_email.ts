@@ -5,8 +5,8 @@ import * as admin from "firebase-admin";
 import {errorCodeForLog} from "./log_safety";
 import sgMail from "@sendgrid/mail";
 
-const sendgridApiKey = defineSecret("SENDGRID_API_KEY");
-const sendgridSenderEmail = defineSecret("SENDGRID_SENDER_EMAIL");
+const sendgridApiKey = defineSecret("SENDGRID_API_KEY_AU");
+const sendgridSenderEmail = defineSecret("SENDGRID_SENDER_EMAIL_AU");
 
 function escapeHtml(s: string): string {
   const map: Record<string, string> = {
@@ -44,7 +44,7 @@ export const processInvoiceEmail = onDocumentCreated(
       if (!to || !pdfBase64) throw new Error("Missing recipient or PDF");
 
       const key = sendgridApiKey.value();
-      if (!key) throw new Error("SENDGRID_API_KEY not configured");
+      if (!key) throw new Error("SendGrid API key not configured");
       sgMail.setApiKey(key);
       const sender = sendgridSenderEmail.value() || "noreply@lumi-reading.app";
 

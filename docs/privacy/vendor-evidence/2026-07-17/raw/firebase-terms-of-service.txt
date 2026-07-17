@@ -1,0 +1,95 @@
+
+Skip to main content
+
+
+￼
+
+
+
+
+Sign in
+	•	Support
+	•	Firebase   Support
+
+Send feedback
+Terms of Service for Firebase Services
+Terms last modified: May 1, 2026
+If you signed an offline variant of the Google Cloud Master Agreement for use of specified Firebase services under the same Google Cloud Platform Account, the terms below do not apply to your use of such Firebase services, and your offline terms govern your use of such Firebase services.
+I agree that my use of any Firebase service is for purposes related to my trade, business, craft, or profession, and that my use is subject to the applicable terms below.
+Firebase Services
+Terms of Service
+Cloud Firestore
+Cloud Functions for Firebase
+Cloud Storage for Firebase
+Firebase AI Logic 4, 6
+Firebase App Check
+Firebase App Hosting
+Firebase Authentication
+Firebase SQL Connect
+Firebase Phone Number Verification
+Firebase Test Lab & Android Device Streaming 7
+Gemini in Firebase (with a Gemini Code Assist Standard or Enterprise license) 4
+Google Cloud Platform Terms of Service 1
+Firebase Studio (Preview) 3, 5
+Google Terms of Service
+Gemini API Additional Terms of Service
+Generative AI Prohibited Use Policy
+Gemini in Firebase (no-cost) 5
+Google Terms of Service
+Generative AI Prohibited Use policy
+Firebase Hosting
+Firebase Realtime Database
+Google APIs Terms of Service
+Firebase Data Processing and Security Terms
+Firebase Paid Services Agreement
+Firebase A/B Testing (Beta)
+Firebase Cloud Messaging
+Firebase Dynamic Links
+Firebase In-App Messaging (Beta)
+Firebase ML (Beta) 2
+Firebase Performance Monitoring
+Firebase Remote Config
+Google APIs Terms of Service
+Firebase Data Processing and Security Terms
+Firebase App Distribution
+Firebase Crashlytics
+Firebase Crashlytics & Firebase App Distribution Terms of Service
+Firebase Data Processing and Security Terms
+1 Unless a Data Location Selection is offered by Google and made by Customer as defined in the Google Cloud Terms of Service, Google may process and store Customer Data anywhere Google or its agents maintain facilities, including Google Cloud Platform locations and Google data centers. Firebase services subject to the Google Cloud Platform Terms of Service are "Services" and/or "Software" as defined in that agreement, and as such are subject to the Google Cloud Platform Service Specific Terms that are part of the Google Cloud Platform Terms of Service.
+2 Some functions of Firebase ML (Beta) interoperate with Google services governed by the Google Cloud Platform Terms of Service, including the Google Cloud Service Specific Terms (Google Cloud Platform Machine Learning Group).
+3 This product is subject to the Pre-GA Offerings Terms, as stated in the service specific terms of the Google Cloud Platform Terms of Service.
+4 This product is a Generative AI service, and use of the service is subject to the Generative AI Services terms in service specific terms of the Google Cloud Platform Terms of Service.
+5 Generative AI features within Firebase Studio are provided by Gemini in Firebase (no-cost).
+6 Firebase AI Logic provides a proxy service, client SDKs, and other features offered under the Google Cloud Platform Terms of Service. Any usage of the Gemini Developer API or the Vertex AI Gemini API is subject to their specific terms.
+7 Android Device Streaming uses features of Test Lab. The use of Android Device Streaming is subject to Google Cloud Platform Terms of Service.
+
+Send feedback
+Except as otherwise noted, the content of this page is licensed under the Creative Commons Attribution 4.0 License, and code samples are licensed under the Apache 2.0 License. For details, see the Google Developers Site Policies. Java is a registered trademark of Oracle and/or its affiliates.
+
+
+	•	Learn
+	•	Developer guides
+	•	SDK & API reference
+	•	Samples
+	•	Libraries
+	•	GitHub
+	•	Stay connected
+	•	Check out the blog
+	•	Find us on Reddit
+	•	Follow on X
+	•	Subscribe on YouTube
+	•	Attend an event
+	•	Support
+	•	Contact support
+	•	Stack Overflow
+	•	Google group
+	•	Release notes
+	•	Brand guidelines
+	•	FAQs
+￼
+	•	Android
+	•	Chrome
+	•	Firebase
+	•	Google Cloud Platform
+	•	All products
+	•	Terms  Privacy

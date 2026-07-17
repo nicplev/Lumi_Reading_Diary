@@ -10,8 +10,8 @@ import * as admin from "firebase-admin";
 import * as crypto from "crypto";
 import sgMail from "@sendgrid/mail";
 
-const sendgridApiKey = defineSecret("SENDGRID_API_KEY");
-const sendgridSenderEmail = defineSecret("SENDGRID_SENDER_EMAIL");
+const sendgridApiKey = defineSecret("SENDGRID_API_KEY_AU");
+const sendgridSenderEmail = defineSecret("SENDGRID_SENDER_EMAIL_AU");
 import {
   isDueAt,
   isWithinQuietHours,

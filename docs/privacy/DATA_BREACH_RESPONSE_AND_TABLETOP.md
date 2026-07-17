@@ -1,6 +1,6 @@
 # Lumi Data Breach Response Plan and Tabletop Record
 
-**Version:** 0.9 · **Prepared:** 17 July 2026
+**Version:** 1.0 · **Prepared:** 17 July 2026
 **Scope:** Suspected or confirmed loss, unauthorised access, disclosure or
 modification of Lumi personal information.
 **Emergency security contacts:** primary `nic@lumi-reading.com`; backup
@@ -23,14 +23,21 @@ The structure follows the OAIC's preparation and response guidance:
 One person may hold several roles while Lumi is small, but each action must be
 recorded.
 
-| Role | Responsibility | Current assignee |
-| --- | --- | --- |
-| Incident lead | Declare severity, coordinate, preserve timeline and approve containment | Founder/technical lead — confirm name |
-| Privacy/legal lead | NDB assessment, school/individual notice and regulator liaison | External Australian privacy counsel — appoint |
-| Technical lead | Containment, evidence, eradication, recovery and verification | Founder/technical lead |
-| School liaison | Verify school authority and coordinate affected-school communication | Founder/customer lead — confirm |
-| Communications | Clear, child-safe notices; no speculation | Founder/customer lead — confirm |
-| Scribe | Time-stamped decisions, evidence chain and action list | Incident lead until delegated |
+| Role | Responsibility | Primary | Authorised backup |
+| --- | --- | --- | --- |
+| Incident lead | Declare severity, coordinate, preserve timeline and approve containment | Nicholas Plevritis, Director of Lumi | Kylie Plevritis |
+| Privacy/legal lead | NDB assessment, school/individual notice and regulator liaison | **Unappointed — external Australian privacy counsel required** | **Unappointed** |
+| Technical lead | Containment, evidence, eradication, recovery and verification | Nicholas Plevritis | Kylie Plevritis coordinates approved technical assistance if Nicholas is unavailable |
+| School liaison | Verify school authority and coordinate affected-school communication | Nicholas Plevritis | Kylie Plevritis |
+| Communications | Clear, child-safe notices; no speculation | Nicholas Plevritis | Kylie Plevritis |
+| Scribe | Time-stamped decisions, evidence chain and action list | Nicholas Plevritis until delegated | Kylie Plevritis |
+
+Nicholas Plevritis confirmed these assignments on 17 July 2026. Kylie
+Plevritis is authorised to act for Nicholas and Lumi if he is unavailable,
+including making urgent non-legal containment, provider-escalation and
+communication decisions under this plan. Kylie must obtain external Australian
+privacy/legal advice for an NDB or other legal conclusion and must not present
+herself as the unappointed privacy/legal lead.
 
 The incident lead is authorised to disable a feature, revoke credentials or
 sessions, block a deployment, enforce maintenance mode, suspend a school, or
@@ -164,17 +171,20 @@ names, book titles, minutes and optional comments. No audio download is proven.
    entries in the Data Access log without displaying document paths or payloads.
 3. **Gap:** Verified emergency contacts for each school are not in this
    repository. Add them to the contract/CRM without storing them in app code.
-4. **Gap:** External Australian privacy counsel and incident roles are not yet
-   formally appointed.
-5. **Partly closed:** Daily monitoring and MFA for `support@lumi-reading.com`
-   are owner-confirmed. Receipt of the synthetic Cloud Monitoring incident in
-   both separate security-alert inboxes still needs human confirmation.
+4. **Partly closed:** Primary and backup operational incident roles are formally
+   assigned to Nicholas Plevritis and Kylie Plevritis. An external Australian
+   privacy/legal lead remains unappointed.
+5. **Closed:** Daily monitoring and MFA for `support@lumi-reading.com` are
+   owner-confirmed. Nicholas confirmed on 17 July 2026 that synthetic Cloud
+   Monitoring incident `0.oabm7h2yj055` arrived in both separate security-alert
+   inboxes (`nic@lumi-reading.com` and `nicxplev@gmail.com`).
 6. **Gap:** Store-attested App Check is not yet enforceable; it would reduce
    scripted exploitation but would not correct broken authorisation.
 
-**Exercise result:** Process is technically executable, with four governance
-actions open and the logging decision closed. The tabletop does not prove that an NDB
-notification decision has been legally reviewed.
+**Exercise result:** Process is technically executable. Alert delivery and
+operational role assignment are closed; school emergency contacts, external
+privacy/legal leadership and store-attested App Check remain open. The tabletop
+does not prove that an NDB notification decision has been legally reviewed.
 
 ## 7. Holding notice template
 

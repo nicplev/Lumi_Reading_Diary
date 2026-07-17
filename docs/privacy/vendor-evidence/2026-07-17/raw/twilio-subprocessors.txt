@@ -1,0 +1,920 @@
+
+English
+
+	•	English
+	•	French
+	•	German
+	•	Portuguese
+	•	Spanish
+Support
+	•	Help Center
+	•	Support Plans
+	•	Partner Solutions
+Login
+	•	Log in to
+	◦	Twilio Console Conversations, Communications and Authentication
+	•
+	•	Or log in to access:
+	◦	Twilio Segment Customer Data Platform
+	◦	Twilio SendGrid Email and Marketing Campaigns
+
+Products
+	•	Twilio Platform Next gen  Built for engagement in the agentic era. Twilio connects communication channels, customer context, and AI on one flexible platform.
+Conversations
+
+
+
+	•	  Conversation Memory New  Build a persistent memory of customer interactions
+	•	  Conversation Orchestrator New  Keep conversations connected across channels
+	•	  Conversation Intelligence  Extract context from real-time conversations
+	•	  Conversation Relay  Build advanced voice AI for natural conversations
+	•	Conversations
+Communications
+
+
+
+	•	Messaging  
+	•	SMS  
+	•	WhatsApp  
+	•	RCS  
+	•	Voice  
+	•	SIP Trunking  
+	•	Email  
+	•	SMTP Service  
+	•	Phone Numbers  
+	•	Toll-free  
+	•	10DLC  
+	•	Short Codes  
+	•	Video API  
+	•	Flex  
+	•	Communications
+
+Authentication
+
+
+
+	•	Verify  
+	•	Lookup  
+	•	Authentication
+Customer Data
+
+
+
+	•	Connections  
+	•	Warehouses  
+	•	Protocols  
+	•	Unify  
+	•	Engage  
+	•	Audiences  
+	•	Journeys  
+	•	Customer Data
+See all products
+See Twilio’s latest innovations and CDP integrations
+Solutions
+Use Cases
+
+
+
+	•	Verification and identity  
+	•	Fraud prevention  
+	•	Alerts and notifications  
+	•	Appointment reminders  
+	•	Lead alerts  
+	•	Mass texting  
+	•	Marketing and promotions  
+	•	SMS marketing  
+	•	Cross-sell and upsell  
+	•	Optimize ad spend  
+	•	Support and sales  
+	•	AI agent productivity  
+	•	IVR  
+	•	Contact center  
+	•	Customer data management  
+Teams
+
+
+
+	•	Developers  
+	•	Data Engineering  
+	•	Marketing  
+	•	Product  
+	•	Customer Experience  
+Industry
+
+
+
+	•	Financial services  
+	•	Healthcare  
+	•	Retail  
+	•	Nonprofit  
+	•	Hospitality  
+	•	Ecommerce  
+	•	Public sector  
+	•	Education  
+
+Company Size
+
+
+
+	•	Enterprise  
+	•	Startup  
+See all solutions
+Why Twilio
+Overview
+
+
+
+	•	Why Twilio  We help you build amazing experiences with contextual data, the right communication channels, and AI to scale personalization and increase efficiency.
+	•	Customer stories  
+Differentiators
+
+
+
+	•	One platform  
+	•	Privacy and security  
+	•	Built for builders  
+	•	Enterprise scale  
+	•	Extensible by design  
+	•	Real-time customer data  
+	•	Artificial intelligence  
+	•	Infrastructure  
+Company
+
+
+
+	•	About us  
+	•	Values  
+	•	Diversity  
+	•	Careers  
+	•	Twilio.org  
+	•	Investor relations  
+	•	Press and media  
+	•	Events  
+
+Resources
+Developers
+
+
+
+	•	Documentation  
+	•	Code samples  
+	•	Developer Hub  
+	•	Champions  
+	•	Changelog  
+	•	Serverless  
+Learn
+
+
+
+	•	Blog  
+	•	Resource Center  
+	•	Guides  
+	•	Reports  
+	•	Webinars  
+	•	Podcasts  
+	•	Customer stories  
+	•	State of Customer Engagement  
+	•	Events  
+	•	Customer data recipes  
+Support and services
+
+
+
+	•	Help Center  
+	•	Find a partner  
+	•	Become a partner  
+	•	Professional services  
+	•	Support plans  
+	•	Status  
+	•	SendGrid status  
+	•	Segment status  
+
+Pricing
+Overview
+
+
+
+	•	All Pricing  Transparent pricing with discounts as you scale. Sign up for a free trial—no credit card required.
+Conversations
+
+
+
+	•	Conversations  
+	•	Conversation Memory  
+	•	Conversation Orchestrator  
+	•	Conversation Intelligence  
+	•	Conversation Relay  
+Communications
+
+
+
+	•	Messaging  
+	•	SMS  
+	•	WhatsApp  
+	•	Conversations API  
+	•	Voice  
+	•	SIP Trunking  
+	•	Conferencing  
+	•	Email API  
+	•	Marketing Campaigns  
+	•	Video API  
+	•	Flex  
+Authentication
+
+
+
+	•	Verify  
+	•	Lookup  
+Customer Data
+
+
+
+	•	Customer Data Platform  
+	•	Customer Data Pipeline  
+
+
+Data is collected based on search terms. Privacy Policy
+Contact sales Start for free
+
+
+
+
+Data is collected based on search terms. Privacy Policy
+Products
+	•	Twilio Platform Next gen  Built for engagement in the agentic era. Twilio connects communication channels, customer context, and AI on one flexible platform.
+Conversations
+
+
+
+	•	  Conversation Memory New  Build a persistent memory of customer interactions
+	•	  Conversation Orchestrator New  Keep conversations connected across channels
+	•	  Conversation Intelligence  Extract context from real-time conversations
+	•	  Conversation Relay  Build advanced voice AI for natural conversations
+	•	Conversations
+Communications
+
+
+
+	•	Messaging  
+	•	SMS  
+	•	WhatsApp  
+	•	RCS  
+	•	Voice  
+	•	SIP Trunking  
+	•	Email  
+	•	SMTP Service  
+	•	Phone Numbers  
+	•	Toll-free  
+	•	10DLC  
+	•	Short Codes  
+	•	Video API  
+	•	Flex  
+	•	Communications
+
+Authentication
+
+
+
+	•	Verify  
+	•	Lookup  
+	•	Authentication
+Customer Data
+
+
+
+	•	Connections  
+	•	Warehouses  
+	•	Protocols  
+	•	Unify  
+	•	Engage  
+	•	Audiences  
+	•	Journeys  
+	•	Customer Data
+See all products
+See Twilio’s latest innovations and CDP integrations
+Solutions
+Use Cases
+
+
+
+	•	Verification and identity  
+	•	Fraud prevention  
+	•	Alerts and notifications  
+	•	Appointment reminders  
+	•	Lead alerts  
+	•	Mass texting  
+	•	Marketing and promotions  
+	•	SMS marketing  
+	•	Cross-sell and upsell  
+	•	Optimize ad spend  
+	•	Support and sales  
+	•	AI agent productivity  
+	•	IVR  
+	•	Contact center  
+	•	Customer data management  
+Teams
+
+
+
+	•	Developers  
+	•	Data Engineering  
+	•	Marketing  
+	•	Product  
+	•	Customer Experience  
+Industry
+
+
+
+	•	Financial services  
+	•	Healthcare  
+	•	Retail  
+	•	Nonprofit  
+	•	Hospitality  
+	•	Ecommerce  
+	•	Public sector  
+	•	Education  
+
+Company Size
+
+
+
+	•	Enterprise  
+	•	Startup  
+See all solutions
+Why Twilio
+Overview
+
+
+
+	•	Why Twilio  We help you build amazing experiences with contextual data, the right communication channels, and AI to scale personalization and increase efficiency.
+	•	Customer stories  
+Differentiators
+
+
+
+	•	One platform  
+	•	Privacy and security  
+	•	Built for builders  
+	•	Enterprise scale  
+	•	Extensible by design  
+	•	Real-time customer data  
+	•	Artificial intelligence  
+	•	Infrastructure  
+Company
+
+
+
+	•	About us  
+	•	Values  
+	•	Diversity  
+	•	Careers  
+	•	Twilio.org  
+	•	Investor relations  
+	•	Press and media  
+	•	Events  
+
+Resources
+Developers
+
+
+
+	•	Documentation  
+	•	Code samples  
+	•	Developer Hub  
+	•	Champions  
+	•	Changelog  
+	•	Serverless  
+Learn
+
+
+
+	•	Blog  
+	•	Resource Center  
+	•	Guides  
+	•	Reports  
+	•	Webinars  
+	•	Podcasts  
+	•	Customer stories  
+	•	State of Customer Engagement  
+	•	Events  
+	•	Customer data recipes  
+Support and services
+
+
+
+	•	Help Center  
+	•	Find a partner  
+	•	Become a partner  
+	•	Professional services  
+	•	Support plans  
+	•	Status  
+	•	SendGrid status  
+	•	Segment status  
+
+Pricing
+Overview
+
+
+
+	•	All Pricing  Transparent pricing with discounts as you scale. Sign up for a free trial—no credit card required.
+Conversations
+
+
+
+	•	Conversations  
+	•	Conversation Memory  
+	•	Conversation Orchestrator  
+	•	Conversation Intelligence  
+	•	Conversation Relay  
+Communications
+
+
+
+	•	Messaging  
+	•	SMS  
+	•	WhatsApp  
+	•	Conversations API  
+	•	Voice  
+	•	SIP Trunking  
+	•	Conferencing  
+	•	Email API  
+	•	Marketing Campaigns  
+	•	Video API  
+	•	Flex  
+Authentication
+
+
+
+	•	Verify  
+	•	Lookup  
+Customer Data
+
+
+
+	•	Customer Data Platform  
+	•	Customer Data Pipeline  
+Contact sales Start for free
+
+
+
+Print this page
+
+Customer and Partner Agreements
+Terms of Service
+Acceptable Use Policy
+Service and Country Specific Requirements
+Data Protection Addendum (DPA)
+Security Overview
+Service Level Agreements
+Advisory Services Terms
+Professional Services Terms
+Twilio Marketplace Terms
+Twilio Segment Customer Data Platform Destination Integration and Listing Terms
+AI/ML Terms
+Twilio Messaging Campaign Terms
+Customer Name Changes and Assignments
+Updates to Legal Terms and Conditions
+Country Specific Disclosures
+EU Data Act Disclosures and Twilio’s Commitment to Open Portability and Switching
+European Electronic Communications Code Disclosures
+Italy ALIAS Database Code of Conduct
+Germany - Impressum
+Privacy
+Data Privacy at Twilio
+Privacy Notice
+Binding Corporate Rules
+Customer Proprietary Network Information (CPNI)
+Sub-processors
+Customer Data Protection Addendum
+Supplier Data Protection Addendum
+Global Applicant Privacy Notice
+Mobile Application Terms
+Twilio Frontline End User App Terms
+Twilio Authy App Terms
+Supplier Agreements
+Supplier Purchase Order Terms and Conditions
+Country-Specific Terms
+Supplier Data Protection Addendum
+Supplier Code of Conduct
+Intellectual Property
+DMCA Policy
+Trademark
+Resources for Law Enforcement
+Government Requests
+Transparency Report
+Civil Requests
+Submit a request or subpoena
+Code of Conduct & Ethics Hotline
+Twilio Code of Conduct
+Ethics and Whistleblower Hotline
+Discord Community Code of Conduct
+Twilio Discord FAQ
+Digital Promotions General Rules
+Sweepstakes Rules
+Customer Research and User Experience
+Acknowledgement and Waiver
+Twilio Sub-Processors
+Last Updated: April 2026
+Third Party Sub-Processors
+Twilio uses the third party companies below (each, a “sub-processor”) to process personal data (i) on behalf of Twilio customers; (ii) in accordance with customer instructions as communicated by Twilio; and (iii) in strict accordance with the terms of a written contract between Twilio and the sub-processor.
+Twilio imposes obligations on its sub-processors to implement appropriate technical and organizational measures ensuring that the sub-processing of personal data is protected to the standards required by applicable data protection laws. Further information relating to sub-processor security measures can be found via the external links below.
+Where the engagement of a sub-processor requires the cross-border transfer of personal data, Twilio has performed Transfer Impact Assessments for such data transfer.
+Twilio maintains an up-to-date list of the names and locations of all sub-processors below. Twilio customers may subscribe to notifications of sub-processor changes to receive updates.
+Duration of processing: For each sub-processor below, processing of personal data will be for the duration that the customer uses and continues to use the applicable service(s), and for the retention periods as set out in customer’s agreement with Twilio.
+Please note that telecommunications providers used by Twilio are not processors of Twilio or sub-processors of our customers. Additional information about this position can be found here.
+Sub-Processor
+Applicable Service(s)
+Subject matter
+Nature and purpose of processing
+Location(s) of processing
+External links for additional information relating to security
+
+Adaptive Mobile
+Programmable Messaging
+Personal data contained in communications sent through the Twilio Services
+Prevention of illegal or unwanted communications over Twilio’s messaging services
+USA
+Data Privacy
+
+AWS
+All services
+Personal data contained in communications sent through or uploaded to the services.
+Infrastructure Provider providing hosting services and storage.
+USA*
+Compliance Program; GDPR Centre; Supplementary Measures Addendum; Blog
+
+AWS
+Programmable Voice
+Personal data contained in voice communications.
+Text to speech functionality for customers using Amazon Polly, Amazon Comprehend, and Amazon Transcribe.
+USA*
+Compliance Program; GDPR Centre; Supplementary Measures Addendum; Blog
+
+AWS
+Programmable Video
+Personal data contained in streamed videos.
+Streaming and interactive video.
+USA*
+Compliance Program; GDPR Centre; Supplementary Measures Addendum; Blog
+
+AWS
+Marketing Campaigns (SendGrid)
+Personal data contained in email communications.
+Automation and storage services for marketing campaigns.
+USA
+Compliance Program; GDPR Centre; Supplementary Measures Addendum; Blog
+
+AWS
+Email (SendGrid)
+Personal data contained in email communications.
+Routing and transmission of emails.
+USA EU
+Compliance Program; GDPR Centre; Supplementary Measures Addendum; Blog
+
+AWS
+CDP (Segment)
+Personal data contained in communications sent through the Segment Services
+Infrastructure Provider providing hosting services and storage.
+USA or EU (Dublin) as selected by customers
+Compliance Program; GDPR Centre; Supplementary Measures Addendum; Blog
+
+Anthropic
+All AI Products
+Personal data contained in communications sent through Flex.
+Vendor for AI functionality in product
+USA
+Claude by Anthropic in Amazon Bedrock
+
+Amazon Bedrock
+All AI Products
+Personal data contained in customer defined workflows
+Vendor for AI functionality in product
+USA
+Amazon Bedrock
+
+Clickhouse
+All Products
+Personal data contained in communications sent through the Twilio Services
+ 
+Infrastructure Provider providing hosting services and storage.
+USA, EU
+Security, Privacy
+
+Datadog
+Segment
+Stytch by Twilio
+System and event logs only
+Operational monitoring
+USA
+Data Protection; Security Policies; Compliance Program
+
+DVELP/Sabio
+Twilio Flex
+Personal data contained in voice communications.
+Connectivity services to customer’s Google CCAI instance.
+UK (provision of the services), Belgium, Finland, Germany, Netherlands, and Poland (data persistence/backups)
+Data Privacy; Data Security;
+
+Deepgram
+Programmable Voice
+Personal data contained in voice communications
+Speech to text and text to speech APIs
+USA
+Data Protection privacy and security policies
+
+Elastic
+Stytch by Twilio
+Storage, indexing, and retrieval of log data and User Personal Data (such as User IDs, emails, and metadata) to facilitate search functionality and system monitoring
+Logging and query solution
+USA
+Trust Center
+
+ElevenLabs
+Conversational Intelligence
+Personal data contained in voice transcriptions 
+AI features as enabled by customer for the purpose of summarization and sentiment analysis
+USA EU
+Security & Compliance Reports
+
+Fivetran
+Stytch by Twilio
+Automated data pipeline service used to replicate and synchronize application data (which may include User Personal Data, billing information, and usage logs) from various third-party sources into a centralized data warehouse for internal analytics and business intelligence
+ETL (Extract, Transform, Load) Service / Automated Data Integration
+USA
+Trust Center
+
+GoodData Corporation
+Twilio Flex
+Personal data contained in communications sent through Twilio Flex.
+Data analytics functionality for customers who have enabled the feature in Twilio Flex.
+USA
+Data Privacy; Data Security & Cloud Security
+
+Google
+Segment/Twilio Engage
+Personal data contained in communications sent through the Segment Services
+Data storage compute and queries
+USA or EU (Zurich & London) as selected by Customers
+Data Privacy;
+Trust & Security; Blog
+
+Google
+Programmable Voice;
+Twilio Flex
+Personal data contained in voice communications.
+Speech recognition functionality for customers who have enabled the feature on supported products.
+USA*
+Data Privacy;
+Trust & Security; Blog
+
+Google RCS...
+Verify
+Phone numbers and message content
+Message  delivery for outbound/inbound Twilio Verify services.
+USA, South America:  Chile,  Europe:  Ireland, Netherlands, Denmark, Finland, Belgium,  Asia: Taiwan, Japan, Singapore
+https://safety .google/intl /en/
+  
+
+Hex
+Stytch by Twilio
+Processing and visualization of User Personal Data (such as User IDs and usage metrics) queried from data warehouse to generate internal business intelligence reports, dashboards, and analytics
+Collaborative data workspace / Analytics & reporting
+USA
+Security / Trust Center
+
+Honeycomb
+Stytch by Twilio
+Ingestion and analysis of system telemetry data (including traces, logs, and structured events) which may contain User Personal Data (such as User IDs, IP addresses, and request metadata) to facilitate real-time debugging, system reliability, and performance optimization
+Observability & Application Performance Management (APM)
+USA
+
+
+Lakera
+All AI Products
+Personal data contained in communications sent through the Twilio Services
+AI security monitoring, data leakage prevention, and real-time threat detection within automated workflows.
+USA
+
+
+Postmark
+Stytch by Twilio
+Personal data contained in voice communications.
+Outbound email messaging service.
+USA
+https://postmarkapp.com/eu-privacy
+
+Sinch
+Stytch by Twilio
+Personal data contained in voice communications.
+Outbound SMS messaging service
+USA
+https://trust.sinch.com/
+
+Meta
+Whatsapp Channel
+Stytch by Twilio
+Phone numbers and message content
+Outbound/inbound message delivery
+USA
+Data Privacy and Security overview
+
+Microsoft Azure
+Conversational Intelligence
+Personal data contained in voice communications
+Speech recognition functionality for customers who have enabled the feature on supported products.
+USA, EU
+Microsoft Compliance
+
+Microsoft Azure
+All AI Products
+Personal data contained in customer defined workflows
+Vendor for AI functionality in product
+USA
+
+
+Mintlify
+Stytch by Twilio
+Process contact data and communications usage data (device data)
+Processing pseudonymized Customer Account Data to facilitate document gating, and personalized service configurations
+USA
+https://security.mintlify.com/
+
+OpenAI
+All AI Products
+Personal data contained in customer defined workflows
+Vendor for AI functionality in product
+USA
+https://openai.com/security
+
+Plain
+Stytch by Twilio
+Storage and processing of User Personal Data (including names, emails, support tickets, and communication history) to facilitate multi-channel customer support, issue tracking, and resolution
+Customer Support Infrastructure / Help Desk Platform
+UK
+Trust Center
+
+Snowflake
+Marketing Campaigns (SendGrid)
+Personal data contained in email communications.
+Automation and storage services for Marketing Campaigns.
+USA
+Security Addendum; DPIA Fact Sheet;
+
+Snowflake
+Stytch by Twilio
+Processing and storage of User Personal Data (including names, email addresses)
+Storage services
+USA
+Security Addendum; DPIA Fact Sheet;
+
+Temporal Cloud
+Twilio Flex
+Personal data contained in customer defined workflows
+Scheduling and execution of the customer defined workflows.
+USA
+Data Security
+
+Slack
+Stytch by Twilio
+Storage and processing of User Personal Data (including names, emails, support tickets, and communication history) to facilitate customer support
+Customer Support chat/messaging solution.
+USA
+https://slack.com/security
+
+Svix
+Stytch by Twilio
+Transmission and temporary processing of event notifications (webhook payloads) which may contain User Personal Data (such as User IDs, authentication events, and request metadata) to facilitate real-time updates to customer applications
+Event delivery (webhooks as a Service)
+USA
+Security
+
+VoiceBase
+Programmable Voice;
+Twilio Flex
+Personal data contained in voice communications.
+Transcription services for customers who have enabled transcriptions on supported products.
+USA
+Data Privacy; Data Security
+
+* If using Regional Twilio for supported products, Customer Content is stored and processed in the region selected (Ireland or Australia). Exceptions will occur as necessary to investigate issues of fraud and abuse. At this time, all other data relating to your account and use of the Twilio Services will continue to be processed in the United States to allow Twilio to continue to provide and improve our Services to you.
+
+Twilio Group Sub-Processors
+Sub-Processor
+Applicable Service(s)
+Subject matter
+Nature and purpose of processing
+Location(s) of processing
+External links for additional information relating to security
+DataBank
+ 
+Sendgrid Services
+Personal data contained in communications sent through or uploaded to the services.
+Infrastructure Provider providing hosting services and storage.
+North America
+Data Privacy; Data Security
+Lumen
+ 
+Sendgrid Services
+Personal data contained in communications sent through or uploaded to the services.
+Infrastructure Provider providing hosting services and storage.
+North America
+Data Privacy; Data Security
+Digital Realty
+ 
+Sendgrid Services
+Personal data contained in communications sent through or uploaded to the services.
+Infrastructure Provider providing hosting services and storage.
+North America EU
+Data Privacy; Data Security
+Twilio Inc.
+
+All Services
+If Twilio Inc. is not the Twilio party to the agreement, then Twilio Inc. is acting as a sub-processor for that Twilio party. (For example. If you are contracting with Twilio Ireland Ltd, then Twilio Inc. is acting as a sub-processor for the provision of the services.)
+Provision of the Twilio Services
+USA*
+Data Privacy; Data Security
+
+* If using Regional Twilio for supported products, Customer Content is stored and processed in the region selected (Ireland or Australia). Exceptions will occur as necessary to investigate issues of fraud and abuse. At this time, all other data relating to your account and use of the Twilio Services will continue to be processed in the United States to allow Twilio to continue to provide and improve our Services to you.
+
+
+
+
+
+
+
+
+	•	Twilio careers  
+	•	Twilio.org  
+	•	Press and media  
+	•	Investor relations  
+	•	Legal  
+	•	Privacy  
+	•	Security  
+	•	Sitemap  
+	•	LLMS  
+	•
+	•	Follow us on Twitter
+	•
+	•
+Copyright © 2026 Twilio Inc. All rights reserved.
+Considering Twilio?
+
+
+
+	•	About Twilio  
+	•	Customer Engagement Platform (CEP)  
+	•	Communications  
+	•	Conversational AI  
+	•	User authentication and identity  
+	•	Customer Data Platform (CDP)  
+	•	AI  
+	•	Customer stories  
+	•	Events  
+	•	Contact sales  
+	•	Why Twilio  
+Products and Features
+
+
+
+	•	SMTP  
+	•	Branded Calling  
+	•	Twilio Segment  
+	•	Twilio Engage  
+	•	Connections  
+	•	SendGrid Email API  
+	•	RCS messaging  
+	•	Latest innovations  
+	•	Pre-built solutions  
+	•	Support plans  
+	•	All products  
+Use Cases
+
+
+
+	•	AI agent productivity  
+	•	Customer data management  
+	•	Audience segmentation  
+	•	Contact center  
+	•	SMS marketing  
+	•	Customer acquisition  
+	•	Fraud prevention  
+	•	Voice response system (IVR)  
+	•	Bulk text messaging  
+	•	Mass email sender  
+	•	All use cases  
+Developers
+
+
+
+	•	Developer resources  
+	•	Twilio Essentials  
+	•	SDKs  
+	•	CDP integrations  
+	•	Serverless  
+	•	Conversations  
+	•	SMTP Email API  
+	•	SMS API  
+	•	WhatsApp API  
+	•	Voice API  
+	•	Connections  
+	•	All docs  
