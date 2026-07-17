@@ -59,6 +59,11 @@ bool useDirectIosDocumentScanner(TargetPlatform platform) {
 }
 
 @visibleForTesting
+bool useSinglePhotoCoverCapture(TargetPlatform platform) {
+  return platform == TargetPlatform.iOS;
+}
+
+@visibleForTesting
 Rect fullImageCoverCropRect(Rect viewportRect, Rect imageRect) => imageRect;
 
 @visibleForTesting
@@ -123,6 +128,21 @@ String? bookMetadataLookupNotice({
   if (bookResolved || !lookupUnavailable) return null;
   return 'Book databases could not be reached. Enter the details manually '
       'and Lumi can save this book.';
+}
+
+@visibleForTesting
+String unresolvedBookPromptMessage({
+  required String isbn,
+  required bool catalogUnavailable,
+}) {
+  if (catalogUnavailable) {
+    return 'Lumi could not reach the book databases for ISBN $isbn. '
+        'You can still add it to the Lumi library by scanning the front cover '
+        'and entering the book details.';
+  }
+  return 'ISBN $isbn was not found in the book databases. You can add it to '
+      'the Lumi library by scanning the front cover and entering the book '
+      'details.';
 }
 
 /// Multi-step screen for contributing books to the Community Book Database.
@@ -282,6 +302,14 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
   // ── Step 1: Cover Capture ──────────────────────────────────────────
 
   Future<void> _startCoverCapture() async {
+    // VisionKit's document scanner is intentionally multi-page and keeps
+    // looking for another document after the first automatic capture. A book
+    // cover is always one image, so iOS uses the single-photo camera and then
+    // Lumi's own crop/rotate review instead.
+    if (useSinglePhotoCoverCapture(defaultTargetPlatform)) {
+      await _pickCoverWithStandardCamera();
+      return;
+    }
     await _startDocumentScannerCapture();
   }
 
@@ -675,7 +703,16 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
 
     final book = outcome.book;
     if (book == null) {
-      _continueToCoverCapture();
+      final shouldAdd = await _showUnresolvedBookPrompt(
+        isbn: isbn,
+        catalogUnavailable: _lookupNotice != null,
+      );
+      if (!mounted) return;
+      if (shouldAdd) {
+        _continueToCoverCapture();
+      } else {
+        _resetStandaloneIsbnScan();
+      }
       return;
     }
 
@@ -693,6 +730,126 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       case null:
         Navigator.of(context).pop(true);
     }
+  }
+
+  Future<bool> _showUnresolvedBookPrompt({
+    required String isbn,
+    required bool catalogUnavailable,
+  }) async {
+    final action = await showModalBottomSheet<bool>(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => Container(
+        decoration: const BoxDecoration(
+          color: LumiTokens.paper,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: LumiTokens.rule,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: LumiTokens.orange.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.search_off_rounded,
+                  color: LumiTokens.orange,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                catalogUnavailable
+                    ? 'Book details unavailable'
+                    : 'Book not found',
+                style: LumiType.subhead,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                unresolvedBookPromptMessage(
+                  isbn: isbn,
+                  catalogUnavailable: catalogUnavailable,
+                ),
+                style: LumiType.caption,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => Navigator.pop(sheetContext, true),
+                  icon: const Icon(Icons.add_a_photo_outlined, size: 18),
+                  label: const Text('Scan cover and add book'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: LumiTokens.green,
+                    foregroundColor: LumiTokens.paper,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(LumiTokens.radiusMedium),
+                    ),
+                    textStyle: LumiType.button,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(sheetContext, false),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: LumiTokens.ink,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(LumiTokens.radiusMedium),
+                    ),
+                    textStyle: LumiType.button,
+                  ),
+                  child: const Text('Cancel'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    return action ?? false;
+  }
+
+  void _resetStandaloneIsbnScan() {
+    _scannerController?.dispose();
+    setState(() {
+      _scannerController = MobileScannerController();
+      _scannedIsbn = null;
+      _isProcessingBarcode = false;
+      _isLoadingMetadata = false;
+      _bookAlreadyExists = false;
+      _resolvedLookupBook = null;
+      _lookupNotice = null;
+      _titleController.clear();
+      _authorController.clear();
+      _readingLevelController.clear();
+      _currentStep = _ScanStep.isbnScan;
+    });
   }
 
   Future<_BookMetadataLookupOutcome> _loadMetadata(String isbn) async {

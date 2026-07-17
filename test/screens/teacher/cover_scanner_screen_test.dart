@@ -19,6 +19,19 @@ void main() {
     });
   });
 
+  group('useSinglePhotoCoverCapture', () {
+    test('uses a one-image camera flow for iOS book covers', () {
+      expect(
+        useSinglePhotoCoverCapture(TargetPlatform.iOS),
+        isTrue,
+      );
+      expect(
+        useSinglePhotoCoverCapture(TargetPlatform.android),
+        isFalse,
+      );
+    });
+  });
+
   group('coverCaptureFailureFor', () {
     test('prefers settings guidance when camera access is blocked', () {
       final failure = coverCaptureFailureFor(
@@ -83,6 +96,31 @@ void main() {
         ),
         isNull,
       );
+    });
+  });
+
+  group('unresolvedBookPromptMessage', () {
+    test('explains why a genuine miss opens the cover scanner', () {
+      final message = unresolvedBookPromptMessage(
+        isbn: '9799999900019',
+        catalogUnavailable: false,
+      );
+
+      expect(message, contains('was not found'));
+      expect(message, contains('Lumi library'));
+      expect(message, contains('scanning the front cover'));
+      expect(message, contains('entering the book details'));
+    });
+
+    test('does not mislabel a catalogue outage as a definite miss', () {
+      final message = unresolvedBookPromptMessage(
+        isbn: '9799999900019',
+        catalogUnavailable: true,
+      );
+
+      expect(message, contains('could not reach'));
+      expect(message, isNot(contains('was not found')));
+      expect(message, contains('still add'));
     });
   });
 
