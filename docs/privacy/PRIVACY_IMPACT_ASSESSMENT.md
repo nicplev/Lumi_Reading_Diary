@@ -1,6 +1,6 @@
 # Lumi Privacy Impact Assessment
 
-**Version:** 0.9 working assessment
+**Version:** 1.0 working assessment
 **Assessment date:** 17 July 2026
 **Owner:** Lumi founder / privacy lead (approval pending)
 **Scope:** Flutter parent and teacher apps, school portal, super-admin portal,
@@ -46,7 +46,8 @@ treats it as an ongoing process, not a one-time document:
 
 The detailed register is `VENDOR_DATA_FLOW_REGISTER.md`. The main paths are:
 
-1. An adult authenticates through Firebase Authentication.
+1. An adult authenticates through Firebase Authentication, which Firebase
+   documents as a US-only processing service.
 2. The app reads and writes school-scoped data in Firestore under Security
    Rules that bind the account to the school, class, child and record.
 3. Optional audio uploads to a create-only pending Storage path. An isolated
@@ -60,6 +61,9 @@ The detailed register is `VENDOR_DATA_FLOW_REGISTER.md`. The main paths are:
 6. ISBN/title-only book lookups go directly to Google Books or Open Library.
 7. AI provider processing is prohibited until a separate approved PIA update,
    contract, APP 8 assessment, retention decision and spend controls exist.
+8. Future ordinary application/security logs are retained for 30 days in an
+   Australian Cloud Logging bucket. Google's required audit logs and ordinary
+   logs written before 17 July remain global platform exceptions.
 
 ## 4. Current controls
 
@@ -77,6 +81,13 @@ The detailed register is `VENDOR_DATA_FLOW_REGISTER.md`. The main paths are:
 - Firestore has seven-day point-in-time recovery and deletion protection.
 - Thirteen production anomaly policies, a project budget and a security/cost
   dashboard are live.
+- Routine Functions logs omit direct account, school, child, record, email and
+  object-path identifiers and use bounded error codes instead of raw exception
+  payloads. A source-wide test rejects regressions.
+- Firestore, user-content Storage, all live application workloads and future
+  ordinary logs are in `australia-southeast1`; the documented US/global
+  service exceptions are tracked in the vendor register and
+  `docs/security/AU_RESOURCE_LOCATION_AUDIT_2026-07-17.md`.
 - Public privacy, terms and support pages return HTTP 200.
 
 ## 5. Privacy risk register
@@ -92,8 +103,8 @@ Likelihood and impact are rated Low / Medium / High after current controls.
 | P-05 | Optional SDK sends data before consent or policy differs from runtime | Low | Medium | Keep native+Dart defaults off; repeat store-signed traffic capture and questionnaires every SDK change | Store evidence open |
 | P-06 | App Check enforcement locks out real users or is left unenforced indefinitely | Medium | Medium | Observe store-attested valid traffic, stage enforcement, monitor denials and maintain rollback | Store evidence open |
 | P-07 | Deletion fails partially, misses a subcollection/object or backup copy | Low | High | Retain integration tests and job receipts; complete signed-in device retest; document PITR/beyond-use period | Device retest open |
-| P-08 | Overseas provider/support access is not contractually assessed | Medium | High | Complete vendor DPA, subprocessor, location, support-access and APP 8 evidence register | Open release blocker |
-| P-09 | Unbounded reads/listeners expose more data than needed and create cost pressure | Medium | Medium | Finish pagination, listener inventory and 30/100/1,000-student load profiles | In progress |
+| P-08 | Overseas provider/support access is not contractually assessed | Medium | High | Technical locations are inventoried; complete vendor DPA, subprocessor, support-access and APP 8 approval for US Authentication, global services/logs/secrets and SendGrid | Open release blocker |
+| P-09 | Unbounded reads/listeners expose more data than needed and create cost pressure | Low | Medium | Retain pagination, summary, listener and 30/100/1,000-student regression evidence | Controlled; review every data/UI release |
 | P-10 | Security alert is missed or incident response is improvised | Medium | High | Confirm both alert inboxes; approve response roles; run six-monthly tabletop | Technical drill complete; owner sign-off open |
 | P-11 | Support/access/deletion requester impersonates a parent or school | Medium | High | Verify authority through existing account and school contact; never act from an unverified email alone; log decisions | Procedure defined; exercise required |
 | P-12 | Book lookup leaks child context through titles/searches | Low | Medium | Send only ISBN/title; never include child, school, notes or account identifiers; retain manual entry | Controlled |
@@ -111,7 +122,10 @@ Likelihood and impact are rated Low / Medium / High after current controls.
 - **APP 6 / use and disclosure:** school use is role/class/child-scoped. New
   vendors or AI purposes require change review.
 - **APP 8 / overseas recipients:** contracts and overseas support/subprocessor
-  evidence are not complete. The OAIC notes that reasonable steps may be
+  evidence are not complete. The technical audit confirms US-only Firebase
+  Authentication plus global Firebase, required-log, secret-replication and
+  SendGrid paths; these are not made Australian by Firestore's Sydney region.
+  The OAIC notes that reasonable steps may be
   required before disclosure and an entity may remain accountable for an
   overseas recipient: https://www.oaic.gov.au/privacy/australian-privacy-principles/australian-privacy-principles-guidelines/chapter-8-app-8-cross-border-disclosure-of-personal-information
 - **APP 10 / quality:** schools and parents can correct records; support must
@@ -154,7 +168,9 @@ https://www.oaic.gov.au/privacy/privacy-registers/privacy-codes/childrens-online
 
 ### First-month work
 
-- [ ] Finish pagination/load tests and tune alert thresholds after a pilot.
+- [x] Finish pagination/load tests. *(Stable 30-record pages, sharded daily
+      summaries and 30/100/1,000-student profiles are complete.)*
+- [ ] Tune alert thresholds after a pilot.
 - [ ] Review retention and destruction evidence monthly during beta.
 - [ ] Run the breach tabletop every six months and after a material incident.
 

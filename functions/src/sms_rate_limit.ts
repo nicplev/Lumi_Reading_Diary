@@ -19,6 +19,7 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions/v1";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {errorCodeForLog} from "./log_safety";
 
 // App Check enforcement, opt-in via env var (default OFF). Flip only after the
 // client attestation rollout is verified (1.6). App Check attests the APP, not
@@ -163,8 +164,7 @@ export const requestSmsVerification = onCall({
     });
   } catch (err) {
     functions.logger.error("requestSmsVerification transaction failed", {
-      phoneTail: phone.slice(-4),
-      error: err instanceof Error ? err.message : String(err),
+      errorCode: errorCodeForLog(err),
     });
     if (config.emergencyFailOpen) {
       functions.logger.warn(

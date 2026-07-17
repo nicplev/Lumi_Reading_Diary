@@ -9,6 +9,7 @@
 
 import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
+import {errorCodeForLog} from "./log_safety";
 
 const HEARTBEAT_DOC = "opsMetrics/cronHeartbeats";
 
@@ -44,7 +45,7 @@ export async function recordCronRun(
     functions.logger.warn("opsHeartbeat.writeFailed", {
       name,
       status,
-      error: err instanceof Error ? err.message : String(err),
+      errorCode: errorCodeForLog(err),
     });
   }
 }

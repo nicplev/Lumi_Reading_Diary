@@ -13,12 +13,12 @@ identities deliberately have no JSON keys and must not receive primitive
 | Super-admin portal | `lumi-super-admin-runtime@lumi-ninc-au.iam.gserviceaccount.com` | Datastore User, Lumi Portal Auth Runtime | Storage Object User on the Firebase bucket; Lumi Service Account Signer on itself |
 | Audio validator | `lumi-audio-validator@lumi-ninc-au.iam.gserviceaccount.com` | None | Invoked only by the Functions runtime |
 
-Two default identities retain narrow non-runtime duties. The Compute default
-account is the configured Cloud Functions build worker and holds only Cloud
-Build Builder. Firebase Scheduler continues to authenticate as the App Engine
-default account, which has Run Invoker only on the 16 scheduled Function
-services. Neither default identity has application-data, secret or project-wide
-Editor access.
+The Compute default account retains one narrow non-runtime duty: it is the
+configured Cloud Functions build worker and holds only Cloud Build Builder.
+All Firebase Scheduler jobs authenticate as the dedicated Functions runtime,
+with Run Invoker granted only on the scheduled Function services. The App
+Engine default account has no application-data, secret, project-wide Editor or
+scheduled-service Run Invoker access.
 
 The signer role is self-bound: a portal/function may sign only as its own
 identity. It contains `signBlob` for custom tokens/signed URLs and
@@ -29,6 +29,9 @@ Every newly deployed Eventarc-triggered Function must receive a service-level
 `roles/run.invoker` binding for the Functions runtime. Do not replace these
 named service bindings with project-wide Run Invoker. The production capability
 canaries must exercise a new trigger before its migration is considered done.
+Run `infra/iam/audit-scheduler.sh` after any scheduled-Function deployment; it
+fails if a job drifts back to a default identity, a scheduled service loses the
+runtime invoker or the old App Engine identity regains an invoker grant.
 
 ## Migration and rollback
 

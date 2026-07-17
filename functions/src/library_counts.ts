@@ -21,6 +21,7 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions/v1";
 import {onDocumentWritten} from "firebase-functions/v2/firestore";
+import {errorCodeForLog} from "./log_safety";
 
 const UNRECOGNISED_BOOK_TITLE = "Unrecognised Book";
 
@@ -129,8 +130,7 @@ export const maintainLibraryCounts = onDocumentWritten(
         await seedLibraryCounts(schoolId);
       } catch (err) {
         functions.logger.error("seedLibraryCounts failed", {
-          schoolId,
-          error: err instanceof Error ? err.message : String(err),
+          errorCode: errorCodeForLog(err),
         });
       }
       return;
@@ -144,9 +144,7 @@ export const maintainLibraryCounts = onDocumentWritten(
       });
     } catch (err) {
       functions.logger.error("maintainLibraryCounts update failed", {
-        schoolId,
-        bookId: event.params.bookId,
-        error: err instanceof Error ? err.message : String(err),
+        errorCode: errorCodeForLog(err),
       });
       throw err;
     }

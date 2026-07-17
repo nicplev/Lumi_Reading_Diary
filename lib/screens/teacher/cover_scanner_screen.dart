@@ -115,6 +115,16 @@ CoverCaptureFailure coverCaptureFailureFor({
   );
 }
 
+@visibleForTesting
+String? bookMetadataLookupNotice({
+  required bool bookResolved,
+  required bool lookupUnavailable,
+}) {
+  if (bookResolved || !lookupUnavailable) return null;
+  return 'Book databases could not be reached. Enter the details manually '
+      'and Lumi can save this book.';
+}
+
 /// Multi-step screen for contributing books to the Community Book Database.
 ///
 /// Entry mode for the community book contribution flow.
@@ -218,6 +228,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
   bool _isLoadingMetadata = false;
   bool _bookAlreadyExists = false;
   BookModel? _resolvedLookupBook;
+  String? _lookupNotice;
   bool _isDecodableBook = false;
   bool _applyGrade = false;
   GradingSchemaDefinition? _selectedSchemaDef;
@@ -690,46 +701,59 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       _currentStep = _ScanStep.metadataReview;
       _bookAlreadyExists = false;
       _resolvedLookupBook = null;
+      _lookupNotice = null;
       _titleController.clear();
       _authorController.clear();
       _readingLevelController.clear();
     });
 
     // Check if already in community database.
-    final existing = await _communityService.lookupByIsbn(isbn);
+    BookModel? existing;
+    var lookupUnavailable = false;
+    try {
+      existing = await _communityService.lookupByIsbn(isbn);
+    } catch (_) {
+      lookupUnavailable = true;
+    }
     if (existing != null) {
+      final resolvedExisting = existing;
       await _materializeBookToSchoolLibrary(
         isbn: isbn,
-        book: existing,
+        book: resolvedExisting,
         source: 'community_books',
       );
       if (!mounted) {
         return _BookMetadataLookupOutcome(
-          book: existing,
+          book: resolvedExisting,
           existsInCommunity: true,
         );
       }
       setState(() {
         _bookAlreadyExists = true;
-        _resolvedLookupBook = existing;
-        _titleController.text = existing.title;
-        _authorController.text = existing.author ?? '';
-        _readingLevelController.text = existing.readingLevel ?? '';
+        _resolvedLookupBook = resolvedExisting;
+        _titleController.text = resolvedExisting.title;
+        _authorController.text = resolvedExisting.author ?? '';
+        _readingLevelController.text = resolvedExisting.readingLevel ?? '';
         _isLoadingMetadata = false;
         _isProcessingBarcode = false;
       });
       return _BookMetadataLookupOutcome(
-        book: existing,
+        book: resolvedExisting,
         existsInCommunity: true,
       );
     }
 
     // Try the full lookup chain for auto-fill.
-    final result = await _lookupService.lookupByIsbn(
-      isbn: isbn,
-      schoolId: widget.teacher.schoolId ?? '',
-      actorId: widget.teacher.id,
-    );
+    BookModel? result;
+    try {
+      result = await _lookupService.lookupByIsbn(
+        isbn: isbn,
+        schoolId: widget.teacher.schoolId ?? '',
+        actorId: widget.teacher.id,
+      );
+    } catch (_) {
+      lookupUnavailable = true;
+    }
 
     if (!mounted) {
       return _BookMetadataLookupOutcome(
@@ -747,6 +771,10 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       }
       _isLoadingMetadata = false;
       _isProcessingBarcode = false;
+      _lookupNotice = bookMetadataLookupNotice(
+        bookResolved: result != null,
+        lookupUnavailable: lookupUnavailable,
+      );
     });
     return _BookMetadataLookupOutcome(
       book: result,
@@ -1054,6 +1082,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
       _isLoadingMetadata = false;
       _bookAlreadyExists = false;
       _resolvedLookupBook = null;
+      _lookupNotice = null;
       _isDecodableBook = false;
       _applyGrade = false;
       _selectedSchemaDef = null;
@@ -1105,6 +1134,7 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                 _scannerController = MobileScannerController();
                 _bookAlreadyExists = false;
                 _resolvedLookupBook = null;
+                _lookupNotice = null;
                 _titleController.clear();
                 _authorController.clear();
                 _readingLevelController.clear();
@@ -1569,6 +1599,39 @@ class _CoverScannerScreenState extends State<CoverScannerScreen> {
                       'You can update its cover image.',
                       style: LumiType.caption.copyWith(
                         color: LumiTokens.blue,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          if (_lookupNotice != null) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: LumiTokens.orange.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: LumiTokens.orange.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.cloud_off_rounded,
+                    color: LumiTokens.orange,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _lookupNotice!,
+                      style: LumiType.caption.copyWith(
+                        color: LumiTokens.ink,
                       ),
                     ),
                   ),

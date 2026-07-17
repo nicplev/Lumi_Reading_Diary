@@ -57,6 +57,35 @@ void main() {
     });
   });
 
+  group('bookMetadataLookupNotice', () {
+    test('offers manual entry when every catalog is unreachable', () {
+      expect(
+        bookMetadataLookupNotice(
+          bookResolved: false,
+          lookupUnavailable: true,
+        ),
+        contains('Enter the details manually'),
+      );
+    });
+
+    test('does not show an outage notice for a genuine miss or a result', () {
+      expect(
+        bookMetadataLookupNotice(
+          bookResolved: false,
+          lookupUnavailable: false,
+        ),
+        isNull,
+      );
+      expect(
+        bookMetadataLookupNotice(
+          bookResolved: true,
+          lookupUnavailable: true,
+        ),
+        isNull,
+      );
+    });
+  });
+
   group('fullImageCoverCropRect', () {
     test('uses the full scanned image as the initial crop rectangle', () {
       const viewport = Rect.fromLTWH(0, 0, 390, 640);

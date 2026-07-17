@@ -205,6 +205,96 @@ test('parents: client cannot self-create a parent membership', async () => {
   );
 });
 
+test('cross-parent matrix: Parent A cannot access Parent B family records', async () => {
+  const future = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const now = new Date();
+  await seedData(async (db) => {
+    const school = db.collection('schools').doc('school_1');
+    await school.set({
+      name: 'Lumi School',
+      settings: {messaging: {enabled: true}},
+    });
+    await school.collection('parents').doc('parent_a').set({
+      role: 'parent', schoolId: 'school_1', linkedChildren: ['student_a'],
+    });
+    await school.collection('parents').doc('parent_b').set({
+      role: 'parent', schoolId: 'school_1', linkedChildren: ['student_b'],
+    });
+    await school.collection('students').doc('student_a').set({
+      schoolId: 'school_1', classId: 'class_1', parentIds: ['parent_a'],
+      firstName: 'Alpha', isActive: true,
+      access: {status: 'active', expiresAt: future},
+    });
+    await school.collection('students').doc('student_b').set({
+      schoolId: 'school_1', classId: 'class_1', parentIds: ['parent_b'],
+      firstName: 'Beta', isActive: true,
+      access: {status: 'active', expiresAt: future},
+    });
+    await school.collection('readingLogs').doc('log_a').set({
+      schoolId: 'school_1', classId: 'class_1', studentId: 'student_a',
+      parentId: 'parent_a', minutesRead: 10, targetMinutes: 20,
+      status: 'completed', bookTitles: ['Book A'], date: now, createdAt: now,
+      comprehensionAudioUploaded: true,
+    });
+    await school.collection('readingLogs').doc('log_b').set({
+      schoolId: 'school_1', classId: 'class_1', studentId: 'student_b',
+      parentId: 'parent_b', minutesRead: 10, targetMinutes: 20,
+      status: 'completed', bookTitles: ['Book B'], date: now, createdAt: now,
+      comprehensionAudioUploaded: true,
+    });
+    await school.collection('readingLogs').doc('log_a')
+      .collection('comments').doc('comment_a').set({
+        authorId: 'parent_a', authorRole: 'parent', authorName: 'Parent A',
+        body: 'Own family comment', createdAt: now,
+        studentId: 'student_a', parentId: 'parent_a',
+      });
+    await school.collection('readingLogs').doc('log_b')
+      .collection('comments').doc('comment_b').set({
+        authorId: 'parent_b', authorRole: 'parent', authorName: 'Parent B',
+        body: 'Other family comment', createdAt: now,
+        studentId: 'student_b', parentId: 'parent_b',
+      });
+  });
+
+  const db = authDb('parent_a');
+  const school = db.collection('schools').doc('school_1');
+
+  // Positive controls prove the seeded Parent-A relationship is usable.
+  await assertSucceeds(school.collection('parents').doc('parent_a').get());
+  await assertSucceeds(school.collection('students').doc('student_a').get());
+  await assertSucceeds(school.collection('readingLogs').doc('log_a').get());
+  await assertSucceeds(school.collection('readingLogs').doc('log_a')
+    .collection('comments').doc('comment_a').get());
+
+  // Direct reads of the other family are denied at every record boundary.
+  await assertFails(school.collection('parents').doc('parent_b').get());
+  await assertFails(school.collection('students').doc('student_b').get());
+  await assertFails(school.collection('readingLogs').doc('log_b').get());
+  await assertFails(school.collection('readingLogs').doc('log_b')
+    .collection('comments').doc('comment_b').get());
+
+  // Rules are not filters: a query explicitly targeting the other child and
+  // an unconstrained family-wide query both fail, while Parent A's scoped
+  // history query succeeds.
+  await assertSucceeds(school.collection('readingLogs')
+    .where('studentId', '==', 'student_a').get());
+  await assertFails(school.collection('readingLogs')
+    .where('studentId', '==', 'student_b').get());
+  await assertFails(school.collection('readingLogs').get());
+
+  // Parent A cannot mutate/delete Parent B's log or inject a comment into its
+  // thread, including audio-bearing logs whose playback is separately signed.
+  await assertFails(school.collection('readingLogs').doc('log_b')
+    .update({minutesRead: 15}));
+  await assertFails(school.collection('readingLogs').doc('log_b').delete());
+  await assertFails(school.collection('readingLogs').doc('log_b')
+    .collection('comments').doc('forged').set({
+      authorId: 'parent_a', authorRole: 'parent', authorName: 'Parent A',
+      body: 'Forged cross-family comment', createdAt: serverTimestamp(),
+      studentId: 'student_b', parentId: 'parent_b',
+    }));
+});
+
 test('parents self-create CANNOT pre-seed linkedChildren (cross-school PII grab)', async () => {
   await seedData(async (db) => {
     await db.collection('schools').doc('school_1').set({

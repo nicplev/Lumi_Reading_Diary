@@ -50,7 +50,7 @@ export const grantAccessOnStudentCreate = onDocumentCreated(
     // Already has an access map — nothing to do (idempotent).
     if (student.access) return;
 
-    const {schoolId, studentId} = event.params;
+    const {schoolId} = event.params;
 
     const schoolSnap = await db().collection("schools").doc(schoolId).get();
     if (!schoolSnap.exists) return;
@@ -80,9 +80,6 @@ export const grantAccessOnStudentCreate = onDocumentCreated(
       {merge: true},
     );
 
-    functions.logger.info(
-      `grantAccessOnStudentCreate: granted year ${year} access to ` +
-        `student ${studentId} at whole-school-paid school ${schoolId}.`,
-    );
+    functions.logger.info("grantAccessOnStudentCreate: access granted", {year});
   },
 );

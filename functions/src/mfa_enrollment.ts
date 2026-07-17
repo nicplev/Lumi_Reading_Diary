@@ -23,6 +23,7 @@
 
 import * as crypto from "crypto";
 import * as admin from "firebase-admin";
+import {errorCodeForLog} from "./log_safety";
 import * as functions from "firebase-functions/v1";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {linkParentToStudentCore, resolveLinkCodeSchool} from "./parent_linking";
@@ -517,9 +518,8 @@ export const enrollLinkedPhoneAsMfa = onCall(
           );
         }
         functions.logger.error("enrollLinkedPhoneAsMfa enroll failed", {
-          uid,
           code,
-          error: err instanceof Error ? err.message : String(err),
+          errorCode: errorCodeForLog(err),
         });
         throw new HttpsError(
           "internal",
@@ -532,7 +532,7 @@ export const enrollLinkedPhoneAsMfa = onCall(
           } catch (e) {
             functions.logger.error(
               "enrollLinkedPhoneAsMfa: failed to restore emailVerified=false",
-              {uid, error: e instanceof Error ? e.message : String(e)},
+              {errorCode: errorCodeForLog(e)},
             );
           }
         }
@@ -544,8 +544,7 @@ export const enrollLinkedPhoneAsMfa = onCall(
       await auth.updateUser(uid, {providersToUnlink: ["phone"]});
     } catch (err) {
       functions.logger.warn("enrollLinkedPhoneAsMfa unlink failed", {
-        uid,
-        error: err instanceof Error ? err.message : String(err),
+        errorCode: errorCodeForLog(err),
       });
     }
 
@@ -585,8 +584,7 @@ export const enrollLinkedPhoneAsMfa = onCall(
       customToken = await auth.createCustomToken(uid);
     } catch (err) {
       functions.logger.error("enrollLinkedPhoneAsMfa custom token failed", {
-        uid,
-        error: err instanceof Error ? err.message : String(err),
+        errorCode: errorCodeForLog(err),
       });
     }
 

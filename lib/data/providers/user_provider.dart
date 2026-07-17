@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/impersonation_session.dart';
+import '../../core/exceptions/session_exceptions.dart';
 import '../../core/services/impersonation_service.dart';
 import '../../services/firebase_service.dart';
 import '../models/user_model.dart';
@@ -103,7 +104,23 @@ Stream<UserModel?> _loadUserResilient(
   const maxAttempts = 5;
   const retryGap = Duration(milliseconds: 400);
   for (var attempt = 0; attempt < maxAttempts; attempt++) {
-    final user = await repository.getUser(uid);
+    UserModel? user;
+    try {
+      user = await repository.getUser(uid);
+    } on InvalidUserSessionException {
+      try {
+        await FirebaseService.instance.signOut();
+      } catch (_) {
+        // Firebase Auth sign-out is the essential last resort; the normal
+        // service path already made best-effort attempts to clear local data.
+        await FirebaseAuth.instance.signOut();
+      }
+      yield null;
+      return;
+    } on FirebaseException {
+      if (attempt == maxAttempts - 1) rethrow;
+      user = null;
+    }
     if (user != null) {
       yield user;
       return;

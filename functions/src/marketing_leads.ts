@@ -4,6 +4,7 @@ import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 import * as crypto from "crypto";
 import sgMail from "@sendgrid/mail";
+import {errorCodeForLog} from "./log_safety";
 
 const sendgridApiKey = defineSecret("SENDGRID_API_KEY");
 const sendgridSenderEmail = defineSecret("SENDGRID_SENDER_EMAIL");
@@ -208,7 +209,9 @@ export const submitDemoRequest = onCall(
       const ref = await admin.firestore().collection("schoolOnboarding").add(doc);
       return {id: ref.id};
     } catch (err) {
-      functions.logger.error("submitDemoRequest: Firestore write failed", {error: err});
+      functions.logger.error("submitDemoRequest: Firestore write failed", {
+        errorCode: errorCodeForLog(err),
+      });
       throw new HttpsError("internal", "Failed to submit request. Please try again.");
     }
   }
@@ -276,8 +279,9 @@ export const submitContactSalesInquiry = onCall(
       });
       return {success: true};
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      functions.logger.error("submitContactSalesInquiry: send failed", {error: errMsg});
+      functions.logger.error("submitContactSalesInquiry: send failed", {
+        errorCode: errorCodeForLog(err),
+      });
       throw new HttpsError("internal", "Failed to send your message. Please try again or email us directly.");
     }
   }

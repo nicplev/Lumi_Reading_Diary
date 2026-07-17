@@ -220,7 +220,7 @@ export async function runStateTermDatesFillPass(): Promise<{
     });
     filled++;
     functions.logger.info("termDates auto-filled from state dates", {
-      schoolId: schoolDoc.id, state, year, terms: plan.filledTerms,
+      state, year, terms: plan.filledTerms,
     });
   }
 
