@@ -9,6 +9,24 @@ import '../../services/diagnostics_preferences_service.dart';
 import '../../theme/lumi_tokens.dart';
 import '../../theme/lumi_typography.dart';
 
+String accountDeletionErrorMessage(AccountDeletionException error) {
+  if (error.requiresRecentLogin) {
+    return 'For your security, sign out and sign back in before deleting data.';
+  }
+  if (error.code == 'permission-denied') {
+    return 'You do not have permission to delete this data.';
+  }
+  if (error.code == 'unavailable' || error.code == 'deadline-exceeded') {
+    return 'The request may still be processing. Reopen this screen in a moment to check.';
+  }
+  if (error.code == 'internal' ||
+      error.message.trim().toUpperCase() == 'INTERNAL') {
+    return 'Lumi could not finish the deletion. Reopen this screen shortly '
+        'to check its status, then try again or contact support.';
+  }
+  return error.message;
+}
+
 class AccountScreen extends StatefulWidget {
   const AccountScreen({
     super.key,
@@ -172,16 +190,7 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   String _messageFor(AccountDeletionException error) {
-    if (error.requiresRecentLogin) {
-      return 'For your security, sign out and sign back in before deleting data.';
-    }
-    if (error.code == 'permission-denied') {
-      return 'You do not have permission to delete this data.';
-    }
-    if (error.code == 'unavailable' || error.code == 'deadline-exceeded') {
-      return 'The request may still be processing. Reopen this screen in a moment to check.';
-    }
-    return error.message;
+    return accountDeletionErrorMessage(error);
   }
 
   Future<bool> _showAccountConfirmation() async {
