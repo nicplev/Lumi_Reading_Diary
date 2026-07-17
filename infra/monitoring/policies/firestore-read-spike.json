@@ -1,0 +1,33 @@
+{
+  "displayName": "Lumi production: Firestore read-volume spike",
+  "combiner": "OR",
+  "enabled": true,
+  "conditions": [
+    {
+      "displayName": "More than 20,000 successful reads in one hour",
+      "conditionThreshold": {
+        "filter": "resource.type=\"firestore_instance\" AND metric.type=\"firestore.googleapis.com/document/read_count\"",
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 20000,
+        "duration": "0s",
+        "aggregations": [
+          {
+            "alignmentPeriod": "3600s",
+            "perSeriesAligner": "ALIGN_SUM",
+            "crossSeriesReducer": "REDUCE_SUM"
+          }
+        ],
+        "trigger": { "count": 1 }
+      }
+    }
+  ],
+  "notificationChannels": [
+    "projects/lumi-ninc-au/notificationChannels/6689107490351214266",
+    "projects/lumi-ninc-au/notificationChannels/11207813659675718192"
+  ],
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "Investigate unexpected query/listener fan-out, abusive clients, leaked credentials and missing query limits. The preceding 30-day maximum was 9,689 reads/hour."
+  },
+  "userLabels": { "service": "lumi", "severity": "medium", "signal": "cost" }
+}

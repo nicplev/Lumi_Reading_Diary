@@ -11,11 +11,12 @@ import {setGlobalOptions} from "firebase-functions/v2";
 // functions could silently fall back to Gen2's us-central1 default region).
 //
 // - region: matches the v1 functions (australia-southeast1 / Sydney).
-// - serviceAccount: PINNED to the App Engine default SA — the Gen1 runtime SA —
-//   so every existing IAM grant carries over unchanged (notably the
-//   getComprehensionAudioUrl signBlob grant + all Firestore/Storage perms),
-//   instead of Gen2's Compute Engine default SA.
+// - serviceAccount: a dedicated keyless runtime identity. Its narrow project
+//   and resource-level grants are documented under infra/iam. Never fall back
+//   to an Editor-bearing default service account. Cloud Build separately uses
+//   the Compute default identity with Cloud Build Builder only.
 setGlobalOptions({
   region: "australia-southeast1",
-  serviceAccount: "lumi-ninc-au@appspot.gserviceaccount.com",
+  serviceAccount:
+    "lumi-functions-runtime@lumi-ninc-au.iam.gserviceaccount.com",
 });

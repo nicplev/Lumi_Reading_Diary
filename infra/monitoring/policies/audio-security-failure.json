@@ -1,0 +1,26 @@
+{
+  "displayName": "Lumi production: comprehension audio security failure",
+  "combiner": "OR",
+  "enabled": true,
+  "conditions": [
+    {
+      "displayName": "Audio validation, retention, cleanup or signing failed",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"cloud_run_revision\" AND (jsonPayload.message=\"comprehensionAudio.retention.pathRejected\" OR jsonPayload.message=\"comprehensionAudio.retention.deleteFailed\" OR jsonPayload.message=\"comprehensionAudio.pendingCleanup.failed\" OR jsonPayload.message=\"comprehensionAudio.validator.failed\" OR jsonPayload.message=\"Comprehension audio validator unavailable\" OR jsonPayload.message=\"getComprehensionAudioUrl sign failed\" OR textPayload:\"comprehensionAudio.retention.pathRejected\" OR textPayload:\"comprehensionAudio.retention.deleteFailed\" OR textPayload:\"comprehensionAudio.pendingCleanup.failed\" OR textPayload:\"comprehensionAudio.validator.failed\" OR textPayload:\"Comprehension audio validator unavailable\" OR textPayload:\"getComprehensionAudioUrl sign failed\")"
+      }
+    }
+  ],
+  "notificationChannels": [
+    "projects/lumi-ninc-au/notificationChannels/6689107490351214266",
+    "projects/lumi-ninc-au/notificationChannels/11207813659675718192"
+  ],
+  "alertStrategy": {
+    "notificationRateLimit": { "period": "300s" },
+    "autoClose": "1800s"
+  },
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "Check the isolated validator, pending/canonical object generations, retention cleanup and signer IAM. Treat a rejected stored path as a security event. Do not download or share a real child's recording during triage unless strictly necessary and authorised."
+  },
+  "userLabels": { "service": "lumi", "severity": "high", "signal": "privacy" }
+}

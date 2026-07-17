@@ -93,7 +93,7 @@ class ServiceStatusSnapshot {
 
   /// Whether the snapshot's *observable* fields are equal. Latency-only
   /// changes are intentionally ignored so the stream doesn't emit on every
-  /// 30s probe.
+  /// 600s probe.
   bool semanticallyEquals(ServiceStatusSnapshot other) {
     return status == other.status &&
         deviceConnected == other.deviceConnected &&

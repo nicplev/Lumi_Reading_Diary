@@ -12,11 +12,11 @@
  * rule — once the app resolves an un-indexed user's school through here instead
  * of listing /schools, `allow list` on /schools can be set to `false`.
  *
- * For the authenticated caller it finds their staff (`users`) or `parents`
- * membership across all schools, backfills the email index so the fast path is
- * used next time, and returns the resolved school. It only writes the index —
- * it never mutates business data — and is scoped to the CALLER's own uid, so it
- * cannot be used to resolve anyone else's membership.
+ * For the authenticated caller it reads a server-owned UID index, verifies the
+ * authoritative membership and backfills the email index so the fast path is
+ * used next time. A bounded query over the existing top-level email/phone index
+ * supports accounts created before the UID index migration; membership
+ * subcollections are never scanned.
  */
 
 import * as functions from "firebase-functions/v1";
@@ -77,39 +77,87 @@ export const resolveUserSchoolByUid = onCall(
       (request.auth?.token as {email?: unknown} | undefined)?.email,
     );
 
-    // Find the caller's membership doc by uid. collectionGroup queries cannot
-    // filter by leaf document id, so scan the (small) membership collections
-    // and match on doc.id. This is a rare fallback — only when the email index
-    // is missing — and it backfills the index below so it is not repeated for
-    // this user. Switch to an indexed `where('email','==')` collection-group
-    // query if membership volume grows large.
-    for (const coll of ["users", "parents"] as const) {
-      const snap = await db.collectionGroup(coll).get();
-      const match = snap.docs.find((d) => d.id === uid);
-      if (!match) continue;
+    type Candidate = {schoolId: string; userType: "parent" | "user"};
+    let candidate: Candidate | null = null;
 
-      const schoolId = match.ref.parent.parent?.id;
-      if (!schoolId) continue;
+    const uidIndex = await db.doc(`userMembershipIndex/${uid}`).get();
+    const indexedSchoolId = optStr(uidIndex.data()?.schoolId);
+    const indexedType = uidIndex.data()?.userType;
+    if (
+      uidIndex.exists &&
+      indexedSchoolId &&
+      (indexedType === "parent" || indexedType === "user")
+    ) {
+      candidate = {schoolId: indexedSchoolId, userType: indexedType};
+    }
 
-      const userType = coll === "parents" ? "parent" : "user";
-      const email = tokenEmail ?? optStr(match.data().email);
-      if (email) {
-        await db
-          .collection("userSchoolIndex")
-          .doc(sha256Hex(email.toLowerCase()))
-          .set(
-            {
-              email: email.toLowerCase(),
-              schoolId,
-              userType,
-              userId: uid,
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            },
-            {merge: true},
-          );
+    if (!candidate) {
+      // Migration-only compatibility path. This is an indexed, bounded query
+      // over the small top-level lookup collection—not a collection-group scan.
+      const legacyIndexes = await db
+        .collection("userSchoolIndex")
+        .where("userId", "==", uid)
+        .limit(10)
+        .get();
+      const unique = new Map<string, Candidate>();
+      for (const doc of legacyIndexes.docs) {
+        const schoolId = optStr(doc.data().schoolId);
+        const userType = doc.data().userType;
+        if (
+          schoolId &&
+          (userType === "parent" || userType === "user")
+        ) {
+          unique.set(`${schoolId}:${userType}`, {schoolId, userType});
+        }
+      }
+      if (unique.size === 1) candidate = [...unique.values()][0];
+    }
+
+    if (candidate) {
+      const collection = candidate.userType === "parent" ? "parents" : "users";
+      const membership = await db
+        .doc(`schools/${candidate.schoolId}/${collection}/${uid}`)
+        .get();
+      if (membership.exists) {
+        await db.doc(`userMembershipIndex/${uid}`).set({
+          userId: uid,
+          schoolId: candidate.schoolId,
+          userType: candidate.userType,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        const email = tokenEmail ?? optStr(membership.data()?.email);
+        if (email) {
+          await db
+            .collection("userSchoolIndex")
+            .doc(sha256Hex(email.toLowerCase()))
+            .set(
+              {
+                email: email.toLowerCase(),
+                schoolId: candidate.schoolId,
+                userType: candidate.userType,
+                userId: uid,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              },
+              {merge: true},
+            );
+        }
+
+        return {...candidate, userId: uid};
       }
 
-      return {schoolId, userType, userId: uid};
+      // Remove a stale UID index only when it still points at this candidate.
+      if (uidIndex.exists) {
+        await db.runTransaction(async (transaction) => {
+          const fresh = await transaction.get(uidIndex.ref);
+          if (
+            fresh.data()?.schoolId === candidate?.schoolId &&
+            fresh.data()?.userType === candidate?.userType
+          ) {
+            transaction.delete(uidIndex.ref);
+          }
+        });
+      }
     }
 
     throw new functions.https.HttpsError(

@@ -28,7 +28,7 @@ class ServiceStatusController with WidgetsBindingObserver {
     Connectivity? connectivity,
     FirebaseFirestore? firestore,
     http.Client? httpClient,
-    // 180s: the steady-state heartbeat is deliberately slow — every tick is
+    // 600s: the steady-state heartbeat is deliberately slow — every tick is
     // a billed server-source Firestore read PER FOREGROUND USER (the old 30s
     // cadence cost ~120 reads/hr/user across the fleet). Fast detection
     // comes from the event-driven probes instead: connectivity changes, app
@@ -37,7 +37,7 @@ class ServiceStatusController with WidgetsBindingObserver {
     // event surfaces. The offline queue makes a stale status safe: writes
     // gated by a stale-healthy status still fail into the queue, and a
     // stale-degraded status just queues writes that drain minutes later.
-    Duration periodicInterval = const Duration(seconds: 180),
+    Duration periodicInterval = const Duration(seconds: 600),
     Duration debounce = const Duration(milliseconds: 500),
     Duration minProbeInterval = const Duration(seconds: 5),
     Duration probeTimeout = const Duration(seconds: 3),
@@ -127,7 +127,7 @@ class ServiceStatusController with WidgetsBindingObserver {
   /// otherwise) completes. Used to (a) widen the L3 timeout so a warming
   /// Firestore SDK doesn't get falsely flagged, and (b) schedule a fast
   /// re-probe after a suppressed unknown→unhealthy emission so we confirm
-  /// or clear the verdict within seconds rather than waiting 30s for the
+  /// or clear the verdict within seconds rather than waiting 600s for the
   /// next periodic tick.
   bool _coldStart = true;
   Timer? _coldStartRetryTimer;
@@ -387,7 +387,7 @@ class ServiceStatusController with WidgetsBindingObserver {
     if (goingUnhealthy && (fromHealthyAndProbeBased || fromUnknown)) {
       _consecutiveUnhealthyProbes += 1;
       if (_consecutiveUnhealthyProbes < 2) {
-        // Periodic probes are 30s apart, so without intervention the user
+        // Periodic probes are 600s apart, so without intervention the user
         // waits the full interval before we get the confirming verdict —
         // long enough for a slow first probe to flash the banner. Run the
         // confirming probe within seconds instead.

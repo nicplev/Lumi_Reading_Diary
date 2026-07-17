@@ -1,0 +1,33 @@
+{
+  "displayName": "Lumi production: Firebase Storage footprint spike",
+  "combiner": "OR",
+  "enabled": true,
+  "conditions": [
+    {
+      "displayName": "User-content bucket exceeds 250 MiB",
+      "conditionThreshold": {
+        "filter": "resource.type=\"gcs_bucket\" AND resource.labels.bucket_name=\"lumi-ninc-au.firebasestorage.app\" AND metric.type=\"storage.googleapis.com/storage/total_bytes\"",
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 262144000,
+        "duration": "0s",
+        "aggregations": [
+          {
+            "alignmentPeriod": "86400s",
+            "perSeriesAligner": "ALIGN_MAX",
+            "crossSeriesReducer": "REDUCE_SUM"
+          }
+        ],
+        "trigger": { "count": 1 }
+      }
+    }
+  ],
+  "notificationChannels": [
+    "projects/lumi-ninc-au/notificationChannels/6689107490351214266",
+    "projects/lumi-ninc-au/notificationChannels/11207813659675718192"
+  ],
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "Investigate upload abuse, retention failures and orphaned objects. This metric is sampled daily and is scoped only to the Firebase user-content bucket. The preceding footprint was about 2.8 MB."
+  },
+  "userLabels": { "service": "lumi", "severity": "medium", "signal": "storage" }
+}

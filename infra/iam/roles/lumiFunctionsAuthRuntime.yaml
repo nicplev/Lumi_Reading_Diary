@@ -1,0 +1,9 @@
+title: Lumi Functions Auth Runtime
+description: Minimum Firebase Authentication permissions used by Lumi Cloud Functions.
+stage: GA
+includedPermissions:
+  - firebase.projects.get
+  - firebaseauth.users.delete
+  - firebaseauth.users.get
+  - firebaseauth.users.update
+  - resourcemanager.projects.get

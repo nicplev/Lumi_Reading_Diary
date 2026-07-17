@@ -9,6 +9,6 @@
   },
   "sideEffects": false,
   "peerDependencies": {
-    "firebase-admin": "^13.0.0"
+    "firebase-admin": "^13.10.0"
   }
 }

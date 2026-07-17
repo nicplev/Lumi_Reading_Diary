@@ -1,0 +1,11 @@
+title: Lumi Portal Auth Runtime
+description: Minimum Firebase Authentication permissions used by the school and super-admin portals.
+stage: GA
+includedPermissions:
+  - firebase.projects.get
+  - firebaseauth.users.create
+  - firebaseauth.users.delete
+  - firebaseauth.users.get
+  - firebaseauth.users.sendEmail
+  - firebaseauth.users.update
+  - resourcemanager.projects.get
