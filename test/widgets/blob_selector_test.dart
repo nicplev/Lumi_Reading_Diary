@@ -131,5 +131,23 @@ void main() {
       // aren't available in test, but the widget still renders)
       expect(find.byType(Image), findsNWidgets(5));
     });
+
+    testWidgets('fits all choices on a narrow Android-sized screen',
+        (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(wrapWidget(
+        BlobSelector(
+          onFeelingSelected: (_) {},
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Great!'), findsOneWidget);
+    });
   });
 }

@@ -31,7 +31,6 @@ import '../../screens/auth/admin_use_web_portal_screen.dart';
 import '../../screens/parent/parent_home_screen.dart';
 import '../../screens/parent/log_reading_screen.dart';
 import '../../screens/parent/access_locked_screen.dart';
-import '../../screens/parent/reading_history_screen.dart';
 import '../../screens/parent/student_goals_screen.dart';
 import '../../screens/parent/achievements_screen.dart';
 import '../../screens/parent/progress_screen.dart';
@@ -417,22 +416,6 @@ class AppRouter {
             parent: parent,
             student: student,
             allocations: allocations,
-          );
-        },
-      ),
-
-      GoRoute(
-        path: '/parent/reading-history',
-        name: 'reading-history',
-        builder: (context, state) {
-          final params = state.extra as Map<String, dynamic>?;
-          final student = params?['student'] as StudentModel?;
-          if (student == null) return const LoginScreen();
-          return ReadingHistoryScreen(
-            studentId: student.id,
-            parentId:
-                student.parentIds.isNotEmpty ? student.parentIds.first : '',
-            schoolId: student.schoolId,
           );
         },
       ),

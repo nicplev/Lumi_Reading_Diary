@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -23,6 +24,7 @@ class LumiTourStep {
     this.tip,
     this.tabIndex,
     this.spotlightTarget = true,
+    this.iosOnly = false,
   });
 
   final String id;
@@ -34,6 +36,7 @@ class LumiTourStep {
   final Color accent;
   final int? tabIndex;
   final bool spotlightTarget;
+  final bool iosOnly;
 }
 
 class LumiTourDefinition {
@@ -48,6 +51,23 @@ class LumiTourDefinition {
   final LumiTourRole role;
   final int version;
   final List<LumiTourStep> steps;
+}
+
+@visibleForTesting
+List<LumiTourStep> availableLumiTourSteps(
+  LumiTourDefinition definition, {
+  bool? isWeb,
+  TargetPlatform? platform,
+}) {
+  final effectiveIsWeb = isWeb ?? kIsWeb;
+  final effectivePlatform = platform ?? defaultTargetPlatform;
+  return definition.steps
+      .where(
+        (step) =>
+            !step.iosOnly ||
+            (!effectiveIsWeb && effectivePlatform == TargetPlatform.iOS),
+      )
+      .toList(growable: false);
 }
 
 class LumiTourDefinitions {
@@ -128,6 +148,7 @@ class LumiTourDefinitions {
         icon: Icons.widgets_rounded,
         accent: LumiTokens.blue,
         spotlightTarget: false,
+        iosOnly: true,
       ),
     ],
   );
@@ -249,6 +270,7 @@ class LumiTourDefinitions {
         icon: Icons.widgets_rounded,
         accent: LumiTokens.blue,
         spotlightTarget: false,
+        iosOnly: true,
       ),
     ],
   );
@@ -289,6 +311,7 @@ class LumiTourController extends ChangeNotifier {
   final Map<String, GlobalKey> _targets = {};
 
   LumiTourDefinition? _definition;
+  List<LumiTourStep> _activeSteps = const [];
   String? _userId;
   LumiTourStepChanged? _onStepChanged;
   int _currentIndex = 0;
@@ -303,13 +326,13 @@ class LumiTourController extends ChangeNotifier {
 
   LumiTourStep? get currentStep {
     final definition = _definition;
-    if (definition == null || _currentIndex >= definition.steps.length) {
+    if (definition == null || _currentIndex >= _activeSteps.length) {
       return null;
     }
-    return definition.steps[_currentIndex];
+    return _activeSteps[_currentIndex];
   }
 
-  int get totalSteps => _definition?.steps.length ?? 0;
+  int get totalSteps => _activeSteps.length;
   bool get isFirstStep => _currentIndex == 0;
   bool get isLastStep => _currentIndex == totalSteps - 1;
 
@@ -329,6 +352,7 @@ class LumiTourController extends ChangeNotifier {
     }
 
     _definition = definition;
+    _activeSteps = availableLumiTourSteps(definition);
     _userId = userId;
     _onStepChanged = onStepChanged;
     _currentIndex = 0;
@@ -362,6 +386,7 @@ class LumiTourController extends ChangeNotifier {
       await _service.markCompleted(definition: definition, userId: userId);
     }
     _definition = null;
+    _activeSteps = const [];
     _userId = null;
     _onStepChanged = null;
     _currentIndex = 0;

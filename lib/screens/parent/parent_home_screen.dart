@@ -207,6 +207,12 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     context.push('/parent/log-reading');
   }
 
+  Future<void> _showReadingHistoryFor(StudentModel student) async {
+    await ref.read(activeChildIdProvider.notifier).select(student.id);
+    if (!mounted || _selectedIndex == 1) return;
+    setState(() => _selectedIndex = 1);
+  }
+
   void _scheduleFirstLoginCharacterPrompt(List<StudentModel> children) {
     if (_characterPromptScheduled || !widget.promptForCharacterOnEntry) return;
 
@@ -852,6 +858,9 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                       quickLoggingEnabled:
                           quickLoggingBySchoolId[children.first.schoolId] ??
                               true,
+                      onViewHistory: () => unawaited(
+                        _showReadingHistoryFor(children.first),
+                      ),
                     ).animate().fadeIn().scale(),
                   )
                 else
@@ -930,6 +939,7 @@ class _TodayCard extends StatefulWidget {
   final bool hasLoggedToday;
   final List<ReadingLogModel> todayLogs;
   final bool quickLoggingEnabled;
+  final VoidCallback onViewHistory;
 
   /// Opens the full detail wizard.
   final VoidCallback? onTap;
@@ -942,6 +952,7 @@ class _TodayCard extends StatefulWidget {
     required this.hasLoggedToday,
     this.todayLogs = const [],
     required this.quickLoggingEnabled,
+    required this.onViewHistory,
     this.onTap,
   });
 
@@ -987,10 +998,6 @@ class _TodayCardState extends State<_TodayCard> {
   }
 
   String get _quickLogLabel => 'Quick log $_targetMinutes min';
-
-  void _openReadingHistory() {
-    context.push('/parent/reading-history', extra: {'student': student});
-  }
 
   /// Records a default reading log for today in a single tap (Rec 1).
   Future<void> _handleQuickLog() async {
@@ -1054,7 +1061,7 @@ class _TodayCardState extends State<_TodayCard> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: hasLoggedToday ? _openReadingHistory : onTap,
+      onTap: hasLoggedToday ? widget.onViewHistory : onTap,
       child: LumiCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1220,7 +1227,7 @@ class _TodayCardState extends State<_TodayCard> {
               SizedBox(
                 width: double.infinity,
                 child: LumiPrimaryButton(
-                  onPressed: _openReadingHistory,
+                  onPressed: widget.onViewHistory,
                   text: 'View reading history',
                   icon: Icons.history_rounded,
                   color: LumiTokens.red,
@@ -1314,11 +1321,13 @@ class _ChildTodayCard extends StatefulWidget {
   final StudentModel student;
   final UserModel parent;
   final bool quickLoggingEnabled;
+  final VoidCallback onViewHistory;
 
   const _ChildTodayCard({
     required this.student,
     required this.parent,
     required this.quickLoggingEnabled,
+    required this.onViewHistory,
   });
 
   @override
@@ -1414,6 +1423,7 @@ class _ChildTodayCardState extends State<_ChildTodayCard> {
               hasLoggedToday: hasLoggedToday,
               todayLogs: todayLogs,
               quickLoggingEnabled: widget.quickLoggingEnabled,
+              onViewHistory: widget.onViewHistory,
               onTap: () {
                 NavigationStateService().setTempData({
                   'parent': widget.parent,
