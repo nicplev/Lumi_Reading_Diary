@@ -74,6 +74,16 @@ Future<void> pumpAccount(
 }
 
 void main() {
+  test('internal deletion failures use actionable copy', () {
+    final message = accountDeletionErrorMessage(
+      const AccountDeletionException('internal', 'INTERNAL'),
+    );
+
+    expect(message, isNot(contains('INTERNAL')));
+    expect(message, contains('could not finish'));
+    expect(message, contains('check its status'));
+  });
+
   testWidgets('parent sees account deletion but not student deletion',
       (tester) async {
     await pumpAccount(tester, UserRole.parent);

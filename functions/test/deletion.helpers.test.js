@@ -1,5 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const admin = require('firebase-admin');
 
 const {
@@ -65,4 +67,62 @@ test('due-state logic handles schedules, retries, leases and terminal states', (
   assert.equal(isDeletionJobDue({ ...base, status: 'processing', leaseExpiresAt: timestamp(now + 1), attemptCount: 2 }, now), false);
   assert.equal(isDeletionJobDue({ ...base, status: 'completed' }, now), false);
   assert.equal(isDeletionJobDue({ ...base, status: 'failed', nextAttemptAt: timestamp(now - 1), attemptCount: 5 }, now), false);
+});
+
+test('production indexes support cross-school student notification cleanup', () => {
+  const config = JSON.parse(fs.readFileSync(
+    path.resolve(__dirname, '..', '..', 'firestore.indexes.json'),
+    'utf8',
+  ));
+  const override = config.fieldOverrides.find((entry) =>
+    entry.collectionGroup === 'notifications' &&
+    entry.fieldPath === 'studentIds'
+  );
+
+  assert.ok(override, 'notifications.studentIds field override is required');
+  assert.ok(override.indexes.some((index) =>
+    index.order === 'ASCENDING' &&
+    index.queryScope === 'COLLECTION'
+  ));
+  assert.ok(override.indexes.some((index) =>
+    index.order === 'DESCENDING' &&
+    index.queryScope === 'COLLECTION'
+  ));
+  assert.ok(override.indexes.some((index) =>
+    index.arrayConfig === 'CONTAINS' &&
+    index.queryScope === 'COLLECTION'
+  ));
+  assert.ok(override.indexes.some((index) =>
+    index.arrayConfig === 'CONTAINS' &&
+    index.queryScope === 'COLLECTION_GROUP'
+  ));
+});
+
+test('checked-in index config preserves live rate-limit TTL policies', () => {
+  const config = JSON.parse(fs.readFileSync(
+    path.resolve(__dirname, '..', '..', 'firestore.indexes.json'),
+    'utf8',
+  ));
+
+  for (const collectionGroup of [
+    'publicCodeVerificationRateLimits',
+    'schoolCodeRedemptions',
+  ]) {
+    const override = config.fieldOverrides.find((entry) =>
+      entry.collectionGroup === collectionGroup &&
+      entry.fieldPath === 'expiresAt'
+    );
+    assert.ok(override, `${collectionGroup}.expiresAt override is required`);
+    assert.equal(override.ttl, true);
+    assert.ok(override.indexes.some((index) =>
+      index.order === 'ASCENDING' && index.queryScope === 'COLLECTION'
+    ));
+    assert.ok(override.indexes.some((index) =>
+      index.order === 'DESCENDING' && index.queryScope === 'COLLECTION'
+    ));
+    assert.ok(override.indexes.some((index) =>
+      index.arrayConfig === 'CONTAINS' &&
+      index.queryScope === 'COLLECTION'
+    ));
+  }
 });
