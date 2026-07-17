@@ -15,6 +15,7 @@ on:
       - 'firebase.json'
       - '.firebaserc'
       - '.github/workflows/admin-deploy.yml'
+      - 'infra/iam/audit-admin-build-identity.sh'
       - 'scripts/security/disable-admin-firebase-framework-auth-bridge.sh'
   workflow_dispatch: {}
 
@@ -34,7 +35,7 @@ jobs:
     env:
       FIREBASE_CLI_EXPERIMENTS: webframeworks
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Keyless Google authentication. The provider condition accepts only
       # this repository's main branch, and the service-account IAM binding is
@@ -49,11 +50,14 @@ jobs:
 
       # pnpm version is sourced from the root package.json `packageManager`
       # field; passing `version:` here conflicts with it.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      # The framework adapter derives the Cloud Functions runtime from this
+      # Node major. Node 20 is deprecated for deployment and scheduled for
+      # decommission; the production-equivalent Node 24 dry run passes.
+      - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: pnpm
 
       - name: Install workspace
@@ -119,6 +123,13 @@ jobs:
             echo "NEXT_PUBLIC_FIREBASE_API_KEY=${NEXT_PUBLIC_FIREBASE_API_KEY}"
             echo "NEXT_PUBLIC_FIREBASE_APP_ID=${NEXT_PUBLIC_FIREBASE_APP_ID}"
           } > admin/.env.production
+
+      # The framework deploy has two identities: Cloud Build compiles the
+      # package, while the resulting portal handles live requests. Refuse to
+      # deploy if either drifts back to a default account, or if the build-only
+      # identity gains project-data, runtime-secret or key-based access.
+      - name: Verify dedicated admin build and runtime identities
+        run: ./infra/iam/audit-admin-build-identity.sh
 
       - name: Deploy to Firebase Hosting (admin)
         # @tremor/react@3 peer-requires react@^18 but admin uses react@19.

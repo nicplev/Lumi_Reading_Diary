@@ -11,10 +11,15 @@ identities deliberately have no JSON keys and must not receive primitive
 | Cloud Functions | `lumi-functions-runtime@lumi-ninc-au.iam.gserviceaccount.com` | Datastore User, App Check Token Verifier, Eventarc Event Receiver, Lumi Functions Auth Runtime, Lumi FCM Sender | Storage Object User on the Firebase bucket; Secret Accessor on the two SendGrid secrets; Lumi Service Account Signer on itself; Run Invoker on the isolated audio validator and each event-triggered Function service |
 | School portal | `lumi-school-portal-runtime@lumi-ninc-au.iam.gserviceaccount.com` | Datastore User, Lumi Portal Auth Runtime | Storage Object User on the Firebase bucket |
 | Super-admin portal | `lumi-super-admin-runtime@lumi-ninc-au.iam.gserviceaccount.com` | Datastore User, Lumi Portal Auth Runtime | Storage Object User on the Firebase bucket; Lumi Service Account Signer on itself |
+| Super-admin build | `lumi-admin-build@lumi-ninc-au.iam.gserviceaccount.com` | Logs Writer only | Artifact Registry Writer on the Sydney `gcf-artifacts` repository; Storage Object Viewer on the Sydney Functions source bucket |
 | Audio validator | `lumi-audio-validator@lumi-ninc-au.iam.gserviceaccount.com` | None | Invoked only by the Functions runtime |
 
-The Compute default account retains one narrow non-runtime duty: it is the
-configured Cloud Functions build worker and holds only Cloud Build Builder.
+The Compute default account retains one narrow non-runtime duty for the ordinary
+application Functions: it is their configured build worker and holds only Cloud
+Build Builder. The super-admin portal no longer uses it. Its dedicated, keyless
+build identity cannot read Firestore/Auth data or the runtime session secret;
+the GitHub deploy identity can only attach it to the build, and Google's Cloud
+Build service agent can mint its short-lived build token.
 All Firebase Scheduler jobs authenticate as the dedicated Functions runtime,
 with Run Invoker granted only on the scheduled Function services. The App
 Engine default account has no application-data, secret, project-wide Editor or
@@ -32,6 +37,12 @@ canaries must exercise a new trigger before its migration is considered done.
 Run `infra/iam/audit-scheduler.sh` after any scheduled-Function deployment; it
 fails if a job drifts back to a default identity, a scheduled service loses the
 runtime invoker or the old App Engine identity regains an invoker grant.
+The admin deployment runs `infra/iam/audit-admin-build-identity.sh` before every
+build and fails closed if either portal identity drifts, the build identity gains
+project-data/secret access, or a user-managed key appears. Its GitHub identity
+has the custom Lumi Admin Deploy Auditor role, which can read only the IAM
+policies and service-account key metadata needed for that guard; it cannot read
+secret payloads or change IAM.
 
 ## Migration and rollback
 
